@@ -16,14 +16,14 @@ ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-460_460.39-0ubuntu0.18.04.1_amd64.deb"
 ARG NVIDIA_COMMON_DEB="libnvidia-common-460_460.39-0ubuntu0.18.04.1_all.deb"
 
 
-FROM gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 AS fetch-nvidia
+FROM gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 AS fetch-nvidia
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
 
 WORKDIR /fetch-nvidia
 RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMMON_DEB}"
-RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_GL_DEB?}"
+RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_GL_DEB}"
 RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMPUTE_DEB}"
 
 
@@ -36,7 +36,7 @@ RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMPUTE_D
 #      does not support Ubuntu 18.04.
 # This allows to share configuration with base CMake, but it also means we need
 # to MATCH the driver version between the host machine and the docker image.
-FROM gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 AS final
+FROM gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 AS final
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
@@ -47,9 +47,9 @@ COPY --from=fetch-nvidia \
   "/fetch-nvidia/${NVIDIA_COMPUTE_DEB}" \
   /tmp/
 
-RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB?}" \
-  "/tmp/${NVIDIA_GL_DEB?}" \
-  "/tmp/${NVIDIA_COMPUTE_DEB?}"
+RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB}" \
+  "/tmp/${NVIDIA_GL_DEB}" \
+  "/tmp/${NVIDIA_COMPUTE_DEB}"
 
 # install cuda sdk
 RUN wget https://developer.download.nvidia.com/compute/cuda/11.6.0/local_installers/cuda-repo-debian11-11-6-local_11.6.0-510.39.01-1_amd64.deb \

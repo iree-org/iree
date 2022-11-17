@@ -17,6 +17,8 @@
 # Refer to: https://github.com/pypa/manylinux
 FROM quay.io/pypa/manylinux2014_x86_64@sha256:9b463efac479efbcab6dec77eca28c5cfa0c5ef64f13ac184eb7117dc1f8edda
 
+SHELL ["/bin/bash", "-e", "-u", "-o", "pipefail", "-c"]
+
 USER root
 
 ######## Pre-requisite packages ########
@@ -30,13 +32,11 @@ RUN yum install -y \
   capstone-devel libzstd-devel
 
 ######## Bazel ########
-# Bazel requires Java.
-ARG BAZEL_VERSION=5.1.0
-RUN curl -fsSL \
-  https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 \
-  -o /usr/local/bin/bazel \
-  && chmod a+x /usr/local/bin/bazel \
-  && /usr/local/bin/bazel --version
+WORKDIR /install-bazel
+COPY build_tools/docker/context/install_bazel.sh .bazelversion ./
+RUN ./install_bazel.sh && rm -rf /install-bazel
+
+##############
 
 # See: https://github.com/bazelbuild/bazel/issues/10327
 # Note also that many things that link fine on newer OS's seem to fail based
@@ -57,6 +57,6 @@ ARG AMDGPU_VERSION=22.20.1
 
 # Install the ROCm rpms
 RUN yum clean all \
-  && echo -e "[ROCm]\nname=ROCm\nbaseurl=https://repo.radeon.com/rocm/yum/$ROCM_VERSION/main\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/rocm.repo \
-  && echo -e "[amdgpu]\nname=amdgpu\nbaseurl=https://repo.radeon.com/amdgpu/$AMDGPU_VERSION/rhel/7.9/main/x86_64\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/amdgpu.repo \
+  && echo -e "[ROCm]\nname=ROCm\nbaseurl=https://repo.radeon.com/rocm/yum/${ROCM_VERSION}/main\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/rocm.repo \
+  && echo -e "[amdgpu]\nname=amdgpu\nbaseurl=https://repo.radeon.com/amdgpu/${AMDGPU_VERSION}/rhel/7.9/main/x86_64\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/amdgpu.repo \
   && yum install -y rocm-dev

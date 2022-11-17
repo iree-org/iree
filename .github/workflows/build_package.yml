@@ -62,7 +62,7 @@ jobs:
             build-package: py-runtime-pkg
             experimental: true
     env:
-      MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:cb77ecaedee1987bc38dc5393f6570566c4c4c89697255158ebce3b073e11ca0
+      MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:b3b096e4b96746c3ae4cc52e880000d91038e79441334a7cfce9914cbbec1312
 
     steps:
       - uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2

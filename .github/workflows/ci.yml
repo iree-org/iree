@@ -117,7 +117,7 @@ jobs:
       - name: "Building IREE"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
+            gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
       # The archive step below doesn't include these files. Remove them first to
@@ -200,14 +200,10 @@ jobs:
       - name: "Building with Bazel"
         env:
           IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ needs.setup.outputs.write-caches }}
-        # This doesn't really need everything in the frontends image, but we
-        # want the cache to be shared with the integrations build (no point
-        # building LLVM twice) and the cache key is the docker container it's
-        # run in (to ensure correct cache hits).
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:1e9adddc2823b4ba6492b07a271e76b6e2cf50f8aca1164bdbb9b8809ee6c338 \
+            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:50301f9ccc0bf63c4d498c225444cc5585218612d15b83d06e4f4672ab2dfc03 \
             ./build_tools/bazel/build_core.sh
 
   test_all:
@@ -236,7 +232,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_CUDA_DISABLE=1 \
-            gcr.io/iree-oss/swiftshader@sha256:e36550924e269fedd68b638cce9bd389b6bda58afeaac68b3146dbb6e9a91d35 \
+            gcr.io/iree-oss/swiftshader@sha256:484720d57fa816280d9a7455d16e1f9f3d90cc3efdb744646016503ea5ab2b30 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
@@ -274,7 +270,7 @@ jobs:
             --env CTEST_PARALLEL_LEVEL=2 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
-            gcr.io/iree-oss/nvidia@sha256:c26464423e6878f52a6d7705d5cd9ef0ac878699ef380f109793172159d9749b \
+            gcr.io/iree-oss/nvidia@sha256:74867181ab29bc890775bf3e2da717225431eaa022422e2dc865dc04d37289a4 \
             bash -euo pipefail -c \
               "./build_tools/scripts/check_cuda.sh
               ./build_tools/scripts/check_vulkan.sh
@@ -297,14 +293,14 @@ jobs:
       - name: "Building runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
+            gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 \
             ./build_tools/cmake/build_runtime.sh \
             "${BUILD_DIR}"
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VULKAN_DISABLE=1 \
-            gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
+            gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
@@ -360,7 +356,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
             --env "IREE_TF_BINARIES_OUTPUT_DIR=${IREE_TF_BINARIES_OUTPUT_DIR}" \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:1e9adddc2823b4ba6492b07a271e76b6e2cf50f8aca1164bdbb9b8809ee6c338 \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:1de463291cfb337089ae4c3beead3c382ea64e53502f57e35457944b6ae152cd \
             build_tools/cmake/build_tf_binaries.sh
           echo "::set-output name=binaries-dir::${IREE_TF_BINARIES_OUTPUT_DIR}"
       - name: "Creating archive of binaries"
@@ -415,7 +411,7 @@ jobs:
       - name: "Running TF integrations tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:1e9adddc2823b4ba6492b07a271e76b6e2cf50f8aca1164bdbb9b8809ee6c338 \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:1de463291cfb337089ae4c3beead3c382ea64e53502f57e35457944b6ae152cd \
             build_tools/cmake/run_tf_tests.sh \
             "${BUILD_DIR}"
 
@@ -457,7 +453,7 @@ jobs:
             --env IREE_LLVM_CPU_DISABLE=1 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
-            gcr.io/iree-oss/frontends-nvidia@sha256:8c724d50a9f4ed2acfa2b137720acb6c83a95351c20b5c930ba3e56d603a1312 \
+            gcr.io/iree-oss/frontends-nvidia@sha256:f9256c8f752179c72fe4fafaeac5d31c3b63ec30c8c35a5ab2c5ae4d0db1a631 \
             bash -euo pipefail -c \
               "./build_tools/scripts/check_cuda.sh
               ./build_tools/scripts/check_vulkan.sh
@@ -544,7 +540,7 @@ jobs:
           # This gives us access to the latest features and validates that IREE
           # builds using the latest versions.
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:d335b0885871356ebe697a8f3eac7ce7cbc3d84a458652e7cd95291a0aecfead \
+            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:50301f9ccc0bf63c4d498c225444cc5585218612d15b83d06e4f4672ab2dfc03 \
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:
@@ -564,7 +560,7 @@ jobs:
       - name: "Building and testing with ThreadSanitizer"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
+            gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 \
             ./build_tools/cmake/build_and_test_tsan.sh
 
   benchmarks:
@@ -604,22 +600,22 @@ jobs:
           - platform: android
             architecture: arm64-v8a
             abi: arm64-v8a
-            docker_image: "gcr.io/iree-oss/android@sha256:99a14dfc482dded1f03460b0ff0a818ecc22688a018a2ccee24c5f21baf09e7b"
+            docker_image: "gcr.io/iree-oss/android@sha256:740f87664b2f4d9288549c95d4d355d5b4a543d55257dcff0308b0c2920bd229"
             test_script: "echo 'bypass tests'"
           - platform: riscv
             architecture: rv64
             abi: lp64d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:cd2ee29950737f44b5ec54a32c37746e951fc74ef29a586e6d2559b113cdbb69"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:e11710158fd09a04ae7accc275a38c95cd59f83fd15a0630a083eb5623807451"
             test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: riscv
             architecture: rv32-linux
             abi: ilp32d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:cd2ee29950737f44b5ec54a32c37746e951fc74ef29a586e6d2559b113cdbb69"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:e11710158fd09a04ae7accc275a38c95cd59f83fd15a0630a083eb5623807451"
             test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: riscv
             architecture: rv32-baremetal
             abi: ilp32
-            docker_image: "gcr.io/iree-oss/riscv@sha256:cd2ee29950737f44b5ec54a32c37746e951fc74ef29a586e6d2559b113cdbb69"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:e11710158fd09a04ae7accc275a38c95cd59f83fd15a0630a083eb5623807451"
             test_script: "./tests/riscv32/smoke.sh"
     env:
       PLATFORM: ${{ matrix.target.platform }}
@@ -685,7 +681,7 @@ jobs:
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            gcr.io/iree-oss/emscripten@sha256:b576c4c695143a089066fe753259e9ec3c003658a85b40bf1a09236abc653ed6 \
+            gcr.io/iree-oss/emscripten@sha256:6e75298c786a5a7d0a076578a210527bcc753d0a228c635ad3b75efd5421632a \
             build_tools/cmake/build_runtime_emscripten.sh
 
   # TODO(#10391): Update the benchmark dependency with the new benchmark
@@ -705,15 +701,15 @@ jobs:
         target:
           - platform: riscv
             architecture: rv64
-            docker_image: "gcr.io/iree-oss/riscv@sha256:cd2ee29950737f44b5ec54a32c37746e951fc74ef29a586e6d2559b113cdbb69"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:e11710158fd09a04ae7accc275a38c95cd59f83fd15a0630a083eb5623807451"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
           - platform: riscv
             architecture: rv32-linux
-            docker_image: "gcr.io/iree-oss/riscv@sha256:cd2ee29950737f44b5ec54a32c37746e951fc74ef29a586e6d2559b113cdbb69"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:e11710158fd09a04ae7accc275a38c95cd59f83fd15a0630a083eb5623807451"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
           - platform: host
             architecture: x86_64
-            docker_image: "gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117"
+            docker_image: "gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4"
             run_scripts: "./build_tools/cmake/test_benchmark_suites_host.sh"
     env:
       PLATFORM: ${{ matrix.target.platform }}

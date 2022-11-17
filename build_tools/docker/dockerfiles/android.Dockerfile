@@ -6,14 +6,14 @@
 
 # An image for cross-compiling IREE towards Android.
 
-FROM gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117
+FROM gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4
 ARG NDK_VERSION=r25b
 WORKDIR /install-ndk
 
 ENV ANDROID_NDK "/usr/src/android-ndk-${NDK_VERSION}"
 
-RUN wget -q "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION?}-linux.zip" \
-    && unzip -q "android-ndk-${NDK_VERSION?}-linux.zip" -d /usr/src/  \
+RUN wget -q "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip" \
+    && unzip -q "android-ndk-${NDK_VERSION}-linux.zip" -d /usr/src/  \
     && rm -rf /install-ndk
 
 WORKDIR /

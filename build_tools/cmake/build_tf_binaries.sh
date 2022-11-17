@@ -44,7 +44,7 @@ fi
 BAZEL_TEST_CMD=("${BAZEL_STARTUP_CMD[@]}" test)
 
 if (( IREE_BAZEL_READ_REMOTE_CACHE == 1 )); then
-  BAZEL_TEST_CMD+=(--config=remote_cache_bazel_ci)
+  BAZEL_TEST_CMD+=(--config=remote_cache_bazel_tf_ci)
 fi
 
 if (( IREE_BAZEL_WRITE_REMOTE_CACHE != 1 )); then

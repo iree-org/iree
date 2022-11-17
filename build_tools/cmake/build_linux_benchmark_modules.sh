@@ -40,7 +40,7 @@ BAZEL_BINDIR="$(${BAZEL_CMD[@]} info bazel-bin)"
       //iree_tf_compiler:iree-import-tflite \
       //iree_tf_compiler:iree-import-tf \
       --config=generic_clang \
-      --config=remote_cache_bazel_ci
+      --config=remote_cache_bazel_tf_ci
 # So the benchmark build below can find the importer binaries that were built.
 export PATH="$PWD/bazel-bin/iree_tf_compiler:$PATH"
 
