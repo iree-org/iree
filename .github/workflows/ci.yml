@@ -852,6 +852,7 @@ jobs:
 
       # Benchmark pipeline
       - benchmarks
+      - build_e2e_test_artifacts
 
       # Test modules from benchmark pipeline
       - test_benchmark_suites
