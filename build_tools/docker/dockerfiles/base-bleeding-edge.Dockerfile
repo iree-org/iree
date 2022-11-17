@@ -84,7 +84,7 @@ ARG PYTHON_VERSION=3.10
 # dependencies are *not* pinned in general. This adds non-determinism to the
 # Docker image build, but reduces maintenance burden. If a new build fails
 # because of a new package version, we should add a max version constraint to
-# the rquireme
+# the requirement.
 COPY runtime/bindings/python/iree/runtime/build_requirements.txt build_tools/docker/context/install_python_deps.sh ./
 RUN ./install_python_deps.sh "${PYTHON_VERSION}" \
   && rm -rf /install-python
