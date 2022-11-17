@@ -225,13 +225,13 @@ def get_test_compilation_infos(
         
         # WarpShape = 1x2 (2 warps = 64 threads)
         #TileWorkgroupSizePair([[16, 16, 16]], [32, 2, 1]), # DOES NOT COMPILE ('nvvm.mma.sync' op unimplemented variant for MMA shape <8, 16, 16>) [This is expected]
-        #TileWorkgroupSizePair([[16, 32, 16]], [32, 2, 1]), # PASSED (Uses FFMA not mma.sync)
+        TileWorkgroupSizePair([[16, 32, 16]], [32, 2, 1]), # PASSED (Uses FFMA not mma.sync)
         #TileWorkgroupSizePair([[16, 64, 16]], [32, 2, 1]), # PASSED
         #TileWorkgroupSizePair([[16, 128, 16]], [32, 2, 1]),# PASSED
         
-        #TileWorkgroupSizePair([[32, 8, 16]], [32, 2, 1]),  # PASSED (MMA.SYNC for math )
-        #TileWorkgroupSizePair([[32, 16, 16]], [32, 2, 1]),  # DOES NOT COMPILE (Compilation BUG error: 'scf.for' op  along control flow edge from Region #0 to Region #0: source type #0 )
-        TileWorkgroupSizePair([[32, 32, 16]], [32, 2, 1]), # PASSED (FFMA for math)
+        TileWorkgroupSizePair([[32, 8, 16]], [32, 2, 1]),  # PASSED (1 MMA.SYNC per warp for math) 
+        TileWorkgroupSizePair([[32, 16, 16]], [32, 2, 1]), # COMPILES but fails correctness (2 MMA.SYNC per warp for math)
+        TileWorkgroupSizePair([[32, 32, 16]], [32, 2, 1]), # COMPILES but fails correctness (4 MMA.SYNC per warp for math)
 
         # WarpShape = 2x2
         #TileWorkgroupSizePair([[32, 32, 16]], [64, 2, 1]),   # DOES NOT COMPILE (Compilation BUG error: 'scf.for' op  along control flow edge from Region #0 to Region #0: source type #0 ) 
