@@ -99,7 +99,7 @@ jobs:
   build_all:
     needs: setup
     if: needs.setup.outputs.should-run == 'true'
-    runs-on: ubuntu-20.04-64core
+    runs-on: ubuntu-20.04-64core-gcmn-test
     env:
       BUILD_DIR: full-build-dir
       BUILD_DIR_ARCHIVE: full-build-dir.tar.gz
@@ -119,6 +119,10 @@ jobs:
             gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
+      - name: Allow SSH
+        run: |
+          echo ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBF2CsKrHopOKqT75WMb2Y5Q2sY27H1hgT4zXpP4nRbGARUQx6wdeUilB+R5bjDLjsqc/LcDB09N9Gijp+k39GRg= gcmn@google.com >> ~/.ssh/authorized_keys
+          sleep 3600
       # The upload action already does its own gzip compression, so it's
       # counter-productive to do our own.
       - name: "Create build dir archive"
