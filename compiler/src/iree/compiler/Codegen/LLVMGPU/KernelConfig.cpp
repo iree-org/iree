@@ -28,6 +28,7 @@ using namespace mlir::iree_compiler;
 
 static constexpr unsigned cudaWarpSize = 32;
 static constexpr StringLiteral kCudaTarget = "cuda";
+static constexpr StringLiteral kReductionStrategyName = "reduction_strategy";
 namespace mlir {
 namespace iree_compiler {
 llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
@@ -458,6 +459,65 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   return llvm::None;
 }
 
+/// Set configuration for reduction transform dialect based strategy.
+static LogicalResult setReductionTransformJitConfig(func::FuncOp entryPoint,
+                                                    linalg::LinalgOp op) {
+  if (!clGPUEnableTransformDialectJit) return failure();
+  // TODO: match the sequence the startegy supports.
+  if (!isCudaTarget(entryPoint)) return failure();
+  if (!isa<linalg::GenericOp>(op)) return failure();
+  if (op.hasDynamicShape()) return failure();
+  SmallVector<unsigned> reductionDims;
+  op.getReductionDims(reductionDims);
+  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
+    return failure();
+  if (op.getRegionOutputArgs().size() != 1) return failure();
+
+  // Only support projected permutation, this could be extended to projected
+  // permutated with broadcast.
+  if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
+        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
+      }))
+    return failure();
+
+  // Only single combiner operations are supported for now.
+  SmallVector<Operation *, 4> combinerOps;
+  if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
+      combinerOps.size() != 1)
+    return failure();
+  Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
+  if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
+
+  const Type elementType = op.getDpsInitOperand(0)
+                               ->get()
+                               .getType()
+                               .cast<ShapedType>()
+                               .getElementType();
+  if (!elementType.isIntOrFloat()) return failure();
+  // Reduction distribution only supports 32-bit types now.
+  if (elementType.getIntOrFloatBitWidth() != 32) return failure();
+
+  // Hardcoded workagroup size, this could be deduced from the reduction dim.
+  std::array<int64_t, 3> workgroupSize = {32, 2, 1};
+  SmallVector<unsigned> partitionedLoops =
+      cast<PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  // Tile all the parallel dimension to 1.
+  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t, 4> threadTileSizes = workgroupTileSizes;
+  threadTileSizes.push_back(1);
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes,
+      IREE::Codegen::DispatchLoweringPassPipeline::
+          TransformDialectJitterCodegen,
+      workgroupSize, 0, kReductionStrategyName);
+  return success();
+}
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op) {
@@ -520,7 +580,6 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   tileSizes.emplace_back(std::move(reductionTileSizes));  // reduction level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
-      // TODO: should this hook up `TransformDialectJitterCodegen` directly ?
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
       workgroupSize);
   return success();
@@ -771,6 +830,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
         linalgOp.getNumParallelLoops() >= 2) {
       return setContractConfig(entryPointFn, linalgOp);
     }
+    if (succeeded(setReductionTransformJitConfig(entryPointFn, linalgOp))) {
+      return success();
+    }
     if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp))) {
       return success();
     }
@@ -866,15 +928,6 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     for (auto op : computeOps) {
       if (op == rootOperation) continue;
       setLoweringConfig(op, config);
-    }
-
-    // TODO: this currently overrides the seeting as soon as the flag is passed.
-    // Should `setLoweringConfig` set `TransformDialectJitterCodegen` instead?
-    if (clGPUEnableTransformDialectJit) {
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectJitterCodegen);
-      setTranslationInfo(funcOp, translationInfo);
     }
   }
   return success();

@@ -31,6 +31,8 @@
 #define DEBUG_TYPE "kernel-dispatch"
 #define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
+static constexpr llvm::StringLiteral kReductionStrategyName =
+    "reduction_strategy";
 namespace mlir {
 namespace iree_compiler {
 
@@ -1191,6 +1193,52 @@ static LogicalResult setDefaultGenericOpRootConfig(
                                                tileSizes, passPipeline);
 }
 
+/// Set lowering info to be used by the transform dialect jitter.
+static LogicalResult setTransformStrategyRootConfig(
+    func::FuncOp entryPointFn, linalg::GenericOp genericOp,
+    const LinalgOpInfo &linalgOpInfo,
+    const TargetMLTransformInfo &targetMLTransInfo) {
+  if (!clCPUEnableTransformDialectJit) return success();
+  if (getLoweringConfig(genericOp)) {
+    return success();
+  }
+  // TODO: match the sequence the startegy supports.
+  if (genericOp.hasDynamicShape()) return success();
+  SmallVector<unsigned> reductionDims;
+  genericOp.getReductionDims(reductionDims);
+  if (reductionDims.size() != 1 ||
+      reductionDims[0] != genericOp.getNumLoops() - 1)
+    return success();
+  if (genericOp.getRegionOutputArgs().size() != 1) return success();
+
+  // Only support projected permutation, this could be extended to projected
+  // permutated with broadcast.
+  if (llvm::any_of(genericOp.getDpsInputOperands(), [&](OpOperand *input) {
+        return !genericOp.getMatchingIndexingMap(input)
+                    .isProjectedPermutation();
+      }))
+    return success();
+
+  // TODO: set the right config as expected by the strategy.
+  std::array<int64_t, 1> workgroupSize = {1};
+  SmallVector<unsigned> partitionedLoops =
+      cast<PartitionableLoopsInterface>(genericOp.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  // Tile all the parallel dimension to 1.
+  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t, 4> threadTileSizes = workgroupTileSizes;
+  threadTileSizes.push_back(1);
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, genericOp, tileSizes,
+      IREE::Codegen::DispatchLoweringPassPipeline::
+          TransformDialectJitterCodegen,
+      workgroupSize, 0, kReductionStrategyName);
+}
+
 /// Sets the lowering configuration for a generic op implementing a
 /// transposition to use CPUDoubleTilingExpert pipeline.
 static LogicalResult setTransposeLikeOpRootConfig(
@@ -1347,7 +1395,9 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  if (failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp, linalgOpInfo,
+  if (failed(setTransformStrategyRootConfig(entryPointFn, genericOp,
+                                            linalgOpInfo, targetMLTransInfo)) ||
+      failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp, linalgOpInfo,
                                           targetMLTransInfo)) ||
       failed(setElementwiseGenericOpRootConfig(
           entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo)) ||
