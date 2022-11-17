@@ -13,6 +13,7 @@ declare -a PACKAGES=(
     "clang-${LLVM_VERSION}"
     "lld-${LLVM_VERSION}"
     # IREE transitive dependencies
+    libsdl2-dev
     libssl-dev
     # A much better CMake builder
     ninja-build
