@@ -171,7 +171,7 @@ jobs:
           BENCHMARKS_DIR: ${{ steps.build.outputs.benchmarks-dir }}
           BENCHMARKS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/benchmark-artifacts
         run: |
-          gcloud alpha storage cp -r "${BENCHMARKS_DIR}/benchmark_suites/iree" "${BENCHMARKS_GCS_ARTIFACT_DIR}/iree"
+          gcloud alpha storage cp -r --gzip-in-flight-all "${BENCHMARKS_DIR}/benchmark_suites/iree" "${BENCHMARKS_GCS_ARTIFACT_DIR}/iree"
           echo "::set-output name=benchmarks-gcs-artifact-dir::${BENCHMARKS_GCS_ARTIFACT_DIR}"
 
   build_tools:
