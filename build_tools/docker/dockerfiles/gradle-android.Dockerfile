@@ -7,7 +7,7 @@
 # An image for cross-compiling IREE's TFLite Java Bindings with Gradle and
 # CMake.
 
-FROM gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117
+FROM gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4
 
 ### Java ###
 WORKDIR /install-jdk
@@ -47,7 +47,9 @@ RUN mkdir -p "${ANDROID_SDK_ROOT}/cmdline-tools" \
         --output android_tools.zip \
     && unzip -q android_tools.zip -d "${ANDROID_SDK_ROOT}/cmdline-tools" \
     && mv "${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools" "${ANDROID_SDK_ROOT}/cmdline-tools/tools" \
-    && yes | "${ANDROID_SDK_ROOT}/cmdline-tools/tools/bin/sdkmanager" --licenses \
+    # yes will give a non-zero exit code in non-interactive settings (broken pipe?)
+    # with -o pipefail this leads to an error.
+    && { yes || true; } | "${ANDROID_SDK_ROOT}/cmdline-tools/tools/bin/sdkmanager" --licenses \
     && /opt/android-sdk/cmdline-tools/tools/bin/sdkmanager --install "ndk;${ANDROID_NDK_VERSION}" \
     && rm -rf /install-android
 

@@ -117,7 +117,7 @@ jobs:
       - name: "Building IREE"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
+            gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
       # The archive step below doesn't include these files. Remove them first to
@@ -203,7 +203,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
-            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:9a3d42cb8e07280a1900e9bee9b4e57519cd7152788656ba53551c6178335e1f \
+            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:50301f9ccc0bf63c4d498c225444cc5585218612d15b83d06e4f4672ab2dfc03 \
             ./build_tools/bazel/build_core.sh
 
   test_all:
@@ -232,7 +232,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_CUDA_DISABLE=1 \
-            gcr.io/iree-oss/swiftshader@sha256:e36550924e269fedd68b638cce9bd389b6bda58afeaac68b3146dbb6e9a91d35 \
+            gcr.io/iree-oss/swiftshader@sha256:484720d57fa816280d9a7455d16e1f9f3d90cc3efdb744646016503ea5ab2b30 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
@@ -293,14 +293,14 @@ jobs:
       - name: "Building runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
+            gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 \
             ./build_tools/cmake/build_runtime.sh \
             "${BUILD_DIR}"
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VULKAN_DISABLE=1 \
-            gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
+            gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
@@ -540,7 +540,7 @@ jobs:
           # This gives us access to the latest features and validates that IREE
           # builds using the latest versions.
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:d335b0885871356ebe697a8f3eac7ce7cbc3d84a458652e7cd95291a0aecfead \
+            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:50301f9ccc0bf63c4d498c225444cc5585218612d15b83d06e4f4672ab2dfc03 \
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:
@@ -560,7 +560,7 @@ jobs:
       - name: "Building and testing with ThreadSanitizer"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
+            gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 \
             ./build_tools/cmake/build_and_test_tsan.sh
 
   benchmarks:
@@ -709,7 +709,7 @@ jobs:
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
           - platform: host
             architecture: x86_64
-            docker_image: "gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117"
+            docker_image: "gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4"
             run_scripts: "./build_tools/cmake/test_benchmark_suites_host.sh"
     env:
       PLATFORM: ${{ matrix.target.platform }}
