@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
+#include "iree/compiler/Dialect/Stream/Analysis/ResourceHazards.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -80,6 +81,11 @@ PartitionSet partitionStreamableOpsReference(
     if (op.hasTrait<OpTrait::ConstantLike>()) {
       LLVM_DEBUG(llvm::dbgs() << "(ignoring constant)\n");
       continue;
+    } else if (isa<IREE::Util::GlobalStoreOpInterface>(op)) {
+      // We ignore global stores as they are unobservable within an execution
+      // region - we must still block on loads though.
+      LLVM_DEBUG(llvm::dbgs() << "(ignoring global store)\n");
+      continue;
     } else if (!isa<IREE::Stream::StreamableOpInterface>(op)) {
       // Not a streamable op. If it has side-effects then we force a hazard on
       // all builders so that we don't move ops across it.
@@ -87,6 +93,7 @@ PartitionSet partitionStreamableOpsReference(
         LLVM_DEBUG({
           llvm::dbgs() << "Side-effecting op forcing flush and freeze:\n";
           op.print(llvm::dbgs(), *asmState);
+          llvm::dbgs() << "\n";
         });
         usableBuilders.reset();
       }
@@ -110,6 +117,7 @@ PartitionSet partitionStreamableOpsReference(
     LLVM_DEBUG({
       llvm::dbgs() << "====\nPartitioning op:\n";
       op.print(llvm::dbgs(), *asmState);
+      llvm::dbgs() << "\n";
     });
 
     // Set bits for each partition this op may be able to be placed into.
@@ -121,6 +129,7 @@ PartitionSet partitionStreamableOpsReference(
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
         user->print(llvm::dbgs(), *asmState);
+        llvm::dbgs() << "\n";
         for (auto membershipOrdinal : userInfo.membership.set_bits()) {
           llvm::dbgs() << "  member of partition " << membershipOrdinal << "\n";
         }
@@ -285,6 +294,13 @@ PartitionSet partitionRegionConcurrencyReference(
 
   auto asmState = getRootAsmState(block);
 
+  // Run analysis - if it fails then we'll just be conservative.
+  IREE::Stream::ResourceHazardAnalysis hazardAnalysis(block->getParentOp());
+  if (failed(hazardAnalysis.run())) {
+    LLVM_DEBUG(llvm::dbgs() << "WARNING: resource hazard analysis failed; "
+                               "conservatively scheduling\n");
+  }
+
   for (auto &op : llvm::reverse(*block)) {
     // Skip constants; they just add noise (and since they are heavily CSE'd
     // they have lots of users to test).
@@ -292,6 +308,10 @@ PartitionSet partitionRegionConcurrencyReference(
       LLVM_DEBUG(llvm::dbgs() << "(ignoring constant)\n");
       continue;
     }
+
+    // NOTE: it's ok if this op is not streamable as we still need to track the
+    // hazards for other ops that it may use/may use it.
+    auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(op);
 
     // Initialize op info for this op - whether streamable or not. We track
     // transitive hazards on each op. Note that thanks to the ordering of ops
@@ -305,17 +325,18 @@ PartitionSet partitionRegionConcurrencyReference(
     LLVM_DEBUG({
       llvm::dbgs() << "====\nPartitioning op:\n";
       op.print(llvm::dbgs(), *asmState);
+      llvm::dbgs() << "\n";
     });
 
     // Set bits for each wave this op may be able to be placed into.
     // We prune the set based on whether the users are part of a transitive
     // dependency chain down the use-def chain to a wave.
-    llvm::BitVector consumers(builders.size(), /*t=*/false);
     for (auto user : op.getUsers()) {
       auto &userInfo = opInfos[user];
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
         user->print(llvm::dbgs(), *asmState);
+        llvm::dbgs() << "\n";
         for (auto membershipOrdinal : userInfo.membership.set_bits()) {
           llvm::dbgs() << "  member of wave " << membershipOrdinal << "\n";
         }
@@ -324,8 +345,14 @@ PartitionSet partitionRegionConcurrencyReference(
           llvm::dbgs() << "  hazard w/ waves 0-" << lastHazardOrdinal << "\n";
         }
       });
-      consumers |= userInfo.membership;
-      opInfo.hazards |= userInfo.membership;
+      bool hazardPresent = hazardAnalysis.hasHazard(streamableOp, user);
+      if (hazardPresent) {
+        // Hazard with existing op usage - prevent concurrent scheduling.
+        opInfo.hazards |= userInfo.membership;
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "  $ hazard analysis says ok to schedule\n");
+      }
+      // Always inherit hazards whether merging or not.
       opInfo.hazards |= userInfo.hazards;
     }
     llvm::BitVector candidates(builders.size(), /*t=*/true);
@@ -333,7 +360,6 @@ PartitionSet partitionRegionConcurrencyReference(
 
     // If this op is not streamable then bail here; we've still setup the hazard
     // map for following iteration.
-    auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(op);
     if (!streamableOp || streamableOp.isMetadata()) {
       LLVM_DEBUG(llvm::dbgs() << "Not streamable/is subview (skip)\n");
       continue;

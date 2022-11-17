@@ -1375,6 +1375,9 @@ def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
   ]>,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
@@ -1417,6 +1420,9 @@ def Stream_AsyncSplatOp : Stream_Op<"async.splat", [
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "preferCloneToConsumers",
   ]>,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
 ]> {
   let summary = [{splats a value into a resource}];
@@ -1455,6 +1461,9 @@ def Stream_AsyncCloneOp : Stream_Op<"async.clone", [
   Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "preferCloneToConsumers",
+  ]>,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
   ]>,
   Util_SizeAwareOp,
 ]> {
@@ -1497,8 +1506,9 @@ def Stream_AsyncSliceOp : Stream_PureOp<"async.slice", [
   AllTypesMatch<["source", "result"]>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_StreamableOp, [
-    "isMetadata",
+  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
   ]>,
   Util_SizeAwareOp,
 ]> {
@@ -1544,6 +1554,9 @@ def Stream_AsyncFillOp : Stream_Op<"async.fill", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
@@ -1595,8 +1608,9 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
   AllTypesMatch<["target", "result"]>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_StreamableOp, [
-    "isMetadata",
+  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
   ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1652,6 +1666,9 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
@@ -1711,6 +1728,9 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
 ]> {
   let summary = [{transfers a resource from one location/state to another}];
@@ -1845,6 +1865,9 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
@@ -1865,6 +1888,9 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
       Stream_PrimitiveType,
     ]>>:$resource_operands,
     Variadic<Stream_Size>:$resource_operand_sizes,
+    Variadic<Stream_Offset>:$resource_operand_offsets,
+    Variadic<Stream_Offset>:$resource_operand_ends,
+    Variadic<Stream_Size>:$resource_operand_lengths,
     Variadic<Stream_Size>:$result_sizes,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -1877,7 +1903,10 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
     (`on` `(` $affinity^ `)`)?
     $entry_point
     (`[` $workload^ `]`)? ``
-    `(` $resource_operands `)` attr-dict `:`
+    `(` custom<DispatchOperands>($resource_operands,
+                                 $resource_operand_offsets,
+                                 $resource_operand_ends,
+                                 $resource_operand_lengths) `)` attr-dict `:`
     custom<ShapedFunctionType>(ref($resource_operands),
                                type($resource_operands), $resource_operand_sizes,
                                type($results), $result_sizes,
@@ -1915,6 +1944,9 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
@@ -2008,6 +2040,9 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface>,

@@ -1102,7 +1102,10 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
       getValue(),
       count,
   };
-  SmallVector<Value> operandSizes = {};
+  SmallVector<Value> operandSizes;
+  SmallVector<Value> operandOffsets;
+  SmallVector<Value> operandEnds;
+  SmallVector<Value> operandLengths;
   SmallVector<int64_t> tiedOperands = {
       -1,
   };
@@ -1117,8 +1120,8 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
       SymbolRefAttr::get(
           builder.getStringAttr("__builtin_splat_i64"),
           FlatSymbolRefAttr::get(builder.getContext(), "__builtin_splat_i64")),
-      operands, operandSizes, resultSizes,
-      builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
+      operands, operandSizes, operandOffsets, operandEnds, operandLengths,
+      resultSizes, builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
   getResult().replaceAllUsesWith(dispatchOp.getResults().front());
   return success();
 }
@@ -1168,6 +1171,15 @@ LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
   SmallVector<Value> operandSizes = {
       getTargetSize(),
   };
+  SmallVector<Value> operandOffsets = {
+      getTargetOffset(),
+  };
+  SmallVector<Value> operandEnds = {
+      getTargetEnd(),
+  };
+  SmallVector<Value> operandLengths = {
+      getTargetLength(),
+  };
   SmallVector<int64_t> tiedOperands = {
       0,
   };
@@ -1182,8 +1194,8 @@ LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
       SymbolRefAttr::get(
           builder.getStringAttr("__builtin_fill_i64"),
           FlatSymbolRefAttr::get(builder.getContext(), "__builtin_fill_i64")),
-      operands, operandSizes, resultSizes,
-      builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
+      operands, operandSizes, operandOffsets, operandEnds, operandLengths,
+      resultSizes, builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
   getResult().replaceAllUsesWith(dispatchOp.getResults().front());
   return success();
 }
@@ -1214,6 +1226,12 @@ LogicalResult AsyncConstantOp::verify() {
   return success();
 }
 
+void AsyncConstantOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(), Value{},
+                    getResultSize(), getResultSize()});
+}
+
 //===----------------------------------------------------------------------===//
 // stream.async.splat
 //===----------------------------------------------------------------------===//
@@ -1227,6 +1245,12 @@ LogicalResult AsyncSplatOp::verify() {
 }
 
 bool AsyncSplatOp::preferCloneToConsumers() { return true; }
+
+void AsyncSplatOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(), Value{},
+                    getResultSize(), getResultSize()});
+}
 
 //===----------------------------------------------------------------------===//
 // stream.async.clone
@@ -1243,6 +1267,14 @@ LogicalResult AsyncCloneOp::verify() {
 
 bool AsyncCloneOp::preferCloneToConsumers() { return true; }
 
+void AsyncCloneOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Read, getSource(), Value{},
+                    getSourceSize(), getSourceSize()});
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(), Value{},
+                    getResultSize(), getResultSize()});
+}
+
 //===----------------------------------------------------------------------===//
 // stream.async.slice
 //===----------------------------------------------------------------------===//
@@ -1256,7 +1288,13 @@ LogicalResult AsyncSliceOp::verify() {
   return success();
 }
 
-bool AsyncSliceOp::isMetadata() { return true; }
+void AsyncSliceOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Read, getSource(),
+                    getSourceOffset(), getSourceEnd(), getResultSize()});
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(), Value{},
+                    getResultSize(), getResultSize()});
+}
 
 //===----------------------------------------------------------------------===//
 // stream.async.fill
@@ -1283,6 +1321,14 @@ SmallVector<int64_t, 4> AsyncFillOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
+void AsyncFillOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Write, getTarget(),
+                    getTargetOffset(), getTargetEnd(), getTargetLength()});
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(),
+                    getTargetOffset(), getTargetEnd(), getTargetLength()});
+}
+
 //===----------------------------------------------------------------------===//
 // stream.async.update
 //===----------------------------------------------------------------------===//
@@ -1296,8 +1342,6 @@ LogicalResult AsyncUpdateOp::verify() {
   return success();
 }
 
-bool AsyncUpdateOp::isMetadata() { return true; }
-
 Value AsyncUpdateOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
@@ -1309,6 +1353,16 @@ Value AsyncUpdateOp::getTiedResult(unsigned resultIndex) {
 
 SmallVector<int64_t, 4> AsyncUpdateOp::getTiedResultOperandIndices() {
   return {0};  // target
+}
+
+void AsyncUpdateOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Read, getUpdate(), Value{},
+                    getUpdateSize(), getUpdateSize()});
+  ranges.push_back({ResourceAccessBitfield::Write, getTarget(),
+                    getTargetOffset(), getTargetEnd(), getUpdateSize()});
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(),
+                    getTargetOffset(), getTargetEnd(), getUpdateSize()});
 }
 
 //===----------------------------------------------------------------------===//
@@ -1344,6 +1398,16 @@ SmallVector<int64_t, 4> AsyncCopyOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
+void AsyncCopyOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Read, getSource(),
+                    getSourceOffset(), getSourceEnd(), getLength()});
+  ranges.push_back({ResourceAccessBitfield::Write, getTarget(),
+                    getTargetOffset(), getTargetEnd(), getLength()});
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(),
+                    getTargetOffset(), getTargetEnd(), getLength()});
+}
+
 //===----------------------------------------------------------------------===//
 // stream.async.transfer
 //===----------------------------------------------------------------------===//
@@ -1355,6 +1419,14 @@ LogicalResult AsyncTransferOp::verify() {
     return failure();
   }
   return success();
+}
+
+void AsyncTransferOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Read, getSource(), Value{},
+                    getSourceSize(), getSourceSize()});
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(), Value{},
+                    getResultSize(), getResultSize()});
 }
 
 //===----------------------------------------------------------------------===//
@@ -1398,12 +1470,78 @@ SmallVector<int64_t, 4> AsyncStoreOp::getTiedResultOperandIndices() {
 // stream.async.dispatch
 //===----------------------------------------------------------------------===//
 
+static ParseResult parseDispatchOperands(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOperands,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceEnds,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceLengths) {
+  do {
+    // All entries at least have an %operand.
+    resourceOperands.emplace_back();
+    if (failed(parser.parseOperand(resourceOperands.back()))) return failure();
+    // Resources have a range.
+    if (succeeded(parser.parseOptionalLSquare())) {
+      resourceOffsets.emplace_back();
+      resourceEnds.emplace_back();
+      resourceLengths.emplace_back();
+      if (failed(parser.parseOperand(resourceOffsets.back())) ||
+          failed(parser.parseKeyword("to")) ||
+          failed(parser.parseOperand(resourceEnds.back())) ||
+          failed(parser.parseKeyword("for")) ||
+          failed(parser.parseOperand(resourceLengths.back())) ||
+          failed(parser.parseRSquare())) {
+        return failure();
+      }
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+static void printDispatchOperands(OpAsmPrinter &p, Operation *op,
+                                  ValueRange resourceOperands,
+                                  ValueRange resourceOffsets,
+                                  ValueRange resourceEnds,
+                                  ValueRange resourceLengths) {
+  unsigned resourceIndex = 0;
+  llvm::interleaveComma(resourceOperands, p, [&](Value operand) {
+    p.printOperand(operand);
+    if (operand.getType().isa<IREE::Stream::ResourceType>()) {
+      p << "[";
+      p.printOperand(resourceOffsets[resourceIndex]);
+      p << " to ";
+      p.printOperand(resourceEnds[resourceIndex]);
+      p << " for ";
+      p.printOperand(resourceLengths[resourceIndex]);
+      p << "]";
+      ++resourceIndex;
+    }
+  });
+}
+
 LogicalResult AsyncDispatchOp::verify() {
   AsyncDispatchOp op = *this;
   if (failed(verifyOpValueSizes(op, op.getResourceOperands(),
                                 op.getResourceOperandSizes())) ||
       failed(verifyOpValueSizes(op, op.getResults(), op.getResultSizes()))) {
     return failure();
+  }
+  unsigned requiredRangeCount = 0;
+  for (auto value : op.getResourceOperands()) {
+    if (value.getType().isa<IREE::Stream::ResourceType>()) {
+      ++requiredRangeCount;
+    }
+  }
+  unsigned presentRangeCount = op.getResourceOperandOffsets().size();
+  if (op.getResourceOperandEnds().size() != presentRangeCount ||
+      op.getResourceOperandLengths().size() != presentRangeCount) {
+    return op->emitOpError() << "mismatch on resource range "
+                                "offsets/ends/lengths; counts must match";
+  }
+  if (presentRangeCount != requiredRangeCount) {
+    return op->emitOpError() << "expects " << requiredRangeCount
+                             << " resource range operand sets but "
+                             << presentRangeCount << " are present";
   }
   return success();
 }
@@ -1436,6 +1574,38 @@ LogicalResult AsyncDispatchOp::verifySymbolUses(
 
 std::pair<unsigned, unsigned> AsyncDispatchOp::getTiedOperandsIndexAndLength() {
   return getODSOperandIndexAndLength(1);  // $operands
+}
+
+void AsyncDispatchOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  unsigned rangeIndex = 0;
+  unsigned tiedOperandBase = getTiedOperandsIndexAndLength().first;
+  for (auto [operandIndex, operand] : llvm::enumerate(getResourceOperands())) {
+    if (!operand.getType().isa<IREE::Stream::ResourceType>()) continue;
+    ResourceAccessBitfield access = ResourceAccessBitfield::Read;
+    auto tiedResults = getOperandTiedResults(tiedOperandBase + operandIndex);
+    if (!tiedResults.empty()) {
+      access = access | ResourceAccessBitfield::Write;
+    }
+    Value start = getResourceOperandOffsets()[rangeIndex];
+    Value end = getResourceOperandEnds()[rangeIndex];
+    Value length = getResourceOperandLengths()[rangeIndex];
+    ++rangeIndex;
+    ranges.push_back({access, operand, start, end, length});
+    for (auto result : tiedResults) {
+      ranges.push_back({access, result, start, end, length});
+    }
+  }
+  for (auto [i, result, resultSize] :
+       llvm::zip(llvm::seq<unsigned>(0, getResults().size()), getResults(),
+                 getResultSizes())) {
+    if (getTiedResultOperandIndex(i).has_value()) {
+      // Already covered above.
+      continue;
+    }
+    ranges.push_back({ResourceAccessBitfield::Write, result, Value{},
+                      resultSize, resultSize});
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1505,6 +1675,43 @@ void AsyncExecuteOp::getSuccessorRegions(
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
   }
+}
+
+// Gets the async access ranges for the generic stream execution op capturing
+// resources.
+template <typename Op>
+static void getExecutionAsyncAccessRanges(
+    Op op, SmallVectorImpl<AsyncAccessRange> &ranges) {
+  unsigned tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
+  for (auto [i, operand, operandSize] :
+       llvm::zip(llvm::seq<unsigned>(0, op.getResourceOperands().size()),
+                 op.getResourceOperands(), op.getResourceOperandSizes())) {
+    if (!operand.getType().template isa<IREE::Stream::ResourceType>()) continue;
+    ResourceAccessBitfield access = ResourceAccessBitfield::Read;
+    auto tiedResults = op.getOperandTiedResults(tiedOperandBase + i);
+    if (!tiedResults.empty()) {
+      access = access | ResourceAccessBitfield::Write;
+    }
+    ranges.push_back({access, operand, Value{}, operandSize, operandSize});
+    for (auto result : tiedResults) {
+      ranges.push_back({access, result, Value{}, operandSize, operandSize});
+    }
+  }
+  for (auto [i, result, resultSize] :
+       llvm::zip(llvm::seq<unsigned>(0, op.getResults().size()),
+                 op.getResults(), op.getResultSizes())) {
+    if (op.getTiedResultOperandIndex(i).has_value()) {
+      // Already covered above.
+      continue;
+    }
+    ranges.push_back({ResourceAccessBitfield::Write, result, Value{},
+                      resultSize, resultSize});
+  }
+}
+
+void AsyncExecuteOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  getExecutionAsyncAccessRanges(*this, ranges);
 }
 
 Operation::operand_range AsyncExecuteOp::getClosureOperands() {
@@ -1622,6 +1829,11 @@ void AsyncConcurrentOp::getSuccessorRegions(
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
   }
+}
+
+void AsyncConcurrentOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  getExecutionAsyncAccessRanges(*this, ranges);
 }
 
 Operation::operand_range AsyncConcurrentOp::getClosureOperands() {

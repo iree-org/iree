@@ -166,9 +166,9 @@ class MaterializeCopyOnWritePass
 
   void runOnOperation() override {
     bool didChange = false;
-    for (auto &region : getOperation()->getRegions()) {
-      didChange = materializeRegionCOW(region) || didChange;
-    }
+    getOperation()->walk([&](Region *region) {
+      didChange = materializeRegionCOW(*region) || didChange;
+    });
     // TODO(benvanik): run canonicalization patterns inline if anything changed.
     (void)didChange;
   }

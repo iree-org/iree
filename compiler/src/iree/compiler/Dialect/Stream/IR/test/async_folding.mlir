@@ -10,6 +10,7 @@ func.func @SinkSplatsToConsumers(
   %arg3: !stream.resource<*>,
   %arg4: !stream.resource<*>
 ) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -26,13 +27,13 @@ func.func @SinkSplatsToConsumers(
   cf.cond_br %arg1, ^bb2, ^bb3
 // CHECK: ^bb2:
 ^bb2:
-  // CHECK: = stream.async.dispatch @executable::@dispatch0[%c1, %c2, %c3](%[[SPLAT]])
-  %2 = stream.async.dispatch @executable::@dispatch0[%c1, %c2, %c3](%0) : (!stream.resource<*>{%c100}) -> !stream.resource<*>{%c100}
+  // CHECK: = stream.async.dispatch @executable::@dispatch0[%c1, %c2, %c3](%[[SPLAT]][%c0 to %c100 for %c100])
+  %2 = stream.async.dispatch @executable::@dispatch0[%c1, %c2, %c3](%0[%c0 to %c100 for %c100]) : (!stream.resource<*>{%c100}) -> !stream.resource<*>{%c100}
   cf.br ^bb4(%2 : !stream.resource<*>)
 // CHECK: ^bb3:
 ^bb3:
-  // CHECK: = stream.async.dispatch @executable::@dispatch1[%c1, %c2, %c3](%[[SPLAT]])
-  %3 = stream.async.dispatch @executable::@dispatch1[%c1, %c2, %c3](%0) : (!stream.resource<*>{%c100}) -> !stream.resource<*>{%c100}
+  // CHECK: = stream.async.dispatch @executable::@dispatch1[%c1, %c2, %c3](%[[SPLAT]][%c0 to %c100 for %c100])
+  %3 = stream.async.dispatch @executable::@dispatch1[%c1, %c2, %c3](%0[%c0 to %c100 for %c100]) : (!stream.resource<*>{%c100}) -> !stream.resource<*>{%c100}
   cf.br ^bb4(%3 : !stream.resource<*>)
 // CHECK: ^bb4(
 ^bb4(%arg6: !stream.resource<*>):
@@ -210,13 +211,14 @@ func.func @FoldAsyncStoreBitcast(%arg0: !stream.resource<staging>, %arg1: index,
 
 // CHECK-LABEL: @ElideImmediateAsyncExecuteWaits
 func.func @ElideImmediateAsyncExecuteWaits(%arg0: !stream.resource<*>, %arg1: index) -> (!stream.resource<*>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK-NOT: stream.timepoint.immediate
   %imm = stream.timepoint.immediate => !stream.timepoint
   // CHECK: stream.async.execute with
   %0:2 = stream.async.execute await(%imm) => with(%arg0 as %arg2: !stream.resource<*>{%arg1}) -> %arg0 as !stream.resource<*>{%arg1} {
     // CHECK: stream.async.dispatch
-    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg2) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
+    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg2[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
     // CHECK: stream.yield
     stream.yield %1 : !stream.resource<*>{%arg1}
   } => !stream.timepoint
@@ -227,13 +229,14 @@ func.func @ElideImmediateAsyncExecuteWaits(%arg0: !stream.resource<*>, %arg1: in
 
 // CHECK-LABEL: @ChainAsyncExecuteWaits
 func.func @ChainAsyncExecuteWaits(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.resource<*>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK-NOT: stream.timepoint.await
   %0 = stream.timepoint.await %arg2 => %arg0 : !stream.resource<*>{%arg1}
   // CHECK: stream.async.execute await(%arg2) => with
   %1:2 = stream.async.execute with(%0 as %arg3: !stream.resource<*>{%arg1}) -> %0 as !stream.resource<*>{%arg1} {
     // CHECK: stream.async.dispatch
-    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
+    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
     // CHECK: stream.yield
     stream.yield %1 : !stream.resource<*>{%arg1}
   } => !stream.timepoint
@@ -252,8 +255,8 @@ func.func @CloneCapturedAsyncExecuteSubviewOps(%arg0: !stream.resource<*>, %arg1
   // CHECK: = stream.async.execute with(%arg0 as %arg2: !stream.resource<*>{%arg1}) -> %arg0{%c128}
   %1:2 = stream.async.execute with(%0 as %arg3: !stream.resource<*>{%c128}) -> %0{%c128} {
     // CHECK: %[[T:.+]] = stream.resource.subview %arg2[%c0] : !stream.resource<*>{%arg1} -> !stream.resource<*>{%c128}
-    // CHECK: stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%[[T]])
-    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
+    // CHECK: stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%[[T]]
+    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
     // CHECK: stream.yield
     stream.yield %1 : !stream.resource<*>{%c128}
   } => !stream.timepoint
@@ -277,11 +280,12 @@ func.func @ElideNoOpAsyncExecuteOp(%arg0: !stream.resource<*>, %arg1: index, %ar
 
 // CHECK-LABEL: @TieRegionResultsAsyncExecuteOp
 func.func @TieRegionResultsAsyncExecuteOp(%arg0: !stream.resource<*>, %arg1: index) -> (!stream.resource<*>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK: = stream.async.execute with(%arg0 as %arg2: !stream.resource<*>{%arg1}) -> %arg0{%arg1}
   %0:2 = stream.async.execute with(%arg0 as %arg2: !stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1} {
-    // CHECK: %[[T:.+]] = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg2)
-    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg2) : (!stream.resource<*>{%arg1}) -> %arg2{%arg1}
+    // CHECK: %[[T:.+]] = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg2
+    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg2[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg2{%arg1}
     // CHECK: stream.yield %[[T]]
     stream.yield %1 : !stream.resource<*>{%arg1}
   } => !stream.timepoint
@@ -292,10 +296,11 @@ func.func @TieRegionResultsAsyncExecuteOp(%arg0: !stream.resource<*>, %arg1: ind
 
 // CHECK-LABEL: @ElideUnusedAsyncExecuteOp
 func.func @ElideUnusedAsyncExecuteOp(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK-NOT: stream.async.execute
   %0:2 = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1} {
-    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
+    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
     stream.yield %1 : !stream.resource<*>{%arg1}
   } => !stream.timepoint
   return
@@ -305,13 +310,14 @@ func.func @ElideUnusedAsyncExecuteOp(%arg0: !stream.resource<*>, %arg1: index, %
 
 // CHECK-LABEL: @TieRegionResultsAsyncConcurrentOp
 func.func @TieRegionResultsAsyncConcurrentOp(%arg0: !stream.resource<*>, %arg1: index) -> (!stream.resource<*>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK: = stream.async.execute with(%arg0 as %arg2: !stream.resource<*>{%arg1}) -> %arg0{%arg1}
   %0:2 = stream.async.execute with(%arg0 as %arg2: !stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1} {
     // CHECK: %[[EXEC_T:.+]] = stream.async.concurrent with(%arg2 as %arg3: !stream.resource<*>{%arg1}) -> %arg2{%arg1}
     %1 = stream.async.concurrent with(%arg2 as %arg3: !stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1} {
-      // CHECK: %[[WAVE_T:.+]] = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3) : (!stream.resource<*>{%arg1}) -> %arg3{%arg1}
-      %2 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3) : (!stream.resource<*>{%arg1}) -> %arg3{%arg1}
+      // CHECK: %[[WAVE_T:.+]] = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg3{%arg1}
+      %2 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg3{%arg1}
       // CHECK: stream.yield %[[WAVE_T]]
       stream.yield %2 : !stream.resource<*>{%arg1}
     }
@@ -325,15 +331,16 @@ func.func @TieRegionResultsAsyncConcurrentOp(%arg0: !stream.resource<*>, %arg1: 
 
 // CHECK-LABEL: @ElideUnusedAsyncConcurrentOp
 func.func @ElideUnusedAsyncConcurrentOp(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.resource<*>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK: stream.async.execute
   %0:2 = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1} {
     // CHECK: stream.async.dispatch @executable::@dispatch0
-    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
+    %1 = stream.async.dispatch @executable::@dispatch0[%c1, %c1, %c1](%arg3[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
     // CHECK-NOT: stream.async.concurrent
     %2 = stream.async.concurrent with(%arg3 as %arg4: !stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1} {
       // CHECK-NOT: stream.async.dispatch @executable::@dispatch1
-      %3 = stream.async.dispatch @executable::@dispatch1[%c1, %c1, %c1](%arg4) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
+      %3 = stream.async.dispatch @executable::@dispatch1[%c1, %c1, %c1](%arg4[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
       stream.yield %3 : !stream.resource<*>{%arg1}
     }
     stream.yield %1 : !stream.resource<*>{%arg1}

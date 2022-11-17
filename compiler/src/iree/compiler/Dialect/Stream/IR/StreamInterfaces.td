@@ -192,6 +192,34 @@ def Stream_StreamableOp : OpInterface<"StreamableOpInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Stream::AsyncAccessOpInterface
+//===----------------------------------------------------------------------===//
+
+def Stream_AsyncAccessOp : OpInterface<"AsyncAccessOpInterface"> {
+  let description = [{
+    Interface for stream.async.* ops that access subviews of resources.
+    This allows for some basic analysis and is only valid prior to allocation.
+    Not all ops need to implement this as such analysis is conservative and will
+    bail whenever resources are used by unknown ops.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Queries the resource ranges accessed by the operation.
+        Each access should be represented: for example a read of an operand
+        and a complete discard and write as the result should be two separate
+        accesses indicating that the existing contents are read and the new
+        contents are written.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"getAsyncAccessRanges",
+      /*args=*/(ins "SmallVectorImpl<AsyncAccessRange> &":$ranges)
+    >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Stream::SubviewEffectOpInterface
 //===----------------------------------------------------------------------===//
 
@@ -202,7 +230,10 @@ def Stream_SubviewEffectOp : OpInterface<"SubviewEffectOpInterface"> {
   }];
 
   let methods = [
-    // TODO(benvanik): get memory effect + range of an operand
+    // TODO(benvanik): get memory effect + range of an operand. Unlike the
+    // AsyncAccessOpInterface this will not be able to provide the access
+    // range end as we don't track that (we assume it's been taken care of
+    // earlier on in lowering).
   ];
 }
 
