@@ -13,6 +13,9 @@ declare -a PACKAGES=(
     "clang-${LLVM_VERSION}"
     "lld-${LLVM_VERSION}"
     # IREE transitive dependencies
+    # Next time someone's updating these, try dropping sdl2. It shouldn't be
+    # necessary anymore, but you need to make sure that we get `vulkaninfo` from
+    # another source (this is currently installing it implicitly).
     libsdl2-dev
     libssl-dev
     # A much better CMake builder
