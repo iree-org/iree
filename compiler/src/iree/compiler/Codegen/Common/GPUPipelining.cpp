@@ -25,6 +25,25 @@ namespace iree_compiler {
 static const StringLiteral kPipeliningLoopMarker = "__pipelining_K_loop__";
 static const StringLiteral kPipeliningGlobalLoad = "__pipelining_global_load__";
 
+/// Returns true if the given `memrefType` as the default numeric address space
+/// 0.
+static bool hasDefaultAddressSpace(MemRefType memrefType) {
+  Attribute addrSpace = memrefType.getMemorySpace();
+  if (!addrSpace) return true;
+  auto intAttr = addrSpace.dyn_cast<IntegerAttr>();
+  return intAttr && intAttr.getInt() == 0;
+}
+
+/// Returns true if the given `memrefType` as the numeric address space for
+/// GPU shared memory.
+static bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
+  Attribute addrSpace = memrefType.getMemorySpace();
+  if (!addrSpace) return false;
+  auto intAttr = addrSpace.dyn_cast<IntegerAttr>();
+  if (!intAttr) return false;
+  return intAttr.getInt() == gpu::GPUDialect::getWorkgroupAddressSpace();
+}
+
 // Returns a new predicated operation to support unpeeled epilogue. Unpeeled
 // epilogue needs to handle the last iterations within the mainloop which
 // requires predicating operations, for e.g., OOB global memory access. This
@@ -45,10 +64,8 @@ static Operation* replaceOpWithPredicatedOp(Operation* op, Value pred,
       return op;
     // Return/execute the op if it is a shared memory load.
     if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
-      unsigned loadAddrSpace =
-          loadOp.getBase().getType().cast<MemRefType>().getMemorySpaceAsInt();
-      if (loadAddrSpace == gpu::GPUDialect::getWorkgroupAddressSpace())
-        return op;
+      auto loadBaseType = loadOp.getBase().getType().cast<MemRefType>();
+      if (hasSharedMemoryAddressSpace(loadBaseType)) return op;
     }
     // If we are here that means the operation does not have predication support
     // and cannot be speculatively executed. Thus, unpeeled epilogue is not
@@ -173,15 +190,13 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
         }
         auto ld = dyn_cast<vector::TransferReadOp>(op);
         if (!ld) continue;
-        unsigned ldAddSpace =
-            ld.getSource().getType().cast<MemRefType>().getMemorySpaceAsInt();
-        if (ldAddSpace != 0 || !ld->hasOneUse()) continue;
+        auto ldSrcType = ld.getSource().getType().cast<MemRefType>();
+        if (!hasDefaultAddressSpace(ldSrcType) || !ld->hasOneUse()) continue;
         auto st =
             dyn_cast<vector::TransferWriteOp>(ld->use_begin()->getOwner());
         if (!st) continue;
-        unsigned stAddSpace =
-            st.getSource().getType().cast<MemRefType>().getMemorySpaceAsInt();
-        if (stAddSpace != 3) continue;
+        auto stSrcType = st.getSource().getType().cast<MemRefType>();
+        if (!hasSharedMemoryAddressSpace(stSrcType)) continue;
         copyToWorkgroupMemory = true;
         ld->setAttr(kPipeliningGlobalLoad, builder.getUnitAttr());
       }

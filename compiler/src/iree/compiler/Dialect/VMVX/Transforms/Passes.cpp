@@ -34,6 +34,10 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
       createTypePropagationPass());
   passManager.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
+  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
+  // memory space through the stack.
+  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      createEraseHALDescriptorTypeFromMemRefPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();

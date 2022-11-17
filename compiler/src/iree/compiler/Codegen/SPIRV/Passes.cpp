@@ -82,15 +82,21 @@ static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
 
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
-  Optional<unsigned> workgroupSpace =
+  Optional<unsigned> workgroupMemorySpace =
       spirv::mapVulkanStorageClassToMemorySpace(spirv::StorageClass::Workgroup);
   auto fromType = from.getType().cast<MemRefType>();
   auto toType = to.getType().cast<MemRefType>();
-  bool isWorkgroupMemory = fromType.getMemorySpaceAsInt() == workgroupSpace ||
-                           toType.getMemorySpaceAsInt() == workgroupSpace;
-  if (isWorkgroupMemory) builder.create<gpu::BarrierOp>(loc);
+
+  bool needsBarrier = false;
+  if (auto attr = fromType.getMemorySpace().dyn_cast_or_null<IntegerAttr>()) {
+    if (attr.getInt() == *workgroupMemorySpace) needsBarrier = true;
+  }
+  if (auto attr = toType.getMemorySpace().dyn_cast_or_null<IntegerAttr>()) {
+    if (attr.getInt() == *workgroupMemorySpace) needsBarrier = true;
+  }
+  if (needsBarrier) builder.create<gpu::BarrierOp>(loc);
   Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
-  if (isWorkgroupMemory) {
+  if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
     builder.create<gpu::BarrierOp>(loc);
   }
@@ -206,7 +212,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(createMapMemRefStorageClassPass());
+  pm.addNestedPass<func::FuncOp>(createSPIRVMapMemRefStorageClassPass());
   pm.addPass(createSPIRVEmulateI64Pass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

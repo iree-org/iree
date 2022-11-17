@@ -284,6 +284,13 @@ def ConcretizePadResultShape :
   let constructor = "mlir::iree_compiler::createConcretizePadResultShapePass()";
 }
 
+def EraseHALDescriptorTypeFromMemRef :
+    Pass<"iree-codegen-erase-hal-descriptor-type-from-memref", "func::FuncOp"> {
+  let summary = "Erase #hal.descriptor_type from MemRef memory space";
+  let constructor =
+      "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -546,6 +553,12 @@ def SPIRVEmulateI64 :
     Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
   let summary = "Emulate 64-bit integer opts with 32-bit integer ops";
   let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
+}
+
+def SPIRVMapMemRefStorageClass :
+    Pass<"iree-spirv-map-memref-storage-class", "func::FuncOp"> {
+  let summary = "Map MemRef memory spaces to SPIR-V storage classes";
+  let constructor = "mlir::iree_compiler::createSPIRVMapMemRefStorageClassPass()";
 }
 
 //------------------------------------------------------------------------------

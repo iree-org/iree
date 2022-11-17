@@ -58,7 +58,8 @@ static Value findOrCreateSubspanBuffer(
                         .dyn_cast<IREE::Flow::DispatchTensorType>();
   assert(shapedType && shapedType.hasRank());
 
-  auto memRefType = getMemrefTypeForTensor(shapedType);
+  auto memRefType = getMemrefTypeForTensor(shapedType, /*layout=*/{},
+                                           subspanOp.getDescriptorTypeAttr());
 
   // Look for an existing op.
   Block *block = subspanOp->getBlock();

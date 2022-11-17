@@ -121,6 +121,10 @@ static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::MemCpyFn memcpyFn = cpuCopyFn;
   addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
                                       memcpyFn);
+  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
+  // memory space through the stack.
+  passManager.addNestedPass<func::FuncOp>(
+      createEraseHALDescriptorTypeFromMemRefPass());
 }
 
 static void addTileAndDistributePasses(
@@ -728,6 +732,10 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createIREEMaterializeEncodingPass());
   passManager.addNestedPass<ModuleOp>(createBufferizeCopyOnlyDispatchesPass());
+  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
+  // memory space through the stack.
+  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      createEraseHALDescriptorTypeFromMemRefPass());
 
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();

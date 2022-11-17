@@ -158,6 +158,7 @@ iree_compiler_cc_library(
         "CleanupBufferAllocViewPass.cpp",
         "ConcretizePadResultShape.cpp",
         "ConvertToDestinationPassingStylePass.cpp",
+        "EraseHALDescriptorTypeFromMemRef.cpp",
         "FlattenMemRefSubspanPass.cpp",
         "FoldTensorExtractOpPass.cpp",
         "ForOpCanonicalizationPass.cpp",

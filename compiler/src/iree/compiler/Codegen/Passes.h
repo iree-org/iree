@@ -199,6 +199,10 @@ createConcretizePadResultShapePass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createIREEMaterializeEncodingPass();
 
+/// Erases #hal.descriptor_type as MemRef memory space.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createEraseHALDescriptorTypeFromMemRefPass();
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
@@ -559,6 +563,10 @@ createSPIRVCreateFastSlowPathPass();
 
 /// Emulates 64-bit integer ops with 32-bit integer ops.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
+
+/// Pass to map MemRef memory spaces to SPIR-V storage classes.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVMapMemRefStorageClassPass();
 
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.

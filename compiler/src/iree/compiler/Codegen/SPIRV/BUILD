@@ -28,6 +28,7 @@ iree_compiler_cc_library(
         "SPIRVDistribute.cpp",
         "SPIRVEmulateI64.cpp",
         "SPIRVLowerExecutableTargetPass.cpp",
+        "SPIRVMapMemRefStorageClass.cpp",
         "SPIRVTile.cpp",
         "SPIRVTileAndDistribute.cpp",
         "SPIRVTileAndPromote.cpp",
