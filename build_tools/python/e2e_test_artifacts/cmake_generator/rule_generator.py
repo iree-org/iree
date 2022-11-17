@@ -13,7 +13,22 @@ import itertools
 import pathlib
 
 from e2e_test_artifacts.cmake_generator import model_rule_generator, iree_rule_generator
+from e2e_test_artifacts import model_artifacts
 import e2e_test_artifacts.artifacts
+
+
+def generate_model_rules(package_name: str, root_path: pathlib.PurePath,
+                         model_artifacts_root: model_artifacts.ArtifactsRoot):
+   """Generates cmake rules to build model artifacts.
+
+  Args:
+    package_name: root cmake package name.
+    root_path: root directory to store all artifacts.
+    model_artifacts_root: model artifact root to be generated.
+  Returns:
+    Map of model rules keyed by 
+  """
+  pass
 
 
 def generate_rules(
