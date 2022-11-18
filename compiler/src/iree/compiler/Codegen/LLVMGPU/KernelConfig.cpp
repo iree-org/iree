@@ -551,10 +551,12 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                .cast<ShapedType>()
                                .getElementType();
   if (!elementType.isIntOrFloat()) return failure();
+  unsigned bitWidth = elementType.getIntOrFloatBitWidth();
   // Reduction distribution only supports 32-bit types now.
-  if (elementType.getIntOrFloatBitWidth() != 32) return failure();
+  if (bitWidth != 32) return failure();
 
-  unsigned vectorSize = 4;
+  const unsigned largestLoadSizeInBits = 128;
+  unsigned vectorSize = largestLoadSizeInBits / bitWidth;
   while ((*dimSize / vectorSize) % cudaWarpSize != 0) vectorSize /= 2;
 
   // TODO: Add reduction tiling to handle larger reductions.
