@@ -402,8 +402,8 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
     : ConversionTarget(context) {
   // Mark any operation that has operands/results with encoding as
   // illegal.
-  markUnknownOpDynamicallyLegal([=](Operation *op) {
-    auto typeHasEncoding = [=](Type t) -> bool {
+  markUnknownOpDynamicallyLegal([](Operation *op) {
+    auto typeHasEncoding = [](Type t) -> bool {
       auto tensorType = t.dyn_cast<RankedTensorType>();
       return tensorType && tensorType.getEncoding();
     };
