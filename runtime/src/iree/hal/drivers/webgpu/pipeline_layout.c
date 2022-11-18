@@ -178,7 +178,9 @@ static iree_hal_webgpu_pipeline_layout_t* iree_hal_webgpu_pipeline_layout_cast(
 iree_status_t iree_hal_webgpu_pipeline_layout_create(
     WGPUDevice device, iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_host_size_t push_constant_count, iree_allocator_t host_allocator,
+    iree_host_size_t push_constant_count,
+    iree_hal_webgpu_staging_buffer_t* staging_buffer,
+    iree_allocator_t host_allocator,
     iree_hal_pipeline_layout_t** out_pipeline_layout) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(!set_layout_count || set_layouts);
@@ -186,16 +188,43 @@ iree_status_t iree_hal_webgpu_pipeline_layout_create(
   *out_pipeline_layout = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_inline_array(WGPUBindGroupLayout, bind_group_layouts, set_layout_count,
-                    host_allocator);
+  if (set_layout_count > IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "set_layout_count must be <= %d, as bind group index %d is reserved",
+        IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX,
+        IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX);
+  }
+
+  // Pad to IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX for push constant emulation.
+  iree_host_size_t bind_group_layouts_count =
+      push_constant_count > 0 ? IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX + 1
+                              : set_layout_count;
+
+  // Populate a WGPUBindGroupLayout array with the provided set layouts, then
+  // set the staging buffer's bind group layout at the right index, padding
+  // with an empty bind layout as needed.
+  iree_inline_array(WGPUBindGroupLayout, bind_group_layouts,
+                    bind_group_layouts_count, host_allocator);
   for (iree_host_size_t i = 0; i < set_layout_count; ++i) {
     *iree_inline_array_at(bind_group_layouts, i) =
         iree_hal_webgpu_descriptor_set_layout_handle(set_layouts[i]);
   }
+  for (iree_host_size_t i = set_layout_count; i < bind_group_layouts_count - 1;
+       ++i) {
+    *iree_inline_array_at(bind_group_layouts, i) =
+        staging_buffer->empty_bind_group_layout;
+  }
+  if (push_constant_count > 0) {
+    *iree_inline_array_at(bind_group_layouts,
+                          IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX) =
+        staging_buffer->bind_group_layout;
+  }
   const WGPUPipelineLayoutDescriptor descriptor = {
       .nextInChain = NULL,
       .label = NULL,
-      .bindGroupLayoutCount = (uint32_t)set_layout_count,
+      .bindGroupLayoutCount = (uint32_t)bind_group_layouts_count,
       .bindGroupLayouts = iree_inline_array_at(bind_group_layouts, 0),
   };
   WGPUPipelineLayout handle =
@@ -231,6 +260,7 @@ iree_status_t iree_hal_webgpu_pipeline_layout_create(
       pipeline_layout->set_binding_info.set_masks[i] =
           iree_hal_webgpu_descriptor_set_layout_binding_mask(set_layouts[i]);
     }
+    // Note: not tracking the empty/padding layout or the staging buffer layout.
 
     *out_pipeline_layout = (iree_hal_pipeline_layout_t*)pipeline_layout;
   } else {
