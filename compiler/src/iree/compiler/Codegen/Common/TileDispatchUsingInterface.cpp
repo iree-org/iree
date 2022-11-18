@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
@@ -222,18 +223,22 @@ static LogicalResult replaceStoreWithTiledVersion(
   SmallVector<OpFoldResult> tileStrides(tileOffsets.size(),
                                         rewriter.getIndexAttr(1));
   SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
+  SmallVector<OpFoldResult> storeOpOffsets, storeOpSizes, storeOpStrides;
+  SmallVector<Value> storeDynamicDims;
+  cloneOffsetsSizesAndStrides(rewriter, storeOp, storeOpOffsets, storeOpSizes,
+                              storeOpStrides, storeDynamicDims);
+
   if (failed(mergeOffsetsSizesAndStrides(
-          rewriter, storeOp.getLoc(), storeOp.getMixedOffsets(),
-          storeOp.getMixedSizes(), storeOp.getMixedStrides(),
-          storeOp.getDroppedDims(), tileOffsets, tileSizes, tileStrides,
-          combinedOffsets, combinedSizes, combinedStrides))) {
+          rewriter, storeOp.getLoc(), storeOpOffsets, storeOpSizes,
+          storeOpStrides, storeOp.getDroppedDims(), tileOffsets, tileSizes,
+          tileStrides, combinedOffsets, combinedSizes, combinedStrides))) {
     return rewriter.notifyMatchFailure(
         storeOp, "failed to create tiled flow.dispatch.tensor.store op");
   }
 
   rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
-      storeOp.getLoc(), tiledValue, storeOp.getTarget(),
-      storeOp.getTargetDims(), combinedOffsets, combinedSizes, combinedStrides);
+      storeOp.getLoc(), tiledValue, storeOp.getTarget(), storeDynamicDims,
+      combinedOffsets, combinedSizes, combinedStrides);
   rewriter.eraseOp(storeOp);
   return success();
 }
