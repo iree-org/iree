@@ -403,16 +403,17 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   // Mark any operation that has operands/results with encoding as
   // illegal.
   markUnknownOpDynamicallyLegal([=](Operation *op) {
-    for (auto v : op->getOperands()) {
-      if (typeHasEncoding(v.getType()))
-        return false;
-    }
-    for (auto t : op->getResultTypes()) {
+    auto typeHasEncoding = [=](Type t) -> bool {
       auto tensorType = t.dyn_cast<RankedTensorType>();
-      if (tensorType && tensorType.getEncoding())
-        return false;
-    }
-    return true;
+      return tensorType && tensorType.getEncoding();
+    };
+    auto valueHasEncoding = [=](Value v) -> bool {
+      return typeHasEncoding(v.getType());
+    };
+    bool hasOperandOrResultsWithEncoding =
+        llvm::any_of(op->getOperands(), valueHasEncoding) ||
+        llvm::any_of(op->getResultTypes(), typeHasEncoding);
+    return !hasOperandOrResultsWithEncoding;
   });
 }
 
