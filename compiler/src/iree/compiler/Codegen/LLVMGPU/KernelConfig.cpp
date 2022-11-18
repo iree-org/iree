@@ -399,6 +399,8 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
              shape.back() % (workgroupSize[0] * vectorSize) != 0) {
         vectorSize /= 2;
       }
+      if (vectorSize == 1)  // assume there is fastpath + slowpath
+        vectorSize = 4;
       int64_t problemSize = std::accumulate(
           shape.begin(), shape.end(), 1,
           [](const int64_t &a, const int64_t &b) { return a * b; });
