@@ -51,7 +51,7 @@ jobs:
           git log --oneline --graph --max-count=3
           ./build_tools/github_actions/configure_ci.py
 
-  build_cpu:
+  benchmark_cpu:
     needs: setup
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
@@ -63,10 +63,8 @@ jobs:
     env:
       MMPERF_REPO_DIR: ${{ needs.setup.outputs.mmperf-repo-dir }}
       BUILD_DIR: mmperf-build-cpu
-    outputs:
-      build-dir: ${{ env.BUILD_DIR }}
-      build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+      RESULTS_DIR: mmperf-results-cpu
+      RESULTS_GCS_UPLOAD_DIR: "gs://mmperf-benchmark-artifacts/cpu"
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -75,31 +73,21 @@ jobs:
       - name: "Building mmperf for CPU"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:1ffc9bfa4618c38d3c2a4ecbf6c4d825106736ff1602bd139bb1cf2005ec23dd \
+            gcr.io/iree-oss/mmperf@sha256:f1b458cb9570e5e70ffbd59d64d365ed818cb3b308d6e42a4cf5807f2c1a9ced \
           ./build_tools/benchmarks/mmperf/build_mmperf.sh "${MMPERF_REPO_DIR}" "${BUILD_DIR}" "cpu"
-      - name: "Removing unused files"
+      - name: "Running mmperf on CPU"
         run: |
-          find "${BUILD_DIR}" -type f -name "*.a" -o -type f -name "*.o" \
-            -print \
-            -delete
-      - name: "Creating build dir archive"
-        id: archive
-        env:
-          BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
+          mkdir ${RESULTS_DIR}
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/mmperf@sha256:f1b458cb9570e5e70ffbd59d64d365ed818cb3b308d6e42a4cf5807f2c1a9ced \
+          ./build_tools/benchmarks/mmperf/run_mmperf.sh "${MMPERF_REPO_DIR}" "${BUILD_DIR}" "${RESULTS_DIR}"
+      - name: "Uploading results"
         run: |
-          tar -I 'zstd -T0' \
-            -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
-          echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
-      - name: "Uploading build dir archive"
-        id: upload
-        env:
-          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
-          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
-        run: |
-          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
-          echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
+          export GCS_DIR_NAME="$(date +'%Y-%m-%d').$(date +'%s')"
+          gcloud alpha storage cp "${RESULTS_DIR}/latest/**" "${RESULTS_GCS_UPLOAD_DIR}/${GCS_DIR_NAME}/"
+          gcloud alpha storage cp "${RESULTS_DIR}/latest/matmul.png" "${RESULTS_GCS_UPLOAD_DIR}/matmul.png"
 
-  build_cuda:
+  benchmark_cuda:
     needs: setup
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
@@ -111,10 +99,8 @@ jobs:
     env:
       MMPERF_REPO_DIR: ${{ needs.setup.outputs.mmperf-repo-dir }}
       BUILD_DIR: mmperf-build-cuda
-    outputs:
-      build-dir: ${{ env.BUILD_DIR }}
-      build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+      RESULTS_DIR: mmperf-results-cuda
+      RESULTS_GCS_UPLOAD_DIR: "gs://mmperf-benchmark-artifacts/cuda"
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -123,100 +109,18 @@ jobs:
       - name: "Building mmperf for CUDA"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:1ffc9bfa4618c38d3c2a4ecbf6c4d825106736ff1602bd139bb1cf2005ec23dd \
+          --gpus all \
+            gcr.io/iree-oss/mmperf@sha256:f1b458cb9570e5e70ffbd59d64d365ed818cb3b308d6e42a4cf5807f2c1a9ced \
           ./build_tools/benchmarks/mmperf/build_mmperf.sh "${MMPERF_REPO_DIR}" "${BUILD_DIR}" "cuda"
-      - name: "Removing unused files"
-        run: |
-          find "${BUILD_DIR}" -type f -name "*.a" -o -type f -name "*.o" \
-            -print \
-            -delete
-      - name: "Creating build dir archive"
-        id: archive
-        env:
-          BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
-        run: |
-          tar -I 'zstd -T0' \
-            -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
-          echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
-      - name: "Uploading build dir archive"
-        id: upload
-        env:
-          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
-          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
-        run: |
-          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
-          echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
-
-  benchmark_cpu:
-    needs: [setup, build_cpu]
-    if: needs.setup.outputs.should-run == 'true'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      MMPERF_REPO_DIR: ${{ needs.setup.outputs.mmperf-repo-dir }}
-      MMPERF_RESULTS_DIR: mmperf-results-cpu
-      MMPERF_RESULTS_GCS_UPLOAD_DIR: "gs://mmperf-benchmark-artifacts/cpu"
-      BUILD_DIR: ${{ needs.build_cpu.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_cpu.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_cpu.outputs.build-dir-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
-      - name: "Running mmperf on CPU"
-        run: |
-          mkdir ${MMPERF_RESULTS_DIR}
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:1ffc9bfa4618c38d3c2a4ecbf6c4d825106736ff1602bd139bb1cf2005ec23dd \
-          ./build_tools/benchmarks/mmperf/run_mmperf.sh "${MMPERF_REPO_DIR}" "${BUILD_DIR}" "${MMPERF_RESULTS_DIR}"
-      - name: "Uploading results"
-        run: |
-          export GCS_DIR_NAME="$(date +'%Y-%m-%d').$(date +'%s')"
-          gcloud alpha storage cp "${MMPERF_RESULTS_DIR}/latest/**" "${MMPERF_RESULTS_GCS_UPLOAD_DIR}/${GCS_DIR_NAME}/"
-          gcloud alpha storage cp "${MMPERF_RESULTS_DIR}/latest/matmul.png" "${MMPERF_RESULTS_GCS_UPLOAD_DIR}/matmul.png"
-
-  benchmark_cuda:
-    needs: [setup, build_cuda]
-    if: needs.setup.outputs.should-run == 'true'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - gpu
-      - os-family=Linux
-    env:
-      MMPERF_REPO_DIR: ${{ needs.setup.outputs.mmperf-repo-dir }}
-      MMPERF_RESULTS_DIR: mmperf-results-cuda
-      MMPERF_RESULTS_GCS_UPLOAD_DIR: "gs://mmperf-benchmark-artifacts/cuda"
-      BUILD_DIR: ${{ needs.build_cuda.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_cuda.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_cuda.outputs.build-dir-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Running mmperf on CUDA"
         run: |
-          mkdir ${MMPERF_RESULTS_DIR}
+          mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:1ffc9bfa4618c38d3c2a4ecbf6c4d825106736ff1602bd139bb1cf2005ec23dd \
-          ./build_tools/benchmarks/mmperf/run_mmperf.sh "${MMPERF_REPO_DIR}" "${BUILD_DIR}" "${MMPERF_RESULTS_DIR}"
+          --gpus all \
+            gcr.io/iree-oss/mmperf@sha256:f1b458cb9570e5e70ffbd59d64d365ed818cb3b308d6e42a4cf5807f2c1a9ced \
+          ./build_tools/benchmarks/mmperf/run_mmperf.sh "${MMPERF_REPO_DIR}" "${BUILD_DIR}" "${RESULTS_DIR}"
       - name: "Uploading results"
         run: |
           export GCS_DIR_NAME="$(date +'%Y-%m-%d').$(date +'%s')"
-          gcloud alpha storage cp "${MMPERF_RESULTS_DIR}/latest/**" "${MMPERF_RESULTS_GCS_UPLOAD_DIR}/${GCS_DIR_NAME}/"
-          gcloud alpha storage cp "${MMPERF_RESULTS_DIR}/latest/matmul.png" "${MMPERF_RESULTS_GCS_UPLOAD_DIR}/matmul.png"
+          gcloud alpha storage cp "${RESULTS_DIR}/latest/**" "${RESULTS_GCS_UPLOAD_DIR}/${GCS_DIR_NAME}/"
+          gcloud alpha storage cp "${RESULTS_DIR}/latest/matmul.png" "${RESULTS_GCS_UPLOAD_DIR}/matmul.png"

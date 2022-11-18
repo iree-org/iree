@@ -31,4 +31,4 @@ export REPORT_DIR=$3
 source ${REPO_DIR}/mmperf.venv/bin/activate
 
 # Run benchmark.
-python3 ${REPO_DIR}/mmperf.py ${BUILD_DIR}/matmul ${REPORT_DIR}
+python3 ${REPO_DIR}/mmperf.py ${BUILD_DIR}/matmul/ ${REPORT_DIR}

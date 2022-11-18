@@ -19,7 +19,7 @@
 # Currently x86 CPU and CUDA are supported.
 #
 # Usage:
-#    ./run_mmperf.sh \
+#    ./build_mmperf.sh \
 #        <mmperf repo dir> \
 #        <mmperf build dir> \
 #        <backend> e.g. "cpu", "cuda".
@@ -44,41 +44,43 @@ source mmperf.venv/bin/activate
 
 # Update IREE.
 pushd external/iree
-git restore .
-git submodule foreach --recursive git restore .
 git fetch
 git checkout origin/main
 git submodule update --init --jobs 8 --depth 1
-popd
+popd # external/iree
 
-popd
+popd # ${REPO_DIR}
 
 # Build mmperf.
-if [ ${BACKEND} == "cuda" ]; then
-  cmake \
-    -GNinja \
-    -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
-    -DCMAKE_C_COMPILER=/usr/bin/clang \
-    -DUSE_IREE=ON \
-    -DIREE_CUDA=ON \
-    -DUSE_CUBLAS=ON \
-    -B ${BUILD_DIR} ${REPO_DIR}
+declare -a args=(
+  -GNinja
+  -DCMAKE_CXX_COMPILER=/usr/bin/clang++
+  -DCMAKE_C_COMPILER=/usr/bin/clang
+  -DUSE_IREE=ON
+)
+
+if [[ ${BACKEND} == "cuda" ]]; then
+  args+=(
+    -DIREE_CUDA=ON
+    -DUSE_CUBLAS=ON
+  )
+  cmake "${args[@]}" -B ${BUILD_DIR} ${REPO_DIR}
+elif [[ ${BACKEND} == "cpu" ]]; then
+  args+=(
+    -DMKL_DIR=/opt/intel/mkl
+    -DBLIS_DIR=/opt/blis
+    -DUSE_MKL=ON
+    -DUSE_RUY=ON
+    -DIREE_LLVMCPU=ON
+    -DUSE_HALIDE=ON
+    -DUSE_OPENBLAS=ON
+    -DUSE_BLIS=ON
+    -DUSE_TVM=ON
+  )
+  MKL_DIR=/opt/intel/mkl BLIS_DIR=/opt/blis cmake "${args[@]}" -B ${BUILD_DIR} ${REPO_DIR}
 else
-  MKL_DIR=/opt/intel/mkl BLIS_DIR=/opt/blis cmake \
-    -GNinja \
-    -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
-    -DCMAKE_C_COMPILER=/usr/bin/clang \
-    -DMKL_DIR=/opt/intel/mkl \
-    -DBLIS_DIR=/opt/blis \
-    -DUSE_MKL=ON \
-    -DUSE_RUY=ON \
-    -DUSE_IREE=ON \
-    -DIREE_LLVMCPU=ON \
-    -DUSE_HALIDE=ON \
-    -DUSE_OPENBLAS=ON \
-    -DUSE_BLIS=ON \
-    -DUSE_TVM=ON \
-    -B ${BUILD_DIR} ${REPO_DIR}
+  echo "Error: Unsupported backend."
+  return 1
 fi
 
 cmake --build ${BUILD_DIR} --verbose

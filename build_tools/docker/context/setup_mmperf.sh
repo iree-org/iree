@@ -24,7 +24,7 @@ export REPO_DIR=$1
 export REPO_SHA=$2
 
 pushd ${REPO_DIR}
-git clone --recurse-submodules https://github.com/mmperf/mmperf.git
+git clone --jobs 8 --depth 1 --no-single-branch --recurse-submodules https://github.com/mmperf/mmperf.git
 pushd mmperf
 
 # Checkout a specific commit.
@@ -36,14 +36,17 @@ source mmperf.venv/bin/activate
 pip install -r requirements.txt
 pip install -r ./external/llvm-project/mlir/python/requirements.txt
 
-# Since we are updating the IREE repo at each run, make sure there are no local changes.
-pushd external/iree
+popd # mmperf
+
+# Since the root user clones the mmperf repo, we update permissions so that a
+# runner can access this repo.
+chmod -R 777 .
+
+# Make sure there are no local changes to the IREE submodule since the workflow
+# updates this at each run.
+pushd mmperf/external/iree
 git restore .
 git submodule foreach --recursive git restore .
-popd
+popd # mmperf/external/iree
 
-popd
-
-# Since the root user is used to clone the mmperf repo, we update permissions
-# so that a runner can access this repo.
-chmod -R 777 .
+popd # ${REPO_DIR}
