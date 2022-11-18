@@ -267,6 +267,81 @@ function(iree_add_data_dependencies)
 endfunction()
 
 #-------------------------------------------------------------------------------
+# Emscripten
+#-------------------------------------------------------------------------------
+
+# A global counter to guarantee unique names for js library files.
+set(_LINK_JS_COUNTER 1)
+
+# Links a JavaScript library to a target using --js-library=file.js.
+#
+# This function is only supported when running under Emscripten (emcmake).
+# This implementation is forked from `em_add_tracked_link_flag()` in
+# https://github.com/emscripten-core/emscripten/blob/main/cmake/Modules/Platform/Emscripten.cmake
+# with changes to be compatible with IREE project style and CMake conventions.
+#
+# Parameters:
+# TARGET: Name of the target to link against
+# SRCS: List of JavaScript source files to link
+function(iree_link_js_library)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "TARGET"
+    "SRCS"
+    ${ARGN}
+  )
+
+  # Convert from aliased, possibly package-relative, names to target names.
+  iree_package_ns(_PACKAGE_NS)
+  string(REGEX REPLACE "^::" "${_PACKAGE_NS}::" _RULE_TARGET ${_RULE_TARGET})
+  string(REPLACE "::" "_" _RULE_TARGET ${_RULE_TARGET})
+
+  foreach(_SRC_FILE ${_RULE_SRCS})
+    # If the JS file is changed, we want to relink dependent binaries, but
+    # unfortunately it is not possible to make a link step depend directly on a
+    # source file. Instead, we must make a dummy no-op build target on that
+    # source file, and make the original target depend on that dummy target.
+
+    # Sanitate the source .js filename to a good dummy filename.
+    get_filename_component(_JS_NAME "${_SRC_FILE}" NAME)
+    string(REGEX REPLACE "[/:\\\\.\ ]" "_" _DUMMY_JS_TARGET ${_JS_NAME})
+    set(_DUMMY_LIB_NAME ${_RULE_TARGET}_${_LINK_JS_COUNTER}_${_DUMMY_JS_TARGET})
+    set(_DUMMY_C_NAME "${CMAKE_BINARY_DIR}/${_DUMMY_JS_TARGET}_tracker.c")
+
+    # Create a new static library target that with a single dummy .c file.
+    add_library(${_DUMMY_LIB_NAME} STATIC ${_DUMMY_C_NAME})
+    # Make the dummy .c file depend on the .js file we are linking, so that if
+    # the .js file is edited, the dummy .c file, and hence the static library
+    # will be rebuild (no-op). This causes the main application to be
+    # relinked, which is what we want. This approach was recommended by
+    # http://www.cmake.org/pipermail/cmake/2010-May/037206.html
+    add_custom_command(
+      OUTPUT ${_DUMMY_C_NAME}
+      COMMAND ${CMAKE_COMMAND} -E touch ${_DUMMY_C_NAME}
+      DEPENDS ${_SRC_FILE}
+    )
+    target_link_libraries(${_RULE_TARGET}
+      PUBLIC
+        ${_DUMMY_LIB_NAME}
+    )
+
+    # Link the js-library to the target.
+    # When a linked library starts with a "-" cmake will just add it to the
+    # linker command line as it is. The advantage of doing it this way is
+    # that the js-library will also be automatically linked to targets that
+    # depend on this target.
+    get_filename_component(_SRC_ABSOLUTE_PATH "${_SRC_FILE}" ABSOLUTE)
+    target_link_libraries(${_RULE_TARGET}
+      PUBLIC
+        "--js-library \"${_SRC_ABSOLUTE_PATH}\""
+    )
+
+    math(EXPR _LINK_JS_COUNTER "${_LINK_JS_COUNTER} + 1")
+  endforeach()
+endfunction()
+
+#-------------------------------------------------------------------------------
 # Tool symlinks
 #-------------------------------------------------------------------------------
 
