@@ -95,11 +95,18 @@ static LogicalResult verifyEntryPoint(
       return verifyLoweringConfiguration(moduleOp, translationInfo,
                                          workgroupSizes,
                                          verifySPIRVBaseVectorizePassPipeline);
+      break;
     case IREE::Codegen::DispatchLoweringPassPipeline::
         SPIRVMatmulPromoteVectorize:
       return verifyLoweringConfiguration(
           moduleOp, translationInfo, workgroupSizes,
           verifySPIRVMatmulPromoteVectorizePassPipeline);
+      break;
+    case IREE::Codegen::DispatchLoweringPassPipeline::
+        SPIRVCooperativeMatrixVectorize:
+      return verifyLoweringConfiguration(
+          moduleOp, translationInfo, workgroupSizes,
+          verifySPIRVCooperativeMatrixVectorizePassPipeline);
       break;
     default:;
   }

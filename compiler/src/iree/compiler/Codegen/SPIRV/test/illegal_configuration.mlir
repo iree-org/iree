@@ -385,6 +385,241 @@ hal.executable private @matmul_tensors {
 
 // -----
 
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16]]>
+#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_tensors {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      #spirv.resource_limits<
+        cooperative_matrix_properties_nv = [
+          #spirv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f16, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+        ],
+        max_compute_shared_memory_size = 65536,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [1024, 1024, 1024],
+        subgroup_size = 64>
+       >}> {
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [128 : index, 2 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @illegal() {
+        %c0 = arith.constant 0 : index
+        %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x16xf32>
+        %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
+        %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
+        // expected-error @+1 {{expected 4 levels of tiling sizes, got 3}}
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
+          outs(%result: memref<64x128xf32>)
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [8, 8], [0, 0, 4], [16, 16, 16]]>
+#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_tensors {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      #spirv.resource_limits<
+        cooperative_matrix_properties_nv = [
+          #spirv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f16, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+        ],
+        max_compute_shared_memory_size = 65536,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [1024, 1024, 1024],
+        subgroup_size = 64>
+       >}> {
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [256 : index, 4 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @illegal() {
+        %c0 = arith.constant 0 : index
+        %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x16xf32>
+        %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
+        %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
+        // expected-error @+1 {{expected subgroup tile sizes to be multiple of 16}}
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
+          outs(%result: memref<64x128xf32>)
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>
+#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_tensors {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      #spirv.resource_limits<
+        cooperative_matrix_properties_nv = [
+          #spirv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f16, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+        ],
+        max_compute_shared_memory_size = 65536,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [1024, 1024, 1024],
+        subgroup_size = 64>
+       >}> {
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [64 : index, 2 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @illegal() {
+        %c0 = arith.constant 0 : index
+        %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x16xf32>
+        %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
+        %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
+        // expected-error @+1 {{expected workgroup x component equals to (warp_size * wg_tile_n / subgroup_tile_n)}}
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
+          outs(%result: memref<64x128xf32>)
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>
+#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_tensors {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      #spirv.resource_limits<
+        cooperative_matrix_properties_nv = [
+          #spirv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f16, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+        ],
+        max_compute_shared_memory_size = 65536,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [1024, 1024, 1024],
+        subgroup_size = 64>
+       >}> {
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [128 : index, 4 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @illegal() {
+        %c0 = arith.constant 0 : index
+        %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x16xf32>
+        %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
+        %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
+        // expected-error @+1 {{expected workgroup y component equals to (wg_tile_m / subgroup_tile_m)}}
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
+          outs(%result: memref<64x128xf32>)
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [32, 32], [0, 0, 16], [16, 16, 16]]>
+#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_tensors {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      #spirv.resource_limits<
+        cooperative_matrix_properties_nv = [
+          #spirv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f16, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+        ],
+        max_compute_shared_memory_size = 65536,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [1024, 1024, 1024],
+        subgroup_size = 64>
+       >}> {
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [64 : index, 1 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @illegal() {
+        %c0 = arith.constant 0 : index
+        %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x16xf32>
+        %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
+        %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
+        // expected-error @+1 {{expected total workgroup size to be >= 128}}
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
+          outs(%result: memref<64x128xf32>)
+        return
+      }
+    }
+  }
+}
+
+// -----
+
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 2], [0, 0, 0, 0, 1, 1, 4]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

@@ -479,6 +479,10 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm);
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing
 /// to workgroups and subgroups and then vectorizing to SPIR-V cooperative
 /// matrix code.
+LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize);
 void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing to
