@@ -911,8 +911,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   if (bitWidth != 32) return failure();
 
   // Let each thread handle `vectorSize` elements.
-  const unsigned largestLoadSizeInBits = 128;
-  unsigned vectorSize = largestLoadSizeInBits / bitWidth;
+  unsigned vectorSize = kMaxVectorNumBits / bitWidth;
   while ((*dimSize / vectorSize) % subgroupSize != 0) vectorSize /= 2;
 
   // TODO: Add reduction tiling to handle larger reductions.
