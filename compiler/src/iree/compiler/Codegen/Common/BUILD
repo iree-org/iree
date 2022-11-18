@@ -99,6 +99,10 @@ iree_compiler_cc_library(
     name = "TransformDialectJitterPass",
     srcs = [
         "TransformDialectJitterPass.cpp",
+        "TransformDialectStrategies.cpp",
+    ],
+    hdrs = [
+        "TransformDialectStrategies.h",
     ],
     deps = [
         # Dialects
@@ -109,6 +113,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:AsyncDialect",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",
@@ -249,7 +254,6 @@ iree_compiler_cc_library(
         "TestPartitionableLoopsInterface.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TileDispatchUsingInterface.cpp",
-        "TransformDialectStrategies.cpp",
         "UserConfig.cpp",
         "VectorReductionToGPU.cpp",
         "WorkGroupSwizzle.cpp",

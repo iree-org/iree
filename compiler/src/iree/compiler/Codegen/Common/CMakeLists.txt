@@ -70,8 +70,11 @@ iree_cc_library(
 iree_cc_library(
   NAME
     TransformDialectJitterPass
+  HDRS
+    "TransformDialectStrategies.h"
   SRCS
     "TransformDialectJitterPass.cpp"
+    "TransformDialectStrategies.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtTransformOps
@@ -79,6 +82,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
+    MLIRAnalysis
     MLIRArithDialect
     MLIRArithTransforms
     MLIRArithUtils
@@ -219,7 +223,6 @@ iree_cc_library(
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
-    "TransformDialectStrategies.cpp"
     "UserConfig.cpp"
     "VectorReductionToGPU.cpp"
     "WorkGroupSwizzle.cpp"
