@@ -17,6 +17,8 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser/Parser.h"
@@ -94,20 +96,28 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
                             typeConverter);
   }
 
-  void walkAttributeStorage(
+  LogicalResult walkAttributeStorage(
       Attribute attr,
       const function_ref<void(Attribute elementAttr)> &fn) const override {
+    MLIRContext *context = attr.getContext();
     // TODO(benvanik): remove this interface or make it an attr interface.
     if (auto bindingAttr =
             attr.dyn_cast<IREE::HAL::DescriptorSetBindingAttr>()) {
-      fn(IntegerAttr::get(IndexType::get(attr.getContext()),
+      fn(IntegerAttr::get(IndexType::get(context),
                           APInt(64, bindingAttr.getOrdinal())));
-      fn(IREE::HAL::DescriptorTypeAttr::get(attr.getContext(),
-                                            bindingAttr.getType()));
+      fn(IREE::HAL::DescriptorTypeAttr::get(context, bindingAttr.getType()));
       fn(IREE::HAL::DescriptorFlagsAttr::get(
-          attr.getContext(),
+          context,
           bindingAttr.getFlags().value_or(IREE::HAL::DescriptorFlags::None)));
+      return success();
     }
+    if (auto dtAttr = attr.dyn_cast<IREE::HAL::DescriptorTypeAttr>()) {
+      // Repack as a normal integer attribute.
+      fn(IntegerAttr::get(IntegerType::get(context, 32),
+                          APInt(32, static_cast<uint32_t>(dtAttr.getValue()))));
+      return success();
+    }
+    return failure();
   }
 };
 

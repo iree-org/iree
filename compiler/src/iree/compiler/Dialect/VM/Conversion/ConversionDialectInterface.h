@@ -45,10 +45,13 @@ class VMConversionDialectInterface
       ConversionTarget &conversionTarget,
       TypeConverter &typeConverter) const = 0;
 
-  // Walks all child attributes defined within a custom dialect attribute.
-  virtual void walkAttributeStorage(
+  // Walks all child attributes defined within a custom dialect attribute;
+  // returns false on unknown attributes.
+  virtual LogicalResult walkAttributeStorage(
       Attribute attr,
-      const function_ref<void(Attribute elementAttr)> &fn) const {}
+      const function_ref<void(Attribute elementAttr)> &fn) const {
+    return success();
+  }
 
  protected:
   // Parses the vm.import module to be cached by the caller.
