@@ -279,7 +279,7 @@ static Value buildReductionStrategyThreadDistributionPart(
                   // not generate the IR we want atm.
                   //  /*tileSizes=*/tileSizes1Fill,
                   //  /*threadDimMapping=*/b.getArrayAttr({y}));
-                   /*tileSizes=*/ArrayRef<int64_t>{1, 0, 0},
+                   /*tileSizes=*/tileSizes1Fill,
                    /*threadDimMapping=*/b.getArrayAttr({z}));
   tfdWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/parParRedH,
@@ -288,7 +288,7 @@ static Value buildReductionStrategyThreadDistributionPart(
                   // not generate the IR we want atm.
                   //  /*tileSizes=*/tileSizes1Generic,
                   //  /*threadDimMapping=*/b.getArrayAttr({y}));
-                   /*tileSizes=*/ArrayRef<int64_t>{1, 1, 0},
+                   /*tileSizes=*/tileSizes1Generic,
                    /*threadDimMapping=*/b.getArrayAttr({z,y}));
   // clang-format on
   return variantH;
@@ -311,7 +311,7 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   variantH = buildReductionStrategyThreadDistributionPart(
-      b, variantH, tileSizes[1], tileSizes[1]);
+      b, variantH, tileSizes[1], tileSizes[2]);
 
   // Step 3. Rank-reduce and vectorize.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
@@ -378,10 +378,11 @@ static bool matchReduction(linalg::LinalgOp op, TileSizesListType &tileSizes,
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   // Tile all the parallel dimension to 1.
   SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
-  SmallVector<int64_t, 4> threadTileSizes = workgroupTileSizes;
-  threadTileSizes.push_back(1);
+  SmallVector<int64_t, 4> fillTileSize = {1, 0, 0};
+  SmallVector<int64_t, 4> genericTileSize = {1, 0, 0};
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
-  tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
+  tileSizes.emplace_back(std::move(fillTileSize));
+  tileSizes.emplace_back(std::move(genericTileSize));
   return true;
 }
 
@@ -406,8 +407,8 @@ static void createTransformRegion(func::FuncOp entryPoint,
       });
 }
 
-LogicalResult matchAndSetReductionTransformStrategy(func::FuncOp entryPoint,
-                                                    linalg::LinalgOp op) {
+LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
+                                                       linalg::LinalgOp op) {
   // 1. Match
   TileSizesListType tileSizes;
   std::array<int64_t, 3> workgroupSize;

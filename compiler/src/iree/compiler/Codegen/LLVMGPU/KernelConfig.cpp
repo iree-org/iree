@@ -465,7 +465,7 @@ static LogicalResult setReductionTransformJitConfig(func::FuncOp entryPoint,
                                                     linalg::LinalgOp op) {
   if (!clGPUEnableTransformDialectJit) return failure();
   if (!isCudaTarget(entryPoint)) return failure();
-  if (failed(matchAndSetReductionTransformStrategy(entryPoint, op)))
+  if (failed(matchAndSetGPUReductionTransformStrategy(entryPoint, op)))
     return failure();
 
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
