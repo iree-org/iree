@@ -73,9 +73,12 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    %[[R6:.+]] = arith.addf %[[R5]], %[[S4]] : f32
 //         CHECK:    %[[ALLOC:.+]] = memref.alloc() : memref<16xf32, 3>
 //         CHECK:    %[[WID:.+]] = arith.divui %{{.*}}, %{{.*}} : index
-//         CHECK:    memref.store %[[R6]], %[[ALLOC]][%[[WID]]] : memref<16xf32, 3>
+//         CHECK:    %[[LANE_ID:.*]] = arith.remui %[[TID]], %[[C32I]] : index
+//         CHECK:    %[[LANE0:.*]] = arith.cmpi eq, %[[LANE_ID]], %[[C0]] : index
+//         CHECK:    scf.if %[[LANE0]] { 
+//         CHECK:      memref.store %[[R6]], %[[ALLOC]][%[[WID]]] : memref<16xf32, 3>
+//         CHECK:    }
 //         CHECK:    gpu.barrier
-//         CHECK:    %[[LANE_ID:.+]] = arith.remui %[[TID]], %[[C32I]] : index
 //         CHECK:    %[[LOAD_VAL:.+]] = memref.load %[[ALLOC]][%[[LANE_ID]]] : memref<16xf32, 3>
 //         CHECK:    %[[USE_IDENTITY:.+]] = arith.cmpi sge, %[[LANE_ID]], %[[C16I]] : index
 //         CHECK:    %[[LANE_VAL:.+]] = arith.select %[[USE_IDENTITY]], %[[IDENTITY]], %[[LOAD_VAL]] : f32
@@ -164,9 +167,11 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    arith.addf
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.addf
-//         CHECK:    memref.store {{.*}} : memref<16xf32, 3>
-//         CHECK:    gpu.barrier
 //         CHECK:    arith.remui
+//         CHECK:    scf.if
+//         CHECK:      memref.store {{.*}} : memref<16xf32, 3>
+//         CHECK:    }
+//         CHECK:    gpu.barrier
 //         CHECK:    memref.load
 //         CHECK:    arith.cmpi
 //         CHECK:    arith.select
@@ -182,7 +187,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    arith.addf
 //         CHECK:    arith.addf
 //         CHECK:    vector.broadcast %{{.*}} : f32 to vector<4xf32>
-//         CHECK:    %22 = arith.divf {{.*}} : vector<4xf32>
+//         CHECK:    arith.divf {{.*}} : vector<4xf32>
 //         CHECK:    scf.for
 //         CHECK:      vector.transfer_write {{.*}} : vector<4xf32>, memref<512x10240xf32>
 //         CHECK:    }

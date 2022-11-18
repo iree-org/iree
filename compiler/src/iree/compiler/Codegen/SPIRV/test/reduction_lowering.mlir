@@ -74,9 +74,12 @@ hal.executable @warp_reduction_dispatch {
 //         CHECK:    %[[R6:.+]] = arith.addf %[[R5]], %[[S4]] : f32
 //         CHECK:    %[[ALLOC:.+]] = memref.alloc() : memref<4xf32, 3>
 //         CHECK:    %[[WID:.+]] = arith.divui %{{.*}}, %{{.*}} : index
-//         CHECK:    memref.store %[[R6]], %[[ALLOC]][%[[WID]]] : memref<4xf32, 3>
+//         CHECK:    %[[LANE_ID:.*]] = arith.remui %[[TID]], %[[C32I]] : index
+//         CHECK:    %[[LANE0:.*]] = arith.cmpi eq, %[[LANE_ID]], %[[C0]] : index
+//         CHECK:    scf.if %[[LANE0]] { 
+//         CHECK:      memref.store %[[R6]], %[[ALLOC]][%[[WID]]] : memref<4xf32, 3>
+//         CHECK:    }
 //         CHECK:    gpu.barrier
-//         CHECK:    %[[LANE_ID:.+]] = arith.remui %[[TID]], %[[C32I]] : index
 //         CHECK:    %[[LOAD_VAL:.+]] = memref.load %[[ALLOC]][%[[LANE_ID]]] : memref<4xf32, 3>
 //         CHECK:    %[[USE_IDENTITY:.+]] = arith.cmpi sge, %[[LANE_ID]], %[[C4I]] : index
 //         CHECK:    %[[LANE_VAL:.+]] = arith.select %[[USE_IDENTITY]], %[[IDENTITY]], %[[LOAD_VAL]] : f32
