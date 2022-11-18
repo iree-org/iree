@@ -18,7 +18,6 @@ iree_compiler_cc_library(
         "ConvertToLLVM.cpp",
         "ConvertToNVVM.cpp",
         "ConvertToROCDL.cpp",
-        "GPUTransformDialectStrategies.cpp",
         "KernelConfig.cpp",
         "LLVMGPUDistribute.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
@@ -34,7 +33,6 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "ConvertToLLVM.h",
-        "GPUTransformDialectStrategies.h",
         "KernelConfig.h",
         "TilingUtils.h",
         "TransposeUtils.h",
@@ -42,7 +40,6 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "//compiler/src/iree/compiler/Codegen/Common",
-        "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
         "//compiler/src/iree/compiler/Codegen/Transforms",

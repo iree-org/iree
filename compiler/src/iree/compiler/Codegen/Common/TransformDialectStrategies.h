@@ -12,8 +12,8 @@
 namespace mlir {
 namespace iree_compiler {
 
-LogicalResult matchAndSetReductionTransformStrategy(func::FuncOp entryPoint,
-                                                    linalg::LinalgOp op);
+LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
+                                                       linalg::LinalgOp op);
 }  // namespace iree_compiler
 }  // namespace mlir
 

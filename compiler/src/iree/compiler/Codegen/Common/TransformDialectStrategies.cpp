@@ -4,21 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/GPUTransformDialectStrategies.h"
+#include "iree/compiler/Codegen/Common/TransformDialectStrategies.h"
 
 #include <numeric>
 #include <type_traits>
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
-#include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterUtils.h"
-#include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
-#include "iree/compiler/Codegen/Common/UserConfig.h"
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/GPUTransformDialectStrategies.h"
-#include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
-#include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -33,8 +26,6 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/PDL/IR/PDL.h"
-#include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
@@ -280,7 +271,7 @@ static Value buildReductionStrategyThreadDistributionPart(
                   // not generate the IR we want atm.
                   //  /*tileSizes=*/tileSizes1Fill,
                   //  /*threadDimMapping=*/b.getArrayAttr({y}));
-                   /*tileSizes=*/ArrayRef<int64_t>{1, 0, 0},
+                   /*tileSizes=*/tileSizes1Fill,
                    /*threadDimMapping=*/b.getArrayAttr({z}));
   tfdWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/parParRedH,
@@ -289,7 +280,7 @@ static Value buildReductionStrategyThreadDistributionPart(
                   // not generate the IR we want atm.
                   //  /*tileSizes=*/tileSizes1Generic,
                   //  /*threadDimMapping=*/b.getArrayAttr({y}));
-                   /*tileSizes=*/ArrayRef<int64_t>{1, 1, 0},
+                   /*tileSizes=*/tileSizes1Generic,
                    /*threadDimMapping=*/b.getArrayAttr({z,y}));
   // clang-format on
   return variantH;
@@ -312,7 +303,7 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   variantH = buildReductionStrategyThreadDistributionPart(
-      b, variantH, tileSizes[1], tileSizes[1]);
+      b, variantH, tileSizes[1], tileSizes[2]);
 
   // Step 3. Rank-reduce and vectorize.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
@@ -379,10 +370,11 @@ static bool matchReduction(linalg::LinalgOp op, TileSizesListType &tileSizes,
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   // Tile all the parallel dimension to 1.
   SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
-  SmallVector<int64_t, 4> threadTileSizes = workgroupTileSizes;
-  threadTileSizes.push_back(1);
+  SmallVector<int64_t, 4> fillTileSize = {1, 0, 0};
+  SmallVector<int64_t, 4> genericTileSize = {1, 1, 0};
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
-  tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
+  tileSizes.emplace_back(std::move(fillTileSize));
+  tileSizes.emplace_back(std::move(genericTileSize));
   return true;
 }
 
@@ -407,8 +399,8 @@ static void createTransformRegion(func::FuncOp entryPoint,
       });
 }
 
-LogicalResult matchAndSetReductionTransformStrategy(func::FuncOp entryPoint,
-                                                    linalg::LinalgOp op) {
+LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
+                                                       linalg::LinalgOp op) {
   // 1. Match
   TileSizesListType tileSizes;
   std::array<int64_t, 3> workgroupSize;
