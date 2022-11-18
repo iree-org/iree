@@ -187,7 +187,7 @@ static Value tfdWithNumThreadsHandle(
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 // TODO: configure patterns.
-static Value vectorize(ImplicitLocOpBuilder &b, Value funcH) {
+static Value buildVectorizeStrategy(ImplicitLocOpBuilder &b, Value funcH) {
   funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
   return b.create<VectorizeOp>(funcH);
 }
@@ -308,7 +308,7 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
   // Step 3. Rank-reduce and vectorize.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = vectorize(b, funcH);
+  funcH = buildVectorizeStrategy(b, funcH);
 
   // Step 4. Bufferize.
   variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
@@ -326,8 +326,8 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
 static constexpr unsigned cudaWarpSize = 32;
 
 /// Matcher.
-static bool matchReduction(linalg::LinalgOp op, TileSizesListType &tileSizes,
-                           std::array<int64_t, 3> &workgroupSize) {
+static bool matchGPUReduction(linalg::LinalgOp op, TileSizesListType &tileSizes,
+                              std::array<int64_t, 3> &workgroupSize) {
   // TODO: match the sequence the startegy supports.
   if (!isa<linalg::GenericOp>(op)) return false;
   if (op.hasDynamicShape()) return false;
@@ -378,6 +378,36 @@ static bool matchReduction(linalg::LinalgOp op, TileSizesListType &tileSizes,
   return true;
 }
 
+static bool matchCPUReduction(linalg::LinalgOp op,
+                              SmallVector<int64_t> &tileSize,
+                              std::array<int64_t, 3> &workgroupSize) {
+  // TODO: match the sequence the startegy supports.
+  if (!isa<linalg::GenericOp>(op)) return false;
+  if (op.hasDynamicShape()) return false;
+  SmallVector<unsigned> reductionDims;
+  op.getReductionDims(reductionDims);
+  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
+    return false;
+  if (op.getRegionOutputArgs().size() != 1) return false;
+
+  // Only support projected permutation, this could be extended to projected
+  // permutated with broadcast.
+  if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
+        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
+      }))
+    return false;
+
+  // Hardcoded workagroup size, this could be deduced from the reduction dim.
+  workgroupSize = {32, 2, 1};
+  SmallVector<unsigned> partitionedLoops =
+      cast<PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  // Tile all the parallel dimension to 1.
+  tileSize.append(numLoops, 1);
+  return true;
+}
+
 using StrategyBuilderFn = std::function<void(ImplicitLocOpBuilder &, Value)>;
 
 static void createTransformRegion(func::FuncOp entryPoint,
@@ -399,17 +429,68 @@ static void createTransformRegion(func::FuncOp entryPoint,
       });
 }
 
+// TODO: generalize and automate over and over.
+// TODO: significantly shrink this down.
+static LogicalResult buildReductionCpuStrategy(
+    ImplicitLocOpBuilder &b, Value variantH, ArrayRef<int64_t> workgroupSize,
+    ArrayRef<int64_t> tileSizes0Generic) {
+  // Step 0. Fetch transform information from the config and materialize it in
+  // the payload IR.
+  // TODO: this still requires specific knowledge of ops present in the IR
+  // and is very brittle.
+  Value originalFillH =
+      b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
+  Value originalGenericH =
+      b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
+
+  // Step 1: Distribute to blocks using the current IREE lowering config.
+  variantH = buildReductionStrategyBlockDistributionPart(
+      b, variantH, originalFillH, originalGenericH, tileSizes0Generic);
+
+  // Step 2. Rank-reduce and buildVectorizeStrategy.
+  // TODO: assumes a single func::FuncOp to transform, may need hardening.
+  Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  funcH = buildVectorizeStrategy(b, funcH);
+
+  // Step 3. Bufferize.
+  variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
+
+  // Step 4. Post-bufferization mapping to blocks only.
+  // Need to match again since bufferize invalidated all handles.
+  // TODO: assumes a single func::FuncOp to transform, may need hardening.
+  funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
+
+  return success();
+}
+
 LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
                                                        linalg::LinalgOp op) {
   // 1. Match
   TileSizesListType tileSizes;
   std::array<int64_t, 3> workgroupSize;
-  if (!matchReduction(op, tileSizes, workgroupSize)) return failure();
+  if (!matchGPUReduction(op, tileSizes, workgroupSize)) return failure();
   auto startegyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
     return buildReductionCudaStrategy(b, variant, tileSizes, workgroupSize);
   };
+  // 2. Add the strategy.
   createTransformRegion(entryPoint, startegyBuilder);
   return success();
 }
+
+LogicalResult matchAndSetCPUReductionTransformStrategy(func::FuncOp entryPoint,
+                                                       linalg::LinalgOp op) {
+  // 1. Match
+  SmallVector<int64_t> tileSize;
+  std::array<int64_t, 3> workgroupSize;
+  if (!matchCPUReduction(op, tileSize, workgroupSize)) return failure();
+  auto startegyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
+    return buildReductionCpuStrategy(b, variant, tileSize, workgroupSize);
+  };
+  // 2. Add the strategy.
+  createTransformRegion(entryPoint, startegyBuilder);
+  return success();
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
