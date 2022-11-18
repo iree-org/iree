@@ -10,6 +10,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
+#include "iree/compiler/Codegen/Common/TransformDialectStrategies.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -1214,41 +1215,14 @@ static LogicalResult setTransformStrategyRootConfig(
   if (getLoweringConfig(genericOp)) {
     return success();
   }
-  // TODO: match the sequence the startegy supports.
-  if (genericOp.hasDynamicShape()) return success();
-  SmallVector<unsigned> reductionDims;
-  genericOp.getReductionDims(reductionDims);
-  if (reductionDims.size() != 1 ||
-      reductionDims[0] != genericOp.getNumLoops() - 1)
+  if (failed(matchAndSetCPUReductionTransformStrategy(entryPointFn, genericOp)))
     return success();
-  if (genericOp.getRegionOutputArgs().size() != 1) return success();
-
-  // Only support projected permutation, this could be extended to projected
-  // permutated with broadcast.
-  if (llvm::any_of(genericOp.getDpsInputOperands(), [&](OpOperand *input) {
-        return !genericOp.getMatchingIndexingMap(input)
-                    .isProjectedPermutation();
-      }))
-    return success();
-
-  // TODO: set the right config as expected by the strategy.
-  std::array<int64_t, 1> workgroupSize = {1};
-  SmallVector<unsigned> partitionedLoops =
-      cast<PartitionableLoopsInterface>(genericOp.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
-  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
-  // Tile all the parallel dimension to 1.
-  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
-  SmallVector<int64_t, 4> threadTileSizes = workgroupTileSizes;
-  threadTileSizes.push_back(1);
-  TileSizesListType tileSizes;
-  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
-  tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, genericOp, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::
-          TransformDialectJitterCodegen,
-      workgroupSize);
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPointFn->getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
+                                      TransformDialectJitterCodegen);
+  if (failed(setTranslationInfo(entryPointFn, translationInfo)))
+    return failure();
+  return success();
 }
 
 /// Sets the lowering configuration for a generic op implementing a
