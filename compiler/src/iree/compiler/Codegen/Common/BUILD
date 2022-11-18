@@ -248,6 +248,7 @@ iree_compiler_cc_library(
         "PadDynamicAlloc.cpp",
         "RemoveTrivialLoops.cpp",
         "TestPartitionableLoopsInterface.cpp",
+        "TileAndDecomposeWinogradInputPass.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TileDispatchUsingInterface.cpp",
         "UserConfig.cpp",

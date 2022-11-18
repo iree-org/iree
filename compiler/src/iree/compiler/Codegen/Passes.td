@@ -289,6 +289,12 @@ def EraseHALDescriptorTypeFromMemRef :
   let summary = "Erase #hal.descriptor_type from MemRef memory space";
   let constructor =
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
+
+def TileAndDecomposeWinogradInputTransform :
+    Pass<"iree-codegen-tile-and-distribute-winograd-input", "func::FuncOp"> {
+  let summary =
+      "Tiles and decomposes winograd input transform op into linalg ops";
+  let constructor = "mlir::iree_compiler::createTileAndDecomposeWinogradInputTransformPass()";
 }
 
 //------------------------------------------------------------------------------

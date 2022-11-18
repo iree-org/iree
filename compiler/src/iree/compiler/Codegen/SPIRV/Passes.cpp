@@ -128,6 +128,8 @@ static void addTileAndDistributeToWorkgroupsPasses(
       createConvertToDestinationPassingStylePass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createTileAndDecomposeWinogradInputTransformPass());
 }
 
 static void addSPIRVBufferizePasses(

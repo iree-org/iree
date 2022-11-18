@@ -8,9 +8,11 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/WinogradConstants.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -2381,6 +2383,175 @@ SmallVector<utils::IteratorType> UnPackOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
+//===----------------------------------------------------------------------===//
+// WinogradInputTransformOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult WinogradInputTransformOp::verify() {
+  Operation *op = getOperation();
+  if (getNumInputs() != 1) {
+    return op->emitOpError("expected one input operand");
+  }
+  if (getNumOutputs() != 1) {
+    return op->emitOpError("expected one output operand");
+  }
+  if (!input().getType().isa<ShapedType>()) {
+    return op->emitOpError("expected input type to be shaped");
+  }
+  if (!output().getType().isa<ShapedType>()) {
+    return op->emitOpError("expected output type to be shaped");
+  }
+  auto inputType = input().getType().cast<ShapedType>();
+  auto outputType = output().getType().cast<ShapedType>();
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  if (inputShape.size() != 4) {
+    return op->emitOpError("expected input operand to have rank 4");
+  }
+  ArrayRef<int64_t> outputShape = outputType.getShape();
+  if (outputType.getElementType() != inputType.getElementType()) {
+    return op->emitOpError(
+        "expected input/output element types to be identical");
+  }
+  if (getOutputOperandRank() != getInputOperandRank() + 2) {
+    return op->emitOpError(
+        "expected output rank to be equal to input rank + 2");
+  }
+  // Check shapes (assumes incoming input shape in NHWC)
+  const int64_t outputTileSize = getOutputTileSize();
+  const int64_t kernelSize = getKernelSize();
+  const int64_t inputTileSize = getInputTileSize();
+  SmallVector<int64_t> expectedOutputShape(getInputOperandRank() + 2,
+                                           inputTileSize);
+  for (int i = 0; i < inputShape.size(); i++) {
+    if ((i == 0) || (i == 3) || (inputShape[i] == ShapedType::kDynamicSize)) {
+      expectedOutputShape[i + 2] = inputShape[i];
+    } else {
+      expectedOutputShape[i + 2] =
+          std::ceil((float)(inputShape[i] - kernelSize + 1) / outputTileSize);
+    }
+  }
+  if (llvm::any_of(llvm::zip(expectedOutputShape, outputShape),
+                   [](std::tuple<int64_t, int64_t> s) {
+                     return std::get<0>(s) != ShapedType::kDynamicSize &&
+                            std::get<1>(s) != ShapedType::kDynamicSize &&
+                            std::get<0>(s) != std::get<1>(s);
+                   })) {
+    return op->emitOpError("incompatible output shape");
+  }
+  const StringRef tensorFormat = getTensorFormat();
+  if (tensorFormat != "nhwc") {
+    return op->emitOpError("only nhwc format currently supported");
+  }
+  return success();
+}
+
+SmallVector<Range>
+WinogradInputTransformOp::getIterationDomain(OpBuilder &builder) {
+  int64_t operandRank = getIterationDomainRank();
+  SmallVector<Range> loopBounds(operandRank);
+  Location loc = getLoc();
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value source = input();
+  StringRef tensorFormat = getTensorFormat();
+  // Expose only the batch dimension(0) and channel dimension(3) for NHWC tensor
+  SmallVector<int64_t> indices = {0, 3};
+  for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].size = getDimValue(builder, loc, source, indices[dim]);
+    loopBounds[dim].stride = one;
+  }
+  return loopBounds;
+}
+
+SmallVector<utils::IteratorType>
+WinogradInputTransformOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getIterationDomainRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+
+static SmallVector<OpFoldResult> convertToIndexAttr(ArrayRef<int64_t> shape,
+                                                    OpBuilder &b) {
+  SmallVector<OpFoldResult> shapeAttr;
+  for (auto val : shape) {
+    shapeAttr.push_back(b.getIndexAttr(val));
+  }
+  return shapeAttr;
+}
+
+SmallVector<Operation *>
+WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
+                                                 ArrayRef<OpFoldResult> offsets,
+                                                 ArrayRef<OpFoldResult> sizes) {
+
+  Location loc = getLoc();
+  auto one = builder.getIndexAttr(1);
+  auto zero = builder.getIndexAttr(0);
+
+  assert(offsets.size() == 2);
+  SmallVector<OpFoldResult> inputOffsets(getInputOperandRank(), zero);
+  SmallVector<OpFoldResult> outputOffsets(getOutputOperandRank(), zero);
+  outputOffsets[2] = inputOffsets[0] = offsets[0];
+  outputOffsets[5] = inputOffsets[3] = offsets[1];
+
+  SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
+  SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
+
+  assert(sizes.size() == 2);
+  auto inputShape = input().getType().cast<ShapedType>().getShape();
+  auto outputShape = output().getType().cast<ShapedType>().getShape();
+  auto inputSizes = convertToIndexAttr(inputShape, builder);
+  auto outputSizes = convertToIndexAttr(outputShape, builder);
+  outputSizes[2] = inputSizes[0] = sizes[0];
+  outputSizes[5] = inputSizes[3] = sizes[1];
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, input(), inputOffsets, inputSizes, inputStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, output(), outputOffsets,
+                                      outputSizes, outputStrides));
+
+  SmallVector<Type, 4> resultTypes;
+  if (hasTensorSemantics()) {
+    resultTypes.push_back(tiledOperands[1].getType());
+  }
+
+  Operation *tiledOp = cast<DestinationStyleOpInterface>(getOperation())
+                           .clone(builder, loc, resultTypes, tiledOperands);
+
+  return {tiledOp};
+}
+
+LogicalResult WinogradInputTransformOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  if (resultNumber == 0) {
+    auto resultShape = output().getType().cast<ShapedType>().getShape();
+    resultSizes = convertToIndexAttr(resultShape, builder);
+    resultOffsets = SmallVector<OpFoldResult>(getOutputOperandRank(),
+                                              builder.getIndexAttr(0));
+    resultOffsets[2] = offsets[0];
+    resultOffsets[5] = offsets[1];
+    resultSizes[2] = sizes[0];
+    resultSizes[5] = sizes[1];
+    return success();
+  }
+  return failure();
+}
+
+LogicalResult WinogradInputTransformOp::fold(ArrayRef<Attribute>,
+                                             SmallVectorImpl<OpFoldResult> &) {
+  return memref::foldMemRefCast(*this);
+}
+
+LogicalResult WinogradInputTransformOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -2399,6 +2570,7 @@ DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
+DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
 
 //===----------------------------------------------------------------------===//
 // iree_linalg_ext.set_encoding

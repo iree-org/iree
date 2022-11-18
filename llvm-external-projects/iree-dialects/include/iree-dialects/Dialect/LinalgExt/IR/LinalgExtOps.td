@@ -889,6 +889,94 @@ let builders = [
 }
 
 //===----------------------------------------------------------------------===//
+// Winograd ops
+//===----------------------------------------------------------------------===//
+
+def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_transform",
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
+      ["getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
+       "getTiledImplementation"]>]> {
+  let summary = "Winograd Input Transform operator";
+  let description = [{
+    This operator is the first step in converting a convolution to
+    its Winograd equivalent. Given a tile of an input image (I),
+    this operator computes matmul(tranpose(B), matmul(I, B)).
+    The input tile is assumed to be square with each side of size m + r - 1,
+    where the convolutional kernel is m x m and the output tile size is r x r.
+    B is a constant 2-d square matrix of the same shape as the input tile I.
+    The input to the operator is an image of shape (N, H, W, C) and the
+    output is an operator of shape (m + r - 1, m + r - 1, N, H', W', C)
+    where H' = ceil((H - m + 1)/r) and W' = ceil((W - m + 1)/r). The result
+    of this operator is first collapsed and then fed to a batch matmul op.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       I64Attr:$output_tile_size,
+                       I64Attr:$kernel_size,
+                       StrAttr:$tensor_format
+  );
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
+      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
+      CArg<"StringRef", "\"nhwc\"">:$tensor_format)>
+  ];
+
+  let results = (outs Variadic<AnyRankedTensor>:$result);
+  let hasFolder = 1;
+  let assemblyFormat = [{
+    attr-dict
+    `output_tile_size` `(` $output_tile_size `)`
+    `kernel_size` `(` $kernel_size `)`
+    `tensor_format` `(` $tensor_format `)`
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`->` type($result)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value input() {
+      return getInputOperand(0)->get();
+    }
+    Value output() {
+      return getOutputOperand(0)->get();
+    }
+    ShapedType getInputOperandType() {
+      return input().getType().cast<ShapedType>();
+    }
+    ShapedType getOutputOperandType() {
+      return output().getType().cast<ShapedType>();
+    }
+    int64_t getInputOperandRank() {
+      return getInputOperandType().getRank();
+    }
+    int64_t getOutputOperandRank() {
+      return getOutputOperandType().getRank();
+    }
+    int64_t getIterationDomainRank() {
+      // We only expose the batch dimension (N) and channels (C)
+      return 2;
+    }
+    int64_t getInputTileSize() {
+      return getOutputTileSize() + getKernelSize() - 1;
+    }
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
+      std::pair<unsigned, unsigned> outputsIndexAndLength =
+        getODSOperandIndexAndLength(1);
+      return std::make_pair<int64_t, int64_t>(
+          outputsIndexAndLength.first,
+          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Pure ops
 //===----------------------------------------------------------------------===//
 

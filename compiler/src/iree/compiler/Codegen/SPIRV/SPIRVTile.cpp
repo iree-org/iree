@@ -279,6 +279,14 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     MLIRContext *context = &getContext();
     func::FuncOp funcOp = getOperation();
 
+    // Skip tiling if loops have already been tiled
+    const char *attrName = getSPIRVDistributeAttrName();
+    WalkResult result = funcOp.walk([&](scf::ForOp forOp) {
+      if (forOp->hasAttr(attrName)) return WalkResult::interrupt();
+      return WalkResult::advance();
+    });
+    if (result.wasInterrupted()) return;
+
     // Try to find computation ops which we will use as anchor to tile and fuse.
     SmallVector<Operation *> computeOps;
     FailureOr<IREE::Codegen::LoweringConfigAttr> loweringConfig =

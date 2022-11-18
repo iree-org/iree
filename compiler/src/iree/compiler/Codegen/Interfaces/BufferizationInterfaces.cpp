@@ -442,6 +442,9 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
             LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
         IREE::LinalgExt::TopkOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
+        IREE::LinalgExt::WinogradInputTransformOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(
+            *ctx);
       });
 }
 
