@@ -88,10 +88,12 @@ These steps help reproduce the failures in TFLite models.
 First you need to have [`iree-import-tflite`](https://iree-org.github.io/iree/getting-started/tflite/),
 [`iree-import-tf`](https://iree-org.github.io/iree/getting-started/tensorflow/),
 and `requests` in your python environment. Then you can build the target
-`iree-benchmark-suites` to generate the required files:
+`iree-benchmark-suites` to generate the required files. Note that this target
+requires the `IREE_BUILD_BENCHMARKS` CMake option.
 
 ```sh
-// Assume your IREE build directory is $IREE_BUILD_DIR.
+# Assume your IREE build directory is $IREE_BUILD_DIR and that cmake build was
+# configured with `-DIREE_BUILD_BENCHMARKS=On`.
 
 cmake --build $IREE_BUILD_DIR --target iree-benchmark-suites
 ```
