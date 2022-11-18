@@ -391,6 +391,7 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
   addConversion([](IntegerType intType) { return intType; });
   addConversion([](IndexType indexType) { return indexType; });
   addConversion([](FloatType floatType) { return floatType; });
+  addConversion([](MemRefType memrefType) { return memrefType; });
   addConversion(
       [materializeEncodingFn](RankedTensorType t) -> RankedTensorType {
         return getMaterializedType(t, materializeEncodingFn);
