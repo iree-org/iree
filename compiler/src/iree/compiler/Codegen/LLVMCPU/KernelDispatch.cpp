@@ -31,8 +31,6 @@
 #define DEBUG_TYPE "kernel-dispatch"
 #define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
-static constexpr llvm::StringLiteral kReductionStrategyName =
-    "reduction_strategy";
 namespace mlir {
 namespace iree_compiler {
 
@@ -1236,7 +1234,7 @@ static LogicalResult setTransformStrategyRootConfig(
       entryPointFn, genericOp, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::
           TransformDialectJitterCodegen,
-      workgroupSize, 0, kReductionStrategyName);
+      workgroupSize);
 }
 
 /// Sets the lowering configuration for a generic op implementing a
