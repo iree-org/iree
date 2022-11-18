@@ -1,3 +1,48 @@
+# Temporary Branch To Iterate On The Transform Dialect Integration
+
+Some scripts and examples I am using successully:
+```
+source tests/transform_dialect/ntv_script.sh
+```
+
+Then, be sure iree-opt, iree-compile, iree-run-module and iree-benchmarks are built
+and in the path (my full setup can be found 
+[here](https://github.com/nicolasvasilache/nicolas.vasilache.github.io/blob/master/.venv/mlirdev/bin/activate)).
+
+Some quick getting started CPU instructions:
+```
+# Compile matmul.mlir with IREE up to HAL, apply call the transform dialect 
+# codegen script: tests/transform_dialect/cpu/matmul_codegen_default_spec.mlir
+# and print the IR to stdout.
+iree-transform-opt tests/transform_dialect/cpu/matmul.mlir -b llvm-cpu -c tests/transform_dialect/cpu/matmul_codegen_default_spec.mlir
+
+# Same as above + run the rest of the IREE pipeline to produce a binary dumped to stdout.
+iree-transform-compile tests/transform_dialect/cpu/matmul.mlir -b llvm-cpu -c tests/transform_dialect/cpu/matmul_codegen_default_spec.mlir
+
+# Same compile as above and pipe through iree-run-module with input values for execution.
+iree-transform-compile tests/transform_dialect/cpu/matmul.mlir -b llvm-cpu -c tests/transform_dialect/cpu/matmul_codegen_default_spec.mlir | \
+  iree-run-module --entry_function=matmul_static  --function_input="3x5xf32=1"  --function_input="5x3xf32=1"  --function_input="3x3xf32=0"
+
+# Same compile as above + add extra args for target-triple and benchmarking then pipe through iree-benchmark-module to benchmark
+iree-transform-compile tests/transform_dialect/cpu/matmul.mlir -b llvm-cpu -c tests/transform_dialect/cpu/matmul_codegen_default_spec.mlir \
+  -- --iree-llvm-target-triple=x86_64-pc-linux-gnu   --iree-llvm-target-cpu-features=host  --iree-hal-benchmark-dispatch-repeat-count=100 | \
+  iree-benchmark-module --device=local-task --task_topology_group_count=0 --batch_size=100 --entry_function=matmul_static  --function_input="3x5xf32=1"  --function_input="5x3xf32=1"  --function_input="3x3xf32=0"
+```
+
+Some quick getting started GPU instructions:
+```
+# Compile matmul.mlir with IREE up to HAL, apply call the transform dialect 
+# codegen script: tests/transform_dialect/cuda/reduction_codegen_spec.mlir
+iree-transform-opt  tests/transform_dialect/cuda/reduction.mlir -b cuda -c tests/transform_dialect/cuda/reduction_codegen_spec.mlir
+
+# Same as above + run the rest of the IREE pipeline to produce a binary dumped to stdout. This shows ptx.
+iree-transform-compile  tests/transform_dialect/cuda/reduction.mlir -b cuda -c tests/transform_dialect/cuda/reduction_codegen_spec.mlir
+
+# Always be sure to run more than a few times because we see a lot of compulsory paging misses on the first run.
+iree-transform-compile  tests/transform_dialect/cuda/reduction.mlir -b cuda -c tests/transform_dialect/cuda/reduction_codegen_spec.mlir -- --iree-hal-benchmark-dispatch-repeat-count=5 | \
+  nvprof  --print-gpu-trace  iree-run-module --entry_function=reduce --device=cuda 
+```
+
 # IREE: Intermediate Representation Execution Environment
 
 IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment,
