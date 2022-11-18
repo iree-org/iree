@@ -400,21 +400,20 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
 MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
     MLIRContext &context)
     : ConversionTarget(context) {
-  auto typeHasEncoding = [=](Type t) -> bool {
-    auto tensorType = t.dyn_cast<RankedTensorType>();
-    return tensorType && tensorType.getEncoding();
-  };
-  auto valueHasEncoding = [=](Value v) -> bool {
-    return typeHasEncoding(v.getType());
-  };
   // Mark any operation that has operands/results with encoding as
   // illegal.
-  auto hasOperandOrResultsWithEncoding = [=](Operation *op) {
-    return llvm::any_of(op->getOperands(), valueHasEncoding) ||
-           llvm::any_of(op->getResultTypes(), typeHasEncoding);
-  };
-  markUnknownOpDynamicallyLegal(
-      [&](Operation *op) { return !hasOperandOrResultsWithEncoding(op); });
+  markUnknownOpDynamicallyLegal([=](Operation *op) {
+    for (auto v : op->getOperands()) {
+      if (typeHasEncoding(v.getType()))
+        return false;
+    }
+    for (auto t : op->getResultTypes()) {
+      auto tensorType = t.dyn_cast<RankedTensorType>();
+      if (tensorType && tensorType.getEncoding())
+        return false;
+    }
+    return true;
+  });
 }
 
 void populateMaterializeEncodingPatterns(
