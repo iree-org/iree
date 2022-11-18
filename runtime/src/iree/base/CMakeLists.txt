@@ -204,8 +204,8 @@ if(EMSCRIPTEN)
   )
 
   iree_link_js_library(
-    NAME
-      iree_base_loop_emscripten
+    TARGET
+      ::loop_emscripten
     SRCS
       "loop_emscripten.js"
   )

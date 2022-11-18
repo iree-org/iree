@@ -281,16 +281,21 @@ set(_LINK_JS_COUNTER 1)
 # with changes to be compatible with IREE project style and CMake conventions.
 #
 # Parameters:
-# NAME: Name of the target to link against
+# TARGET: Name of the target to link against
 # SRCS: List of JavaScript source files to link
 function(iree_link_js_library)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
+    "TARGET"
     "SRCS"
     ${ARGN}
   )
+
+  # Convert from aliased, possibly package-relative, names to target names.
+  iree_package_ns(_PACKAGE_NS)
+  string(REGEX REPLACE "^::" "${_PACKAGE_NS}::" _RULE_TARGET ${_RULE_TARGET})
+  string(REPLACE "::" "_" _RULE_TARGET ${_RULE_TARGET})
 
   foreach(_SRC_FILE ${_RULE_SRCS})
     # If the JS file is changed, we want to relink dependent binaries, but
@@ -299,9 +304,9 @@ function(iree_link_js_library)
     # source file, and make the original target depend on that dummy target.
 
     # Sanitate the source .js filename to a good dummy filename.
-    get_filename_component(jsname "${_SRC_FILE}" NAME)
-    string(REGEX REPLACE "[/:\\\\.\ ]" "_" _DUMMY_JS_TARGET ${jsname})
-    set(_DUMMY_LIB_NAME ${_RULE_NAME}_${_LINK_JS_COUNTER}_${_DUMMY_JS_TARGET})
+    get_filename_component(_JS_NAME "${_SRC_FILE}" NAME)
+    string(REGEX REPLACE "[/:\\\\.\ ]" "_" _DUMMY_JS_TARGET ${_JS_NAME})
+    set(_DUMMY_LIB_NAME ${_RULE_TARGET}_${_LINK_JS_COUNTER}_${_DUMMY_JS_TARGET})
     set(_DUMMY_C_NAME "${CMAKE_BINARY_DIR}/${_DUMMY_JS_TARGET}_tracker.c")
 
     # Create a new static library target that with a single dummy .c file.
@@ -316,7 +321,7 @@ function(iree_link_js_library)
       COMMAND ${CMAKE_COMMAND} -E touch ${_DUMMY_C_NAME}
       DEPENDS ${_SRC_FILE}
     )
-    target_link_libraries(${_RULE_NAME}
+    target_link_libraries(${_RULE_TARGET}
       PUBLIC
         ${_DUMMY_LIB_NAME}
     )
@@ -327,7 +332,7 @@ function(iree_link_js_library)
     # that the js-library will also be automatically linked to targets that
     # depend on this target.
     get_filename_component(_SRC_ABSOLUTE_PATH "${_SRC_FILE}" ABSOLUTE)
-    target_link_libraries(${_RULE_NAME}
+    target_link_libraries(${_RULE_TARGET}
       PUBLIC
         "--js-library \"${_SRC_ABSOLUTE_PATH}\""
     )
