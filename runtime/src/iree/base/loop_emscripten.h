@@ -7,7 +7,7 @@
 #ifndef IREE_BASE_LOOP_EMSCRIPTEN_H_
 #define IREE_BASE_LOOP_EMSCRIPTEN_H_
 
-#include "iree/base/loop.h"
+#include "iree/base/api.h"
 
 #if defined(IREE_PLATFORM_EMSCRIPTEN)
 
@@ -23,13 +23,12 @@ extern "C" {
 // TODO(scotttodd): comment on thread safety (when established)
 typedef struct iree_loop_emscripten_t iree_loop_emscripten_t;
 
-// Allocates a loop using |allocator| stored into |out_loop_emscripten|.
+// Allocates a loop using |allocator| stored into |out_loop|.
 IREE_API_EXPORT iree_status_t iree_loop_emscripten_allocate(
-    iree_allocator_t allocator, iree_loop_emscripten_t** out_loop_emscripten);
+    iree_allocator_t allocator, iree_loop_emscripten_t** out_loop);
 
 // Frees |loop_emscripten|, aborting all pending operations.
-IREE_API_EXPORT void iree_loop_emscripten_free(
-    iree_loop_emscripten_t* loop_emscripten);
+IREE_API_EXPORT void iree_loop_emscripten_free(iree_loop_emscripten_t* loop);
 
 IREE_API_EXPORT iree_status_t
 iree_loop_emscripten_ctl(void* self, iree_loop_command_t command,

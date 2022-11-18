@@ -200,7 +200,6 @@ if(EMSCRIPTEN)
       "loop_emscripten.c"
     DEPS
       ::base
-      ::tracing
     PUBLIC
   )
 
@@ -221,10 +220,8 @@ if(EMSCRIPTEN)
       "loop_emscripten_test.cc"
     DEPS
       ::base
-      ::cc
       ::loop_emscripten
       ::loop_test_hdrs
-      ::tracing
       iree::testing::gtest
       iree::testing::gtest_main
   )

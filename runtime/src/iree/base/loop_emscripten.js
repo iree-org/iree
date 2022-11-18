@@ -20,24 +20,19 @@ const LibraryLoopEmscripten = {
       }
 
       loop_command_call(callback, user_data, loop) {
-        console.log('loop_command_call');
-
-        const iree_ok_status = 0;
+        const IREE_STATUS_OK = 0;
 
         setTimeout(() => {
-          console.log('loop_command_call -> timeout, calling function');
           const ret =
-              Module['dynCall_iiii'](callback, user_data, loop, iree_ok_status);
-          console.log('function result:', ret);
+              Module['dynCall_iiii'](callback, user_data, loop, IREE_STATUS_OK);
           // TODO(scotttodd): handle the returned status (sticky failure state?)
         }, 0);
 
-        return iree_ok_status;
+        return IREE_STATUS_OK;
       }
     }
 
     const instance = new LoopEmscripten();
-    _logValue = instance.logValue.bind(instance);
     _loop_command_call = instance.loop_command_call.bind(instance);
   },
 

@@ -31,34 +31,26 @@ typedef struct iree_loop_emscripten_t {
 } iree_loop_emscripten_t;
 
 IREE_API_EXPORT iree_status_t iree_loop_emscripten_allocate(
-    iree_allocator_t allocator, iree_loop_emscripten_t** out_loop_emscripten) {
-  IREE_ASSERT_ARGUMENT(out_loop_emscripten);
-
-  const iree_host_size_t loop_emscripten_size =
-      iree_host_align(sizeof(iree_loop_emscripten_t), iree_max_align_t);
-
-  uint8_t* storage = NULL;
+    iree_allocator_t allocator, iree_loop_emscripten_t** out_loop) {
+  IREE_ASSERT_ARGUMENT(out_loop);
+  iree_loop_emscripten_t* loop = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, loop_emscripten_size, (void**)&storage));
-  iree_loop_emscripten_t* loop_emscripten = (iree_loop_emscripten_t*)storage;
-  loop_emscripten->allocator = allocator;
-
-  *out_loop_emscripten = loop_emscripten;
-
+      iree_allocator_malloc(allocator, sizeof(*loop), (void**)&loop));
+  loop->allocator = allocator;
+  *out_loop = loop;
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void iree_loop_emscripten_free(
-    iree_loop_emscripten_t* loop_emscripten) {
-  IREE_ASSERT_ARGUMENT(loop_emscripten);
-  iree_allocator_t allocator = loop_emscripten->allocator;
+IREE_API_EXPORT void iree_loop_emscripten_free(iree_loop_emscripten_t* loop) {
+  IREE_ASSERT_ARGUMENT(loop);
+  iree_allocator_t allocator = loop->allocator;
 
   // TODO(scotttodd): cleanup:
   //     abort pending operations (neuter callbacks/Promises)
   //     assert if any work is still outstanding
 
   // After all operations are cleared we can release the data structures.
-  iree_allocator_free(allocator, loop_emscripten);
+  iree_allocator_free(allocator, loop);
 }
 
 static iree_status_t iree_loop_emscripten_run_call(
