@@ -1,12 +1,9 @@
 !in_tensor_t = tensor<8x64xf32>
 !out_tensor_t = tensor<8xf32>
 
-func.func @reduce() -> (!out_tensor_t) {
+func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   %cst = arith.constant -0.000000e+00 : f32
 
-  // Note: arith.constant is good for our purposes here but it may be useful to use
-  // util.unfoldable_constant.
-  %arg = arith.constant dense<1.0> : !in_tensor_t
   %0 = tensor.empty() : !out_tensor_t
   %1 = linalg.fill ins(%cst : f32) outs(%0 : !out_tensor_t) ->   !out_tensor_t
   %2 = linalg.generic {
@@ -30,7 +27,7 @@ func.func @reduce() -> (!out_tensor_t) {
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK
 
-/// Note: the current --iree-codegen-llvmgpu-enable-transform-dialect-jit only works for exactly this softmax atm.
+/// Note: the current --iree-codegen-llvmgpu-enable-transform-dialect-jit only works for exactly this reduction atm.
 // RUN: iree-opt %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-abi-transformation-pipeline \
 // RUN:     --iree-flow-transformation-pipeline  \
@@ -42,13 +39,13 @@ func.func @reduce() -> (!out_tensor_t) {
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
-// RUN: iree-run-module --entry_function=reduce --device=cuda |\
+// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
-/// Note: the current --iree-codegen-llvmgpu-enable-transform-dialect-jit only works for exactly this softmax atm.
+/// Note: the current --iree-codegen-llvmgpu-enable-transform-dialect-jit only works for exactly this reduction atm.
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit | \
-// RUN: iree-run-module --entry_function=reduce --device=cuda |\
+// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
@@ -63,7 +60,7 @@ func.func @reduce() -> (!out_tensor_t) {
   //         CHECK: %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]{{.*}}to memref<f32, {{.*}}, 3>
 
   // Distributed reduction: everyone loads then 5 xor + addf expected
-  //         CHECK: vector.transfer_read %{{.*}}[%[[TIDX]]]
+  //         CHECK: vector.transfer_read %{{.*}}[%[[TIDZ]], %[[TIDY]], %[[TIDX]]]
   // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
   //         CHECK: %[[RES:.*]] = arith.addf %{{.*}}
