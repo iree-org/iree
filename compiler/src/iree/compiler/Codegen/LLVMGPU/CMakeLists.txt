@@ -15,7 +15,6 @@ iree_cc_library(
     LLVMGPU
   HDRS
     "ConvertToLLVM.h"
-    "GPUTransformDialectStrategies.h"
     "KernelConfig.h"
     "TilingUtils.h"
     "TransposeUtils.h"
@@ -23,7 +22,6 @@ iree_cc_library(
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
-    "GPUTransformDialectStrategies.cpp"
     "KernelConfig.cpp"
     "LLVMGPUDistribute.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
@@ -90,7 +88,6 @@ iree_cc_library(
     MLIRVectorToSCF
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
-    iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::PassHeaders

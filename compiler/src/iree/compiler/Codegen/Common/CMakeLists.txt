@@ -200,6 +200,7 @@ iree_cc_library(
   HDRS
     "GPUPatterns.h"
     "LinalgOpInfo.h"
+    "TransformDialectStrategies.h"
     "UserConfig.h"
   SRCS
     "DecomposeLinalgGeneric.cpp"
@@ -218,6 +219,7 @@ iree_cc_library(
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
+    "TransformDialectStrategies.cpp"
     "UserConfig.cpp"
     "VectorReductionToGPU.cpp"
     "WorkGroupSwizzle.cpp"

@@ -249,6 +249,7 @@ iree_compiler_cc_library(
         "TestPartitionableLoopsInterface.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TileDispatchUsingInterface.cpp",
+        "TransformDialectStrategies.cpp",
         "UserConfig.cpp",
         "VectorReductionToGPU.cpp",
         "WorkGroupSwizzle.cpp",
@@ -256,6 +257,7 @@ iree_compiler_cc_library(
     hdrs = [
         "GPUPatterns.h",
         "LinalgOpInfo.h",
+        "TransformDialectStrategies.h",
         "UserConfig.h",
     ],
     deps = [
