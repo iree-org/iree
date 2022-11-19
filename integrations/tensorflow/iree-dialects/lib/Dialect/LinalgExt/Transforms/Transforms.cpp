@@ -1024,20 +1024,48 @@ struct LinalgExtVectorizationPass
     // Apply tiling to make outer dims be all 1s.
     {
       SimpleRewriter rewriter(ctx);
-      auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
-          [](OpBuilder &builder, Operation *op) {
-            Location loc = op->getLoc();
-            auto packOp = cast<PackOp>(op);
-            auto innerDims = extractFromI64ArrayAttr(packOp.getInnerDimsPos());
-            int inputRank = packOp.getInputRank();
-            SmallVector<Value> tileSizes(
-                inputRank, builder.create<arith::ConstantIndexOp>(loc, 1));
-            return tileSizes;
-          });
+      auto packTilingOptions =
+          scf::SCFTilingOptions().setTileSizeComputationFunction(
+              [](OpBuilder &builder, Operation *op) {
+                Location loc = op->getLoc();
+                int inputRank = cast<PackOp>(op).getInputRank();
+                SmallVector<Value> tileSizes(
+                    inputRank, builder.create<arith::ConstantIndexOp>(loc, 1));
+                return tileSizes;
+              });
       auto funcOp = getOperation();
       funcOp->walk([&](LinalgExt::PackOp op) {
         FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-            rewriter, cast<TilingInterface>(op.getOperation()), options);
+            rewriter, cast<TilingInterface>(op.getOperation()),
+            packTilingOptions);
+        if (failed(tilingResult))
+          return signalPassFailure();
+        rewriter.replaceOp(op, tilingResult->replacements);
+      });
+
+      auto unpackTilingOptions =
+          scf::SCFTilingOptions().setTileSizeComputationFunction(
+              [](OpBuilder &builder, Operation *op) {
+                Location loc = op->getLoc();
+                auto unpackOp = cast<UnPackOp>(op);
+                int numLoops = unpackOp.getOutputRank();
+                auto dimAndTileMapping = unpackOp.getDimAndTileMapping();
+                SmallVector<Value> tileSizes;
+                for (int i = 0; i < numLoops; ++i) {
+                  if (dimAndTileMapping.count(i)) {
+                    tileSizes.push_back(getValueOrCreateConstantIndexOp(
+                        builder, loc, dimAndTileMapping[i]));
+                  } else {
+                    tileSizes.push_back(
+                        getDimValue(builder, loc, unpackOp.getOutput(), i));
+                  }
+                }
+                return tileSizes;
+              });
+      funcOp->walk([&](LinalgExt::UnPackOp op) {
+        FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
+            rewriter, cast<TilingInterface>(op.getOperation()),
+            unpackTilingOptions);
         if (failed(tilingResult))
           return signalPassFailure();
         rewriter.replaceOp(op, tilingResult->replacements);
