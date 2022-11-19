@@ -468,7 +468,7 @@ hal.executable private @matmul_tensors {
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
-        // expected-error @+1 {{expected subgroup tile sizes to be multiple of 16}}
+        // expected-error @+1 {{expected subgroup tile sizes to be multiple of [16, 16, 16]}}
         linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
           outs(%result: memref<64x128xf32>)
         return
