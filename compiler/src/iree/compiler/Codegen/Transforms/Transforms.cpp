@@ -17,6 +17,15 @@
 namespace mlir {
 namespace iree_compiler {
 
+static bool sliceFilter(Operation *op, ValueRange nonIndexComputationOperands,
+                        Operation *baseOp) {
+  for (auto val : nonIndexComputationOperands) {
+    if (op == val.getDefiningOp()) return false;
+  }
+  if (op->isProperAncestor(baseOp)) return false;
+  return !isa<IREE::HAL::InterfaceConstantLoadOp>(op);
+}
+
 static void cloneOffsetsSizesAndStridesImpl(
     OpBuilder &builder, Operation *baseOp,
     ValueRange nonIndexComputationOperands, ArrayRef<OpFoldResult> offsets,
@@ -26,15 +35,9 @@ static void cloneOffsetsSizesAndStridesImpl(
     SmallVector<OpFoldResult> &clonedStrides,
     SmallVector<Value> &clonedDynamicDims) {
   SetVector<Operation *> slice;
-  TransitiveFilter filter = [&nonIndexComputationOperands,
-                             &baseOp](Operation *op) {
-    for (auto val : nonIndexComputationOperands) {
-      if (op == val.getDefiningOp()) return false;
-    }
-    if (op->isProperAncestor(baseOp)) return false;
-    return !isa<IREE::HAL::InterfaceConstantLoadOp>(op);
-  };
-  getBackwardSlice(baseOp, &slice, filter);
+  getBackwardSlice(baseOp, &slice, [&](Operation *op) {
+    return sliceFilter(op, nonIndexComputationOperands, baseOp);
+  });
   BlockAndValueMapping bvm;
   for (auto origOp : slice) {
     builder.clone(*origOp, bvm);
