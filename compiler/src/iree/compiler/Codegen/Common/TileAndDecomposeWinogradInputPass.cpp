@@ -14,7 +14,6 @@
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -105,7 +104,7 @@ class ReifyWinogradInputTransform final
             ValueRange iterArgs) -> scf::ValueVector { return {iterArgs[0]}; });
 
     // Add spir-v attributes to loops (H, W, C)
-    const char *attrName = getSPIRVDistributeAttrName();
+    const char *attrName = "iree.spirv.distribute_dim";
     for (int i = loopNest.loops.size() - 1, dim = 0; i > 0; --i) {
       loopNest.loops[i]->setAttr(attrName, rewriter.getIndexAttr(dim++));
     }
@@ -180,24 +179,31 @@ class ReifyWinogradInputTransform final
             .getResult();
 
     // Create computation
-    Value interim, accumulator;
-    accumulator = rewriter
-                      .create<linalg::FillOp>(loc, ValueRange{zeroF32},
-                                              ValueRange{outputSlice})
-                      .result();
-    interim = rewriter
-                  .create<linalg::MatmulOp>(
-                      loc, tensorType, ValueRange{inputSlice, BV}, accumulator)
-                  .getResult(0);
-    accumulator = rewriter
-                      .create<linalg::FillOp>(loc, ValueRange{zeroF32},
-                                              ValueRange{outputSlice})
-                      .result();
-    auto result =
-        rewriter
-            .create<linalg::MatmulOp>(loc, tensorType, ValueRange{BTV, interim},
-                                      accumulator)
-            .getResult(0);
+    Value accumulator, result, AMatrix, BMatrix;
+    linalg::MatmulOp matmulOp;
+    for (int i = 0; i < 2; i++) {
+      accumulator = rewriter
+                        .create<linalg::FillOp>(loc, ValueRange{zeroF32},
+                                                ValueRange{outputSlice})
+                        .result();
+      if (i == 0) {
+        AMatrix = inputSlice;
+        BMatrix = BV;
+      } else {
+        AMatrix = BTV;
+        BMatrix = result;
+      }
+      matmulOp = rewriter.create<linalg::MatmulOp>(
+          loc, tensorType, ValueRange{AMatrix, BMatrix}, accumulator);
+      if (i == 0) {
+        matmulOp->setAttr(IREE::LinalgExt::Winograd::getWinogradAttrName(),
+                          rewriter.getStringAttr("I x B"));
+      } else {
+        matmulOp->setAttr(IREE::LinalgExt::Winograd::getWinogradAttrName(),
+                          rewriter.getStringAttr("B' x I x B"));
+      }
+      result = matmulOp.getResult(0);
+    }
 
     // Insert results into output slice
     auto updatedOutput = rewriter

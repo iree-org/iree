@@ -14,7 +14,9 @@ namespace LinalgExt {
 namespace Winograd {
 
 // This file contains the Winograd constant matrices for different
-// output tile sizes
+// output tile sizes and some Winograd utilities
+
+constexpr const char *getWinogradAttrName() { return "winograd.matmul"; }
 
 //===----------------------------------------------------------------------===//
 // Output tile size = 6, Kernel size = 3

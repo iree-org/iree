@@ -12,7 +12,6 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -2453,7 +2452,6 @@ WinogradInputTransformOp::getIterationDomain(OpBuilder &builder) {
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   Value source = input();
-  StringRef tensorFormat = getTensorFormat();
   // Expose only the batch dimension(0) and channel dimension(3) for NHWC tensor
   SmallVector<int64_t> indices = {0, 3};
   for (auto dim : llvm::seq<int64_t>(0, operandRank)) {

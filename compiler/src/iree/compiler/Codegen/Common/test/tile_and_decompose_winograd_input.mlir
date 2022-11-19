@@ -77,10 +77,10 @@ func.func @_winograd_input_transform_dispatch_0() {
 // CHECK:                   %[[EXTRACTED_SLICE_2:.+]] = tensor.extract_slice %[[ARG9]][0, 0, %[[ARG2]], %[[ARG4]], %[[ARG6]], %[[ARG8]]]
 // CHECK-SAME:                  [8, 8, 1, 1, 1, 1] [1, 1, 1, 1, 1, 1] : tensor<8x8x1x2x2x64xf32> to tensor<8x8xf32>
 // CHECK:                   %[[D18:.+]] = linalg.fill ins(%[[CST_1]] : f32) outs(%[[EXTRACTED_SLICE_2]] : tensor<8x8xf32>) -> tensor<8x8xf32>
-// CHECK:                   %[[D19:.+]] = linalg.matmul ins(%[[INSERTED_SLICE]], %[[CST_0]] : tensor<8x8xf32>, tensor<8x8xf32>)
+// CHECK:                   %[[D19:.+]] = linalg.matmul {winograd.matmul = "I x B"} ins(%[[INSERTED_SLICE]], %[[CST_0]] : tensor<8x8xf32>, tensor<8x8xf32>)
 // CHECK-SAME:                  outs(%[[D18]] : tensor<8x8xf32>) -> tensor<8x8xf32>
 // CHECK:                   %[[D20:.+]] = linalg.fill ins(%[[CST_1]] : f32) outs(%[[EXTRACTED_SLICE_2]] : tensor<8x8xf32>) -> tensor<8x8xf32>
-// CHECK:                   %[[D21:.+]] = linalg.matmul ins(%[[CST]], %[[D19]] : tensor<8x8xf32>, tensor<8x8xf32>)
+// CHECK:                   %[[D21:.+]] = linalg.matmul {winograd.matmul = "B' x I x B"} ins(%[[CST]], %[[D19]] : tensor<8x8xf32>, tensor<8x8xf32>)
 // CHECK-SAME:                  outs(%[[D20]] : tensor<8x8xf32>) -> tensor<8x8xf32>
 // CHECK:                   %[[INSERTED_SLICE_3:.+]] = tensor.insert_slice %[[D21]] into %[[ARG9]][0, 0, %[[ARG2]], %[[ARG4]], %[[ARG6]], %[[ARG8]]]
 // CHECK-SAME:                  [8, 8, 1, 1, 1, 1] [1, 1, 1, 1, 1, 1] : tensor<8x8xf32> into tensor<8x8x1x2x2x64xf32>

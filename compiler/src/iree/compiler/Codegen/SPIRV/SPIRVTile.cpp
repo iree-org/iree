@@ -12,6 +12,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/WinogradConstants.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -279,10 +280,10 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     MLIRContext *context = &getContext();
     func::FuncOp funcOp = getOperation();
 
-    // Skip tiling if loops have already been tiled
-    const char *attrName = getSPIRVDistributeAttrName();
-    WalkResult result = funcOp.walk([&](scf::ForOp forOp) {
-      if (forOp->hasAttr(attrName)) return WalkResult::interrupt();
+    // Skip tiling if lowering winograd ops
+    const char *attrName = IREE::LinalgExt::Winograd::getWinogradAttrName();
+    WalkResult result = funcOp.walk([&](linalg::MatmulOp matmulOp) {
+      if (matmulOp->hasAttr(attrName)) return WalkResult::interrupt();
       return WalkResult::advance();
     });
     if (result.wasInterrupted()) return;
