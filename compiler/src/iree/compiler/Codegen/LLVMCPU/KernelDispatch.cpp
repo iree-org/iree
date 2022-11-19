@@ -1047,6 +1047,18 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
       workgroupTileSizes[dim] = 0;
     }
   }
+
+  OpBuilder builder(op.getContext());
+  builder.setInsertionPoint(op);
+  SmallVector<Range> iterationDomain = op.getIterationDomain(builder);
+  for (int i = 0, e = std::min<int64_t>(numLoops, workgroupTileSizes.size());
+       i < e; ++i) {
+    Optional<int64_t> cstSize = getConstantIntValue(iterationDomain[i].size);
+    if (workgroupTileSizes[i] && cstSize) {
+      workgroupTileSizes[i] = std::min(workgroupTileSizes[i], cstSize.value());
+    }
+  }
+
   return workgroupTileSizes;
 }
 
@@ -1055,6 +1067,27 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   TileSizesListType tileSizes = {getLinalgExtDefaultWorkgroupTileSizes(op)};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDataTiling);
+}
+
+static LogicalResult setRootConfig(
+    func::FuncOp entryPointFn, IREE::LinalgExt::UnPackOp op,
+    DispatchLoweringPassPipeline pipeline =
+        DispatchLoweringPassPipeline::CPUDataTiling) {
+  SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(op);
+
+  // Fixup for making tileSizes be multiple of inner_tile_sizes.
+  DenseMap<int64_t, OpFoldResult> tileAndPosMapping = op.getDimAndTileMapping();
+  for (int i = 0, e = tileSizes.size(); i < e; ++i) {
+    if (!tileAndPosMapping.count(i)) continue;
+    if (tileSizes[i] == 0) continue;
+    Optional<int64_t> cst = getConstantIntValue(tileAndPosMapping[i]);
+    if (!cst) continue;
+    tileSizes[i] = llvm::alignDown(tileSizes[i], cst.value());
+  }
+
+  TileSizesListType tileSizesList = {tileSizes};
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, tileSizesList,
+                                               pipeline);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
@@ -1601,14 +1634,14 @@ static LogicalResult setRootConfigImpl(
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
         })
-        .Case<IREE::LinalgExt::FftOp, linalg::Mmt4DOp, linalg::Conv2DNhwcHwcfOp,
-              linalg::Conv2DNchwFchwOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+        .Case<IREE::LinalgExt::FftOp, IREE::LinalgExt::PackOp,
+              IREE::LinalgExt::UnPackOp, linalg::Mmt4DOp,
+              linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
+              linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<linalg::ContractionOpInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<linalg::LinalgOp>(
-            [&](auto op) { return setRootConfig(entryPointFn, op); })
-        .Case<IREE::LinalgExt::PackOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<TilingInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
@@ -1626,7 +1659,7 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
   // Redirect to individual operations.
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<IREE::LinalgExt::FftOp>([&](auto op) {
+        .Case<IREE::LinalgExt::FftOp, IREE::LinalgExt::UnPackOp>([&](auto op) {
           return setRootConfig(entryPointFn, op,
                                DispatchLoweringPassPipeline::VMVXDefault);
         })
