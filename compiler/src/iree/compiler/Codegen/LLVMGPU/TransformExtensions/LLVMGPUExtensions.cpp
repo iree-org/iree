@@ -93,7 +93,6 @@ transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
       mlir::transform::gpu::mapNestedForeachToThreadsImpl(
           rewriter, target, workgroupSize, true, transformOp,
           threadMappingAttributes);
-
   if (diag.succeeded()) {
     auto newAttr = rewriter.getIndexArrayAttr(workgroupSize);
     // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
