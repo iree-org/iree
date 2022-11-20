@@ -200,6 +200,7 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createIREEMaterializeEncodingPass();
 
 /// Erases #hal.descriptor_type as MemRef memory space.
+LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createEraseHALDescriptorTypeFromMemRefPass();
 

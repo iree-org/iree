@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -134,22 +135,25 @@ struct EraseHALDescriptorTypeFromMemRefPass final
     : public EraseHALDescriptorTypeFromMemRefBase<
           EraseHALDescriptorTypeFromMemRefPass> {
   void runOnOperation() override {
-    MLIRContext *context = &getContext();
-    Operation *op = getOperation();
-
-    ConversionTarget target(*context);
-    target.markUnknownOpDynamicallyLegal(isLegalOp);
-
-    MemRefTypeConverter typeConverter;
-    RewritePatternSet patterns(context);
-    patterns.add<EraseMemorySpacePattern>(context, typeConverter);
-
-    if (failed(applyFullConversion(op, target, std::move(patterns))))
+    func::FuncOp op = getOperation();
+    if (failed(eraseHALDescriptorTypeFromMemRef(op)))
       return signalPassFailure();
   }
 };
 
 }  // namespace
+
+LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp) {
+  MLIRContext *context = funcOp.getContext();
+  ConversionTarget target(*context);
+  target.markUnknownOpDynamicallyLegal(isLegalOp);
+
+  MemRefTypeConverter typeConverter;
+  RewritePatternSet patterns(context);
+  patterns.add<EraseMemorySpacePattern>(context, typeConverter);
+
+  return applyFullConversion(funcOp, target, std::move(patterns));
+}
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createEraseHALDescriptorTypeFromMemRefPass() {

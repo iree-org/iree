@@ -10,6 +10,8 @@ transform.structured.canonicalized_sequence failures(propagate) {
     ( mapping = [#gpu.block<x>] )
 
   %1 = transform.iree.bufferize %variant_op
+  %memref_func = transform.structured.match ops{["func.func"]} in %1
+  transform.iree.erase_hal_descriptor_type_from_memref %memref_func
 
   %func = transform.structured.match ops{["func.func"]} in %1
   transform.iree.foreach_thread_to_workgroup %func
