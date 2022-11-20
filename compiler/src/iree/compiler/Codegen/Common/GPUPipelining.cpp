@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
@@ -25,16 +25,19 @@ namespace iree_compiler {
 static const StringLiteral kPipeliningLoopMarker = "__pipelining_K_loop__";
 static const StringLiteral kPipeliningGlobalLoad = "__pipelining_global_load__";
 
-/// Returns true if the given `memrefType` as the default numeric address space
-/// 0.
-static bool hasDefaultAddressSpace(MemRefType memrefType) {
+/// Returns true if the given `memrefType` has the default numeric address space
+/// 0 or a HAL descriptor type address space.
+static bool hasDefaultOrHALAddressSpace(MemRefType memrefType) {
   Attribute addrSpace = memrefType.getMemorySpace();
   if (!addrSpace) return true;
   auto intAttr = addrSpace.dyn_cast<IntegerAttr>();
-  return intAttr && intAttr.getInt() == 0;
+  // Accept both default numeric address space and HAL descriptor type address
+  // space--the former is used by LLVMGPU while the latter is used by SPIR-V.
+  if (intAttr && intAttr.getInt() == 0) return true;
+  return addrSpace.isa<IREE::HAL::DescriptorTypeAttr>();
 }
 
-/// Returns true if the given `memrefType` as the numeric address space for
+/// Returns true if the given `memrefType` has the numeric address space for
 /// GPU shared memory.
 static bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
   Attribute addrSpace = memrefType.getMemorySpace();
@@ -191,7 +194,8 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
         auto ld = dyn_cast<vector::TransferReadOp>(op);
         if (!ld) continue;
         auto ldSrcType = ld.getSource().getType().cast<MemRefType>();
-        if (!hasDefaultAddressSpace(ldSrcType) || !ld->hasOneUse()) continue;
+        if (!hasDefaultOrHALAddressSpace(ldSrcType) || !ld->hasOneUse())
+          continue;
         auto st =
             dyn_cast<vector::TransferWriteOp>(ld->use_begin()->getOwner());
         if (!st) continue;
