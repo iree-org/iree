@@ -23,9 +23,6 @@
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -101,8 +98,17 @@ static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
                                             MemRefType allocationType,
                                             ValueRange dynamicSizes,
                                             unsigned int alignment) {
-  return builder.create<memref::AllocOp>(loc, allocationType, dynamicSizes)
-      .getResult();
+  MemRefType type = allocationType;
+  if (auto storage = type.getMemorySpace()) {
+    // We cannot allocate to generate a resultant MemRef type with descriptor
+    // type memory space; that's runtime allocations. So erase and fallback to
+    // the default 0 memory space. It is fine given this is just the default
+    // allocator; backends are expected to control by themselves.
+    if (storage.isa<IREE::HAL::DescriptorTypeAttr>())
+      type = MemRefType::get(type.getShape(), type.getElementType(),
+                             type.getLayout());
+  }
+  return builder.create<memref::AllocOp>(loc, type, dynamicSizes).getResult();
 }
 static LogicalResult defaultDeallocationFn(OpBuilder &builder, Location loc,
                                            Value allocation) {
