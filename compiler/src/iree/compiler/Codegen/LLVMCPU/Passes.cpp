@@ -143,6 +143,8 @@ static void addTileAndDistributePasses(
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createTileAndDecomposeWinogradInputTransformPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createTileAndDecomposeWinogradOutputTransformPass());
 }
 
 //===---------------------------------------------------------------------===//

@@ -167,6 +167,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtVectorizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTileAndDecomposeWinogradInputTransformPass();
 
+/// Tile and decompose the winograd output transform op into a sequence
+/// of linalg ops.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createTileAndDecomposeWinogradOutputTransformPass();
+
 // Marker used as attribute the depth of the split reduction transformations.
 const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 
