@@ -784,11 +784,9 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
   return true;
 }
 
-// Converts the status to an allocated string value using the given allocator.
-// The caller must free the buffer with |allocator|.
-static bool iree_status_to_string(iree_status_t status,
-                                  iree_allocator_t allocator, char** out_buffer,
-                                  iree_host_size_t* out_buffer_length) {
+IREE_API_EXPORT bool iree_status_to_string(
+    iree_status_t status, const iree_allocator_t* allocator, char** out_buffer,
+    iree_host_size_t* out_buffer_length) {
   *out_buffer_length = 0;
   iree_host_size_t buffer_length = 0;
   if (IREE_UNLIKELY(!iree_status_format(status, /*buffer_capacity=*/0,
@@ -799,7 +797,7 @@ static bool iree_status_to_string(iree_status_t status,
   // Buffer capacity needs to be +1 for the NUL terminator (see snprintf).
   char* buffer = NULL;
   iree_status_t malloc_status =
-      iree_allocator_malloc(allocator, buffer_length + 1, (void**)&buffer);
+      iree_allocator_malloc(*allocator, buffer_length + 1, (void**)&buffer);
   if (!iree_status_is_ok(malloc_status)) {
     iree_status_ignore(malloc_status);
     return false;
@@ -810,7 +808,7 @@ static bool iree_status_to_string(iree_status_t status,
     *out_buffer = buffer;
     return true;
   } else {
-    iree_allocator_free(allocator, buffer);
+    iree_allocator_free(*allocator, buffer);
     return false;
   }
 }
@@ -821,7 +819,7 @@ IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status) {
   iree_allocator_t allocator = iree_allocator_system();
   char* status_buffer = NULL;
   iree_host_size_t status_buffer_length = 0;
-  if (iree_status_to_string(status, allocator, &status_buffer,
+  if (iree_status_to_string(status, &allocator, &status_buffer,
                             &status_buffer_length)) {
     fprintf(file, "%.*s\n", (int)status_buffer_length, status_buffer);
     iree_allocator_free(allocator, status_buffer);

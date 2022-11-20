@@ -25,6 +25,8 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_allocator_t iree_allocator_t;
+
 //===----------------------------------------------------------------------===//
 // IREE_STATUS_FEATURE flags and IREE_STATUS_MODE setting
 //===----------------------------------------------------------------------===//
@@ -497,6 +499,13 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
                                         iree_host_size_t buffer_capacity,
                                         char* buffer,
                                         iree_host_size_t* out_buffer_length);
+
+// Converts the status to an allocated string value using the given allocator.
+// The caller must free the buffer with |allocator|.
+IREE_API_EXPORT bool iree_status_to_string(iree_status_t status,
+                                           const iree_allocator_t* allocator,
+                                           char** out_buffer,
+                                           iree_host_size_t* out_buffer_length);
 
 // Prints |status| to the given |file| as a string with all available
 // annotations. This will produce multiple lines of output and should be used
