@@ -28,7 +28,6 @@ using namespace mlir::iree_compiler;
 
 static constexpr unsigned cudaWarpSize = 32;
 static constexpr StringLiteral kCudaTarget = "cuda";
-static constexpr StringLiteral kReductionStrategyName = "reduction_strategy";
 namespace mlir {
 namespace iree_compiler {
 llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
@@ -514,7 +513,7 @@ static LogicalResult setReductionTransformJitConfig(func::FuncOp entryPoint,
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::
           TransformDialectJitterCodegen,
-      workgroupSize, 0, kReductionStrategyName);
+      workgroupSize);
   return success();
 }
 
@@ -552,10 +551,12 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                .cast<ShapedType>()
                                .getElementType();
   if (!elementType.isIntOrFloat()) return failure();
+  unsigned bitWidth = elementType.getIntOrFloatBitWidth();
   // Reduction distribution only supports 32-bit types now.
-  if (elementType.getIntOrFloatBitWidth() != 32) return failure();
+  if (bitWidth != 32) return failure();
 
-  unsigned vectorSize = 4;
+  const unsigned largestLoadSizeInBits = 128;
+  unsigned vectorSize = largestLoadSizeInBits / bitWidth;
   while ((*dimSize / vectorSize) % cudaWarpSize != 0) vectorSize /= 2;
 
   // TODO: Add reduction tiling to handle larger reductions.

@@ -119,12 +119,18 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
                                                     gpu::Dimension::x);
     Value cstWarpSize = builder.create<arith::ConstantIndexOp>(loc, warpSize);
     Value warpId = builder.create<arith::DivUIOp>(loc, threadX, cstWarpSize);
+    Value laneId = builder.create<arith::RemUIOp>(loc, threadX, cstWarpSize);
+    Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+    Value lane0 = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                                laneId, zero);
     // Store the reduction for each warp.
     SmallVector<Value> indices = {warpId};
-    builder.create<memref::StoreOp>(loc, laneVal, alloc, indices);
+    builder.create<scf::IfOp>(loc, lane0, [&](OpBuilder &b, Location l) {
+      b.create<memref::StoreOp>(l, laneVal, alloc, indices);
+      b.create<scf::YieldOp>(l, llvm::None);
+    });
     builder.create<gpu::BarrierOp>(loc);
     // Further reduce the outputs from each warps with a single warp reduce.
-    Value laneId = builder.create<arith::RemUIOp>(loc, threadX, cstWarpSize);
     Value loadVal = builder.create<memref::LoadOp>(loc, alloc, laneId);
     Value cstNumWarp = builder.create<arith::ConstantIndexOp>(loc, numWarp);
     // Pad with identity element if numel < warpSize for valid warp reduction.

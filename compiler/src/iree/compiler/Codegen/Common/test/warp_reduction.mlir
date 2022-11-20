@@ -147,9 +147,12 @@ hal.executable private @simple_reduce_multi_warp  {
 //       CHECK:     %[[S9:.*]] = arith.addf %[[S7]], %[[S8]] : f32
 //       CHECK:     %[[A:.*]] = memref.alloc() : memref<2xf32, 3>
 //       CHECK:     %[[WID:.*]] = arith.divui %[[TID]], %[[C32I]] : index
-//       CHECK:     memref.store %[[S9]], %[[A]][%[[WID]]] : memref<2xf32, 3>
-//       CHECK:     gpu.barrier
 //       CHECK:     %[[LANE_ID:.*]] = arith.remui %[[TID]], %[[C32I]] : index
+//       CHECK:     %[[LANE0:.*]] = arith.cmpi eq, %[[LANE_ID]], %[[C0]] : index
+//       CHECK:     scf.if %[[LANE0]] { 
+//       CHECK:       memref.store %[[S9]], %[[A]][%[[WID]]] : memref<2xf32, 3>
+//       CHECK:     }
+//       CHECK:     gpu.barrier
 //       CHECK:     %[[LOAD_VAL:.*]] = memref.load %[[A]][%[[LANE_ID]]] : memref<2xf32, 3>
 //       CHECK:     %[[USE_IDENTITY:.*]] = arith.cmpi sge, %[[LANE_ID]], %[[C2I]] : index
 //       CHECK:     %[[LANE_VAL:.*]] = arith.select %[[USE_IDENTITY]], %[[IDENTITY]], %[[LOAD_VAL]] : f32
@@ -216,5 +219,13 @@ hal.executable private @reduce_then_broadcast  {
 // Check that there is no scf.if generated.
 // If some operations were not distributed we would end up with a scf.if(warp0) block.
 // CHECK-LABEL: func.func @reduce_then_broadcast() {
+//   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C32I:.*]] = arith.constant 32 : index
+//   CHECK-DAG:   %[[TID:.*]] = gpu.thread_id  x
+//       CHECK:   %[[LANE_ID:.*]] = arith.remui %[[TID]], %[[C32I]] : index
+//       CHECK:   %[[LANE0:.*]] = arith.cmpi eq, %[[LANE_ID]], %[[C0]] : index
+//       CHECK:   scf.if %[[LANE0]] { 
+//       CHECK:     memref.store {{.*}} : memref<2xf32, 3>
+//       CHECK:   }
 //   CHECK-NOT:  scf.if
 //       CHECK:  return
