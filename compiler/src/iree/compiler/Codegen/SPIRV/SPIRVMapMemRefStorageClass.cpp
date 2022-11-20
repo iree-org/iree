@@ -65,7 +65,10 @@ struct SPIRVMapMemRefStorageClassPass final
         memorySpaceMap = mapHALDescriptorTypeForOpenCL;
       }
     }
-    if (!memorySpaceMap) return signalPassFailure();
+    if (!memorySpaceMap) {
+      op->emitError("missing storage class map for unknown client API");
+      return signalPassFailure();
+    }
 
     auto target = spirv::getMemorySpaceToStorageClassTarget(*context);
     spirv::MemorySpaceToStorageClassConverter converter(memorySpaceMap);

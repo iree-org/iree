@@ -51,19 +51,6 @@ struct MemRefTypeConverter final : public TypeConverter {
       return UnrankedMemRefType::get(memRefType.getElementType(),
                                      /*memorySpace=*/0);
     });
-
-    addConversion([this](FunctionType type) {
-      SmallVector<Type> inputs, results;
-      inputs.reserve(type.getNumInputs());
-      results.reserve(type.getNumResults());
-      for (Type input : type.getInputs()) {
-        inputs.push_back(convertType(input));
-      }
-      for (Type result : type.getResults()) {
-        results.push_back(convertType(result));
-      }
-      return FunctionType::get(type.getContext(), inputs, results);
-    });
   }
 };
 
@@ -82,11 +69,6 @@ static bool isLegalType(Type type) {
 
 /// Returns true if the given `op` is considered as legal.
 static bool isLegalOp(Operation *op) {
-  if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {
-    return llvm::all_of(funcOp.getArgumentTypes(), isLegalType) &&
-           llvm::all_of(funcOp.getResultTypes(), isLegalType);
-  }
-
   return llvm::all_of(op->getOperandTypes(), isLegalType) &&
          llvm::all_of(op->getResultTypes(), isLegalType);
 }

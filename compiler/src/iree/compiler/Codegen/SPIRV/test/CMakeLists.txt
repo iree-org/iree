@@ -36,6 +36,7 @@ iree_lit_test_suite(
     "illegal_configuration.mlir"
     "lowering_matmul_promotion.mlir"
     "lowering_reduction.mlir"
+    "map_memref_storage_class.mlir"
     "pipeline_matmul_cooperative_ops.mlir"
     "pipeline_matmul_promotion.mlir"
     "pipeline_matmul_vectorization.mlir"

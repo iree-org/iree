@@ -2399,3 +2399,44 @@ module {
 // CHECK: hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c5120) alignment(64) : memref<1001xf32, #hal.descriptor_type<storage_buffer>>
 // CHECK: hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c5120) alignment(64) : memref<1x1001xf32, #hal.descriptor_type<storage_buffer>>
 // CHECK: hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<1x1001xf32, #hal.descriptor_type<storage_buffer>>
+
+// -----
+
+func.func @uniform_storage_buffer() {
+  %c0 = arith.constant 0 : index
+  %m = hal.interface.constant.load[0] : index
+  %n = hal.interface.constant.load[1] : index
+  %k = hal.interface.constant.load[2] : index
+  %lhs = hal.interface.binding.subspan set(0) binding(0) type(uniform_buffer) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%m, %k}
+  %rhs = hal.interface.binding.subspan set(0) binding(1) type(uniform_buffer) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%k, %n}
+  %init = hal.interface.binding.subspan set(0) binding(2) type(uniform_buffer) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%m, %n}
+  %result = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%m, %n}
+  %wg_id_y = hal.interface.workgroup.id[1] : index
+  %wg_count_y = hal.interface.workgroup.count[1] : index
+  %wg_size_y = hal.interface.workgroup.size[1] : index
+  %wg_id_x = hal.interface.workgroup.id[0] : index
+  %wg_count_x = hal.interface.workgroup.count[0] : index
+  %wg_size_x = hal.interface.workgroup.size[0] : index
+  %offset_y = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%wg_id_y, %wg_size_y]
+  %step_y = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%wg_count_y, %wg_size_y]
+  %offset_x = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%wg_id_x, %wg_size_x]
+  %step_x = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%wg_count_x, %wg_size_x]
+  scf.for %iv0 = %offset_y to %m step %step_y {
+    %tilesize_y = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%iv0)[%wg_size_y, %m]
+    scf.for %iv1 = %offset_x to %n step %step_x {
+      %tilesize_x = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%iv1)[%wg_size_x, %n]
+      %lhs_tile = flow.dispatch.tensor.load %lhs, offsets = [%iv0, 0], sizes = [%tilesize_y, %k], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%m, %k} -> tensor<?x?xf32>
+      %rhs_tile = flow.dispatch.tensor.load %rhs, offsets = [0, %iv1], sizes = [%k, %tilesize_x], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%k, %n} -> tensor<?x?xf32>
+      %init_tile = flow.dispatch.tensor.load %init, offsets = [%iv0, %iv1], sizes = [%tilesize_y, %tilesize_x], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%m, %n} -> tensor<?x?xf32>
+      %matmul_tile = linalg.matmul ins(%lhs_tile, %rhs_tile : tensor<?x?xf32>, tensor<?x?xf32>) outs(%init_tile : tensor<?x?xf32>) -> tensor<?x?xf32>
+      flow.dispatch.tensor.store %matmul_tile, %result, offsets = [%iv0, %iv1], sizes = [%tilesize_y, %tilesize_x], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%m, %n}
+    }
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @uniform_storage_buffer()
+//       CHECK: hal.interface.binding.subspan set(0) binding(0) type(uniform_buffer) : memref<?x?xf32, #hal.descriptor_type<uniform_buffer>>
+//       CHECK: hal.interface.binding.subspan set(0) binding(1) type(uniform_buffer) : memref<?x?xf32, #hal.descriptor_type<uniform_buffer>>
+//       CHECK: hal.interface.binding.subspan set(0) binding(2) type(uniform_buffer) : memref<?x?xf32, #hal.descriptor_type<uniform_buffer>>
+//       CHECK: hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : memref<?x?xf32, #hal.descriptor_type<storage_buffer>>
