@@ -40,7 +40,6 @@ iree_lit_test_suite(
             "remove_trivial_loops.mlir",
             "swizzle_workgroup.mlir",
             "test_partitionable_loops_interface.mlir",
-            "tile_and_decompose_winograd_input.mlir",
             "tile_and_distribute_to_workgroups.mlir",
             "tile_reduction.mlir",
             "transform_dialect_apply_pattern_op.mlir",

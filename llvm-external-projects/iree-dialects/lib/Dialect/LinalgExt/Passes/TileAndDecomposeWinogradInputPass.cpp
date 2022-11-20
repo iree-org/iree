@@ -6,74 +6,69 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/WinogradConstants.h"
-#include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
-#define DEBUG_TYPE "iree-codegen-tile-and-decompose-winograd-input"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/Debug.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace LinalgExt {
 
 namespace {
 
+static void computeLoopParams(SmallVectorImpl<Value> &lbs,
+                              SmallVectorImpl<Value> &ubs,
+                              SmallVectorImpl<Value> &steps, Value tensor,
+                              Location loc, OpBuilder &builder) {
+  auto zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  auto one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  auto tensorDims = tensor::createDimValues(builder, loc, tensor);
+  for (int i = 2; i < tensorDims.size(); i++) {
+    lbs.push_back(zero);
+    ubs.push_back(getValueOrCreateConstantIndexOp(builder, loc, tensorDims[i]));
+    steps.push_back(one);
+  }
+}
+
 class ReifyWinogradInputTransform final
-    : public OpRewritePattern<IREE::LinalgExt::WinogradInputTransformOp> {
- public:
+    : public OpRewritePattern<WinogradInputTransformOp> {
+public:
   using OpRewritePattern::OpRewritePattern;
 
-  static void computeLoopParams(SmallVectorImpl<Value> &lbs,
-                                SmallVectorImpl<Value> &ubs,
-                                SmallVectorImpl<Value> &steps,
-                                ArrayRef<int64_t> tensorShape, Location loc,
-                                PatternRewriter &rewriter) {
-    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    for (auto shape : llvm::enumerate(tensorShape)) {
-      if (shape.index() < 2) continue;
-      lbs.push_back(zero);
-      ubs.push_back(
-          rewriter.create<arith::ConstantIndexOp>(loc, shape.value()));
-      steps.push_back(one);
-    }
-  }
-
-  LogicalResult matchAndRewrite(
-      IREE::LinalgExt::WinogradInputTransformOp inputOp,
-      PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(WinogradInputTransformOp inputOp,
+                                PatternRewriter &rewriter) const override {
     auto loc = inputOp.getLoc();
     auto funcOp = inputOp->getParentOfType<func::FuncOp>();
-    if (!funcOp) return failure();
+    if (!funcOp) {
+      return rewriter.notifyMatchFailure(
+          inputOp, "Could not find parent of type funcOp");
+    }
 
     const float *BT{nullptr};
     auto inputTileSize = inputOp.getInputTileSize();
     auto outputTileSize = inputOp.getOutputTileSize();
     switch (outputTileSize) {
-      case 6:
-        BT = IREE::LinalgExt::Winograd::BT_6x6_3x3;
-        break;
-      default:
-        return failure();
+    case 6:
+      BT = IREE::LinalgExt::Winograd::BT_6x6_3x3;
+      break;
+    default:
+      return failure();
     }
+    /// The two values below are the transpose(B) [BTV]
+    /// and B [BV] constant matrices that convert the input
+    /// tile to the Winograd domain.
     Value BTV = IREE::LinalgExt::createValueFrom2DConstant(
         BT, inputTileSize, inputTileSize, false, loc, rewriter);
     Value BV = IREE::LinalgExt::createValueFrom2DConstant(
@@ -83,7 +78,6 @@ class ReifyWinogradInputTransform final
     auto output = inputOp.output();
     auto outputType = output.getType().cast<ShapedType>();
     auto inputType = input.getType().cast<ShapedType>();
-    auto outputShape = outputType.getShape();
     auto inputShape = inputType.getShape();
     auto elementType = outputType.getElementType();
     SmallVector<int64_t> inputTileSquare(2, inputTileSize);
@@ -96,18 +90,12 @@ class ReifyWinogradInputTransform final
 
     rewriter.setInsertionPoint(inputOp);
     SmallVector<Value> lbs, ubs, steps;
-    computeLoopParams(lbs, ubs, steps, outputShape, loc, rewriter);
+    computeLoopParams(lbs, ubs, steps, output, loc, rewriter);
     // Construct loops
     auto loopNest = scf::buildLoopNest(
         rewriter, loc, lbs, ubs, steps, ValueRange({output}),
         [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
             ValueRange iterArgs) -> scf::ValueVector { return {iterArgs[0]}; });
-
-    // Add spir-v attributes to loops (H, W, C)
-    const char *attrName = "iree.spirv.distribute_dim";
-    for (int i = loopNest.loops.size() - 1, dim = 0; i > 0; --i) {
-      loopNest.loops[i]->setAttr(attrName, rewriter.getIndexAttr(dim++));
-    }
 
     // Extract input slice
     auto one = rewriter.getIndexAttr(1);
@@ -221,7 +209,7 @@ class ReifyWinogradInputTransform final
   }
 };
 
-}  // namespace
+} // namespace
 
 namespace {
 struct TileAndDecomposeWinogradInputTransformPass
@@ -235,7 +223,7 @@ struct TileAndDecomposeWinogradInputTransformPass
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void TileAndDecomposeWinogradInputTransformPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -252,5 +240,7 @@ createTileAndDecomposeWinogradInputTransformPass() {
   return std::make_unique<TileAndDecomposeWinogradInputTransformPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace LinalgExt
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

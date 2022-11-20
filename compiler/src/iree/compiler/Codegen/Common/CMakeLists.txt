@@ -75,7 +75,6 @@ iree_cc_library(
   DEPS
     IREELinalgExtDialect
     IREELinalgExtTransformOps
-    IREELinalgExtUtils
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
@@ -140,7 +139,6 @@ iree_cc_library(
     "PolynomialApproximationPass.cpp"
     "SplitFullPartialTransferPass.cpp"
     "TestPartitionableLoopsInterface.cpp"
-    "TileAndDecomposeWinogradInputPass.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
     "VectorizePad.cpp"
@@ -149,7 +147,6 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms
-    IREELinalgExtUtils
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
@@ -220,7 +217,6 @@ iree_cc_library(
     "PadDynamicAlloc.cpp"
     "RemoveTrivialLoops.cpp"
     "TestPartitionableLoopsInterface.cpp"
-    "TileAndDecomposeWinogradInputPass.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
     "UserConfig.cpp"
@@ -233,7 +229,6 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms
-    IREELinalgExtUtils
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils

@@ -204,11 +204,6 @@ LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createEraseHALDescriptorTypeFromMemRefPass();
 
-/// Tile and decompose the winograd input transform op into a sequence
-/// of linalg ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createTileAndDecomposeWinogradInputTransformPass();
-
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//

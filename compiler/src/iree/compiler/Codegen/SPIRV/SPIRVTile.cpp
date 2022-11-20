@@ -12,7 +12,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "iree-dialects/Dialect/LinalgExt/Utils/WinogradConstants.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -279,14 +278,6 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     func::FuncOp funcOp = getOperation();
-
-    // Skip tiling if lowering winograd ops
-    const char *attrName = IREE::LinalgExt::Winograd::getWinogradAttrName();
-    WalkResult result = funcOp.walk([&](linalg::MatmulOp matmulOp) {
-      if (matmulOp->hasAttr(attrName)) return WalkResult::interrupt();
-      return WalkResult::advance();
-    });
-    if (result.wasInterrupted()) return;
 
     // Try to find computation ops which we will use as anchor to tile and fuse.
     SmallVector<Operation *> computeOps;
