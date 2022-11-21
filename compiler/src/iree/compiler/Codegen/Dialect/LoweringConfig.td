@@ -114,7 +114,7 @@ def IREECodegen_TranslationInfoAttr :
   let assemblyFormat = [{
     `<` `` $passPipeline
     (`pipeline_depth` `=` $softwarePipelineDepth^)?
-    (`store_stage` `=` $softwarePipelineStoreStage^) `>`
+    (`store_stage` `=` $softwarePipelineStoreStage^)? `>`
   }];
 
   let parameters = (ins
@@ -128,7 +128,7 @@ def IREECodegen_TranslationInfoAttr :
   let builders = [
     AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
         CArg<"unsigned", "0">:$softwarePipelineDepth,
-        CArg<"unsigned", "1">:$softwarePipelineStoreStage>
+        CArg<"unsigned", "1">:$softwarePipelineStoreStage)>
   ];
   let extraClassDeclaration = [{
     // Returns the lowering pass pipeline set.

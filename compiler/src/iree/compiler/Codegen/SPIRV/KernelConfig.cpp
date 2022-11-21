@@ -55,34 +55,6 @@ bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
          llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops());
 }
 
-// Check if the given linalg op is fused with another op that may block
-// multi-buffering
-static bool isFusedWithUnbufferableOp(linalg::LinalgOp matmul) {
-  func::FuncOp entryPoint = matmul->getParentOfType<func::FuncOp>();
-
-  auto getResultBits = [](linalg::LinalgOp linalgOp) {
-    auto shapedType = linalgOp->getResult(0).getType().dyn_cast<ShapedType>();
-    return shapedType.getElementType().getIntOrFloatBitWidth();
-  };
-
-  auto matmulResultBits = getResultBits(matmul);
-  bool fusedWithUnbufferableOps = false;
-  entryPoint.walk([&](linalg::LinalgOp linalgOp) {
-    if (linalgOp == matmul || isMatmulOrBatchMatmul(linalgOp) ||
-        isa<linalg::FillOp>(linalgOp)) {
-      return WalkResult::advance();
-    }
-
-    // This is a conservative approach in case bufferization produces an intermediate buffer that prevents multi-buffering from working.
-    if (linalgOp->getNumResults() != 1 || !OpTrait::hasElementwiseMappableTraits(linalgOp) || getResultBits(linalgOp) != matmulResultBits) {
-      fusedWithUnbufferableOps = true;
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  return fusedWithUnbufferableOps;
-}
-
 //===----------------------------------------------------------------------===//
 // Convolution Default Configuration
 //===----------------------------------------------------------------------===//
@@ -627,12 +599,6 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   // depth.
   auto pipelineDepth = softwarePipelineDepth ? softwarePipelineDepth : 1;
   auto storeStage = softwarePipelineStoreStage;
-
-  // Check whether multi-buffering is possible.
-  if (isFusedWithUnbufferableOp(op)) {
-    pipelineDepth = 1;
-    storeStage = 1;
-  }
 
   // Try to adjust tiling sizes to fit in shared memory.
   auto usePromotionPipeline =

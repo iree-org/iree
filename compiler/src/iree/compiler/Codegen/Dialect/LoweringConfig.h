@@ -145,7 +145,8 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
   setLoweringConfig(op, config);
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), passPipeline, softwarePipelineDepth, softwarePipelineStoreStage);
+      entryPointFn->getContext(), passPipeline, softwarePipelineDepth,
+      softwarePipelineStoreStage);
   setTranslationInfo(entryPointFn, translationInfo, workgroupSize);
   return success();
 }

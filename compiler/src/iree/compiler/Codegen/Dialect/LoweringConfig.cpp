@@ -78,7 +78,8 @@ TranslationInfoAttr TranslationInfoAttr::get(
     unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage) {
   auto pipelineAttr =
       DispatchLoweringPassPipelineAttr::get(context, passPipeline);
-  return get(context, pipelineAttr, softwarePipelineDepth, softwarePipelineStoreStage);
+  return get(context, pipelineAttr, softwarePipelineDepth,
+             softwarePipelineStoreStage);
 }
 
 DispatchLoweringPassPipeline

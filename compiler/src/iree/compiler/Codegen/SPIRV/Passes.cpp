@@ -159,6 +159,8 @@ static void addLoopMaterializationPasses(OpPassManager &pm) {
   pm.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   pm.addNestedPass<func::FuncOp>(createRemoveSingleIterationLoopPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 }
 
 /// Adds passes to lowering MemRefs. This folds MemRef subviews, flattens n-D
@@ -337,6 +339,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
   // Tile and distribute to GPU invocations.
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVTileAndPromotePass());
 
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
   if (pipelineDepth > 1 || storeStage == 0)
     nestedModulePM.addNestedPass<func::FuncOp>(createGPUMultiBuffering(
         storeStage == 0 ? pipelineDepth + 1 : pipelineDepth));
@@ -346,12 +350,10 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
       createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUReduceSharedMemoryBankConflicts(
           detail::bankConflictReductionPaddingBits));
-
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
