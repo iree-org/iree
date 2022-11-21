@@ -120,12 +120,7 @@ fi
 
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
-label_exclude_args_exclude_vulkan=(
-  "${label_exclude_args[@]}"
-  "^driver=vulkan$"
-)
-
-label_exclude_regex_exclude_vulkan="($(IFS="|" ; echo "${label_exclude_args_exclude_vulkan[*]?}"))"
+vulkan_label_regex='^driver=vulkan$'
 
 # These tests currently have asan failures
 declare -a excluded_tests=(
@@ -160,7 +155,7 @@ ctest \
   --timeout 900 \
   --output-on-failure \
   --no-tests=error \
-  --label-exclude "${label_exclude_regex_exclude_vulkan}" \
+  --label-exclude "${label_exclude_regex}|${vulkan_label_regex}" \
   --exclude-regex "${excluded_tests_regex?}"
 
 echo "******************** llvm-external-projects tests ***********************"
@@ -174,6 +169,6 @@ ASAN_OPTIONS=detect_leaks=0 \
     --timeout 900 \
     --output-on-failure \
     --no-tests=error \
-    --label-regex "^driver=vulkan$" \
+    --label-regex "${vulkan_label_regex}" \
     --label-exclude "${label_exclude_regex}" \
     --exclude-regex "${excluded_tests_regex?}"
