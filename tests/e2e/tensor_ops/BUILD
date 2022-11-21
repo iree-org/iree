@@ -19,7 +19,11 @@ iree_lit_test_suite(
         "tensor_cast.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
-    tags = ["hostonly"],
+    tags = [
+        "driver=local-task",
+        "driver=vulkan",
+        "hostonly",
+    ],
     tools = [
         "//tools:iree-benchmark-module",
         "//tools:iree-compile",
