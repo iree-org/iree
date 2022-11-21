@@ -427,17 +427,51 @@ func.func @subgroup_mma_load_with_offset(%offset : index, %i0: index, %i1: index
 
 // -----
 
-func.func @subgroup_mma_storewith_offset(%offset : index, %i0: index, %i1: index, %val: !gpu.mma_matrix<16x16xf16, "COp">) {
+func.func @subgroup_mma_store_with_offset(%offset : index, %i0: index, %i1: index, %val: !gpu.mma_matrix<16x16xf16, "COp">) {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<32x32xf16, 3>
   gpu.subgroup_mma_store_matrix %val, %subspan[%i0, %i1] {leadDimension = 128 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
   return
 }
 
 //       CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 32 + s1 + s2 floordiv 2)>
-// CHECK-LABEL: func.func @subgroup_mma_storewith_offset
+// CHECK-LABEL: func.func @subgroup_mma_store_with_offset
 //  CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[VAL:.+]]: !gpu.mma_matrix<16x16xf16, "COp">
 //   CHECK-DAG:   %[[ZERO:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1024:.+]] = arith.constant 1024 : index
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[ZERO]]) : memref<?xf16, 3>{%[[C1024]]}
 //       CHECK:   %[[INDEX:.+]] = affine.apply #[[$MAP]]()[%[[I0]], %[[I1]], %[[OFFSET]]]
 //       CHECK:   gpu.subgroup_mma_store_matrix %[[VAL]], %[[SUBSPAN]][%[[INDEX]]] {leadDimension = 128 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<?xf16, 3>
+
+// -----
+
+func.func @load_uniform_buffer(%offset: index, %i0: index, %i1 : index, %i2: index) -> i32 {
+  %subspan = hal.interface.binding.subspan set(0) binding(0) type(uniform_buffer) offset(%offset) : memref<2x3x4xi32, #hal.descriptor_type<uniform_buffer>>
+  %val = memref.load %subspan[%i0, %i1, %i2] : memref<2x3x4xi32, #hal.descriptor_type<uniform_buffer>>
+  return %val: i32
+}
+
+//       CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 12 + s1 * 4 + s2 + s3 floordiv 4)>
+// CHECK-LABEL: func.func @load_uniform_buffer
+//  CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(uniform_buffer) offset(%[[C0]]) : memref<24xi32, #hal.descriptor_type<uniform_buffer>>
+//       CHECK:   %[[INDEX:.+]] = affine.apply #[[$MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[OFFSET]]]
+//       CHECK:   %[[LD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]] : memref<24xi32, #hal.descriptor_type<uniform_buffer>>
+//       CHECK:   return %[[LD]] : i32
+
+
+// -----
+
+func.func @store_uniform_buffer(%value : i32, %offset: index, %i0: index, %i1 : index, %i2: index) {
+  %subspan = hal.interface.binding.subspan set(0) binding(0) type(uniform_buffer) offset(%offset) : memref<2x3x4xi32, #hal.descriptor_type<uniform_buffer>>
+  memref.store %value, %subspan[%i0, %i1, %i2] : memref<2x3x4xi32, #hal.descriptor_type<uniform_buffer>>
+  return
+}
+
+//       CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 12 + s1 * 4 + s2 + s3 floordiv 4)>
+// CHECK-LABEL: func.func @store_uniform_buffer
+//  CHECK-SAME: (%[[VAL:.+]]: i32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(uniform_buffer) offset(%[[C0]]) : memref<24xi32, #hal.descriptor_type<uniform_buffer>>
+//       CHECK:   %[[INDEX:.+]] = affine.apply #[[$MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[OFFSET]]]
+//       CHECK:   memref.store %[[VAL]], %[[SUBSPAN]][%[[INDEX]]] : memref<24xi32, #hal.descriptor_type<uniform_buffer>>
