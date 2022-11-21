@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
@@ -17,6 +18,10 @@ namespace IREE {
 namespace LinalgExt {
 
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
+  ShapedType type = v.getType().cast<ShapedType>();
+  if (!type.isDynamicDim(dim)) {
+    return builder.create<arith::ConstantIndexOp>(loc, type.getDimSize(dim));
+  }
   return TypeSwitch<Type, Value>(v.getType())
       .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
         return builder.create<tensor::DimOp>(loc, v, dim);
