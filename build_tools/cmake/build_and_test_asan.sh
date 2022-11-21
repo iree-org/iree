@@ -120,9 +120,6 @@ fi
 
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
-# For the purpose of determining whether to disable LSAN, we need to catch not
-# only the tests that are specifically labelled `driver=vulkan`, but also any
-# multi-driver test that may run Vulkan among other drivers.
 vulkan_label_regex='^driver=vulkan$'
 
 cd ${BUILD_DIR?}
