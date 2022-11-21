@@ -77,9 +77,9 @@ static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
   }
   SmallVector<int64_t> convertedStaticTargetShape;
   SmallVector<Value> convertedDynamicTargetShape;
-  dispatchIndexOpFoldResults(
-      convertedTargetShape.value(), convertedDynamicTargetShape,
-      convertedStaticTargetShape, ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(convertedTargetShape.value(),
+                             convertedDynamicTargetShape,
+                             convertedStaticTargetShape, ShapedType::kDynamic);
   return convertedDynamicTargetShape;
 }
 

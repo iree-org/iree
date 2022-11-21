@@ -324,8 +324,7 @@ static FailureOr<RankedTensorType> canonicalizeSubViewParts(
   for (auto size : llvm::enumerate(mixedSizes)) {
     if (droppedDims.test(size.index())) continue;
     Optional<int64_t> staticSize = getConstantIntValue(size.value());
-    newShape.push_back(staticSize ? staticSize.value()
-                                  : ShapedType::kDynamic);
+    newShape.push_back(staticSize ? staticSize.value() : ShapedType::kDynamic);
   }
 
   auto newSliceType =

@@ -577,8 +577,7 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
 
   processMixedOperands(mixedOffsets, offsets, staticOffsets,
                        ShapedType::kDynamic);
-  processMixedOperands(mixedSizes, sizes, staticSizes,
-                       ShapedType::kDynamic);
+  processMixedOperands(mixedSizes, sizes, staticSizes, ShapedType::kDynamic);
   processMixedOperands(mixedStrides, strides, staticStrides,
                        ShapedType::kDynamic);
 
@@ -685,8 +684,7 @@ void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
   SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
   processMixedOperands(mixedOffsets, offsets, staticOffsets,
                        ShapedType::kDynamic);
-  processMixedOperands(mixedSizes, sizes, staticSizes,
-                       ShapedType::kDynamic);
+  processMixedOperands(mixedSizes, sizes, staticSizes, ShapedType::kDynamic);
   processMixedOperands(mixedStrides, strides, staticStrides,
                        ShapedType::kDynamic);
 

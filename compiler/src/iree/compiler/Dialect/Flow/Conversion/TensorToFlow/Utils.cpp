@@ -63,11 +63,9 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
 
   bool fullSlices = true;
   for (size_t dim = offsets.size(); dim > 0; dim--) {
-    int64_t staticOffset =
-        getVal(offsets[dim - 1], ShapedType::kDynamic);
+    int64_t staticOffset = getVal(offsets[dim - 1], ShapedType::kDynamic);
     int64_t staticSize = getVal(sizes[dim - 1], ShapedType::kDynamic);
-    int64_t staticStride =
-        getVal(strides[dim - 1], ShapedType::kDynamic);
+    int64_t staticStride = getVal(strides[dim - 1], ShapedType::kDynamic);
 
     if (staticStride != 1) return false;
     // The offsets and sizes dont have to be static for all dimensions. When
