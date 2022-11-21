@@ -136,7 +136,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     if (allocOp.getType().getMemorySpaceAsInt() != 3) return failure();
     ArrayRef<int64_t> shape = allocOp.getType().getShape();
     if (llvm::any_of(shape, [](int64_t dim) {
-          return dim == ShapedType::kDynamicSize;
+          return dim == ShapedType::kDynamic;
         })) {
       return failure();
     }

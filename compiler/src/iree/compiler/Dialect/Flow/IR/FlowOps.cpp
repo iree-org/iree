@@ -161,7 +161,7 @@ static bool doesSliceSpanWholeTarget(
   SmallVector<int64_t> staticSizes;
   SmallVector<Value> dynamicSizes;
   dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes,
-                             ShapedType::kDynamicSize);
+                             ShapedType::kDynamic);
   auto targetType = dispatchType;
   if (staticSizes != targetType.getShape() ||
       llvm::any_of(llvm::zip(dynamicSizes, dispatchTypeDims),
@@ -466,7 +466,7 @@ LogicalResult DispatchTieShapeOp::reifyResultShapes(
   auto tensorType =
       getResult().getType().cast<IREE::Flow::DispatchTensorType>();
   for (int64_t dim : tensorType.getShape()) {
-    if (dim == ShapedType::kDynamicSize) {
+    if (dim == ShapedType::kDynamic) {
       shape.push_back(getDynamicDims()[dynamicIdx++]);
     } else {
       shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));
@@ -540,7 +540,7 @@ RankedTensorType DispatchTensorLoadOp::inferResultType(
         if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
           return attr.cast<IntegerAttr>().getInt();
         }
-        return ShapedType::kDynamicSize;
+        return ShapedType::kDynamic;
       }));
   return RankedTensorType::get(shape, sourceType.getBoundElementType());
 }
@@ -578,7 +578,7 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
   processMixedOperands(mixedOffsets, offsets, staticOffsets,
                        ShapedType::kDynamicStrideOrOffset);
   processMixedOperands(mixedSizes, sizes, staticSizes,
-                       ShapedType::kDynamicSize);
+                       ShapedType::kDynamic);
   processMixedOperands(mixedStrides, strides, staticStrides,
                        ShapedType::kDynamicStrideOrOffset);
 
@@ -620,7 +620,7 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
     // Result size matches the source size (no slicing).
     unsigned dynamicIdx = 0;
     for (int64_t dim : getType().getShape()) {
-      if (dim == ShapedType::kDynamicSize) {
+      if (dim == ShapedType::kDynamic) {
         shape.push_back(getSourceDims()[dynamicIdx++]);
       } else {
         shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));
@@ -686,7 +686,7 @@ void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
   processMixedOperands(mixedOffsets, offsets, staticOffsets,
                        ShapedType::kDynamicStrideOrOffset);
   processMixedOperands(mixedSizes, sizes, staticSizes,
-                       ShapedType::kDynamicSize);
+                       ShapedType::kDynamic);
   processMixedOperands(mixedStrides, strides, staticStrides,
                        ShapedType::kDynamicStrideOrOffset);
 
@@ -1350,7 +1350,7 @@ LogicalResult TensorTieShapeOp::reifyResultShapes(
   unsigned dynamicIdx = 0;
   auto tensorType = getResult().getType().cast<RankedTensorType>();
   for (int64_t dim : tensorType.getShape()) {
-    if (dim == ShapedType::kDynamicSize) {
+    if (dim == ShapedType::kDynamic) {
       shape.push_back(getDynamicDims()[dynamicIdx++]);
     } else {
       shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));

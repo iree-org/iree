@@ -122,7 +122,7 @@ static Type makeZeroElementsStaticTensorType(Type type) {
   dims.resize(tensorType.getRank());
   for (int64_t i = 0; i < tensorType.getRank(); ++i) {
     int64_t dim = tensorType.getDimSize(i);
-    dims[i] = dim == ShapedType::kDynamicSize ? 0 : dim;
+    dims[i] = dim == ShapedType::kDynamic ? 0 : dim;
   }
   return RankedTensorType::get(dims, tensorType.getElementType(),
                                tensorType.getEncoding());
@@ -325,7 +325,7 @@ static FailureOr<RankedTensorType> canonicalizeSubViewParts(
     if (droppedDims.test(size.index())) continue;
     Optional<int64_t> staticSize = getConstantIntValue(size.value());
     newShape.push_back(staticSize ? staticSize.value()
-                                  : ShapedType::kDynamicSize);
+                                  : ShapedType::kDynamic);
   }
 
   auto newSliceType =

@@ -38,8 +38,8 @@ static Value expandTo4D(mlir::Location loc, PatternRewriter &rewriter,
   // where M0, N0 are always static and M1, N1 are static if and only if M, N
   // are.
   for (int i : {0, 1}) {
-    if (inputShape[i] == ShapedType::kDynamicSize) {
-      targetShape[2 * i] = ShapedType::kDynamicSize;
+    if (inputShape[i] == ShapedType::kDynamic) {
+      targetShape[2 * i] = ShapedType::kDynamic;
     } else {
       targetShape[2 * i] = inputShape[i] / tileShape[i];
     }
@@ -70,7 +70,7 @@ static Value transpose(mlir::Location loc, PatternRewriter &rewriter,
   ArrayRef<int64_t> inputShape = inputType.getShape();
   SmallVector<OpFoldResult, 4> targetShape;
   for (int i = 0; i < 4; i++) {
-    if (inputShape[indices[i]] == ShapedType::kDynamicSize) {
+    if (inputShape[indices[i]] == ShapedType::kDynamic) {
       targetShape.emplace_back(
           rewriter.create<tensor::DimOp>(loc, input, indices[i]));
     } else {
@@ -121,7 +121,7 @@ static bool needsPadding(ArrayRef<int64_t> inputShape,
                          ArrayRef<int64_t> tileShape) {
   assert(inputShape.size() == tileShape.size());
   for (int i = 0; i < inputShape.size(); i++) {
-    if (inputShape[i] == ShapedType::kDynamicSize) {
+    if (inputShape[i] == ShapedType::kDynamic) {
       return true;
     }
     if (inputShape[i] % tileShape[i] != 0) {
@@ -149,8 +149,8 @@ static Value pad(Location loc, PatternRewriter &rewriter, Value input,
     // 'High' padding i.e. padding at the bottom and on the right, and the
     // result type shape, will be dynamic in any dimension if and only if the
     // input shape is.
-    if (inputShape[i] == ShapedType::kDynamicSize) {
-      resultTypeShape.push_back(ShapedType::kDynamicSize);
+    if (inputShape[i] == ShapedType::kDynamic) {
+      resultTypeShape.push_back(ShapedType::kDynamic);
       // There only remains to compute the 'high' padding Value.
       auto add = [&](Value a, Value b) {
         return rewriter.create<arith::AddIOp>(loc, a, b);
@@ -204,7 +204,7 @@ static Value extractSliceLike(Location loc, PatternRewriter &rewriter,
   for (int i = 0; i < rank; ++i) {
     offsets.push_back(rewriter.getIndexAttr(0));
     strides.push_back(rewriter.getIndexAttr(1));
-    if (resultShape[i] == ShapedType::kDynamicSize) {
+    if (resultShape[i] == ShapedType::kDynamic) {
       dims.emplace_back(rewriter.create<tensor::DimOp>(loc, likeWhat, i));
     } else {
       dims.push_back(rewriter.getIndexAttr(resultShape[i]));

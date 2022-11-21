@@ -397,7 +397,7 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     `,` `offsets` `=` custom<DynamicIndexList>(
       $offsets, $static_offsets, "ShapedType::kDynamicStrideOrOffset")
     `,` `sizes` `=` custom<DynamicIndexList>(
-      $sizes, $static_sizes, "ShapedType::kDynamicSize")
+      $sizes, $static_sizes, "ShapedType::kDynamic")
     `,` `strides` `=` custom<DynamicIndexList>(
       $strides, $static_strides, "ShapedType::kDynamicStrideOrOffset")
     attr-dict `:` type($source) (`{` $source_dims^ `}`)?  `->` type($result)
@@ -517,7 +517,7 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     `,` `offsets` `=` custom<DynamicIndexList>(
       $offsets, $static_offsets, "ShapedType::kDynamicStrideOrOffset")
     `,` `sizes` `=` custom<DynamicIndexList>(
-      $sizes, $static_sizes, "ShapedType::kDynamicSize")
+      $sizes, $static_sizes, "ShapedType::kDynamic")
     `,` `strides` `=` custom<DynamicIndexList>(
       $strides, $static_strides, "ShapedType::kDynamicStrideOrOffset")
     attr-dict `:` type($value) `->` type($target) (`{` $target_dims^ `}`)?
