@@ -33,7 +33,8 @@ iree_lit_test_suite(
     ),
     cfg = "//tools:lit.cfg.py",
     tags = [
-        "driver=vulkan",  # Multiple driver= tags allowed. Used by sanitizer CI.
+        "driver=local-task",
+        "driver=vulkan",
         "hostonly",
     ],
     tools = [

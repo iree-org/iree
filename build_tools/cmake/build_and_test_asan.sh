@@ -107,9 +107,8 @@ declare -a label_exclude_args=(
   #   ^bindings/
 )
 
-if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
-  label_exclude_args+=("^driver=vulkan$")
-fi
+# IREE_VULKAN_DISABLE is handled separately as we run Vulkan and non-Vulkan
+# tests in separate ctest commands anyway.
 if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=cuda$")
 fi
@@ -134,13 +133,15 @@ ctest \
 echo "******************** llvm-external-projects tests ***********************"
 cmake --build . --target check-iree-dialects -- -k 0
 
-echo "*** Running main project ctests that may use the Vulkan driver  *********"
-# Disable LeakSanitizer (LSAN) because of a history of issues with Swiftshader
-# (#5716, #8489, #11203).
-ASAN_OPTIONS=detect_leaks=0 \
-  ctest \
-    --timeout 900 \
-    --output-on-failure \
-    --no-tests=error \
-    --label-regex "${vulkan_label_regex}" \
-    --label-exclude "${label_exclude_regex}"
+if [[ "${IREE_VULKAN_DISABLE?}" == 0 ]]; then
+  echo "*** Running ctests that use the Vulkan driver, with LSAN disabled *****"
+  # Disable LeakSanitizer (LSAN) because of a history of issues with Swiftshader
+  # (#5716, #8489, #11203).
+  ASAN_OPTIONS=detect_leaks=0 \
+    ctest \
+      --timeout 900 \
+      --output-on-failure \
+      --no-tests=error \
+      --label-regex "${vulkan_label_regex}" \
+      --label-exclude "${label_exclude_regex}"
+fi
