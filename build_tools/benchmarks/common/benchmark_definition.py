@@ -12,6 +12,7 @@ shared between different stages of the same benchmark pipeline.
 
 import json
 import os
+import pathlib
 import re
 import subprocess
 

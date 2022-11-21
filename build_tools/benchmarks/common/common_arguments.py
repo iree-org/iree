@@ -8,6 +8,7 @@
 import glob
 import os
 import argparse
+import pathlib
 from typing import List, Sequence
 
 
@@ -15,12 +16,14 @@ def build_common_argument_parser():
   """Returns an argument parser with common options."""
 
   def check_dir_path(path):
-    if os.path.isdir(path):
+    path = pathlib.Path(path)
+    if path.is_dir():
       return path
     else:
       raise argparse.ArgumentTypeError(path)
 
   def check_exe_path(path):
+    path = pathlib.Path(path)
     if os.access(path, os.X_OK):
       return path
     else:
@@ -69,10 +72,12 @@ def build_common_argument_parser():
   parser.add_argument("--output",
                       "-o",
                       default=None,
+                      type=pathlib.Path,
                       help="Path to the output file")
   parser.add_argument("--capture_tarball",
                       "--capture-tarball",
                       default=None,
+                      type=pathlib.Path,
                       help="Path to the tarball for captures")
   parser.add_argument("--no-clean",
                       action="store_true",
@@ -101,13 +106,15 @@ def build_common_argument_parser():
       "--tmp_dir",
       "--tmp-dir",
       "--tmpdir",
-      default="/tmp/iree-benchmarks",
+      default=pathlib.Path("/tmp/iree-benchmarks"),
+      type=check_dir_path,
       help="Base directory in which to store temporary files. A subdirectory"
       " with a name matching the git commit hash will be created.")
   parser.add_argument(
       "--continue_from_directory",
       "--continue-from-directory",
       default=None,
+      type=check_dir_path,
       help="Path to directory with previous benchmark temporary files. This"
       " should be for the specific commit (not the general tmp-dir). Previous"
       " benchmark and capture results from here will not be rerun and will be"

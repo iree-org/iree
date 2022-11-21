@@ -6,6 +6,7 @@
 
 import json
 import os
+import pathlib
 import time
 from typing import Dict, Optional, Sequence, Tuple
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
@@ -27,13 +28,13 @@ class BenchmarkDriver(object):
     self.benchmark_suite = benchmark_suite
     self.benchmark_grace_time = benchmark_grace_time
     self.verbose = verbose
-    self.finished_benchmarks: Dict[str, Tuple[BenchmarkInfo, str]] = {}
-    self.finished_captures: Dict[str, Tuple[BenchmarkInfo, str]] = {}
+    self.finished_benchmarks: Dict[str, Tuple[BenchmarkInfo, pathlib.Path]] = {}
+    self.finished_captures: Dict[str, Tuple[BenchmarkInfo, pathlib.Path]] = {}
     self.benchmark_errors = []
 
   def run_benchmark_case(self, benchmark_case: BenchmarkCase,
-                         benchmark_results_filename: Optional[str],
-                         capture_filename: Optional[str]) -> None:
+                         benchmark_results_filename: Optional[pathlib.Path],
+                         capture_filename: Optional[pathlib.Path]) -> None:
     """Runs the benchmark case and returns the results.
 
     Args:
@@ -48,31 +49,30 @@ class BenchmarkDriver(object):
     """
     raise NotImplementedError("Should be overwritten by a subclass.")
 
-  def add_previous_benchmarks_and_captures(self,
-                                           previous_directory: str) -> None:
+  def add_previous_benchmarks_and_captures(
+      self, previous_directory: pathlib.Path) -> None:
     """Collect names of previous benchmarks and captures that should be skipped
     and merged into the results.
     """
 
-    def get_key_value_pair(path: str):
-      name, _ = os.path.splitext(os.path.basename(path))
+    def get_key_value_pair(path: pathlib.Path):
+      name = path.stem
       info = BenchmarkInfo.from_device_info_and_name(self.device_info, name)
       return (str(info), (info, path))
 
     previous_benchmark_filenames = set()
     previous_capture_filenames = set()
-    previous_benchmarks_dir = os.path.join(previous_directory,
-                                           BENCHMARK_RESULTS_REL_PATH)
-    if os.path.isdir(previous_benchmarks_dir):
+    previous_benchmarks_dir = previous_directory / BENCHMARK_RESULTS_REL_PATH
+    if previous_benchmarks_dir.is_dir():
       previous_benchmark_filenames = set(
-          os.path.join(previous_benchmarks_dir, p)
+          previous_benchmarks_dir / p
           for p in os.listdir(previous_benchmarks_dir)
           if os.path.splitext(os.path.basename(p))[1] == ".json")
 
-    previous_captures_dir = os.path.join(previous_directory, CAPTURES_REL_PATH)
-    if os.path.isdir(previous_captures_dir):
+    previous_captures_dir = previous_directory / CAPTURES_REL_PATH
+    if previous_captures_dir.is_dir():
       previous_capture_filenames = set(
-          os.path.join(previous_captures_dir, p)
+          previous_captures_dir / p
           for p in os.listdir(previous_captures_dir)
           if os.path.splitext(os.path.basename(p))[1] == ".tracy")
 
@@ -168,11 +168,11 @@ class BenchmarkDriver(object):
 
     return results
 
-  def get_benchmark_result_filenames(self) -> Sequence[str]:
+  def get_benchmark_result_filenames(self) -> Sequence[pathlib.Path]:
     """Returns the json file paths of finished benchmarks."""
     return list(path for _, path in self.finished_benchmarks.values())
 
-  def get_capture_filenames(self) -> Sequence[str]:
+  def get_capture_filenames(self) -> Sequence[pathlib.Path]:
     """Returns the tracy file paths of finished captures."""
     return list(path for _, path in self.finished_captures.values())
 
@@ -192,15 +192,12 @@ class BenchmarkDriver(object):
     benchmark_results_filename = None
     if (benchmark_name not in self.finished_benchmarks and
         self.config.normal_benchmark_tool_dir):
-      benchmark_results_filename = os.path.join(
-          self.config.benchmark_results_dir, f"{benchmark_name}.json")
+      benchmark_results_filename = self.config.benchmark_results_dir / f"{benchmark_name}.json"
 
     capture_filename = None
     if (benchmark_name not in self.finished_captures and
         self.config.trace_capture_config):
-      capture_filename = os.path.join(
-          self.config.trace_capture_config.capture_tmp_dir,
-          f"{benchmark_name}.tracy")
+      capture_filename = self.config.trace_capture_config.capture_tmp_dir / f"{benchmark_name}.tracy"
 
     return (benchmark_info, benchmark_results_filename, capture_filename)
 
@@ -218,8 +215,8 @@ class BenchmarkDriver(object):
     any_tool_dir = (self.config.normal_benchmark_tool_dir
                     if self.config.normal_benchmark_tool_dir else
                     self.config.trace_capture_config.traced_benchmark_tool_dir)
-    config_txt_file_path = os.path.join(any_tool_dir, "build_config.txt")
-    with open(config_txt_file_path, "r") as config_txt_file:
+    config_txt_file_path = any_tool_dir / "build_config.txt"
+    with config_txt_file_path.open("r") as config_txt_file:
       config_txt_file_lines = config_txt_file.readlines()
 
     available_drivers = []
