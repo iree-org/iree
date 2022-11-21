@@ -253,7 +253,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     # return.
     pull_cmd = [
         "adb", "pull",
-        (ANDROID_TMPDIR / android_case_dir / results_filename.name).as_posix(),
+        str(ANDROID_TMPDIR / android_case_dir / results_filename.name),
         str(results_filename)
     ]
     execute_cmd_and_get_output(pull_cmd, verbose=self.verbose)
@@ -272,8 +272,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     android_tool = self.__check_and_push_file(host_tool_path,
                                               TRACED_TOOL_REL_DIR)
     run_cmd = [
-        "TRACY_NO_EXIT=1",
-        f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMPDIR.as_posix()}",
+        "TRACY_NO_EXIT=1", f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMPDIR}",
         "taskset", taskset, android_tool, f"--flagfile={MODEL_FLAGFILE_NAME}"
     ]
 
@@ -379,16 +378,15 @@ def main(args):
 
   # Clear the benchmark directory on the Android device first just in case
   # there are leftovers from manual or failed runs.
-  execute_cmd_and_get_output(
-      ["adb", "shell", "rm", "-rf",
-       ANDROID_TMPDIR.as_posix()],
-      verbose=args.verbose)
+  execute_cmd_and_get_output(["adb", "shell", "rm", "-rf",
+                              str(ANDROID_TMPDIR)],
+                             verbose=args.verbose)
 
   if not args.no_clean:
     # Clear the benchmark directory on the Android device.
     atexit.register(execute_cmd_and_get_output,
                     ["adb", "shell", "rm", "-rf",
-                     ANDROID_TMPDIR.as_posix()],
+                     str(ANDROID_TMPDIR)],
                     verbose=args.verbose)
     # Also clear temporary directory on the host device.
     atexit.register(shutil.rmtree, args.tmp_dir)

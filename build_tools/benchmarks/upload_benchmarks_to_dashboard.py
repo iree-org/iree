@@ -305,9 +305,8 @@ def main(args):
   # Collect benchmark results from all files.
   all_results = []
   for benchmark_file in benchmark_files:
-    with benchmark_file.open("r") as f:
-      content = f.read()
-    all_results.append(BenchmarkResults.from_json_str(content))
+    all_results.append(
+        BenchmarkResults.from_json_str(benchmark_file.read_text()))
   for other_results in all_results[1:]:
     all_results[0].merge(other_results)
   all_results = all_results[0]
