@@ -105,7 +105,7 @@ class EmitDefaultIREEABIPass
       });
       if (shapedType.hasRank()) {
         for (auto dim : shapedType.getShape()) {
-          record.push_back(dim == ShapedType::kDynamicSize
+          record.push_back(dim == ShapedType::kDynamic
                                ? json::Value(nullptr)
                                : json::Value(dim));
         }
