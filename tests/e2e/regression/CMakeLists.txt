@@ -26,6 +26,7 @@ iree_lit_test_suite(
     iree-opt
     iree-run-mlir
   LABELS
+    "driver=vulkan"
     "hostonly"
 )
 

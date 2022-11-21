@@ -19,7 +19,10 @@ iree_lit_test_suite(
         "tensor_cast.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
-    tags = ["hostonly"],
+    tags = [
+        "driver=vulkan",  # Multiple driver= tags allowed. Used by sanitizer CI.
+        "hostonly",
+    ],
     tools = [
         "//tools:iree-benchmark-module",
         "//tools:iree-compile",

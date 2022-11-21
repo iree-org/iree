@@ -120,48 +120,24 @@ fi
 
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
+# For the purpose of determining whether to disable LSAN, we need to catch not
+# only the tests that are specifically labelled `driver=vulkan`, but also any
+# multi-driver test that may run Vulkan among other drivers.
 vulkan_label_regex='^driver=vulkan$'
-
-# These tests currently have asan failures
-declare -a excluded_tests=(
-  # TODO(#5716): Fix flaky ASan crash in these tests
-  "iree/tests/e2e/models/collatz.mlir.test"
-  "iree/tests/e2e/models/edge_detection.mlir.test"
-  "iree/tests/e2e/models/fragment_000.mlir.test"
-  "iree/tests/e2e/models/fullyconnected.mlir.test"
-  "iree/tests/e2e/models/mnist_fake_weights.mlir.test"
-  "iree/tests/e2e/models/resnet50_fake_weights.mlir.test"
-  "iree/tests/e2e/models/unidirectional_lstm.mlir.test"
-  "iree/tests/e2e/regression/globals.mlir.test"
-  # TODO(#5715): Fix these
-  "iree/samples/simple_embedding/simple_embedding_vulkan_test"
-  "iree/tools/test/iree-benchmark-module.mlir.test"
-  "iree/tools/test/iree-run-module.mlir.test"
-  "iree/tools/test/multiple_exported_functions.mlir.test"
-)
-
-# Prefix with `^` anchor
-excluded_tests=( "${excluded_tests[@]/#/^}" )
-# Suffix with `$` anchor
-excluded_tests=( "${excluded_tests[@]/%/$}" )
-
-# Join on `|` and wrap in parens
-excluded_tests_regex="($(IFS="|" ; echo "${excluded_tests[*]?}"))"
 
 cd ${BUILD_DIR?}
 
-echo "********** Running main project ctests on non-Vulkan backends ***********"
+echo "*** Running main project ctests that do not use the Vulkan driver *******"
 ctest \
   --timeout 900 \
   --output-on-failure \
   --no-tests=error \
-  --label-exclude "${label_exclude_regex}|${vulkan_label_regex}" \
-  --exclude-regex "${excluded_tests_regex?}"
+  --label-exclude "${label_exclude_regex}|${vulkan_label_regex}"
 
 echo "******************** llvm-external-projects tests ***********************"
 cmake --build . --target check-iree-dialects -- -k 0
 
-echo "**************** Running main project ctests on Vulkan ******************"
+echo "*** Running main project ctests that may use the Vulkan driver  *********"
 # Disable LeakSanitizer (LSAN) because of a history of issues with Swiftshader
 # (#5716, #8489, #11203).
 ASAN_OPTIONS=detect_leaks=0 \
@@ -170,5 +146,4 @@ ASAN_OPTIONS=detect_leaks=0 \
     --output-on-failure \
     --no-tests=error \
     --label-regex "${vulkan_label_regex}" \
-    --label-exclude "${label_exclude_regex}" \
-    --exclude-regex "${excluded_tests_regex?}"
+    --label-exclude "${label_exclude_regex}"

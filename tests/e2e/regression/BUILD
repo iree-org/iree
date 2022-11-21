@@ -59,7 +59,10 @@ iree_lit_test_suite(
         ] + BACKEND_TESTS,
     ),
     cfg = "//tests:lit.cfg.py",
-    tags = ["hostonly"],
+    tags = [
+        "driver=vulkan",  # Multiple driver= tags allowed. Used by sanitizer CI.
+        "hostonly",
+    ],
     tools = [
         "//tools:iree-opt",
         "//tools:iree-run-mlir",

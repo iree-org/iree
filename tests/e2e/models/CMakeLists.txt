@@ -26,6 +26,7 @@ iree_lit_test_suite(
     FileCheck
     iree-run-mlir
   LABELS
+    "driver=vulkan"
     "hostonly"
     "optonly"
   TIMEOUT
