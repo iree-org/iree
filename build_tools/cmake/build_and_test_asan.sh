@@ -125,19 +125,7 @@ vulkan_label_regex='^driver=vulkan$'
 # These tests currently have asan failures
 declare -a excluded_tests=(
   # TODO(#5716): Fix flaky ASan crash in these tests
-  "iree/tests/e2e/models/collatz.mlir.test"
-  "iree/tests/e2e/models/edge_detection.mlir.test"
   "iree/tests/e2e/models/fragment_000.mlir.test"
-  "iree/tests/e2e/models/fullyconnected.mlir.test"
-  "iree/tests/e2e/models/mnist_fake_weights.mlir.test"
-  "iree/tests/e2e/models/resnet50_fake_weights.mlir.test"
-  "iree/tests/e2e/models/unidirectional_lstm.mlir.test"
-  "iree/tests/e2e/regression/globals.mlir.test"
-  # TODO(#5715): Fix these
-  "iree/samples/simple_embedding/simple_embedding_vulkan_test"
-  "iree/tools/test/iree-benchmark-module.mlir.test"
-  "iree/tools/test/iree-run-module.mlir.test"
-  "iree/tools/test/multiple_exported_functions.mlir.test"
 )
 
 # Prefix with `^` anchor
