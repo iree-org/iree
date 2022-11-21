@@ -146,9 +146,10 @@ static Value tileAndFuseAndDistributeImpl(
   return foreachThreadH;
 }
 
+/// Call tileAndFuseAndDistributeImpl with ArrayRef<int64_t> tilesSizes.
 template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
-static Value tfdWithTileSizes(
+static Value buildTFDWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<int64_t> tileSizes, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
@@ -158,9 +159,10 @@ static Value tfdWithTileSizes(
                            resultingFusedOpsHandles);
 }
 
+/// Call tileAndFuseAndDistributeImpl with a handle to multiple tilesSizes.
 template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
-static Value tfdWithTileSizeHandle(
+static Value buildTFDWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     Value tileSizeHandle, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
@@ -171,9 +173,23 @@ static Value tfdWithTileSizeHandle(
                              threadDimMapping, resultingFusedOpsHandles);
 }
 
+/// Call tileAndFuseAndDistributeImpl with ArrayRef<int64_t> numThreads.
 template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
-static Value tfdWithNumThreadsHandle(
+static Value buildTFDWithNumThreads(
+    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<int64_t> numThreads, ArrayAttr threadDimMapping = {},
+    SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
+  return tileAndFuseAndDistributeImpl<
+      TilingTransformOp, transform::NumThreadsSpec, BatchOrIterativeFusion>(
+      b, rootH, opsHToFuse, numThreads, threadDimMapping,
+      resultingFusedOpsHandles);
+}
+
+/// Call tileAndFuseAndDistributeImpl with a handle to multiple numThreads.
+template <typename TilingTransformOp = TileToForeachThreadOp,
+          typename BatchOrIterativeFusion = BatchFusionSpec>
+static Value buildTFDWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     Value numThreads, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
@@ -219,9 +235,10 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
 /// It runs without interleaved canonicalize, CSE or enabling transforms which
 /// allows the transform dialect to build payload IR and not risk seeing it
 /// being DCE'd away immediately.
+template <typename TileSizesType>
 static Value buildReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
-    Value originalGenericH, ArrayRef<int64_t> tileSizes0Generic) {
+    Value originalGenericH, TileSizesType tileSizes0Generic) {
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
   auto splitReductionTransformOp =
@@ -239,7 +256,7 @@ static Value buildReductionStrategyBlockDistributionPart(
                                                ::mlir::gpu::Blocks::DimX);
   // Step 2. First level of tiling + fusion parallelizes to blocks using
   // `tileSizes`.
-  tfdWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
+  buildTFDWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
       b,
       /*rootH=*/combinerH,
       /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH},
@@ -264,7 +281,7 @@ static Value buildReductionStrategyThreadDistributionPart(
   (void)y;
 
   // clang-format off
-  tfdWithTileSizes<TileToForeachThreadOp>(b,
+  buildTFDWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/parRedH,
                    /*opsHToFuse=*/{fill1dH},
                   // TODO: activate this, we have the information but it does
@@ -273,7 +290,7 @@ static Value buildReductionStrategyThreadDistributionPart(
                   //  /*threadDimMapping=*/b.getArrayAttr({y}));
                    /*tileSizes=*/tileSizes1Fill,
                    /*threadDimMapping=*/b.getArrayAttr({z}));
-  tfdWithTileSizes<TileToForeachThreadOp>(b,
+  buildTFDWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/parParRedH,
                    /*opsHToFuse=*/{fill2dH},
                   // TODO: activate this, we have the information but it does
