@@ -120,6 +120,8 @@ fi
 
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
+vulkan_label_regex='^driver=vulkan$'
+
 # These tests currently have asan failures
 declare -a excluded_tests=(
   # TODO(#5716): Fix flaky ASan crash in these tests
@@ -148,13 +150,25 @@ excluded_tests_regex="($(IFS="|" ; echo "${excluded_tests[*]?}"))"
 
 cd ${BUILD_DIR?}
 
-echo "******************** Running main project ctests ************************"
+echo "********** Running main project ctests on non-Vulkan backends ***********"
 ctest \
   --timeout 900 \
   --output-on-failure \
   --no-tests=error \
-  --label-exclude "${label_exclude_regex}" \
+  --label-exclude "${label_exclude_regex}|${vulkan_label_regex}" \
   --exclude-regex "${excluded_tests_regex?}"
 
 echo "******************** llvm-external-projects tests ***********************"
 cmake --build . --target check-iree-dialects -- -k 0
+
+echo "**************** Running main project ctests on Vulkan ******************"
+# Disable LeakSanitizer (LSAN) because of a history of issues with Swiftshader
+# (#5716, #8489, #11203).
+ASAN_OPTIONS=detect_leaks=0 \
+  ctest \
+    --timeout 900 \
+    --output-on-failure \
+    --no-tests=error \
+    --label-regex "${vulkan_label_regex}" \
+    --label-exclude "${label_exclude_regex}" \
+    --exclude-regex "${excluded_tests_regex?}"
