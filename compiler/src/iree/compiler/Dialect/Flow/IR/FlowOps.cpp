@@ -576,11 +576,11 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
   SmallVector<int64_t> staticStrides;
 
   processMixedOperands(mixedOffsets, offsets, staticOffsets,
-                       ShapedType::kDynamicStrideOrOffset);
+                       ShapedType::kDynamic);
   processMixedOperands(mixedSizes, sizes, staticSizes,
                        ShapedType::kDynamic);
   processMixedOperands(mixedStrides, strides, staticStrides,
-                       ShapedType::kDynamicStrideOrOffset);
+                       ShapedType::kDynamic);
 
   build(builder, state, returnType, source, sourceDynamicDims, offsets, sizes,
         strides, builder.getI64ArrayAttr(staticOffsets),
@@ -684,11 +684,11 @@ void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
   SmallVector<Value> offsets, sizes, strides;
   SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
   processMixedOperands(mixedOffsets, offsets, staticOffsets,
-                       ShapedType::kDynamicStrideOrOffset);
+                       ShapedType::kDynamic);
   processMixedOperands(mixedSizes, sizes, staticSizes,
                        ShapedType::kDynamic);
   processMixedOperands(mixedStrides, strides, staticStrides,
-                       ShapedType::kDynamicStrideOrOffset);
+                       ShapedType::kDynamic);
 
   build(builder, state, ArrayRef<Type>(), value, target, targetDynamicDims,
         offsets, sizes, strides, builder.getI64ArrayAttr(staticOffsets),

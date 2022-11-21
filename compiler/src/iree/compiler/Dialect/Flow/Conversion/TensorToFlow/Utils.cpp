@@ -64,10 +64,10 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
   bool fullSlices = true;
   for (size_t dim = offsets.size(); dim > 0; dim--) {
     int64_t staticOffset =
-        getVal(offsets[dim - 1], ShapedType::kDynamicStrideOrOffset);
+        getVal(offsets[dim - 1], ShapedType::kDynamic);
     int64_t staticSize = getVal(sizes[dim - 1], ShapedType::kDynamic);
     int64_t staticStride =
-        getVal(strides[dim - 1], ShapedType::kDynamicStrideOrOffset);
+        getVal(strides[dim - 1], ShapedType::kDynamic);
 
     if (staticStride != 1) return false;
     // The offsets and sizes dont have to be static for all dimensions. When
@@ -76,7 +76,7 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     // another tensor which lives on the device. To avoid host-round tripping
     // enforce that offset/size is also static.
     if (staticSize == ShapedType::kDynamic) return false;
-    if (staticOffset == ShapedType::kDynamicStrideOrOffset) return false;
+    if (staticOffset == ShapedType::kDynamic) return false;
 
     if (fullSlices == false) {
       if (staticSize != 1) return false;
