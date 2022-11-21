@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
@@ -306,6 +307,12 @@ TilingInterfaceTilingPattern::matchAndRewrite(TilingInterface tilableOp,
 //===----------------------------------------------------------------------===//
 
 namespace {
+/// A simple pattern rewriter that implements no special logic.
+class SimpleRewriter : public PatternRewriter {
+public:
+  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
+};
+
 struct TilingInterfaceTilingPass
     : public TilingInterfaceTilingBase<TilingInterfaceTilingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -395,14 +402,35 @@ void TilingInterfaceTilingPass::runOnOperation() {
           StringAttr::get(context, "tiling_repeated_indices_scatter_input"),
           StringAttr::get(context, "tiling_repeated_indices_scatter_output")));
 
-  patterns.add<TilingInterfaceTilingPattern>(
-      context, linalg::LinalgTilingOptions().setTileSizes({2, 4}),
-      IREE::LinalgExt::LinalgTransformationFilter(
-          StringAttr::get(context, "tiling_pack_input"),
-          StringAttr::get(context, "tiling_pack_output")));
-
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
+  }
+
+  // TODO(hanchung): Deprecate IREE specific logic. We should move to use
+  // upstream scf::tileUsingSCFForOp method. For now only uses it for packing
+  // and unpacking ops.
+  {
+    SimpleRewriter rewriter(context);
+    auto filter = IREE::LinalgExt::LinalgTransformationFilter(
+        StringAttr::get(context, "tiling_pack_input"),
+        StringAttr::get(context, "tiling_pack_output"));
+    auto options = scf::SCFTilingOptions().setTileSizes({2, 4});
+    auto funcOp = getOperation();
+    funcOp->walk([&](Operation *tilableOp) {
+      if (failed(filter.checkAndNotify(rewriter, tilableOp))) {
+        return;
+      }
+
+      FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
+          rewriter, cast<TilingInterface>(tilableOp), options);
+      if (failed(tilingResult))
+        return signalPassFailure();
+      rewriter.replaceOp(tilableOp, tilingResult->replacements);
+
+      for (auto op : tilingResult.value().tiledOps) {
+        filter.replaceLinalgTransformationFilter(rewriter, op);
+      }
+    });
   }
 }
 
