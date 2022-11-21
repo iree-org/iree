@@ -123,8 +123,8 @@ def query_base_benchmark_results(commit,
   return get_from_dashboard(f'{url}/apis/v2/getBuild', payload, verbose=verbose)
 
 
-def get_benchmark_result_markdown(benchmark_files: Sequence[str],
-                                  compile_stats_files: Sequence[str],
+def get_benchmark_result_markdown(benchmark_files: Sequence[pathlib.Path],
+                                  compile_stats_files: Sequence[pathlib.Path],
                                   query_base: bool,
                                   comment_title: str,
                                   verbose: bool = False) -> Tuple[str, str]:

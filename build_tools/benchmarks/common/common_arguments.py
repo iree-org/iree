@@ -133,7 +133,7 @@ def build_common_argument_parser():
   return parser
 
 
-def expand_and_check_file_paths(paths: Sequence[str]) -> List[str]:
+def expand_and_check_file_paths(paths: Sequence[str]) -> List[pathlib.Path]:
   """Expands the wildcards in the paths and check if they are files.
     Returns:
       List of expanded paths.
@@ -141,10 +141,10 @@ def expand_and_check_file_paths(paths: Sequence[str]) -> List[str]:
 
   expanded_paths = []
   for path in paths:
-    expanded_paths += glob.glob(path)
+    expanded_paths += [pathlib.Path(path) for path in glob.glob(path)]
 
   for path in expanded_paths:
-    if not os.path.isfile(path):
+    if not path.is_file():
       raise ValueError(f"{path} is not a file.")
 
   return expanded_paths

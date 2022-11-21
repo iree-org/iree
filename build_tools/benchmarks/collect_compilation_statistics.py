@@ -134,7 +134,8 @@ def parse_arguments():
   """Returns an argument parser with common options."""
 
   def check_dir_path(path):
-    if os.path.isdir(path):
+    path = pathlib.Path(path)
+    if path.is_dir():
       return path
     else:
       raise argparse.ArgumentTypeError(path)
@@ -142,6 +143,7 @@ def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("--output",
                       required=True,
+                      type=pathlib.Path,
                       help="Path to output JSON file.")
   parser.add_argument(
       "build_dir",
@@ -156,11 +158,11 @@ def parse_arguments():
 
 
 def main(args: argparse.Namespace):
-  benchmark_suite_dir = os.path.join(args.build_dir, BENCHMARK_SUITE_REL_PATH)
+  benchmark_suite_dir = args.build_dir / BENCHMARK_SUITE_REL_PATH
   benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
       benchmark_suite_dir)
 
-  with open(os.path.join(args.build_dir, NINJA_BUILD_LOG), "r") as log_file:
+  with (args.build_dir / NINJA_BUILD_LOG).open("r") as log_file:
     target_build_time_map = parse_compilation_time_from_ninja_log(log_file)
 
   compilation_statistics_list = []
@@ -171,7 +173,7 @@ def main(args: argparse.Namespace):
       # TODO(#11076): Support run_config.
       if benchmark_case.benchmark_case_dir is None:
         raise ValueError("benchmark_case_dir can't be None.")
-      benchmark_case_dir = pathlib.Path(benchmark_case.benchmark_case_dir)
+      benchmark_case_dir = benchmark_case.benchmark_case_dir
 
       flag_file_path = benchmark_case_dir / BENCHMARK_FLAGFILE
       with flag_file_path.open("r") as flag_file:
@@ -185,7 +187,7 @@ def main(args: argparse.Namespace):
       with module_path.open("rb") as module_file:
         module_component_sizes = get_module_component_info(
             module_file,
-            os.stat(module_path).st_size)
+            module_path.stat().st_size)
 
       cmake_target = match_module_cmake_target(str(module_path))
       if cmake_target is None:
