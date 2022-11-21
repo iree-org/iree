@@ -26,14 +26,11 @@ static bool sliceFilter(Operation *op, ValueRange nonIndexComputationOperands,
   return !isa<IREE::HAL::InterfaceConstantLoadOp>(op);
 }
 
-static void cloneOffsetsSizesAndStridesImpl(
+static SliceAndDynamicDims cloneOffsetsSizesAndStridesImpl(
     OpBuilder &builder, Operation *baseOp,
     ValueRange nonIndexComputationOperands, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, ArrayRef<OpFoldResult> strides,
-    ValueRange dynamicDims, SmallVector<OpFoldResult> &clonedOffsets,
-    SmallVector<OpFoldResult> &clonedSizes,
-    SmallVector<OpFoldResult> &clonedStrides,
-    SmallVector<Value> &clonedDynamicDims) {
+    ValueRange dynamicDims) {
   SetVector<Operation *> slice;
   getBackwardSlice(baseOp, &slice, [&](Operation *op) {
     return sliceFilter(op, nonIndexComputationOperands, baseOp);
@@ -63,35 +60,27 @@ static void cloneOffsetsSizesAndStridesImpl(
     return clonedVals;
   };
 
-  clonedOffsets = remapOpFoldResult(offsets);
-  clonedSizes = remapOpFoldResult(sizes);
-  clonedStrides = remapOpFoldResult(strides);
-  clonedDynamicDims = remapValues(dynamicDims);
+  SliceAndDynamicDims clonedVals;
+  clonedVals.offsets = remapOpFoldResult(offsets);
+  clonedVals.sizes = remapOpFoldResult(sizes);
+  clonedVals.strides = remapOpFoldResult(strides);
+  clonedVals.dynamicDims = remapValues(dynamicDims);
+  return clonedVals;
 }
 
-void cloneOffsetsSizesAndStrides(OpBuilder &builder,
-                                 IREE::Flow::DispatchTensorStoreOp storeOp,
-                                 SmallVector<OpFoldResult> &offsets,
-                                 SmallVector<OpFoldResult> &sizes,
-                                 SmallVector<OpFoldResult> &strides,
-                                 SmallVector<Value> &dynamicDims) {
+SliceAndDynamicDims cloneOffsetsSizesAndStrides(
+    OpBuilder &builder, IREE::Flow::DispatchTensorStoreOp storeOp) {
   return cloneOffsetsSizesAndStridesImpl(
       builder, storeOp, ValueRange{storeOp.getValue(), storeOp.getTarget()},
       storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
-      storeOp.getMixedStrides(), storeOp.getTargetDims(), offsets, sizes,
-      strides, dynamicDims);
+      storeOp.getMixedStrides(), storeOp.getTargetDims());
 }
 
-void cloneOffsetsSizesAndStrides(OpBuilder &builder,
-                                 IREE::Flow::DispatchTensorLoadOp loadOp,
-                                 SmallVector<OpFoldResult> &offsets,
-                                 SmallVector<OpFoldResult> &sizes,
-                                 SmallVector<OpFoldResult> &strides,
-                                 SmallVector<Value> &dynamicDims) {
+SliceAndDynamicDims cloneOffsetsSizesAndStrides(
+    OpBuilder &builder, IREE::Flow::DispatchTensorLoadOp loadOp) {
   return cloneOffsetsSizesAndStridesImpl(
       builder, loadOp, ValueRange{loadOp.getSource()}, loadOp.getMixedOffsets(),
-      loadOp.getMixedSizes(), loadOp.getMixedStrides(), loadOp.getSourceDims(),
-      offsets, sizes, strides, dynamicDims);
+      loadOp.getMixedSizes(), loadOp.getMixedStrides(), loadOp.getSourceDims());
 }
 
 }  // namespace iree_compiler

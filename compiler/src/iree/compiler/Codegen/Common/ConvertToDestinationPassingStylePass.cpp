@@ -66,12 +66,11 @@ class ConvertToDestinationPassingStylePass
 static Value getTensorLoadOpForTensorStoreOp(
     OpBuilder &b, IREE::Flow::DispatchTensorStoreOp storeOp) {
   // Clone the offset, size and stride values. They will be CSE-ed later.
-  SmallVector<OpFoldResult> offsets, sizes, strides;
-  SmallVector<Value> dynamicDims;
-  cloneOffsetsSizesAndStrides(b, storeOp, offsets, sizes, strides, dynamicDims);
+  SliceAndDynamicDims clonedVals = cloneOffsetsSizesAndStrides(b, storeOp);
   Value tensorLoadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
       storeOp.getLoc(), storeOp.getValue().getType().cast<RankedTensorType>(),
-      storeOp.getTarget(), dynamicDims, offsets, sizes, strides);
+      storeOp.getTarget(), clonedVals.dynamicDims, clonedVals.offsets,
+      clonedVals.sizes, clonedVals.strides);
   return tensorLoadOp;
 }
 

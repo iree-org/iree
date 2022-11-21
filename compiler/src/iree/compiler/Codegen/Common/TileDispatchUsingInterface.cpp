@@ -223,22 +223,22 @@ static LogicalResult replaceStoreWithTiledVersion(
   SmallVector<OpFoldResult> tileStrides(tileOffsets.size(),
                                         rewriter.getIndexAttr(1));
   SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
-  SmallVector<OpFoldResult> storeOpOffsets, storeOpSizes, storeOpStrides;
-  SmallVector<Value> storeDynamicDims;
-  cloneOffsetsSizesAndStrides(rewriter, storeOp, storeOpOffsets, storeOpSizes,
-                              storeOpStrides, storeDynamicDims);
+  SliceAndDynamicDims clonedSliceAndVals =
+      cloneOffsetsSizesAndStrides(rewriter, storeOp);
 
   if (failed(mergeOffsetsSizesAndStrides(
-          rewriter, storeOp.getLoc(), storeOpOffsets, storeOpSizes,
-          storeOpStrides, storeOp.getDroppedDims(), tileOffsets, tileSizes,
-          tileStrides, combinedOffsets, combinedSizes, combinedStrides))) {
+          rewriter, storeOp.getLoc(), clonedSliceAndVals.offsets,
+          clonedSliceAndVals.sizes, clonedSliceAndVals.strides,
+          storeOp.getDroppedDims(), tileOffsets, tileSizes, tileStrides,
+          combinedOffsets, combinedSizes, combinedStrides))) {
     return rewriter.notifyMatchFailure(
         storeOp, "failed to create tiled flow.dispatch.tensor.store op");
   }
 
   rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
-      storeOp.getLoc(), tiledValue, storeOp.getTarget(), storeDynamicDims,
-      combinedOffsets, combinedSizes, combinedStrides);
+      storeOp.getLoc(), tiledValue, storeOp.getTarget(),
+      clonedSliceAndVals.dynamicDims, combinedOffsets, combinedSizes,
+      combinedStrides);
   rewriter.eraseOp(storeOp);
   return success();
 }
