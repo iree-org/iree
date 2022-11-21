@@ -178,9 +178,7 @@ def adb_start_cmd(cmd_args: Sequence[str],
 def get_vmfb_full_path_for_benchmark_case(
     benchmark_case_dir: pathlib.Path) -> pathlib.Path:
   flagfile_path = benchmark_case_dir / MODEL_FLAGFILE_NAME
-  with flagfile_path.open("r") as flagfile:
-    flagfile_lines = flagfile.readlines()
-  for line in flagfile_lines:
+  for line in flagfile_path.read_text().splitlines():
     flag_name, flag_value = line.strip().split("=")
     if flag_name == "--module_file":
       # Realpath canonicalization matters. The caller may rely on that to track
