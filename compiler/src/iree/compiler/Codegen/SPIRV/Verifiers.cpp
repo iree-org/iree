@@ -219,10 +219,16 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   // Verify the total workgroup size should be equal or larger than 2 *
-  // subgroupSize,
+  // subgroupSize.
   if (totalWorkgroupSize / subgroupSize < 2) {
     return op->emitOpError("expected total workgroup size to be >= ")
            << 2 * subgroupSize;
+  }
+
+  // Verify that there are four level of tile sizes.
+  if (loweringConfig.getTileSizes().size() != 4) {
+    return op->emitOpError("expected 4 levels of tiling sizes, got ")
+           << loweringConfig.getTileSizes().size();
   }
 
   ArrayRef<int64_t> lhsShape =
@@ -236,11 +242,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
       loweringConfig.getTileSizeVals(kThreadTileLevel);
   SmallVector<int64_t> reductionTileSizes =
       loweringConfig.getTileSizeVals(kReductionTileLevel);
-
-  if (loweringConfig.getTileSizes().size() != 4) {
-    return op->emitOpError("expected 4 levels of tiling sizes, got ")
-           << loweringConfig.getTileSizes().size();
-  }
+  SmallVector<int64_t> nativeVectorSizes = loweringConfig.getTileSizeVals(3);
 
   // For BatchMatmul, the first dimension is the batch dimension.
   // We don't check the batch.
@@ -250,22 +252,47 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
     workgroupTileSizes.erase(workgroupTileSizes.begin());
     subgroupTileSizes.erase(subgroupTileSizes.begin());
     reductionTileSizes.erase(reductionTileSizes.begin());
+    nativeVectorSizes.erase(nativeVectorSizes.begin());
   }
 
-  // Verify that subgroup tile sizes should be multiple of cooperative matrix
-  // (M, N, K) sizes.
+  auto getElementType = [](Value v) {
+    return v.getType().cast<ShapedType>().getElementType();
+  };
+
+  Type lhsType = getElementType(op->getOperand(0));
+  Type rhsType = getElementType(op->getOperand(1));
+  Type resultType = getElementType(op->getOperand(2));
+
   auto properties = limits.getCooperativeMatrixPropertiesNv()
                         .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
-  for (auto property : properties) {
-    const unsigned matmulM = property.getMSize();
-    const unsigned matmulN = property.getNSize();
-    const unsigned matmulK = property.getKSize();
-    if (subgroupTileSizes[0] % matmulM != 0 ||
-        subgroupTileSizes[1] % matmulN != 0 ||
-        reductionTileSizes[2] % matmulK != 0) {
-      return op->emitOpError("expected subgroup tile sizes to be multiple of ")
-             << "[" << matmulM << ", " << matmulN << ", " << matmulK << "]";
+
+  // Verify that the fourth level tile sizes match cooperative matrix,
+  // and subgroup tile sizes should be multiple of cooperative matrix (M, N, K)
+  // sizes.
+  bool isNativeVectorSizeAccepted = false;
+  for (auto p : properties) {
+    if (p.getAType() == lhsType && p.getBType() == rhsType &&
+        p.getCType() == resultType &&
+        p.getScope().getValue() == spirv::Scope::Subgroup &&
+        p.getMSize() == nativeVectorSizes[0] &&
+        p.getNSize() == nativeVectorSizes[1] &&
+        p.getKSize() == nativeVectorSizes[2]) {
+      isNativeVectorSizeAccepted = true;
+      if (subgroupTileSizes[0] % p.getMSize() != 0 ||
+          subgroupTileSizes[1] % p.getNSize() != 0 ||
+          reductionTileSizes[2] % p.getKSize() != 0) {
+        return op->emitOpError(
+                   "expected subgroup tile sizes to be multiple of ")
+               << "[" << p.getMSize() << ", " << p.getNSize() << ", "
+               << p.getKSize() << "]";
+      }
     }
+  }
+
+  if (!isNativeVectorSizeAccepted) {
+    return op->emitOpError(
+        "expected the fourth level tile sizes to match cooperative matrix "
+        "sizes");
   }
 
   // Verify the tile size divides the matmul inputs A [M x K] & B [K x N].
@@ -293,10 +320,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   // Verify shared memory usage of operands after tiling <= maxSharedMemory.
-  Type inputType = op->getOperand(0).getType();
-  unsigned tilingSharedMemSizeBytes = getTileBytes(
-      workgroupTileSizes[0], workgroupTileSizes[1], reductionTileSizes[2],
-      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth());
+  unsigned tilingSharedMemSizeBytes =
+      getTileBytes(workgroupTileSizes[0], workgroupTileSizes[1],
+                   reductionTileSizes[2], lhsType.getIntOrFloatBitWidth());
   unsigned totalSharedMemSizeBytes = getMultiBufferMemoryUsage(
       tilingSharedMemSizeBytes, translationInfo.getSoftwarePipelineDepth());
 
