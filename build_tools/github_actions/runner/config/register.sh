@@ -130,4 +130,12 @@ declare -a args=(
 # functionality.
 (set -x; : Running configuration with additional args: "${args[@]}")
 
+# DO NOT SUBMIT
+if (( RANDOM % 2 == 0 )); then
+  echo "OH NOES. Registration failed!!!!"
+  exit 1
+else
+  echo "Few, we won the coin toss"
+fi
+
 /runner-root/actions-runner/config.sh --token "${REGISTER_TOKEN}" "${args[@]}"
