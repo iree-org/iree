@@ -7,6 +7,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar, Union
+import pathlib
 import dataclasses
 import json
 import urllib.parse
@@ -167,7 +168,7 @@ COMPILATION_METRICS_TO_TABLE_MAPPERS: List[
 
 
 def aggregate_all_benchmarks(
-    benchmark_files: Sequence[str],
+    benchmark_files: Sequence[pathlib.Path],
     expected_pr_commit: Optional[str] = None,
     verbose: bool = False) -> Dict[str, AggregateBenchmarkLatency]:
   """Aggregates all benchmarks in the given files.
@@ -184,9 +185,7 @@ def aggregate_all_benchmarks(
   aggregate_results = {}
 
   for benchmark_file in benchmark_files:
-    with open(benchmark_file) as f:
-      content = f.read()
-    file_results = BenchmarkResults.from_json_str(content)
+    file_results = BenchmarkResults.from_json_str(benchmark_file.read_text())
 
     if ((expected_pr_commit is not None) and
         (file_results.commit != expected_pr_commit)):
@@ -212,7 +211,7 @@ def aggregate_all_benchmarks(
 
 
 def collect_all_compilation_metrics(
-    compile_stats_files: Sequence[str],
+    compile_stats_files: Sequence[pathlib.Path],
     expected_pr_commit: Optional[str] = None) -> Dict[str, CompilationMetrics]:
   """Collects all compilation statistics in the given files.
 
@@ -227,7 +226,7 @@ def collect_all_compilation_metrics(
   compile_metrics = {}
 
   for compile_stats_file in compile_stats_files:
-    with open(compile_stats_file) as f:
+    with compile_stats_file.open("r") as f:
       file_results = CompilationResults.from_json_object(json.load(f))
 
     if ((expected_pr_commit is not None) and

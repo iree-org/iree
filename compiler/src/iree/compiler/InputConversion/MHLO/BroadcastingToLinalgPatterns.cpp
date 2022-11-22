@@ -98,7 +98,7 @@ Value broadcast(OpBuilder &builder, Location loc, Value operand,
     if (dim.isStatic()) {
       resultShape.push_back(dim.getStatic());
     } else {
-      resultShape.push_back(-1);
+      resultShape.push_back(ShapedType::kDynamic);
       dynDims.push_back(dim.getValue());
     }
   }

@@ -33,6 +33,8 @@ iree_lit_test_suite(
     iree-run-module
     not
   LABELS
+    "driver=local-task"
+    "driver=vulkan"
     "hostonly"
 )
 

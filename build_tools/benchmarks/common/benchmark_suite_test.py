@@ -6,6 +6,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import os
+import pathlib
 import tempfile
 import unittest
 from typing import Sequence
@@ -18,12 +19,13 @@ class BenchmarkSuiteTest(unittest.TestCase):
 
   def test_list_categories(self):
     suite = BenchmarkSuite({
-        "suite/TFLite": [],
-        "suite/PyTorch": [],
+        pathlib.Path("suite/TFLite"): [],
+        pathlib.Path("suite/PyTorch"): [],
     })
 
-    self.assertEqual(suite.list_categories(), [("PyTorch", "suite/PyTorch"),
-                                               ("TFLite", "suite/TFLite")])
+    self.assertEqual(suite.list_categories(),
+                     [("PyTorch", pathlib.Path("suite/PyTorch")),
+                      ("TFLite", pathlib.Path("suite/TFLite"))])
 
   def test_filter_benchmarks_for_category(self):
     case1 = BenchmarkCase(model_name="deepnet",
@@ -31,24 +33,24 @@ class BenchmarkSuiteTest(unittest.TestCase):
                           bench_mode=["1-thread", "full-inference"],
                           target_arch="CPU-ARMv8",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
-                          benchmark_case_dir="case1",
+                          benchmark_case_dir=pathlib.Path("case1"),
                           benchmark_tool_name="tool")
     case2 = BenchmarkCase(model_name="deepnetv2",
                           model_tags=["f32"],
                           bench_mode=["full-inference"],
                           target_arch="GPU-Mali",
                           driver_info=IREE_DRIVERS_INFOS["iree-vulkan"],
-                          benchmark_case_dir="case2",
+                          benchmark_case_dir=pathlib.Path("case2"),
                           benchmark_tool_name="tool")
     case3 = BenchmarkCase(model_name="deepnetv3",
                           model_tags=["f32"],
                           bench_mode=["full-inference"],
                           target_arch="CPU-x86_64",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
-                          benchmark_case_dir="case3",
+                          benchmark_case_dir=pathlib.Path("case3"),
                           benchmark_tool_name="tool")
     suite = BenchmarkSuite({
-        "suite/TFLite": [case1, case2, case3],
+        pathlib.Path("suite/TFLite"): [case1, case2, case3],
     })
 
     cpu_and_gpu_benchmarks = suite.filter_benchmarks_for_category(
@@ -84,7 +86,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
 
   def test_filter_benchmarks_for_nonexistent_category(self):
     suite = BenchmarkSuite({
-        "suite/TFLite": [],
+        pathlib.Path("suite/TFLite"): [],
     })
 
     benchmarks = suite.filter_benchmarks_for_category(
@@ -98,8 +100,9 @@ class BenchmarkSuiteTest(unittest.TestCase):
 
   def test_load_from_benchmark_suite_dir(self):
     with tempfile.TemporaryDirectory() as tmp_dir:
-      tflite_dir = os.path.join(tmp_dir, "TFLite")
-      pytorch_dir = os.path.join(tmp_dir, "PyTorch")
+      tmp_dir = pathlib.Path(tmp_dir)
+      tflite_dir = tmp_dir / "TFLite"
+      pytorch_dir = tmp_dir / "PyTorch"
       BenchmarkSuiteTest.__create_bench(tflite_dir,
                                         model_name="DeepNet",
                                         model_tags=["f32"],
@@ -200,8 +203,8 @@ class BenchmarkSuiteTest(unittest.TestCase):
     suite = BenchmarkSuite.load_from_run_configs(run_configs=run_configs)
 
     self.assertEqual(suite.list_categories(),
-                     [("exported_tf", "exported_tf"),
-                      ("exported_tflite", "exported_tflite")])
+                     [("exported_tf", pathlib.Path("exported_tf")),
+                      ("exported_tflite", pathlib.Path("exported_tflite"))])
     self.assertEqual(
         suite.filter_benchmarks_for_category(category="exported_tflite"), [
             BenchmarkCase(model_name=model_tflite.name,
@@ -244,17 +247,16 @@ class BenchmarkSuiteTest(unittest.TestCase):
             mode_filter="experimental"), [])
 
   @staticmethod
-  def __create_bench(dir_path: str, model_name: str, model_tags: Sequence[str],
-                     bench_mode: Sequence[str], target_arch: str, config: str,
-                     tool: str):
+  def __create_bench(dir_path: pathlib.Path, model_name: str,
+                     model_tags: Sequence[str], bench_mode: Sequence[str],
+                     target_arch: str, config: str, tool: str):
     case_name = f"{config}__{target_arch}__{','.join(bench_mode)}"
     model_name_with_tags = model_name
     if len(model_tags) > 0:
       model_name_with_tags += f"-{','.join(model_tags)}"
-    bench_path = os.path.join(dir_path, model_name_with_tags, case_name)
-    os.makedirs(bench_path)
-    with open(os.path.join(bench_path, "tool"), "w") as f:
-      f.write(tool)
+    bench_path = dir_path / model_name_with_tags / case_name
+    bench_path.mkdir(parents=True)
+    (bench_path / "tool").write_text(tool)
 
     return BenchmarkCase(model_name=model_name,
                          model_tags=model_tags,

@@ -105,9 +105,8 @@ class EmitDefaultIREEABIPass
       });
       if (shapedType.hasRank()) {
         for (auto dim : shapedType.getShape()) {
-          record.push_back(dim == ShapedType::kDynamicSize
-                               ? json::Value(nullptr)
-                               : json::Value(dim));
+          record.push_back(dim == ShapedType::kDynamic ? json::Value(nullptr)
+                                                       : json::Value(dim));
         }
       }
       return json::Value(std::move(record));

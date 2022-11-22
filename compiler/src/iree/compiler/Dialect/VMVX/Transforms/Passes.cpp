@@ -38,6 +38,8 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // memory space through the stack.
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createEraseHALDescriptorTypeFromMemRefPass());
+  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      createIREEMaterializeEncodingPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();

@@ -42,7 +42,7 @@ static bool shouldBypassCast(ShapedType a, ShapedType b) {
   for (auto pair : llvm::zip(a_shape, b_shape)) {
     auto a_dim = std::get<0>(pair);
     auto b_dim = std::get<1>(pair);
-    if (a_dim != b_dim && a_dim == -1) {
+    if (a_dim != b_dim && a_dim == ShapedType::kDynamic) {
       return false;
     }
   }

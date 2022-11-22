@@ -39,6 +39,14 @@ wget https://storage.googleapis.com/iree-model-artifacts/deeplabv3.tflite -P "${
 wget https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite -P "${ROOT_DIR}/models/tflite/"
 wget https://storage.googleapis.com/iree-model-artifacts/ssd_mobilenet_v2_static_1.0_int8.tflite -P "${ROOT_DIR}/models/tflite/"
 wget https://storage.googleapis.com/iree-model-artifacts/resnet_v2_101_1_default_1.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/asr_conformer_int8.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/albert_lite_base_squadv1_1.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/ssd_mobilenet_v2_fpnlite_fp32.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/ssd_mobilenet_v2_fpnlite_uint8.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/inception_v4_299_fp32.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/inception_v4_299_uint8.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/efficientnet_lite0_fp32_2.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/efficientnet_lite0_int8_2.tflite -P "${ROOT_DIR}/models/tflite/"
 
 # Build IREE source.
 SOURCE_DIR=/tmp/github
@@ -59,11 +67,11 @@ cmake --build ../iree-build/
 
 export CC=clang
 export CXX=clang++
-python configure_bazel.py
+python3 configure_bazel.py
 
 cd integrations/tensorflow
-./symlink_binaries.sh
 bazel build -c opt iree_tf_compiler:iree-import-tflite
+./symlink_binaries.sh
 
 echo "Done building iree-import-tflite"
 echo
@@ -80,9 +88,9 @@ mkdir -p "${IREE_MODEL_DIR}/llvm-cpu"
 # keep going.
 for i in $(ls ${ROOT_DIR}/models/tflite/); do
   MODEL_NAME=$(basename $i .tflite)
-
   echo "Processing ${MODEL_NAME} ..."
-  ${IREE_IMPORT_TFLITE_PATH} "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir"
+
+  ${IREE_IMPORT_TFLITE_PATH} "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" || true
   echo -e "\tCompiling ${MODEL_NAME}.vmfb for aarch64..."
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
@@ -94,6 +102,19 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
     --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}.vmfb" || true
 
+  echo -e "\tCompiling ${MODEL_NAME}_padfuse.vmfb for aarch64..."
+  "${IREE_COMPILE_PATH}" \
+    --iree-input-type=tosa \
+    --iree-hal-target-backends=llvm-cpu \
+    --iree-llvm-target-triple=aarch64-none-linux-android29 \
+    --iree-llvm-debug-symbols=false \
+    --iree-vm-bytecode-module-strip-source-map=true \
+    --iree-vm-emit-polyglot-zip=false \
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops" \
+    "--iree-llvmcpu-enable-pad-consumer-fusion" \
+    "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
+    --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}_padfuse.vmfb" || true
+
   echo -e "\tCompiling ${MODEL_NAME}_mmt4d.vmfb for aarch64..."
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
@@ -101,6 +122,8 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-llvm-target-triple=aarch64-none-linux-android29 \
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod" \
     --iree-llvm-target-cpu-features=+dotprod \
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops" \
+    "--iree-llvmcpu-enable-pad-consumer-fusion" \
     --iree-llvm-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
@@ -114,13 +137,14 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-llvm-target-triple=aarch64-none-linux-android29 \
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod" \
     --iree-llvm-target-cpu-features=+dotprod \
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops" \
+    "--iree-llvmcpu-enable-pad-consumer-fusion" \
     --iree-flow-enable-conv-img2col-transform \
     --iree-llvm-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
     --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}_im2col_mmt4d.vmfb" || true
-
 
   if [[ "${GPU_TYPE}" = "mali" ]]; then
     echo -e "\tCompiling ${MODEL_NAME}.vmfb for vulkan mali..."
@@ -133,7 +157,20 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
       --iree-vm-emit-polyglot-zip=false \
       "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
       --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb" || true
-     echo -e "\tCompiling ${MODEL_NAME}_fp16.vmfb for vulkan mali..."
+
+    echo -e "\tCompiling ${MODEL_NAME}_padfuse.vmfb for vulkan mali..."
+    "${IREE_COMPILE_PATH}" \
+      --iree-input-type=tosa \
+      --iree-hal-target-backends=vulkan-spirv \
+      --iree-vulkan-target-triple=valhall-unknown-android31 \
+      --iree-llvm-debug-symbols=false \
+      --iree-vm-bytecode-module-strip-source-map=true \
+      --iree-vm-emit-polyglot-zip=false \
+      --iree-flow-enable-fuse-padding-into-linalg-consumer-ops \
+      "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
+      --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}_padfuse.vmfb" || true
+
+    echo -e "\tCompiling ${MODEL_NAME}_fp16.vmfb for vulkan mali..."
     "${IREE_COMPILE_PATH}" \
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
@@ -142,19 +179,9 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
       --iree-llvm-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \
+      --iree-flow-enable-fuse-padding-into-linalg-consumer-ops \
       "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
       --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}_fp16.vmfb" || true
-    echo -e "\tCompiling ${MODEL_NAME}_padfuse.vmfb for vulkan mali..."
-    "${IREE_COMPILE_PATH}" \
-      --iree-input-type=tosa \
-      --iree-hal-target-backends=vulkan-spirv \
-      --iree-vulkan-target-triple=valhall-unknown-android31 \
-      --iree-flow-enable-fuse-padding-into-linalg-consumer-ops \
-      --iree-llvm-debug-symbols=false \
-      --iree-vm-bytecode-module-strip-source-map=true \
-      --iree-vm-emit-polyglot-zip=false \
-      "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-      --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}_padfuse.vmfb" || true
   else
     echo -e "\tCompiling ${MODEL_NAME}.vmfb for vulkan adreno..."
     "${IREE_COMPILE_PATH}" \
@@ -164,6 +191,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
       --iree-llvm-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \
+      --iree-flow-enable-fuse-padding-into-linalg-consumer-ops \
       "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
       --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb" || true
   fi
@@ -183,7 +211,7 @@ cmake -GNinja -B ../iree-build-android/ \
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK?}/build/cmake/android.toolchain.cmake" \
   -DIREE_HOST_BINARY_ROOT="${PWD}/../iree-build/install" \
   -DANDROID_ABI="arm64-v8a" \
-  -DANDROID_PLATFORM="android-29" \
+  -DANDROID_PLATFORM="latest" \
   -DIREE_BUILD_COMPILER=OFF \
   .
 cmake --build ../iree-build-android/
@@ -211,7 +239,7 @@ bazel build -c opt --config=android_arm64 \
 
 cp "${SOURCE_DIR}/tensorflow/bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model" "${ROOT_DIR}/"
 
-echo Pushing benchmarking artifacts to device.
+echo "Pushing benchmarking artifacts to device."
 DEVICE_ROOT_DIR=/data/local/tmp/benchmarks
 adb shell rm -r "${DEVICE_ROOT_DIR}" || true
 adb push "${ROOT_DIR}" /data/local/tmp

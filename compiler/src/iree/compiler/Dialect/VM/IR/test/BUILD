@@ -18,6 +18,7 @@ iree_lit_test_suite(
         [
             "arithmetic_folding.mlir",
             "arithmetic_ops.mlir",
+            "arithmetic_speculation.mlir",
             "assignment_folding.mlir",
             "assignment_ops.mlir",
             "comparison_folding.mlir",
@@ -34,6 +35,7 @@ iree_lit_test_suite(
             "global_ops.mlir",
             "list_op_verification.mlir",
             "list_ops.mlir",
+            "list_speculation.mlir",
             "shift_ops.mlir",
             "structural_folding.mlir",
             "structural_ops.mlir",

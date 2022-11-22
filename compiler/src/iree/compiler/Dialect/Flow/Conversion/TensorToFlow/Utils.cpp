@@ -36,7 +36,7 @@ static SmallVector<int64_t, 4> getShapeFromSizes(
         if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
           return attr.cast<IntegerAttr>().getInt();
         }
-        return ShapedType::kDynamicSize;
+        return ShapedType::kDynamic;
       }));
 }
 
@@ -63,11 +63,9 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
 
   bool fullSlices = true;
   for (size_t dim = offsets.size(); dim > 0; dim--) {
-    int64_t staticOffset =
-        getVal(offsets[dim - 1], ShapedType::kDynamicStrideOrOffset);
-    int64_t staticSize = getVal(sizes[dim - 1], ShapedType::kDynamicSize);
-    int64_t staticStride =
-        getVal(strides[dim - 1], ShapedType::kDynamicStrideOrOffset);
+    int64_t staticOffset = getVal(offsets[dim - 1], ShapedType::kDynamic);
+    int64_t staticSize = getVal(sizes[dim - 1], ShapedType::kDynamic);
+    int64_t staticStride = getVal(strides[dim - 1], ShapedType::kDynamic);
 
     if (staticStride != 1) return false;
     // The offsets and sizes dont have to be static for all dimensions. When
@@ -75,14 +73,14 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     // cases, the dynamic offset/size value is obtained by computing from
     // another tensor which lives on the device. To avoid host-round tripping
     // enforce that offset/size is also static.
-    if (staticSize == ShapedType::kDynamicSize) return false;
-    if (staticOffset == ShapedType::kDynamicStrideOrOffset) return false;
+    if (staticSize == ShapedType::kDynamic) return false;
+    if (staticOffset == ShapedType::kDynamic) return false;
 
     if (fullSlices == false) {
       if (staticSize != 1) return false;
     } else {
-      if (!(staticOffset == 0 && staticSize != ShapedType::kDynamicSize &&
-            baseShape[dim - 1] != ShapedType::kDynamicSize &&
+      if (!(staticOffset == 0 && staticSize != ShapedType::kDynamic &&
+            baseShape[dim - 1] != ShapedType::kDynamic &&
             staticSize == baseShape[dim - 1])) {
         fullSlices = false;
       }

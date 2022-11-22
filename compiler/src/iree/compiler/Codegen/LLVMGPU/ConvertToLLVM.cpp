@@ -135,9 +135,8 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
                                 PatternRewriter &rewriter) const override {
     if (allocOp.getType().getMemorySpaceAsInt() != 3) return failure();
     ArrayRef<int64_t> shape = allocOp.getType().getShape();
-    if (llvm::any_of(shape, [](int64_t dim) {
-          return dim == ShapedType::kDynamicSize;
-        })) {
+    if (llvm::any_of(shape,
+                     [](int64_t dim) { return dim == ShapedType::kDynamic; })) {
       return failure();
     }
     // In CUDA workgroup memory is represented by a global variable.

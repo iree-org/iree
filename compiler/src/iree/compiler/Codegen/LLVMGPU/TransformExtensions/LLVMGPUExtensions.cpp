@@ -13,6 +13,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
@@ -81,9 +82,18 @@ transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
 
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
   SimplePatternRewriter rewriter(target);
+
+  MLIRContext *ctx = target->getContext();
+  SmallVector<DeviceMappingAttrInterface> threadMappingAttributes = {
+      gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimX),
+      gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimY),
+      gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimZ)};
+
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForeachToThreadsImpl(
-          rewriter, target, workgroupSize, true, transformOp);
+          rewriter, target, workgroupSize, true, transformOp,
+          threadMappingAttributes);
+
   if (diag.succeeded()) {
     auto newAttr = rewriter.getIndexArrayAttr(workgroupSize);
     // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);

@@ -180,9 +180,9 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       op.getDpsInputOperand(0)->get().getType().cast<ShapedType>().getShape();
   auto rhsShape =
       op.getDpsInputOperand(1)->get().getType().cast<ShapedType>().getShape();
-  int64_t sizeM = ShapedType::kDynamicSize;
-  int64_t sizeN = ShapedType::kDynamicSize;
-  int64_t sizeK = ShapedType::kDynamicSize;
+  int64_t sizeM = ShapedType::kDynamic;
+  int64_t sizeN = ShapedType::kDynamic;
+  int64_t sizeK = ShapedType::kDynamic;
   auto outputMap = op.getMatchingIndexingMap(op.getDpsInitOperand(0));
   for (unsigned i = 0; i < lhsShape.size(); i++) {
     if (op.getMatchingIndexingMap(op.getDpsInputOperand(0)).getDimPosition(i) ==
@@ -209,9 +209,9 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       }
     }
   }
-  bool isStaticSize = sizeM != ShapedType::kDynamicSize &&
-                      sizeN != ShapedType::kDynamicSize &&
-                      sizeK != ShapedType::kDynamicSize;
+  bool isStaticSize = sizeM != ShapedType::kDynamic &&
+                      sizeN != ShapedType::kDynamic &&
+                      sizeK != ShapedType::kDynamic;
   if (isStaticSize) {
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op)) {
@@ -398,6 +398,8 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
              shape.back() % (workgroupSize[0] * vectorSize) != 0) {
         vectorSize /= 2;
       }
+      if (vectorSize == 1)  // assume there is fastpath + slowpath
+        vectorSize = 4;
       int64_t problemSize = std::accumulate(
           shape.begin(), shape.end(), 1,
           [](const int64_t &a, const int64_t &b) { return a * b; });

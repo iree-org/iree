@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -87,7 +88,7 @@ static Value getSlice(OpBuilder &b, Location loc, Value source,
 
 /// Returns true if the dimensions of ShapedType are compatible.
 static bool isShapedTypeDimCompatible(int64_t lhs, int64_t rhs) {
-  return lhs == ShapedType::kDynamicSize || rhs == ShapedType::kDynamicSize ||
+  return lhs == ShapedType::kDynamic || rhs == ShapedType::kDynamic ||
          lhs == rhs;
 }
 
@@ -128,8 +129,8 @@ static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
       llvm::zip(sourceShape, limitShape), [](std::tuple<int64_t, int64_t> it) {
         int64_t sourceExtent = std::get<0>(it);
         int64_t limit = std::get<1>(it);
-        return sourceExtent == ShapedType::kDynamicSize ||
-               limit == ShapedType::kDynamicSize || sourceExtent <= limit;
+        return sourceExtent == ShapedType::kDynamic ||
+               limit == ShapedType::kDynamic || sourceExtent <= limit;
       });
 }
 
@@ -156,7 +157,7 @@ LogicalResult ScatterOp::verify() {
         "expected indices to be of rank 2 of i32 element type");
   }
   auto indexDepth = getIndexDepth();
-  if (indexDepth == ShapedType::kDynamicSize) {
+  if (indexDepth == ShapedType::kDynamic) {
     return op->emitOpError("expected index depth is static");
   }
 
@@ -627,7 +628,7 @@ LogicalResult FftOp::verify() {
   // After tiling, it could be dynamic shape. (Because
   // subview/subtensor does not inference the type correctly
   // on (1 << x)) cases).
-  if (length == ShapedType::kDynamicSize)
+  if (length == ShapedType::kDynamic)
     return success();
   if (length & (length - 1)) {
     return op->emitOpError("only powers of 2 are handled currently");
@@ -664,7 +665,7 @@ SmallVector<Range> FftOp::getIterationDomain(OpBuilder &builder) {
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   for (auto en : llvm::enumerate(getOperandShape().drop_back())) {
     Value size;
-    if (en.value() == ShapedType::kDynamicSize) {
+    if (en.value() == ShapedType::kDynamic) {
       size = getDimValue(builder, loc, getReal(), en.index());
     } else {
       size = builder.create<arith::ConstantIndexOp>(loc, en.value());
@@ -901,8 +902,8 @@ LogicalResult ScanOp::verify() {
   }
   if (llvm::any_of(llvm::zip(expectedAccumulatorShape, accumulatorShape),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return std::get<0>(s) != ShapedType::kDynamicSize &&
-                            std::get<1>(s) != ShapedType::kDynamicSize &&
+                     return std::get<0>(s) != ShapedType::kDynamic &&
+                            std::get<1>(s) != ShapedType::kDynamic &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/accumulator shapes");
@@ -916,8 +917,8 @@ LogicalResult ScanOp::verify() {
   }
   if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return std::get<0>(s) != ShapedType::kDynamicSize &&
-                            std::get<1>(s) != ShapedType::kDynamicSize &&
+                     return std::get<0>(s) != ShapedType::kDynamic &&
+                            std::get<1>(s) != ShapedType::kDynamic &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/output shapes");
@@ -1124,8 +1125,8 @@ LogicalResult ReverseOp::verify() {
   }
   if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return std::get<0>(s) != ShapedType::kDynamicSize &&
-                            std::get<1>(s) != ShapedType::kDynamicSize &&
+                     return std::get<0>(s) != ShapedType::kDynamic &&
+                            std::get<1>(s) != ShapedType::kDynamic &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/output shapes");
@@ -1525,7 +1526,7 @@ areNotFullTiles(ArrayRef<int64_t> inputShape,
                 DenseMap<int64_t, OpFoldResult> const &dimAndTileMapping) {
   int64_t rank = inputShape.size();
   for (int64_t dim = 0; dim < rank; dim++) {
-    if (inputShape[dim] == ShapedType::kDynamicSize)
+    if (inputShape[dim] == ShapedType::kDynamic)
       continue;
     auto it = dimAndTileMapping.find(dim);
     if (it != dimAndTileMapping.end()) {
@@ -1559,7 +1560,7 @@ static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
 }
 
 /// Return the tile sizes as `int64_t`. If a tile size is dynamic a sentinel
-/// `kDynamicSize` is introduced at that position in the returned vector.
+/// `kDynamic` is introduced at that position in the returned vector.
 template <typename OpTy>
 static SmallVector<int64_t> getStaticTiles(OpTy op) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
@@ -1567,7 +1568,7 @@ static SmallVector<int64_t> getStaticTiles(OpTy op) {
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
   dispatchIndexOpFoldResults(op.getMixedTiles(), dynamicTiles, staticTiles,
-                             ShapedType::kDynamicSize);
+                             ShapedType::kDynamic);
   return staticTiles;
 }
 
@@ -1676,9 +1677,9 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
             if (!constTileSize) {
               // If specified tile size is dynamic, output shape should
               // be dynamic too.
-              return shape == ShapedType::kDynamicSize;
+              return shape == ShapedType::kDynamic;
             } else {
-              if (shape == ShapedType::kDynamicSize) {
+              if (shape == ShapedType::kDynamic) {
                 // For the shape being dynamic when tile size is
                 // specified, return true. In canonical form a constant
                 // tile size should lead to constant shape of the tiled
@@ -1710,7 +1711,7 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
-                             ShapedType::kDynamicSize);
+                             ShapedType::kDynamic);
   build(builder, state, output.getType(), source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getI64ArrayAttr(outerDimsPerm),
@@ -1787,7 +1788,7 @@ ShapedType PackOp::getPackedType(ShapedType sourceType,
     if (ShapedType::isDynamic(resultShape[tiledDim.value()]))
       continue;
     if (ShapedType::isDynamic(innerTileSizes[tiledDim.index()])) {
-      resultShape[tiledDim.value()] = ShapedType::kDynamicSize;
+      resultShape[tiledDim.value()] = ShapedType::kDynamic;
       continue;
     }
     resultShape[tiledDim.value()] = ceilDiv(resultShape[tiledDim.value()],
@@ -2107,7 +2108,7 @@ void UnPackOp::build(OpBuilder &builder, OperationState &state, Value source,
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
-                             ShapedType::kDynamicSize);
+                             ShapedType::kDynamic);
   build(builder, state, output.getType(), source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getI64ArrayAttr(outerDimsPerm),
@@ -2175,9 +2176,7 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   // interchange the tiled loops induction variables based on `outer_dims_perm`.
   SmallVector<int64_t> outerDims = extractFromI64ArrayAttr(getOuterDimsPerm());
   if (!outerDims.empty()) {
-    interchangeVector =
-        computeInterchangeFromDimPos(outerDims, getOutputRank());
-    inputIvs = interchange<Value>(inputIvs, interchangeVector, /*offset=*/0);
+    inputIvs = interchange<Value>(inputIvs, outerDims, /*offset=*/0);
   }
 
   llvm::append_range(inputIvs, interchangedInputIvsPointLoops);
@@ -2243,8 +2242,25 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
                                           dimAndTileMapping[dim]));
 
       inputIndices.push_back(firstCoord.quotient);
-      inputSizes.push_back(
-          add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
+
+      // Get the upper bound because it could be an extract_slice case. The
+      // sizes are determined by loop bound and step, where loop bound is the
+      // size of output shape.
+      // In incomplete tile cases, the input could have larger shape, it is safe
+      // to extend the boundary because they are pre-padded. I.e., the size of
+      // input dim is always aligned to inner_tile_size.
+      FailureOr<int64_t> cstSize = linalg::getConstantUpperBoundForIndex(
+          getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]));
+      Optional<int64_t> cstInnerSize =
+          getConstantIntValue(dimAndTileMapping[dim]);
+      if (!failed(cstSize) && cstInnerSize &&
+          cstSize.value() % cstInnerSize.value() == 0) {
+        inputSizes.push_back(
+            builder.getIndexAttr(cstSize.value() / cstInnerSize.value()));
+      } else {
+        inputSizes.push_back(
+            add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
+      }
       outputNewOffsets.push_back(firstCoord.remainder);
 
       AffineExpr i, tile;

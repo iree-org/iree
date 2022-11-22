@@ -12,6 +12,7 @@ shared between different stages of the same benchmark pipeline.
 
 import json
 import os
+import pathlib
 import re
 import subprocess
 
@@ -82,7 +83,7 @@ IREE_PRETTY_NAME_TO_DRIVER_NAME = {
 }
 
 
-def execute_cmd(args: Sequence[str],
+def execute_cmd(args: Sequence[Any],
                 verbose: bool = False,
                 **kwargs) -> subprocess.CompletedProcess:
   """Executes a command and returns the completed process.
@@ -93,13 +94,12 @@ def execute_cmd(args: Sequence[str],
   Raises:
     CalledProcessError if the command fails.
   """
-  cmd = " ".join(args)
   if verbose:
-    print(f"cmd: {cmd}")
+    print(f"cmd: {args}")
   try:
     return subprocess.run(args, check=True, text=True, **kwargs)
   except subprocess.CalledProcessError as exc:
-    print((f"\n\nThe following command failed:\n\n{cmd}"
+    print((f"\n\nThe following command failed:\n\n{args}"
            f"\n\nReturn code: {exc.returncode}\n\n"))
     if exc.stdout:
       print(f"Stdout:\n\n{exc.stdout}\n\n")
@@ -108,7 +108,7 @@ def execute_cmd(args: Sequence[str],
     raise exc
 
 
-def execute_cmd_and_get_output(args: Sequence[str],
+def execute_cmd_and_get_output(args: Sequence[Any],
                                verbose: bool = False,
                                **kwargs) -> str:
   """Executes a command and returns its stdout.
@@ -121,8 +121,7 @@ def execute_cmd_and_get_output(args: Sequence[str],
 
 def get_git_commit_hash(commit: str) -> str:
   return execute_cmd_and_get_output(['git', 'rev-parse', commit],
-                                    cwd=os.path.dirname(
-                                        os.path.realpath(__file__)))
+                                    cwd=pathlib.Path(__file__).resolve().parent)
 
 
 def get_iree_benchmark_module_arguments(

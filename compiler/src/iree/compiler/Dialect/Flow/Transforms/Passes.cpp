@@ -183,6 +183,24 @@ void buildGlobalOptimizationPassPipeline(
 
 }  // namespace
 
+/// Optional pre-processing passes that transform the program for specialist
+/// uses case.
+static void buildOptionalPreprocessingPassPipeline(OpPassManager &passManager) {
+  FunctionLikeNest(passManager)
+      .addPredicatedPass(clEnableConvToImg2Col,
+                         IREE::Flow::createConvertConv2DToImg2ColPass)
+      .addPredicatedPass(
+          !clMmt4dTargetOptions.empty(),
+          []() {
+            return IREE::Flow::createConvertLinalgMatmulToMmt4DPass(
+                clMmt4dTargetOptions);
+          })
+      .addPredicatedPass(clEnablePaddingLinalgOps, []() {
+        return IREE::Flow::createPadLinalgOpsToIntegerMultiplePass(
+            clLinalgOpsPaddingSize);
+      });
+}
+
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
   // ML frontends have very uneven support for user-controlled types _and_ users
@@ -204,29 +222,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
     passManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
   }
 
-  // Special case peephole optimizations.
+  // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(passManager)
       .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass)
-      .addPredicatedPass(clEnableConvToImg2Col,
-                         IREE::Flow::createConvertConv2DToImg2ColPass)
-      .addPredicatedPass(clDispatchTransformFileName.empty(),
-                         IREE::Flow::createDetachElementwiseFromNamedOpsPass)
-      // Input should now be legal.
-      .addPass(IREE::Flow::createVerifyInputLegalityPass)
-      // Catch matmul ops before we do anything else with them.
-      .addPredicatedPass(
-          !clMmt4dTargetOptions.empty(),
-          []() {
-            return IREE::Flow::createConvertLinalgMatmulToMmt4DPass(
-                clMmt4dTargetOptions);
-          })
-      // Pad linalg ops
-      .addPredicatedPass(clEnablePaddingLinalgOps, []() {
-        return IREE::Flow::createPadLinalgOpsToIntegerMultiplePass(
-            clLinalgOpsPaddingSize);
-      });
+      .addPass(IREE::Flow::createDetachElementwiseFromNamedOpsPass)
+      .addPass(mlir::createLinalgNamedOpConversionPass);
 
-  passManager.addPass(mlir::createLinalgNamedOpConversionPass());
+  // Optional pre-processing passes.
+  buildOptionalPreprocessingPassPipeline(passManager);
+  passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
   // The more we are able to equate shape dimensions at this level the better

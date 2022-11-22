@@ -59,7 +59,11 @@ iree_lit_test_suite(
         ] + BACKEND_TESTS,
     ),
     cfg = "//tests:lit.cfg.py",
-    tags = ["hostonly"],
+    tags = [
+        "driver=local-task",
+        "driver=vulkan",
+        "hostonly",
+    ],
     tools = [
         "//tools:iree-opt",
         "//tools:iree-run-mlir",

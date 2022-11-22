@@ -57,7 +57,6 @@ class IreeRuleBuilder(object):
 
     if model.source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
       cmake_rules = [
-          f'# Import the TFLite model "{source_model_rule.file_path}"',
           cmake_builder.rules.build_iree_import_tflite_model(
               target_path=self._build_target_path(target_name),
               source=source_model_rule.file_path,
@@ -65,7 +64,6 @@ class IreeRuleBuilder(object):
       ]
     elif model.source_type == common_definitions.ModelSourceType.EXPORTED_TF:
       cmake_rules = [
-          f'# Import the Tensorflow model "{source_model_rule.file_path}"',
           cmake_builder.rules.build_iree_import_tf_model(
               target_path=self._build_target_path(target_name),
               source=source_model_rule.file_path,
@@ -101,7 +99,6 @@ class IreeRuleBuilder(object):
     target_name = f"iree-module-{imported_model.model.id}-{compile_config.id}"
 
     cmake_rules = [
-        f'# Compile the module "{output_file_path}"',
         cmake_builder.rules.build_iree_bytecode_module(
             target_name=target_name,
             src=model_import_rule.output_file_path,

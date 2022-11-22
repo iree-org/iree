@@ -54,7 +54,7 @@ IREE_PROJECT_ID = 'IREE'
 MAX_BASE_COMMIT_QUERY_COUNT = 10
 # The max number of rows to show per table.
 TABLE_SIZE_CUT = 3
-THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
 
 
 def get_required_env_var(var: str) -> str:
@@ -123,8 +123,8 @@ def query_base_benchmark_results(commit,
   return get_from_dashboard(f'{url}/apis/v2/getBuild', payload, verbose=verbose)
 
 
-def get_benchmark_result_markdown(benchmark_files: Sequence[str],
-                                  compile_stats_files: Sequence[str],
+def get_benchmark_result_markdown(benchmark_files: Sequence[pathlib.Path],
+                                  compile_stats_files: Sequence[pathlib.Path],
                                   query_base: bool,
                                   comment_title: str,
                                   verbose: bool = False) -> Tuple[str, str]:
