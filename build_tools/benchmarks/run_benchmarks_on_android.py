@@ -36,12 +36,11 @@ import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 import atexit
-import os
 import subprocess
 import tarfile
 import shutil
 
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_definition import (DriverInfo, execute_cmd,
@@ -81,11 +80,9 @@ def adb_push_to_tmp_dir(
   # When the output is a TTY, keep the default progress info output.
   # In other cases, redirect progress info to null to avoid bloating log files.
   stdout_redirect = None if sys.stdout.isatty() else subprocess.DEVNULL
-  execute_cmd(
-      ["adb", "push", str(content.resolve()),
-       str(android_path)],
-      verbose=verbose,
-      stdout=stdout_redirect)
+  execute_cmd(["adb", "push", content.resolve(), android_path],
+              verbose=verbose,
+              stdout=stdout_redirect)
   return android_path
 
 
@@ -106,11 +103,8 @@ def adb_execute_and_get_output(
   Returns:
     A string for the command output.
   """
-  cmd = ["adb", "shell"]
-  cmd.extend(["cd", str(ANDROID_TMPDIR / relative_dir)])
-  cmd.append("&&")
+  cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
   cmd.extend(cmd_args)
-
   return execute_cmd_and_get_output(cmd, verbose=verbose)
 
 
@@ -130,11 +124,8 @@ def adb_execute(cmd_args: Sequence[str],
   Returns:
     The completed process.
   """
-  cmd = ["adb", "shell"]
-  cmd.extend(["cd", str(ANDROID_TMPDIR / relative_dir)])
-  cmd.append("&&")
+  cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
   cmd.extend(cmd_args)
-
   return execute_cmd(cmd, verbose=verbose)
 
 
@@ -143,7 +134,7 @@ def is_magisk_su():
   return "MagiskSU" in adb_execute_and_get_output(["su", "--help"])
 
 
-def adb_execute_as_root(cmd_args: Sequence[str]) -> subprocess.CompletedProcess:
+def adb_execute_as_root(cmd_args: Sequence[Any]) -> subprocess.CompletedProcess:
   """Executes the given command as root."""
   cmd = ["su", "-c" if is_magisk_su() else "root"]
   cmd.extend(cmd_args)
@@ -164,14 +155,11 @@ def adb_start_cmd(cmd_args: Sequence[str],
   Returns:
     A Popen object for the started command.
   """
-  cmd = ["adb", "shell"]
-  cmd.extend(["cd", str(ANDROID_TMPDIR / relative_dir)])
-  cmd.append("&&")
+  cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
   cmd.extend(cmd_args)
 
   if verbose:
-    cmd_str = " ".join(cmd)
-    print(f"cmd: {cmd_str}")
+    print(f"cmd: {cmd}")
   return subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
 
 
@@ -251,8 +239,8 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     # return.
     pull_cmd = [
         "adb", "pull",
-        str(ANDROID_TMPDIR / android_case_dir / results_filename.name),
-        str(results_filename)
+        ANDROID_TMPDIR / android_case_dir / results_filename.name,
+        results_filename
     ]
     execute_cmd_and_get_output(pull_cmd, verbose=self.verbose)
 
@@ -284,8 +272,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     # send the signal to let the previously waiting benchmark tool to
     # complete.
     capture_cmd = [
-        str(capture_config.trace_capture_tool), "-f", "-o",
-        str(capture_filename)
+        capture_config.trace_capture_tool, "-f", "-o", capture_filename
     ]
     # If verbose, just let the subprocess print its output. The subprocess
     # may need to detect if the output is a TTY to decide whether to log
@@ -328,7 +315,7 @@ def set_cpu_frequency_scaling_governor(governor: str):
   cpu_script = (pathlib.Path(git_root) / "build_tools" / "benchmarks" /
                 "set_android_scaling_governor.sh")
   android_path = adb_push_to_tmp_dir(cpu_script)
-  adb_execute_as_root([str(android_path), governor])
+  adb_execute_as_root([android_path, governor])
 
 
 def set_gpu_frequency_scaling_policy(policy: str):
@@ -344,7 +331,7 @@ def set_gpu_frequency_scaling_policy(policy: str):
     raise RuntimeError(
         f"Unsupported device '{device_model}' for setting GPU scaling policy")
   android_path = adb_push_to_tmp_dir(gpu_script)
-  adb_execute_as_root([str(android_path), policy])
+  adb_execute_as_root([android_path, policy])
 
 
 def main(args):
@@ -376,15 +363,13 @@ def main(args):
 
   # Clear the benchmark directory on the Android device first just in case
   # there are leftovers from manual or failed runs.
-  execute_cmd_and_get_output(["adb", "shell", "rm", "-rf",
-                              str(ANDROID_TMPDIR)],
+  execute_cmd_and_get_output(["adb", "shell", "rm", "-rf", ANDROID_TMPDIR],
                              verbose=args.verbose)
 
   if not args.no_clean:
     # Clear the benchmark directory on the Android device.
     atexit.register(execute_cmd_and_get_output,
-                    ["adb", "shell", "rm", "-rf",
-                     str(ANDROID_TMPDIR)],
+                    ["adb", "shell", "rm", "-rf", ANDROID_TMPDIR],
                     verbose=args.verbose)
     # Also clear temporary directory on the host device.
     atexit.register(shutil.rmtree, args.tmp_dir)

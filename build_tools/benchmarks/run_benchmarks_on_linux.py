@@ -14,7 +14,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 import subprocess
 import atexit
-import os
 import shutil
 import tarfile
 
@@ -77,7 +76,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
       raise ValueError("normal_benchmark_tool_dir can't be None.")
 
     tool_name = benchmark_case.benchmark_tool_name
-    tool_path = str(self.config.normal_benchmark_tool_dir / tool_name)
+    tool_path = self.config.normal_benchmark_tool_dir / tool_name
     cmd = ["taskset", taskset, tool_path] + run_flags
     if tool_name == "iree-benchmark-module":
       cmd.extend(
@@ -98,8 +97,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     if capture_config is None:
       raise ValueError("capture_config can't be None.")
 
-    tool_path = str(capture_config.traced_benchmark_tool_dir /
-                    benchmark_case.benchmark_tool_name)
+    tool_path = capture_config.traced_benchmark_tool_dir / benchmark_case.benchmark_tool_name
     cmd = ["taskset", taskset, tool_path] + run_flags
     process = subprocess.Popen(cmd,
                                env={"TRACY_NO_EXIT": "1"},
@@ -110,7 +108,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     wait_for_iree_benchmark_module_start(process, self.verbose)
 
     capture_cmd = [
-        str(capture_config.trace_capture_tool), "-f", "-o", capture_filename
+        capture_config.trace_capture_tool, "-f", "-o", capture_filename
     ]
     stdout_redirect = None if self.verbose else subprocess.DEVNULL
     execute_cmd(capture_cmd, verbose=self.verbose, stdout=stdout_redirect)
