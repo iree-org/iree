@@ -227,7 +227,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     if tool_name == "iree-benchmark-module":
       cmd.extend(
           get_iree_benchmark_module_arguments(
-              results_filename=results_filename.name,
+              results_filename=f"'{results_filename.name}'",
               driver_info=driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
