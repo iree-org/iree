@@ -597,7 +597,7 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
         ArrayRef<OpFoldResult>{workload[tileSize.index()], tileSize.value()});
     workgroupCount.push_back(count);
   }
-  // Make sure to fill unused dimensions with a 1
+  // Make sure to fill unused dimensions with 1
   workgroupCount.resize(3, rewriter.getIndexAttr(1));
   permutedWorkgroupCount.resize(3, rewriter.getIndexAttr(1));
   int mappingId = 0;
