@@ -43,11 +43,12 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
     }
     for (auto operand : allocaOp.getDynamicSizes()) {
       auto ub = linalg::getConstantUpperBoundForIndex(operand);
-      if (failed(ub) && clFailUnboundDynamicStackAllocation) {
+      if (succeeded(ub)) {
+        size *= *ub;
+      } else if (clFailUnboundDynamicStackAllocation) {
         return allocaOp.emitOpError(
             "expected no stack allocations without upper bound shapes");
       }
-      size *= *ub;
     }
     size *= type.getElementType().getIntOrFloatBitWidth();
     if (allocaOp.getAlignment()) {
