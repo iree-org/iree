@@ -3,7 +3,7 @@ func.func @winograd_input() {
 
   %init = tensor.empty() : tensor<8x8x1x1x1x1xf32>
   %1 = iree_linalg_ext.winograd.input_transform
-       output_tile_size(6) kernel_size(3) tensor_format("nhwc")
+       output_tile_size(6) kernel_size(3) image_dimensions([1, 2])
        ins(%input : tensor<1x6x6x1xf32>)
        outs(%init : tensor<8x8x1x1x1x1xf32>) -> tensor<8x8x1x1x1x1xf32>
   %2 = flow.tensor.reshape %1 : tensor<8x8x1x1x1x1xf32> -> tensor<8x8xf32>

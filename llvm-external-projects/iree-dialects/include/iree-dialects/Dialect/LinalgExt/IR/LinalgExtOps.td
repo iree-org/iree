@@ -917,13 +917,13 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
                        Variadic<AnyShaped>:$outputs,
                        I64Attr:$output_tile_size,
                        I64Attr:$kernel_size,
-                       StrAttr:$tensor_format
+                       I64ArrayAttr:$image_dimensions
   );
 
   let builders = [
     OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
       CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"StringRef", "\"nhwc\"">:$tensor_format)>
+      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions)>
   ];
 
   let results = (outs Variadic<AnyRankedTensor>:$result);
@@ -932,7 +932,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     attr-dict
     `output_tile_size` `(` $output_tile_size `)`
     `kernel_size` `(` $kernel_size `)`
-    `tensor_format` `(` $tensor_format `)`
+    `image_dimensions` `(` $image_dimensions `)`
     `ins` `(` $inputs `:` type($inputs) `)`
     `outs` `(` $outputs `:` type($outputs) `)`
     (`->` type($result)^)?
@@ -957,12 +957,15 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     int64_t getOutputOperandRank() {
       return getOutputOperandType().getRank();
     }
-    int64_t getIterationDomainRank() {
-      // We only expose the batch dimension (N) and channels (C)
-      return 2;
-    }
     int64_t getInputTileSize() {
       return getOutputTileSize() + getKernelSize() - 1;
+    }
+    SmallVector<int64_t> imageDimensions() {
+      return extractFromI64ArrayAttr(getImageDimensions());
+    }
+    int64_t getIterationDomainRank() {
+      SmallVector<int64_t> imageDims = imageDimensions();
+      return getInputOperandRank() - imageDims.size();
     }
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface

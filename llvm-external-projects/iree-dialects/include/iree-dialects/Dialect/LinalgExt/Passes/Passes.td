@@ -83,7 +83,7 @@ def LinalgExtVectorization:
 }
 
 def TileAndDecomposeWinogradInputTransform :
-    Pass<"iree-linalg-ext-tile-and-distribute-winograd-input", "func::FuncOp"> {
+    Pass<"iree-linalg-ext-tile-and-decompose-winograd-input", "func::FuncOp"> {
   let summary =
       "Tiles and decomposes winograd input transform op into linalg ops";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"

@@ -8,7 +8,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
-#include "iree-dialects/Dialect/LinalgExt/Utils/WinogradConstants.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -36,6 +35,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/MathExtras.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -2394,12 +2394,6 @@ LogicalResult WinogradInputTransformOp::verify() {
   if (getNumOutputs() != 1) {
     return op->emitOpError("expected one output operand");
   }
-  if (!input().getType().isa<ShapedType>()) {
-    return op->emitOpError("expected input type to be shaped");
-  }
-  if (!output().getType().isa<ShapedType>()) {
-    return op->emitOpError("expected output type to be shaped");
-  }
   auto inputType = input().getType().cast<ShapedType>();
   auto outputType = output().getType().cast<ShapedType>();
   ArrayRef<int64_t> inputShape = inputType.getShape();
@@ -2415,49 +2409,55 @@ LogicalResult WinogradInputTransformOp::verify() {
     return op->emitOpError(
         "expected output rank to be equal to input rank + 2");
   }
-  // Check shapes (assumes incoming input shape in NHWC)
+  const SmallVector<int64_t> imageDims = imageDimensions();
+  llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
+                                                imageDims.end());
+  if (imageDims.size() != 2) {
+    return op->emitOpError("expected only 2 image dimensions");
+  }
+  for (auto dim : imageDims) {
+    if ((dim < 0) || (dim > 3)) {
+      return op->emitOpError(
+          "expect image dimensions to be in the range: [0, 3]");
+    }
+  }
   const int64_t outputTileSize = getOutputTileSize();
   const int64_t kernelSize = getKernelSize();
   const int64_t inputTileSize = getInputTileSize();
-  SmallVector<int64_t> expectedOutputShape(getInputOperandRank() + 2,
+  SmallVector<int64_t> expectedOutputShape(getOutputOperandRank(),
                                            inputTileSize);
   for (int i = 0; i < inputShape.size(); i++) {
-    if ((i == 0) || (i == 3) || (inputShape[i] == ShapedType::kDynamicSize)) {
+    if (!imageDimsSet.contains(i)) {
       expectedOutputShape[i + 2] = inputShape[i];
     } else {
       expectedOutputShape[i + 2] =
           std::ceil((float)(inputShape[i] - kernelSize + 1) / outputTileSize);
     }
   }
-  if (llvm::any_of(llvm::zip(expectedOutputShape, outputShape),
-                   [](std::tuple<int64_t, int64_t> s) {
-                     return std::get<0>(s) != ShapedType::kDynamicSize &&
-                            std::get<1>(s) != ShapedType::kDynamicSize &&
-                            std::get<0>(s) != std::get<1>(s);
-                   })) {
+  if (!areShapesCompatible(expectedOutputShape, outputShape)) {
     return op->emitOpError("incompatible output shape");
-  }
-  const StringRef tensorFormat = getTensorFormat();
-  if (tensorFormat != "nhwc") {
-    return op->emitOpError("only nhwc format currently supported");
   }
   return success();
 }
 
 SmallVector<Range>
 WinogradInputTransformOp::getIterationDomain(OpBuilder &builder) {
-  int64_t operandRank = getIterationDomainRank();
-  SmallVector<Range> loopBounds(operandRank);
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   Value source = input();
-  // Expose only the batch dimension(0) and channel dimension(3) for NHWC tensor
-  SmallVector<int64_t> indices = {0, 3};
-  for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
-    loopBounds[dim].offset = zero;
-    loopBounds[dim].size = getDimValue(builder, loc, source, indices[dim]);
-    loopBounds[dim].stride = one;
+  SmallVector<int64_t> imageDims = imageDimensions();
+  llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
+                                                imageDims.end());
+  SmallVector<Range> loopBounds(imageDims.size());
+  int count = 0;
+  for (auto dim : llvm::seq<int64_t>(0, getInputOperandRank())) {
+    if (!imageDimsSet.contains(dim)) {
+      loopBounds[count].offset = zero;
+      loopBounds[count].size = getDimValue(builder, loc, source, dim);
+      loopBounds[count].stride = one;
+      count++;
+    }
   }
   return loopBounds;
 }
@@ -2467,15 +2467,6 @@ WinogradInputTransformOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getIterationDomainRank(),
                                                  utils::IteratorType::parallel);
   return iteratorTypes;
-}
-
-static SmallVector<OpFoldResult> convertToIndexAttr(ArrayRef<int64_t> shape,
-                                                    OpBuilder &b) {
-  SmallVector<OpFoldResult> shapeAttr;
-  for (auto val : shape) {
-    shapeAttr.push_back(b.getIndexAttr(val));
-  }
-  return shapeAttr;
 }
 
 SmallVector<Operation *>
@@ -2499,8 +2490,10 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   assert(sizes.size() == 2);
   auto inputShape = input().getType().cast<ShapedType>().getShape();
   auto outputShape = output().getType().cast<ShapedType>().getShape();
-  auto inputSizes = convertToIndexAttr(inputShape, builder);
-  auto outputSizes = convertToIndexAttr(outputShape, builder);
+  SmallVector<OpFoldResult> inputSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
+  SmallVector<OpFoldResult> outputSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
   outputSizes[2] = inputSizes[0] = sizes[0];
   outputSizes[5] = inputSizes[3] = sizes[1];
 
@@ -2527,7 +2520,7 @@ LogicalResult WinogradInputTransformOp::getResultTilePosition(
     SmallVector<OpFoldResult> &resultSizes) {
   if (resultNumber == 0) {
     auto resultShape = output().getType().cast<ShapedType>().getShape();
-    resultSizes = convertToIndexAttr(resultShape, builder);
+    resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
     resultOffsets = SmallVector<OpFoldResult>(getOutputOperandRank(),
                                               builder.getIndexAttr(0));
     resultOffsets[2] = offsets[0];

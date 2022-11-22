@@ -55,11 +55,9 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
                                                   int64_t rank);
 
 /// Converts a 2D float array to a constant value. The 2D array is stored as
-/// a 1D row-major array in `val` and has shape `rows` x `cols`. The `transpose`
-/// option creates a transposed version of the float array.
+/// a 1D row-major array in `val` and has shape `rows` x `cols`.
 Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
-                                bool transpose, Location loc,
-                                PatternRewriter &rewriter);
+                                Location loc, PatternRewriter &rewriter);
 
 } // namespace LinalgExt
 } // namespace IREE

@@ -14,9 +14,7 @@ namespace LinalgExt {
 namespace Winograd {
 
 // This file contains the Winograd constant matrices for different
-// output tile sizes and some Winograd utilities
-
-constexpr const char *getWinogradAttrName() { return "winograd.matmul"; }
+// output tile sizes
 
 //===----------------------------------------------------------------------===//
 // Output tile size = 6, Kernel size = 3
@@ -29,7 +27,7 @@ constexpr const char *getWinogradAttrName() { return "winograd.matmul"; }
 
 // clang-format off
 
-constexpr float BT_6x6_3x3[] = {
+const float BT_6x6_3x3[] = {
   1,      0, -21./4.,        0,  21./4.,       0, -1, 0,
   0,      1,       1,  -17./4., -17./4.,       1,  1, 0,
   0,     -1,       1,   17./4., -17./4.,      -1,  1, 0,
@@ -40,7 +38,18 @@ constexpr float BT_6x6_3x3[] = {
   0,     -1,       0,   21./4.,       0, -21./4.,  0, 1
 };
 
-constexpr float G_6x6_3x3[] = {
+const float B_6x6_3x3[] = {
+        1,       0,       0,      0,      0,      0,      0,       0,
+        0,       1,      -1,   1./2,  -1./2,      2,     -2,      -1,
+  -21./4.,       1,       1,  1./4.,  1./4.,      4,      4,       0,
+        0, -17./4.,  17./4., -5./2.,  5./2., -5./2.,  5./2.,  21./4.,
+   21./4., -17./4., -17./4., -5./4., -5./4.,     -5,     -5,       0,
+        0,       1,      -1,      2,     -2,  1./2., -1./2., -21./4.,
+       -1,       1,       1,      1,      1,      1,      1,       0,
+        0,       0,       0,      0,      0,      0,      0,       1
+};
+
+const float G_6x6_3x3[] = {
        1,       0,      0,
   -2./9.,  -2./9., -2./9.,
   -2./9.,   2./9., -2./9.,
@@ -51,7 +60,7 @@ constexpr float G_6x6_3x3[] = {
        0,       0,      1
 };
 
-constexpr float AT_6x6_3x3[] = {
+const float AT_6x6_3x3[] = {
   1,  1,   1,   1,    1,     1,      1,  0,
   0,  1,  -1,   2,   -2,  1./2,  -1./2,  0,
   0,  1,   1,   4,    4,  1./4,   1./4,  0,

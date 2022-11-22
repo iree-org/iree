@@ -31,13 +31,15 @@ namespace {
 static void computeLoopParams(SmallVectorImpl<Value> &lbs,
                               SmallVectorImpl<Value> &ubs,
                               SmallVectorImpl<Value> &steps, Value tensor,
-                              Location loc, OpBuilder &builder) {
-  auto zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  auto one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  auto tensorDims = tensor::createDimValues(builder, loc, tensor);
-  for (int i = 2; i < tensorDims.size(); i++) {
+                              int numImageDims, Location loc,
+                              OpBuilder &builder) {
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  SmallVector<OpFoldResult> dimValues =
+      tensor::createDimValues(builder, loc, tensor);
+  for (int i = numImageDims; i < dimValues.size(); i++) {
     lbs.push_back(zero);
-    ubs.push_back(getValueOrCreateConstantIndexOp(builder, loc, tensorDims[i]));
+    ubs.push_back(getValueOrCreateConstantIndexOp(builder, loc, dimValues[i]));
     steps.push_back(one);
   }
 }
@@ -49,7 +51,7 @@ public:
 
   LogicalResult matchAndRewrite(WinogradInputTransformOp inputOp,
                                 PatternRewriter &rewriter) const override {
-    auto loc = inputOp.getLoc();
+    Location loc = inputOp.getLoc();
     auto funcOp = inputOp->getParentOfType<func::FuncOp>();
     if (!funcOp) {
       return rewriter.notifyMatchFailure(
@@ -57,10 +59,12 @@ public:
     }
 
     const float *BT{nullptr};
-    auto inputTileSize = inputOp.getInputTileSize();
-    auto outputTileSize = inputOp.getOutputTileSize();
+    const float *B{nullptr};
+    const int64_t inputTileSize = inputOp.getInputTileSize();
+    const int64_t outputTileSize = inputOp.getOutputTileSize();
     switch (outputTileSize) {
     case 6:
+      B = IREE::LinalgExt::Winograd::B_6x6_3x3;
       BT = IREE::LinalgExt::Winograd::BT_6x6_3x3;
       break;
     default:
@@ -70,29 +74,33 @@ public:
     /// and B [BV] constant matrices that convert the input
     /// tile to the Winograd domain.
     Value BTV = IREE::LinalgExt::createValueFrom2DConstant(
-        BT, inputTileSize, inputTileSize, false, loc, rewriter);
+        BT, inputTileSize, inputTileSize, loc, rewriter);
     Value BV = IREE::LinalgExt::createValueFrom2DConstant(
-        BT, inputTileSize, inputTileSize, true, loc, rewriter);
+        B, inputTileSize, inputTileSize, loc, rewriter);
 
-    auto input = inputOp.input();
-    auto output = inputOp.output();
+    Value input = inputOp.input();
+    Value output = inputOp.output();
     auto outputType = output.getType().cast<ShapedType>();
     auto inputType = input.getType().cast<ShapedType>();
-    auto inputShape = inputType.getShape();
-    auto elementType = outputType.getElementType();
-    SmallVector<int64_t> inputTileSquare(2, inputTileSize);
+    ArrayRef<int64_t> inputShape = inputType.getShape();
+    Type elementType = outputType.getElementType();
+    SmallVector<int64_t> imageDims = inputOp.imageDimensions();
+    const size_t numImageDims = imageDims.size();
+    llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
+                                                  imageDims.end());
+    SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
 
     rewriter.setInsertionPointToStart(&funcOp.getBody().front());
-    auto zeroF32 = rewriter.create<arith::ConstantOp>(
+    Value zeroF32 = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
-    auto scratch =
+    Value scratch =
         rewriter.create<tensor::EmptyOp>(loc, inputTileSquare, elementType);
 
     rewriter.setInsertionPoint(inputOp);
     SmallVector<Value> lbs, ubs, steps;
-    computeLoopParams(lbs, ubs, steps, output, loc, rewriter);
+    computeLoopParams(lbs, ubs, steps, output, numImageDims, loc, rewriter);
     // Construct loops
-    auto loopNest = scf::buildLoopNest(
+    scf::LoopNest loopNest = scf::buildLoopNest(
         rewriter, loc, lbs, ubs, steps, ValueRange({output}),
         [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
             ValueRange iterArgs) -> scf::ValueVector { return {iterArgs[0]}; });
@@ -105,11 +113,11 @@ public:
     SmallVector<OpFoldResult> sizes(inputOp.getInputOperandRank(), one);
     SmallVector<OpFoldResult> offsets(inputOp.getInputOperandRank(), zero);
     SmallVector<Value> ivs;
-    for (auto loop : loopNest.loops) {
+    for (scf::ForOp loop : loopNest.loops) {
       ivs.push_back(loop.getInductionVar());
     }
     for (int i = 0; i < inputShape.size(); i++) {
-      if ((i == 0) || (i == 3)) {
+      if (!imageDimsSet.contains(i)) {
         offsets[i] = ivs[i];
       } else {
         rewriter.setInsertionPointToStart(loopNest.loops[i].getBody());
@@ -132,48 +140,36 @@ public:
     }
     rewriter.setInsertionPointToStart(loopNest.loops.back().getBody());
     auto tensorType = RankedTensorType::get(
-        SmallVector<int64_t>(2, ShapedType::kDynamicSize), elementType);
-    auto dynamicSlice = rewriter
-                            .create<tensor::ExtractSliceOp>(
-                                loc, tensorType, input, offsets, sizes, strides)
-                            .getResult();
+        SmallVector<int64_t>(numImageDims, ShapedType::kDynamic), elementType);
+    Value dynamicSlice = rewriter.create<tensor::ExtractSliceOp>(
+        loc, tensorType, input, offsets, sizes, strides);
 
     // Copy input slice into zeroed padded scratch space
-    strides = SmallVector<OpFoldResult>(2, one);
-    offsets = SmallVector<OpFoldResult>(2, zero);
+    strides = SmallVector<OpFoldResult>(numImageDims, one);
+    offsets = SmallVector<OpFoldResult>(numImageDims, zero);
     sizes = SmallVector<OpFoldResult>{sizes[1], sizes[2]};
-    Value zeroScratch = rewriter
-                            .create<linalg::FillOp>(loc, ValueRange{zeroF32},
-                                                    ValueRange{scratch})
-                            .result();
-    auto inputSlice =
-        rewriter
-            .create<tensor::InsertSliceOp>(loc, dynamicSlice, zeroScratch,
-                                           offsets, sizes, strides)
-            .getResult();
+    linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
+        loc, ValueRange{zeroF32}, ValueRange{scratch});
+    Value inputSlice = rewriter.create<tensor::InsertSliceOp>(
+        loc, dynamicSlice, fillOp.result(), offsets, sizes, strides);
 
     // Extract output slice
     strides = SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
-    offsets = SmallVector<OpFoldResult>(2, zero);
+    offsets = SmallVector<OpFoldResult>(numImageDims, zero);
     offsets.append(ivs.begin(), ivs.end());
     sizes = SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
     sizes[0] = sizes[1] = inputTileSizeAttr;
     tensorType = RankedTensorType::get(inputTileSquare, elementType);
     Value iterArg = loopNest.loops.back().getRegionIterArg(0);
-    auto outputSlice =
-        rewriter
-            .create<tensor::ExtractSliceOp>(loc, tensorType, iterArg, offsets,
-                                            sizes, strides)
-            .getResult();
+    Value outputSlice = rewriter.create<tensor::ExtractSliceOp>(
+        loc, tensorType, iterArg, offsets, sizes, strides);
 
     // Create computation
-    Value accumulator, result, AMatrix, BMatrix;
+    Value result, AMatrix, BMatrix;
     linalg::MatmulOp matmulOp;
     for (int i = 0; i < 2; i++) {
-      accumulator = rewriter
-                        .create<linalg::FillOp>(loc, ValueRange{zeroF32},
-                                                ValueRange{outputSlice})
-                        .result();
+      fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32},
+                                               ValueRange{outputSlice});
       if (i == 0) {
         AMatrix = inputSlice;
         BMatrix = BV;
@@ -182,22 +178,13 @@ public:
         BMatrix = result;
       }
       matmulOp = rewriter.create<linalg::MatmulOp>(
-          loc, tensorType, ValueRange{AMatrix, BMatrix}, accumulator);
-      if (i == 0) {
-        matmulOp->setAttr(IREE::LinalgExt::Winograd::getWinogradAttrName(),
-                          rewriter.getStringAttr("I x B"));
-      } else {
-        matmulOp->setAttr(IREE::LinalgExt::Winograd::getWinogradAttrName(),
-                          rewriter.getStringAttr("B' x I x B"));
-      }
+          loc, tensorType, ValueRange{AMatrix, BMatrix}, fillOp.result());
       result = matmulOp.getResult(0);
     }
 
     // Insert results into output slice
-    auto updatedOutput = rewriter
-                             .create<tensor::InsertSliceOp>(
-                                 loc, result, iterArg, offsets, sizes, strides)
-                             .getResult();
+    Value updatedOutput = rewriter.create<tensor::InsertSliceOp>(
+        loc, result, iterArg, offsets, sizes, strides);
 
     // Replace returned value
     if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(

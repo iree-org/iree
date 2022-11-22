@@ -72,21 +72,9 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
 }
 
 Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
-                                bool transpose, Location loc,
-                                PatternRewriter &rewriter) {
-  SmallVector<float> vector(rows * cols, 0.0);
-  for (int i = 0; i < rows; i++) {
-    for (int j = 0; j < cols; j++) {
-      if (!transpose) {
-        vector[i * cols + j] = val[i * cols + j];
-      } else {
-        vector[j * rows + i] = val[i * cols + j];
-      }
-    }
-  }
+                                Location loc, PatternRewriter &rewriter) {
+  ArrayRef<float> vector(val, rows * cols);
   SmallVector<int64_t> shape{rows, cols};
-  if (transpose)
-    shape = {cols, rows};
   return rewriter.create<arith::ConstantOp>(
       loc, DenseFPElementsAttr::get(
                RankedTensorType::get(shape, rewriter.getF32Type()), vector));
