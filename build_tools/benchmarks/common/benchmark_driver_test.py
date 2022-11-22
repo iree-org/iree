@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import json
-import os
 import pathlib
 import tempfile
 import unittest
@@ -34,14 +33,13 @@ class FakeBenchmarkDriver(BenchmarkDriver):
       raise Exception("fake exception")
 
     if benchmark_results_filename:
-      with open(benchmark_results_filename, "w") as f:
-        f.write(json.dumps({
-            "context": "fake_context",
-            "benchmarks": [],
-        }))
+      benchmark_results_filename.write_text(
+          json.dumps({
+              "context": "fake_context",
+              "benchmarks": [],
+          }))
     if capture_filename:
-      with open(capture_filename, "w") as f:
-        f.write("{}")
+      capture_filename.write_text("{}")
 
 
 class BenchmarkDriverTest(unittest.TestCase):
@@ -51,10 +49,10 @@ class BenchmarkDriverTest(unittest.TestCase):
     self.root_dir = tempfile.TemporaryDirectory()
 
     self.tmp_dir_path = pathlib.Path(self.tmp_dir.name)
-    with (self.tmp_dir_path / "build_config.txt").open("w") as f:
-      f.write("IREE_HAL_DRIVER_LOCAL_SYNC=ON\n")
-      f.write("IREE_HAL_DRIVER_LOCAL_TASK=ON\n")
-      f.write("IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF=ON\n")
+    (self.tmp_dir_path / "build_config.txt").write_text(
+        "IREE_HAL_DRIVER_LOCAL_SYNC=ON\n"
+        "IREE_HAL_DRIVER_LOCAL_TASK=ON\n"
+        "IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF=ON\n")
 
     self.config = BenchmarkConfig(
         root_benchmark_dir=pathlib.Path(self.root_dir.name),
@@ -99,18 +97,18 @@ class BenchmarkDriverTest(unittest.TestCase):
   def test_add_previous_benchmarks_and_captures(self):
     driver = BenchmarkDriver(self.device_info, self.config,
                              self.benchmark_suite)
-    os.makedirs(self.tmp_dir_path / BENCHMARK_RESULTS_REL_PATH)
-    os.makedirs(self.tmp_dir_path / CAPTURES_REL_PATH)
+    (self.tmp_dir_path / BENCHMARK_RESULTS_REL_PATH).mkdir(parents=True)
+    (self.tmp_dir_path / CAPTURES_REL_PATH).mkdir(parents=True)
     benchmark_filename = (
         self.tmp_dir_path / BENCHMARK_RESULTS_REL_PATH /
         "MobileNetv2 [fp32,imagenet] (TFLite) big-core,full-inference with IREE-LLVM-CPU @ Pixel-4 (CPU-ARMv8.2-A).json"
     )
-    benchmark_filename.write_text("")
+    benchmark_filename.touch()
     capture_filename = (
         self.tmp_dir_path / CAPTURES_REL_PATH /
         "MobileNetv2 [fp32,imagenet] (TFLite) big-core,full-inference with IREE-LLVM-CPU @ Pixel-4 (CPU-ARMv8.2-A).tracy"
     )
-    capture_filename.write_text("")
+    capture_filename.touch()
 
     driver.add_previous_benchmarks_and_captures(self.tmp_dir_path)
 

@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import json
-import os
 import pathlib
 import time
 from typing import Dict, Optional, Sequence, Tuple
@@ -66,15 +65,14 @@ class BenchmarkDriver(object):
     if previous_benchmarks_dir.is_dir():
       previous_benchmark_filenames = set(
           previous_benchmarks_dir / p
-          for p in os.listdir(previous_benchmarks_dir)
-          if os.path.splitext(os.path.basename(p))[1] == ".json")
+          for p in previous_benchmarks_dir.iterdir()
+          if p.suffix == ".json")
 
     previous_captures_dir = previous_directory / CAPTURES_REL_PATH
     if previous_captures_dir.is_dir():
-      previous_capture_filenames = set(
-          previous_captures_dir / p
-          for p in os.listdir(previous_captures_dir)
-          if os.path.splitext(os.path.basename(p))[1] == ".tracy")
+      previous_capture_filenames = set(previous_captures_dir / p
+                                       for p in previous_captures_dir.iterdir()
+                                       if p.suffix == ".tracy")
 
     self.finished_benchmarks.update(
         get_key_value_pair(p) for p in previous_benchmark_filenames)
@@ -93,10 +91,10 @@ class BenchmarkDriver(object):
 
     do_capture = self.config.trace_capture_config is not None
 
-    os.makedirs(self.config.benchmark_results_dir, exist_ok=True)
+    self.config.benchmark_results_dir.mkdir(parents=True, exist_ok=True)
     if do_capture:
-      os.makedirs(self.config.trace_capture_config.capture_tmp_dir,
-                  exist_ok=True)
+      self.config.trace_capture_config.capture_tmp_dir.mkdir(parents=True,
+                                                             exist_ok=True)
 
     cpu_target_arch = self.device_info.get_iree_cpu_arch_name()
     gpu_target_arch = self.device_info.get_iree_gpu_arch_name()
@@ -216,8 +214,7 @@ class BenchmarkDriver(object):
                     if self.config.normal_benchmark_tool_dir else
                     self.config.trace_capture_config.traced_benchmark_tool_dir)
     config_txt_file_path = any_tool_dir / "build_config.txt"
-    with config_txt_file_path.open("r") as config_txt_file:
-      config_txt_file_lines = config_txt_file.readlines()
+    config_txt_file_lines = config_txt_file_path.read_text().splitlines()
 
     available_drivers = []
     available_loaders = []

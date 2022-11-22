@@ -22,9 +22,9 @@ class BenchmarkConfigTest(unittest.TestCase):
     self.tmp_dir = tempfile.TemporaryDirectory()
     self.build_dir_path = pathlib.Path(self.build_dir.name).resolve()
     self.normal_tool_dir = self.build_dir_path / "normal_tool"
-    os.mkdir(self.normal_tool_dir)
+    self.normal_tool_dir.mkdir()
     self.traced_tool_dir = self.build_dir_path / "traced_tool"
-    os.mkdir(self.traced_tool_dir)
+    self.traced_tool_dir.mkdir()
     self.trace_capture_tool = tempfile.NamedTemporaryFile()
     os.chmod(self.trace_capture_tool.name, stat.S_IEXEC)
 

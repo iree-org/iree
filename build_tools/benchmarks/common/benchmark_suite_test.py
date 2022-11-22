@@ -255,7 +255,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
     if len(model_tags) > 0:
       model_name_with_tags += f"-{','.join(model_tags)}"
     bench_path = dir_path / model_name_with_tags / case_name
-    os.makedirs(bench_path)
+    bench_path.mkdir(parents=True)
     (bench_path / "tool").write_text(tool)
 
     return BenchmarkCase(model_name=model_name,
