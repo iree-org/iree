@@ -256,6 +256,38 @@ LinalgTilingPattern::returningMatchAndRewrite(linalg::LinalgOp op,
   return res;
 }
 
+/// Linalg SCF tiling pattern.
+LinalgSCFTilingPattern::LinalgSCFTilingPattern(
+    MLIRContext *context, scf::SCFTilingOptions options,
+    LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
+    : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
+      filter(std::move(f)), options(std::move(options)) {}
+
+LinalgSCFTilingPattern::LinalgSCFTilingPattern(
+    StringRef opName, MLIRContext *context, scf::SCFTilingOptions options,
+    LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
+    : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
+      filter(f.addOpNameFilter(opName)), options(std::move(options)) {}
+
+LogicalResult LinalgSCFTilingPattern::returningMatchAndRewrite(
+    TilingInterface op, PatternRewriter &rewriter) const {
+  if (failed(filter.checkAndNotify(rewriter, op)))
+    return failure();
+
+  FailureOr<scf::SCFTilingResult> tiledResults =
+      scf::tileUsingSCFForOp(rewriter, op, options);
+  if (failed(tiledResults))
+    return failure();
+
+  rewriter.replaceOp(op, tiledResults->replacements);
+
+  for (auto tiledOp : tiledResults->tiledOps) {
+    filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
+  }
+
+  return success();
+}
+
 LinalgVectorizationPattern::LinalgVectorizationPattern(
     MLIRContext *context, LinalgExt::LinalgTransformationFilter f,
     PatternBenefit benefit)

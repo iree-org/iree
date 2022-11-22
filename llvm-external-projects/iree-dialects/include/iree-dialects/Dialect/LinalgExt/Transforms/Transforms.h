@@ -10,6 +10,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir {
@@ -159,6 +160,43 @@ private:
   LinalgTransformationFilter filter;
   /// Options to control tiling;
   linalg::LinalgTilingOptions options;
+};
+
+///
+/// Linalg SCF tiling pattern.
+///
+/// Apply the `tiling` transformation as a pattern.
+/// `filter` controls LinalgTransformMarker matching and update when specified.
+/// See `tiling` for more details.
+struct LinalgSCFTilingPattern
+    : public OpInterfaceRewritePattern<TilingInterface> {
+  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
+  LinalgSCFTilingPattern(
+      MLIRContext *context, scf::SCFTilingOptions options,
+      LinalgTransformationFilter f = LinalgTransformationFilter(),
+      PatternBenefit benefit = 1);
+
+  /// Construct a pattern specifically applied to `opName`.
+  LinalgSCFTilingPattern(
+      StringRef opName, MLIRContext *context, scf::SCFTilingOptions options,
+      LinalgTransformationFilter f = LinalgTransformationFilter(),
+      PatternBenefit benefit = 1);
+
+  /// `matchAndRewrite` implementation that returns the significant transformed
+  /// pieces of IR.
+  LogicalResult returningMatchAndRewrite(TilingInterface op,
+                                         PatternRewriter &rewriter) const;
+
+  LogicalResult matchAndRewrite(TilingInterface op,
+                                PatternRewriter &rewriter) const override {
+    return returningMatchAndRewrite(op, rewriter);
+  }
+
+private:
+  /// LinalgTransformMarker handles special attribute manipulations.
+  LinalgTransformationFilter filter;
+  /// Options to control tiling;
+  scf::SCFTilingOptions options;
 };
 
 template <typename... OpTypes>
