@@ -306,6 +306,8 @@ void IREEMaterializeEncodingPass::runOnOperation() {
               subspanOp.getResult()
                   .getType()
                   .template dyn_cast<IREE::Flow::DispatchTensorType>();
+          // For types that are not `Flow::DispatchTensorType` mark as legal.
+          if (!resultType) return true;
           return resultType == typeConverter.convertType(resultType);
         });
 
