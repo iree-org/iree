@@ -43,5 +43,5 @@ echo "Configuring to build e2e test artifacts"
 echo "Building e2e test artifacts"
 "${CMAKE_BIN}" \
   --build "${BUILD_E2E_TEST_ARTIFACTS_DIR}" \
-  --target iree-benchmark-suites \
+  --target iree-e2e-test-artifacts \
   -- -k 0

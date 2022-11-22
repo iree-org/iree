@@ -731,6 +731,19 @@ if(IREE_BUILD_BENCHMARKS OR IREE_BUILD_EXPERIMENTAL_E2E_TEST_ARTIFACTS)
   add_custom_target(iree-benchmark-suites)
 endif()
 
+# TODO(#11263): This conditional block should be merged with the block above
+# once we remove IREE_BUILD_BENCHMARKS.
+if(IREE_BUILD_EXPERIMENTAL_E2E_TEST_ARTIFACTS)
+  # iree-e2e-test-artifacts builds all e2e test artifacts, including benchmarks
+  # and model tests.
+  add_custom_target(iree-e2e-test-artifacts)
+
+  add_dependencies(iree-e2e-test-artifacts
+    iree-benchmark-import-models
+    iree-benchmark-suites
+  )
+endif()
+
 if(IREE_BUILD_MICROBENCHMARKS)
   # Add top-level custom targets to drive generating microbenchmark suites.
   add_custom_target(iree-microbenchmark-suites)
