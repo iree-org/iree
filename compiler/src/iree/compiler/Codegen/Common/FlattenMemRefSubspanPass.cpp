@@ -83,10 +83,24 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
 
     // Convert n-D MemRef to 1-D MemRef.
     addConversion([](MemRefType type) -> Optional<Type> {
-      // Convert to a MemRef with unknown dimension. This is actually more akin
-      // to how IREE uses memref types: they are for representing a view from a
-      // byte buffer with potentially unknown total size, as transformation
-      // passes can concatenate buffers, etc.
+      if (Attribute storage = type.getMemorySpace()) {
+        if (auto dtAttr = storage.dyn_cast<IREE::HAL::DescriptorTypeAttr>()) {
+          // Uniform buffers are faster but generally have a much smaller
+          // capacity limits. GPUs would expect such buffers to have a bound
+          // size when declaring resource ops in the kernel, so converting them
+          // to a static shaped 1-D memref.
+          if (dtAttr.getValue() == IREE::HAL::DescriptorType::UniformBuffer &&
+              type.hasStaticShape()) {
+            return MemRefType::get(type.getNumElements(), type.getElementType(),
+                                   AffineMap(), type.getMemorySpace());
+          }
+        }
+      }
+      // By default convert others to a MemRef with unknown dimension. This is
+      // actually more akin to how IREE uses memref types for storage buffers:
+      // they are representing a view from a byte buffer with potentially
+      // unknown total size, as transformation passes can concatenate buffers,
+      // etc.
       return MemRefType::get(ShapedType::kDynamicSize, type.getElementType(),
                              AffineMap(), type.getMemorySpace());
     });
@@ -218,13 +232,16 @@ struct FlattenBindingSubspan final
     // layout maps.
     if (!oldType || !oldType.getLayout().isIdentity()) return failure();
 
-    Value dynamicDim = createTotalElementCountValue(
-        oldType, subspanOp.getDynamicDims(), subspanOp.getLoc(), rewriter);
-    Type newType = getTypeConverter()->convertType(oldType);
+    auto newType = getTypeConverter()->convertType(oldType).cast<MemRefType>();
+    SmallVector<Value, 1> dynamicDims;
+    if (!newType.hasStaticShape()) {
+      dynamicDims.push_back(createTotalElementCountValue(
+          oldType, subspanOp.getDynamicDims(), subspanOp.getLoc(), rewriter));
+    }
 
     auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp.getLoc(), newType, subspanOp.getSet(), subspanOp.getBinding(),
-        subspanOp.getDescriptorType(), subspanOp.getByteOffset(), dynamicDim,
+        subspanOp.getDescriptorType(), subspanOp.getByteOffset(), dynamicDims,
         subspanOp.getAlignmentAttr());
     if (isRankOneMemRef(oldType)) {
       rewriter.replaceOpWithNewOp<memref::CastOp>(subspanOp, oldType, newOp);
@@ -735,23 +752,25 @@ struct FlattenMemRefSubspanPass
 
     RewritePatternSet flattenPatterns(context);
 
-    // For subspan ops that "generate" MemRef values, convert all MemRef types
-    // to 1-D dynamic sized one. This matches how IREE models buffers nicely.
-    FlattenMemRefTypeConverter fullyDynamicTypeConverter;
-    flattenPatterns.add<FlattenBindingSubspan>(fullyDynamicTypeConverter,
-                                               context);
+    // Interface binding subspan ops represents allocations from the runtime. We
+    // convert all MemRef types "generated" by them to 1-D one, static for
+    // uniform buffers and dynamic for storage buffers. This matches how IREE
+    // models runtime buffers nicely.
+    FlattenMemRefTypeConverter interfaceTypeConverter;
+    flattenPatterns.add<FlattenBindingSubspan>(interfaceTypeConverter, context);
 
-    // For other ops that generate MemRef values, we may not be able to go fully
-    // dynamic (e.g., memref::GlobalOp). Still convert everything to 1-D though.
-    FlattenMemRefTypeConverter only1DStaticTypeConverter;
-    only1DStaticTypeConverter.addConversion(
-        [](MemRefType type) -> Optional<Type> {
-          // 1-D MemRef types are okay.
-          if (isRankOneMemRef(type)) return type;
+    // Other ops generate MemRef values representing internal allocations (e.g.,
+    // on stack for GPU, in shared memory for GPU) or data embedded in the
+    // kernel. We may not be able to go fully dynamic (e.g., memref::GlobalOp).
+    // Still convert everything to 1-D though.
+    FlattenMemRefTypeConverter internalTypeConverter;
+    internalTypeConverter.addConversion([](MemRefType type) -> Optional<Type> {
+      // 1-D MemRef types are okay.
+      if (isRankOneMemRef(type)) return type;
 
-          // Fall back to the default conversion flow.
-          return llvm::None;
-        });
+      // Fall back to the default conversion flow.
+      return llvm::None;
+    });
     flattenPatterns
         .add<FlattenAlloc<memref::AllocaOp>, FlattenAlloc<memref::AllocOp>,
              FlattenGlobal, FlattenGetGlobal, LinearizeLoadIndices,
@@ -759,8 +778,8 @@ struct FlattenMemRefSubspanPass
              LinearizeMMAStoreIndices, LinearizeTransferReadIndices,
              LinearizeTransferWriteIndices, AdjustConversionCast,
              FlattenSubView, FoldMemRefReshape<memref::CollapseShapeOp>,
-             FoldMemRefReshape<memref::ExpandShapeOp>>(
-            only1DStaticTypeConverter, context);
+             FoldMemRefReshape<memref::ExpandShapeOp>>(internalTypeConverter,
+                                                       context);
 
     ConversionTarget target(*context);
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
@@ -775,10 +794,8 @@ struct FlattenMemRefSubspanPass
                      isRankOneMemRef(op->getOperandTypes().front());
             });
     target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        [](IREE::HAL::InterfaceBindingSubspanOp op) {
-          return isRankOneMemRef(op.getType()) &&
-                 // Additionally require dynamic sized dimension.
-                 op.getType().cast<MemRefType>().isDynamicDim(0);
+        [&](IREE::HAL::InterfaceBindingSubspanOp op) {
+          return interfaceTypeConverter.isLegal(op.getType());
         });
     target.addDynamicallyLegalOp<memref::GlobalOp>(
         [](memref::GlobalOp op) { return isRankOneMemRef(op.getType()); });
