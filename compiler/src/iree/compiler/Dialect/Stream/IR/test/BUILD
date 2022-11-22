@@ -31,7 +31,7 @@ iree_lit_test_suite(
             "timepoint_ops.mlir",
         ],
         include = ["*.mlir"],
-        exclude = ["timepint_folding.mlir"],
+        exclude = ["timepoint_folding.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
