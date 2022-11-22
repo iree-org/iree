@@ -33,8 +33,16 @@ _PLATFORM_MOBILE = "mobile"
 
 # A map of model name to data type.
 _MODEL_TO_DATA_TYPE = {
+    "albert_lite_base_squadv1_1": "fp32",
+    "albert_lite_base_squadv1_1_fp16": "fp16",
     "deeplabv3": "fp32",
     "deeplabv3_fp16": "fp16",
+    "efficientnet_lite0_fp32_2": "fp32",
+    "efficientnet_lite0_fp32_2_fp16": "fp16",
+    "efficientnet_lite0_int8_2": "int8",
+    "inception_v4_299_fp32": "fp32",
+    "inception_v4_299_fp32_fp16": "fp16",
+    "inception_v4_299_uint8": "uint8",
     "mobilebert-baseline-tf2-quant": "int8",
     "mobilebert_float_384_gpu": "fp32",
     "mobilebert_float_384_gpu_fp16": "fp16",
@@ -45,6 +53,9 @@ _MODEL_TO_DATA_TYPE = {
     "resnet_v2_101_1_default_1": "fp32",
     "resnet_v2_101_1_default_1_fp16": "fp16",
     "ssd_mobilenet_v2_static_1.0_int8": "int8",
+    "ssd_mobilenet_v2_fpnlite_fp32": "fp32",
+    "ssd_mobilenet_v2_fpnlite_fp32_fp16": "fp16",
+    "ssd_mobilenet_v2_fpnlite_uint8": 'uint8',
 }
 
 # Column headers.

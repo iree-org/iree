@@ -109,14 +109,17 @@ def benchmark_mobile_gpu(device_name: str,
 def main(args):
   # Create factories for all models to be benchmarked.
   command_factory = []
-  command_factory.append(MobilebertFP32CommandFactory(args.base_dir))
+  command_factory.append(
+      MobilebertFP32CommandFactory(args.base_dir, "mobilebert_float_384_gpu"))
   command_factory.append(MobilebertInt8CommandFactory(args.base_dir))
+  command_factory.append(
+      MobilebertFP32CommandFactory(args.base_dir, "albert_lite_base_squadv1_1"))
   command_factory.append(
       SimpleCommandFactory(args.base_dir, "mobilenet_v2_1.0_224",
                            "1x224x224x3xf32"))
   command_factory.append(
       SimpleCommandFactory(args.base_dir, "mobilenet_v2_224_1.0_uint8",
-                           "1x224x224x3xui8", "input", "1,224,224,3"))
+                           "1x224x224x3xui8"))
   command_factory.append(
       SimpleCommandFactory(args.base_dir, "deeplabv3", "1x257x257x3xf32"))
   command_factory.append(
@@ -126,6 +129,24 @@ def main(args):
                            "1x320x320x3xi8"))
   command_factory.append(
       SimpleCommandFactory(args.base_dir, "resnet_v2_101_1_default_1",
+                           "1x299x299x3xf32"))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "ssd_mobilenet_v2_fpnlite_uint8",
+                           "1x320x320x3xui8"))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "ssd_mobilenet_v2_fpnlite_fp32",
+                           "1x320x320x3xf32"))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "efficientnet_lite0_int8_2",
+                           "1x224x224x3xui8"))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "efficientnet_lite0_fp32_2",
+                           "1x224x224x3xf32"))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "inception_v4_299_uint8",
+                           "1x299x299x3xui8"))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "inception_v4_299_fp32",
                            "1x299x299x3xf32"))
 
   if args.mode == "desktop":
