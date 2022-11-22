@@ -301,6 +301,10 @@ git push UPSTREAM_AUTOMATION bump-llvm-...
 
 ### Cherry-picking
 
+Please add the integrator to reviewers in the cherry-pick PR, so the integrator
+won't miss the commits when bumping submodules. If you don't know who is the
+integrator, you can reach out to @hanchung on discord or add hanhanW as a reviewer.
+
 We support cherry-picking specific commits in to both llvm-project and mlir-hlo.
 This should only ever be done to incorporate patches that enable further
 development and which will resolve automatically as part of a future
