@@ -19,7 +19,10 @@ get bundled into an unrelated patch unless if very careful). In this rare
 case, just copy the contents of this directory to a temporary location and
 edit/run from there. When done, submit the changes to main.
 
-What follows are some rambly notes on how to do an LLVM integrate.
+What follows are some rambly notes on how to do an LLVM integrate. The integrator
+needs to look at the current LLVM pinned commit and figure out which are
+cherry-picked. If any commit that is cherry picked is not part of the integrate,
+the integrator needs to cherry pick it again.
 
 TODO: Refactor these based on the common procedure we actually use.
 
@@ -300,6 +303,10 @@ git push UPSTREAM_AUTOMATION bump-llvm-...
 ```
 
 ### Cherry-picking
+
+Please add the integrator to reviewers in the cherry-pick PR, so the integrator
+won't miss the commits when bumping submodules. If you don't know who is the
+integrator, you can reach out to @hanchung on discord or add hanhanW as a reviewer.
 
 We support cherry-picking specific commits in to both llvm-project and mlir-hlo.
 This should only ever be done to incorporate patches that enable further
