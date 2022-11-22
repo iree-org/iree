@@ -58,6 +58,26 @@ static FailureOr<Operation *> getRootOp(func::FuncOp funcOp) {
   return rootOp;
 }
 
+/// Builds a proper tile sizes vector for the op.
+/// scf::tileUsingSCFForOp expects the num of tile sizes = num of loops. This
+/// method returns a proper tile sizes vector for each op during tiling.
+static SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
+                                              SmallVector<int64_t> tileSizes) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  assert(linalgOp && "can only compute tile size on linalg ops");
+
+  SmallVector<int64_t> newTileSizes = tileSizes;
+  newTileSizes.resize(linalgOp.getNumLoops(), /*default=*/0);
+
+  OpBuilder::InsertionGuard guard(b);
+  b.setInsertionPointToStart(
+      &op->getParentOfType<func::FuncOp>().getBody().front());
+  return llvm::to_vector(map_range(newTileSizes, [&](int64_t size) {
+    Value v = b.create<arith::ConstantIndexOp>(op->getLoc(), size);
+    return v;
+  }));
+}
+
 /// Default method to initialize the tiling options in IREE. These could be
 /// overriden by the command line options if specified. For now the sentinel
 /// -1 is used for avoiding querying the lowering config.
@@ -68,8 +88,12 @@ static bool getTilingOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel,
     if (failed(rootOp)) {
       return false;
     }
-    tilingOptions.setTileSizes(
-        mlir::iree_compiler::getTileSizes(rootOp.value(), tilingLevel));
+    SmallVector<int64_t> tileSizes =
+        mlir::iree_compiler::getTileSizes(rootOp.value(), tilingLevel);
+    tilingOptions.setTileSizeComputationFunction(
+        [tileSizes](OpBuilder &b, Operation *op) {
+          return buildTileSizesForOp(b, op, tileSizes);
+        });
     return true;
   }
   return false;
@@ -558,7 +582,11 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
       getTilingOptionsFromConfig(funcOp, tilingLevel, tilingOptions);
   if (!tileSizes.empty()) {
     doTiling = true;
-    tilingOptions = tilingOptions.setTileSizes(tileSizes);
+    SmallVector<int64_t> clonedTileSizes = llvm::to_vector(tileSizes);
+    tilingOptions.setTileSizeComputationFunction(
+        [clonedTileSizes](OpBuilder &b, Operation *op) {
+          return buildTileSizesForOp(b, op, clonedTileSizes);
+        });
   }
   if (!tileInterchange.empty()) {
     tilingOptions = tilingOptions.setInterchange(tileInterchange);
