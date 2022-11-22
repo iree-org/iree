@@ -51,7 +51,7 @@ jobs:
           git log --oneline --graph --max-count=3
           ./build_tools/github_actions/configure_ci.py
 
-  benchmark_cpu:
+  build_and_benchmark_cpu:
     needs: setup
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
@@ -87,8 +87,56 @@ jobs:
           gcloud alpha storage cp "${RESULTS_DIR}/latest/**" "${RESULTS_GCS_UPLOAD_DIR}/${GCS_DIR_NAME}/"
           gcloud alpha storage cp "${RESULTS_DIR}/latest/matmul.png" "${RESULTS_GCS_UPLOAD_DIR}/matmul.png"
 
-  benchmark_cuda:
+  build_cuda:
     needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      MMPERF_REPO_DIR: ${{ needs.setup.outputs.mmperf-repo-dir }}
+      BUILD_DIR: mmperf-build-cuda
+    outputs:
+      build-dir: ${{ env.BUILD_DIR }}
+      build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
+      build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Building mmperf for CUDA"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/mmperf@sha256:f1b458cb9570e5e70ffbd59d64d365ed818cb3b308d6e42a4cf5807f2c1a9ced \
+          ./build_tools/benchmarks/mmperf/build_mmperf.sh "${MMPERF_REPO_DIR}" "${BUILD_DIR}" "cuda"
+      - name: "Removing unused files"
+        run: |
+          find "${BUILD_DIR}" -type f -name "*.a" -o -type f -name "*.o" \
+            -print \
+            -delete
+      - name: "Creating build dir archive"
+        id: archive
+        env:
+          BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
+        run: |
+          tar -I 'zstd -T0' \
+            -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+          echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
+      - name: "Uploading build dir archive"
+        id: upload
+        env:
+          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
+        run: |
+          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
+          echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
+
+  benchmark_cuda:
+    needs: [setup, build_cuda]
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
@@ -98,20 +146,20 @@ jobs:
       - os-family=Linux
     env:
       MMPERF_REPO_DIR: ${{ needs.setup.outputs.mmperf-repo-dir }}
-      BUILD_DIR: mmperf-build-cuda
       RESULTS_DIR: mmperf-results-cuda
       RESULTS_GCS_UPLOAD_DIR: "gs://mmperf-benchmark-artifacts/cuda"
+      BUILD_DIR: ${{ needs.build_cuda.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_cuda.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_cuda.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
-      - name: "Building mmperf for CUDA"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-          --gpus all \
-            gcr.io/iree-oss/mmperf@sha256:f1b458cb9570e5e70ffbd59d64d365ed818cb3b308d6e42a4cf5807f2c1a9ced \
-          ./build_tools/benchmarks/mmperf/build_mmperf.sh "${MMPERF_REPO_DIR}" "${BUILD_DIR}" "cuda"
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Running mmperf on CUDA"
         run: |
           mkdir ${RESULTS_DIR}
