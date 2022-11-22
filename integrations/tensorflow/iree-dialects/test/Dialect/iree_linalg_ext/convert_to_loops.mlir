@@ -1412,3 +1412,32 @@ func.func @NPQK_to_NKPQk(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x2x56x56x
 // CHECK:             }
 // CHECK:           }
 // CHECK:         }
+
+// -----
+
+func.func @unpack(%arg0: memref<1x4x6x6x2xf32>, %arg1: memref<1x6x6x8xf32>) {
+  iree_linalg_ext.unpack %arg0 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [2] into %arg1 : (memref<1x4x6x6x2xf32> memref<1x6x6x8xf32>)
+  return 
+}
+
+// CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> (d0 floordiv 2)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0) -> (d0 mod 2)>
+// CHECK: func.func @unpack(
+// CHECK-SAME:  %[[INPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:  %[[OUTPUT:[a-zA-Z0-9]+]]
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C6:.+]] = arith.constant 6 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+// CHECK:     scf.for %[[I:.+]] = %[[C0]] to %[[C1]] step %[[C1]] {
+// CHECK:       scf.for %[[J:.+]] = %[[C0]] to %[[C6]] step %[[C1]] {
+// CHECK:         scf.for %[[K:.+]] = %[[C0]] to %[[C6]] step %[[C1]] {
+// CHECK:           scf.for %[[L:.+]] = %[[C0]] to %[[C8]] step %[[C1]] {
+// CHECK:             %[[APPLY_TILE:.+]] = affine.apply #[[MAP]](%[[L]])
+// CHECK:             %[[APPLY_LOOP:.+]] = affine.apply #[[MAP1]](%[[L]])
+// CHECK:             %[[LOAD:.+]] = memref.load %[[INPUT]][%[[I]], %[[APPLY_TILE]], %[[J]], %[[K]], %[[APPLY_LOOP]]] : memref<1x4x6x6x2xf32>
+// CHECK:             memref.store %[[LOAD]], %[[OUTPUT]][%[[I]], %[[J]], %[[K]], %[[L]]] : memref<1x6x6x8xf32>
+// CHECK:           }
+// CHECK:         }
+// CHECK:       }
+// CHECK:     }

@@ -2176,9 +2176,7 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   // interchange the tiled loops induction variables based on `outer_dims_perm`.
   SmallVector<int64_t> outerDims = extractFromI64ArrayAttr(getOuterDimsPerm());
   if (!outerDims.empty()) {
-    interchangeVector =
-        computeInterchangeFromDimPos(outerDims, getOutputRank());
-    inputIvs = interchange<Value>(inputIvs, interchangeVector, /*offset=*/0);
+    inputIvs = interchange<Value>(inputIvs, outerDims, /*offset=*/0);
   }
 
   llvm::append_range(inputIvs, interchangedInputIvsPointLoops);
