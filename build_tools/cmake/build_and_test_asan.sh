@@ -107,9 +107,8 @@ declare -a label_exclude_args=(
   #   ^bindings/
 )
 
-if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
-  label_exclude_args+=("^driver=vulkan$")
-fi
+# IREE_VULKAN_DISABLE is handled separately as we run Vulkan and non-Vulkan
+# tests in separate ctest commands anyway.
 if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=cuda$")
 fi
@@ -122,53 +121,27 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
 vulkan_label_regex='^driver=vulkan$'
 
-# These tests currently have asan failures
-declare -a excluded_tests=(
-  # TODO(#5716): Fix flaky ASan crash in these tests
-  "iree/tests/e2e/models/collatz.mlir.test"
-  "iree/tests/e2e/models/edge_detection.mlir.test"
-  "iree/tests/e2e/models/fragment_000.mlir.test"
-  "iree/tests/e2e/models/fullyconnected.mlir.test"
-  "iree/tests/e2e/models/mnist_fake_weights.mlir.test"
-  "iree/tests/e2e/models/resnet50_fake_weights.mlir.test"
-  "iree/tests/e2e/models/unidirectional_lstm.mlir.test"
-  "iree/tests/e2e/regression/globals.mlir.test"
-  # TODO(#5715): Fix these
-  "iree/samples/simple_embedding/simple_embedding_vulkan_test"
-  "iree/tools/test/iree-benchmark-module.mlir.test"
-  "iree/tools/test/iree-run-module.mlir.test"
-  "iree/tools/test/multiple_exported_functions.mlir.test"
-)
-
-# Prefix with `^` anchor
-excluded_tests=( "${excluded_tests[@]/#/^}" )
-# Suffix with `$` anchor
-excluded_tests=( "${excluded_tests[@]/%/$}" )
-
-# Join on `|` and wrap in parens
-excluded_tests_regex="($(IFS="|" ; echo "${excluded_tests[*]?}"))"
-
 cd ${BUILD_DIR?}
 
-echo "********** Running main project ctests on non-Vulkan backends ***********"
+echo "*** Running main project ctests that do not use the Vulkan driver *******"
 ctest \
   --timeout 900 \
   --output-on-failure \
   --no-tests=error \
-  --label-exclude "${label_exclude_regex}|${vulkan_label_regex}" \
-  --exclude-regex "${excluded_tests_regex?}"
+  --label-exclude "${label_exclude_regex}|${vulkan_label_regex}"
 
 echo "******************** llvm-external-projects tests ***********************"
 cmake --build . --target check-iree-dialects -- -k 0
 
-echo "**************** Running main project ctests on Vulkan ******************"
-# Disable LeakSanitizer (LSAN) because of a history of issues with Swiftshader
-# (#5716, #8489, #11203).
-ASAN_OPTIONS=detect_leaks=0 \
-  ctest \
-    --timeout 900 \
-    --output-on-failure \
-    --no-tests=error \
-    --label-regex "${vulkan_label_regex}" \
-    --label-exclude "${label_exclude_regex}" \
-    --exclude-regex "${excluded_tests_regex?}"
+if [[ "${IREE_VULKAN_DISABLE?}" == 0 ]]; then
+  echo "*** Running ctests that use the Vulkan driver, with LSAN disabled *****"
+  # Disable LeakSanitizer (LSAN) because of a history of issues with Swiftshader
+  # (#5716, #8489, #11203).
+  ASAN_OPTIONS=detect_leaks=0 \
+    ctest \
+      --timeout 900 \
+      --output-on-failure \
+      --no-tests=error \
+      --label-regex "${vulkan_label_regex}" \
+      --label-exclude "${label_exclude_regex}"
+fi

@@ -690,3 +690,36 @@ func.func @sort1D() {
 //      CHECK:   %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:       outs(%[[IN]] : tensor<4xi32>)
 //      CHECK:   flow.dispatch.tensor.store %[[SORT]], %[[BUF]]
+
+// -----
+
+func.func @clone_index_computations() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load[0] : i32
+  %1 = arith.index_castui %0 : i32 to index
+  %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%1}
+  %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%1}
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %4 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
+  %5 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
+  scf.for %arg0 = %4 to %1 step %5 {
+    %6 = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 64)>(%arg0)[%1]
+    %7 = flow.dispatch.tensor.load %2, offsets = [%arg0], sizes = [%6], strides = [1] : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%1} -> tensor<?xf32>
+    %8 = tensor.empty(%6) : tensor<?xf32>
+    %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%7 : tensor<?xf32>) outs(%8 : tensor<?xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64]]>} {
+    ^bb0(%in: f32, %out: f32):
+      %11 = arith.addf %in, %in : f32
+      linalg.yield %11 : f32
+    } -> tensor<?xf32>
+    %10 = arith.index_castui %0 : i32 to index
+    flow.dispatch.tensor.store %9, %3, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%10}
+  }
+  return
+}
+// CHECK-LABEL: func @clone_index_computations()
+//   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//       CHECK:   scf.for
+//       CHECK:     %[[TILESIZE:.+]] = affine.min
+//       CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[OUTPUT]], offsets = [{{.+}}], sizes = [%[[TILESIZE]]]
