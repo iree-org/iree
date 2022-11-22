@@ -19,6 +19,7 @@ Example usage:
 import argparse
 import json
 import os
+import pathlib
 import requests
 
 from typing import Any, Dict, Optional
@@ -32,7 +33,7 @@ from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
 
 IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/iree-org/iree/commit'
 IREE_PROJECT_ID = 'IREE'
-THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
 
 COMMON_DESCRIIPTION = """
 <br>
@@ -305,9 +306,8 @@ def main(args):
   # Collect benchmark results from all files.
   all_results = []
   for benchmark_file in benchmark_files:
-    with open(benchmark_file) as f:
-      content = f.read()
-    all_results.append(BenchmarkResults.from_json_str(content))
+    all_results.append(
+        BenchmarkResults.from_json_str(benchmark_file.read_text()))
   for other_results in all_results[1:]:
     all_results[0].merge(other_results)
   all_results = all_results[0]

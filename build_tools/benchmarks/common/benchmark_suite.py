@@ -30,7 +30,7 @@ CMake target, which put them in the following directory structure:
 """
 
 import collections
-import os
+import pathlib
 import re
 
 from dataclasses import dataclass
@@ -66,7 +66,7 @@ class BenchmarkCase:
   target_arch: str
   driver_info: DriverInfo
   benchmark_tool_name: str
-  benchmark_case_dir: Optional[str] = None
+  benchmark_case_dir: Optional[pathlib.Path] = None
   run_config: Optional[iree_definitions.E2EModelRunConfig] = None
 
 
@@ -92,17 +92,17 @@ EXECUTION_CONFIG_TO_DRIVER_INFO_KEY_MAP: Dict[Tuple[
 class BenchmarkSuite(object):
   """Represents the benchmarks in benchmark suite directory."""
 
-  def __init__(self, suite_map: Dict[str, List[BenchmarkCase]]):
+  def __init__(self, suite_map: Dict[pathlib.Path, List[BenchmarkCase]]):
     """Construct a benchmark suite.
 
     Args:
       suites: the map of benchmark cases keyed by category directories.
     """
     self.suite_map = suite_map
-    self.category_map = dict((os.path.basename(category_dir), category_dir)
+    self.category_map = dict((category_dir.name, category_dir)
                              for category_dir in self.suite_map.keys())
 
-  def list_categories(self) -> List[Tuple[str, str]]:
+  def list_categories(self) -> List[Tuple[str, pathlib.Path]]:
     """Returns all categories and their directories.
 
     Returns:
@@ -179,7 +179,7 @@ class BenchmarkSuite(object):
       elif benchmark_case.benchmark_case_dir is not None:
         # For backward compatibility, model_name_filter matches against the string:
         #   <model name with tags>/<benchmark case name>
-        model_and_case_name = f"{model_name_with_tags}/{os.path.basename(benchmark_case.benchmark_case_dir)}"
+        model_and_case_name = f"{model_name_with_tags}/{benchmark_case.benchmark_case_dir.name}"
       else:
         raise ValueError("Either run_config or benchmark_case_dir must be set.")
       matched_model_name = (model_name_filter is None or re.match(
@@ -228,18 +228,20 @@ class BenchmarkSuite(object):
           driver_info=driver_info,
           benchmark_tool_name="iree-benchmark-module",
           run_config=run_config)
-      category = model.source_type.value
+      category = pathlib.Path(model.source_type.value)
       suite_map[category].append(benchmark_case)
 
     return BenchmarkSuite(suite_map=suite_map)
 
   @staticmethod
-  def load_from_benchmark_suite_dir(benchmark_suite_dir: str):
+  def load_from_benchmark_suite_dir(benchmark_suite_dir: pathlib.Path):
     """Scans and loads the benchmarks under the directory."""
 
-    suite_map: Dict[str, List[BenchmarkCase]] = collections.defaultdict(list)
-    for benchmark_case_dir, _, _ in os.walk(benchmark_suite_dir):
-      model_dir, benchmark_name = os.path.split(benchmark_case_dir)
+    suite_map: Dict[pathlib.Path,
+                    List[BenchmarkCase]] = collections.defaultdict(list)
+    for benchmark_case_dir in benchmark_suite_dir.glob("**"):
+      model_dir = benchmark_case_dir.parent
+      benchmark_name = benchmark_case_dir.name
       # Take the benchmark directory name and see if it matches the benchmark
       # naming convention:
       #   <iree-driver>__<target-architecture>__<benchmark_mode>
@@ -252,7 +254,8 @@ class BenchmarkSuite(object):
 
       # The path of model_dir is expected to be:
       #   <benchmark_suite_dir>/<category>/<model_name>-<model_tags>
-      category_dir, model_name_with_tags = os.path.split(model_dir)
+      category_dir = model_dir.parent
+      model_name_with_tags = model_dir.name
       model_name_parts = model_name_with_tags.split("-", 1)
       model_name = model_name_parts[0]
       if len(model_name_parts) == 2:
@@ -260,9 +263,7 @@ class BenchmarkSuite(object):
       else:
         model_tags = []
 
-      with open(os.path.join(benchmark_case_dir, MODEL_TOOLFILE_NAME),
-                "r") as f:
-        tool_name = f.read().strip()
+      tool_name = (benchmark_case_dir / MODEL_TOOLFILE_NAME).read_text().strip()
 
       suite_map[category_dir].append(
           BenchmarkCase(model_name=model_name,
