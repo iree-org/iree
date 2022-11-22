@@ -2328,7 +2328,8 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
       cast<DestinationStyleOpInterface>(getOperation())
           .clone(builder, loc, tiledResultTypes, tiledOperands);
 
-  if (isInputDivisable) return {tiledUnpackOp};
+  if (isInputDivisable)
+    return {tiledUnpackOp};
 
   Operation *extractSlice = builder.create<tensor::ExtractSliceOp>(
       loc, tiledUnpackOp->getResult(0), outputNewOffsets, sizes, outputStrides);
