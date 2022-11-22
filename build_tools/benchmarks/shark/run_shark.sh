@@ -33,11 +33,22 @@ git reset --hard ${SHARK_SHA}
 rm -rf ./shark_tmp
 rm -rf ~/.local/shark_tank
 
+declare -a args=(
+  --benchmark
+  --update_tank
+  --maxfail=500
+  -k "${BENCHMARK_REGEX}"
+)
+
+if [[ ${DRIVER} == "cuda" ]]; then
+  args+=(--tf32)
+fi
+
 # Run with SHARK-Runtime.
 PYTHON=python3.10 VENV_DIR=shark.venv BENCHMARK=1 IMPORTER=1 ./setup_venv.sh
 source shark.venv/bin/activate
 export SHARK_VERSION=`pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g"`
-pytest --benchmark --update_tank --maxfail=500 tank/test_models.py -k "${BENCHMARK_REGEX}" || true
+pytest "${args[@]}" tank/test_models.py || true
 
 echo "######################################################"
 echo "Benchmarks for SHARK-Runtime Complete"
@@ -54,7 +65,7 @@ rm -rf ~/.local/shark_tank
 PYTHON=python3.10 VENV_DIR=iree.venv BENCHMARK=1 IMPORTER=1 USE_IREE=1 ./setup_venv.sh
 source iree.venv/bin/activate
 export IREE_VERSION=`pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g"`
-pytest --benchmark --update_tank --maxfail=500 tank/test_models.py -k "${BENCHMARK_REGEX}" || true
+pytest "${args[@]}" tank/test_models.py || true
 
 echo "######################################################"
 echo "Benchmarks for IREE Complete"
