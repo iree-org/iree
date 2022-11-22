@@ -61,16 +61,15 @@ static FailureOr<Operation *> getRootOp(func::FuncOp funcOp) {
 /// Default method to initialize the tiling options in IREE. These could be
 /// overriden by the command line options if specified. For now the sentinel
 /// -1 is used for avoiding querying the lowering config.
-static bool getTilingOptionsFromConfig(
-    func::FuncOp funcOp, int64_t tilingLevel,
-    linalg::LinalgTilingOptions &tilingOptions) {
+static bool getTilingOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel,
+                                       scf::SCFTilingOptions &tilingOptions) {
   if (tilingLevel != -1) {
     FailureOr<Operation *> rootOp = getRootOp(funcOp);
     if (failed(rootOp)) {
       return false;
     }
     tilingOptions.setTileSizes(
-        mlir::iree_compiler ::getTileSizes(rootOp.value(), tilingLevel));
+        mlir::iree_compiler::getTileSizes(rootOp.value(), tilingLevel));
     return true;
   }
   return false;
@@ -554,7 +553,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
 
   // Set up tiling and vectorization options.
-  linalg::LinalgTilingOptions tilingOptions;
+  scf::SCFTilingOptions tilingOptions;
   bool doTiling =
       getTilingOptionsFromConfig(funcOp, tilingLevel, tilingOptions);
   if (!tileSizes.empty()) {
@@ -562,10 +561,8 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
     tilingOptions = tilingOptions.setTileSizes(tileSizes);
   }
   if (!tileInterchange.empty()) {
-    tilingOptions = tilingOptions.setInterchange(
-        SmallVector<unsigned>(tileInterchange.begin(), tileInterchange.end()));
+    tilingOptions = tilingOptions.setInterchange(tileInterchange);
   }
-  tilingOptions = tilingOptions.setPeeledLoops(peeledLoops);
 
   // Parse the padding values.
   SmallVector<Attribute> paddingValueAttributes;

@@ -477,9 +477,9 @@ struct LinalgStrategyTilePass
 
   LinalgStrategyTilePass() = default;
 
-  LinalgStrategyTilePass(StringRef opName, linalg::LinalgTilingOptions opt,
+  LinalgStrategyTilePass(StringRef opName, scf::SCFTilingOptions options,
                          LinalgExt::LinalgTransformationFilter filt)
-      : options(std::move(opt)), filter(std::move(filt)) {
+      : options(std::move(options)), filter(std::move(filt)) {
     this->anchorOpName.setValue(opName.str());
   }
 
@@ -491,16 +491,20 @@ struct LinalgStrategyTilePass
     MLIRContext *ctx = funcOp.getContext();
     RewritePatternSet tilingPattern(ctx);
     if (!anchorOpName.empty())
-      tilingPattern.add<LinalgTilingPattern>(anchorOpName, ctx, options,
-                                             filter);
+      tilingPattern.add<LinalgSCFTilingPattern>(anchorOpName, ctx, options,
+                                                filter);
     else
-      tilingPattern.add<LinalgTilingPattern>(ctx, options, filter);
-    if (anchorOpName == tensor::PadOp::getOperationName())
-      populatePadTensorTilingPatterns(tilingPattern, options);
+      tilingPattern.add<LinalgSCFTilingPattern>(ctx, options, filter);
+    if (anchorOpName == tensor::PadOp::getOperationName()) {
+      linalg::LinalgTilingOptions legacyTilingOptions;
+      legacyTilingOptions.setTileSizeComputationFunction(
+          options.tileSizeComputationFunction);
+      populatePadTensorTilingPatterns(tilingPattern, legacyTilingOptions);
+    }
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(tilingPattern));
   }
 
-  linalg::LinalgTilingOptions options;
+  scf::SCFTilingOptions options;
   LinalgExt::LinalgTransformationFilter filter;
 };
 
@@ -797,9 +801,9 @@ createLinalgStrategyTileAndFusePass(
 
 /// Create a LinalgStrategyTilePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
-    StringRef opName, const linalg::LinalgTilingOptions &opt,
+    StringRef opName, const scf::SCFTilingOptions &options,
     const LinalgExt::LinalgTransformationFilter &filter) {
-  return std::make_unique<LinalgStrategyTilePass>(opName, opt, filter);
+  return std::make_unique<LinalgStrategyTilePass>(opName, options, filter);
 }
 
 /// Create a LinalgStrategyPadPass.
