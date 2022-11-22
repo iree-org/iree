@@ -58,6 +58,20 @@ set(BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE
     "1x512xi32,1x512xi32"
 )
 
+set(EFFICIENTNET_V2_S_TF_FP32_MODULE
+  NAME
+    "EfficientNetV2STF"
+  TAGS
+    "fp32"
+  SOURCE
+    # Derived from https://github.com/keras-team/keras/blob/v2.10.0/keras/applications/efficientnet_v2.py.
+    "https://storage.googleapis.com/iree-model-artifacts/efficientnet-v2-s-tf-model.tar.gz"
+  ENTRY_FUNCTION
+    "forward"
+  FUNCTION_INPUTS
+    "1x384x384x3xf32"
+)
+
 ################################################################################
 # Add benchmarks for all platforms.                                            #
 ################################################################################
