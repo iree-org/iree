@@ -599,16 +599,13 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
   }
   workgroupCount.resize(3, rewriter.getIndexAttr(1));
   permutedWorkgroupCount.resize(3, rewriter.getIndexAttr(1));
-  int dimId = 0;
+  int mappingId = 0;
   for (auto map : mapping->getValue()) {
-    auto id = map.cast<mlir::gpu::GPUBlockMappingAttr>().getBlock();
-    if (id == mlir::gpu::Blocks::DimX)
-      permutedWorkgroupCount[0] = workgroupCount[dimId];
-    if (id == mlir::gpu::Blocks::DimY)
-      permutedWorkgroupCount[1] = workgroupCount[dimId];
-    if (id == mlir::gpu::Blocks::DimZ)
-      permutedWorkgroupCount[2] = workgroupCount[dimId];
-    dimId++;
+    int64_t dimId = map.cast<DeviceMappingAttrInterface>().getMappingId();
+    permutedWorkgroupCount[dimId] = workgroupCount[mappingId];
+    permutedWorkgroupCount[dimId] = workgroupCount[mappingId];
+    permutedWorkgroupCount[dimId] = workgroupCount[mappingId];
+    mappingId++;
   }
   rewriter.replaceOp(
       workgroupCountOp,
