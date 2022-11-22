@@ -2219,8 +2219,12 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   auto sub = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
     return makeComposedFoldedAffineApply(builder, loc, subMap, {v1, v2});
   };
+  auto div = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
+    return makeComposedFoldedAffineApply(builder, loc, dim0.floorDiv(dim1),
+                                         {v1, v2});
+  };
 
-  int64_t inputRank = getInputRank();
+  bool isInputDivisable = true;
   int64_t outputRank = getOutputRank();
   Attribute zeroAttr = builder.getIndexAttr(0);
   Attribute oneAttr = builder.getIndexAttr(1);
@@ -2228,63 +2232,67 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> inputIndices, inputSizes, outputNewOffsets,
       outputExpandedSizes;
   for (auto dim : llvm::seq<int64_t>(0, outputRank)) {
-    if (dimAndTileMapping.count(dim)) {
-      DivModValue firstCoord =
-          getDivMod(builder, loc,
-                    getValueOrCreateConstantIndexOp(builder, loc, offsets[dim]),
-                    getValueOrCreateConstantIndexOp(builder, loc,
-                                                    dimAndTileMapping[dim]));
-      DivModValue lastCoord = getDivMod(
-          builder, loc,
-          getValueOrCreateConstantIndexOp(
-              builder, loc, sub(add(offsets[dim], sizes[dim]), oneAttr)),
-          getValueOrCreateConstantIndexOp(builder, loc,
-                                          dimAndTileMapping[dim]));
-
-      inputIndices.push_back(firstCoord.quotient);
-
-      // Get the upper bound because it could be an extract_slice case. The
-      // sizes are determined by loop bound and step, where loop bound is the
-      // size of output shape.
-      // In incomplete tile cases, the input could have larger shape, it is safe
-      // to extend the boundary because they are pre-padded. I.e., the size of
-      // input dim is always aligned to inner_tile_size.
-      FailureOr<int64_t> cstSize = linalg::getConstantUpperBoundForIndex(
-          getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]));
-      Optional<int64_t> cstInnerSize =
-          getConstantIntValue(dimAndTileMapping[dim]);
-      if (!failed(cstSize) && cstInnerSize &&
-          cstSize.value() % cstInnerSize.value() == 0) {
-        inputSizes.push_back(
-            builder.getIndexAttr(cstSize.value() / cstInnerSize.value()));
-      } else {
-        inputSizes.push_back(
-            add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
-      }
-      outputNewOffsets.push_back(firstCoord.remainder);
-
-      AffineExpr i, tile;
-      bindDims(builder.getContext(), i);
-      bindSymbols(builder.getContext(), tile);
-      OpFoldResult size = makeComposedFoldedAffineApply(
-          builder, loc, i * tile,
-          ArrayRef<OpFoldResult>{inputSizes.back(), dimAndTileMapping[dim]});
-      outputExpandedSizes.push_back(size);
-    } else {
+    if (!dimAndTileMapping.count(dim)) {
       inputIndices.push_back(offsets[dim]);
       inputSizes.push_back(sizes[dim]);
       outputNewOffsets.push_back(zeroAttr);
       outputExpandedSizes.push_back(sizes[dim]);
+      continue;
     }
+
+    // Get the upper bound because the "output_size * inner_tile_size" could
+    // be less than input size. The sizes are determined by loop bound and
+    // step, where loop bound is the size of output shape. In incomplete tile
+    // cases, the input could have larger shape, it is safe to extend the
+    // boundary because they are pre-padded. I.e., the size of input dim is
+    // always aligned to inner_tile_size.
+    FailureOr<int64_t> cstSize = linalg::getConstantUpperBoundForIndex(
+        getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]));
+    Optional<int64_t> cstInnerSize =
+        getConstantIntValue(dimAndTileMapping[dim]);
+    if (!failed(cstSize) && cstInnerSize &&
+        cstSize.value() % cstInnerSize.value() == 0) {
+      inputIndices.push_back(div(offsets[dim], dimAndTileMapping[dim]));
+      inputSizes.push_back(
+          builder.getIndexAttr(cstSize.value() / cstInnerSize.value()));
+      outputNewOffsets.push_back(zeroAttr);
+      outputExpandedSizes.push_back(sizes[dim]);
+      continue;
+    }
+
+    isInputDivisable = false;
+    DivModValue firstCoord = getDivMod(
+        builder, loc,
+        getValueOrCreateConstantIndexOp(builder, loc, offsets[dim]),
+        getValueOrCreateConstantIndexOp(builder, loc, dimAndTileMapping[dim]));
+    DivModValue lastCoord = getDivMod(
+        builder, loc,
+        getValueOrCreateConstantIndexOp(
+            builder, loc, sub(add(offsets[dim], sizes[dim]), oneAttr)),
+        getValueOrCreateConstantIndexOp(builder, loc, dimAndTileMapping[dim]));
+
+    inputIndices.push_back(firstCoord.quotient);
+    inputSizes.push_back(
+        add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
+    outputNewOffsets.push_back(firstCoord.remainder);
+
+    AffineExpr i, tile;
+    bindDims(builder.getContext(), i);
+    bindSymbols(builder.getContext(), tile);
+    OpFoldResult size = makeComposedFoldedAffineApply(
+        builder, loc, i * tile,
+        ArrayRef<OpFoldResult>{inputSizes.back(), dimAndTileMapping[dim]});
+    outputExpandedSizes.push_back(size);
   }
 
   // The tiling is applied on output dimensions. We have to apply the
   // interchange on input dimensions if outer_dims_perm is set.
+  int64_t inputRank = getInputRank();
   SmallVector<int64_t> dimsToOuterBlock =
       extractFromI64ArrayAttr(getOuterDimsPerm());
   if (!dimsToOuterBlock.empty()) {
     SmallVector<int64_t> vec =
-        computeInterchangeFromDimPos(dimsToOuterBlock, getInputRank());
+        computeInterchangeFromDimPos(dimsToOuterBlock, inputRank);
     inputIndices = interchange<OpFoldResult>(inputIndices, vec);
     inputSizes = interchange<OpFoldResult>(inputSizes, vec);
   }
@@ -2298,11 +2306,18 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   tiledOperands.push_back(getSlice(builder, loc, getInput(), inputIndices,
                                    inputSizes, inputStrides));
 
-  // The tiling is only avaiable on tensors. It's fine to create a tensor.empty
-  // instead of tensor.pad because the op is not a destination-style op.
-  auto empty = builder.create<tensor::EmptyOp>(
-      loc, outputExpandedSizes, getOutputType().getElementType());
-  tiledOperands.push_back(empty.getResult());
+  SmallVector<OpFoldResult> outputStrides(outputRank, oneAttr);
+  if (isInputDivisable) {
+    tiledOperands.push_back(
+        getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides));
+  } else {
+    // The tiling is only avaiable on tensors. It's fine to create a
+    // tensor.empty instead of tensor.pad because the op is not a
+    // destination-style op.
+    auto empty = builder.create<tensor::EmptyOp>(
+        loc, outputExpandedSizes, getOutputType().getElementType());
+    tiledOperands.push_back(empty.getResult());
+  }
 
   SmallVector<Type, 4> tiledResultTypes;
   tiledResultTypes.push_back(tiledOperands[1].getType());
@@ -2311,7 +2326,9 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
       cast<DestinationStyleOpInterface>(getOperation())
           .clone(builder, loc, tiledResultTypes, tiledOperands);
 
-  SmallVector<OpFoldResult> outputStrides(outputRank, oneAttr);
+  if (isInputDivisable)
+    return {tiledUnpackOp};
+
   Operation *extractSlice = builder.create<tensor::ExtractSliceOp>(
       loc, tiledUnpackOp->getResult(0), outputNewOffsets, sizes, outputStrides);
 
