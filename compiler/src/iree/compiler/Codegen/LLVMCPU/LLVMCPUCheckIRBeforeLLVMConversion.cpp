@@ -21,7 +21,7 @@ static llvm::cl::opt<bool> clFailUnboundDynamicStackAllocation(
     "iree-llvmcpu-fail-unbound-dynamic-stack-allocation",
     llvm::cl::desc("fail if the upper bound of dynamic stack allocation cannot "
                    "be solved"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 namespace {
 struct LLVMCPUCheckIRBeforeLLVMConversionPass
