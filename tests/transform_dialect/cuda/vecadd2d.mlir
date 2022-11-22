@@ -1,30 +1,32 @@
 !type = tensor<512x9xf32>
-#trait = { indexing_maps = [affine_map<(d0,d1) -> (d0,d1)>],
-           iterator_types = ["parallel", "parallel"]}
+#trait = { indexing_maps  = [affine_map<(d0, d1) -> (d0, d1)>],
+           iterator_types = ["parallel", "parallel"] }
+
+#trait2 = { indexing_maps  = [affine_map<(d0, d1) -> (d0, d1)>, 
+                              affine_map<(d0, d1) -> (d0, d1)>],
+           iterator_types = ["parallel", "parallel"] }
+
 func.func @vecadd2d() -> (!type) {
   %cst0 = arith.constant 0.000000e+00 : f32
   %cst1 = arith.constant 2.000000e+00 : f32
   %0 = tensor.empty() : !type
-  %1 = tensor.empty() : !type
-  %x = linalg.generic #trait
-    outs(%0 : !type) {
-      ^bb0(%arg: f32):        
-        linalg.yield %cst1 : f32
-      } -> !type
-  %y = linalg.generic #trait
-    outs(%0 : !type) {
-      ^bb0(%arg: f32):        
-        linalg.yield %cst0 : f32
-      } -> !type
-  %2 = linalg.generic {
-    indexing_maps = [affine_map<(d0,d1) -> (d0,d1)>,
-                     affine_map<(d0,d1) -> (d0,d1)>],
-    iterator_types = ["parallel", "parallel"]}
-    ins(%x : !type) outs(%y : !type) {
-      ^bb0(%arg3: f32, %arg4: f32):
-        %3 = arith.addf %arg3, %arg4 : f32
-        linalg.yield %3 : f32
-      } -> !type
+  %1 = tensor.empty() : !type  
+  %x = linalg.generic #trait outs(%0 : !type) {
+  ^bb0(%arg: f32):        
+    linalg.yield %cst1 : f32
+  } -> !type
+  %y = linalg.generic #trait outs(%0 : !type) {
+  ^bb0(%arg: f32):        
+    linalg.yield %cst0 : f32
+  } -> !type
+  // Note: Two linalg.generics to fill the tensors will make IREE generate two 
+  // separate kernels for the above and the below. It is important to validate
+  // the results. 
+  %2 = linalg.generic #trait2 ins(%x : !type) outs(%y : !type) {
+  ^bb0(%arg3: f32, %arg4: f32):
+    %3 = arith.addf %arg3, %arg4 : f32
+    linalg.yield %3 : f32
+  } -> !type
 
   return %2 : !type
 }

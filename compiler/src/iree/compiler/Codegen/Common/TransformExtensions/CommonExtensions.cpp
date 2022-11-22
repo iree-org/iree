@@ -597,15 +597,12 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
         ArrayRef<OpFoldResult>{workload[tileSize.index()], tileSize.value()});
     workgroupCount.push_back(count);
   }
+  // Make sure to fill unused dimensions with a 1
   workgroupCount.resize(3, rewriter.getIndexAttr(1));
   permutedWorkgroupCount.resize(3, rewriter.getIndexAttr(1));
   int mappingId = 0;
-  for (auto map : mapping->getValue()) {
-    int64_t dimId = map.cast<DeviceMappingAttrInterface>().getMappingId();
-    permutedWorkgroupCount[dimId] = workgroupCount[mappingId];
-    permutedWorkgroupCount[dimId] = workgroupCount[mappingId];
-    permutedWorkgroupCount[dimId] = workgroupCount[mappingId];
-    mappingId++;
+  for (DeviceMappingAttrInterface map : mapping->getValue()) {
+    permutedWorkgroupCount[map.getMappingId()] = workgroupCount[mappingId++];
   }
   rewriter.replaceOp(
       workgroupCountOp,
