@@ -341,7 +341,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     if (maxTileSizes[i] == 0 || ShapedType::isDynamic(lbs[i]) ||
         ShapedType::isDynamic(ubs[i])) {
       distributedTileSizes[i] = maxTileSizes[i];
-      workload[i] = ShapedType::kDynamicSize;
+      workload[i] = ShapedType::kDynamic;
       continue;
     }
 
@@ -384,7 +384,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
     unsigned index = currDim - 1;
     int64_t currSize = distributedTileSizes[index];
-    if (workload[index] == ShapedType::kDynamicSize ||
+    if (workload[index] == ShapedType::kDynamic ||
         currSize >= maxTileSizes[index] || currSize >= workload[index]) {
       currDim--;
       continue;
@@ -420,7 +420,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
 static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
                               int64_t vectorSize,
                               bool allowIncompleteTile = false) {
-  if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
+  if (ub == ShapedType::kDynamic || lb == ShapedType::kDynamic) {
     return maxSize;
   }
   int64_t numIters = ub - lb;
@@ -685,7 +685,7 @@ static bool isNoPadMultiTilingBeneficial(linalg::ContractionOpInterface op,
 
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
   if (llvm::any_of(shape,
-                   [](int64_t v) { return v == ShapedType::kDynamicSize; })) {
+                   [](int64_t v) { return v == ShapedType::kDynamic; })) {
     return false;
   }
 
@@ -738,7 +738,7 @@ static LogicalResult setMatmulNoPadRootConfig(
       // Quantized cases are not fully evaluated yet, so it might go with NoPad
       // approach.
       int idx = en.index();
-      if (en.value() == 0 || shape[idx] == ShapedType::kDynamicSize) continue;
+      if (en.value() == 0 || shape[idx] == ShapedType::kDynamic) continue;
       assert(shape[idx] % en.value() == 0);
       shape[idx] = en.value();
     }
@@ -1337,8 +1337,8 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   int64_t numWorkload = 1;
   for (auto en : llvm::enumerate(shape)) {
     int64_t size = en.value();
-    if (size == ShapedType::kDynamicSize) {
-      numWorkload = ShapedType::kDynamicSize;
+    if (size == ShapedType::kDynamic) {
+      numWorkload = ShapedType::kDynamic;
       break;
     }
     int index = en.index();
@@ -1351,8 +1351,8 @@ static LogicalResult setElementwiseGenericOpRootConfig(
        numWorkload < kMinimumWorkload && currDim < numLoops;) {
     int64_t currSize = flowTileSizes[currDim];
     if (currSize == shape[currDim] || currSize == 0 ||
-        shape[currDim] == ShapedType::kDynamicSize ||
-        numWorkload == ShapedType::kDynamicSize) {
+        shape[currDim] == ShapedType::kDynamic ||
+        numWorkload == ShapedType::kDynamic) {
       currDim++;
       continue;
     }
@@ -1574,7 +1574,7 @@ static LogicalResult setRootConfig(
       tilingInterfaceOp.getIterationDomain(builder);
   auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
     Optional<int64_t> intVal = getConstantIntValue(ofr);
-    if (!intVal) return ShapedType::kDynamicSize;
+    if (!intVal) return ShapedType::kDynamic;
     return intVal.value();
   };
   auto lbs = llvm::to_vector(llvm::map_range(

@@ -83,7 +83,7 @@ static ExpandedGlobalMap expandGlobalTensorDims(Operation *rootOp) {
 
     auto tensorType = global.tensorOp.getType().cast<RankedTensorType>();
     for (auto it : llvm::enumerate(tensorType.getShape())) {
-      if (it.value() == ShapedType::kDynamicSize) {
+      if (it.value() == ShapedType::kDynamic) {
         auto dimName =
             (global.tensorOp.getName() + "__d" + std::to_string(it.index()))
                 .str();

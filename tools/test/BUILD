@@ -33,6 +33,8 @@ iree_lit_test_suite(
     ),
     cfg = "//tools:lit.cfg.py",
     tags = [
+        "driver=local-task",
+        "driver=vulkan",
         "hostonly",
     ],
     tools = [

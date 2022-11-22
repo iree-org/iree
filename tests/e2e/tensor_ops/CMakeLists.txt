@@ -21,6 +21,8 @@ iree_lit_test_suite(
     iree-compile
     iree-run-mlir
   LABELS
+    "driver=local-task"
+    "driver=vulkan"
     "hostonly"
 )
 

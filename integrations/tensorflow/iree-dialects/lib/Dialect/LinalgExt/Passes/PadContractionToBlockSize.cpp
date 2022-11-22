@@ -49,7 +49,7 @@ static bool padTensor(Location loc, OpOperand *operand,
 
   // New dimensions.
   SmallVector<int64_t> newStaticDims;
-  newStaticDims.resize(shape.size(), -1);
+  newStaticDims.resize(shape.size(), ShapedType::kDynamic);
   SmallVector<OpFoldResult> newPaddingSizes(shape.size(),
                                             builder.getI64IntegerAttr(0));
 
