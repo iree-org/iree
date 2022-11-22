@@ -806,20 +806,6 @@ static OneShotBufferizationOptions getBufferizationOptions() {
   return options;
 }
 
-/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
-/// into nested pass pipeline mess.
-static LogicalResult runIREEBufferizeOnModule(
-    ModuleOp moduleOp, BufferizationOptions::AllocationFn allocationFn,
-    BufferizationOptions::DeallocationFn deallocationFn,
-    BufferizationOptions::MemCpyFn memCpyFn) {
-  OneShotBufferizationOptions options = getBufferizationOptions();
-  options.allocationFn = allocationFn;
-  options.deallocationFn = deallocationFn;
-  options.memCpyFn = memCpyFn;
-
-  return runIREEOneShotBufferize(moduleOp, options);
-}
-
 namespace {
 /// Pattern to rewrite tensor.empty to tensor.alloc.
 struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
@@ -891,9 +877,14 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
                                      "listener tracking failed");
 
   //   3. Run one-shot-bufferize, without the pass baggage.
+  OneShotBufferizationOptions options = getBufferizationOptions();
+  options.allocationFn = allocationFn;
+  options.deallocationFn = deallocationFn;
+  options.memCpyFn = memCpyFn;
+  options.testAnalysisOnly = getTestAnalysisOnly();
+  options.printConflicts = getPrintConflicts();
   res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
-    if (failed(runIREEBufferizeOnModule(moduleOp, allocationFn, deallocationFn,
-                                        memCpyFn)))
+    if (failed(runIREEOneShotBufferize(moduleOp, options)))
       return WalkResult::interrupt();
     return WalkResult::advance();
   });
