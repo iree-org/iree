@@ -536,7 +536,8 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
 /// pdl::OperationType handles on the fly.
 static LogicalResult lowerWorkgroupCountComputingRegion(
     transform::TransformState &state, RewriterBase &rewriter, Location loc,
-    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> tileSizes) {
+    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> tileSizes,
+    Optional<ArrayAttr> mapping) {
   Region &r = exportOp.getWorkgroupCount();
   if (!r.hasOneBlock()) {
     return rewriter.notifyMatchFailure(exportOp,
@@ -579,7 +580,7 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
         "number of tile sizes overflow the dimension from the workload");
   }
 
-  SmallVector<OpFoldResult> workgroupCount;
+  SmallVector<OpFoldResult> workgroupCount, permutedWorkgroupCount;
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(workgroupCountOp);
   loc = workgroupCountOp.getLoc();
@@ -596,10 +597,22 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
         ArrayRef<OpFoldResult>{workload[tileSize.index()], tileSize.value()});
     workgroupCount.push_back(count);
   }
-  workgroupCount = llvm::to_vector(llvm::reverse(workgroupCount));
   workgroupCount.resize(3, rewriter.getIndexAttr(1));
-  rewriter.replaceOp(workgroupCountOp, getValueOrCreateConstantIndexOp(
-                                           rewriter, loc, workgroupCount));
+  permutedWorkgroupCount.resize(3, rewriter.getIndexAttr(1));
+  int dimId = 0;
+  for (auto map : mapping->getValue()) {
+    auto id = map.cast<mlir::gpu::GPUBlockMappingAttr>().getBlock();
+    if (id == mlir::gpu::Blocks::DimX)
+      permutedWorkgroupCount[0] = workgroupCount[dimId];
+    if (id == mlir::gpu::Blocks::DimY)
+      permutedWorkgroupCount[1] = workgroupCount[dimId];
+    if (id == mlir::gpu::Blocks::DimZ)
+      permutedWorkgroupCount[2] = workgroupCount[dimId];
+    dimId++;
+  }
+  rewriter.replaceOp(
+      workgroupCountOp,
+      getValueOrCreateConstantIndexOp(rewriter, loc, permutedWorkgroupCount));
   return success();
 }
 
@@ -646,7 +659,8 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
   /// regions are created by default in IREEs compilation flow.
   IRRewriter rewriter(getContext());
   if (failed(lowerWorkgroupCountComputingRegion(
-          state, rewriter, getLoc(), exportOp.value(), getMixedTileSizes()))) {
+          state, rewriter, getLoc(), exportOp.value(), getMixedTileSizes(),
+          getMapping()))) {
     return mlir::emitDefiniteFailure(exportOp.value(),
                                      "failed to lower workgroup count region");
   }
