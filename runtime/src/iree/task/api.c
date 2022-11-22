@@ -86,22 +86,26 @@ IREE_FLAG(
 iree_status_t iree_task_topology_initialize_from_flags(
     iree_task_topology_t* out_topology) {
   IREE_ASSERT_ARGUMENT(out_topology);
-  if (out_topology->groups[0].ideal_thread_affinity.group == 0) {
-    iree_task_topology_initialize(out_topology);
-  }
-
-  if (FLAG_task_topology_group_count != 0) {
-    iree_task_topology_initialize_from_group_count(
-        FLAG_task_topology_group_count, out_topology);
-  } else if (strcmp(FLAG_task_topology_mode, "physical_cores") == 0) {
-    iree_task_topology_initialize_from_physical_cores(
-        FLAG_task_topology_max_group_count, out_topology);
+  iree_host_size_t numa_node_id = out_topology->numa_node_id;
+  iree_task_topology_initialize(out_topology);
+  
+  if (strlen(FLAG_task_numa_nodes) != 0) {
+    iree_task_topology_initialize_with_cluster(
+        FLAG_task_topology_max_group_count, numa_node_id, out_topology);
   } else {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "one of --task_topology_group_count or --task_topology_mode must be "
-        "specified and be a valid value; have --task_topology_mode=%s.",
-        FLAG_task_topology_mode);
+    if (FLAG_task_topology_group_count != 0) {
+      iree_task_topology_initialize_from_group_count(
+          FLAG_task_topology_group_count, out_topology);
+    } else if (strcmp(FLAG_task_topology_mode, "physical_cores") == 0) {
+      iree_task_topology_initialize_from_physical_cores(
+          FLAG_task_topology_max_group_count, out_topology);
+    } else {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "one of --task_topology_group_count or --task_topology_mode must be "
+          "specified and be a valid value; have --task_topology_mode=%s.",
+          FLAG_task_topology_mode);
+    }
   }
 
   return iree_ok_status();
@@ -142,10 +146,8 @@ iree_status_t iree_task_executor_create_from_flags(
   iree_status_t status;
   for (int i = 0; i < num_nodes; i++) {
     iree_task_topology_t topology;
-    // Set all topology groups to ideal affinity of nodes[i]
-    for (int j = 0; j < IREE_TASK_EXECUTOR_MAX_WORKER_COUNT; j++) {
-      topology.groups[j].ideal_thread_affinity.group = nodes[i];
-    }
+
+    topology.numa_node_id = nodes[i];
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_task_topology_initialize_from_flags(&topology));
     

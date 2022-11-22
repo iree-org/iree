@@ -79,9 +79,7 @@ static uint32_t iree_task_topology_rotate_from_base_core(uint32_t core_id) {
 static void iree_task_topology_set_affinity_from_processor(
     const struct cpuinfo_processor* processor,
     iree_thread_affinity_t* out_affinity) {
-  if (out_affinity->group == 0) {
-    memset(out_affinity, 0, sizeof(*out_affinity));
-  }
+  memset(out_affinity, 0, sizeof(*out_affinity));
   out_affinity->specified = 1;
 
   // Special bit to indicate that (if required) we want the entire core.
@@ -208,6 +206,7 @@ static void iree_task_topology_initialize_from_physical_cores_with_filter(
     iree_task_topology_core_filter_t filter_fn, uintptr_t filter_fn_data,
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
   max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+  iree_host_size_t numa_node_id = out_topology->numa_node_id;
   if (!iree_task_topology_is_cpuinfo_available()) {
     iree_task_topology_initialize_fallback(max_core_count, out_topology);
     return;
@@ -215,32 +214,31 @@ static void iree_task_topology_initialize_from_physical_cores_with_filter(
 
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, max_core_count);
-
   // Count cores that match the filter.
   iree_host_size_t core_count = 0;
-  for (uint32_t i = 0; i < cpuinfo_get_cores_count(); i++) {
+  uint32_t cluster_core_count = cpuinfo_get_cluster(out_topology->numa_node_id)->core_count;
+  for (uint32_t i = 0; i < cluster_core_count; i++) {
     const struct cpuinfo_core* core = cpuinfo_get_core(i);
     if (filter_fn(core, filter_fn_data)) ++core_count;
   }
   core_count = iree_min(core_count, max_core_count);
 
-  if (out_topology->groups[0].ideal_thread_affinity.group == 0) {
-    iree_task_topology_initialize(out_topology);
-  }
+  iree_task_topology_initialize(out_topology);
+  out_topology->numa_node_id = numa_node_id;
 
   // Build each core up to the max allowed.
   // TODO(benvanik): if our group_count <= core_count/2 then distribute better;
   // for now we just do a straight-line through (cores 0-N) when instead we may
   // want to take advantage of L3 cache info (half of groups on one L3 cache,
   // half of groups on another, etc).
+  uint32_t core_start = cpuinfo_get_cluster(out_topology->numa_node_id)->core_start;
   out_topology->group_count = core_count;
-  for (uint32_t core_i = 0, group_i = 0; group_i < out_topology->group_count;
+  for (uint32_t core_i = core_start, group_i = 0; group_i < out_topology->group_count;
        ++core_i) {
     // Rotate the core ID so that we avoid setting the affinity to the calling
     // thread which we assume is something the user has plans for and doesn't
     // want to have our workers stealing their time.
-    const struct cpuinfo_core* core =
-        cpuinfo_get_core(iree_task_topology_rotate_from_base_core(core_i));
+    const struct cpuinfo_core* core = cpuinfo_get_core(core_i);
     if (filter_fn(core, filter_fn_data)) {
       iree_task_topology_group_initialize_from_core(
           group_i, core, &out_topology->groups[group_i]);
@@ -256,6 +254,19 @@ void iree_task_topology_initialize_from_physical_cores(
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
   iree_task_topology_initialize_from_physical_cores_with_filter(
       iree_task_topology_core_filter_all, 0, max_core_count, out_topology);
+}
+
+void iree_task_topology_initialize_with_cluster(
+    iree_host_size_t max_core_count, iree_host_size_t numa_node_id,
+    iree_task_topology_t* out_topology) {
+  out_topology->numa_node_id = numa_node_id;
+  if (!iree_task_topology_is_cpuinfo_available()) {
+    iree_task_topology_initialize_fallback(max_core_count, out_topology);
+    return;
+  }
+
+  iree_task_topology_initialize_from_physical_cores(
+    max_core_count, out_topology);
 }
 
 #endif  // IREE_TASK_CPUINFO_DISABLED

@@ -59,20 +59,16 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   options.worker_local_memory_size =
       iree_host_align(options.worker_local_memory_size,
                       iree_hardware_destructive_interference_size);
-  //printf("options.worker_local_memory_size: %zu\n", options.worker_local_memory_size);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)options.worker_local_memory_size);
   iree_host_size_t executor_base_size =
       iree_host_align(sizeof(iree_task_executor_t),
                       iree_hardware_destructive_interference_size);
-  //printf("executor_base_size: %zu\n", executor_base_size);
   iree_host_size_t worker_list_size =
       iree_host_align(worker_count * sizeof(iree_task_worker_t),
                       iree_hardware_destructive_interference_size);
-  //printf("worker_list_size: %zu\n", worker_list_size);
   iree_host_size_t executor_size =
       executor_base_size + worker_list_size +
       worker_count * options.worker_local_memory_size;
-  //printf("executor_size: %zu\n", executor_size);
 
   iree_task_executor_t* executor = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

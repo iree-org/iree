@@ -48,13 +48,13 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
   nodes_name = iree_string_view_trim(nodes_name);
   nodes_value = iree_string_view_trim(nodes_value);
   int num_nodes = 0;
+  int maxnode = numa_max_node();
+  char node_str[2] = {0};
   while (!iree_string_view_is_empty(nodes_value)) {
     iree_string_view_t key_value;
     iree_string_view_split(nodes_value, ',', &key_value, &nodes_value);
-    char node_str[3];
     strncpy(node_str, key_value.data, key_value.size);
     long input_node = strtol(node_str, NULL, 10);
-    int maxnode = numa_max_node();
     if (input_node > maxnode) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "input_node %lu out of range (0 - %d)",
