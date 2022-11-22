@@ -8,7 +8,7 @@
 // Patterns and pass to erase #hal.descriptor_type from MemRef memory space.
 // The purpose of these utilities is just to make transitioning easier--right
 // now converting to LLVM still has lots of underlying assumption over numeric
-// memory space and does not support memory space other than 0.
+// memory spaces, and some pattern does not support memory space other than 0.
 //===----------------------------------------------------------------------===//
 
 #include <memory>
