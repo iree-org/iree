@@ -1,4 +1,3 @@
-# Import the TFLite model "${ROOT_ARTIFACTS_DIR}/models/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32.tflite"
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-c36c63b0-220a-4d78-8ade-c45ce47d89d3"
@@ -12,7 +11,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-c36c63b0-220a-4d78-8ade-c45ce47d89d3
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/DeepLabV3_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -32,7 +30,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/6d0d5716-5525-44ad-b71d-8075ee1583a6/DeepLabV3_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -54,7 +51,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/cdf579a9-5446-403b-a991-802a6c702e65/DeepLabV3_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-cdf579a9-5446-403b-a991-802a6c702e65"
@@ -78,7 +74,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-cdf579a9-5446-403b-a991-802a6c702e65
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/DeepLabV3_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
@@ -97,7 +92,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/d463322c-24e6-4685-85ca-d541b41a405f/DeepLabV3_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-d463322c-24e6-4685-85ca-d541b41a405f"
@@ -119,7 +113,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-d463322c-24e6-4685-85ca-d541b41a405f
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/DeepLabV3_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-c7eea358-d8d2-4199-9d75-bb741c399b1b"
@@ -138,7 +131,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/DeepLabV3_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-d3038b95-c889-456a-bff6-5cbabd10f1ad"
@@ -158,7 +150,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/DeepLabV3_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-8da35f2b-a042-4b7d-9dcf-5ebbc1728765"
@@ -177,7 +168,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/32a56c8d-cc6c-41b8-8620-1f8eda0b8223/DeepLabV3_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-32a56c8d-cc6c-41b8-8620-1f8eda0b8223"
@@ -197,7 +187,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/6b601a8d-4824-42e0-bcc6-500c0c3fa346/DeepLabV3_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-6b601a8d-4824-42e0-bcc6-500c0c3fa346"
@@ -218,7 +207,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
 
-# Import the TFLite model "${ROOT_ARTIFACTS_DIR}/models/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.tflite"
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-0e466f69-91d6-4e50-b62b-a82b6213a231"
@@ -232,7 +220,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-0e466f69-91d6-4e50-b62b-a82b6213a231
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileSSD_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -252,7 +239,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/6d0d5716-5525-44ad-b71d-8075ee1583a6/MobileSSD_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -274,7 +260,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/MobileSSD_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
@@ -293,7 +278,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/d463322c-24e6-4685-85ca-d541b41a405f/MobileSSD_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-d463322c-24e6-4685-85ca-d541b41a405f"
@@ -315,7 +299,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-d463322c-24e6-4685-85ca-d541b41a405f
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/MobileSSD_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-c7eea358-d8d2-4199-9d75-bb741c399b1b"
@@ -334,7 +317,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/MobileSSD_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-d3038b95-c889-456a-bff6-5cbabd10f1ad"
@@ -354,7 +336,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/70b823ca-2807-4531-8c00-e02af7d70466/MobileSSD_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-70b823ca-2807-4531-8c00-e02af7d70466"
@@ -375,7 +356,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-70b823ca-2807-4531-8c00-e02af7d70466
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/MobileSSD_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-8da35f2b-a042-4b7d-9dcf-5ebbc1728765"
@@ -394,7 +374,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/32a56c8d-cc6c-41b8-8620-1f8eda0b8223/MobileSSD_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-32a56c8d-cc6c-41b8-8620-1f8eda0b8223"
@@ -414,7 +393,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/6b601a8d-4824-42e0-bcc6-500c0c3fa346/MobileSSD_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6b601a8d-4824-42e0-bcc6-500c0c3fa346"
@@ -435,7 +413,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
 
-# Import the TFLite model "${ROOT_ARTIFACTS_DIR}/models/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.tflite"
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-5afc3014-d29d-4e88-a840-fbaf678acf2b"
@@ -449,7 +426,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-5afc3014-d29d-4e88-a840-fbaf678acf2b
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/PoseNet_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -469,7 +445,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/6d0d5716-5525-44ad-b71d-8075ee1583a6/PoseNet_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -491,7 +466,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/PoseNet_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
@@ -510,7 +484,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/d463322c-24e6-4685-85ca-d541b41a405f/PoseNet_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-d463322c-24e6-4685-85ca-d541b41a405f"
@@ -532,7 +505,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-d463322c-24e6-4685-85ca-d541b41a405f
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/PoseNet_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-c7eea358-d8d2-4199-9d75-bb741c399b1b"
@@ -551,7 +523,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/PoseNet_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-d3038b95-c889-456a-bff6-5cbabd10f1ad"
@@ -571,7 +542,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/70b823ca-2807-4531-8c00-e02af7d70466/PoseNet_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-70b823ca-2807-4531-8c00-e02af7d70466"
@@ -592,7 +562,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-70b823ca-2807-4531-8c00-e02af7d70466
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/PoseNet_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-8da35f2b-a042-4b7d-9dcf-5ebbc1728765"
@@ -611,7 +580,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/32a56c8d-cc6c-41b8-8620-1f8eda0b8223/PoseNet_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-32a56c8d-cc6c-41b8-8620-1f8eda0b8223"
@@ -631,7 +599,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/6b601a8d-4824-42e0-bcc6-500c0c3fa346/PoseNet_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6b601a8d-4824-42e0-bcc6-500c0c3fa346"
@@ -652,7 +619,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
 
-# Import the TFLite model "${ROOT_ARTIFACTS_DIR}/models/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32.tflite"
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-cc69d69f-6d1f-4a1a-a31e-e021888d0d28"
@@ -666,7 +632,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-cc69d69f-6d1f-4a1a-a31e-e021888d0d28
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -686,7 +651,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/6d0d5716-5525-44ad-b71d-8075ee1583a6/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -708,7 +672,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/cdf579a9-5446-403b-a991-802a6c702e65/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-cdf579a9-5446-403b-a991-802a6c702e65"
@@ -732,7 +695,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-cdf579a9-5446-403b-a991-802a6c702e65
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
@@ -751,7 +713,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/d463322c-24e6-4685-85ca-d541b41a405f/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-d463322c-24e6-4685-85ca-d541b41a405f"
@@ -773,7 +734,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-d463322c-24e6-4685-85ca-d541b41a405f
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-c7eea358-d8d2-4199-9d75-bb741c399b1b"
@@ -792,7 +752,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-d3038b95-c889-456a-bff6-5cbabd10f1ad"
@@ -812,7 +771,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-8da35f2b-a042-4b7d-9dcf-5ebbc1728765"
@@ -831,7 +789,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/32a56c8d-cc6c-41b8-8620-1f8eda0b8223/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-32a56c8d-cc6c-41b8-8620-1f8eda0b8223"
@@ -851,7 +808,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/6b601a8d-4824-42e0-bcc6-500c0c3fa346/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-6b601a8d-4824-42e0-bcc6-500c0c3fa346"
@@ -872,7 +828,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
 
-# Import the TFLite model "${ROOT_ARTIFACTS_DIR}/models/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.tflite"
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-e3997104-a3d2-46b4-9fbf-39069906d123"
@@ -886,7 +841,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-e3997104-a3d2-46b4-9fbf-39069906d123
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileBertSquad_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -906,7 +860,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/6d0d5716-5525-44ad-b71d-8075ee1583a6/MobileBertSquad_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -928,7 +881,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/cdf579a9-5446-403b-a991-802a6c702e65/MobileBertSquad_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-cdf579a9-5446-403b-a991-802a6c702e65"
@@ -952,7 +904,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-cdf579a9-5446-403b-a991-802a6c702e65
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/MobileBertSquad_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
@@ -971,7 +922,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/f672a6b9-99fc-47ce-8b1b-8e5f44a541a1/MobileBertSquad_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-f672a6b9-99fc-47ce-8b1b-8e5f44a541a1"
@@ -994,7 +944,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-f672a6b9-99fc-47ce-8b1b-8e5f44a541a1
 )
 
-# Import the TFLite model "${ROOT_ARTIFACTS_DIR}/models/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.tflite"
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-73a0402e-271b-4aa8-a6a5-ac05839ca569"
@@ -1008,7 +957,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-73a0402e-271b-4aa8-a6a5-ac05839ca569
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileBertSquad_fp16.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -1028,7 +976,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/6d0d5716-5525-44ad-b71d-8075ee1583a6/MobileBertSquad_fp16.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -1050,7 +997,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/8da35f2b-a042-4b7d-9dcf-5ebbc1728765_demote_f32_to_16/MobileBertSquad_fp16.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-8da35f2b-a042-4b7d-9dcf-5ebbc1728765_demote_f32_to_16"
@@ -1070,7 +1016,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-8da35f2b-a042-4b7d-9dcf-5ebbc1728765_demote_f32_to_16
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/32a56c8d-cc6c-41b8-8620-1f8eda0b8223_demote_f32_to_16/MobileBertSquad_fp16.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-32a56c8d-cc6c-41b8-8620-1f8eda0b8223_demote_f32_to_16"
@@ -1091,7 +1036,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-32a56c8d-cc6c-41b8-8620-1f8eda0b8223_demote_f32_to_16
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/6b601a8d-4824-42e0-bcc6-500c0c3fa346_demote_f32_to_16/MobileBertSquad_fp16.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6b601a8d-4824-42e0-bcc6-500c0c3fa346_demote_f32_to_16"
@@ -1113,7 +1057,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6b601a8d-4824-42e0-bcc6-500c0c3fa346_demote_f32_to_16
 )
 
-# Import the TFLite model "${ROOT_ARTIFACTS_DIR}/models/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.0_float.tflite"
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-78eab9e5-9ff1-4769-9b55-933c81cc9a0f"
@@ -1127,7 +1070,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-78eab9e5-9ff1-4769-9b55-933c81cc9a0f
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileNetV1_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -1147,7 +1089,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/6d0d5716-5525-44ad-b71d-8075ee1583a6/MobileNetV1_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -1169,7 +1110,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/cdf579a9-5446-403b-a991-802a6c702e65/MobileNetV1_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-cdf579a9-5446-403b-a991-802a6c702e65"
@@ -1193,7 +1133,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-cdf579a9-5446-403b-a991-802a6c702e65
 )
 
-# Import the TFLite model "${ROOT_ARTIFACTS_DIR}/models/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.0_224.tflite"
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-7d45f8e5-bb5e-48d0-928d-8f125104578f"
@@ -1207,7 +1146,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-7d45f8e5-bb5e-48d0-928d-8f125104578f
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileNetV2_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -1227,7 +1165,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/6d0d5716-5525-44ad-b71d-8075ee1583a6/MobileNetV2_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -1249,7 +1186,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/MobileNetV2_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
@@ -1268,7 +1204,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/d463322c-24e6-4685-85ca-d541b41a405f/MobileNetV2_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-d463322c-24e6-4685-85ca-d541b41a405f"
@@ -1290,7 +1225,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-d463322c-24e6-4685-85ca-d541b41a405f
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/MobileNetV2_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-c7eea358-d8d2-4199-9d75-bb741c399b1b"
@@ -1309,7 +1243,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/MobileNetV2_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-d3038b95-c889-456a-bff6-5cbabd10f1ad"
@@ -1329,7 +1262,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/70b823ca-2807-4531-8c00-e02af7d70466/MobileNetV2_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-70b823ca-2807-4531-8c00-e02af7d70466"
@@ -1350,7 +1282,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-70b823ca-2807-4531-8c00-e02af7d70466
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/MobileNetV2_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-8da35f2b-a042-4b7d-9dcf-5ebbc1728765"
@@ -1369,7 +1300,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/32a56c8d-cc6c-41b8-8620-1f8eda0b8223/MobileNetV2_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-32a56c8d-cc6c-41b8-8620-1f8eda0b8223"
@@ -1389,7 +1319,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/6b601a8d-4824-42e0-bcc6-500c0c3fa346/MobileNetV2_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-6b601a8d-4824-42e0-bcc6-500c0c3fa346"
@@ -1410,7 +1339,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/75336abd-8108-462c-9ce3-15443e3f32f4/MobileNetV2_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-75336abd-8108-462c-9ce3-15443e3f32f4"
@@ -1428,7 +1356,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-75336abd-8108-462c-9ce3-15443e3f32f4
 )
 
-# Import the TFLite model "${ROOT_ARTIFACTS_DIR}/models/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32.tflite"
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-58855e40-eba9-4a71-b878-6b35e3460244"
@@ -1442,7 +1369,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-58855e40-eba9-4a71-b878-6b35e3460244
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileNetV3Small_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -1462,7 +1388,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/6d0d5716-5525-44ad-b71d-8075ee1583a6/MobileNetV3Small_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -1484,7 +1409,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/MobileNetV3Small_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
@@ -1503,7 +1427,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/d463322c-24e6-4685-85ca-d541b41a405f/MobileNetV3Small_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-d463322c-24e6-4685-85ca-d541b41a405f"
@@ -1525,7 +1448,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-d463322c-24e6-4685-85ca-d541b41a405f
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/MobileNetV3Small_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-c7eea358-d8d2-4199-9d75-bb741c399b1b"
@@ -1544,7 +1466,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/MobileNetV3Small_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-d3038b95-c889-456a-bff6-5cbabd10f1ad"
@@ -1564,7 +1485,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/70b823ca-2807-4531-8c00-e02af7d70466/MobileNetV3Small_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-70b823ca-2807-4531-8c00-e02af7d70466"
@@ -1585,7 +1505,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-70b823ca-2807-4531-8c00-e02af7d70466
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/MobileNetV3Small_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-8da35f2b-a042-4b7d-9dcf-5ebbc1728765"
@@ -1604,7 +1523,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/32a56c8d-cc6c-41b8-8620-1f8eda0b8223/MobileNetV3Small_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-32a56c8d-cc6c-41b8-8620-1f8eda0b8223"
@@ -1624,7 +1542,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/6b601a8d-4824-42e0-bcc6-500c0c3fa346/MobileNetV3Small_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-6b601a8d-4824-42e0-bcc6-500c0c3fa346"
@@ -1645,7 +1562,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/75336abd-8108-462c-9ce3-15443e3f32f4/MobileNetV3Small_fp32.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-75336abd-8108-462c-9ce3-15443e3f32f4"
@@ -1663,7 +1579,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-75336abd-8108-462c-9ce3-15443e3f32f4
 )
 
-# Import the TFLite model "${ROOT_ARTIFACTS_DIR}/models/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.tflite"
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-bc1338be-e3df-44fd-82e4-40ba9560a073"
@@ -1677,7 +1592,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-bc1338be-e3df-44fd-82e4-40ba9560a073
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/PersonDetect_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -1697,7 +1611,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/6d0d5716-5525-44ad-b71d-8075ee1583a6/PersonDetect_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -1719,7 +1632,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/cdf579a9-5446-403b-a991-802a6c702e65/PersonDetect_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-cdf579a9-5446-403b-a991-802a6c702e65"
@@ -1743,7 +1655,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-cdf579a9-5446-403b-a991-802a6c702e65
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4/PersonDetect_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4"
@@ -1767,7 +1678,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4
 )
 
-# Import the TFLite model "${ROOT_ARTIFACTS_DIR}/models/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.tflite"
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-4a6f545e-1b4e-41a5-9236-792aa578184b"
@@ -1781,7 +1691,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-4a6f545e-1b4e-41a5-9236-792aa578184b
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/EfficientNet_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -1801,7 +1710,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/6d0d5716-5525-44ad-b71d-8075ee1583a6/EfficientNet_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -1823,7 +1731,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/cdf579a9-5446-403b-a991-802a6c702e65/EfficientNet_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-cdf579a9-5446-403b-a991-802a6c702e65"
@@ -1847,7 +1754,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-cdf579a9-5446-403b-a991-802a6c702e65
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4/EfficientNet_int8.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4"
@@ -1871,7 +1777,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4
 )
 
-# Import the Tensorflow model "${ROOT_ARTIFACTS_DIR}/models/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
 iree_import_tf_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493"
@@ -1887,7 +1792,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MiniLML12H384Uncased.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
@@ -1907,7 +1811,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased/6d0d5716-5525-44ad-b71d-8075ee1583a6/MiniLML12H384Uncased.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-6d0d5716-5525-44ad-b71d-8075ee1583a6"
@@ -1929,7 +1832,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
-# Compile the module "${ROOT_ARTIFACTS_DIR}/iree/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased/09cb5300-7f73-45cf-9f68-e114c77ca030/MiniLML12H384Uncased.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-09cb5300-7f73-45cf-9f68-e114c77ca030"
