@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -110,6 +111,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       populateLowerHALInterfaceOp(llvmPatterns);
       populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
+      memref::populateExpandStridedMetadataPatterns(llvmPatterns);
       populateMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
