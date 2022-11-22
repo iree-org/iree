@@ -284,7 +284,6 @@ struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
     this->vectorize = options.vectorize;
     this->vectorizePadding = options.vectorizePadding;
     this->tilingLevel = options.tilingLevel;
-    this->doIREEDistribution = options.doIREEDistribution;
   }
   void runOnOperation() override;
 };
@@ -408,13 +407,6 @@ void LinalgFusePass::runOnOperation() {
   bool doTileAndFuse =
       tileAndFuseOptions.tilingOptions.tileSizeComputationFunction != nullptr;
   bool doTiling = tilingOptions.tileSizeComputationFunction != nullptr;
-
-  /*
-  if (doIREEDistribution) {
-    tilingOptions.setDistributionOptions(
-        ::mlir::iree_compiler::getIREELinalgLoopDistributionOptions());
-  }
-  */
 
   if (setAnchorOpToRootOp) {
     FailureOr<Operation *> rootOp = getRootOp(funcOp);
