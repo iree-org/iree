@@ -20,7 +20,7 @@ static llvm::cl::opt<int> clMaxAllocationSizeInBytes(
 static llvm::cl::opt<bool> clFailUnboundDynamicStackAllocation(
     "iree-llvmcpu-fail-unbound-dynamic-stack-allocation",
     llvm::cl::desc("fail if the upper bound of dynamic stack allocation cannot "
-                   "be solved."),
+                   "be solved"),
     llvm::cl::init(false));
 
 namespace {
