@@ -573,9 +573,9 @@ struct ScatterOpCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
     for (int i = 0, s = batchCount; i < s; i++) {
       reassociationMap.front().push_back(rewriter.getAffineDimExpr(i));
       bool isDynamic =
-          valueTy.isDynamicDim(i) || batchSize == ShapedType::kDynamicSize;
-      batchSize = isDynamic ? ShapedType::kDynamicSize
-                            : valueTy.getDimSize(i) * batchSize;
+          valueTy.isDynamicDim(i) || batchSize == ShapedType::kDynamic;
+      batchSize =
+          isDynamic ? ShapedType::kDynamic : valueTy.getDimSize(i) * batchSize;
     }
 
     SmallVector<int64_t> newShape = {batchSize};

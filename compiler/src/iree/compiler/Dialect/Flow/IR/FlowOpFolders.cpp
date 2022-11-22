@@ -122,7 +122,7 @@ static Type makeZeroElementsStaticTensorType(Type type) {
   dims.resize(tensorType.getRank());
   for (int64_t i = 0; i < tensorType.getRank(); ++i) {
     int64_t dim = tensorType.getDimSize(i);
-    dims[i] = dim == ShapedType::kDynamicSize ? 0 : dim;
+    dims[i] = dim == ShapedType::kDynamic ? 0 : dim;
   }
   return RankedTensorType::get(dims, tensorType.getElementType(),
                                tensorType.getEncoding());
@@ -314,9 +314,9 @@ static FailureOr<RankedTensorType> canonicalizeSubViewParts(
   mixedOffsets.assign(op.getMixedOffsets());
   mixedSizes.assign(op.getMixedSizes());
   mixedStrides.assign(op.getMixedStrides());
-  canonicalizeSubViewPart(mixedOffsets, ShapedType::isDynamicStrideOrOffset);
+  canonicalizeSubViewPart(mixedOffsets, ShapedType::isDynamic);
   canonicalizeSubViewPart(mixedSizes, ShapedType::isDynamic);
-  canonicalizeSubViewPart(mixedStrides, ShapedType::isDynamicStrideOrOffset);
+  canonicalizeSubViewPart(mixedStrides, ShapedType::isDynamic);
 
   // Drop out the same dimensions form before.
   llvm::SmallVector<int64_t> newShape;
@@ -324,8 +324,7 @@ static FailureOr<RankedTensorType> canonicalizeSubViewParts(
   for (auto size : llvm::enumerate(mixedSizes)) {
     if (droppedDims.test(size.index())) continue;
     Optional<int64_t> staticSize = getConstantIntValue(size.value());
-    newShape.push_back(staticSize ? staticSize.value()
-                                  : ShapedType::kDynamicSize);
+    newShape.push_back(staticSize ? staticSize.value() : ShapedType::kDynamic);
   }
 
   auto newSliceType =

@@ -218,10 +218,10 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
     $target oilist(
         `num_threads` custom<DynamicIndexList>($num_threads,
                                                $static_num_threads,
-                                               "ShapedType::kDynamicSize") |
+                                               "ShapedType::kDynamic") |
          `tile_sizes` custom<DynamicIndexList>($tile_sizes,
                                                $static_tile_sizes,
-                                               "ShapedType::kDynamicSize"))
+                                               "ShapedType::kDynamic"))
     (`(` `mapping` `=` $mapping^ `)`)? attr-dict
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";

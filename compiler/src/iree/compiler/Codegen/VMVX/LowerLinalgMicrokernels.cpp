@@ -101,7 +101,7 @@ bool verifyMemRefInnerDimsContiguousRowMajor(MemRefType type) {
   }
   int64_t product_of_inner_sizes = 1;
   for (int i = rank - 1; i >= 2; --i) {
-    if (sizes[i] == ShapedType::kDynamicSize) {
+    if (sizes[i] == ShapedType::kDynamic) {
       return false;
     }
     product_of_inner_sizes *= sizes[i];

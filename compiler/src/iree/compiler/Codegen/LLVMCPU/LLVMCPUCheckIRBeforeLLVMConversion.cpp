@@ -33,7 +33,7 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
     auto type = allocaOp.getType().cast<ShapedType>();
     int64_t size = 1;
     for (auto dimSize : type.getShape()) {
-      if (dimSize == ShapedType::kDynamicSize) continue;
+      if (dimSize == ShapedType::kDynamic) continue;
       size *= dimSize;
     }
     for (auto operand : allocaOp.getDynamicSizes()) {

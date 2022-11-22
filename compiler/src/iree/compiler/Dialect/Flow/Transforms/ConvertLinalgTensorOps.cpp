@@ -51,7 +51,7 @@ struct LinalgTensorReshapeToFlowTensorReshape
     SmallVector<Value> outputDynamicShapes;
     for (auto shape :
          llvm::zip(reshapeOp.getResultType().getShape(), outputShape[0])) {
-      if (std::get<0>(shape) != ShapedType::kDynamicSize) continue;
+      if (std::get<0>(shape) != ShapedType::kDynamic) continue;
       outputDynamicShapes.push_back(std::get<1>(shape));
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(

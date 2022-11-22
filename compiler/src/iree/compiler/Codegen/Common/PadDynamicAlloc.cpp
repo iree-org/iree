@@ -37,7 +37,7 @@ static LogicalResult padAlloc(memref::AllocOp allocOp) {
   SmallVector<OpFoldResult> sizes;
   size_t dynamicDimIdx = 0;
   for (int64_t &dimSize : shape) {
-    if (dimSize != ShapedType::kDynamicSize) {
+    if (dimSize != ShapedType::kDynamic) {
       sizes.push_back(builder.getIndexAttr(dimSize));
       continue;
     }

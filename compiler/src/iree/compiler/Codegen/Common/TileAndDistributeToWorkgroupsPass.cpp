@@ -114,7 +114,7 @@ static LogicalResult getTileAndDistributeConfig(
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*rootOp)) {
     staticLoopRanges = linalgOp.getStaticLoopRanges();
   }
-  staticLoopRanges.resize(tileSizes.size(), ShapedType::kDynamicSize);
+  staticLoopRanges.resize(tileSizes.size(), ShapedType::kDynamic);
 
   return success();
 }
@@ -176,7 +176,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
     Attribute zero = rewriter.getIndexAttr(0);
     tileSizes.resize(workloadValues.size(), zero);
     SmallVector<int64_t> staticLoopRanges = givenStaticLoopRanges;
-    staticLoopRanges.resize(workloadValues.size(), ShapedType::kDynamicSize);
+    staticLoopRanges.resize(workloadValues.size(), ShapedType::kDynamic);
     Location loc = workgroupCountOp.getLoc();
     auto numTiles = llvm::to_vector(llvm::map_range(
         llvm::zip(workloadValues, staticLoopRanges, tileSizes),
@@ -188,7 +188,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
 
           int64_t staticLoopRange = std::get<1>(p);
           OpFoldResult workload =
-              (staticLoopRange == ShapedType::kDynamicSize
+              (staticLoopRange == ShapedType::kDynamic
                    ? OpFoldResult(std::get<0>(p))
                    : OpFoldResult(rewriter.getIndexAttr(staticLoopRange)));
           AffineExpr s0, s1;

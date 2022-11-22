@@ -39,7 +39,7 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
   }
 
   for (auto dim : llvm::enumerate(tensorType.getShape())) {
-    if (dim.value() != ShapedType::kDynamicSize) continue;
+    if (dim.value() != ShapedType::kDynamic) continue;
     argumentDims.push_back(
         b.createOrFold<tensor::DimOp>(loc, tensor, dim.index()));
   }

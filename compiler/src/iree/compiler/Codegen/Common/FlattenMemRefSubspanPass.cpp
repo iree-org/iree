@@ -101,7 +101,7 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
       // they are representing a view from a byte buffer with potentially
       // unknown total size, as transformation passes can concatenate buffers,
       // etc.
-      return MemRefType::get(ShapedType::kDynamicSize, type.getElementType(),
+      return MemRefType::get(ShapedType::kDynamic, type.getElementType(),
                              AffineMap(), type.getMemorySpace());
     });
   }
