@@ -87,7 +87,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-llvm-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
-   "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
+    "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
     --o "${IREE_MODEL_DIR}/cuda/${MODEL_NAME}.vmfb" || true
 
   echo "Compiling ${MODEL_NAME}_fp16.vmfb for cuda..."
@@ -99,7 +99,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-llvm-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
-   "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
+    "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
     --o "${IREE_MODEL_DIR}/cuda/${MODEL_NAME}_fp16.vmfb" || true
 
   # Build for x86.
