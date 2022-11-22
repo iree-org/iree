@@ -121,8 +121,7 @@ def execute_cmd_and_get_output(args: Sequence[Any],
 
 def get_git_commit_hash(commit: str) -> str:
   return execute_cmd_and_get_output(['git', 'rev-parse', commit],
-                                    cwd=os.path.dirname(
-                                        os.path.realpath(__file__)))
+                                    cwd=pathlib.Path(__file__).resolve().parent)
 
 
 def get_iree_benchmark_module_arguments(

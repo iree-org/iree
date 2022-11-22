@@ -54,7 +54,7 @@ IREE_PROJECT_ID = 'IREE'
 MAX_BASE_COMMIT_QUERY_COUNT = 10
 # The max number of rows to show per table.
 TABLE_SIZE_CUT = 3
-THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
 
 
 def get_required_env_var(var: str) -> str:
