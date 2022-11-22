@@ -66,8 +66,10 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                          run_flags=run_flags)
 
   def __parse_flagfile(self, case_dir: pathlib.Path) -> List[str]:
-    with (case_dir / MODEL_FLAGFILE_NAME).open("r") as flagfile:
-      return [line.strip() for line in flagfile.readlines()]
+    return [
+        line.strip()
+        for line in (case_dir / MODEL_FLAGFILE_NAME).read_text().splitlines()
+    ]
 
   def __run_benchmark(self, benchmark_case: BenchmarkCase,
                       results_filename: pathlib.Path, taskset: str,
