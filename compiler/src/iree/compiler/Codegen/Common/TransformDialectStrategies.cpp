@@ -401,14 +401,38 @@ class StructuredOpMatcher {
   friend StructuredOpMatcher m_StructuredOp();
   using PredicateFn = std::function<bool(linalg::LinalgOp)>;
 
+  /// Matches a structured operation if the given predicate is satisfied.
+  StructuredOpMatcher(PredicateFn &&firstPredicate) {
+    predicates.push_back(std::move(firstPredicate));
+  }
+
  public:
+  /// Matches any structured operation, i.e., operation with LinalgOp interface.
+  StructuredOpMatcher() {}
+
+  /// Creates a matcher for a structured operation with one of the given types.
+  template <typename... OpType>
+  static StructuredOpMatcher create() {
+    return StructuredOpMatcher(
+        [](linalg::LinalgOp op) { return isa<OpType...>(op.getOperation()); });
+  }
+
+  /// Returns the matched operation if the match was successful.
+  linalg::LinalgOp getCaptured() const { return captured; }
+
   /// Matches the given operation, hook for `matchPattern`.
   bool match(Operation *op) {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) return false;
 
-    return llvm::all_of(
-        predicates, [linalgOp](const PredicateFn &fn) { return fn(linalgOp); });
+    if (!llvm::all_of(predicates, [linalgOp](const PredicateFn &fn) {
+          return fn(linalgOp);
+        })) {
+      return false;
+    }
+
+    captured = linalgOp;
+    return true;
   }
 
   /// Adds a predicate checking that the given iteration space dimension is
@@ -483,6 +507,31 @@ class StructuredOpMatcher {
     return *this;
   }
 
+  /// Adds a predicate that recursively applies other predicates to the
+  /// operation defining the `position`-th operand. The position may be
+  /// negative, in which case positions are counted from the last one
+  /// Python-style.
+  template <typename T>
+  std::enable_if_t<
+      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
+                        Operation *>::value,
+      StructuredOpMatcher &>
+  input(int64_t position, T &operandMatcher) {
+    predicates.push_back([position,
+                          &operandMatcher](linalg::LinalgOp linalgOp) -> bool {
+      int64_t transformedPosition =
+          position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
+      if (transformedPosition >= linalgOp.getNumDpsInputs()) return false;
+
+      Operation *definingOp = linalgOp.getDpsInputOperand(transformedPosition)
+                                  ->get()
+                                  .getDefiningOp();
+      if (!definingOp) return false;
+      return operandMatcher.match(definingOp);
+    });
+    return *this;
+  }
+
   /// Adds a predicate checking that all input operands of the structured op
   /// have a permutation indexing map.
   StructuredOpMatcher &input(AllOperands tag, IsPermutation) {
@@ -539,12 +588,49 @@ class StructuredOpMatcher {
     return *this;
   }
 
+  /// Adds a predicate that recursively applies other predicates to the
+  /// operation defining the init/out operand corresponding to `position`-th
+  /// output. The position may be negative, in which case positions are counted
+  /// from the last one Python-style.
+  template <typename T>
+  std::enable_if_t<
+      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
+                        Operation *>::value,
+      StructuredOpMatcher &>
+  output(int64_t position, T &operandMatcher) {
+    predicates.push_back([position,
+                          &operandMatcher](linalg::LinalgOp linalgOp) -> bool {
+      int64_t transformedPosition =
+          position >= 0 ? position : linalgOp.getNumDpsInits() + position;
+      if (transformedPosition >= linalgOp.getNumDpsInits()) return false;
+
+      Operation *definingOp = linalgOp.getDpsInitOperand(transformedPosition)
+                                  ->get()
+                                  .getDefiningOp();
+      if (!definingOp) return false;
+      return operandMatcher.match(definingOp);
+    });
+    return *this;
+  }
+
  private:
   /// Additional predicates to be checked on the structured op.
   SmallVector<PredicateFn> predicates;
+
+  /// Matched value.
+  linalg::LinalgOp captured = nullptr;
 };
 
+/// Creates a matcher of an arbitrary structured op.
 StructuredOpMatcher m_StructuredOp() { return StructuredOpMatcher(); }
+
+/// Creates a matcher of a structured op with kinds provided as template
+/// arguments.
+template <typename... OpType>
+StructuredOpMatcher m_StructuredOp() {
+  return StructuredOpMatcher::create<OpType...>();
+}
+
 }  // namespace
 
 static constexpr unsigned cudaWarpSize = 32;
@@ -553,6 +639,7 @@ static constexpr unsigned cudaWarpSize = 32;
 static bool matchGPUReduction(linalg::LinalgOp op, TileSizesListType &tileSizes,
                               std::array<int64_t, 3> &workgroupSize) {
   // TODO: match the sequence the strategy supports.
+  auto fill = m_StructuredOp<linalg::FillOp>();
   auto pattern = m_StructuredOp()
                      .dim(AllDims(), ShapeKind::Static)
                      .dim(-1, utils::IteratorType::reduction)
@@ -560,6 +647,7 @@ static bool matchGPUReduction(linalg::LinalgOp op, TileSizesListType &tileSizes,
                      // Can be extended to projected permutation with broadcast.
                      .input(AllOperands(), IsPermutation())
                      .output(NumEqualsTo(1))
+                     .output(0, fill)
                      // Only single combiner over 32 bits for now due to
                      // reduction distribution.
                      .output(0, ElementTypeBitWidth(32))
@@ -586,10 +674,12 @@ static bool matchCPUReduction(linalg::LinalgOp op,
                               SmallVector<int64_t> &tileSize,
                               std::array<int64_t, 3> &workgroupSize) {
   // TODO: match the sequence the strategy supports.
+  auto fill = m_StructuredOp<linalg::FillOp>();
   auto pattern = m_StructuredOp()
                      .dim(AllDims(), ShapeKind::Static)
                      .dim(-1, utils::IteratorType::reduction)
-                     .output(NumEqualsTo(1));
+                     .output(NumEqualsTo(1))
+                     .output(0, fill);
 
   // Hardcoded workagroup size, this could be deduced from the reduction dim.
   workgroupSize = {32, 2, 1};
