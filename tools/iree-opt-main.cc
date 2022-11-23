@@ -8,30 +8,6 @@
 //
 // Based on mlir-opt but registers the passes and dialects we care about.
 
-#include "iree/compiler/Tools/init_dialects.h"
-#include "iree/compiler/Tools/init_passes.h"
-#include "iree/compiler/Tools/init_targets.h"
-#include "llvm/Support/InitLLVM.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/Support/LogicalResult.h"
-#include "mlir/Tools/mlir-opt/MlirOptMain.h"
+#include "iree/compiler/API2/ToolEntryPoints.h"
 
-int main(int argc, char **argv) {
-  llvm::InitLLVM y(argc, argv);
-
-  mlir::DialectRegistry registry;
-  mlir::iree_compiler::registerAllDialects(registry);
-  mlir::iree_compiler::registerAllPasses();
-  mlir::iree_compiler::registerHALTargetBackends();
-
-  // Register the pass to drop embedded transform dialect IR.
-  // TODO: this should be upstreamed.
-  mlir::linalg::transform::registerDropSchedulePass();
-
-  if (failed(MlirOptMain(argc, argv, "IREE modular optimizer driver\n",
-                         registry,
-                         /*preloadDialectsInContext=*/false))) {
-    return 1;
-  }
-  return 0;
-}
+int main(int argc, char **argv) { return ireeOptRunMain(argc, argv); }

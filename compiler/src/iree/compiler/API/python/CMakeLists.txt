@@ -108,20 +108,12 @@ set(_SOURCE_COMPONENTS
   IREEDialectsPythonExtensions
 )
 
-add_mlir_python_common_capi_library(IREECompilerAggregateCAPI
-  INSTALL_COMPONENT IREECompilerPythonModules
-  INSTALL_DESTINATION ${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs
-  OUTPUT_DIRECTORY "${_PYTHON_BUILD_PREFIX}/iree/compiler/_mlir_libs"
-  RELATIVE_INSTALL_ROOT "../../../.."
-  DECLARED_SOURCES ${_SOURCE_COMPONENTS}
-)
-
 add_mlir_python_modules(IREECompilerPythonModules
   ROOT_PREFIX "${_PYTHON_BUILD_PREFIX}/iree/compiler"
   INSTALL_PREFIX "${_PYTHON_INSTALL_PREFIX}/iree/compiler"
   DECLARED_SOURCES ${_SOURCE_COMPONENTS}
   COMMON_CAPI_LINK_LIBS
-    IREECompilerAggregateCAPI
+    iree_compiler_API2_SharedImpl
   )
 
 
@@ -140,7 +132,7 @@ function(add_iree_compiler_busybox_tool target)
     ${target}
     ${ARG_SRCS}
   )
-  target_link_libraries(${target} IREECompilerAggregateCAPI)
+  target_link_libraries(${target} iree_compiler_API2_SharedImpl)
   set_target_properties(${target}
     PROPERTIES
       OUTPUT_NAME "${ARG_OUTPUT_NAME}"
@@ -168,6 +160,24 @@ if(TARGET lld)
       LldTool.c
   )
 endif()
+
+# Install shared libraries that the extension depends on. This uses
+# CMake's defer feature to evaluate the install directive once everything
+# has been evaluated (because there is no guarantee that this file evaluates
+# before the API libraries are defined). While deferred calls are generally
+# fragile, this install is purely a leaf feature (with no other calls
+# depending on its sequencing), so this use is okay.
+# We defer it to the compiler/ directory so that cmake_install.cmake targets
+# are all self contained to the compiler, which is the most common spanning
+# parent.
+cmake_language(EVAL CODE "
+cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}/compiler\"
+  CALL install
+  TARGETS
+    iree_compiler_API2_SharedImpl
+  DESTINATION \"${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs\"
+)
+")
 
 ################################################################################
 # Subdirectories

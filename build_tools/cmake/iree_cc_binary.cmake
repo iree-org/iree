@@ -20,6 +20,8 @@ include(CMakeParseArguments)
 # LINKOPTS: List of link options
 # TESTONLY: for testing; won't compile when tests are disabled
 # HOSTONLY: host only; compile using host toolchain when cross-compiling
+# SETUP_INSTALL_RPATH: Sets an install RPATH which assumes the standard
+#   directory layout (to be used if linking against installed shared libs).
 #
 # Note:
 # iree_cc_binary will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
@@ -47,7 +49,7 @@ include(CMakeParseArguments)
 function(iree_cc_binary)
   cmake_parse_arguments(
     _RULE
-    "EXCLUDE_FROM_ALL;HOSTONLY;TESTONLY"
+    "EXCLUDE_FROM_ALL;HOSTONLY;TESTONLY;SETUP_INSTALL_RPATH"
     "NAME"
     "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS"
     ${ARGN}
@@ -150,5 +152,28 @@ function(iree_cc_binary)
       RENAME ${_RULE_NAME}
       COMPONENT ${_RULE_NAME}
       RUNTIME DESTINATION bin)
+  endif()
+
+  # Setup RPATH if on a Unix-like system. We have two use cases that we are
+  # handling here:
+  #   1. Install tree layouts like bin/ and lib/ directories that are
+  #      peers.
+  #   2. Single directory bundles (language bindings do this) where the
+  #      shared library is placed next to the consumer.
+  #
+  # The common solution is to use an RPATH of the origin and the
+  # lib/ directory that may be a peer of the origin. Distributions
+  # outside of this setup will need to do their own manipulation.
+  if(_RULE_SETUP_INSTALL_RPATH)
+    if(APPLE OR UNIX)
+      set(_origin_prefix "\$ORIGIN")
+      if(APPLE)
+        set(_origin_prefix "@loader_path")
+      endif()
+      set_target_properties(${_NAME} PROPERTIES
+        BUILD_WITH_INSTALL_RPATH OFF
+        INSTALL_RPATH "${_origin_prefix}:${_origin_prefix}/../lib"
+      )
+    endif()
   endif()
 endfunction()

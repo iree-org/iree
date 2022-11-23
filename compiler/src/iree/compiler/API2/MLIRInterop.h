@@ -4,8 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_API_COMPILER_H
-#define IREE_COMPILER_API_COMPILER_H
+// Low-level interface to IREE compiler facilities that augment and work with
+// the MLIR C-API.
+// Stability: This API, like the MLIR C-API, offers no ABI stability guarantees,
+// and API stability is best effort.
+
+#ifndef IREE_COMPILER_API2_MLIR_INTEROP_H
+#define IREE_COMPILER_API2_MLIR_INTEROP_H
 
 #include "mlir-c/Pass.h"
 #include "mlir-c/Support.h"
@@ -70,4 +75,4 @@ MLIR_CAPI_EXPORTED MlirLogicalResult ireeCompilerTranslateModuletoVMBytecode(
 }
 #endif
 
-#endif  // IREE_COMPILER_API_COMPILER_H
+#endif  // IREE_COMPILER_API2_MLIR_INTEROP_H

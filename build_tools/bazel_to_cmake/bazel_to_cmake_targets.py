@@ -34,10 +34,17 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//llvm:X86AsmParser": ["IREELLVMCPUTargetDeps"],
     "@llvm-project//llvm:X86CodeGen": ["IREELLVMCPUTargetDeps"],
 
+    # LLD
+    "@llvm-project//lld": ["${IREE_LLD_TARGET}"],
+    "@llvm-project//lld:COFF": ["lldCOFF"],
+    "@llvm-project//lld:Common": ["lldCommon"],
+    "@llvm-project//lld:ELF": ["lldELF"],
+    "@llvm-project//lld:MachO": ["lldMachO"],
+    "@llvm-project//lld:Wasm": ["lldWasm"],
+
     # LLVM
     "@llvm-project//llvm:config": [],
     "@llvm-project//llvm:IPO": ["LLVMipo"],
-    "@llvm-project//lld": ["${IREE_LLD_TARGET}"],
     "@llvm-project//llvm:FileCheck": ["FileCheck"],
     "@llvm-project//llvm:not": ["not"],
     # MLIR
@@ -51,6 +58,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
     "@llvm-project//mlir:ToLLVMIRTranslation": ["MLIRTargetLLVMIRExport"],
     "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
+    "@llvm-project//mlir:MlirLspServerLib": ["MLIRLspServerLib"],
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
     "@llvm-project//mlir:VectorOps": ["MLIRVector"],
@@ -125,7 +133,14 @@ def _convert_mlir_target(target):
   # Take "MLIR" and append the name part of the full target identifier, e.g.
   #   "@llvm-project//mlir:IR"   -> "MLIRIR"
   #   "@llvm-project//mlir:Pass" -> "MLIRPass"
-  return ["MLIR" + target.rsplit(":")[-1]]
+  # MLIR does not have header-only targets apart from the libraries. Here
+  # we redirect any request for a CAPI{Name}Headers to a target within IREE
+  # that sets this up.
+  label = target.rsplit(":")[-1]
+  if label.startswith("CAPI") and label.endswith("Headers"):
+    return [f"IREELLVMIncludeSetup"]
+  else:
+    return [f"MLIR{label}"]
 
 
 def _convert_llvm_target(target):

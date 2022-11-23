@@ -206,6 +206,9 @@ class BuildFileFunctions(object):
   # ------------------------------------------------------------------------- #
 
   # Functions with no mapping to CMake. Just ignore these.
+  def alias(self, *args, **kwargs):
+    pass
+
   def load(self, *args, **kwargs):
     pass
 
@@ -370,6 +373,9 @@ class BuildFileFunctions(object):
 
   def iree_runtime_cc_test(self, deps=[], **kwargs):
     self.cc_test(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
+
+  def iree_compiler_cc_test(self, deps=[], **kwargs):
+    self.cc_test(deps=deps + ["//compiler/src:defs"], **kwargs)
 
   def cc_binary(self,
                 name,

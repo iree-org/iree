@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Tools/iree_compile_lib.h"
+#include "iree/compiler/API2/ToolEntryPoints.h"
 
-int main(int argc, char **argv) {
-  return mlir::iree_compiler::runIreecMain(argc, argv);
-}
+int main(int argc, char **argv) { return ireeCompilerRunMain(argc, argv); }
