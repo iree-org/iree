@@ -782,6 +782,13 @@ add_custom_target(iree-run-module-test-deps
     "Building IREE run module test targets"
 )
 
+# Samples may require additional files to be built/configured and will add
+# dependencies to this target. It is a subset of `iree-test-deps`.
+add_custom_target(iree-sample-deps
+  COMMENT
+    "Building IREE sample data targets"
+)
+
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
 #-------------------------------------------------------------------------------

@@ -24,6 +24,7 @@ function(iree_configure_test TEST_NAME)
   set(_TEST_TMPDIR "${IREE_TEST_TMPDIR_ROOT}/${TEST_NAME}_test_tmpdir")
   set_property(GLOBAL APPEND PROPERTY IREE_TEST_TMPDIRS ${_TEST_TMPDIR})
   set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "TEST_TMPDIR=${_TEST_TMPDIR}")
+  set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_BINARY_DIR=${IREE_BINARY_DIR}")
 
   # IREE_*_DISABLE environment variables may used to skip test cases which
   # require both a compiler target backend and compatible runtime HAL driver.
