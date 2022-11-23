@@ -9,7 +9,7 @@
 #   * Vulkan (using SwiftShader)
 #   * Python (including `venv` and common pip packages needed for Colab)
 
-FROM gcr.io/iree-oss/swiftshader@sha256:484720d57fa816280d9a7455d16e1f9f3d90cc3efdb744646016503ea5ab2b30
+FROM gcr.io/iree-oss/swiftshader@sha256:33368be42c7de747a234c5192b993436ceff08901250724c24af02d31e817fb8
 
 # Install additional packages often used in notebooks.
 # Installing these at the system level helps with caching, since venvs can
