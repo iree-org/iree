@@ -29,6 +29,8 @@ SKIP_PATH_PATTERNS = [
     "docs/*",
     "experimental/*",
     "build_tools/buildkite/*",
+    # These configure the runners themselves and don't affect presubmit.
+    "build_tools/github_actions/runner/*",
     ".github/ISSUE_TEMPLATE/*",
     "*.cff",
     "*.clang-format",

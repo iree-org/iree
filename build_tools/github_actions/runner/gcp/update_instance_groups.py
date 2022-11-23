@@ -96,11 +96,6 @@ def main(args):
       project=args.project,
   )
 
-  if "testing" in args.version and args.env != "testing":
-    scary_action = (f"using testing template version '{args.version}' in"
-                    f" environment '{args.env}'")
-    check_scary_action(scary_action, args.skip_confirmation)
-
   # Prod instances just have the bare name
   modifier = None if args.env == "prod" else args.env
   migs = updater.get_migs(region=args.region,
@@ -128,6 +123,11 @@ def main(args):
   for mig in migs:
     region = resource_basename(mig.region)
     if args.command in [DIRECT_UPDATE_COMMAND_NAME, CANARY_COMMAND_NAME]:
+      if "testing" in args.version and args.env != "testing":
+        scary_action = (f"using testing template version '{args.version}' in"
+                        f" environment '{args.env}'")
+        check_scary_action(scary_action, args.skip_confirmation)
+
       strip = f"-{region}"
       if not mig.name.endswith(strip):
         raise ValueError(f"MIG name does not end with '{strip}' as expected")
