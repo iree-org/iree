@@ -20,6 +20,22 @@ IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 IREE_ENABLE_CCACHE="${IREE_ENABLE_CCACHE:-OFF}"
 IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
 
+IREE_READ_REMOTE_SCCACHE="${IREE_READ_REMOTE_SCCACHE:-1}"
+IREE_WRITE_REMOTE_SCCACHE="${IREE_WRITE_REMOTE_SCCACHE:-0}"
+if (( ${IREE_WRITE_REMOTE_SCCACHE} == 1 && ${IREE_READ_REMOTE_SCCACHE} != 1 )); then
+  echo "Can't have 'IREE_WRITE_REMOTE_SCCACHE' (${IREE_WRITE_REMOTE_SCCACHE}) set without 'IREE_READ_REMOTE_SCCACHE' (${IREE_READ_REMOTE_SCCACHE})"
+fi
+
+if (( IREE_READ_REMOTE_SCCACHE == 1 )); then
+  export SCCACHE_GCS_BUCKET=iree-sccache
+  export CMAKE_C_COMPILER_LAUNCHER=sccache
+  export CMAKE_CXX_COMPILER_LAUNCHER=sccache
+fi
+if (( IREE_WRITE_REMOTE_SCCACHE == 1 )); then
+  export SCCACHE_GCS_RW_MODE=READ_WRITE
+fi
+
+
 "$CMAKE_BIN" --version
 ninja --version
 
@@ -75,3 +91,7 @@ echo "------------------"
 echo "Building test deps"
 echo "------------------"
 "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
+
+if (( IREE_READ_REMOTE_SCCACHE == 1 )); then
+  sccache --show-stats
+fi
