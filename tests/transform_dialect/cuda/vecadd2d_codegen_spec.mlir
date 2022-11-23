@@ -10,6 +10,9 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %func = transform.structured.match ops{["func.func"]} in %variant_op
   transform.iree.apply_patterns %func { rank_reducing }
   %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
+  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_2
+  transform.iree.erase_hal_descriptor_type_from_memref %memref_func
+
   // Step 3. Map to GPU thread blocks
   // ===========================================================================
   %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_2
