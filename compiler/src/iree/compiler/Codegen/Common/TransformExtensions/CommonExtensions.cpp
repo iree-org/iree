@@ -199,7 +199,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getPromoteForeachThreadCaptureToShared())
     addForeachThreadCapturePromotionPatterns(patterns);
   if (getRankReducing()) addRankReducingPatterns(patterns);
-  if (getSimplifyMemrefMetadata())
+  if (getExpandMemrefStridedMetadata())
     memref::populateExpandStridedMetadataPatterns(patterns);
   if (getSwappingPatterns())
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());
@@ -536,7 +536,8 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
 /// pdl::OperationType handles on the fly.
 static LogicalResult lowerWorkgroupCountComputingRegion(
     transform::TransformState &state, RewriterBase &rewriter, Location loc,
-    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> tileSizes) {
+    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> tileSizes,
+    Optional<ArrayAttr> mapping) {
   Region &r = exportOp.getWorkgroupCount();
   if (!r.hasOneBlock()) {
     return rewriter.notifyMatchFailure(exportOp,
@@ -579,7 +580,7 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
         "number of tile sizes overflow the dimension from the workload");
   }
 
-  SmallVector<OpFoldResult> workgroupCount;
+  SmallVector<OpFoldResult> workgroupCount, permutedWorkgroupCount;
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(workgroupCountOp);
   loc = workgroupCountOp.getLoc();
@@ -596,10 +597,16 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
         ArrayRef<OpFoldResult>{workload[tileSize.index()], tileSize.value()});
     workgroupCount.push_back(count);
   }
-  workgroupCount = llvm::to_vector(llvm::reverse(workgroupCount));
+  // Make sure to fill unused dimensions with 1
   workgroupCount.resize(3, rewriter.getIndexAttr(1));
-  rewriter.replaceOp(workgroupCountOp, getValueOrCreateConstantIndexOp(
-                                           rewriter, loc, workgroupCount));
+  permutedWorkgroupCount.resize(3, rewriter.getIndexAttr(1));
+  int mappingId = 0;
+  for (DeviceMappingAttrInterface map : mapping->getValue()) {
+    permutedWorkgroupCount[map.getMappingId()] = workgroupCount[mappingId++];
+  }
+  rewriter.replaceOp(
+      workgroupCountOp,
+      getValueOrCreateConstantIndexOp(rewriter, loc, permutedWorkgroupCount));
   return success();
 }
 
@@ -646,7 +653,8 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
   /// regions are created by default in IREEs compilation flow.
   IRRewriter rewriter(getContext());
   if (failed(lowerWorkgroupCountComputingRegion(
-          state, rewriter, getLoc(), exportOp.value(), getMixedTileSizes()))) {
+          state, rewriter, getLoc(), exportOp.value(), getMixedTileSizes(),
+          getMapping()))) {
     return mlir::emitDefiniteFailure(exportOp.value(),
                                      "failed to lower workgroup count region");
   }
@@ -806,20 +814,6 @@ static OneShotBufferizationOptions getBufferizationOptions() {
   return options;
 }
 
-/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
-/// into nested pass pipeline mess.
-static LogicalResult runIREEBufferizeOnModule(
-    ModuleOp moduleOp, BufferizationOptions::AllocationFn allocationFn,
-    BufferizationOptions::DeallocationFn deallocationFn,
-    BufferizationOptions::MemCpyFn memCpyFn) {
-  OneShotBufferizationOptions options = getBufferizationOptions();
-  options.allocationFn = allocationFn;
-  options.deallocationFn = deallocationFn;
-  options.memCpyFn = memCpyFn;
-
-  return runIREEOneShotBufferize(moduleOp, options);
-}
-
 namespace {
 /// Pattern to rewrite tensor.empty to tensor.alloc.
 struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
@@ -891,9 +885,14 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
                                      "listener tracking failed");
 
   //   3. Run one-shot-bufferize, without the pass baggage.
+  OneShotBufferizationOptions options = getBufferizationOptions();
+  options.allocationFn = allocationFn;
+  options.deallocationFn = deallocationFn;
+  options.memCpyFn = memCpyFn;
+  options.testAnalysisOnly = getTestAnalysisOnly();
+  options.printConflicts = getPrintConflicts();
   res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
-    if (failed(runIREEBufferizeOnModule(moduleOp, allocationFn, deallocationFn,
-                                        memCpyFn)))
+    if (failed(runIREEOneShotBufferize(moduleOp, options)))
       return WalkResult::interrupt();
     return WalkResult::advance();
   });

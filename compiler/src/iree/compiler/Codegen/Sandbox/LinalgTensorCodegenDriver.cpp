@@ -58,19 +58,39 @@ static FailureOr<Operation *> getRootOp(func::FuncOp funcOp) {
   return rootOp;
 }
 
+/// Builds a proper tile sizes vector for the op.
+/// scf::tileUsingSCFForOp expects the num of tile sizes = num of loops. This
+/// method returns a proper tile sizes vector for each op during tiling.
+static SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
+                                              SmallVector<int64_t> tileSizes) {
+  auto tilingOp = cast<TilingInterface>(op);
+
+  SmallVector<int64_t> newTileSizes = tileSizes;
+  newTileSizes.resize(tilingOp.getLoopIteratorTypes().size(), /*default=*/0);
+
+  OpBuilder::InsertionGuard guard(b);
+  return llvm::to_vector(map_range(newTileSizes, [&](int64_t size) {
+    Value v = b.create<arith::ConstantIndexOp>(tilingOp->getLoc(), size);
+    return v;
+  }));
+}
+
 /// Default method to initialize the tiling options in IREE. These could be
 /// overriden by the command line options if specified. For now the sentinel
 /// -1 is used for avoiding querying the lowering config.
-static bool getTilingOptionsFromConfig(
-    func::FuncOp funcOp, int64_t tilingLevel,
-    linalg::LinalgTilingOptions &tilingOptions) {
+static bool getTilingOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel,
+                                       scf::SCFTilingOptions &tilingOptions) {
   if (tilingLevel != -1) {
     FailureOr<Operation *> rootOp = getRootOp(funcOp);
     if (failed(rootOp)) {
       return false;
     }
-    tilingOptions.setTileSizes(
-        mlir::iree_compiler ::getTileSizes(rootOp.value(), tilingLevel));
+    SmallVector<int64_t> tileSizes =
+        mlir::iree_compiler::getTileSizes(rootOp.value(), tilingLevel);
+    tilingOptions.setTileSizeComputationFunction(
+        [tileSizes](OpBuilder &b, Operation *op) {
+          return buildTileSizesForOp(b, op, tileSizes);
+        });
     return true;
   }
   return false;
@@ -231,7 +251,6 @@ struct LinalgSingleTilingExpertPass
     this->anchorOpName = options.anchorOpName;
     this->tileSizes = options.tileSizes;
     this->tileInterchange = options.tileInterchange;
-    this->peeledLoops = options.peeledLoops;
     this->pad = options.pad;
     this->paddingValues = options.paddingValues;
     this->packPaddings = options.packPaddings;
@@ -554,18 +573,20 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
 
   // Set up tiling and vectorization options.
-  linalg::LinalgTilingOptions tilingOptions;
+  scf::SCFTilingOptions tilingOptions;
   bool doTiling =
       getTilingOptionsFromConfig(funcOp, tilingLevel, tilingOptions);
   if (!tileSizes.empty()) {
     doTiling = true;
-    tilingOptions = tilingOptions.setTileSizes(tileSizes);
+    SmallVector<int64_t> clonedTileSizes = llvm::to_vector(tileSizes);
+    tilingOptions.setTileSizeComputationFunction(
+        [clonedTileSizes](OpBuilder &b, Operation *op) {
+          return buildTileSizesForOp(b, op, clonedTileSizes);
+        });
   }
   if (!tileInterchange.empty()) {
-    tilingOptions = tilingOptions.setInterchange(
-        SmallVector<unsigned>(tileInterchange.begin(), tileInterchange.end()));
+    tilingOptions = tilingOptions.setInterchange(tileInterchange);
   }
-  tilingOptions = tilingOptions.setPeeledLoops(peeledLoops);
 
   // Parse the padding values.
   SmallVector<Attribute> paddingValueAttributes;

@@ -579,6 +579,64 @@ jobs:
       tf-binaries-archive: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
       tf-binaries-gcs-artifact: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
 
+  build_e2e_test_artifacts:
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
+      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+    outputs:
+      e2e-test-artifacts-dir: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
+      e2e-test-artifacts-gcs-artifact-dir: ${{ steps.upload.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Downloading TF binaries archive"
+        run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+      - name: "Extracting TF binaries archive"
+        run: tar -xf "${TF_BINARIES_ARCHIVE}"
+      - name: "Building e2e test artifacts"
+        id: build
+        env:
+          BUILD_E2E_TEST_ARTIFACTS_DIR: build-e2e-test-artifacts
+        run: |
+          build_tools/github_actions/docker_run.sh \
+            --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "BUILD_E2E_TEST_ARTIFACTS_DIR=${BUILD_E2E_TEST_ARTIFACTS_DIR}" \
+            gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
+            build_tools/cmake/build_e2e_test_artifacts.sh
+          echo "::set-output name=e2e-test-artifacts-dir::${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts"
+      - name: "Uploading e2e test artifacts"
+        id: upload
+        env:
+          E2E_TEST_ARTIFACTS_DIR: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
+          E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
+        run: |
+          # Not archiving the directory to allow fetching each file as needed
+          # separately. The option `--gzip-in-flight-all` compresses the files
+          # during uploading to save traffic. The files are still uncompressed
+          # on GCS.
+          # More details: https://cloud.google.com/sdk/gcloud/reference/storage/cp#--gzip-in-flight-all
+          gcloud alpha storage cp -r --gzip-in-flight-all "${E2E_TEST_ARTIFACTS_DIR}/iree" "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/iree"
+          echo "::set-output name=e2e-test-artifacts-gcs-artifact-dir::${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
+
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################
@@ -796,6 +854,9 @@ jobs:
       # Crosscompilation
       - cross_compile_and_test
       - emscripten
+
+      # Artifacts for e2e testing and benchmarking
+      - build_e2e_test_artifacts
 
       # Benchmark pipeline
       - benchmarks

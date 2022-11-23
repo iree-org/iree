@@ -2219,12 +2219,21 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   auto sub = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
     return makeComposedFoldedAffineApply(builder, loc, subMap, {v1, v2});
   };
-  auto div = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
+  auto ceilDiv = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
+    return makeComposedFoldedAffineApply(builder, loc, dim0.ceilDiv(dim1),
+                                         {v1, v2});
+  };
+  auto floorDiv = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
     return makeComposedFoldedAffineApply(builder, loc, dim0.floorDiv(dim1),
                                          {v1, v2});
   };
 
-  bool isInputDivisable = true;
+  // The perfect tiling case indicates that the tiling sizes is are multiple of
+  // inner_tile_size. In this context, The indices of input slice are all
+  // aligned to head. No extra data is needed when representing the tiled unpack
+  // op.
+  bool isPerfectTilingCase = true;
+
   int64_t outputRank = getOutputRank();
   Attribute zeroAttr = builder.getIndexAttr(0);
   Attribute oneAttr = builder.getIndexAttr(1);
@@ -2240,27 +2249,28 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
       continue;
     }
 
-    // Get the upper bound because the "output_size * inner_tile_size" could
-    // be less than input size. The sizes are determined by loop bound and
-    // step, where loop bound is the size of output shape. In incomplete tile
-    // cases, the input could have larger shape, it is safe to extend the
-    // boundary because they are pre-padded. I.e., the size of input dim is
-    // always aligned to inner_tile_size.
     FailureOr<int64_t> cstSize = linalg::getConstantUpperBoundForIndex(
         getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]));
     Optional<int64_t> cstInnerSize =
         getConstantIntValue(dimAndTileMapping[dim]);
-    if (!failed(cstSize) && cstInnerSize &&
-        cstSize.value() % cstInnerSize.value() == 0) {
-      inputIndices.push_back(div(offsets[dim], dimAndTileMapping[dim]));
-      inputSizes.push_back(
-          builder.getIndexAttr(cstSize.value() / cstInnerSize.value()));
-      outputNewOffsets.push_back(zeroAttr);
-      outputExpandedSizes.push_back(sizes[dim]);
-      continue;
+    bool isAlignedToInnerTileSize = false;
+    if (!failed(cstSize) && cstInnerSize) {
+      // If the tiling size equals to the inner tiling size, the outer dims are
+      // always 1.
+      if (cstInnerSize.value() == cstSize.value()) {
+        inputIndices.push_back(floorDiv(offsets[dim], dimAndTileMapping[dim]));
+        inputSizes.push_back(builder.getIndexAttr(1));
+        outputNewOffsets.push_back(zeroAttr);
+        outputExpandedSizes.push_back(sizes[dim]);
+        continue;
+      }
+      if (cstSize.value() % cstInnerSize.value() == 0)
+        isAlignedToInnerTileSize = true;
     }
 
-    isInputDivisable = false;
+    if (!isAlignedToInnerTileSize)
+      isPerfectTilingCase = false;
+
     DivModValue firstCoord = getDivMod(
         builder, loc,
         getValueOrCreateConstantIndexOp(builder, loc, offsets[dim]),
@@ -2271,18 +2281,32 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
             builder, loc, sub(add(offsets[dim], sizes[dim]), oneAttr)),
         getValueOrCreateConstantIndexOp(builder, loc, dimAndTileMapping[dim]));
 
-    inputIndices.push_back(firstCoord.quotient);
-    inputSizes.push_back(
-        add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
-    outputNewOffsets.push_back(firstCoord.remainder);
+    if (isAlignedToInnerTileSize) {
+      inputIndices.push_back(floorDiv(offsets[dim], dimAndTileMapping[dim]));
+      outputNewOffsets.push_back(zeroAttr);
+      outputExpandedSizes.push_back(sizes[dim]);
 
-    AffineExpr i, tile;
-    bindDims(builder.getContext(), i);
-    bindSymbols(builder.getContext(), tile);
-    OpFoldResult size = makeComposedFoldedAffineApply(
-        builder, loc, i * tile,
-        ArrayRef<OpFoldResult>{inputSizes.back(), dimAndTileMapping[dim]});
-    outputExpandedSizes.push_back(size);
+      // The ceilDiv is needed here because there could be incomplete tile even
+      // it is perfect tiling cases. E.g.,
+      //   %0 = unpack tensor<33x2xf32> into tensor<64xf32>
+      // If the tiling size is 32, there will be three tiles. Two of them have
+      // size=32; one of them have size=2. The size is represented using
+      // affine_min op; we need ceilDiv.
+      inputSizes.push_back(ceilDiv(sizes[dim], dimAndTileMapping[dim]));
+    } else {
+      inputIndices.push_back(firstCoord.quotient);
+      inputSizes.push_back(
+          add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
+      outputNewOffsets.push_back(firstCoord.remainder);
+
+      AffineExpr i, tile;
+      bindDims(builder.getContext(), i);
+      bindSymbols(builder.getContext(), tile);
+      OpFoldResult size = makeComposedFoldedAffineApply(
+          builder, loc, i * tile,
+          ArrayRef<OpFoldResult>{inputSizes.back(), dimAndTileMapping[dim]});
+      outputExpandedSizes.push_back(size);
+    }
   }
 
   // The tiling is applied on output dimensions. We have to apply the
@@ -2307,7 +2331,7 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
                                    inputSizes, inputStrides));
 
   SmallVector<OpFoldResult> outputStrides(outputRank, oneAttr);
-  if (isInputDivisable) {
+  if (isPerfectTilingCase) {
     tiledOperands.push_back(
         getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides));
   } else {
@@ -2326,7 +2350,7 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
       cast<DestinationStyleOpInterface>(getOperation())
           .clone(builder, loc, tiledResultTypes, tiledOperands);
 
-  if (isInputDivisable)
+  if (isPerfectTilingCase)
     return {tiledUnpackOp};
 
   Operation *extractSlice = builder.create<tensor::ExtractSliceOp>(

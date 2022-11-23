@@ -48,7 +48,6 @@ struct LinalgSingleTilingExpertPassOptions {
   std::string anchorOpName = "";
   SmallVector<int64_t> tileSizes = {};
   SmallVector<int64_t> tileInterchange = {};
-  SmallVector<int64_t> peeledLoops = {};
   bool pad = false;
   SmallVector<std::string> paddingValues = {};
   SmallVector<int64_t> packPaddings = {};
