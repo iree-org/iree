@@ -256,6 +256,38 @@ LinalgTilingPattern::returningMatchAndRewrite(linalg::LinalgOp op,
   return res;
 }
 
+/// Linalg SCF tiling pattern.
+LinalgSCFTilingPattern::LinalgSCFTilingPattern(
+    MLIRContext *context, scf::SCFTilingOptions options,
+    LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
+    : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
+      filter(std::move(f)), options(std::move(options)) {}
+
+LinalgSCFTilingPattern::LinalgSCFTilingPattern(
+    StringRef opName, MLIRContext *context, scf::SCFTilingOptions options,
+    LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
+    : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
+      filter(f.addOpNameFilter(opName)), options(std::move(options)) {}
+
+LogicalResult LinalgSCFTilingPattern::returningMatchAndRewrite(
+    TilingInterface op, PatternRewriter &rewriter) const {
+  if (failed(filter.checkAndNotify(rewriter, op)))
+    return failure();
+
+  FailureOr<scf::SCFTilingResult> tiledResults =
+      scf::tileUsingSCFForOp(rewriter, op, options);
+  if (failed(tiledResults))
+    return failure();
+
+  rewriter.replaceOp(op, tiledResults->replacements);
+
+  for (auto tiledOp : tiledResults->tiledOps) {
+    filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
+  }
+
+  return success();
+}
+
 LinalgVectorizationPattern::LinalgVectorizationPattern(
     MLIRContext *context, LinalgExt::LinalgTransformationFilter f,
     PatternBenefit benefit)
@@ -445,9 +477,9 @@ struct LinalgStrategyTilePass
 
   LinalgStrategyTilePass() = default;
 
-  LinalgStrategyTilePass(StringRef opName, linalg::LinalgTilingOptions opt,
+  LinalgStrategyTilePass(StringRef opName, scf::SCFTilingOptions options,
                          LinalgExt::LinalgTransformationFilter filt)
-      : options(std::move(opt)), filter(std::move(filt)) {
+      : options(std::move(options)), filter(std::move(filt)) {
     this->anchorOpName.setValue(opName.str());
   }
 
@@ -459,16 +491,15 @@ struct LinalgStrategyTilePass
     MLIRContext *ctx = funcOp.getContext();
     RewritePatternSet tilingPattern(ctx);
     if (!anchorOpName.empty())
-      tilingPattern.add<LinalgTilingPattern>(anchorOpName, ctx, options,
-                                             filter);
+      tilingPattern.add<LinalgSCFTilingPattern>(anchorOpName, ctx, options,
+                                                filter);
     else
-      tilingPattern.add<LinalgTilingPattern>(ctx, options, filter);
-    if (anchorOpName == tensor::PadOp::getOperationName())
-      populatePadTensorTilingPatterns(tilingPattern, options);
+      tilingPattern.add<LinalgSCFTilingPattern>(ctx, options, filter);
+
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(tilingPattern));
   }
 
-  linalg::LinalgTilingOptions options;
+  scf::SCFTilingOptions options;
   LinalgExt::LinalgTransformationFilter filter;
 };
 
@@ -765,9 +796,9 @@ createLinalgStrategyTileAndFusePass(
 
 /// Create a LinalgStrategyTilePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
-    StringRef opName, const linalg::LinalgTilingOptions &opt,
+    StringRef opName, const scf::SCFTilingOptions &options,
     const LinalgExt::LinalgTransformationFilter &filter) {
-  return std::make_unique<LinalgStrategyTilePass>(opName, opt, filter);
+  return std::make_unique<LinalgStrategyTilePass>(opName, options, filter);
 }
 
 /// Create a LinalgStrategyPadPass.

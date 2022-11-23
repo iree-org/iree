@@ -10,6 +10,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -202,7 +203,7 @@ createLinalgStrategyTileAndFusePass(
 /// Create a LinalgStrategyTilePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
     StringRef opName = "",
-    const linalg::LinalgTilingOptions &opt = linalg::LinalgTilingOptions(),
+    const scf::SCFTilingOptions &options = scf::SCFTilingOptions(),
     const LinalgExt::LinalgTransformationFilter &filter =
         LinalgExt::LinalgTransformationFilter());
 
