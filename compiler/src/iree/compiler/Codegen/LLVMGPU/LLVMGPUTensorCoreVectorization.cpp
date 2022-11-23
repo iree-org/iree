@@ -104,8 +104,7 @@ struct CombineTransferReadOpBroadcast final
   }
 };
 
-static Optional<SmallVector<int64_t, 4>> getGPUTCNativeVectorSize(
-    Operation *op) {
+static Optional<SmallVector<int64_t>> getGPUTCNativeVectorSize(Operation *op) {
   // Currently hardcode the size of wmma operation. When more cases are
   // supported this should be picked based on what the backend supports.
   int64_t m = 16;
@@ -116,14 +115,12 @@ static Optional<SmallVector<int64_t, 4>> getGPUTCNativeVectorSize(
       k = contract.getLhsType().getElementType().isF16() ? 8 : 4;
     else
       k = contract.getLhsType().getElementType().isF16() ? 16 : 8;
-    SmallVector<int64_t, 4> nativeSize(contract.getIteratorTypes().size() - 3,
-                                       1);
+    SmallVector<int64_t> nativeSize(contract.getIteratorTypes().size() - 3, 1);
     nativeSize.append({m, n, k});
     return nativeSize;
   }
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
-    SmallVector<int64_t, 4> nativeSize(writeOp.getVectorType().getRank() - 2,
-                                       1);
+    SmallVector<int64_t> nativeSize(writeOp.getVectorType().getRank() - 2, 1);
     nativeSize.append({m, n});
     return nativeSize;
   }
@@ -138,11 +135,11 @@ static Optional<SmallVector<int64_t, 4>> getGPUTCNativeVectorSize(
       if (sliceType && sliceType != vecType) return llvm::None;
       sliceType = vecType;
     }
-    return llvm::to_vector<4>(sliceType.getShape());
+    return llvm::to_vector<>(sliceType.getShape());
   }
   if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
-      SmallVector<int64_t, 4> nativeSize(vecType.getRank() - 2, 1);
+      SmallVector<int64_t> nativeSize(vecType.getRank() - 2, 1);
       // Map elementwise ops to the output shape.
       nativeSize.append({m, n});
       return nativeSize;

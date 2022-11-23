@@ -49,7 +49,7 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     return failure();
   }
 
-  SmallVector<OpFoldResult, 4> targetShape = getMixedSizes(
+  SmallVector<OpFoldResult, 4> targetShape = getMixedValues(
       builder.getIndexArrayAttr(dispatchTensorType.getShape()), dynamicDims);
   SmallVector<OpFoldResult> innerTileSizes = llvm::to_vector(llvm::map_range(
       encodingInfo->innerTileSizes,

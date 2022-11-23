@@ -592,8 +592,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     (`outer_dims_perm` `=` $outer_dims_perm^)?
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
-    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
-                             "ShapedType::kDynamic")
+    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles)
     `into` $outputs `:` `(` type($inputs) type($outputs) `)`
      (`->` type($results)^)?
   }];
@@ -744,8 +743,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
     (`outer_dims_perm` `=` $outer_dims_perm^)?
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
-    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
-                             "ShapedType::kDynamic")
+    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles)
     `into` $outputs `:` `(` type($inputs) type($outputs) `)`
      (`->` type($results)^)?
   }];
