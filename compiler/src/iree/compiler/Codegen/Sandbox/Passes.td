@@ -101,8 +101,6 @@ def LinalgSingleTilingExpert
     ListOption<"tileInterchange", "tile-interchange", "int64_t",
                 "Tile loop interchange",
                 "llvm::cl::ZeroOrMore">,
-    ListOption<"peeledLoops", "peeled-loops", "int64_t", "Peeled loops",
-               "llvm::cl::ZeroOrMore">,
     Option<"pad", "pad", "bool", /*default=*/"false",
       "Pad the anchor op operands.">,
     ListOption<"paddingValues", "padding-values", "std::string",

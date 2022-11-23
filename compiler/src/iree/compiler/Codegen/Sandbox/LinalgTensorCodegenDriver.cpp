@@ -254,7 +254,6 @@ struct LinalgSingleTilingExpertPass
     this->anchorOpName = options.anchorOpName;
     this->tileSizes = options.tileSizes;
     this->tileInterchange = options.tileInterchange;
-    this->peeledLoops = options.peeledLoops;
     this->pad = options.pad;
     this->paddingValues = options.paddingValues;
     this->packPaddings = options.packPaddings;
