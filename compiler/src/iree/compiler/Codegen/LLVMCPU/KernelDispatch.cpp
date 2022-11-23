@@ -1065,13 +1065,13 @@ static LogicalResult setRootConfig(
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(op);
 
   // Fixup for making tileSizes be multiple of inner_tile_sizes.
-  DenseMap<int64_t, OpFoldResult> tileAndPosMapping = op.getDimAndTileMapping();
-  for (int i = 0, e = tileSizes.size(); i < e; ++i) {
-    if (!tileAndPosMapping.count(i)) continue;
-    if (tileSizes[i] == 0) continue;
-    Optional<int64_t> cst = getConstantIntValue(tileAndPosMapping[i]);
-    if (!cst) continue;
-    tileSizes[i] = llvm::alignDown(tileSizes[i], cst.value());
+  SmallVector<int64_t> innerTiles = op.getStaticTiles();
+  SmallVector<int64_t> dimPos = extractFromI64ArrayAttr(op.getInnerDimsPos());
+  for (auto it : llvm::zip(dimPos, innerTiles)) {
+    int64_t pos = std::get<0>(it);
+    int64_t size = std::get<1>(it);
+    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+    tileSizes[pos] = llvm::alignDown(tileSizes[pos], size);
   }
 
   TileSizesListType tileSizesList = {tileSizes};
