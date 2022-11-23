@@ -223,6 +223,36 @@ public:
 };
 
 ///
+/// Linalg SCF tile and fuse patterns.
+///
+/// `filter` controls LinalgTransformMarker matching and update when specified.
+struct LinalgSCFTileAndFusePattern
+    : public OpInterfaceRewritePattern<TilingInterface> {
+  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
+  LinalgSCFTileAndFusePattern(
+      MLIRContext *context,
+      scf::SCFTileAndFuseOptions options = scf::SCFTileAndFuseOptions(),
+      LinalgTransformationFilter f = LinalgTransformationFilter(),
+      PatternBenefit benefit = 1);
+
+  /// Construct a pattern specifically applied to `opName`.
+  LinalgSCFTileAndFusePattern(
+      StringRef opName, MLIRContext *context,
+      scf::SCFTileAndFuseOptions options = scf::SCFTileAndFuseOptions(),
+      LinalgTransformationFilter f = LinalgTransformationFilter(),
+      PatternBenefit benefit = 1);
+
+  LogicalResult matchAndRewrite(TilingInterface op,
+                                PatternRewriter &rewriter) const override;
+
+private:
+  /// LinalgTransformMarker handles special attribute manipulations.
+  LinalgTransformationFilter filter;
+
+  scf::SCFTileAndFuseOptions options;
+};
+
+///
 /// Linalg vectorization patterns.
 ///
 /// `filter` controls LinalgTransformMarker matching and update when specified.
@@ -268,37 +298,6 @@ public:
                                              patterns.getContext(), f);
     VectorizationPatterns<OpTypes...>::insert(patterns, f);
   }
-};
-
-///
-/// Linalg tile and fuse patterns.
-///
-/// `filter` controls LinalgTransformMarker matching and update when specified.
-/// See `vectorizeLinalgOp` for more details.
-struct LinalgTileAndFusePattern
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
-  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
-  LinalgTileAndFusePattern(
-      MLIRContext *context,
-      scf::SCFTileAndFuseOptions options = scf::SCFTileAndFuseOptions(),
-      LinalgTransformationFilter f = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1);
-
-  /// Construct a pattern specifically applied to `opName`.
-  LinalgTileAndFusePattern(
-      StringRef opName, MLIRContext *context,
-      scf::SCFTileAndFuseOptions options = scf::SCFTileAndFuseOptions(),
-      LinalgTransformationFilter f = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1);
-
-  LogicalResult matchAndRewrite(linalg::LinalgOp op,
-                                PatternRewriter &rewriter) const override;
-
-private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  LinalgTransformationFilter filter;
-
-  scf::SCFTileAndFuseOptions options;
 };
 
 ///

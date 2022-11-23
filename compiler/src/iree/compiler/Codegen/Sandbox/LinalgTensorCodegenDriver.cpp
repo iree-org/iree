@@ -62,10 +62,10 @@ static FailureOr<Operation *> getRootOp(func::FuncOp funcOp) {
 /// scf::tileUsingSCFForOp expects the num of tile sizes = num of loops. This
 /// method returns a proper tile sizes vector for each op during tiling.
 static SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
-                                              SmallVector<int64_t> tileSizes) {
+                                              ArrayRef<int64_t> tileSizes) {
   auto tilingOp = cast<TilingInterface>(op);
 
-  SmallVector<int64_t> newTileSizes = tileSizes;
+  SmallVector<int64_t> newTileSizes = llvm::to_vector(tileSizes);
   newTileSizes.resize(tilingOp.getLoopIteratorTypes().size(), /*default=*/0);
 
   OpBuilder::InsertionGuard guard(b);
@@ -146,59 +146,44 @@ static LogicalResult getPaddingDims(func::FuncOp funcOp,
 /// Default method to initialize the tiling options for fusion in IREE. These
 /// could be ovveridden by the command line options if specified.
 static LogicalResult getTileAndFuseOptionsFromConfig(
-    linalg::LinalgOp rootOp, int64_t tilingLevel,
-    SmallVector<int64_t> &tileSizes, SmallVector<int64_t> &tileInterchange) {
+    func::FuncOp funcOp, int64_t tilingLevel,
+    SmallVector<int64_t> &tileAndFuseSizes, SmallVector<int64_t> &tileOnlySizes,
+    SmallVector<int64_t> &tileInterchange) {
   if (tilingLevel == -1) {
     return success();
   }
 
+  FailureOr<Operation *> rootOp = getRootOp(funcOp);
+  if (failed(rootOp) || !rootOp.value()) return failure();
+  auto tilingOp = cast<TilingInterface>(rootOp.value());
+
   iree_compiler::IREE::Codegen::LoweringConfigAttr loweringConfig =
-      iree_compiler::getLoweringConfig(rootOp);
-  tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
-  tileInterchange = loweringConfig.getTileInterchangeVals(tilingLevel);
-  return success();
-}
+      iree_compiler::getLoweringConfig(tilingOp);
+  SmallVector<int64_t> tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
 
-static SmallVector<Value> clipAndCreateTileSize(
-    OpBuilder &b, Operation *op, SmallVector<int64_t> tileSizes) {
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  assert(linalgOp && "can only compute tile size on linalg ops");
-
-  SmallVector<int64_t> clippedTileSizes =
-      tileSizes.size() <= linalgOp.getNumLoops()
-          ? tileSizes
-          : SmallVector<int64_t>(tileSizes.begin(),
-                                 tileSizes.begin() + linalgOp.getNumLoops());
-
-  OpBuilder::InsertionGuard guard(b);
-  b.setInsertionPointToStart(
-      &op->getParentOfType<func::FuncOp>().getBody().front());
-  return llvm::to_vector<4>(map_range(clippedTileSizes, [&](int64_t s) {
-    Value v = b.create<arith::ConstantIndexOp>(op->getLoc(), s);
-    return v;
-  }));
-}
-
-static LogicalResult populateTileAndFuseOptions(
-    linalg::LinalgOp rootOp, ArrayRef<int64_t> tileSizes,
-    ArrayRef<int64_t> tileInterchange,
-    scf::SCFTileAndFuseOptions &tileAndFuseOptions,
-    linalg::LinalgTilingOptions &tilingOptions) {
-  SmallVector<int64_t> tileAndFuseSizes;
-  SmallVector<int64_t> tileOnlySizes;
-  // Splits the tileSizes into two sizes. We want to tile-and-fuse on parallel
-  // dims and tile-only on reduction dims.
-  auto iteratorTypes = rootOp.getIteratorTypesArray();
-  for (unsigned i = 0; i < tileSizes.size() && i < rootOp.getNumLoops(); ++i) {
-    if (linalg::isParallelIterator(iteratorTypes[i])) {
-      tileAndFuseSizes.push_back(tileSizes[i]);
-      tileOnlySizes.push_back(0);
+  auto iteratorTypes = tilingOp.getLoopIteratorTypes();
+  tileAndFuseSizes = SmallVector<int64_t>(iteratorTypes.size(), /*default=*/0);
+  tileOnlySizes = SmallVector<int64_t>(iteratorTypes.size(), /*default=*/0);
+  // Splits the tileSizes into two sizes vectors. We want to tile-and-fuse on
+  // parallel dims and tile-only on reduction dims.
+  for (size_t i = 0; i < tileSizes.size() && i < iteratorTypes.size(); ++i) {
+    if (iteratorTypes[i] == utils::IteratorType::parallel) {
+      tileAndFuseSizes[i] = tileSizes[i];
     } else {
-      tileAndFuseSizes.push_back(0);
-      tileOnlySizes.push_back(tileSizes[i]);
+      tileOnlySizes[i] = tileSizes[i];
     }
   }
 
+  tileInterchange = loweringConfig.getTileInterchangeVals(tilingLevel);
+
+  return success();
+}
+
+static void populateTileAndFuseOptions(
+    ArrayRef<int64_t> tileAndFuseSizes, ArrayRef<int64_t> tileOnlySizes,
+    ArrayRef<int64_t> tileInterchange,
+    scf::SCFTileAndFuseOptions &tileAndFuseOptions,
+    scf::SCFTilingOptions &tilingOptions) {
   auto anyNonZeroSizes = [](ArrayRef<int64_t> sizes) {
     return llvm::any_of(sizes, [](int64_t size) { return size > 0; });
   };
@@ -206,7 +191,7 @@ static LogicalResult populateTileAndFuseOptions(
   if (anyNonZeroSizes(tileAndFuseSizes)) {
     tileAndFuseOptions.tilingOptions.setTileSizeComputationFunction(
         [tileAndFuseSizes](OpBuilder &b, Operation *op) {
-          return clipAndCreateTileSize(b, op, tileAndFuseSizes);
+          return buildTileSizesForOp(b, op, tileAndFuseSizes);
         });
   }
   tileAndFuseOptions.tilingOptions.setInterchange(tileInterchange);
@@ -214,13 +199,10 @@ static LogicalResult populateTileAndFuseOptions(
   if (anyNonZeroSizes(tileOnlySizes)) {
     tilingOptions.setTileSizeComputationFunction(
         [tileOnlySizes](OpBuilder &b, Operation *op) {
-          return clipAndCreateTileSize(b, op, tileOnlySizes);
+          return buildTileSizesForOp(b, op, tileOnlySizes);
         });
   }
-  tilingOptions.setInterchange(
-      SmallVector<unsigned>(tileInterchange.begin(), tileInterchange.end()));
-
-  return success();
+  tilingOptions.setInterchange(tileInterchange);
 }
 
 /// Default method to initialize the split reduction size in IREE. These could
@@ -377,33 +359,29 @@ struct OutlineOneParentLoopPass
 void LinalgFusePass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
 
-  FailureOr<Operation *> rootOp = getRootOp(funcOp);
-  if (failed(rootOp)) return;
-  auto linalgRootOp = dyn_cast<linalg::LinalgOp>(rootOp.value());
-  if (!linalgRootOp) return;
-
   // Set up tiling and vectorization options.
-  SmallVector<int64_t> derivedTileSizes;
+  SmallVector<int64_t> derivedTileAndFuseSizes;
+  SmallVector<int64_t> derivedTileOnlySizes;
   SmallVector<int64_t> derivedTileInterchange;
-  if (failed(getTileAndFuseOptionsFromConfig(linalgRootOp, tilingLevel,
-                                             derivedTileSizes,
-                                             derivedTileInterchange))) {
+  if (failed(getTileAndFuseOptionsFromConfig(
+          funcOp, tilingLevel, derivedTileAndFuseSizes, derivedTileOnlySizes,
+          derivedTileInterchange))) {
     return;
   }
   if (!tileSizes.empty()) {
-    derivedTileSizes = llvm::to_vector(tileSizes);
+    // If tile sizes are from the option, we interpret it as the sizes for
+    // tile-and-fuse.
+    derivedTileAndFuseSizes = llvm::to_vector(tileSizes);
+    derivedTileOnlySizes.clear();
   }
   if (!tileInterchange.empty()) {
     derivedTileInterchange = llvm::to_vector(tileInterchange);
   }
-
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
-  linalg::LinalgTilingOptions tilingOptions;
-  if (failed(populateTileAndFuseOptions(linalgRootOp, derivedTileSizes,
-                                        derivedTileInterchange,
-                                        tileAndFuseOptions, tilingOptions))) {
-    return;
-  }
+  scf::SCFTilingOptions tilingOptions;
+  populateTileAndFuseOptions(derivedTileAndFuseSizes, derivedTileOnlySizes,
+                             derivedTileInterchange, tileAndFuseOptions,
+                             tilingOptions);
   bool doTileAndFuse =
       tileAndFuseOptions.tilingOptions.tileSizeComputationFunction != nullptr;
   bool doTiling = tilingOptions.tileSizeComputationFunction != nullptr;
