@@ -69,10 +69,8 @@ static SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
   newTileSizes.resize(tilingOp.getLoopIteratorTypes().size(), /*default=*/0);
 
   OpBuilder::InsertionGuard guard(b);
-  b.setInsertionPointToStart(
-      &op->getParentOfType<func::FuncOp>().getBody().front());
   return llvm::to_vector(map_range(newTileSizes, [&](int64_t size) {
-    Value v = b.create<arith::ConstantIndexOp>(op->getLoc(), size);
+    Value v = b.create<arith::ConstantIndexOp>(tilingOp->getLoc(), size);
     return v;
   }));
 }
