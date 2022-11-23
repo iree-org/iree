@@ -38,6 +38,24 @@ COPY build_tools/docker/context/install_iree_deps.sh ./
 RUN ./install_iree_deps.sh "${LLVM_VERSION}" \
   && rm -rf /install-basics
 
+######## sccache ########
+
+WORKDIR /install-sccache
+ARG SCCACHE_VERSION=0.3.1
+
+RUN curl --silent --show-error --fail --location \
+    https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz \
+    --output sccache.tar.gz \
+    https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz.sha256 \
+    --output sccache.tar.gz.sha256 \
+  # Yes, it does seem really weird to have a `cat` inside of an `echo` here.
+  # IDK why the input format for shasum is so unfriendly.
+  && echo "$(cat sccache.tar.gz.sha256) *sccache.tar.gz" | shasum --algorithm 256 --check \
+  && tar -xvf sccache.tar.gz --strip-components=1 \
+  && chmod +x sccache \
+  && cp sccache /usr/bin/ \
+  && rm -rf /install-sccache
+
 ######## CMake ########
 WORKDIR /install-cmake
 
