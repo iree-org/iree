@@ -630,11 +630,11 @@ jobs:
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
         run: |
           # Not archiving the directory to allow fetching each file as needed
-          # separately. The option `--gzip-local-all` compresses files first
-          # and upload them to the GCS in the gzip format. The files can be
-          # either on-the-fly or manually uncompressed when being downloaded.
-          # More details: https://cloud.google.com/storage/docs/transcoding
-          gcloud alpha storage cp -r --gzip-local-all "${E2E_TEST_ARTIFACTS_DIR}/iree" "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/iree"
+          # separately. The option `--gzip-in-flight` compresses the files
+          # during uploading to save traffic. The files are still uncompressed
+          # on GCS.
+          # More details: https://cloud.google.com/sdk/gcloud/reference/storage/cp#--gzip-in-flight-all
+          gcloud alpha storage cp -r --gzip-in-flight-all "${E2E_TEST_ARTIFACTS_DIR}/iree" "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/iree"
           echo "::set-output name=e2e-test-artifacts-gcs-artifact-dir::${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
 
   ############################## Crosscompilation ##############################

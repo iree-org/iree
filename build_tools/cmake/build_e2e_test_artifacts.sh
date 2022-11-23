@@ -8,6 +8,10 @@
 
 # Build e2e test artifacts using a host tools directory.
 # Designed for CI, but can be run locally.
+#
+# This is copied and modified from build_tools/cmake/build_benchmarks.sh.
+# We will remove build_tools/cmake/build_benchmarks.sh once everything has been
+# migrated.
 
 set -xeuo pipefail
 
