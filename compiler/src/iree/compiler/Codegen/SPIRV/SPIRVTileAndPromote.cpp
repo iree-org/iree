@@ -13,6 +13,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPUPatterns.h"
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
@@ -45,14 +46,11 @@ namespace iree_compiler {
 
 static void populateTilingReductionPatterns(
     RewritePatternSet &patterns,
-    IREE::LinalgExt::LinalgTransformationFilter filter) {
-  auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
-    return getTileSizes(builder, op, 2);
-  };
-
+    IREE::LinalgExt::LinalgTransformationFilter filter,
+    const linalg::TileSizeComputationFunction &computeFn) {
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setTileSizeComputationFunction(getTileSizeFn);
+                           .setTileSizeComputationFunction(computeFn);
   TilingPatterns<linalg::BatchMatmulOp, linalg::MatmulOp,
                  linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
@@ -63,12 +61,8 @@ static void populateTilingReductionPatterns(
 
 static void populateTilingToInvocationPatterns(
     RewritePatternSet &patterns,
-    IREE::LinalgExt::LinalgTransformationFilter filter) {
-  linalg::TileSizeComputationFunction getTileSizeFn = [&](OpBuilder &builder,
-                                                          Operation *op) {
-    return getTileSizes(builder, op, 1);
-  };
-
+    IREE::LinalgExt::LinalgTransformationFilter filter,
+    const linalg::TileSizeComputationFunction &computeFn) {
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
@@ -79,7 +73,7 @@ static void populateTilingToInvocationPatterns(
 
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setTileSizeComputationFunction(getTileSizeFn)
+                           .setTileSizeComputationFunction(computeFn)
                            .setDistributionOptions(distributionOptions);
 
   TilingPatterns<linalg::BatchMatmulOp, linalg::FillOp, linalg::GenericOp,
@@ -90,8 +84,6 @@ static void populateTilingToInvocationPatterns(
 // Promotion patterns
 //===----------------------------------------------------------------------===//
 
-static const char promoteLHSMarker[] = "promote_lhs";
-static const char promoteRHSMarker[] = "promote_rhs";
 static const char promoteBothMarker[] = "promote_lhs_and_rhs";
 
 template <typename T>
@@ -107,25 +99,11 @@ static void populatePromotionPatterns(RewritePatternSet &patterns,
                                         deallocateWorkgroupMemory)
           .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory)
           .setUseFullTileBuffers({false, false});
-  auto promoteLHSOptions = baseOptions.setOperandsToPromote({0});
-  auto promoteRHSOptions = baseOptions.setOperandsToPromote({1});
   auto promoteBothOptions = baseOptions.setOperandsToPromote({0, 1});
 
-  IREE::LinalgExt::LinalgTransformationFilter promoteLHSFilter(
-      {StringAttr::get(context, promoteLHSMarker)}, replaceMarker);
-  IREE::LinalgExt::LinalgTransformationFilter promoteRHSFilter(
-      {StringAttr::get(context, promoteRHSMarker)}, replaceMarker);
   IREE::LinalgExt::LinalgTransformationFilter promoteBothFilter(
       {StringAttr::get(context, promoteBothMarker)}, replaceMarker);
 
-  patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
-                  LinalgPromotionPattern<linalg::BatchMatmulOp>,
-                  LinalgPromotionPattern<linalg::GenericOp>>(
-      context, promoteLHSOptions, promoteLHSFilter);
-  patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
-                  LinalgPromotionPattern<linalg::BatchMatmulOp>,
-                  LinalgPromotionPattern<linalg::GenericOp>>(
-      context, promoteRHSOptions, promoteRHSFilter);
   patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
                   LinalgPromotionPattern<linalg::BatchMatmulOp>,
                   LinalgPromotionPattern<linalg::GenericOp>>(
@@ -159,6 +137,8 @@ class SPIRVTileAndPromotePass final
   void runOnOperation() override;
 
  private:
+  LogicalResult doPromoteCMatrix(func::FuncOp funcOp) const;
+
   // Whether to promote C matrix to use shared memory.
   bool promoteCMatrix = false;
   // Whether to skip thread level tiling and distribution.
@@ -173,22 +153,14 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) return;
 
+  auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
+  if (failed(threadTileComputeFn)) return signalPassFailure();
+  auto reductionTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 2);
+  if (failed(reductionTileComputeFn)) return signalPassFailure();
+
   // Promote C matrix and propagate the potential fill producer into the
   // allocation. This needs to be done before reduction tiling.
-  if (promoteCMatrix) {
-    RewritePatternSet patterns(&getContext());
-    populateContractPromotionPatterns(patterns, {2});
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
-    }
-    propagateSharedMemoryCopy(funcOp);
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After promoting C matrix ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
+  if (failed(doPromoteCMatrix(funcOp))) return signalPassFailure();
 
   StringLiteral markerAttrName =
       IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker;
@@ -202,7 +174,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
         {workgroupMarker}, kTiledMarker);
     // Not going through C matrix promotion we will have no marker..
     filter.setMatchByDefault();
-    populateTilingReductionPatterns(patterns, filter);
+    populateTilingReductionPatterns(patterns, filter, *reductionTileComputeFn);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError() << "failed tiling reduction";
       return signalPassFailure();
@@ -235,33 +207,12 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     // Attach markers to contract ops to drive promotion.
     funcOp.walk([&](linalg::LinalgOp op) {
       if (isMatmulOrBatchMatmul(op)) {
-        Value lhs = op.getDpsInputOperand(0)->get();
-        Value rhs = op.getDpsInputOperand(1)->get();
-        auto lhsType = lhs.getType().cast<ShapedType>();
-        auto rhsType = rhs.getType().cast<ShapedType>();
-
-        auto elementNumBits = lhsType.getElementTypeBitWidth();
-        assert(kMaxVectorNumBits % elementNumBits == 0);
-        const int vectorSize = kMaxVectorNumBits / elementNumBits;
-
-        const bool canPromoteLHS = canPerformVectorAccessUsingAllThreads(
-            lhsType.getShape(), totalThreads, vectorSize);
-        const bool canPromoteRHS = canPerformVectorAccessUsingAllThreads(
-            rhsType.getShape(), totalThreads, vectorSize);
-
-        StringAttr promoteMarker = workgroupMarker;
-        if (canPromoteLHS && canPromoteRHS) {
-          promoteMarker = StringAttr::get(context, promoteBothMarker);
-        } else if (canPromoteLHS) {
-          promoteMarker = StringAttr::get(context, promoteLHSMarker);
-        } else if (canPromoteRHS) {
-          promoteMarker = StringAttr::get(context, promoteRHSMarker);
-        }
+        auto promoteMarker = StringAttr::get(context, promoteBothMarker);
         op->setAttr(markerAttrName, promoteMarker);
       }
     });
 
-    RewritePatternSet promotionPatterns(&getContext());
+    RewritePatternSet promotionPatterns(context);
     populatePromotionPatterns(promotionPatterns, workgroupMarker);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(promotionPatterns)))) {
@@ -282,9 +233,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
       auto marker = linalgOp->getAttrOfType<StringAttr>(markerAttrName);
       if (!marker) return WalkResult::advance();
-      if (marker.getValue() == promoteLHSMarker ||
-          marker.getValue() == promoteRHSMarker ||
-          marker.getValue() == promoteBothMarker)
+      if (marker.getValue() == promoteBothMarker)
         linalgOp->removeAttr(markerAttrName);
       return WalkResult::advance();
     });
@@ -305,10 +254,11 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   });
 
   if (!skipThreadLevel) {  // Tile and distribute to invocations.
-    RewritePatternSet tilingPatterns(&getContext());
+    RewritePatternSet tilingPatterns(context);
     IREE::LinalgExt::LinalgTransformationFilter filter({workgroupMarker},
                                                        llvm::None);
-    populateTilingToInvocationPatterns(tilingPatterns, filter);
+    populateTilingToInvocationPatterns(tilingPatterns, filter,
+                                       *threadTileComputeFn);
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(tilingPatterns)))) {
       funcOp.emitOpError() << "failed tiling and distributing to invocations";
@@ -332,6 +282,36 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       llvm::dbgs() << "\n\n";
     });
   }
+}
+
+LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
+    func::FuncOp funcOp) const {
+  MLIRContext *context = funcOp.getContext();
+  if (!promoteCMatrix) return success();
+
+  // If there are no fused elementwise ops, we can avoid promoting C matrix.
+  SmallVector<Operation *> computeOps;
+  if (failed(getComputeOps(funcOp, computeOps)))
+    return funcOp.emitError("failed to get compute ops");
+  unsigned count = 0;
+  for (Operation *op : computeOps) {
+    if (!isa<linalg::FillOp>(op)) ++count;
+  }
+  if (count <= 1) return success();
+
+  RewritePatternSet patterns(context);
+  populateContractPromotionPatterns(patterns, {2});
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    return failure();
+  }
+  propagateSharedMemoryCopy(funcOp);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "--- After promoting C matrix ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+  return success();
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(

@@ -101,7 +101,7 @@ func.func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
 func.func @scatter_update_scalar_1D(
     %original: memref<8xi32>, %indices: memref<3x1xi32>,
     %updates: memref<3xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x1xi32>)
     outs(%original : memref<8xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -127,7 +127,7 @@ func.func @scatter_update_scalar_1D(
 func.func @scatter_add_scalar_2D(
     %original: memref<4x3xi32>, %indices: memref<3x2xi32>,
     %updates: memref<3xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x2xi32>)
     outs(%original : memref<4x3xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -158,7 +158,7 @@ func.func @scatter_add_scalar_2D(
 func.func @scatter_update_slice_2D(
     %original: memref<4x3xi32>, %indices: memref<2x1xi32>,
     %updates: memref<2x3xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<2x3xi32>, memref<2x1xi32>)
     outs(%original : memref<4x3xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -188,7 +188,7 @@ func.func @scatter_update_slice_2D(
 func.func @scatter_add_scalar_1D(
     %original: memref<8xi32>, %indices: memref<3x1xi32>,
     %updates: memref<3xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x1xi32>)
     outs(%original : memref<8xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -217,7 +217,7 @@ func.func @scatter_add_scalar_1D(
 func.func @scatter_add_slice_2D(
     %original: memref<4x3xi32>, %indices: memref<2x1xi32>,
     %updates: memref<2x3xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<2x3xi32>, memref<2x1xi32>)
     outs(%original : memref<4x3xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -247,7 +247,7 @@ func.func @scatter_add_slice_2D(
 func.func @scatter_update_scalar_dynamic_1D(
     %original: memref<?xi32>, %indices: memref<?x1xi32>,
     %updates: memref<?xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<?xi32>, memref<?x1xi32>)
     outs(%original : memref<?xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -273,7 +273,7 @@ func.func @scatter_update_scalar_dynamic_1D(
 func.func @scatter_add_scalar_dynamic_2D(
     %original: memref<?x?xi32>, %indices: memref<?x2xi32>,
     %updates: memref<?xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
     ins(%updates, %indices : memref<?xi32>, memref<?x2xi32>)
     outs(%original : memref<?x?xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -304,7 +304,7 @@ func.func @scatter_add_scalar_dynamic_2D(
 func.func @scatter_update_slice_dynamic_2D(
     %original: memref<?x?xi32>, %indices: memref<?x1xi32>,
     %updates: memref<?x?xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<?x?xi32>, memref<?x1xi32>)
     outs(%original : memref<?x?xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -331,6 +331,7 @@ func.func @scatter_update_slice_dynamic_2D(
 
 func.func @scatter_partial_slices(%arg0: memref<2x64x12xf32>, %arg1: memref<2x3xi32>, %arg2: memref<2x1x12xf32>) {
   iree_linalg_ext.scatter
+    dimension_map = [0, 1, 2]
     unique_indices(true)
     ins(%arg2, %arg1 : memref<2x1x12xf32>, memref<2x3xi32>)
     outs(%arg0 : memref<2x64x12xf32>) {
@@ -1001,31 +1002,27 @@ func.func @KCRS_to_KCRSsr(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x32
   return
 }
 
-// CHECK-DAG:   #[[MAP0:.*]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-// CHECK-DAG:   #[[MAP1:.*]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-// CHECK-DAG:   #[[MAP2:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
-// CHECK-DAG:   #[[MAP3:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
-// CHECK-LABEL: func.func @KCRS_to_KCRSsr(
+// CHECK-DAG:   #[[MAP0:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
+// CHECK-DAG:   #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
+// CHECK:       func.func @KCRS_to_KCRSsr(
 // CHECK-DAG:     %[[zero:.*]] = arith.constant 0 : index
 // CHECK-DAG:     %[[one:.*]] = arith.constant 1 : index
-// CHECK-DAG:     %[[eight:.*]] = arith.constant 8 : index
-// CHECK-DAG:     %[[thirtytwo:.*]] = arith.constant 32 : index
 // CHECK-DAG:     %[[two:.*]] = arith.constant 2 : index
 // CHECK-DAG:     %[[three:.*]] = arith.constant 3 : index
-// CHECK-DAG:     %[[dimZero:.*]] = memref.dim %arg0, %[[zero]] : memref<?x?x?x?xf32>
-// CHECK-DAG:     %[[dimOne:.*]] = memref.dim %arg0, %[[one]] : memref<?x?x?x?xf32>
-// CHECK-DAG:     %[[dimTwo:.*]] = memref.dim %arg0, %[[two]] : memref<?x?x?x?xf32>
-// CHECK-DAG:     %[[dimThree:.*]] = memref.dim %arg0, %[[three]] : memref<?x?x?x?xf32>
-// CHECK-DAG:     %[[mapOnDimTwo:.*]] = affine.apply #[[MAP0]]()[%[[dimTwo]]]
-// CHECK-DAG:     %[[mapOnDimThree:.*]] = affine.apply #[[MAP1]]()[%[[dimThree]]]
+// CHECK-DAG:     %[[eight:.*]] = arith.constant 8 : index
+// CHECK-DAG:     %[[thirtyTwo:.*]] = arith.constant 32 : index
+// CHECK-DAG:     %[[dimZero:.*]] = memref.dim %arg1, %[[zero]] : memref<?x?x?x?x8x32xf32>
+// CHECK-DAG:     %[[dimOne:.*]] = memref.dim %arg1, %[[one]] : memref<?x?x?x?x8x32xf32>
+// CHECK-DAG:     %[[dimTwo:.*]] = memref.dim %arg1, %[[two]] : memref<?x?x?x?x8x32xf32>
+// CHECK-DAG:     %[[dimThree:.*]] = memref.dim %arg1, %[[three]] : memref<?x?x?x?x8x32xf32>
 // CHECK:         scf.for %[[K:.*]] = %[[zero]] to %[[dimZero]] step %[[one]] {
 // CHECK:           scf.for %[[C:.*]] = %[[zero]] to %[[dimOne]] step %[[one]] {
-// CHECK:             scf.for %[[R:.*]] = %[[zero]] to %[[mapOnDimTwo]] step %[[one]] {
-// CHECK:               scf.for %[[S:.*]] = %[[zero]] to %[[mapOnDimThree]] step %[[one]] {
+// CHECK:             scf.for %[[R:.*]] = %[[zero]] to %[[dimTwo]] step %[[one]] {
+// CHECK:               scf.for %[[S:.*]] = %[[zero]] to %[[dimThree]] step %[[one]] {
 // CHECK:                 scf.for %[[s:.*]] = %[[zero]] to %[[eight]] step %[[step]] {
-// CHECK:                   scf.for %[[r:.*]] = %[[zero]] to %[[thirtytwo]] step %[[step]] {
-// CHECK-DAG:                 %[[affineMapR:.*]] = affine.apply #[[MAP2]](%[[R]], %[[r]])
-// CHECK-DAG:                 %[[affineMapS:.*]] = affine.apply #[[MAP3]](%[[S]], %[[s]])
+// CHECK:                   scf.for %[[r:.*]] = %[[zero]] to %[[thirtyTwo]] step %[[step]] {
+// CHECK-DAG:                 %[[affineMapR:.*]] = affine.apply #[[MAP0]](%[[R]], %[[r]])
+// CHECK-DAG:                 %[[affineMapS:.*]] = affine.apply #[[MAP1]](%[[S]], %[[s]])
 // CHECK:                     %[[scalar:.*]] = memref.load %arg0[%[[K]], %[[C]], %[[affineMapR]], %[[affineMapS]]] : memref<?x?x?x?xf32>
 // CHECK:                     memref.store %[[scalar]], %arg1[%[[K]], %[[C]], %[[R]], %[[S]], %[[s]], %[[r]]] : memref<?x?x?x?x8x32xf32>
 // CHECK:                   }
@@ -1042,33 +1039,31 @@ func.func @KCRS_to_KCRSsr(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x?x
   return
 }
 
-// CHECK-DAG:  #[[MAP0:.*]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
-// CHECK-DAG:  #[[MAP1:.*]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-// CHECK-DAG:  #[[MAP2:.*]] = affine_map<(d0, d1)[s0] -> (d0 * s0 + d1)>
-// CHECK-DAG:  #[[MAP3:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
+// CHECK-DAG:  #[[MAP0:.*]] = affine_map<(d0, d1)[s0] -> (d0 * s0 + d1)>
+// CHECK-DAG:  #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
 // CHECK:      func.func @KCRS_to_KCRSsr
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[zero:.*]] = arith.constant 0 : index
 // CHECK-DAG:     %[[one:.*]] = arith.constant 1 : index
-// CHECK-DAG:     %[[eight:.*]] = arith.constant 8 : index
 // CHECK-DAG:     %[[two:.*]] = arith.constant 2 : index
 // CHECK-DAG:     %[[three:.*]] = arith.constant 3 : index
-// CHECK-DAG:     %[[dimZero:.*]] = memref.dim %[[ARG0]], %[[zero]] : memref<?x?x?x?xf32>
-// CHECK-DAG:     %[[dimOne:.*]] = memref.dim %[[ARG0]], %[[one]] : memref<?x?x?x?xf32>
-// CHECK-DAG:     %[[dimTwo:.*]] = memref.dim %[[ARG0]], %[[two]] : memref<?x?x?x?xf32>
-// CHECK-DAG:     %[[dimThree:.*]] = memref.dim %[[ARG0]], %[[three]] : memref<?x?x?x?xf32>
-// CHECK-DAG:     %[[mapOnDimTwo:.*]] = affine.apply #[[MAP0]]()[%[[dimTwo]], %[[ARG2]]]
-// CHECK-DAG:     %[[mapOnDimThree:.*]] = affine.apply #[[MAP1]]()[%[[dimThree]]]
+// CHECK-DAG:     %[[eight:.*]] = arith.constant 8 : index
+// CHECK-DAG:     %[[five:.*]] = arith.constant 5 : index
+// CHECK-DAG:     %[[dimZero:.*]] = memref.dim %[[ARG1]], %[[zero]] : memref<?x?x?x?x8x?xf32>
+// CHECK-DAG:     %[[dimOne:.*]] = memref.dim %[[ARG1]], %[[one]] : memref<?x?x?x?x8x?xf32>
+// CHECK-DAG:     %[[dimTwo:.*]] = memref.dim %[[ARG1]], %[[two]] : memref<?x?x?x?x8x?xf32>
+// CHECK-DAG:     %[[dimThree:.*]] = memref.dim %[[ARG1]], %[[three]] : memref<?x?x?x?x8x?xf32>
 // CHECK:         scf.for %[[K:.*]] = %[[zero]] to %[[dimZero]] step %[[one]] {
 // CHECK:           scf.for %[[C:.*]] = %[[zero]] to %[[dimOne]] step %[[one]] {
-// CHECK:             scf.for %[[R:.*]] = %[[zero]] to %[[mapOnDimTwo]] step %[[one]] {
-// CHECK:               scf.for %[[S:.*]] = %[[zero]] to %[[mapOnDimThree]] step %[[one]] {
+// CHECK:             scf.for %[[R:.*]] = %[[zero]] to %[[dimTwo]] step %[[one]] {
+// CHECK:               scf.for %[[S:.*]] = %[[zero]] to %[[dimThree]] step %[[one]] {
+// CHECK:                 %[[dimFive:.*]] = memref.dim %[[ARG1]], %[[five]] : memref<?x?x?x?x8x?xf32>
 // CHECK:                 scf.for %[[s:.*]] = %[[zero]] to %[[eight]] step %[[step]] {
-// CHECK:                   scf.for %[[r:.*]] = %[[zero]] to %[[ARG2]] step %[[step]] {
-// CHECK-DAG:                 %[[affineMapR:.*]] = affine.apply #[[MAP2]](%[[R]], %[[r]])
-// CHECK-DAG:                 %[[affineMapS:.*]] = affine.apply #[[MAP3]](%[[S]], %[[s]])
+// CHECK:                   scf.for %[[r:.*]] = %[[zero]] to %[[dimFive]] step %[[step]] {
+// CHECK-DAG:                 %[[affineMapR:.*]] = affine.apply #[[MAP0]](%[[R]], %[[r]])[%[[ARG2]]]
+// CHECK-DAG:                 %[[affineMapS:.*]] = affine.apply #[[MAP1]](%[[S]], %[[s]])
 // CHECK:                     %[[scalar:.*]] = memref.load %[[ARG0]][%[[K]], %[[C]], %[[affineMapR]], %[[affineMapS]]] : memref<?x?x?x?xf32>
 // CHECK:                     memref.store %[[scalar]], %[[ARG1]][%[[K]], %[[C]], %[[R]], %[[S]], %[[s]], %[[r]]] : memref<?x?x?x?x8x?xf32>
 // CHECK:                   }
@@ -1417,3 +1412,32 @@ func.func @NPQK_to_NKPQk(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x2x56x56x
 // CHECK:             }
 // CHECK:           }
 // CHECK:         }
+
+// -----
+
+func.func @unpack(%arg0: memref<1x4x6x6x2xf32>, %arg1: memref<1x6x6x8xf32>) {
+  iree_linalg_ext.unpack %arg0 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [2] into %arg1 : (memref<1x4x6x6x2xf32> memref<1x6x6x8xf32>)
+  return 
+}
+
+// CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> (d0 floordiv 2)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0) -> (d0 mod 2)>
+// CHECK: func.func @unpack(
+// CHECK-SAME:  %[[INPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:  %[[OUTPUT:[a-zA-Z0-9]+]]
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C6:.+]] = arith.constant 6 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+// CHECK:     scf.for %[[I:.+]] = %[[C0]] to %[[C1]] step %[[C1]] {
+// CHECK:       scf.for %[[J:.+]] = %[[C0]] to %[[C6]] step %[[C1]] {
+// CHECK:         scf.for %[[K:.+]] = %[[C0]] to %[[C6]] step %[[C1]] {
+// CHECK:           scf.for %[[L:.+]] = %[[C0]] to %[[C8]] step %[[C1]] {
+// CHECK:             %[[APPLY_TILE:.+]] = affine.apply #[[MAP]](%[[L]])
+// CHECK:             %[[APPLY_LOOP:.+]] = affine.apply #[[MAP1]](%[[L]])
+// CHECK:             %[[LOAD:.+]] = memref.load %[[INPUT]][%[[I]], %[[APPLY_TILE]], %[[J]], %[[K]], %[[APPLY_LOOP]]] : memref<1x4x6x6x2xf32>
+// CHECK:             memref.store %[[LOAD]], %[[OUTPUT]][%[[I]], %[[J]], %[[K]], %[[L]]] : memref<1x6x6x8xf32>
+// CHECK:           }
+// CHECK:         }
+// CHECK:       }
+// CHECK:     }

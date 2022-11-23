@@ -66,54 +66,11 @@ class ConvertToDestinationPassingStylePass
 static Value getTensorLoadOpForTensorStoreOp(
     OpBuilder &b, IREE::Flow::DispatchTensorStoreOp storeOp) {
   // Clone the offset, size and stride values. They will be CSE-ed later.
-  Operation *parentOp = storeOp->getParentOp();
-  BlockAndValueMapping indexValMap;
-  llvm::SetVector<Operation *> slice;
-  auto cloneIndexValues = [&](ArrayRef<OpFoldResult> ofrs) {
-    SmallVector<OpFoldResult> clonedVals;
-    for (auto ofr : ofrs) {
-      // Just copy the attributes.
-      if (auto attr = ofr.dyn_cast<Attribute>()) {
-        clonedVals.push_back(attr);
-        continue;
-      }
-      Value val = ofr.get<Value>();
-      // If it is a block argument use the same value.
-      if (val.isa<BlockArgument>()) {
-        clonedVals.push_back(val);
-        continue;
-      }
-      // The slice of ops needed for index computation need to be cloned to
-      // avoid use-def violations. If the value has been cloned already, reuse
-      // that.
-      if (auto lookupVal = indexValMap.lookupOrNull(val)) {
-        clonedVals.push_back(lookupVal);
-        continue;
-      }
-      slice.clear();
-      getBackwardSlice(val, &slice, [&](Operation *sliceOp) {
-        return sliceOp->getParentOp() == parentOp;
-      });
-      for (auto sliceOp : slice) {
-        if (!indexValMap.contains(sliceOp->getResult(0))) {
-          b.clone(*sliceOp, indexValMap);
-        }
-      }
-      if (Operation *definingOp = val.getDefiningOp()) {
-        b.clone(*definingOp, indexValMap);
-      }
-      clonedVals.push_back(indexValMap.lookup(val));
-    }
-    return clonedVals;
-  };
-  SmallVector<OpFoldResult> loadOffsets, loadSizes, loadStrides;
-  loadOffsets = cloneIndexValues(storeOp.getMixedOffsets());
-  loadSizes = cloneIndexValues(storeOp.getMixedSizes());
-  loadStrides = cloneIndexValues(storeOp.getMixedStrides());
+  SliceAndDynamicDims clonedVals = cloneOffsetsSizesAndStrides(b, storeOp);
   Value tensorLoadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
       storeOp.getLoc(), storeOp.getValue().getType().cast<RankedTensorType>(),
-      storeOp.getTarget(), storeOp.getTargetDims(), loadOffsets, loadSizes,
-      loadStrides);
+      storeOp.getTarget(), clonedVals.dynamicDims, clonedVals.offsets,
+      clonedVals.sizes, clonedVals.strides);
   return tensorLoadOp;
 }
 
@@ -363,8 +320,8 @@ struct AdaptLinalgInputOperandToOutputOperand
     maps.push_back(op.getMatchingIndexingMap(operand));
 
     Location loc = op.getLoc();
-    SmallVector<StringRef> iterTypes(op.getNumLoops(),
-                                     getParallelIteratorTypeName());
+    SmallVector<utils::IteratorType> iterTypes(op.getNumLoops(),
+                                               utils::IteratorType::parallel);
     auto newOp = rewriter.create<linalg::GenericOp>(
         loc, op.getResultTypes(), newOperands, operand->get(), maps, iterTypes,
         /*bodyBuild=*/nullptr, PruneAttributeList(op));
@@ -443,6 +400,15 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
 
   if (failed(convertToDestinationPassingStyle(b, funcOp))) {
     return signalPassFailure();
+  }
+
+  // Add patterns to remove unused operands and results
+  {
+    RewritePatternSet patterns(context);
+    linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 }
 

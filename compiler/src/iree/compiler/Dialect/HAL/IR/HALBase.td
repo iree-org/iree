@@ -19,6 +19,18 @@ include "mlir/IR/SubElementInterfaces.td"
 // HAL enums
 //===----------------------------------------------------------------------===//
 
+// Wrapper over base I32EnumAttr to set common fields for HAL enums.
+class HAL_I32Enum<string name, string description, list<I32EnumAttrCase> cases>
+    : I32EnumAttr<name, description, cases> {
+  let genSpecializedAttr = 0;
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+class HAL_I32EnumAttr<string name, string description, string mnemonic,
+                      list<I32EnumAttrCase> cases>
+    : EnumAttr<HAL_Dialect, HAL_I32Enum<name, description, cases>, mnemonic> {
+  let assemblyFormat = "`<` $value `>`";
+}
+
 def HAL_MemoryModel_Unified : I32EnumAttrCase<"Unified", 0>;
 def HAL_MemoryModel_Discrete : I32EnumAttrCase<"Discrete", 1>;
 def HAL_MemoryModelAttr :
@@ -130,12 +142,10 @@ def HAL_CommandCategoryBitfieldAttr :
 def HAL_DescriptorType_UniformBuffer : I32EnumAttrCase<"UniformBuffer", 6, "uniform_buffer">;
 def HAL_DescriptorType_StorageBuffer : I32EnumAttrCase<"StorageBuffer", 7, "storage_buffer">;
 def HAL_DescriptorTypeAttr :
-    I32EnumAttr<"DescriptorType", "valid DescriptorType", [
+    HAL_I32EnumAttr<"DescriptorType", "valid DescriptorType", "descriptor_type", [
       HAL_DescriptorType_UniformBuffer,
       HAL_DescriptorType_StorageBuffer,
-    ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
-}
+    ]>;
 
 def HAL_DescriptorFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
 def HAL_DescriptorFlags_ReadOnly : I32BitEnumAttrCase<"ReadOnly", 0x0001>;
@@ -514,7 +524,7 @@ def HAL_InterfaceBindingAttr :
 
 def HAL_DeviceTargetAttr :
     AttrDef<HAL_Dialect, "DeviceTarget", [
-      DeclareAttrInterfaceMethods<SubElementAttrInterface>,
+      SubElementAttrInterface,
     ]> {
   let mnemonic = "device.target";
   let summary = [{generic device target specification}];
@@ -622,6 +632,12 @@ def HAL_ExecutableTargetAttr :
     // Returns a hal.match.* expression tree that specifically matches a
     // device that can load an executable of this target.
     Attribute getMatchExpression();
+
+    // Returns the executable target configuration for the given operation.
+    // This will recursively walk parent operations until one with the
+    // `hal.executable.target` attribute is found or a `hal.executable.variant`
+    // specifies a value. Returns nullptr if no target specification can be found.
+    static ExecutableTargetAttr lookup(Operation *op);
   }];
 
   let hasCustomAssemblyFormat = 1;

@@ -37,7 +37,6 @@ def generate_model_rule_map(
     model_url = urllib.parse.urlparse(model.source_url)
     if model_url.scheme == "https":
       cmake_rules = [
-          f'# Fetch the model from "{model.source_url}"\n' +
           cmake_builder.rules.build_iree_fetch_artifact(
               target_name=target_name,
               source_url=model.source_url,

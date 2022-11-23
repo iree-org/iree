@@ -42,6 +42,7 @@ iree_cc_library(
     MLIRLLVMToLLVMIRTranslation
     MLIRPDLDialect
     MLIRPDLInterpDialect
+    MLIRSupport
     MLIRTargetLLVMIRExport
     MLIRTransformDialect
     iree::compiler::Codegen::Common
@@ -98,7 +99,10 @@ iree_cc_library(
   SRCS
     "LinkerTool.cpp"
   DEPS
+    ::LLVMTargetOptions
+    LLVMCore
     LLVMSupport
+    MLIRSupport
     iree::compiler::Dialect::HAL::Target::LLVM::internal::LinkerTools_internal
     iree::compiler::Utils
   PUBLIC

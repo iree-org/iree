@@ -19,8 +19,8 @@ namespace LinalgExt {
 
 /// Structure to represent the result of tiling operation.
 struct TiledOp {
-  /// Tiled op.
-  Operation *op;
+  /// Tiled operations that are created during tiling.
+  SmallVector<Operation *> op;
   /// Loops generated during tiling.
   SmallVector<Operation *> loops;
   /// Values that are replacements for the untiled operations.

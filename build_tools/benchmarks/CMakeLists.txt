@@ -25,7 +25,7 @@ function(benchmark_tool_py_test)
     ${ARGN}
   )
 
-  iree_local_py_test(
+  iree_build_tools_py_test(
     NAME
       "${_RULE_NAME}"
     SRC

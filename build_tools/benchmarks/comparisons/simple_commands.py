@@ -135,6 +135,17 @@ class SimpleCommandFactory(BenchmarkCommandFactory):
                        driver=driver)
     commands.append(iree)
 
+    model_padfuse_name = self._model_name + "_padfuse"
+    iree_padfuse_model_path = os.path.join(self._base_dir, "models", "iree",
+                                           backend,
+                                           model_padfuse_name + ".vmfb")
+    iree_padfuse = IreeWrapper(self._iree_benchmark_binary_path,
+                               model_padfuse_name,
+                               iree_padfuse_model_path,
+                               self._function_input,
+                               driver=driver)
+    commands.append(iree_padfuse)
+
     # Test mmt4d only on mobile.
     if device == "mobile":
       model_mmt4d_name = self._model_name + "_mmt4d"

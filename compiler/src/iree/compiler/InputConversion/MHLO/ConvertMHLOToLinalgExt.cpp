@@ -15,8 +15,8 @@
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir-hlo/Dialect/mhlo/transforms/map_mhlo_to_scalar_op.h"
+#include "mhlo/IR/hlo_ops.h"
+#include "mhlo/transforms/map_mhlo_to_scalar_op.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -210,10 +210,6 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     if (indexVectorDim != indicesRank - 1) return false;
     if (scatterDimsToOperandDims.size() != indexDepth) return false;
 
-    for (auto en : llvm::enumerate(scatterDimsToOperandDims)) {
-      if (en.index() != en.value()) return false;
-    }
-
     auto insertedWindowDims = dimNumbers.getInsertedWindowDims();
     for (auto en : llvm::enumerate(insertedWindowDims)) {
       if (en.index() != en.value()) return false;
@@ -242,9 +238,16 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     Value indices = adaptor.getScatterIndices();
     Value updates = adaptor.getUpdates().front();
 
+    llvm::SmallVector<int64_t> scatterDimMap;
+    for (auto dim :
+         op.getScatterDimensionNumbers().getScatterDimsToOperandDims()) {
+      scatterDimMap.push_back(dim);
+    }
+
     auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
         op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
-        ValueRange{original}, op.getUniqueIndices());
+        ValueRange{original}, rewriter.getI64ArrayAttr(scatterDimMap),
+        op.getUniqueIndices());
 
     rewriter.inlineRegionBefore(op.getUpdateComputation(),
                                 scatterOp.getRegion(),
@@ -293,7 +296,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
 
     SmallVector<Value> dynSizes;
     for (auto en : llvm::enumerate(realType.getShape())) {
-      if (en.value() == ShapedType::kDynamicSize) {
+      if (en.value() == ShapedType::kDynamic) {
         dynSizes.push_back(b.create<tensor::DimOp>(real, en.index()));
       }
     }
@@ -304,7 +307,8 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     maps.push_back(
         AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
     maps.push_back(b.getMultiDimIdentityMap(rank));
-    SmallVector<StringRef> iterTypes(rank, getParallelIteratorTypeName());
+    SmallVector<utils::IteratorType> iterTypes(rank,
+                                               utils::IteratorType::parallel);
 
     Value indices = getBitReversalBuffer(b, fftLength);
     auto genericOp = b.create<linalg::GenericOp>(
@@ -382,7 +386,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     SmallVector<OpFoldResult> sizes;
     Value operand = adaptor.getOperand();
     for (auto dim : llvm::enumerate(operandType.getShape().drop_back())) {
-      if (dim.value() != ShapedType::kDynamicSize) {
+      if (dim.value() != ShapedType::kDynamic) {
         sizes.push_back(b.getIndexAttr(dim.value()));
       } else {
         sizes.push_back(b.createOrFold<tensor::DimOp>(operand, dim.index()));
@@ -414,7 +418,7 @@ struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
     Location loc = op.getLoc();
     SmallVector<Value> dynSizes;
     for (auto en : llvm::enumerate(ty.getShape())) {
-      if (en.value() == ShapedType::kDynamicSize) {
+      if (en.value() == ShapedType::kDynamic) {
         dynSizes.push_back(rewriter.create<tensor::DimOp>(
             loc, adaptor.getOperands()[0], en.index()));
       }
@@ -460,7 +464,7 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     // Define the output types based on the results of CHLO TopK
     SmallVector<Value> dynSizes;
     for (auto en : llvm::enumerate(inputValuesType.getShape())) {
-      if (en.value() == ShapedType::kDynamicSize) {
+      if (en.value() == ShapedType::kDynamic) {
         dynSizes.push_back(rewriter.create<tensor::DimOp>(
             loc, adaptor.getOperand(), en.index()));
       }

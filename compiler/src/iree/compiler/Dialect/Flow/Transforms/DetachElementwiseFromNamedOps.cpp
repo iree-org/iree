@@ -90,11 +90,11 @@ struct DetachElementwisePattern
     if (!outputMap.isIdentity()) return failure();
     SmallVector<AffineMap> maps(3, outputMap);
 
-    SmallVector<StringRef> iterators;
+    SmallVector<utils::IteratorType> iterators;
     iterators.reserve(outputMap.getNumResults());
     for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
       int pos = outputMap.getResult(i).cast<AffineDimExpr>().getPosition();
-      StringRef attr = linalgOp.getIteratorTypesArray()[pos];
+      auto attr = linalgOp.getIteratorTypesArray()[pos];
       if (!linalg::isParallelIterator(attr)) return failure();
       iterators.push_back(attr);
     }

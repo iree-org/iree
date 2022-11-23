@@ -1,4 +1,4 @@
-// RUN: iree-opt-tflite --split-input-file --allow-unregistered-dialect --pass-pipeline='iree-tflite-lower-global-tensors' %s | FileCheck %s
+// RUN: iree-opt-tflite --split-input-file --allow-unregistered-dialect --pass-pipeline='builtin.module(iree-tflite-lower-global-tensors)' %s | FileCheck %s
 
 module {
   // CHECK: ml_program.global private mutable @Variable(dense<1.000000e+00> : tensor<16x16xf32>)

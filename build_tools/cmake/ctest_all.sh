@@ -65,6 +65,28 @@ fi
 IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
 label_exclude_args+=(${extra_label_exclude_args[@]})
 
+# Some tests are just failing on some platforms and this filtering lets us
+# exclude any type of test. Ideally each test would be tagged with the
+# platforms it doesn't support, but that would require editing through layers
+# of CMake functions. Hopefully this list stays very short.
+declare -a excluded_tests=()
+if [[ "$OSTYPE" =~ ^msys ]]; then
+  # These tests are failing on Windows.
+  excluded_tests+=(
+    # TODO(#11077): Fix assert on task->pending_dependency_count atomic
+    "iree/tests/e2e/matmul/e2e_matmul_direct_i8_small_ukernel_vmvx_local-task"
+    "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_ukernel_vmvx_local-task"
+    # TODO(#11068): Fix compilation segfault
+    "iree/tests/e2e/regression/check_regression_llvm-cpu_lowering_config.mlir"
+    # TODO: Fix equality mismatch
+    "iree/tests/e2e/linalg_ext_ops/check_vmvx_ukernel_local-task_unpack.mlir"
+    # TODO(#11070): Fix argument/result signature mismatch
+    "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
+    # TODO(#11080): Fix arrays not matching in test_variant_list_buffers
+    "iree/runtime/bindings/python/vm_types_test"
+  )
+fi
+
 ctest_args=(
   "--test-dir ${BUILD_DIR}"
   "--timeout 900"
@@ -84,6 +106,16 @@ if (( ${#label_exclude_args[@]} )); then
   # Join on "|"
   label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
   ctest_args+=("--label-exclude ${label_exclude_regex}")
+fi
+
+if (( ${#excluded_tests[@]} )); then
+  # Prefix with `^` anchor
+  excluded_tests=( "${excluded_tests[@]/#/^}" )
+  # Suffix with `$` anchor
+  excluded_tests=( "${excluded_tests[@]/%/$}" )
+  # Join on `|` and wrap in parens
+  excluded_tests_regex="($(IFS="|" ; echo "${excluded_tests[*]?}"))"
+  ctest_args+=("--exclude-regex ${excluded_tests_regex}")
 fi
 
 echo "*************** Running CTest ***************"

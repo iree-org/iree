@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterUtils.h"
@@ -240,6 +241,8 @@ struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
 
   void runOnOperation() override {
     getOperation()->walk<WalkOrder::PreOrder>([&](Operation *nestedOp) {
+      if (isa<iree_compiler::IREE::LinalgExt::DoNotDCEOperandsOp>(nestedOp))
+        nestedOp->erase();
       if (isa<::mlir::transform::TransformOpInterface>(nestedOp)) {
         nestedOp->erase();
         return WalkResult::skip();

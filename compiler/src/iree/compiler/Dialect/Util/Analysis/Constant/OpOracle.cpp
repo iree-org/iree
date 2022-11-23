@@ -87,7 +87,7 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
   }
 
   // By default any effects make it non const-expr.
-  if (!MemoryEffectOpInterface::hasNoEffect(op)) {
+  if (!isMemoryEffectFree(op)) {
     return {};
   }
 

@@ -23,12 +23,11 @@ func.func @addWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> te
 func.func @dynamicBroadcast(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
   // Should broadcast %arg0 -> %arg1 and cf.assert on dynamic expansion.
 
-  // CHECK: %[[C0_0:.*]] = arith.constant 0 : index
-  // CHECK: %[[ARG0_D0:.*]] = tensor.dim %arg0, %[[C0_0]]
-  // CHECK: %[[C0_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[ARG1_D0:.*]] = tensor.dim %arg1, %[[C0_1]] : tensor<?x?xf32>
-  // CHECK: %[[C1_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[ARG1_D1:.*]] = tensor.dim %arg1, %[[C1_0]] : tensor<?x?xf32>
+  // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[ARG0_D0:.*]] = tensor.dim %arg0, %[[C0]]
+  // CHECK-DAG: %[[ARG1_D0:.*]] = tensor.dim %arg1, %[[C0]] : tensor<?x?xf32>
+  // CHECK-DAG: %[[ARG1_D1:.*]] = tensor.dim %arg1, %[[C1]] : tensor<?x?xf32>
   // CHECK: %[[EQ:.*]] = arith.cmpi eq, %[[ARG0_D0]], %[[ARG1_D1]] : index
   // CHECK: cf.assert %[[EQ]], "mismatched dynamic broadcast extents"
 
@@ -174,8 +173,8 @@ func.func @selectv2_broadcast_all(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi
 // CHECK: #map3 = affine_map<(d0, d1, d2) -> (0, 0, d2)>
 // CHECK-LABEL: func.func @selectv2_broadcast_dyn_pred
 func.func @selectv2_broadcast_dyn_pred(%arg0: tensor<?x1x1xi1>, %arg1: tensor<1x8x1xi32>, %arg2: tensor<1x1x8xi32>) -> tensor<?x8x8xi32> {
-  // CHECK: %[[C0_0:.*]] = arith.constant 0 : index
-  // CHECK: %[[DIM_PRED_0:.*]] = tensor.dim %arg0, %[[C0_0]]
+  // CHECK: %[[C0:.*]] = arith.constant 0 : index
+  // CHECK: %[[DIM_PRED_0:.*]] = tensor.dim %arg0, %[[C0]]
   // CHECK: %[[INIT_PRED:.*]] = tensor.empty(%[[DIM_PRED_0]])
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic
   //     CHECK-SAME: indexing_maps = [#map, #map1]
@@ -189,8 +188,7 @@ func.func @selectv2_broadcast_dyn_pred(%arg0: tensor<?x1x1xi1>, %arg1: tensor<1x
   //     CHECK-SAME: indexing_maps = [#map3, #map1]
   //     CHECK-SAME: ins(%arg2 : tensor<1x1x8xi32>) outs(%[[INIT_ELSE]] : tensor<?x8x8xi32>)
   // CHECK: %[[SHAPE_BCAST_THEN:.*]] = shape.shape_of %[[BCAST_THEN]]
-  // CHECK: %[[C0_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[DIM_BCAST_THEN_0:.*]] = tensor.extract %[[SHAPE_BCAST_THEN]][%[[C0_1]]]
+  // CHECK: %[[DIM_BCAST_THEN_0:.*]] = tensor.extract %[[SHAPE_BCAST_THEN]][%[[C0]]]
   // CHECK: %[[INIT_RESULT:.*]] = tensor.empty(%[[DIM_BCAST_THEN_0]])
   // CHECK: linalg.generic
   //     CHECK-SAME: ins(%[[BCAST_PRED]], %[[BCAST_THEN]], %[[BCAST_ELSE]] : tensor<?x8x8xi1>, tensor<?x8x8xi32>, tensor<?x8x8xi32>) outs(%[[INIT_RESULT]] : tensor<?x8x8xi32>)
@@ -201,8 +199,8 @@ func.func @selectv2_broadcast_dyn_pred(%arg0: tensor<?x1x1xi1>, %arg1: tensor<1x
 // -----
 // CHECK-LABEL: func.func @selectv2_broadcast_dyn_then
 func.func @selectv2_broadcast_dyn_then(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x?x1xi32>, %arg2: tensor<1x1x8xi32>) -> tensor<8x?x8xi32> {
-  // CHECK: %[[C1_0:.*]] = arith.constant 1 : index
-  // CHECK: %[[DIM_THEN_1:.*]] = tensor.dim %arg1, %[[C1_0]]
+  // CHECK: %[[C1:.*]] = arith.constant 1 : index
+  // CHECK: %[[DIM_THEN_1:.*]] = tensor.dim %arg1, %[[C1]]
   // CHECK: %[[INIT_PRED:.*]] = tensor.empty(%[[DIM_THEN_1]])
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic
   //     CHECK-SAME: indexing_maps = [#map, #map1]
@@ -216,8 +214,7 @@ func.func @selectv2_broadcast_dyn_then(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x
   //     CHECK-SAME: indexing_maps = [#map3, #map1]
   //     CHECK-SAME: ins(%arg2 : tensor<1x1x8xi32>) outs(%[[INIT_ELSE]] : tensor<8x?x8xi32>)
   // CHECK: %[[SHAPE_BCAST_THEN:.*]] = shape.shape_of %[[BCAST_THEN]]
-  // CHECK: %[[C1_1:.*]] = arith.constant 1 : index
-  // CHECK: %[[DIM_BCAST_THEN_1:.*]] = tensor.extract %[[SHAPE_BCAST_THEN]][%[[C1_1]]]
+  // CHECK: %[[DIM_BCAST_THEN_1:.*]] = tensor.extract %[[SHAPE_BCAST_THEN]][%[[C1]]]
   // CHECK: %[[INIT_RESULT:.*]] = tensor.empty(%[[DIM_BCAST_THEN_1]])
   // CHECK: linalg.generic
   //     CHECK-SAME: ins(%[[BCAST_PRED]], %[[BCAST_THEN]], %[[BCAST_ELSE]] : tensor<8x?x8xi1>, tensor<8x?x8xi32>, tensor<8x?x8xi32>) outs(%[[INIT_RESULT]] : tensor<8x?x8xi32>)
@@ -228,8 +225,8 @@ func.func @selectv2_broadcast_dyn_then(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x
 // -----
 // CHECK-LABEL: func.func @selectv2_broadcast_dyn_else
 func.func @selectv2_broadcast_dyn_else(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi32>, %arg2: tensor<1x1x?xi32>) -> tensor<8x8x?xi32> {
-  // CHECK: %[[C2_0:.*]] = arith.constant 2 : index
-  // CHECK: %[[DIM_ELSE_2:.*]] = tensor.dim %arg2, %[[C2_0]]
+  // CHECK: %[[C2:.*]] = arith.constant 2 : index
+  // CHECK: %[[DIM_ELSE_2:.*]] = tensor.dim %arg2, %[[C2]]
   // CHECK: %[[INIT_PRED:.*]] = tensor.empty(%[[DIM_ELSE_2]])
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic
   //     CHECK-SAME: indexing_maps = [#map, #map1]
@@ -244,8 +241,7 @@ func.func @selectv2_broadcast_dyn_else(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x
   //     CHECK-SAME: indexing_maps = [#map3, #map1]
   //     CHECK-SAME: ins(%arg2 : tensor<1x1x?xi32>) outs(%[[INIT_ELSE]] : tensor<8x8x?xi32>)
   // CHECK: %[[SHAPE_BCAST_THEN:.*]] = shape.shape_of %[[BCAST_THEN]]
-  // CHECK: %[[C2_1:.*]] = arith.constant 2 : index
-  // CHECK: %[[DIM_BCAST_THEN_1:.*]] = tensor.extract %[[SHAPE_BCAST_THEN]][%[[C2_1]]]
+  // CHECK: %[[DIM_BCAST_THEN_1:.*]] = tensor.extract %[[SHAPE_BCAST_THEN]][%[[C2]]]
   // CHECK: %[[INIT_RESULT:.*]] = tensor.empty(%[[DIM_BCAST_THEN_1]])
   // CHECK: linalg.generic
   //     CHECK-SAME: ins(%[[BCAST_PRED]], %[[BCAST_THEN]], %[[BCAST_ELSE]] : tensor<8x8x?xi1>, tensor<8x8x?xi32>, tensor<8x8x?xi32>) outs(%[[INIT_RESULT]] : tensor<8x8x?xi32>)
@@ -256,14 +252,12 @@ func.func @selectv2_broadcast_dyn_else(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x
 // -----
 // CHECK-LABEL: func.func @selectv2_broadcast_dyn_all
 func.func @selectv2_broadcast_dyn_all(%arg0: tensor<?x1x1xi1>, %arg1: tensor<?x8x1xi32>, %arg2: tensor<?x1x?xi32>) -> tensor<?x8x?xi32> {
-  // CHECK: %[[C0:.*]] = arith.constant 0 : index
-  // CHECK: %[[PRED_D0:.*]] = tensor.dim %arg0, %[[C0]] : tensor<?x1x1xi1>
-  // CHECK: %[[C0_0:.*]] = arith.constant 0 : index
-  // CHECK: %[[THEN_D0:.*]] = tensor.dim %arg1, %[[C0_0]] : tensor<?x8x1xi32>
-  // CHECK: %[[C0_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[ELSE_D0:.*]] = tensor.dim %arg2, %[[C0_1]] : tensor<?x1x?xi32>
-  // CHECK: %[[C2:.*]] = arith.constant 2 : index
-  // CHECK: %[[ELSE_D2:.*]] = tensor.dim %arg2, %[[C2]] : tensor<?x1x?xi32>
+  // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[PRED_D0:.*]] = tensor.dim %arg0, %[[C0]] : tensor<?x1x1xi1>
+  // CHECK-DAG: %[[THEN_D0:.*]] = tensor.dim %arg1, %[[C0]] : tensor<?x8x1xi32>
+  // CHECK-DAG: %[[ELSE_D0:.*]] = tensor.dim %arg2, %[[C0]] : tensor<?x1x?xi32>
+  // CHECK-DAG: %[[ELSE_D2:.*]] = tensor.dim %arg2, %[[C2]] : tensor<?x1x?xi32>
   // CHECK: %[[CMP_0:.*]] = arith.cmpi eq, %[[PRED_D0]], %[[THEN_D0]] : index
   // CHECK: cf.assert %[[CMP_0]], "mismatched dynamic broadcast extents"
   // CHECK: %[[CMP_1:.*]] = arith.cmpi eq, %[[PRED_D0]], %[[ELSE_D0]] : index
@@ -411,16 +405,15 @@ func.func @PolygammaWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>)
 // -----
 // CHECK-LABEL: @fallbackDynamicReshape
 func.func @fallbackDynamicReshape(%arg0 : tensor<4x?x3x?xui32>, %arg1 : tensor<5xindex>) -> tensor<12x?x?x1x?xui32> {
+  // CHECK-DAG: %[[C3:.*]] = arith.constant 3 : index
+  // CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
+  // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
   // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
   // CHECK-DAG: %[[RESULT_D1:.*]] = tensor.extract %arg1[%[[C1]]] : tensor<5xindex>
-  // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
   // CHECK-DAG: %[[RESULT_D2:.*]] = tensor.extract %arg1[%[[C2]]] : tensor<5xindex>
-  // CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
   // CHECK-DAG: %[[RESULT_D4:.*]] = tensor.extract %arg1[%[[C4]]] : tensor<5xindex>
-  // CHECK-DAG: %[[INDEX1:.*]] = arith.constant 1 : index
-  // CHECK-DAG: %[[ARG_D1:.*]] = tensor.dim %arg0, %[[INDEX1]] : tensor<4x?x3x?xi32>
-  // CHECK-DAG: %[[INDEX3:.*]] = arith.constant 3 : index
-  // CHECK-DAG: %[[ARG_D3:.*]] = tensor.dim %arg0, %[[INDEX3]] : tensor<4x?x3x?xi32>
+  // CHECK-DAG: %[[ARG_D1:.*]] = tensor.dim %arg0, %[[C1]] : tensor<4x?x3x?xi32>
+  // CHECK-DAG: %[[ARG_D3:.*]] = tensor.dim %arg0, %[[C3]] : tensor<4x?x3x?xi32>
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<4x?x3x?xi32>{%[[ARG_D1]], %[[ARG_D3]]} -> tensor<12x?x?x1x?xi32>{%[[RESULT_D1]], %[[RESULT_D2]], %[[RESULT_D4]]}
   %0 = "mhlo.dynamic_reshape"(%arg0, %arg1) : (tensor<4x?x3x?xui32>, tensor<5xindex>) -> tensor<12x?x?x1x?xui32>
   // CHECK: return %[[RESULT]]
@@ -430,19 +423,18 @@ func.func @fallbackDynamicReshape(%arg0 : tensor<4x?x3x?xui32>, %arg1 : tensor<5
 // -----
 // CHECK-LABEL: @fallbackDynamicReshapeInt
 func.func @fallbackDynamicReshapeInt(%arg0 : tensor<4x?x3x?xui32>, %arg1 : tensor<5xi32>) -> tensor<12x?x?x1x?xui32> {
+  // CHECK-DAG: %[[C3:.*]] = arith.constant 3 : index
   // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
   // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
   // CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
   // CHECK-DAG: %[[D1:.*]] = tensor.extract %arg1[%[[C1]]] : tensor<5xi32>
   // CHECK-DAG: %[[D2:.*]] = tensor.extract %arg1[%[[C2]]] : tensor<5xi32>
   // CHECK-DAG: %[[D4:.*]] = tensor.extract %arg1[%[[C4]]] : tensor<5xi32>
-  // CHECK-DAG: %[[RESULT_D1:.*]] = arith.index_cast %{{.*}} : i32 to index
-  // CHECK-DAG: %[[RESULT_D2:.*]] = arith.index_cast %{{.*}} : i32 to index
-  // CHECK-DAG: %[[RESULT_D4:.*]] = arith.index_cast %{{.*}} : i32 to index
-  // CHECK-DAG: %[[INDEX1:.*]] = arith.constant 1 : index
-  // CHECK-DAG: %[[ARG_D1:.*]] = tensor.dim %arg0, %[[INDEX1]] : tensor<4x?x3x?xi32>
-  // CHECK-DAG: %[[INDEX3:.*]] = arith.constant 3 : index
-  // CHECK-DAG: %[[ARG_D3:.*]] = tensor.dim %arg0, %[[INDEX3]] : tensor<4x?x3x?xi32>
+  // CHECK-DAG: %[[RESULT_D1:.*]] = arith.index_cast %[[D1]] : i32 to index
+  // CHECK-DAG: %[[RESULT_D2:.*]] = arith.index_cast %[[D2]] : i32 to index
+  // CHECK-DAG: %[[RESULT_D4:.*]] = arith.index_cast %[[D4]] : i32 to index
+  // CHECK-DAG: %[[ARG_D1:.*]] = tensor.dim %arg0, %[[C1]] : tensor<4x?x3x?xi32>
+  // CHECK-DAG: %[[ARG_D3:.*]] = tensor.dim %arg0, %[[C3]] : tensor<4x?x3x?xi32>
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<4x?x3x?xi32>{%[[ARG_D1]], %[[ARG_D3]]} -> tensor<12x?x?x1x?xi32>{%[[RESULT_D1]], %[[RESULT_D2]], %[[RESULT_D4]]}
   %0 = "mhlo.dynamic_reshape"(%arg0, %arg1) : (tensor<4x?x3x?xui32>, tensor<5xi32>) -> tensor<12x?x?x1x?xui32>
   // CHECK: return %[[RESULT]]

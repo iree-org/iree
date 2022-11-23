@@ -18,19 +18,23 @@ iree_cc_library(
   SRCS
     "AffineMinDistributedSCFCanonicalization.cpp"
     "RemoveSingleIterationLoop.cpp"
+    "Transforms.cpp"
   DEPS
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
+    MLIRAnalysis
     MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgTransforms
     MLIRMemRefDialect
     MLIRPass
     MLIRSupport
     MLIRTransforms
     MLIRVectorDialect
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )

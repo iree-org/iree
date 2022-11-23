@@ -16,12 +16,14 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRVPass.h"
+#include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -178,6 +180,7 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
   pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
+  pm.addNestedPass<func::FuncOp>(createSPIRVBreakDownLargeVectorPass());
 
   // Perform optimizations that need to across the scf.for region boundary.
   pm.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
@@ -195,6 +198,11 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerAffinePass());
+
+  // Lower ApplyScale before the i64 Emulation Pass so that new 64-bit ops are
+  // also emulated if not supported by the target.
+  pm.addPass(tosa::createTosaToArith(/*includeApplyRescale=*/true,
+                                     /*use32BitApplyRescale=*/true));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -302,7 +310,9 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
 }
 
-void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
+void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
+                                                unsigned pipelineDepth) {
+  LLVM_DEBUG(llvm::dbgs() << "Pipeline Depth: " << pipelineDepth << "\n");
   addTileAndDistributeToWorkgroupsPasses(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -310,13 +320,19 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
 
   // Tile and distribute to GPU invocations.
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVTileAndPromotePass());
+
+  if (pipelineDepth > 1)
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGPUMultiBuffering(pipelineDepth));
+
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUReduceSharedMemoryBankConflicts());
+      createGPUReduceSharedMemoryBankConflicts(
+          detail::bankConflictReductionPaddingBits));
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
@@ -328,7 +344,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUPipeliningPass(pipelineDepth ? pipelineDepth : 1));
 
   addLoopMaterializationPasses(nestedModulePM);
 }
@@ -360,6 +377,8 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileReductionPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   // Performs mechanical vectorization. This does not perform unrolling or
   // lowering, which is done later.

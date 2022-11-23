@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "assign_constant_ordinals.mlir"
     "assign_import_ordinals.mlir"
     "check_ir_before_llvm_conversion.mlir"
+    "check_ir_before_llvm_conversion_not_fail_unbound.mlir"
     "convert_to_llvm.mlir"
     "emit_vectorization_remarks.mlir"
     "hal_executable_constants.mlir"

@@ -234,19 +234,25 @@ function(iree_local_py_test)
       ${_RULE_ARGS}
   )
 
+  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_ARGS})
+
+  # Extend the PYTHONPATH environment variable with _RULE_PACKAGE_DIRS.
   list(APPEND _RULE_PACKAGE_DIRS "$ENV{PYTHONPATH}")
-  string(JOIN ":" _PYTHONPATH ${_RULE_PACKAGE_DIRS})
+  if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+    # Windows uses semi-colon delimiters, but so does CMake, so escape them.
+    list(JOIN _RULE_PACKAGE_DIRS "\\;" _PYTHONPATH)
+  else()
+    list(JOIN _RULE_PACKAGE_DIRS ":" _PYTHONPATH)
+  endif()
+  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
+      "PYTHONPATH=${_PYTHONPATH}"
+  )
 
   if (NOT DEFINED _RULE_TIMEOUT)
     set(_RULE_TIMEOUT 60)
   endif()
 
-  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
-  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_ARGS})
-
-  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
-      "PYTHONPATH=${_PYTHONPATH}"
-  )
   iree_configure_test(${_NAME_PATH})
 
   # TODO(marbre): Find out how to add deps to tests.
@@ -303,12 +309,13 @@ endfunction()
 # ARGS: Command line arguments to the Python source file.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
+# PACKAGE_DIRS: Additional python module paths.
 function(iree_build_tools_py_test)
   cmake_parse_arguments(
     _RULE
     ""
     "NAME;SRC"
-    "ARGS;LABELS"
+    "ARGS;LABELS;PACKAGE_DIRS"
     ${ARGN}
   )
 
@@ -322,6 +329,7 @@ function(iree_build_tools_py_test)
     LABELS
       ${_RULE_LABELS}
     PACKAGE_DIRS
+      ${_RULE_PACKAGE_DIRS}
       "${IREE_ROOT_DIR}/build_tools/python"
   )
 endfunction()

@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "elide_async_copies.mlir"
     "elide_timepoints_coverage.mlir"
     "elide_timepoints_immediate.mlir"
+    "emplace_allocations.mlir"
     "encode_device_tensors.mlir"
     "encode_host_tensors.mlir"
     "fold_globals.mlir"

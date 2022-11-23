@@ -1179,11 +1179,72 @@ void TensorStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.async.alloca
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Sinks transient alloca-like ops down to their consumers to avoid cases where
+// we allocate and then keep that live/copy-on-write it when not required.
+template <typename Op>
+struct SinkAllocaLikeOpToConsumers : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(Op producerOp,
+                                PatternRewriter &rewriter) const override {
+    auto users = llvm::to_vector<4>(producerOp->getUsers());
+    if (users.size() == 0) return failure();
+
+    // If we have a single user then we can sink right to it.
+    if (users.size() == 1) {
+      return sinkOp(producerOp, users.front());
+    }
+
+    // If we only have users in the same block then we can safely move to the
+    // first (as no change to cross-block SSA dominance can happen).
+    if (!producerOp.getResult().isUsedOutsideOfBlock(producerOp->getBlock())) {
+      Operation *targetOp = nullptr;
+      for (auto user : users) {
+        if (!targetOp || user->isBeforeInBlock(targetOp)) {
+          targetOp = user;
+        }
+      }
+      assert(targetOp);
+      return sinkOp(producerOp, targetOp);
+    }
+
+    // Redundant computation here, but only in cases where we have multiple
+    // users that may live outside the block the op is in.
+    DominanceInfo domInfo(producerOp->getParentOp());
+
+    // Find the common dominator block across all uses. This may be the
+    // entry block itself.
+    Block *commonDominator = users.front()->getBlock();
+    for (auto user : users) {
+      commonDominator =
+          domInfo.findNearestCommonDominator(commonDominator, user->getBlock());
+    }
+
+    // Find the first use within the dominator block (if any) so that we
+    // can sink down to it.
+    Operation *firstUserInDominator = commonDominator->getTerminator();
+    for (auto user : users) {
+      if (user->getBlock() == commonDominator) {
+        if (user->isBeforeInBlock(firstUserInDominator)) {
+          firstUserInDominator = user;
+        }
+      }
+    }
+
+    // Sink to the common dominator - which may not even use the op but will
+    // at least prevent us from doing extra work.
+    return sinkOp(producerOp, firstUserInDominator);
+  }
+};
+
+}  // namespace
+
 void AsyncAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
   // TODO(benvanik): alloca (staging) -> non-staging change to target.
   // TODO(benvanik): alloca (non-staging) -> staging change to target.
-  // TODO(benvanik): sink to first user.
+  results.insert<SinkAllocaLikeOpToConsumers<AsyncAllocaOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1224,66 +1285,6 @@ void AsyncConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.async.splat
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-// Sinks splat ops down to its consumers to avoid cases where we splat and then
-// keep that live/copy-on-write it.
-struct SinkSplatsToConsumers : public OpRewritePattern<AsyncSplatOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(AsyncSplatOp splatOp,
-                                PatternRewriter &rewriter) const override {
-    auto users = llvm::to_vector<4>(splatOp->getUsers());
-    if (users.size() == 0) return failure();
-
-    // If we have a single user then we can sink right to it.
-    if (users.size() == 1) {
-      return sinkOp(splatOp, users.front());
-    }
-
-    // If we only have users in the same block then we can safely move to the
-    // first (as no change to cross-block SSA dominance can happen).
-    if (!splatOp.getResult().isUsedOutsideOfBlock(splatOp->getBlock())) {
-      Operation *targetOp = nullptr;
-      for (auto user : users) {
-        if (!targetOp || user->isBeforeInBlock(targetOp)) {
-          targetOp = user;
-        }
-      }
-      assert(targetOp);
-      return sinkOp(splatOp, targetOp);
-    }
-
-    // Redundant computation here, but only in cases where we have multiple
-    // users that may live outside the block the op is in.
-    DominanceInfo domInfo(splatOp->getParentOp());
-
-    // Find the common dominator block across all uses. This may be the
-    // entry block itself.
-    Block *commonDominator = users.front()->getBlock();
-    for (auto user : users) {
-      commonDominator =
-          domInfo.findNearestCommonDominator(commonDominator, user->getBlock());
-    }
-
-    // Find the first use within the dominator block (if any) so that we
-    // can sink down to it.
-    Operation *firstUserInDominator = commonDominator->getTerminator();
-    for (auto user : users) {
-      if (user->getBlock() == commonDominator) {
-        if (user->isBeforeInBlock(firstUserInDominator)) {
-          firstUserInDominator = user;
-        }
-      }
-    }
-
-    // Sink to the common dominator - which may not even use the op but will
-    // at least prevent us from doing extra work.
-    return sinkOp(splatOp, firstUserInDominator);
-  }
-};
-
-}  // namespace
-
 void AsyncSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
   // TODO(#6972): find splat+update-from and turn into fill.
@@ -1291,7 +1292,7 @@ void AsyncSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
   // TODO(#6972): find splat+update-into and turn into alloca+fill+update.
   // TODO(#6972): find splat+copy-into and turn into alloca+fill+copy.
   // TODO(#6972): clone instead of sinking to common dominator.
-  results.insert<SinkSplatsToConsumers>(context);
+  results.insert<SinkAllocaLikeOpToConsumers<AsyncSplatOp>>(context);
   results.insert<ElideUnusedOp<AsyncSplatOp>>(context);
 }
 
@@ -2180,10 +2181,10 @@ namespace {
 
 // Elides a region-carrying op when the region is empty.
 // Requires no results that need replacement.
-template <typename OpT>
-struct ElideEmptyCmdRegionOp : public OpRewritePattern<OpT> {
-  using OpRewritePattern<OpT>::OpRewritePattern;
-  LogicalResult matchAndRewrite(OpT op,
+template <typename Op>
+struct ElideEmptyCmdRegionOp : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     auto &entryBlock = op.getBody().front();
     auto yieldOp = getYieldIfOnlyOp(entryBlock);

@@ -14,9 +14,11 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "break_down_large_vector.mlir"
     "config_adreno_conv.mlir"
     "config_adreno_matmul.mlir"
     "config_amd_matmul.mlir"
+    "config_amd_matmul_cooperative_ops.mlir"
     "config_default_conv.mlir"
     "config_default_linalg_ext_ops.mlir"
     "config_default_linalg_ops.mlir"
@@ -31,6 +33,8 @@ iree_lit_test_suite(
     "create_fast_slow_path.mlir"
     "distribute_to_invocations.mlir"
     "emulate_i64.mlir"
+    "illegal_configuration.mlir"
+    "lowering_matmul_promotion.mlir"
     "pipeline_matmul_cooperative_ops.mlir"
     "pipeline_matmul_promotion.mlir"
     "pipeline_matmul_vectorization.mlir"

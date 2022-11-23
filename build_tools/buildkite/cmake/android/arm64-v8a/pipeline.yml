@@ -8,7 +8,7 @@ steps:
   - label: "build"
     commands:
       - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/android@sha256:76c2a52dcd6d07601227b965ac87d021c1d2d5e2d01f46ad58da28c89267f2ab build_tools/cmake/build_host_and_android.sh arm64-v8a"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/android@sha256:740f87664b2f4d9288549c95d4d355d5b4a543d55257dcff0308b0c2920bd229 build_tools/cmake/build_host_and_android.sh arm64-v8a"
       - "tar --exclude='*.o' --exclude='*.a' -czvf build-artifacts.tgz build-android"
     agents:
       - "queue=build"

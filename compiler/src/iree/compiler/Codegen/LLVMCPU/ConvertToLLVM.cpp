@@ -1094,8 +1094,9 @@ class RewriteExternCallOpToDynamicImportCallOp
 
 class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
  public:
-  ConvertToLLVMPass(bool reassociateFpReductions)
-      : reassociateFpReductions(reassociateFpReductions){};
+  ConvertToLLVMPass(bool reassociateFpReductions) {
+    targetReassociateFpReductions.setValue(reassociateFpReductions);
+  }
   ConvertToLLVMPass(const ConvertToLLVMPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<LLVM::LLVMDialect, arm_neon::ArmNeonDialect>();
@@ -1111,7 +1112,10 @@ class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
       *this, "target-data-layout",
       llvm::cl::desc("Code generation target data layout."),
       llvm::cl::init("")};
-  bool reassociateFpReductions = false;
+  Option<bool> targetReassociateFpReductions{
+      *this, "target-reassociate-fp-reductions",
+      llvm::cl::desc("Code generation target reassociate FP reductions."),
+      llvm::cl::init("false")};
 };
 
 }  // namespace
@@ -1212,8 +1216,8 @@ void ConvertToLLVMPass::runOnOperation() {
   arith::populateArithToLLVMConversionPatterns(converter, patterns);
   populateVectorToSCFConversionPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
-  populateVectorToLLVMConversionPatterns(converter, patterns,
-                                         reassociateFpReductions);
+  populateVectorToLLVMConversionPatterns(
+      converter, patterns, targetReassociateFpReductions.getValue());
   populateLinalgToLLVMConversionPatterns(converter, patterns);
   populateReconcileUnrealizedCastsPatterns(patterns);
 

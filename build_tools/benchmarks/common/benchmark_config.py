@@ -5,11 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 # All benchmarks' relative path against root build directory.
 
-import os
-
 from argparse import Namespace
 from dataclasses import dataclass
 from typing import Optional
+import pathlib
 
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 BENCHMARK_RESULTS_REL_PATH = "benchmark-results"
@@ -27,10 +26,10 @@ class TraceCaptureConfig:
     capture_tmp_dir: the temporary directory to store captured traces.
   """
 
-  traced_benchmark_tool_dir: str
-  trace_capture_tool: str
-  capture_tarball: str
-  capture_tmp_dir: str
+  traced_benchmark_tool_dir: pathlib.Path
+  trace_capture_tool: pathlib.Path
+  capture_tarball: pathlib.Path
+  capture_tmp_dir: pathlib.Path
 
 
 @dataclass
@@ -58,11 +57,11 @@ class BenchmarkConfig:
       times.
   """
 
-  root_benchmark_dir: str
-  benchmark_results_dir: str
+  root_benchmark_dir: pathlib.Path
+  benchmark_results_dir: pathlib.Path
   git_commit_hash: str
 
-  normal_benchmark_tool_dir: Optional[str] = None
+  normal_benchmark_tool_dir: Optional[pathlib.Path] = None
   trace_capture_config: Optional[TraceCaptureConfig] = None
 
   driver_filter: Optional[str] = None
@@ -75,14 +74,15 @@ class BenchmarkConfig:
   @staticmethod
   def build_from_args(args: Namespace, git_commit_hash: str):
     """Build config from command arguments.
-    
+
     Args:
       args: the command arguments.
       git_commit_hash: the git commit hash of IREE.
     """
 
-    def real_path_or_none(path: str) -> Optional[str]:
-      return os.path.realpath(path) if path else None
+    def real_path_or_none(
+        path: Optional[pathlib.Path]) -> Optional[pathlib.Path]:
+      return path.resolve() if path else None
 
     if not args.normal_benchmark_tool_dir and not args.traced_benchmark_tool_dir:
       raise ValueError(
@@ -95,24 +95,22 @@ class BenchmarkConfig:
           "The following 3 flags should be simultaneously all specified or all unspecified: --traced_benchmark_tool_dir, --trace_capture_tool, --capture_tarball"
       )
 
-    per_commit_tmp_dir = os.path.realpath(
-        os.path.join(args.tmp_dir, git_commit_hash))
+    per_commit_tmp_dir: pathlib.Path = (args.tmp_dir /
+                                        git_commit_hash).resolve()
 
     if args.traced_benchmark_tool_dir is None:
       trace_capture_config = None
     else:
       trace_capture_config = TraceCaptureConfig(
-          traced_benchmark_tool_dir=real_path_or_none(
-              args.traced_benchmark_tool_dir),
-          trace_capture_tool=real_path_or_none(args.trace_capture_tool),
-          capture_tarball=real_path_or_none(args.capture_tarball),
-          capture_tmp_dir=os.path.join(per_commit_tmp_dir, CAPTURES_REL_PATH))
+          traced_benchmark_tool_dir=args.traced_benchmark_tool_dir.resolve(),
+          trace_capture_tool=args.trace_capture_tool.resolve(),
+          capture_tarball=args.capture_tarball.resolve(),
+          capture_tmp_dir=per_commit_tmp_dir / CAPTURES_REL_PATH)
 
-    build_dir = os.path.realpath(args.build_dir)
+    build_dir = args.build_dir.resolve()
     return BenchmarkConfig(
-        root_benchmark_dir=os.path.join(build_dir, BENCHMARK_SUITE_REL_PATH),
-        benchmark_results_dir=os.path.join(per_commit_tmp_dir,
-                                           BENCHMARK_RESULTS_REL_PATH),
+        root_benchmark_dir=build_dir / BENCHMARK_SUITE_REL_PATH,
+        benchmark_results_dir=per_commit_tmp_dir / BENCHMARK_RESULTS_REL_PATH,
         git_commit_hash=git_commit_hash,
         normal_benchmark_tool_dir=real_path_or_none(
             args.normal_benchmark_tool_dir),

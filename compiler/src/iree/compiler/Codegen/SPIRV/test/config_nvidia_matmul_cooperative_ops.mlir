@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -353,6 +353,6 @@ hal.executable public @matmul_256x1024x8 {
   }
 }
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize pipeline_depth = 1>
 // CHECK-LABEL: hal.executable.export public @matmul_256x1024x8
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]

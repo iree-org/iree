@@ -11,8 +11,8 @@
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
+#include "mhlo/IR/hlo_ops.h"
+#include "mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -573,9 +573,9 @@ struct ScatterOpCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
     for (int i = 0, s = batchCount; i < s; i++) {
       reassociationMap.front().push_back(rewriter.getAffineDimExpr(i));
       bool isDynamic =
-          valueTy.isDynamicDim(i) || batchSize == ShapedType::kDynamicSize;
-      batchSize = isDynamic ? ShapedType::kDynamicSize
-                            : valueTy.getDimSize(i) * batchSize;
+          valueTy.isDynamicDim(i) || batchSize == ShapedType::kDynamic;
+      batchSize =
+          isDynamic ? ShapedType::kDynamic : valueTy.getDimSize(i) * batchSize;
     }
 
     SmallVector<int64_t> newShape = {batchSize};

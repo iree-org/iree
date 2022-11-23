@@ -36,7 +36,7 @@ func.func @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {i
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   // CHECK: %[[RET0_SIZE:.+]] = stream.tensor.sizeof tensor<?xf32>{%[[DIM0]]} : index
-  // CHECK: %[[RET0:.+]] = stream.async.dispatch @executable::@dispatch[%c2, %c1, %c1](%[[ARG0_T]]) : (!stream.resource<*>{%[[ARG0_SIZE]]}) -> !stream.resource<*>{%[[RET0_SIZE]]}
+  // CHECK: %[[RET0:.+]] = stream.async.dispatch @executable::@dispatch[%c2, %c1, %c1](%[[ARG0_T]][%c0 to %[[ARG0_SIZE]] for %[[ARG0_SIZE]]]) : (!stream.resource<*>{%[[ARG0_SIZE]]}) -> !stream.resource<*>{%[[RET0_SIZE]]}
   %1 = flow.dispatch @executable::@dispatch[%c2, %c1, %c1](%0) : (tensor<?x4xf32>{%dim0}) -> tensor<?xf32>{%dim0}
 
   // CHECK: %[[RET0_T:.+]] = stream.async.transfer %[[RET0]] : !stream.resource<*>{%[[RET0_SIZE]]} -> !stream.resource<external>{%[[RET0_SIZE]]}
@@ -135,7 +135,7 @@ func.func @while_test() {
 // CHECK: ^bb1(%[[BB1_ARG:.+]]: !stream.resource<*>, %[[BB1_ARG_SIZE:.+]]: index):
 ^bb1(%1: tensor<i32>):
   // CHECK: %[[COND_SIZE:.+]] = stream.tensor.sizeof tensor<i1> : index
-  // CHECK: %[[COND_RESOURCE:.+]] = stream.async.dispatch @while_test_dispatch_0::@dispatch[%c1, %c1, %c1](%[[BB1_ARG]]) : (!stream.resource<*>{%[[BB1_ARG_SIZE]]}) -> !stream.resource<*>{%[[COND_SIZE]]}
+  // CHECK: %[[COND_RESOURCE:.+]] = stream.async.dispatch @while_test_dispatch_0::@dispatch[%c1, %c1, %c1](%[[BB1_ARG]][%c0{{[_0-9]*}} to %[[BB1_ARG_SIZE]] for %[[BB1_ARG_SIZE]]]) : (!stream.resource<*>{%[[BB1_ARG_SIZE]]}) -> !stream.resource<*>{%[[COND_SIZE]]}
   %2 = flow.dispatch @while_test_dispatch_0::@dispatch[%c1, %c1, %c1](%1) : (tensor<i32>) -> tensor<i1>
 
   // CHECK: %[[READBACK:.+]] = stream.async.transfer %[[COND_RESOURCE]] : !stream.resource<*>{%[[COND_SIZE]]} -> !stream.resource<staging>{%[[COND_SIZE]]}
@@ -148,7 +148,7 @@ func.func @while_test() {
 // CHECK: ^bb2:
 ^bb2:
   // CHECK: %[[BB2_VAR_SIZE:.+]] = stream.tensor.sizeof tensor<i32> : index
-  // CHECK: %[[BB2_VAR:.+]] = stream.async.dispatch @while_test_dispatch_1::@dispatch[%c1, %c1, %c1](%[[BB1_ARG]]) : (!stream.resource<*>{%[[BB1_ARG_SIZE]]}) -> !stream.resource<*>{%[[BB2_VAR_SIZE]]}
+  // CHECK: %[[BB2_VAR:.+]] = stream.async.dispatch @while_test_dispatch_1::@dispatch[%c1, %c1, %c1](%[[BB1_ARG]][%c0{{[_0-9]*}} to %[[BB1_ARG_SIZE]] for %[[BB1_ARG_SIZE]]]) : (!stream.resource<*>{%[[BB1_ARG_SIZE]]}) -> !stream.resource<*>{%[[BB2_VAR_SIZE]]}
   %4 = flow.dispatch @while_test_dispatch_1::@dispatch[%c1, %c1, %c1](%1) : (tensor<i32>) -> tensor<i32>
 
   // CHECK: cf.br ^bb1(%[[BB2_VAR]], %[[BB2_VAR_SIZE]] : !stream.resource<*>, index)

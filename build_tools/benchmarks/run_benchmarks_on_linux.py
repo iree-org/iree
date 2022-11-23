@@ -6,12 +6,15 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Runs all matched benchmark suites on a Linux device."""
 
+import sys
+import pathlib
+
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
+
 import subprocess
 import atexit
-import os
-import re
 import shutil
-import sys
 import tarfile
 
 from typing import List, Optional
@@ -32,12 +35,16 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     super().__init__(*args, **kwargs)
 
   def run_benchmark_case(self, benchmark_case: BenchmarkCase,
-                         benchmark_results_filename: Optional[str],
-                         capture_filename: Optional[str]) -> None:
+                         benchmark_results_filename: Optional[pathlib.Path],
+                         capture_filename: Optional[pathlib.Path]) -> None:
 
     # TODO(pzread): Taskset should be derived from CPU topology.
     # Only use the low 8 cores.
     taskset = "0xFF"
+
+    # TODO(#11076): Support run_config.
+    if benchmark_case.benchmark_case_dir is None:
+      raise ValueError("benchmark_case_dir can't be None.")
 
     run_flags = self.__parse_flagfile(benchmark_case.benchmark_case_dir)
     # Replace the CUDA device flag with the specified GPU.
@@ -58,20 +65,25 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                          taskset=taskset,
                          run_flags=run_flags)
 
-  def __parse_flagfile(self, case_dir: str) -> List[str]:
-    with open(os.path.join(case_dir, MODEL_FLAGFILE_NAME)) as flagfile:
-      return [line.strip() for line in flagfile.readlines()]
+  def __parse_flagfile(self, case_dir: pathlib.Path) -> List[str]:
+    return [
+        line.strip()
+        for line in (case_dir / MODEL_FLAGFILE_NAME).read_text().splitlines()
+    ]
 
   def __run_benchmark(self, benchmark_case: BenchmarkCase,
-                      results_filename: str, taskset: str,
+                      results_filename: pathlib.Path, taskset: str,
                       run_flags: List[str]):
+    if self.config.normal_benchmark_tool_dir is None:
+      raise ValueError("normal_benchmark_tool_dir can't be None.")
+
     tool_name = benchmark_case.benchmark_tool_name
-    tool_path = os.path.join(self.config.normal_benchmark_tool_dir, tool_name)
+    tool_path = self.config.normal_benchmark_tool_dir / tool_name
     cmd = ["taskset", taskset, tool_path] + run_flags
     if tool_name == "iree-benchmark-module":
       cmd.extend(
           get_iree_benchmark_module_arguments(
-              results_filename=results_filename,
+              results_filename=str(results_filename),
               driver_info=benchmark_case.driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
@@ -80,12 +92,14 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     if self.verbose:
       print(result_json)
 
-  def __run_capture(self, benchmark_case: BenchmarkCase, capture_filename: str,
-                    taskset: str, run_flags: List[str]):
+  def __run_capture(self, benchmark_case: BenchmarkCase,
+                    capture_filename: pathlib.Path, taskset: str,
+                    run_flags: List[str]):
     capture_config = self.config.trace_capture_config
+    if capture_config is None:
+      raise ValueError("capture_config can't be None.")
 
-    tool_path = os.path.join(capture_config.traced_benchmark_tool_dir,
-                             benchmark_case.benchmark_tool_name)
+    tool_path = capture_config.traced_benchmark_tool_dir / benchmark_case.benchmark_tool_name
     cmd = ["taskset", taskset, tool_path] + run_flags
     process = subprocess.Popen(cmd,
                                env={"TRACY_NO_EXIT": "1"},
@@ -130,7 +144,7 @@ def main(args):
 
   benchmark_results = benchmark_driver.get_benchmark_results()
   if args.output is not None:
-    with open(args.output, "w") as f:
+    with args.output.open("w") as f:
       f.write(benchmark_results.to_json_str())
 
   if args.verbose:

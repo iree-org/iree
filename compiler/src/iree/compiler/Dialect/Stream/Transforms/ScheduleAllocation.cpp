@@ -42,11 +42,11 @@ namespace {
 using ValueAliasingMap = llvm::MapVector<Value, SmallPtrSet<Value, 16>>;
 
 // Builds a map of value aliases from aliasee to a set of aliasers.
-// Only values that alias will be present in the map.
-static ValueAliasingMap computeExecutionRegionValueAliases(
-    IREE::Stream::AsyncExecuteOp executeOp) {
-  auto *streamBlock = &executeOp.getBody().front();
-  ValueAliasingMap valueAliases;
+// Only values that alias will be present in the map. The map may contain
+// values nested within the |regionOp|.
+static void computeRegionValueAliases(Operation *regionOp,
+                                      ValueAliasingMap &valueAliases) {
+  auto *block = &regionOp->getRegion(0).front();
 
   auto propagateAlias = [&](Value streamValue, Value aliasedValue) {
     auto &baseSet = valueAliases[streamValue];
@@ -58,22 +58,30 @@ static ValueAliasingMap computeExecutionRegionValueAliases(
 
   // Start with outputs so that we handle tied values that may lead all the way
   // back up the chain to the stream inputs.
-  auto tiedStreamOp =
-      cast<IREE::Util::TiedOpInterface>(executeOp.getOperation());
-  auto yieldOp = cast<IREE::Stream::YieldOp>(streamBlock->getTerminator());
+  auto tiedStreamOp = cast<IREE::Util::TiedOpInterface>(regionOp);
+  auto yieldOp = cast<IREE::Stream::YieldOp>(block->getTerminator());
   for (auto it :
-       llvm::zip(executeOp.getResults(), yieldOp.getResourceOperands())) {
+       llvm::zip(regionOp->getResults(), yieldOp.getResourceOperands())) {
     auto outerResult = std::get<0>(it);
     auto innerResult = std::get<1>(it);
     auto tiedOperandIndex =
         tiedStreamOp.getTiedResultOperandIndex(outerResult.getResultNumber());
     if (tiedOperandIndex.has_value()) {
-      auto arg = streamBlock->getArgument(tiedOperandIndex.value());
+      auto arg = block->getArgument(tiedOperandIndex.value());
       propagateAlias(innerResult, arg);
     }
   }
 
-  for (auto &op : *streamBlock) {
+  for (auto &op : *block) {
+    // Recurse into regions to build the alias map. This will introduce aliases
+    // that are outside of the parent block scope but they should only be
+    // present for in-place operations. If we want to allocate within the nested
+    // scopes we'll need to fix up the subsequent liveness analysis code to
+    // handle ops in differing scopes by walking parent chains.
+    if (isa<mlir::RegionBranchOpInterface>(op)) {
+      computeRegionValueAliases(&op, valueAliases);
+    }
+
     // Tied results reuse their operand buffer.
     auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
     for (auto result : op.getResults()) {
@@ -98,7 +106,15 @@ static ValueAliasingMap computeExecutionRegionValueAliases(
       }
     }
   }
+}
 
+// Builds a map of value aliases from aliasee to a set of aliasers.
+// Only values that alias will be present in the map. The map may contain
+// values nested within the |executeOp|.
+static ValueAliasingMap computeExecutionRegionValueAliases(
+    IREE::Stream::AsyncExecuteOp executeOp) {
+  ValueAliasingMap valueAliases;
+  computeRegionValueAliases(executeOp, valueAliases);
   return valueAliases;
 }
 
@@ -201,7 +217,13 @@ static LivenessIntervalList computeExecutionRegionLivenessIntervals(
     auto &aliasee = it.first;
     auto &aliasers = it.second;
     auto &aliaseeInterval = valueIntervals[aliasee];
-    assert(aliaseeInterval.ordinal != -1);
+    if (aliaseeInterval.ordinal == -1) {
+      // Aliasee is nested somewhere within the current scope.
+      // We'd need to update this analysis to handle the nesting in order to
+      // compute the ranges here but that's not (currently) required as all
+      // allocated values roll up to the parent scope by way of the yields.
+      continue;
+    }
     int start = aliaseeInterval.start;
     int end = aliaseeInterval.end;
     for (auto aliaser : aliasers) {
@@ -224,7 +246,10 @@ static LivenessIntervalList computeExecutionRegionLivenessIntervals(
   SmallVector<LivenessInterval> sortedIntervals;
   sortedIntervals.reserve(valueIntervals.size());
   for (auto it : valueIntervals) {
-    sortedIntervals.push_back(it.second);
+    // Filter out values we couldn't analyze.
+    if (it.second.value) {
+      sortedIntervals.push_back(it.second);
+    }
   }
   llvm::stable_sort(sortedIntervals);
   return sortedIntervals;
@@ -269,6 +294,11 @@ struct ResourceRange {
   }
 };
 
+static std::unique_ptr<AsmState> getRootAsmState(Operation *rootOp) {
+  LLVM_DEBUG(return std::make_unique<AsmState>(rootOp));
+  return nullptr;
+}
+
 struct AllocationScope {
   explicit AllocationScope(IREE::Stream::AsyncExecuteOp rootAsyncOp)
       : rootOp(rootAsyncOp),
@@ -301,13 +331,16 @@ struct AllocationScope {
   // Performs a memoized add (as many adds of offsets or lengths are redundant).
   Value add(Location loc, Value lhs, Value rhs) {
     // TODO(benvanik): memoize - if worth it. Needs profiling.
+    if (matchPattern(lhs, m_Zero())) return rhs;
+    if (matchPattern(rhs, m_Zero())) return lhs;
     auto result = OpBuilder(rootOp).createOrFold<arith::AddIOp>(loc, lhs, rhs);
     return result;
   }
 
   // Maps |resource| to the storage range defined by |resourceRange|.
   // All aliases of |resource| will also be mapped.
-  void mapResourceRange(Value resource, ResourceRange resourceRange) {
+  void mapResourceRange(Value resource, ResourceRange resourceRange,
+                        AsmState *asmState) {
     if (resourceRangeMap.count(resource)) return;
 
     if (!resourceRange.offset && !resourceRange.length) {
@@ -317,11 +350,10 @@ struct AllocationScope {
 
     resourceRangeMap.insert(std::make_pair(resource, resourceRange));
     LLVM_DEBUG({
-      AsmState asmState(rootOp->getParentOp());
       llvm::dbgs() << " -> mapping ";
-      resource.printAsOperand(llvm::dbgs(), asmState);
+      resource.printAsOperand(llvm::dbgs(), *asmState);
       llvm::dbgs() << " = ";
-      resourceRange.print(llvm::dbgs(), asmState);
+      resourceRange.print(llvm::dbgs(), *asmState);
       llvm::dbgs() << "\n";
     });
 
@@ -330,11 +362,10 @@ struct AllocationScope {
     for (auto alias : valueAliases[resource]) {
       resourceRangeMap.insert(std::make_pair(alias, resourceRange));
       LLVM_DEBUG({
-        AsmState asmState(rootOp->getParentOp());
         llvm::dbgs() << "   = alias ";
-        alias.printAsOperand(llvm::dbgs(), asmState);
+        alias.printAsOperand(llvm::dbgs(), *asmState);
         llvm::dbgs() << " = ";
-        resourceRange.print(llvm::dbgs(), asmState);
+        resourceRange.print(llvm::dbgs(), *asmState);
         llvm::dbgs() << "\n";
       });
     }
@@ -451,7 +482,6 @@ static LogicalResult applyAsyncCloneOp(IREE::Stream::AsyncCloneOp asyncOp,
 static LogicalResult applyAsyncSliceOp(IREE::Stream::AsyncSliceOp asyncOp,
                                        AllocationScope &scope,
                                        OpBuilder builder) {
-  // TODO(benvanik): place the allocation instead.
   auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
   auto sourceOffset = scope.add(asyncOp.getLoc(), sourceRange.offset,
                                 asyncOp.getSourceOffset());
@@ -480,7 +510,6 @@ static LogicalResult applyAsyncFillOp(IREE::Stream::AsyncFillOp asyncOp,
 static LogicalResult applyAsyncUpdateOp(IREE::Stream::AsyncUpdateOp asyncOp,
                                         AllocationScope &scope,
                                         OpBuilder builder) {
-  // TODO(benvanik): place the allocation instead.
   auto sourceRange = scope.lookupResourceRange(asyncOp.getUpdate());
   auto sourceOffset = sourceRange.offset;
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
@@ -565,6 +594,7 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   SmallVector<Value> newResourceLengths;
   SmallVector<Attribute> newResourceAccesses;
 
+  unsigned resourceIndex = 0;
   for (auto it : llvm::enumerate(asyncOp.getResourceOperands())) {
     auto operand = it.value();
     if (!operand.getType().isa<IREE::Stream::ResourceType>()) {
@@ -582,8 +612,10 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
     }
 
     auto resourceRange = scope.lookupResourceRange(operand);
-    auto resourceOffset = resourceRange.offset;
-    auto resourceLength = asyncOp.getOperandSize(operandIdx);
+    auto resourceOffset =
+        scope.add(asyncOp.getLoc(), resourceRange.offset,
+                  asyncOp.getResourceOperandOffsets()[resourceIndex]);
+    auto resourceLength = asyncOp.getResourceOperandLengths()[resourceIndex];
     auto resourceAccess = IREE::Stream::ResourceAccessBitfieldAttr::get(
         builder.getContext(), accessBits);
     newResources.push_back(resourceRange.resource);
@@ -591,6 +623,7 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
     newResourceOffsets.push_back(resourceOffset);
     newResourceLengths.push_back(resourceLength);
     newResourceAccesses.push_back(resourceAccess);
+    ++resourceIndex;
   }
 
   for (auto result : asyncOp.getResults()) {
@@ -744,6 +777,7 @@ static llvm::Optional<TransientAllocation> allocateLocalTransients(
       executeOp, scope.getValueAliases());
   for (auto valueInterval : livenessIntervals) {
     auto value = valueInterval.value;
+    assert(value && "must have value for interval");
     auto valueType = value.getType().dyn_cast<IREE::Stream::ResourceType>();
     if (!valueType) continue;
 
@@ -802,13 +836,14 @@ static llvm::Optional<TransientAllocation> allocateLocalTransients(
       allocation.reservation.getType(), allocation.reservation.getLoc());
 
   // Map values to their ranges within the slab.
+  auto asmState = getRootAsmState(executeOp->getParentOp());
   for (size_t i = 0; i < transientValues.size(); ++i) {
     auto value = transientValues[i];
     auto offset = packOp.getPackedOffsets()[i];
     auto length = packOp.getDynamicSliceSizes()[i];
     auto resourceRange = ResourceRange(
         allocation.capturedArg, allocation.reservationSize, offset, length);
-    scope.mapResourceRange(value, resourceRange);
+    scope.mapResourceRange(value, resourceRange, asmState.get());
   }
 
   return allocation;
@@ -1054,16 +1089,17 @@ static LogicalResult allocateExecutionRegion(
       // separating ones that have deps and ones that don't so that we minimize
       // the dependency chain.
       newAwaitTimepoints.push_back(awaitTimepoint);
+      auto asmState = getRootAsmState(executeOp->getParentOp());
       LLVM_DEBUG({
-        AsmState asmState(executeOp->getParentOp());
         llvm::dbgs() << "  + adding await on dependent constant upload ";
-        awaitTimepoint.printAsOperand(llvm::dbgs(), asmState);
+        awaitTimepoint.printAsOperand(llvm::dbgs(), *asmState);
         llvm::dbgs() << "\n";
       });
       for (auto &reservation : constantAllocation->reservations) {
         auto resourceRange =
             ResourceRange(reservation.capturedArg, reservation.resourceSize);
-        scope.mapResourceRange(reservation.constantOp, resourceRange);
+        scope.mapResourceRange(reservation.constantOp, resourceRange,
+                               asmState.get());
       }
     } else {
       // No deps within the execute op but we need to keep the dependency chain
@@ -1100,6 +1136,7 @@ static LogicalResult allocateExecutionRegion(
   // Compute an updated set of operands/results. After allocation all results
   // must be tied to operands; it's possible though that this is already the
   // case by construction.
+  auto asmState = getRootAsmState(executeOp->getParentOp());
   for (auto operand : llvm::enumerate(executeOp.getResourceOperands())) {
     unsigned operandIdx =
         executeOp.getTiedOperandsIndexAndLength().first + operand.index();
@@ -1114,7 +1151,7 @@ static LogicalResult allocateExecutionRegion(
       llvm::dbgs() << "\n";
     });
     auto resourceRange = ResourceRange(arg, operandSize);
-    scope.mapResourceRange(arg, resourceRange);
+    scope.mapResourceRange(arg, resourceRange, asmState.get());
   }
   SmallVector<ResultReservation> resultReservations;
   for (auto it :
@@ -1147,7 +1184,8 @@ static LogicalResult allocateExecutionRegion(
         result.printAsOperand(llvm::dbgs(), asmState);
         llvm::dbgs() << "\n";
       });
-      scope.mapResourceRange(yieldValue, ResourceRange(arg, resultSize));
+      scope.mapResourceRange(yieldValue, ResourceRange(arg, resultSize),
+                             asmState.get());
       resultReplacements.push_back(std::make_pair(result, tiedOperand));
       continue;
     }
@@ -1198,10 +1236,10 @@ static LogicalResult allocateExecutionRegion(
         /*uninitialized=*/externalBuilder.getUnitAttr(),
         executeOp.getAffinityAttr());
 
+    auto asmState = getRootAsmState(executeOp->getParentOp());
     LLVM_DEBUG({
-      AsmState asmState(executeOp->getParentOp());
       llvm::dbgs() << "  + alloc for result reservation set: ";
-      allocOp.print(llvm::dbgs(), asmState);
+      allocOp.print(llvm::dbgs(), *asmState);
       llvm::dbgs() << ":\n";
     });
 
@@ -1220,21 +1258,21 @@ static LogicalResult allocateExecutionRegion(
           entryBlock.addArgument(reservation.resultType, reservation.loc);
 
       LLVM_DEBUG({
-        AsmState asmState(executeOp->getParentOp());
         llvm::dbgs() << "    + adding entry arg for reservation ";
-        reservation.result.printAsOperand(llvm::dbgs(), asmState);
+        reservation.result.printAsOperand(llvm::dbgs(), *asmState);
         llvm::dbgs() << "{";
-        reservation.resultSize.printAsOperand(llvm::dbgs(), asmState);
+        reservation.resultSize.printAsOperand(llvm::dbgs(), *asmState);
         llvm::dbgs() << "} from ";
-        reservation.yieldValue.printAsOperand(llvm::dbgs(), asmState);
+        reservation.yieldValue.printAsOperand(llvm::dbgs(), *asmState);
         llvm::dbgs() << " as ";
-        arg.printAsOperand(llvm::dbgs(), asmState);
+        arg.printAsOperand(llvm::dbgs(), *asmState);
         llvm::dbgs() << "\n";
       });
 
       // Map into scope, updating all aliases.
       auto resourceRange = ResourceRange(arg, reservation.resultSize);
-      scope.mapResourceRange(reservation.yieldValue, resourceRange);
+      scope.mapResourceRange(reservation.yieldValue, resourceRange,
+                             asmState.get());
     }
   }
 
@@ -1303,6 +1341,7 @@ static LogicalResult allocateExecutionRegion(
   // and convert to stream.cmd.concurrent we are removing all wave
   // operands/results and taking whatever we established above as the true
   // ranges.
+  asmState = getRootAsmState(newExecuteOp->getParentOp());
   newExecuteOp.getBody().walk<WalkOrder::PreOrder>(
       [&](IREE::Stream::AsyncConcurrentOp concurrentOp) {
         for (auto it : llvm::zip(concurrentOp.getResourceOperands(),
@@ -1310,15 +1349,15 @@ static LogicalResult allocateExecutionRegion(
           auto outerValue = std::get<0>(it);
           auto innerValue = std::get<1>(it);
           LLVM_DEBUG({
-            AsmState asmState(newExecuteOp->getParentOp());
             llvm::dbgs() << "  = shady alias of wave operand ";
-            outerValue.printAsOperand(llvm::dbgs(), asmState);
+            outerValue.printAsOperand(llvm::dbgs(), *asmState);
             llvm::dbgs() << " to wave arg ";
-            innerValue.printAsOperand(llvm::dbgs(), asmState);
+            innerValue.printAsOperand(llvm::dbgs(), *asmState);
             llvm::dbgs() << "\n";
           });
           scope.mapResourceRange(innerValue,
-                                 scope.lookupResourceRange(outerValue));
+                                 scope.lookupResourceRange(outerValue),
+                                 asmState.get());
         }
         auto yieldOp = cast<IREE::Stream::YieldOp>(
             concurrentOp.getBody().front().getTerminator());
@@ -1327,15 +1366,15 @@ static LogicalResult allocateExecutionRegion(
           auto innerValue = std::get<0>(it);
           auto outerValue = std::get<1>(it);
           LLVM_DEBUG({
-            AsmState asmState(newExecuteOp->getParentOp());
             llvm::dbgs() << "  = shady alias of wave result ";
-            innerValue.printAsOperand(llvm::dbgs(), asmState);
+            innerValue.printAsOperand(llvm::dbgs(), *asmState);
             llvm::dbgs() << " to stream value ";
-            outerValue.printAsOperand(llvm::dbgs(), asmState);
+            outerValue.printAsOperand(llvm::dbgs(), *asmState);
             llvm::dbgs() << "\n";
           });
           scope.mapResourceRange(innerValue,
-                                 scope.lookupResourceRange(outerValue));
+                                 scope.lookupResourceRange(outerValue),
+                                 asmState.get());
         }
       });
 

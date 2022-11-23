@@ -61,8 +61,8 @@ class Convert1x1FilterConvToMatmul : public OpRewritePattern<Conv2DOpType> {
     const int owIndex = isNHWC ? 2 : 3;
     const int ocIndex = isNHWC ? 3 : 1;
 
-    bool isInputHWDynamic = inputShape[ohIndex] == ShapedType::kDynamicSize &&
-                            inputShape[owIndex] == ShapedType::kDynamicSize;
+    bool isInputHWDynamic = inputShape[ohIndex] == ShapedType::kDynamic &&
+                            inputShape[owIndex] == ShapedType::kDynamic;
 
     // We cannot merge the width and height if they are both dynamic as we
     // cannot expand them back to their dynamic values.
@@ -84,8 +84,8 @@ class Convert1x1FilterConvToMatmul : public OpRewritePattern<Conv2DOpType> {
       return failure();
 
     auto combineDims = [](int64_t a, int64_t b) {
-      if (a == ShapedType::kDynamicSize || b == ShapedType::kDynamicSize)
-        return ShapedType::kDynamicSize;
+      if (a == ShapedType::kDynamic || b == ShapedType::kDynamic)
+        return ShapedType::kDynamic;
       return a * b;
     };
 

@@ -12,6 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/module.h"
+#include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
 
 #ifdef __cplusplus
@@ -122,5 +123,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_notify(iree_vm_context_t* context,
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+IREE_VM_DECLARE_CC_TYPE_ADAPTERS(iree_vm_context, iree_vm_context_t);
 
 #endif  // IREE_VM_CONTEXT_H_

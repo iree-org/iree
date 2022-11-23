@@ -24,8 +24,10 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
+        "@llvm-project//mlir:GPUDeviceMapperEnumsGen",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:SCFTdFiles",
         "@llvm-project//mlir:TransformDialectTdFiles",
     ],
 )
@@ -44,7 +46,10 @@ iree_gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "CommonExtensionsOps.td",
-    deps = [":td_files"],
+    deps = [
+        ":td_files",
+        "@llvm-project//mlir:SCFDeviceMappingInterfacesIncGen",
+    ],
 )
 
 iree_compiler_cc_library(
@@ -66,6 +71,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
@@ -73,11 +79,14 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",
+        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransforms",
+        "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:Transforms",

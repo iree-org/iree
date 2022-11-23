@@ -15,7 +15,7 @@ steps:
         --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
         --workdir="$$IREE_DOCKER_WORKDIR" \
         --rm \
-        gcr.io/iree-oss/frontends@sha256:7a7a6d2fce60f3db82bfd2f18316231f9e4662cd9307b079d5adfbb6e119b817 \
+        gcr.io/iree-oss/frontends@sha256:4b8f97bccf8443f0314d25c2737a46c979d9acffd28ad52f7d0ce5b879449da5 \
         build_tools/cmake/build_linux_benchmark.sh
       tar --exclude="*.tar.gz" \
         --exclude="*.tgz" \

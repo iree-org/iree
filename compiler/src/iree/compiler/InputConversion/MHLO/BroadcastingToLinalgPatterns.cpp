@@ -10,9 +10,9 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir-hlo/Dialect/mhlo/transforms/map_chlo_to_hlo_op.h"
-#include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
+#include "mhlo/IR/hlo_ops.h"
+#include "mhlo/transforms/map_chlo_to_hlo_op.h"
+#include "mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -38,15 +38,15 @@ bool isElementTypeLegalForCodegen(Type t) { return !t.isa<ComplexType>(); }
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
 /// attributes.
-SmallVector<StringRef, 3> getParallelAndReductionIterators(int nLoops,
-                                                           int nReduction) {
-  SmallVector<StringRef, 3> res(nLoops - nReduction,
-                                getParallelIteratorTypeName());
-  res.append(nReduction, getReductionIteratorTypeName());
+SmallVector<utils::IteratorType, 3> getParallelAndReductionIterators(
+    int nLoops, int nReduction) {
+  SmallVector<utils::IteratorType, 3> res(nLoops - nReduction,
+                                          utils::IteratorType::parallel);
+  res.append(nReduction, utils::IteratorType::reduction);
   return res;
 }
 
-SmallVector<StringRef, 3> getNParallelLoopsAttrs(int nParallelLoops) {
+SmallVector<utils::IteratorType, 3> getNParallelLoopsAttrs(int nParallelLoops) {
   return getParallelAndReductionIterators(nParallelLoops, 0);
 }
 
@@ -98,7 +98,7 @@ Value broadcast(OpBuilder &builder, Location loc, Value operand,
     if (dim.isStatic()) {
       resultShape.push_back(dim.getStatic());
     } else {
-      resultShape.push_back(-1);
+      resultShape.push_back(ShapedType::kDynamic);
       dynDims.push_back(dim.getValue());
     }
   }

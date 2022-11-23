@@ -17,145 +17,6 @@
 
 using namespace mlir;
 
-///
-/// Copied from usptream's OperationSupport.cpp until CSE improvements land.
-///
-static bool
-isRegionEquivalentTo(Region *lhs, Region *rhs,
-                     function_ref<LogicalResult(Value, Value)> mapOperands,
-                     function_ref<LogicalResult(Value, Value)> mapResults,
-                     OperationEquivalence::Flags flags);
-
-static bool OperationEquivalence__isEquivalentTo(
-    Operation *lhs, Operation *rhs,
-    function_ref<LogicalResult(Value, Value)> mapOperands,
-    function_ref<LogicalResult(Value, Value)> mapResults,
-    OperationEquivalence::Flags flags) {
-  if (lhs == rhs)
-    return true;
-
-  // Compare the operation properties.
-  if (lhs->getName() != rhs->getName() ||
-      lhs->getAttrDictionary() != rhs->getAttrDictionary() ||
-      lhs->getNumRegions() != rhs->getNumRegions() ||
-      lhs->getNumSuccessors() != rhs->getNumSuccessors() ||
-      lhs->getNumOperands() != rhs->getNumOperands() ||
-      lhs->getNumResults() != rhs->getNumResults())
-    return false;
-  if (!(flags & OperationEquivalence::IgnoreLocations) &&
-      lhs->getLoc() != rhs->getLoc())
-    return false;
-
-  ValueRange lhsOperands = lhs->getOperands(), rhsOperands = rhs->getOperands();
-  SmallVector<Value> lhsOperandStorage, rhsOperandStorage;
-  if (lhs->hasTrait<mlir::OpTrait::IsCommutative>()) {
-    auto sortValues = [](ValueRange values) {
-      SmallVector<Value> sortedValues = llvm::to_vector(values);
-      llvm::sort(sortedValues, [](Value a, Value b) {
-        auto aArg = a.dyn_cast<BlockArgument>();
-        auto bArg = b.dyn_cast<BlockArgument>();
-
-        // Case 1. Both `a` and `b` are `BlockArgument`s.
-        if (aArg && bArg) {
-          if (aArg.getParentBlock() == bArg.getParentBlock())
-            return aArg.getArgNumber() < bArg.getArgNumber();
-          return aArg.getParentBlock() < bArg.getParentBlock();
-        }
-
-        // Case 2. One of then is a `BlockArgument` and other is not. Treat
-        // `BlockArgument` as lesser.
-        if (aArg && !bArg)
-          return true;
-        if (bArg && !aArg)
-          return false;
-
-        // Case 3. Both are values.
-        return a.getAsOpaquePointer() < b.getAsOpaquePointer();
-      });
-      return sortedValues;
-    };
-    lhsOperandStorage = sortValues(lhsOperands);
-    lhsOperands = lhsOperandStorage;
-    rhsOperandStorage = sortValues(rhsOperands);
-    rhsOperands = rhsOperandStorage;
-  }
-  auto checkValueRangeMapping =
-      [](ValueRange lhs, ValueRange rhs,
-         function_ref<LogicalResult(Value, Value)> mapValues) {
-        for (auto operandPair : llvm::zip(lhs, rhs)) {
-          Value curArg = std::get<0>(operandPair);
-          Value otherArg = std::get<1>(operandPair);
-          if (curArg.getType() != otherArg.getType())
-            return false;
-          if (failed(mapValues(curArg, otherArg)))
-            return false;
-        }
-        return true;
-      };
-  // Check mapping of operands and results.
-  if (!checkValueRangeMapping(lhsOperands, rhsOperands, mapOperands))
-    return false;
-  if (!checkValueRangeMapping(lhs->getResults(), rhs->getResults(), mapResults))
-    return false;
-  for (auto regionPair : llvm::zip(lhs->getRegions(), rhs->getRegions()))
-    if (!isRegionEquivalentTo(&std::get<0>(regionPair),
-                              &std::get<1>(regionPair), mapOperands, mapResults,
-                              flags))
-      return false;
-  return true;
-}
-
-static bool
-isRegionEquivalentTo(Region *lhs, Region *rhs,
-                     function_ref<LogicalResult(Value, Value)> mapOperands,
-                     function_ref<LogicalResult(Value, Value)> mapResults,
-                     OperationEquivalence::Flags flags) {
-  DenseMap<Block *, Block *> blocksMap;
-  auto blocksEquivalent = [&](Block &lBlock, Block &rBlock) {
-    // Check block arguments.
-    if (lBlock.getNumArguments() != rBlock.getNumArguments())
-      return false;
-
-    // Map the two blocks.
-    auto insertion = blocksMap.insert({&lBlock, &rBlock});
-    if (insertion.first->getSecond() != &rBlock)
-      return false;
-
-    for (auto argPair :
-         llvm::zip(lBlock.getArguments(), rBlock.getArguments())) {
-      Value curArg = std::get<0>(argPair);
-      Value otherArg = std::get<1>(argPair);
-      if (curArg.getType() != otherArg.getType())
-        return false;
-      if (!(flags & OperationEquivalence::IgnoreLocations) &&
-          curArg.getLoc() != otherArg.getLoc())
-        return false;
-      // Check if this value was already mapped to another value.
-      if (failed(mapOperands(curArg, otherArg)))
-        return false;
-    }
-
-    auto opsEquivalent = [&](Operation &lOp, Operation &rOp) {
-      // Check for op equality (recursively).
-      if (!OperationEquivalence__isEquivalentTo(&lOp, &rOp, mapOperands,
-                                                mapResults, flags))
-        return false;
-      // Check successor mapping.
-      for (auto successorsPair :
-           llvm::zip(lOp.getSuccessors(), rOp.getSuccessors())) {
-        Block *curSuccessor = std::get<0>(successorsPair);
-        Block *otherSuccessor = std::get<1>(successorsPair);
-        auto insertion = blocksMap.insert({curSuccessor, otherSuccessor});
-        if (insertion.first->getSecond() != otherSuccessor)
-          return false;
-      }
-      return true;
-    };
-    return llvm::all_of_zip(lBlock, rBlock, opsEquivalent);
-  };
-  return llvm::all_of_zip(*lhs, *rhs, blocksEquivalent);
-}
-
 //===----------------------------------------------------------------------===//
 // BEGIN copied from mlir/lib/Transforms/CSE.cpp
 //===----------------------------------------------------------------------===//
@@ -180,7 +41,7 @@ struct SimpleOperationInfo : public llvm::DenseMapInfo<Operation *> {
     // If op has no regions, operation equivalence w.r.t operands alone is
     // enough.
     if (lhs->getNumRegions() == 0 && rhs->getNumRegions() == 0) {
-      return OperationEquivalence__isEquivalentTo(
+      return OperationEquivalence::isEquivalentTo(
           const_cast<Operation *>(lhsC), const_cast<Operation *>(rhsC),
           OperationEquivalence::exactValueMatch,
           OperationEquivalence::ignoreValueEquivalence,
@@ -237,7 +98,7 @@ struct SimpleOperationInfo : public llvm::DenseMapInfo<Operation *> {
       return success();
     };
 
-    return OperationEquivalence__isEquivalentTo(
+    return OperationEquivalence::isEquivalentTo(
         const_cast<Operation *>(lhsC), const_cast<Operation *>(rhsC),
         mapOperands, mapResults, OperationEquivalence::IgnoreLocations);
   }
@@ -316,6 +177,7 @@ private:
   /// An optional listener to notify of replaced or erased operations.
   RewriteListener *listener;
   int64_t numDCE = 0, numCSE = 0;
+
   //===----------------------------------------------------------------------===//
   // BEGIN copied from mlir/lib/Transforms/CSE.cpp
   //===----------------------------------------------------------------------===//
@@ -334,7 +196,7 @@ void CSE::replaceUsesAndDelete(ScopedMapTy &knownValues, Operation *op,
     // END copied from mlir/lib/Transforms/CSE.cpp
     //===----------------------------------------------------------------------===//
     if (listener)
-      listener->notifyOperationReplaced(op, existing->getResults());
+      listener->notifyRootReplaced(op, existing->getResults());
     //===----------------------------------------------------------------------===//
     // BEGIN copied from mlir/lib/Transforms/CSE.cpp
     //===----------------------------------------------------------------------===//
@@ -427,7 +289,7 @@ LogicalResult CSE::simplifyOperation(ScopedMapTy &knownValues, Operation *op,
 
   // Some simple use case of operation with memory side-effect are dealt with
   // here. Operations with no side-effect are done after.
-  if (!MemoryEffectOpInterface::hasNoEffect(op)) {
+  if (!isMemoryEffectFree(op)) {
     auto memEffects = dyn_cast<MemoryEffectOpInterface>(op);
     // TODO: Only basic use case for operations with MemoryEffects::Read can
     // be eleminated now. More work needs to be done for more complicated

@@ -8,7 +8,7 @@
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
@@ -45,13 +45,13 @@ func.func @softmax() -> !out_tensor_t {
   util.optimization_barrier %input : !in_tensor_t
 
   %input_max_empty = tensor.empty() : !tmp_tensor_t
-  %input_max_filled = linalg.fill ins(%cst_min : f32) 
+  %input_max_filled = linalg.fill ins(%cst_min : f32)
     outs(%input_max_empty : !tmp_tensor_t) -> !tmp_tensor_t
-  %input_max = linalg.generic 
-    {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, 
-                      affine_map<(d0, d1, d2) -> (d0, d1)>], 
+  %input_max = linalg.generic
+    {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                      affine_map<(d0, d1, d2) -> (d0, d1)>],
                       iterator_types = ["parallel", "parallel", "reduction"]}
-     ins(%input : !in_tensor_t) 
+     ins(%input : !in_tensor_t)
     outs(%input_max_filled : !tmp_tensor_t) {
       ^bb0(%arg0: f32, %arg1: f32):
         %max = arith.maxf %arg0, %arg1 : f32
@@ -61,14 +61,14 @@ func.func @softmax() -> !out_tensor_t {
   // This has been fused manually to avoid the fusion on tensors pass and reduce noise atm.
   %exps_empty = tensor.empty() : !out_tensor_t
   %exps_sum_empty = tensor.empty() : !tmp_tensor_t
-  %exps_sum_filled = linalg.fill ins(%cst_0 : f32) 
+  %exps_sum_filled = linalg.fill ins(%cst_0 : f32)
     outs(%exps_sum_empty : !tmp_tensor_t) -> !tmp_tensor_t
   %exps = linalg.generic
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                       affine_map<(d0, d1, d2) -> (d0, d1)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1, d2)>], 
+                      affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
                       iterator_types = ["parallel", "parallel", "parallel"]}
-     ins(%input, %input_max : !in_tensor_t, !tmp_tensor_t) 
+     ins(%input, %input_max : !in_tensor_t, !tmp_tensor_t)
     outs(%exps_empty : !out_tensor_t) {
       ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
         %sub = arith.subf %arg0, %arg1 : f32
@@ -78,9 +78,9 @@ func.func @softmax() -> !out_tensor_t {
 
   %exps_sum = linalg.generic
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1)>], 
+                      affine_map<(d0, d1, d2) -> (d0, d1)>],
                       iterator_types = ["parallel", "parallel", "reduction"]}
-     ins(%exps : !out_tensor_t) 
+     ins(%exps : !out_tensor_t)
     outs(%exps_sum_filled : !tmp_tensor_t) {
       ^bb0(%exp: f32, %acc: f32):
         %add = arith.addf %exp, %acc : f32
@@ -88,12 +88,12 @@ func.func @softmax() -> !out_tensor_t {
       } -> (!tmp_tensor_t)
 
   %res_empty = tensor.empty() : !out_tensor_t
-  %res = linalg.generic 
+  %res = linalg.generic
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                       affine_map<(d0, d1, d2) -> (d0, d1)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1, d2)>], 
+                      affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
                       iterator_types = ["parallel", "parallel", "parallel"]}
-     ins(%exps, %exps_sum : !out_tensor_t, !tmp_tensor_t) 
+     ins(%exps, %exps_sum : !out_tensor_t, !tmp_tensor_t)
     outs(%res_empty : !out_tensor_t) {
       ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
         // %10 = arith.divf %cst_1, %arg1 : f32

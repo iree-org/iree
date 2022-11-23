@@ -40,14 +40,20 @@ class Android_ARMv8_A_Benchmarks(object):
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D,
       tags=["experimental-flags", "mmt4d"],
       compile_targets=[ARMV8_A_CPU_TARGET],
-      extra_flags=["--iree-flow-mmt4d-target-options=arch=aarch64"])
+      extra_flags=[
+          "--iree-flow-mmt4d-target-options=arch=aarch64",
+          "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
+          "--iree-llvmcpu-enable-pad-consumer-fusion"
+      ])
   MMT4D_AND_DOTPROD_COMPILE_CONFIG = iree_definitions.CompileConfig(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D_DOTPROD,
       tags=["experimental-flags", "mmt4d", "dotprod"],
       compile_targets=[ARMV8_A_CPU_TARGET],
       extra_flags=[
           "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod",
-          "--iree-llvm-target-cpu-features=+dotprod"
+          "--iree-llvm-target-cpu-features=+dotprod",
+          "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
+          "--iree-llvmcpu-enable-pad-consumer-fusion"
       ])
 
   def generate(

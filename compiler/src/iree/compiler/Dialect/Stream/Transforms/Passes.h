@@ -112,6 +112,7 @@ std::unique_ptr<OperationPass<>> createEncodeDeviceTensorsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createMaterializeBuiltinsPass();
 std::unique_ptr<OperationPass<>> createMaterializeCopyOnWritePass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createElideAsyncCopiesPass();
+std::unique_ptr<OperationPass<>> createEmplaceAllocationsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createRefineUsagePass();
 
 //===----------------------------------------------------------------------===//

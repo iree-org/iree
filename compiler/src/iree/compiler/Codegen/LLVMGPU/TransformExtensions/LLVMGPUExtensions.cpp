@@ -12,8 +12,8 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
@@ -40,11 +40,23 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // IREE-specific LLVMGPU transformations.
 //===---------------------------------------------------------------------===//
 
+void transform_dialect::MapNestedForeachThreadToGpuThreadsOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    ArrayRef<int64_t> workgroupSize) {
+  result.addOperands(target);
+  result.addAttribute(
+      MapNestedForeachThreadToGpuThreadsOp::getWorkgroupSizeAttrName(
+          result.name),
+      builder.getI64ArrayAttr(workgroupSize));
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
+
 // TODO: if the number of threads was wired like the workgroup_count, we could
 // reuse most of the code and not require a static number of threads.
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
-transform_dialect::MapNestedForeachThreadToGpuThreads::applyToOne(
+transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
     func::FuncOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
@@ -70,9 +82,18 @@ transform_dialect::MapNestedForeachThreadToGpuThreads::applyToOne(
 
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
   SimplePatternRewriter rewriter(target);
+
+  MLIRContext *ctx = target->getContext();
+  SmallVector<DeviceMappingAttrInterface> threadMappingAttributes = {
+      gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimX),
+      gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimY),
+      gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimZ)};
+
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForeachToThreadsImpl(
-          rewriter, target, workgroupSize, true, transformOp);
+          rewriter, target, workgroupSize, true, transformOp,
+          threadMappingAttributes);
+
   if (diag.succeeded()) {
     auto newAttr = rewriter.getIndexArrayAttr(workgroupSize);
     // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
@@ -85,6 +106,16 @@ transform_dialect::MapNestedForeachThreadToGpuThreads::applyToOne(
 //===---------------------------------------------------------------------===//
 // VectorToWarpExecuteOnLane0Op.
 //===---------------------------------------------------------------------===//
+void transform_dialect::VectorToWarpExecuteOnLane0Op::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    int64_t warpSize) {
+  MLIRContext *ctx = builder.getContext();
+  result.addOperands(target);
+  result.addAttribute(
+      VectorToWarpExecuteOnLane0Op::getWarpSizeAttrName(result.name),
+      builder.getI64IntegerAttr(warpSize));
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
 
 /// Helper method to replace all uses of the laneId operand by the constant
 /// 0 inside the region. This is a necessary prerequisite to perform any kind of
@@ -296,6 +327,11 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
 //===---------------------------------------------------------------------===//
 // VectorWarpDistributionOp.
 //===---------------------------------------------------------------------===//
+void transform_dialect::VectorWarpDistributionOp::build(OpBuilder &builder,
+                                                        OperationState &result,
+                                                        Value target) {
+  result.addOperands(target);
+}
 
 /// Emit shared local memory allocation in case it is needed when lowering the
 /// warp operations.
@@ -317,7 +353,8 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
 /// Emit warp reduction code sequence for a given input.
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            vector::CombiningKind kind, uint32_t size) {
-  Value laneVal = input;
+  // First reduce on a single thread to get per lane reduction value.
+  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
   // Parallel reduction using butterfly shuffles.
   for (uint64_t i = 1; i < size; i <<= 1) {
     Value shuffled = builder
@@ -479,12 +516,28 @@ static void populateVectorTransferWriteDistribution(Operation *target,
       patterns, simpleDistributionFunction, benefit);
 }
 
+static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
+                                       Value val, Value srcIdx,
+                                       int64_t warpSz) {
+  assert((val.getType().isF32() || val.getType().isInteger(32)) &&
+         "unsupported shuffle type");
+  Type i32Type = builder.getIntegerType(32);
+  Value srcIdxI32 = builder.create<arith::IndexCastOp>(loc, i32Type, srcIdx);
+  Value warpSzI32 = builder.create<arith::ConstantOp>(
+      loc, builder.getIntegerAttr(i32Type, warpSz));
+  Value result = builder
+                     .create<gpu::ShuffleOp>(loc, val, srcIdxI32, warpSzI32,
+                                             gpu::ShuffleMode::IDX)
+                     .getResult(0);
+  return result;
+}
+
 static void populatePropagateVectorDistribution(Operation *target,
                                                 RewritePatternSet &patterns,
                                                 PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populatePropagateWarpVectorDistributionPatterns(
-      patterns, simpleDistributionFunction, benefit);
+      patterns, simpleDistributionFunction, simpleWarpShuffleFunction, benefit);
   vector::populateDistributeReduction(patterns, warpReduction, benefit);
   patterns.add<WarpOpLoad, HoistSharedMemoryAlloc>(target->getContext(),
                                                    benefit);
@@ -542,6 +595,12 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   }
 
   return DiagnosedSilenceableFailure(success());
+}
+
+void transform_dialect::VectorWarpDistributionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES

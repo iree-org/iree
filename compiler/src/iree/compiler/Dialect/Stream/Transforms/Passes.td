@@ -77,6 +77,14 @@ def ElideAsyncCopies :
   }];
 }
 
+def EmplaceAllocations :
+    Pass<"iree-stream-emplace-allocations", ""> {
+  let summary = "Emplaces transient tensor allocations to remove copies.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createEmplaceAllocationsPass()
+  }];
+}
+
 def RefineUsage :
     Pass<"iree-stream-refine-usage", "mlir::ModuleOp"> {
   let summary = "Refines resource usage bits and inserts transfers where appropriate.";

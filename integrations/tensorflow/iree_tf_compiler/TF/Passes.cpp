@@ -6,7 +6,7 @@
 
 #include "iree_tf_compiler/TF/Passes.h"
 
-#include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
+#include "mhlo/transforms/passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"

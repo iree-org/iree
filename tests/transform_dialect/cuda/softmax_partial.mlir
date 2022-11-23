@@ -4,7 +4,7 @@
 // RUN:     --iree-flow-transformation-pipeline  \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_partial_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 

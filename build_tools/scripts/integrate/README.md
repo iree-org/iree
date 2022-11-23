@@ -19,7 +19,10 @@ get bundled into an unrelated patch unless if very careful). In this rare
 case, just copy the contents of this directory to a temporary location and
 edit/run from there. When done, submit the changes to main.
 
-What follows are some rambly notes on how to do an LLVM integrate.
+What follows are some rambly notes on how to do an LLVM integrate. The integrator
+needs to look at the current LLVM pinned commit and figure out which are
+cherry-picked. If any commit that is cherry picked is not part of the integrate,
+the integrator needs to cherry pick it again.
 
 TODO: Refactor these based on the common procedure we actually use.
 
@@ -301,6 +304,10 @@ git push UPSTREAM_AUTOMATION bump-llvm-...
 
 ### Cherry-picking
 
+Please add the integrator to reviewers in the cherry-pick PR, so the integrator
+won't miss the commits when bumping submodules. If you don't know who is the
+integrator, you can reach out to @hanchung on discord or add hanhanW as a reviewer.
+
 We support cherry-picking specific commits in to both llvm-project and mlir-hlo.
 This should only ever be done to incorporate patches that enable further
 development and which will resolve automatically as part of a future
@@ -351,8 +358,8 @@ under docker, we can find the hash from CI log.
 An example from a log:
 
 ```
-[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:3d5b879672d7f302124ab3d1aa533a6949bd0adfc176884177844ac6767e23e9 build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
-Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:3d5b879672d7f302124ab3d1aa533a6949bd0adfc176884177844ac6767e23e9' locally
+[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:1de463291cfb337089ae4c3beead3c382ea64e53502f57e35457944b6ae152cd build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
+Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:1de463291cfb337089ae4c3beead3c382ea64e53502f57e35457944b6ae152cd' locally
 sha256:aeb8de9fb7af3913d385ec6b274320197d61aa7bc51a6e8bc0deba644da3e405: Pulling from iree-oss/frontends-swiftshader
 ```
 
@@ -360,7 +367,7 @@ You can find the hash tag from log and run the below command. It makes sure that
 you have the enviroment as same as CI bot and requires less local setup.
 
 ```
-docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:3d5b879672d7f302124ab3d1aa533a6949bd0adfc176884177844ac6767e23e9
+docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:1de463291cfb337089ae4c3beead3c382ea64e53502f57e35457944b6ae152cd
 ```
 
 To repro failures in `iree/e2e/`:

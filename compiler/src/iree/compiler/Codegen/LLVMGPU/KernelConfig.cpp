@@ -36,6 +36,11 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
 
+llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
+    "iree-codegen-llvmgpu-enable-transform-dialect-jit",
+    llvm::cl::desc("enable the usage of the transform dialect JIT"),
+    llvm::cl::init(false));
+
 llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes(
     "iree-codegen-llvmgpu-workgroup-tile-sizes",
     llvm::cl::desc("Fixed tile sizes when using the transform dialect starting "
@@ -175,9 +180,9 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       op.getDpsInputOperand(0)->get().getType().cast<ShapedType>().getShape();
   auto rhsShape =
       op.getDpsInputOperand(1)->get().getType().cast<ShapedType>().getShape();
-  int64_t sizeM = ShapedType::kDynamicSize;
-  int64_t sizeN = ShapedType::kDynamicSize;
-  int64_t sizeK = ShapedType::kDynamicSize;
+  int64_t sizeM = ShapedType::kDynamic;
+  int64_t sizeN = ShapedType::kDynamic;
+  int64_t sizeK = ShapedType::kDynamic;
   auto outputMap = op.getMatchingIndexingMap(op.getDpsInitOperand(0));
   for (unsigned i = 0; i < lhsShape.size(); i++) {
     if (op.getMatchingIndexingMap(op.getDpsInputOperand(0)).getDimPosition(i) ==
@@ -204,9 +209,9 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       }
     }
   }
-  bool isStaticSize = sizeM != ShapedType::kDynamicSize &&
-                      sizeN != ShapedType::kDynamicSize &&
-                      sizeK != ShapedType::kDynamicSize;
+  bool isStaticSize = sizeM != ShapedType::kDynamic &&
+                      sizeN != ShapedType::kDynamic &&
+                      sizeK != ShapedType::kDynamic;
   if (isStaticSize) {
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op)) {
@@ -393,6 +398,8 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
              shape.back() % (workgroupSize[0] * vectorSize) != 0) {
         vectorSize /= 2;
       }
+      if (vectorSize == 1)  // assume there is fastpath + slowpath
+        vectorSize = 4;
       int64_t problemSize = std::accumulate(
           shape.begin(), shape.end(), 1,
           [](const int64_t &a, const int64_t &b) { return a * b; });
@@ -453,6 +460,65 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   return llvm::None;
 }
 
+/// Set configuration for reduction transform dialect based strategy.
+static LogicalResult setReductionTransformJitConfig(func::FuncOp entryPoint,
+                                                    linalg::LinalgOp op) {
+  if (!clGPUEnableTransformDialectJit) return failure();
+  // TODO: match the sequence the startegy supports.
+  if (!isCudaTarget(entryPoint)) return failure();
+  if (!isa<linalg::GenericOp>(op)) return failure();
+  if (op.hasDynamicShape()) return failure();
+  SmallVector<unsigned> reductionDims;
+  op.getReductionDims(reductionDims);
+  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
+    return failure();
+  if (op.getRegionOutputArgs().size() != 1) return failure();
+
+  // Only support projected permutation, this could be extended to projected
+  // permutated with broadcast.
+  if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
+        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
+      }))
+    return failure();
+
+  // Only single combiner operations are supported for now.
+  SmallVector<Operation *, 4> combinerOps;
+  if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
+      combinerOps.size() != 1)
+    return failure();
+  Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
+  if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
+
+  const Type elementType = op.getDpsInitOperand(0)
+                               ->get()
+                               .getType()
+                               .cast<ShapedType>()
+                               .getElementType();
+  if (!elementType.isIntOrFloat()) return failure();
+  // Reduction distribution only supports 32-bit types now.
+  if (elementType.getIntOrFloatBitWidth() != 32) return failure();
+
+  // Hardcoded workagroup size, this could be deduced from the reduction dim.
+  std::array<int64_t, 3> workgroupSize = {32, 2, 1};
+  SmallVector<unsigned> partitionedLoops =
+      cast<PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  // Tile all the parallel dimension to 1.
+  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t, 4> threadTileSizes = workgroupTileSizes;
+  threadTileSizes.push_back(1);
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes,
+      IREE::Codegen::DispatchLoweringPassPipeline::
+          TransformDialectJitterCodegen,
+      workgroupSize);
+  return success();
+}
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op) {
@@ -487,10 +553,12 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                .cast<ShapedType>()
                                .getElementType();
   if (!elementType.isIntOrFloat()) return failure();
+  unsigned bitWidth = elementType.getIntOrFloatBitWidth();
   // Reduction distribution only supports 32-bit types now.
-  if (elementType.getIntOrFloatBitWidth() != 32) return failure();
+  if (bitWidth != 32) return failure();
 
-  unsigned vectorSize = 4;
+  const unsigned largestLoadSizeInBits = 128;
+  unsigned vectorSize = largestLoadSizeInBits / bitWidth;
   while ((*dimSize / vectorSize) % cudaWarpSize != 0) vectorSize /= 2;
 
   // TODO: Add reduction tiling to handle larger reductions.
@@ -765,6 +833,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
         linalgOp.getNumParallelLoops() >= 2) {
       return setContractConfig(entryPointFn, linalgOp);
     }
+    if (succeeded(setReductionTransformJitConfig(entryPointFn, linalgOp))) {
+      return success();
+    }
     if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp))) {
       return success();
     }
@@ -801,6 +872,10 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
+    // If using the transform dialect, call the proper pipeline.
+    assert((clGPUCodegenTransformDialectFileName.empty() ||
+            !clGPUEnableTransformDialectJit) &&
+           "Can't use both transform dialect interpreted and jitted modes");
     if (clGPUCodegenTransformDialectFileName.size() > 0) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
@@ -843,6 +918,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       // continue;
       return funcOp.emitOpError("unable to find root operation");
     }
+
     if (failed(setRootConfig(funcOp, rootOperation))) continue;
 
     // Propogate the configuration to the other ops.

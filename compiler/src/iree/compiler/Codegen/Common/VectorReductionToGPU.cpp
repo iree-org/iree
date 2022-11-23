@@ -14,9 +14,9 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Transforms/SideEffectUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-reduction-distribution"
 
@@ -56,6 +56,45 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
   return laneVal;
 }
 
+// List of identity elements by operation.
+// https://en.wikipedia.org/wiki/Identity_element
+static Attribute getCombiningKindIdentity(OpBuilder &builder,
+                                          vector::CombiningKind combiningKind,
+                                          Type type) {
+  switch (combiningKind) {
+    case vector::CombiningKind::ADD:
+      return builder.getZeroAttr(type);
+    case vector::CombiningKind::MUL: {
+      if (type.isIntOrIndex()) {
+        return builder.getIntegerAttr(type, 1);
+      }
+      return builder.getFloatAttr(type, 1);
+    }
+    case vector::CombiningKind::MINUI:
+    case vector::CombiningKind::MINSI:
+      return builder.getIntegerAttr(type, std::numeric_limits<int64_t>::max());
+    case vector::CombiningKind::MAXUI:
+    case vector::CombiningKind::MAXSI:
+      return builder.getIntegerAttr(type, std::numeric_limits<int64_t>::min());
+    case vector::CombiningKind::AND:
+      return builder.getIntegerAttr(type, 1);
+    case vector::CombiningKind::OR:
+    case vector::CombiningKind::XOR:
+      return builder.getZeroAttr(type);
+    case vector::CombiningKind::MINF: {
+      auto posInfApFloat = APFloat::getInf(
+          type.cast<FloatType>().getFloatSemantics(), /*Negative=*/false);
+      return builder.getFloatAttr(type, posInfApFloat);
+    }
+    case vector::CombiningKind::MAXF: {
+      auto negInfApFloat = APFloat::getInf(
+          type.cast<FloatType>().getFloatSemantics(), /*Negative=*/true);
+      return builder.getFloatAttr(type, negInfApFloat);
+    }
+  }
+  return Attribute();
+}
+
 /// Emit reduction across a group for a given input.
 static Value groupReduction(Location loc, OpBuilder &builder, Value input,
                             vector::CombiningKind kind, uint32_t size,
@@ -63,27 +102,48 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
   assert(
       size % warpSize == 0 &&
       "Group reduction only support for sizes aligned on warp size for now.");
-  Value laneVal = warpReduction(loc, builder, input, kind, warpSize);
+  // First reduce on a single thread to get per lane reduction value.
+  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
+  laneVal = warpReduction(loc, builder, laneVal, kind, warpSize);
   // if we have more than one warp, reduce across warps.
   if (size > warpSize) {
     uint32_t numWarp = size / warpSize;
+    assert(numWarp <= warpSize &&
+           "Only support 1 level, need to implement recursive/loop for this "
+           "case.");
     MemRefType memrefType =
-        MemRefType::get(numWarp, input.getType(), {},
+        MemRefType::get(numWarp, laneVal.getType(), {},
                         gpu::GPUDialect::getWorkgroupAddressSpace());
     Value alloc = builder.create<memref::AllocOp>(loc, memrefType);
     Value threadX = builder.create<gpu::ThreadIdOp>(loc, builder.getIndexType(),
                                                     gpu::Dimension::x);
     Value cstWarpSize = builder.create<arith::ConstantIndexOp>(loc, warpSize);
     Value warpId = builder.create<arith::DivUIOp>(loc, threadX, cstWarpSize);
+    Value laneId = builder.create<arith::RemUIOp>(loc, threadX, cstWarpSize);
+    Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+    Value lane0 = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                                laneId, zero);
     // Store the reduction for each warp.
     SmallVector<Value> indices = {warpId};
-    builder.create<memref::StoreOp>(loc, laneVal, alloc, indices);
+    builder.create<scf::IfOp>(loc, lane0, [&](OpBuilder &b, Location l) {
+      b.create<memref::StoreOp>(l, laneVal, alloc, indices);
+      b.create<scf::YieldOp>(l, llvm::None);
+    });
     builder.create<gpu::BarrierOp>(loc);
-    VectorType vecType = VectorType::get(numWarp, input.getType());
-    Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-    Value vec =
-        builder.create<vector::TransferReadOp>(loc, vecType, alloc, zero);
-    laneVal = builder.create<vector::ReductionOp>(loc, kind, vec);
+    // Further reduce the outputs from each warps with a single warp reduce.
+    Value loadVal = builder.create<memref::LoadOp>(loc, alloc, laneId);
+    Value cstNumWarp = builder.create<arith::ConstantIndexOp>(loc, numWarp);
+    // Pad with identity element if numel < warpSize for valid warp reduction.
+    Value useIdentityElement = builder.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::sge, laneId, cstNumWarp);
+    Attribute identityAttr =
+        getCombiningKindIdentity(builder, kind, loadVal.getType());
+    assert(identityAttr && "Unknown identity value for the reduction");
+    // TODO: Avoid reduction across all lanes if numWarp <= warpSize/2.
+    Value identity = builder.create<arith::ConstantOp>(loc, identityAttr);
+    Value selectedInput = builder.create<arith::SelectOp>(
+        loc, useIdentityElement, identity, loadVal);
+    laneVal = warpReduction(loc, builder, selectedInput, kind, warpSize);
   }
   return laneVal;
 }
@@ -145,6 +205,22 @@ class InsertElementToBroadcast final
     return success();
   }
 };
+
+static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
+                                       Value val, Value srcIdx,
+                                       int64_t warpSz) {
+  assert((val.getType().isF32() || val.getType().isInteger(32)) &&
+         "unsupported shuffle type");
+  Type i32Type = builder.getIntegerType(32);
+  Value srcIdxI32 = builder.create<arith::IndexCastOp>(loc, i32Type, srcIdx);
+  Value warpSzI32 = builder.create<arith::ConstantOp>(
+      loc, builder.getIntegerAttr(i32Type, warpSz));
+  Value result = builder
+                     .create<gpu::ShuffleOp>(loc, val, srcIdxI32, warpSzI32,
+                                             gpu::ShuffleMode::IDX)
+                     .getResult(0);
+  return result;
+}
 
 class VectorReduceToGPUPass
     : public VectorReduceToGPUBase<VectorReduceToGPUPass> {
@@ -243,8 +319,8 @@ class VectorReduceToGPUPass
         return map;
       };
       RewritePatternSet patterns(ctx);
-      vector::populatePropagateWarpVectorDistributionPatterns(patterns,
-                                                              distributionFn);
+      vector::populatePropagateWarpVectorDistributionPatterns(
+          patterns, distributionFn, simpleWarpShuffleFunction);
       vector::populateDistributeReduction(patterns, groupReductionFn);
       vector::populateDistributeTransferWriteOpPatterns(patterns,
                                                         distributionFn);

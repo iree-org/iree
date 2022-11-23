@@ -74,8 +74,8 @@ class IreeMobilebertFP32(IreeBenchmarkCommand):
 class MobilebertFP32CommandFactory(BenchmarkCommandFactory):
   """ Generates `BenchmarkCommand` objects specific to running MobileBert."""
 
-  def __init__(self, base_dir: str):
-    self._model_name = "mobilebert_float_384_gpu"
+  def __init__(self, base_dir: str, model_name: str):
+    self._model_name = model_name
     self._base_dir = base_dir
     self._iree_benchmark_binary_path = os.path.join(base_dir,
                                                     "iree-benchmark-module")

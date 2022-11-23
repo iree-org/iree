@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true}))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true})))' --split-input-file %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -1366,7 +1366,7 @@ hal.executable private @multi_root {
       native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
     hal.executable.export public @multi_root ordinal(0)
         layout(#hal.pipeline.layout<
-            push_constants = 0, 
+            push_constants = 0,
             sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -1391,7 +1391,7 @@ hal.executable private @multi_root {
         %7 = tensor.empty() : tensor<12x128xf32>
         %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<12x128xf32>) -> tensor<12x128xf32>
         %9 = linalg.generic {
-            indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], 
+            indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
             iterator_types = ["parallel", "parallel", "reduction"]}
             ins(%4 : tensor<12x128x128xf32>) outs(%5 : tensor<12x128xf32>) {
         ^bb0(%arg0: f32, %arg1: f32):
@@ -1410,7 +1410,7 @@ hal.executable private @multi_root {
           %13 = arith.addf %12, %arg3 : f32
           linalg.yield %13 : f32
         } -> tensor<12x128xf32>
-        flow.dispatch.tensor.store %10, %3, offsets = [0, 0], sizes = [12, 128], strides = [1, 1] 
+        flow.dispatch.tensor.store %10, %3, offsets = [0, 0], sizes = [12, 128], strides = [1, 1]
             : tensor<12x128xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x128xf32>>
         return
       }

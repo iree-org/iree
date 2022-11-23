@@ -91,6 +91,14 @@ static llvm::cl::opt<bool> clEnableAggressiveFusion(
         "with reduction loops"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
+    "iree-flow-dispatch-generate-workload-region",
+    llvm::cl::desc("Generate the workload region"), llvm::cl::init(true));
+
+static llvm::cl::opt<bool> clEnableDataTiling(
+    "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<std::string> clMmt4dTargetOptions(
     "iree-flow-mmt4d-target-options",
     llvm::cl::desc("Convert linalg.matmul ops to MMT4D ops targetting the "
@@ -117,16 +125,11 @@ static llvm::cl::opt<std::string> clDispatchTransformFileName(
                    "the transformations to apply to form dispatch regions."),
     llvm::cl::init(""));
 
-static llvm::cl::opt<bool> clDispatchViaRegionOps(
-    "iree-flow-dispatch-via-region-ops",
-    llvm::cl::desc("Create dispatches via DispatchRegionOps"),
+static llvm::cl::opt<bool> clZeroFillEmptyTensors(
+    "iree-flow-zero-fill-empty-tensors",
+    llvm::cl::desc(
+        "Zero fill empty tensors instead of leaving them uninitialized"),
     llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clDispatchViaRegionOpsGenerateWorkloadRegion(
-    "iree-flow-dispatch-via-region-ops-generate-workload-region",
-    llvm::cl::desc("Generate the workload region when running with "
-                   "iree-flow-dispatch-via-region-ops"),
-    llvm::cl::init(true));
 
 namespace mlir {
 namespace iree_compiler {
@@ -180,6 +183,24 @@ void buildGlobalOptimizationPassPipeline(
 
 }  // namespace
 
+/// Optional pre-processing passes that transform the program for specialist
+/// uses case.
+static void buildOptionalPreprocessingPassPipeline(OpPassManager &passManager) {
+  FunctionLikeNest(passManager)
+      .addPredicatedPass(clEnableConvToImg2Col,
+                         IREE::Flow::createConvertConv2DToImg2ColPass)
+      .addPredicatedPass(
+          !clMmt4dTargetOptions.empty(),
+          []() {
+            return IREE::Flow::createConvertLinalgMatmulToMmt4DPass(
+                clMmt4dTargetOptions);
+          })
+      .addPredicatedPass(clEnablePaddingLinalgOps, []() {
+        return IREE::Flow::createPadLinalgOpsToIntegerMultiplePass(
+            clLinalgOpsPaddingSize);
+      });
+}
+
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
   // ML frontends have very uneven support for user-controlled types _and_ users
@@ -201,30 +222,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
     passManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
   }
 
-  // Special case peephole optimizations.
+  // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(passManager)
       .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass)
-      .addPredicatedPass(clEnableConvToImg2Col,
-                         IREE::Flow::createConvertConv2DToImg2ColPass)
-      .addPredicatedPass(
-          clDispatchTransformFileName.empty() && !clDispatchViaRegionOps,
-          IREE::Flow::createDetachElementwiseFromNamedOpsPass)
-      // Input should now be legal.
-      .addPass(IREE::Flow::createVerifyInputLegalityPass)
-      // Catch matmul ops before we do anything else with them.
-      .addPredicatedPass(
-          !clMmt4dTargetOptions.empty(),
-          []() {
-            return IREE::Flow::createConvertLinalgMatmulToMmt4DPass(
-                clMmt4dTargetOptions);
-          })
-      // Pad linalg ops
-      .addPredicatedPass(clEnablePaddingLinalgOps, []() {
-        return IREE::Flow::createPadLinalgOpsToIntegerMultiplePass(
-            clLinalgOpsPaddingSize);
-      });
+      .addPass(IREE::Flow::createDetachElementwiseFromNamedOpsPass)
+      .addPass(mlir::createLinalgNamedOpConversionPass);
 
-  passManager.addPass(mlir::createLinalgNamedOpConversionPass());
+  // Optional pre-processing passes.
+  buildOptionalPreprocessingPassPipeline(passManager);
+  passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
   // The more we are able to equate shape dimensions at this level the better
@@ -265,6 +271,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // transpose.
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
+      // Enable data tiling after all linalg level transformations.
+      .addPredicatedPass(clEnableDataTiling, createSetEncodingPass)
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
       .addPredicatedPass(!clDispatchTransformFileName.empty(),
@@ -274,27 +282,17 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                          })
       // Only want use the transform dialect for some dispatch regions and let
       // the DispatchLinalgOnTensorsPass handle the rest.
-      .addPredicatedPass(
-          !clDispatchViaRegionOps,
-          []() {
-            return createDispatchLinalgOnTensorsPass(clEnableAggressiveFusion);
-          })
-      // DispatchLinalgOnTensorsViaRegionsPass is a variant of
-      // DispatchLinalgOnTensorsPass that lowers via DispatchRegionOps. This is
-      // on an opt-in basis until the pass is stable enough to replace
-      // DispatchLinalgOnTensorsPass.
-      .addPredicatedPass(clDispatchViaRegionOps,
-                         [&]() {
-                           return createDispatchLinalgOnTensorsViaRegionOpsPass(
-                               clDispatchViaRegionOpsGenerateWorkloadRegion);
-                         })
+      .addPass([&]() {
+        return createDispatchLinalgOnTensorsPass(
+            clEnableAggressiveFusion, clDispatchGenerateWorkloadRegion);
+      })
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(createCSEPass);
 
   // Initialize any empty tensors to zero.
-  passManager.addPass(createInitializeEmptyTensorsPass());
+  passManager.addPass(createInitializeEmptyTensorsPass(clZeroFillEmptyTensors));
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.

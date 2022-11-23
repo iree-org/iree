@@ -25,7 +25,6 @@ iree_cc_library(
     "KernelConfig.cpp"
     "LLVMGPUDistribute.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
-    "LLVMGPUMultiBuffering.cpp"
     "LLVMGPUTensorAlloc.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTensorPad.cpp"
@@ -78,6 +77,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
+    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformDialect

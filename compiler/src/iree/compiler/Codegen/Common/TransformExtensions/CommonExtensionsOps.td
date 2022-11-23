@@ -11,24 +11,25 @@ include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
 def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
-    [FunctionalStyleTransformOpTrait, 
+    [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
-     TransformEachOpTrait, 
+     TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
     Greedily applies patterns as specified by its attributes.
-    
-    Must be applied to an op with trait IsolatedFromAbove since the 
+
+    Must be applied to an op with trait IsolatedFromAbove since the
     GreedyPatternRewriter asserts those.
 
     Returns the IsolatedFromAbove op whose content it has modified for better
     chaining APIs.
 
-    The following additive attributes can be set, they add patterns in an 
+    The following additive attributes can be set, they add patterns in an
     unspecified order:
       - additional_iree_patterns: fancy patterns we shortcut into the system,
       will need to be sliced out better in the future.
@@ -42,8 +43,9 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       be unsafe wrt parallelism so use carefully!
       - rank_reducing: adds patterns that results in rank-reducing behavior on
       subset-based operations.
-      - simplify_memref_metadata: adds patterns that simplify the uses of
-      memref.extract_strided_metadata and fold to the underlying indices.
+      - expand_memref_strided_metadata: adds patterns that expand memref
+      operations into extract_strided_metadata operations and a materialization
+      of their effect on the metadata (sizes, offset, strides).
       - swapping_patterns: adds patterns that swap operations for a better outcome.
       This is a catch all that can be refined further if/when needed.
       - swap_padding_elide_conditional: refines the tensor.pad +
@@ -55,12 +57,12 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
     Return modes:
     =============
-    This operation applies a number of patterns to rewrite vector IR into 
-    distributed warp form. To apply these patterns, this operation must target 
+    This operation applies a number of patterns to rewrite vector IR into
+    distributed warp form. To apply these patterns, this operation must target
     an operation that is isolated from above, otherwise the transform definitely
     fails.
-  
-    If the pattern application fails, or if the underlying listener fails to 
+
+    If the pattern application fails, or if the underlying listener fails to
     capture op handles, the transformation definitely fails.
 
     Otherwise the transformation is successful and no result is returned.
@@ -71,13 +73,18 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$canonicalization,
                        UnitAttr:$promote_foreach_thread_capture_to_shared,
                        UnitAttr:$rank_reducing,
-                       UnitAttr:$simplify_memref_metadata,
+                       UnitAttr:$expand_memref_strided_metadata,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns);
   let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    // TODO: Some bitvector to scale better than n-bools.
+    OpBuilder<(ins "Value":$target, "bool":$rankReducing)>
+  ];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
@@ -88,14 +95,14 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 }
 
 def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
-    [FunctionalStyleTransformOpTrait, 
+    [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{
     Target the whole hal.executable_variant op and call upstream comprehensive
     bufferize with extra IREE hooks.
 
-    By default, CPU allocations are emitted. This behavior can be modified by 
+    By default, CPU allocations are emitted. This behavior can be modified by
     using the following attributes:
       - target_gpu: if set, GPU allocations are emitted.
 
@@ -103,11 +110,11 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     =============
     This operation calls the upstream one-shot bufferization pass with extra
     registered patterns for IREE.
-  
+
     The pass is ran on all the ModuleOp nested under the top-level op on which
     the transform dialect interpreter pass is applied.
 
-    If any of the pass on any of the ModuleOp fails, the transformation 
+    If any of the pass on any of the ModuleOp fails, the transformation
     definitely fails. Otherwise the transformation succeeds.
 
     No handles are consumed or produced.
@@ -119,9 +126,13 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
 
   let assemblyFormat = "attr-dict $target";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target, CArg<"bool", "false">:$targetGpu)>
+  ];
 }
 
-def ForeachThreadToWorkgroupOp : Op<Transform_Dialect, 
+def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
     "iree.foreach_thread_to_workgroup",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
@@ -140,26 +151,26 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
     =============
     This operation ignores non-Func ops and drops them in the return.
 
-    If no unique scf.foreach_thread topLevel operation is found, then the 
+    If no unique scf.foreach_thread topLevel operation is found, then the
     transform definitely fails.
     If the unique topLevel scf.foreach_thread has results (i.e. tensors), then
     the transform definitely fails.
-    
-    If the unique topLevel scf.foreach_thread maps to a dynamic number of 
-    threads, then the transform definitely fails. This is a temporary 
+
+    If the unique topLevel scf.foreach_thread maps to a dynamic number of
+    threads, then the transform definitely fails. This is a temporary
     limitation until the backward slice computing scf.foreach_thread.num_threads
     can be extracted into the hal::executable_export workgroup_count region.
-    This region may require arbitrary computations and cannot magically match 
-    what the `stream.cmd.dispatch` has already imposed on us at a distance. 
-    For now we must specify the number of values properly when applying the 
+    This region may require arbitrary computations and cannot magically match
+    what the `stream.cmd.dispatch` has already imposed on us at a distance.
+    For now we must specify the number of values properly when applying the
     topLevel tile_to_foreach_thread_op.
-    
-    If the unique topLevel scf.foreach_thread operation contained within the 
+
+    If the unique topLevel scf.foreach_thread operation contained within the
     FuncOp referred to by the `target` PDLOperation lowers to workgroup properly,
     the transform succeeds. Otherwise the transform definitely fails.
-    
+
     The returned handle points to the same FuncOp operand, consuming it and
-    producing a new SSA value to satisfy chaining and linearity of the IR 
+    producing a new SSA value to satisfy chaining and linearity of the IR
     properties.
   }];
 
@@ -168,6 +179,11 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
 
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::func::FuncOp target,
@@ -176,7 +192,7 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
   }];
 }
 
-def TileToForeachThreadAndWorkgroupCountRegion :
+def TileToForeachThreadAndWorkgroupCountRegionOp :
     Op<Transform_Dialect, "iree.tile_to_foreach_thread_and_workgroup_count_region",
       [AttrSizedOperandSegments,
        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
@@ -188,7 +204,7 @@ def TileToForeachThreadAndWorkgroupCountRegion :
     the `workgroup_count` region of the export op corresponding to the parent
     `func.func` of the target to return the number of workgroups.
     Please see the doc of `structured.tile_to_foreach_thread_op` for full
-    description of op semantics. 
+    description of op semantics.
   }];
 
   let arguments = (ins PDL_Operation:$target,
@@ -196,21 +212,44 @@ def TileToForeachThreadAndWorkgroupCountRegion :
                    Variadic<PDL_Operation>:$tile_sizes,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$static_num_threads,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$static_tile_sizes,
-                   OptionalAttr<I64ArrayAttr>:$thread_dim_mapping);
+                   OptionalAttr<DeviceMappingArrayAttr>:$mapping);
   let results = (outs PDL_Operation:$foreach_thread_op,
                       PDL_Operation:$tiled_op);
   let assemblyFormat = [{
     $target oilist(
         `num_threads` custom<DynamicIndexList>($num_threads,
                                                $static_num_threads,
-                                               "ShapedType::kDynamicSize") |
+                                               "ShapedType::kDynamic") |
          `tile_sizes` custom<DynamicIndexList>($tile_sizes,
                                                $static_tile_sizes,
-                                               "ShapedType::kDynamicSize"))
-    (`(` `mapped` `to` `dims` $thread_dim_mapping^ `)`)? attr-dict
+                                               "ShapedType::kDynamic"))
+    (`(` `mapping` `=` $mapping^ `)`)? attr-dict
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let hasVerifier = 1;
+
+  let builders = [
+    OpBuilder<(ins "Value":$target,
+                   "ArrayRef<int64_t>":$staticTileSizes,
+                   CArg<"::mlir::transform::TileSizesSpec",
+                        "::mlir::transform::TileSizesSpec()">,
+                   CArg<"ArrayAttr", "{}">:$mapping)>,
+    OpBuilder<(ins "Value":$target,
+                   "ArrayRef<OpFoldResult>":$mixedTileSizes,
+                   CArg<"::mlir::transform::TileSizesSpec",
+                        "::mlir::transform::TileSizesSpec()">,
+                   CArg<"ArrayAttr", "{}">:$mapping)>,
+    OpBuilder<(ins "Value":$target,
+                   "ArrayRef<int64_t>":$staticNumThreads,
+                   CArg<"::mlir::transform::NumThreadsSpec",
+                        "::mlir::transform::NumThreadsSpec()">,
+                   CArg<"ArrayAttr", "{}">:$mapping)>,
+    OpBuilder<(ins "Value":$target,
+                   "ArrayRef<OpFoldResult>":$mixedNumThreads,
+                   CArg<"::mlir::transform::NumThreadsSpec",
+                        "::mlir::transform::NumThreadsSpec()">,
+                   CArg<"ArrayAttr", "{}">:$mapping)>,
+  ];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
@@ -222,5 +261,31 @@ def TileToForeachThreadAndWorkgroupCountRegion :
   }];
 }
 
+def ConfigExtractPart :
+    Op<Transform_Dialect, "iree.config.extract_part",
+      [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+       TransformOpInterface]> {
+  let description = [{
+  }];
+  let arguments = (ins PDL_Operation:$target,
+                       StrAttr:$attr_name,
+                       OptionalAttr<I64Attr>:$level);
+  // TODO: allow return attributes ?
+  let results = (outs PDL_Operation:$resultConfigPart);
+  let assemblyFormat = "attr-dict $target";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  // TODO: impl me.
+  // let hasVerifier = 1;
+
+  let builders = [
+    OpBuilder<(ins "Value":$target, "StringRef":$attrName,
+               CArg<"Optional<int64_t>", "llvm::None">:$level)>
+  ];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+        ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
+  }];
+}
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS

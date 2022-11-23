@@ -55,6 +55,10 @@ IMAGES_TO_DEPENDENCIES = {
     "samples": ["swiftshader"],
     "frontends-swiftshader": ["frontends", "swiftshader"],
     "frontends-nvidia": ["frontends"],
+    # Containers with all the newest versions of dependencies that we support
+    # instead of the oldest.
+    "base-bleeding-edge": [],
+    "swiftshader-bleeding-edge": ["base-bleeding-edge"],
 }
 
 IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES}
@@ -213,14 +217,24 @@ if __name__ == "__main__":
     print("\n" * 5 + f"Processing image {image}")
     image_url = posixpath.join(IREE_GCR_URL, image)
     tagged_image_url = f"{image_url}"
-    image_path = os.path.join(DOCKER_DIR, image)
+    image_path = os.path.join(DOCKER_DIR, "dockerfiles", f"{image}.Dockerfile")
 
     if args.only_references:
       digest = image_urls_to_prod_digests[image_url]
     else:
-      utils.run_command(
-          ["docker", "build", "--tag", tagged_image_url, image_path],
-          dry_run=args.dry_run)
+      # We deliberately give the whole repository as context so we can reuse
+      # scripts and such. It would be nice if Docker gave us a way to make this
+      # more explicit, like symlinking files in the context, but they refuse to
+      # with the justification that it makes builds non-hermetic, a hilarious
+      # concern for something that allows and encourages arbitrary network
+      # access in builds.
+      # We're assuming this is being run from the root of the repository.
+      # FIXME: make this more robust to where it is run from.
+      utils.run_command([
+          "docker", "build", "--file", image_path, "--tag", tagged_image_url,
+          "."
+      ],
+                        dry_run=args.dry_run)
 
       utils.run_command(["docker", "push", tagged_image_url],
                         dry_run=args.dry_run)

@@ -17,6 +17,11 @@ static llvm::cl::opt<int> clMaxAllocationSizeInBytes(
     "iree-llvmcpu-stack-allocation-limit",
     llvm::cl::desc("maximum allowed stack allocation size in bytes"),
     llvm::cl::init(32768));
+static llvm::cl::opt<bool> clFailUnboundDynamicStackAllocation(
+    "iree-llvmcpu-fail-unbound-dynamic-stack-allocation",
+    llvm::cl::desc("fail if the upper bound of dynamic stack allocation cannot "
+                   "be solved"),
+    llvm::cl::init(true));
 
 namespace {
 struct LLVMCPUCheckIRBeforeLLVMConversionPass
@@ -33,16 +38,17 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
     auto type = allocaOp.getType().cast<ShapedType>();
     int64_t size = 1;
     for (auto dimSize : type.getShape()) {
-      if (dimSize == ShapedType::kDynamicSize) continue;
+      if (dimSize == ShapedType::kDynamic) continue;
       size *= dimSize;
     }
     for (auto operand : allocaOp.getDynamicSizes()) {
       auto ub = linalg::getConstantUpperBoundForIndex(operand);
-      if (failed(ub)) {
+      if (succeeded(ub)) {
+        size *= *ub;
+      } else if (clFailUnboundDynamicStackAllocation) {
         return allocaOp.emitOpError(
             "expected no stack allocations without upper bound shapes");
       }
-      size *= *ub;
     }
     size *= type.getElementType().getIntOrFloatBitWidth();
     if (allocaOp.getAlignment()) {

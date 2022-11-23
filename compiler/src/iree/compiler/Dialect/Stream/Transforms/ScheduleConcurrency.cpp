@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -24,6 +23,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-stream-schedule-concurrency"
 
@@ -252,7 +252,7 @@ class ScheduleConcurrencyPass
     // Sort the ops in the execution region as they may have gotten out of order
     // during partitioning. This is safe because we are still unaliased and SSA
     // values imply ordering.
-    sortBlockTopologically(block);
+    mlir::sortTopologically(block);
 
     LLVM_DEBUG({
       llvm::dbgs() << "\nWaves constructed:\n";

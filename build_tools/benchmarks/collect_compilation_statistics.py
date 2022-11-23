@@ -10,6 +10,12 @@ The benchmark suites need to be built with ninja and enable the CMake option
 IREE_ENABLE_COMPILATION_BENCHMARKS.
 """
 
+import pathlib
+import sys
+
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
+
 import argparse
 import json
 import os
@@ -52,12 +58,14 @@ def match_module_cmake_target(module_path: str) -> Optional[str]:
     return None
   if os.path.splitext(path_parts[3])[1] != MODULE_FILE_EXTENSION:
     return None
-  return os.path.join(*path_parts)
+  # Join to get the CMake target name. This is *not* a filesystem path, so we
+  # don't want \ separators on Windows that we would get with os.path.join().
+  return '/'.join(path_parts)
 
 
 def parse_compilation_time_from_ninja_log(log: TextIO) -> Dict[str, int]:
   """Retrieve the compilation time (ms) from the Ninja build log.
-  
+
   Returns:
     Map of target name and compilation time in ms.
   """
@@ -126,7 +134,8 @@ def parse_arguments():
   """Returns an argument parser with common options."""
 
   def check_dir_path(path):
-    if os.path.isdir(path):
+    path = pathlib.Path(path)
+    if path.is_dir():
       return path
     else:
       raise argparse.ArgumentTypeError(path)
@@ -134,6 +143,7 @@ def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("--output",
                       required=True,
+                      type=pathlib.Path,
                       help="Path to output JSON file.")
   parser.add_argument(
       "build_dir",
@@ -148,11 +158,11 @@ def parse_arguments():
 
 
 def main(args: argparse.Namespace):
-  benchmark_suite_dir = os.path.join(args.build_dir, BENCHMARK_SUITE_REL_PATH)
+  benchmark_suite_dir = args.build_dir / BENCHMARK_SUITE_REL_PATH
   benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
       benchmark_suite_dir)
 
-  with open(os.path.join(args.build_dir, NINJA_BUILD_LOG), "r") as log_file:
+  with (args.build_dir / NINJA_BUILD_LOG).open("r") as log_file:
     target_build_time_map = parse_compilation_time_from_ninja_log(log_file)
 
   compilation_statistics_list = []
@@ -160,23 +170,26 @@ def main(args: argparse.Namespace):
     benchmark_cases = benchmark_suite.filter_benchmarks_for_category(
         category=category)
     for benchmark_case in benchmark_cases:
-      flag_file_path = os.path.join(benchmark_case.benchmark_case_dir,
-                                    BENCHMARK_FLAGFILE)
-      with open(flag_file_path, "r") as flag_file:
+      # TODO(#11076): Support run_config.
+      if benchmark_case.benchmark_case_dir is None:
+        raise ValueError("benchmark_case_dir can't be None.")
+      benchmark_case_dir = benchmark_case.benchmark_case_dir
+
+      flag_file_path = benchmark_case_dir / BENCHMARK_FLAGFILE
+      with flag_file_path.open("r") as flag_file:
         module_path = get_module_path(flag_file)
 
       if module_path is None:
         raise RuntimeError(
             f"Can't find the module file in the flagfile: {flag_file_path}")
-      module_path = os.path.abspath(
-          os.path.join(benchmark_case.benchmark_case_dir, module_path))
+      module_path = (benchmark_case_dir / module_path).resolve()
 
-      with open(module_path, "rb") as module_file:
+      with module_path.open("rb") as module_file:
         module_component_sizes = get_module_component_info(
             module_file,
-            os.stat(module_path).st_size)
+            module_path.stat().st_size)
 
-      cmake_target = match_module_cmake_target(module_path)
+      cmake_target = match_module_cmake_target(str(module_path))
       if cmake_target is None:
         raise RuntimeError(
             f"Module path isn't a module cmake target: {module_path}")

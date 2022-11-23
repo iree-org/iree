@@ -54,6 +54,14 @@ namespace iree_compiler {
 namespace IREE {
 namespace Stream {
 
+struct AsyncAccessRange {
+  ResourceAccessBitfield access;
+  Value resource;
+  Value start;  // may be nullptr to indicate 0
+  Value end;
+  Value length;
+};
+
 #include "iree/compiler/Dialect/Stream/IR/StreamOpInterfaces.h.inc"  // IWYU pragma: export
 
 }  // namespace Stream

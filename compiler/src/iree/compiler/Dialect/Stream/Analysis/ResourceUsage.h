@@ -77,7 +77,7 @@ class ResourceUsageAnalysis {
   // May return `Unknown` if analysis failed for the given value due to usage
   // that lead to indeterminate results (such as indirect access).
   ResourceUsageBitfield lookupResourceUsage(Value value) {
-    return tryLookupResourceUsage(value).getValueOr(
+    return tryLookupResourceUsage(value).value_or(
         ResourceUsageBitfield::Unknown);
   }
 

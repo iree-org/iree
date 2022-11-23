@@ -5,6 +5,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import pathlib
 import stat
 import unittest
 import tempfile
@@ -19,14 +20,16 @@ class BenchmarkConfigTest(unittest.TestCase):
   def setUp(self):
     self.build_dir = tempfile.TemporaryDirectory()
     self.tmp_dir = tempfile.TemporaryDirectory()
-    self.normal_tool_dir = os.path.join(self.build_dir.name, "normal_tool")
-    os.mkdir(self.normal_tool_dir)
-    self.traced_tool_dir = os.path.join(self.build_dir.name, "traced_tool")
-    os.mkdir(self.traced_tool_dir)
+    self.build_dir_path = pathlib.Path(self.build_dir.name).resolve()
+    self.normal_tool_dir = self.build_dir_path / "normal_tool"
+    self.normal_tool_dir.mkdir()
+    self.traced_tool_dir = self.build_dir_path / "traced_tool"
+    self.traced_tool_dir.mkdir()
     self.trace_capture_tool = tempfile.NamedTemporaryFile()
     os.chmod(self.trace_capture_tool.name, stat.S_IEXEC)
 
   def tearDown(self):
+    self.trace_capture_tool.close()
     self.tmp_dir.cleanup()
     self.build_dir.cleanup()
 
@@ -43,26 +46,24 @@ class BenchmarkConfigTest(unittest.TestCase):
 
     config = BenchmarkConfig.build_from_args(args=args, git_commit_hash="abcd")
 
-    per_commit_tmp_dir = os.path.join(self.tmp_dir.name, "abcd")
+    per_commit_tmp_dir = pathlib.Path(self.tmp_dir.name).resolve() / "abcd"
     expected_trace_capture_config = TraceCaptureConfig(
         traced_benchmark_tool_dir=self.traced_tool_dir,
-        trace_capture_tool=self.trace_capture_tool.name,
-        capture_tarball=os.path.realpath("capture.tar"),
-        capture_tmp_dir=os.path.join(per_commit_tmp_dir, "captures"))
-    self.assertEqual(
-        config,
-        BenchmarkConfig(root_benchmark_dir=os.path.join(self.build_dir.name,
-                                                        "benchmark_suites"),
-                        benchmark_results_dir=os.path.join(
-                            per_commit_tmp_dir, "benchmark-results"),
-                        git_commit_hash="abcd",
-                        normal_benchmark_tool_dir=self.normal_tool_dir,
-                        trace_capture_config=expected_trace_capture_config,
-                        driver_filter="a",
-                        model_name_filter="b",
-                        mode_filter="c",
-                        keep_going=True,
-                        benchmark_min_time=10))
+        trace_capture_tool=pathlib.Path(self.trace_capture_tool.name).resolve(),
+        capture_tarball=pathlib.Path("capture.tar").resolve(),
+        capture_tmp_dir=per_commit_tmp_dir / "captures")
+    expected_config = BenchmarkConfig(
+        root_benchmark_dir=self.build_dir_path / "benchmark_suites",
+        benchmark_results_dir=per_commit_tmp_dir / "benchmark-results",
+        git_commit_hash="abcd",
+        normal_benchmark_tool_dir=self.normal_tool_dir,
+        trace_capture_config=expected_trace_capture_config,
+        driver_filter="a",
+        model_name_filter="b",
+        mode_filter="c",
+        keep_going=True,
+        benchmark_min_time=10)
+    self.assertEqual(config, expected_config)
 
   def test_build_from_args_benchmark_only(self):
     args = build_common_argument_parser().parse_args([

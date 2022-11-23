@@ -32,6 +32,7 @@ iree_cc_library(
   DEPS
     ::CommonExtensionsOpGen
     IREEDialectsTransforms
+    IREELinalgExtDialect
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
@@ -39,11 +40,14 @@ iree_cc_library(
     MLIRArithUtils
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
+    MLIRGPUOps
     MLIRLinalgTransformOps
     MLIRLinalgTransforms
     MLIRMemRefDialect
     MLIRMemRefTransforms
+    MLIRPDLDialect
     MLIRPass
+    MLIRSCFDialect
     MLIRTensorDialect
     MLIRTransformDialect
     MLIRTransforms

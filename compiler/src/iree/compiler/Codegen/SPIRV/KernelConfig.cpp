@@ -21,6 +21,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
@@ -31,6 +32,13 @@
 #include "mlir/IR/Matchers.h"
 
 #define DEBUG_TYPE "iree-spirv-kernel-config"
+
+using llvm::APIntOps::GreatestCommonDivisor;
+
+// The default number of subgroups to use per workgroup.
+constexpr unsigned numSubgroupsPerWorkgroup = 4;
+// The default number of tiles along each dimension to use per workgroup.
+constexpr unsigned numTilesPerSubgroupDim = 2;
 
 constexpr int kMaxVectorNumBits = 128;
 
@@ -360,13 +368,17 @@ static bool tileMatmulK(const int64_t dimK, const int64_t residualTilingFactor,
   return false;
 }
 
-/// Computes the total number of bytes if promoting both matmul LHS and RHS with
-/// the tiven tile sizes.
-static int64_t getTileBytes(int64_t mTileSize, int64_t nTileSize,
-                            int64_t kTileSize, int64_t elementBits) {
-  const int64_t count = (mTileSize + nTileSize) * kTileSize;
+int64_t getTileBytes(int64_t mTileSize, int64_t nTileSize, int64_t kTileSize,
+                     int64_t elementBits) {
+  const int64_t count =
+      (mTileSize + nTileSize) *
+      (kTileSize + detail::bankConflictReductionPaddingBits / elementBits);
   return (elementBits / 8) * count;
 }
+
+int64_t getMultiBufferMemoryUsage(int64_t singleBufferBytes, unsigned depth) {
+  return singleBufferBytes * (depth ? depth : 1);
+};
 
 /// Tries to adjust workgroup and tile sizes to enable vector load for both
 /// matmul LHS and RHS. Returns false only when it's not beneficial to promote.
@@ -428,19 +440,34 @@ static bool adjustToVectorLoad(ArrayRef<int64_t> dimMNKSize, int64_t &mTileSize,
 static bool adjustToPromote(ArrayRef<int64_t> dimMNKSize, int64_t &mTileSize,
                             int64_t &nTileSize, int64_t &kTileSize,
                             SmallVectorImpl<int64_t> &wgSize,
-                            const int subgroupSize, const int maxBytes,
-                            const int elementBits) {
+                            unsigned &pipelineDepth, const int subgroupSize,
+                            const int maxBytes, const int elementBits) {
   LLVM_DEBUG(llvm::dbgs() << "subgroup size = " << subgroupSize << "\n");
   const int vectorSize = kMaxVectorNumBits / elementBits;
   if (!adjustToVectorLoad(dimMNKSize, mTileSize, nTileSize, kTileSize, wgSize,
                           subgroupSize, vectorSize))
     return false;
 
-  auto usedBytes = getTileBytes(mTileSize, nTileSize, kTileSize, elementBits);
-  LLVM_DEBUG(llvm::dbgs() << "initial tile bytes = " << usedBytes << "\n");
-  if (usedBytes <= maxBytes) return true;
+  // Don't do multibuffering if the inner reduction loop is folded out.
+  if (dimMNKSize[2] == kTileSize) pipelineDepth = 1;
 
-  // Using too much workgorup memory. Try to reduce the tile size for X/Y once
+  auto usedBytes = getTileBytes(mTileSize, nTileSize, kTileSize, elementBits);
+
+  LLVM_DEBUG(llvm::dbgs() << "initial multibuffering bytes = "
+                          << getMultiBufferMemoryUsage(usedBytes, pipelineDepth)
+                          << "\n");
+
+  // First try to fit the given tile sizes with the largest pipelining depth
+  // possible.
+  do {
+    if (getMultiBufferMemoryUsage(usedBytes, pipelineDepth) <= maxBytes)
+      return true;
+  } while (pipelineDepth-- > 1);
+
+  // If we can't fit in workgroup memory, don't multibuffer.
+  pipelineDepth = 1;
+
+  // Using too much workgroup memory. Try to reduce the tile size for X/Y once
   // by a factor of two.
   int64_t &wgDimSize = wgSize[0] > wgSize[1] ? wgSize[0] : wgSize[1];
   int64_t &tileSize = wgSize[0] > wgSize[1] ? nTileSize : mTileSize;
@@ -461,7 +488,8 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
                                 linalg::LinalgOp op,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
                                 std::array<int64_t, 3> bestThreadTileSizeMNK,
-                                bool enablePromotion) {
+                                bool enablePromotion,
+                                unsigned softwarePipelineDepth) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as matmul...\n");
   OpOperand *lhs = op.getDpsInputOperand(0);
   OpOperand *rhs = op.getDpsInputOperand(1);
@@ -551,14 +579,18 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   const int subgroupSize = limits.getSubgroupSize();
   const int maxBytes = limits.getMaxComputeSharedMemorySize();
 
-  auto pipeline =
+  // We want a 2-stage pipeline without multi-buffering if the depth is 0 to
+  // keep the default for compilation configs that don't specify a pipeline
+  // depth.
+  auto pipelineDepth = softwarePipelineDepth ? softwarePipelineDepth : 1;
+
+  // Try to adjust tiling sizes to fit in shared memory.
+  auto usePromotionPipeline =
       enablePromotion &&
-              adjustToPromote({dimM, dimN, dimK}, workgroupTileSizes[mIndex],
-                              workgroupTileSizes[nIndex],
-                              reductionTileSizes[kIndex], workgroupSize,
-                              subgroupSize, maxBytes, elementBits)
-          ? CodeGenPipeline::SPIRVMatmulPromoteVectorize
-          : CodeGenPipeline::SPIRVBaseVectorize;
+      adjustToPromote({dimM, dimN, dimK}, workgroupTileSizes[mIndex],
+                      workgroupTileSizes[nIndex], reductionTileSizes[kIndex],
+                      workgroupSize, pipelineDepth, subgroupSize, maxBytes,
+                      elementBits);
 
   SmallVector<int64_t> threadTileSizes(numLoops, 0);
   if (isBM) {
@@ -573,6 +605,218 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(threadTileSizes);
   tileSizes.push_back(reductionTileSizes);
+
+  // Only the promotion pipeline has multibuffering + pipelining.
+  if (usePromotionPipeline) {
+    return setOpConfigAndEntryPointFnTranslation(
+        op->getParentOfType<func::FuncOp>(), op, tileSizes,
+        CodeGenPipeline::SPIRVMatmulPromoteVectorize, workgroupSize,
+        pipelineDepth);
+  }
+
+  return setOpConfigAndEntryPointFnTranslation(
+      op->getParentOfType<func::FuncOp>(), op, tileSizes,
+      CodeGenPipeline::SPIRVBaseVectorize, workgroupSize);
+}
+
+}  // namespace detail
+
+//===----------------------------------------------------------------------===//
+// Cooperative Matrix Default Configuration
+//===----------------------------------------------------------------------===//
+
+struct CooperativeMatrixSize {
+  int64_t mSize;       // Native cooperative matrix size along M dimension
+  int64_t nSize;       // Native cooperative matrix size along N dimension
+  int64_t kSize;       // Native cooperative matrix size along K dimension
+  int64_t mWarpCount;  // # subgroups along M dimension
+  int64_t nWarpCount;  // # subgroups along N dimension
+  int64_t mTileCount;  // # tiles per subgroup along M dimension
+  int64_t nTileCount;  // # tiles per subgroup along N dimension
+  int64_t kTileCount;  // # tiles along K dimension
+};
+
+/// Returns the cooperative matrix (M, N, K) sizes that are supported by the
+/// target environment and match the given parameters.
+static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
+    spirv::ResourceLimitsAttr resourceLimits, Type aType, Type bType,
+    Type cType, int64_t m, int64_t n, int64_t k) {
+  auto properties = resourceLimits.getCooperativeMatrixPropertiesNv()
+                        .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
+  for (auto property : properties) {
+    if (property.getAType() != aType || property.getBType() != bType ||
+        property.getCType() != cType || property.getResultType() != cType ||
+        property.getScope().getValue() != spirv::Scope::Subgroup) {
+      continue;  // Cannot use this cooperative matrix configuration
+    }
+
+    const unsigned matmulM = property.getMSize();
+    const unsigned matmulN = property.getNSize();
+    const unsigned matmulK = property.getKSize();
+    if (m % matmulM != 0 || n % matmulN != 0 || k % matmulK != 0) continue;
+
+    uint64_t nTotalTileCount = n / matmulN;
+    uint64_t mTotalTileCount = m / matmulM;
+
+    uint64_t remainingWarps = numSubgroupsPerWorkgroup;
+    uint64_t remainingTiles = numTilesPerSubgroupDim * numTilesPerSubgroupDim;
+    uint64_t warpSqrt = 1ull << (llvm::Log2_64(remainingWarps) / 2);
+    uint64_t tileSqrt = 1ull << (llvm::Log2_64(remainingTiles) / 2);
+
+    int64_t mWarpCount = 0, nWarpCount = 0;
+    int64_t mTileCount = 0, nTileCount = 0;
+
+    // See if the square root can divide mTotalTileCount. If so it means we can
+    // distribute to both dimensions evenly. Otherwise, try to distribute to N
+    // and then M.
+    if (mTotalTileCount > (warpSqrt * tileSqrt) &&
+        mTotalTileCount % (warpSqrt * tileSqrt) == 0) {
+      mWarpCount = warpSqrt;
+      mTileCount = tileSqrt;
+
+      remainingWarps /= warpSqrt;
+      remainingTiles /= tileSqrt;
+
+      APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCount),
+                                         APInt(64, remainingWarps));
+      nWarpCount = nGCD.getSExtValue();
+      nTotalTileCount /= nWarpCount;
+      remainingWarps /= nWarpCount;
+
+      nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCount),
+                                   APInt(64, remainingTiles));
+      nTileCount = nGCD.getSExtValue();
+    } else {
+      APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCount),
+                                         APInt(64, remainingWarps));
+      nWarpCount = nGCD.getSExtValue();
+      nTotalTileCount /= nWarpCount;
+      remainingWarps /= nWarpCount;
+
+      nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCount),
+                                   APInt(64, remainingTiles));
+      nTileCount = nGCD.getSExtValue();
+      remainingTiles /= nTileCount;
+
+      APInt mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCount),
+                                         APInt(64, remainingWarps));
+      mWarpCount = mGCD.getSExtValue();
+      mTotalTileCount /= mWarpCount;
+      remainingWarps /= mWarpCount;
+
+      mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCount),
+                                   APInt(64, remainingTiles));
+      mTileCount = mGCD.getSExtValue();
+    }
+
+    const uint64_t kTotalTileCount = k / matmulK;
+    APInt kGCD = GreatestCommonDivisor(APInt(64, kTotalTileCount),
+                                       APInt(64, numTilesPerSubgroupDim));
+    int64_t kTileCount = kGCD.getSExtValue();
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "chosen cooperative matrix configuration:\n";
+      llvm::dbgs() << "  (M, N, K) size = (" << matmulM << ", " << matmulN
+                   << ", " << matmulK << ")\n";
+      llvm::dbgs() << "  (M, N) subgroup count = (" << mWarpCount << ", "
+                   << nWarpCount << ")\n";
+      llvm::dbgs() << "  (M, N, K) tile count per subgroup = (" << mTileCount
+                   << ", " << nTileCount << ", " << kTileCount << ")\n";
+    });
+    return CooperativeMatrixSize{matmulM,    matmulN,    matmulK,
+                                 mWarpCount, nWarpCount, mTileCount,
+                                 nTileCount, kTileCount};
+  }
+  return llvm::None;
+}
+
+namespace detail {
+
+LogicalResult setCooperativeMatrixConfig(const spirv::TargetEnv &targetEnv,
+                                         linalg::LinalgOp op) {
+  LLVM_DEBUG(llvm::dbgs() << "trying to matmul tensorcore config...\n");
+  // This configuration is only for cooperative matrix.
+  if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
+      !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
+    return success();
+  }
+
+  if (op.hasDynamicShape()) return success();
+
+  Value lhs = op.getDpsInputOperand(0)->get();
+  Value rhs = op.getDpsInputOperand(1)->get();
+  Value init = op.getDpsInitOperand(0)->get();
+
+  int lastParallelDim = -1;
+  const auto [bIndex, mIndex, nIndex, kIndex] =
+      getMatmulBMNKIndex(op, &lastParallelDim);
+  if (mIndex < 0 || nIndex < 0 || kIndex < 0) return success();
+  const bool isBM = bIndex >= 0;
+
+  SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
+
+  const int64_t dimM = loopRanges[mIndex];
+  const int64_t dimK = loopRanges[kIndex];
+  const int64_t dimN = loopRanges[nIndex];
+  LLVM_DEBUG({
+    llvm::dbgs() << "input matmul shape (B, M, N, K) = ("
+                 << (bIndex >= 0 ? loopRanges[bIndex] : -1) << ", " << dimM
+                 << ", " << dimN << ", " << dimK << ")\n";
+  });
+
+  // TODO: Cooperative matrix support is fairly restricted. We can only have
+  // a curated list of fused element wise ops as defined in the extension
+  // SPV_NV_cooperative_matrix. Check that once we move bufferization after
+  // vectorization.
+
+  auto getElementType = [](Value v) {
+    return v.getType().cast<ShapedType>().getElementType();
+  };
+
+  spirv::ResourceLimitsAttr resourceLimits = targetEnv.getResourceLimits();
+  Optional<CooperativeMatrixSize> coopMatSize = getCooperativeMatrixSize(
+      resourceLimits, getElementType(lhs), getElementType(rhs),
+      getElementType(init), dimM, dimN, dimK);
+  if (!coopMatSize) return success();
+
+  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
+      SPIRVCooperativeMatrixVectorize;
+
+  std::array<int64_t, 3> workgroupSize{
+      coopMatSize->nWarpCount * resourceLimits.getSubgroupSize(),
+      coopMatSize->mWarpCount, 1};
+
+  SmallVector<int64_t> vectorSizes(kIndex + 1, 0);
+  if (isBM) vectorSizes[bIndex] = 1;
+  vectorSizes[mIndex] = coopMatSize->mSize;
+  vectorSizes[nIndex] = coopMatSize->nSize;
+  vectorSizes[kIndex] = coopMatSize->kSize;
+
+  SmallVector<int64_t> subgroupTileSizes(lastParallelDim + 1, 0);
+  if (isBM) subgroupTileSizes[bIndex] = 1;
+  subgroupTileSizes[mIndex] = coopMatSize->mTileCount * vectorSizes[mIndex];
+  subgroupTileSizes[nIndex] = coopMatSize->nTileCount * vectorSizes[nIndex];
+
+  SmallVector<int64_t> workgroupTileSizes(lastParallelDim + 1, 0);
+  if (isBM) workgroupTileSizes[bIndex] = 1;
+  workgroupTileSizes[mIndex] =
+      coopMatSize->mWarpCount * subgroupTileSizes[mIndex];
+  workgroupTileSizes[nIndex] =
+      coopMatSize->nWarpCount * subgroupTileSizes[nIndex];
+
+  // Also create one level for reduction. This is needed because of
+  // SPIRVTileAndPromotePass requires it.
+  // TODO(#10499): Consolidate tiling configuration across different pipelines.
+  SmallVector<int64_t> reductionTileSizes;
+  reductionTileSizes.append(kIndex, 0);
+  reductionTileSizes.push_back(coopMatSize->kTileCount * coopMatSize->kSize);
+
+  TileSizesListType tileSizes;
+  tileSizes.reserve(3);
+  tileSizes.push_back(workgroupTileSizes);
+  tileSizes.push_back(subgroupTileSizes);
+  tileSizes.push_back(reductionTileSizes);
+  tileSizes.push_back(vectorSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
@@ -662,11 +906,12 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   const Type elementType =
       op.getOutputs()[0].getType().cast<ShapedType>().getElementType();
   if (!elementType.isIntOrFloat()) return failure();
+  unsigned bitWidth = elementType.getIntOrFloatBitWidth();
   // Reduction distribution only supports 32-bit types now.
-  if (elementType.getIntOrFloatBitWidth() != 32) return failure();
+  if (bitWidth != 32) return failure();
 
   // Let each thread handle `vectorSize` elements.
-  unsigned vectorSize = 4;
+  unsigned vectorSize = kMaxVectorNumBits / bitWidth;
   while ((*dimSize / vectorSize) % subgroupSize != 0) vectorSize /= 2;
 
   // TODO: Add reduction tiling to handle larger reductions.
@@ -677,6 +922,16 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     groupSize = llvm::APIntOps::GreatestCommonDivisor(
                     {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
                     .getZExtValue();
+  }
+  // Current warp reduction pattern is a two step butterfly warp reduce.
+  // First, do warp reductions along multiple subgroups.
+  // Second, reduce results from multiple subgroups using single warp reduce.
+  // The final warp reduce requires numSubgroupUsed > subgroupSize to work.
+  // TODO(raikonenfnu): Add flexible num of warp reduce to handle more configs.
+  // TT::CPU and TT::ARM_Valhall is not going through warp reduce.
+  const int64_t numSubgroupsUsed = groupSize / subgroupSize;
+  if (numSubgroupsUsed > subgroupSize) {
+    return failure();
   }
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   // Tile all the parallel dimension to 1.
@@ -1074,18 +1329,6 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
             "loop body is expected to be set as root");
       }
       rootOperation = computeOp;
-    }
-
-    // Propogate the `lowering_config` attribute to the other ops.
-    // TODO(ravishankarm, antiagainst): This is a very specific use (and
-    // fragile). In general, this should not be needed. Things are already tiled
-    // and distributed. The rest of the compilation must be structured to either
-    // use `TileAndFuse` or they are independent configurations that are
-    // determined based on the op.
-    IREE::Codegen::LoweringConfigAttr config = getLoweringConfig(rootOperation);
-    for (auto op : computeOps) {
-      if (op == rootOperation) continue;
-      setLoweringConfig(op, config);
     }
   }
   return success();

@@ -2109,7 +2109,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   let assemblyFormat = [{
     `set` `(` $set `)`
     `binding` `(` $binding `)`
-    `type` `(` $descriptor_type `)`
+    `type` `(` custom<DescriptorType>($descriptor_type) `)`
     (`offset` `(` $byte_offset^ `)`)?
     (`alignment` `(` $alignment^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?

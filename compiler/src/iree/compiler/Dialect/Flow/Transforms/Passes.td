@@ -75,13 +75,9 @@ def DispatchLinalgOnTensors :
   let options = [
     Option<"aggressiveFusion", "aggressive-fusion", "bool",
            /*default=*/"false", "Fuse with aggressive heuristics">,
+    Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
+           /*default=*/"true", "Generate workload regions of WorkgroupOps">,
   ];
-}
-
-def DispatchLinalgOnTensorsViaRegionOps :
-    InterfacePass<"iree-flow-dispatch-linalg-on-tensors-via-regionops-pass", "mlir::FunctionOpInterface"> {
-  let summary = "Dispatch Linalg operations on tensors by using tile and distribute (via DispatchRegionOps)";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsViaRegionOpsPass()";
 }
 
 def DispatchWithTransformDialect :
@@ -127,6 +123,10 @@ def InferNumericNarrowing :
 
 def InitializeEmptyTensors : Pass<"iree-flow-initialize-empty-tensors", ""> {
   let summary = "Initialize empty tensors";
+  let options = [
+    Option<"zeroFill", "zero-fill", "bool", /*default=*/"false",
+           "Fills empty tensors with zeros.">,
+  ];
   let constructor = "mlir::iree_compiler::IREE::Flow::createInitializeEmptyTensorsPass()";
 }
 

@@ -264,6 +264,49 @@ def VMVX_Mmt4dOp : VMVX_Op<"mmt4d"> {
   }];
 }
 
+def VMVX_UnpackOp : VMVX_Op<"unpack"> {
+  let summary = "unpack";
+  let description = [{
+    4D-to-2D unpacking op mirroring linalg_ext.unpack
+  }];
+  let arguments = (ins
+    // In buffer.
+    VMVX_Buffer:$in_buffer,
+    VMVX_Index:$in_offset,
+    VMVX_Index:$in_stride0,
+
+    // Out buffer.
+    VMVX_Buffer:$out_buffer,
+    VMVX_Index:$out_offset,
+    VMVX_Index:$out_stride0,
+
+    // In dimensions.
+    VMVX_Index:$in_size0,
+    VMVX_Index:$in_size1,
+    VMVX_Index:$in_size2,
+    VMVX_Index:$in_size3,
+
+    // Out dimensions.
+    VMVX_Index:$out_size0,
+    VMVX_Index:$out_size1,
+
+    // Type and flag attributes.
+    VMVX_ElementTypeAttr:$in_type,
+    VMVX_ElementTypeAttr:$out_type,
+    I32Attr:$flags
+  );
+
+  let assemblyFormat = [{
+    `in` `` `(` $in_buffer `offset` $in_offset `stride0` $in_stride0 `:` type($in_buffer) `)`
+    `out` `` `(` $out_buffer `offset` $out_offset `stride0` $out_stride0 `:` type($out_buffer) `)`
+    `in_shape` `` `(` $in_size0 `,` $in_size1 `,` $in_size2 `,` $in_size3 `)`
+    `out_shape` `` `(` $out_size0 `,` $out_size1 `)`
+    `flags` `` `(` $flags `)`
+    `:` `(` $in_type `,` $out_type `)`
+    attr-dict
+  }];
+}
+
 def VMVX_PackOp : VMVX_Op<"pack"> {
   let summary = "pack";
   let description = [{
@@ -309,7 +352,6 @@ def VMVX_PackOp : VMVX_Op<"pack"> {
     attr-dict
   }];
 }
-
 
 def VMVX_UnaryOp : VMVX_Op<"unary", [SameVariadicOperandSize]> {
   let summary = "Performs a strided elementwise unary operation";

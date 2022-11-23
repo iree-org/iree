@@ -42,7 +42,7 @@ namespace Flow {
 //===----------------------------------------------------------------------===//
 
 // Returns true if |value| is definitely empty at runtime.
-static bool isTensorEmpty(Value value) {
+static bool isTensorZeroElements(Value value) {
   auto type = value.getType().dyn_cast<ShapedType>();
   if (!type) return false;
   // Any static dimension being zero is definitely empty.
@@ -56,27 +56,24 @@ static bool isTensorEmpty(Value value) {
 // Returns true if |value| is definitely empty at runtime.
 // Returns false if the value is definitely not empty or may be empty at runtime
 // (one or more dynamic dimensions).
-static bool isTensorOperandEmpty(Value value) {
-  // Any value produced by an empty sentinel op is empty.
-  auto baseValue = IREE::Util::TiedOpInterface::findTiedBaseValue(value);
-  if (isa_and_nonnull<IREE::Flow::TensorEmptyOp>(baseValue.getDefiningOp())) {
-    return true;
-  }
-  return isTensorEmpty(value);
+static bool isTensorOperandZeroElements(Value value) {
+  return isTensorZeroElements(value);
 }
 
 // Returns true if |value| is definitely empty at runtime.
 // Returns false if the value is definitely not empty or may be empty at runtime
 // (one or more dynamic dimensions).
-static bool isTensorResultEmpty(Value value) { return isTensorEmpty(value); }
+static bool isTensorResultZeroElements(Value value) {
+  return isTensorZeroElements(value);
+}
 
 template <typename Op, int OperandIdx, int ResultIdx = 0>
-struct ReplaceOpIfTensorOperandEmpty : public OpRewritePattern<Op> {
+struct ReplaceOpIfTensorOperandZeroElements : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     auto operand = op->getOperand(OperandIdx);
-    if (!isTensorOperandEmpty(operand)) return failure();
+    if (!isTensorOperandZeroElements(operand)) return failure();
     auto result = op->getResult(ResultIdx);
     auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorEmptyOp>(op, result.getType(),
@@ -86,12 +83,28 @@ struct ReplaceOpIfTensorOperandEmpty : public OpRewritePattern<Op> {
 };
 
 template <typename Op, int ResultIdx>
-struct ReplaceOpIfTensorResultEmpty : public OpRewritePattern<Op> {
+struct ReplaceOpIfTensorResultZeroElements : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     auto result = op->getResult(ResultIdx);
-    if (!isTensorResultEmpty(result)) return failure();
+    if (!isTensorResultZeroElements(result)) return failure();
+    auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorEmptyOp>(op, result.getType(),
+                                                           dynamicDims);
+    return success();
+  }
+};
+
+template <typename Op, int OperandIdx, int ResultIdx = 0>
+struct ReplaceOpIfTensorOperandEmpty : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(Op op,
+                                PatternRewriter &rewriter) const override {
+    auto operand = op->getOperand(OperandIdx);
+    auto emptyOp = dyn_cast_or_null<TensorEmptyOp>(operand.getDefiningOp());
+    if (!emptyOp) return failure();
+    auto result = op->getResult(ResultIdx);
     auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorEmptyOp>(op, result.getType(),
                                                            dynamicDims);
@@ -102,14 +115,14 @@ struct ReplaceOpIfTensorResultEmpty : public OpRewritePattern<Op> {
 // Turns a tensor type that may have one or more dynamic dimensions into a
 // static type with dynamic dimensions replaced with 0.
 // Example: tensor<?x0x1xf32> -> tensor<0x0x1xf32>
-static Type makeEmptyStaticTensorType(Type type) {
+static Type makeZeroElementsStaticTensorType(Type type) {
   auto tensorType = type.cast<RankedTensorType>();
   if (tensorType.hasStaticShape()) return type;
   SmallVector<int64_t> dims;
   dims.resize(tensorType.getRank());
   for (int64_t i = 0; i < tensorType.getRank(); ++i) {
     int64_t dim = tensorType.getDimSize(i);
-    dims[i] = dim == ShapedType::kDynamicSize ? 0 : dim;
+    dims[i] = dim == ShapedType::kDynamic ? 0 : dim;
   }
   return RankedTensorType::get(dims, tensorType.getElementType(),
                                tensorType.getEncoding());
@@ -159,7 +172,7 @@ static SmallVector<Value, 4> refreshDimsOnTypeChange(
 // flow.dispatch.workgroups
 //===----------------------------------------------------------------------===//
 
-struct ReplaceDispatchResultIfEmpty
+struct ReplaceDispatchResultIfZeroElements
     : public OpRewritePattern<DispatchWorkgroupsOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DispatchWorkgroupsOp op,
@@ -169,7 +182,7 @@ struct ReplaceDispatchResultIfEmpty
     bool didReplaceAny = false;
     for (auto result : op.getResults()) {
       if (result.use_empty()) continue;
-      if (isTensorResultEmpty(result)) {
+      if (isTensorResultZeroElements(result)) {
         auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
         auto emptyOp = rewriter.create<IREE::Flow::TensorEmptyOp>(
             result.getLoc(), result.getType(), dynamicDims);
@@ -185,7 +198,7 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
   results.insert<IREE::Util::ClosureOptimizationPattern<DispatchWorkgroupsOp>>(
       context);
-  results.insert<ReplaceDispatchResultIfEmpty>(context);
+  results.insert<ReplaceDispatchResultIfZeroElements>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -301,9 +314,9 @@ static FailureOr<RankedTensorType> canonicalizeSubViewParts(
   mixedOffsets.assign(op.getMixedOffsets());
   mixedSizes.assign(op.getMixedSizes());
   mixedStrides.assign(op.getMixedStrides());
-  canonicalizeSubViewPart(mixedOffsets, ShapedType::isDynamicStrideOrOffset);
+  canonicalizeSubViewPart(mixedOffsets, ShapedType::isDynamic);
   canonicalizeSubViewPart(mixedSizes, ShapedType::isDynamic);
-  canonicalizeSubViewPart(mixedStrides, ShapedType::isDynamicStrideOrOffset);
+  canonicalizeSubViewPart(mixedStrides, ShapedType::isDynamic);
 
   // Drop out the same dimensions form before.
   llvm::SmallVector<int64_t> newShape;
@@ -311,8 +324,7 @@ static FailureOr<RankedTensorType> canonicalizeSubViewParts(
   for (auto size : llvm::enumerate(mixedSizes)) {
     if (droppedDims.test(size.index())) continue;
     Optional<int64_t> staticSize = getConstantIntValue(size.value());
-    newShape.push_back(staticSize ? staticSize.value()
-                                  : ShapedType::kDynamicSize);
+    newShape.push_back(staticSize ? staticSize.value() : ShapedType::kDynamic);
   }
 
   auto newSliceType =
@@ -538,7 +550,8 @@ OpFoldResult TensorTieShapeOp::fold(ArrayRef<Attribute> operands) {
 
 void TensorTieShapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
-  results.insert<ReplaceOpIfTensorOperandEmpty<TensorTieShapeOp, 0>>(context);
+  results.insert<ReplaceOpIfTensorOperandZeroElements<TensorTieShapeOp, 0>>(
+      context);
 }
 
 OpFoldResult TensorReshapeOp::fold(ArrayRef<Attribute> operands) {
@@ -660,8 +673,11 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
 
 void TensorReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
-  results.insert<ReplaceOpIfTensorOperandEmpty<TensorReshapeOp, 0>>(context);
-  results.insert<ReplaceOpIfTensorResultEmpty<TensorReshapeOp, 0>>(context);
+  results.insert<ReplaceOpIfTensorOperandZeroElements<TensorReshapeOp, 0>>(
+      context);
+  results.insert<ReplaceOpIfTensorResultZeroElements<TensorReshapeOp, 0>>(
+      context);
+  results.insert<ReplaceOpIfTensorOperandEmpty<TensorReshapeOp, 0, 0>>(context);
   results.insert<FlattenTensorReshapeChain>(context);
   results.insert<ResolveShapedRank>(context);
   results.insert<ResolveShapedDim>(context);
@@ -717,7 +733,8 @@ void TensorEmptyOp::getCanonicalizationPatterns(RewritePatternSet &results,
 void TensorSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
   // TODO(benvanik): canonicalize splat+slice to smaller splat.
-  results.insert<ReplaceOpIfTensorResultEmpty<TensorSplatOp, 0>>(context);
+  results.insert<ReplaceOpIfTensorResultZeroElements<TensorSplatOp, 0>>(
+      context);
   results.insert<FoldSplatReshapeIntoSplat>(context);
 }
 
@@ -742,7 +759,9 @@ OpFoldResult TensorCloneOp::fold(ArrayRef<Attribute> operands) {
 
 void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
-  results.insert<ReplaceOpIfTensorOperandEmpty<TensorCloneOp, 0>>(context);
+  results.insert<ReplaceOpIfTensorOperandZeroElements<TensorCloneOp, 0>>(
+      context);
+  results.insert<ReplaceOpIfTensorOperandEmpty<TensorCloneOp, 0, 0>>(context);
 }
 
 // Slices tensor from start to (start + length) exclusively at dim.
@@ -797,8 +816,11 @@ OpFoldResult TensorSliceOp::fold(ArrayRef<Attribute> operands) {
 void TensorSliceOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
   // TODO(benvanik): canonicalize multiple slices (traverse upward through ssa).
-  results.insert<ReplaceOpIfTensorOperandEmpty<TensorSliceOp, 0>>(context);
-  results.insert<ReplaceOpIfTensorResultEmpty<TensorSliceOp, 0>>(context);
+  results.insert<ReplaceOpIfTensorOperandZeroElements<TensorSliceOp, 0>>(
+      context);
+  results.insert<ReplaceOpIfTensorResultZeroElements<TensorSliceOp, 0>>(
+      context);
+  results.insert<ReplaceOpIfTensorOperandEmpty<TensorSliceOp, 0, 0>>(context);
 }
 
 static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
@@ -901,13 +923,13 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
   }
 };
 
-struct ReplaceOpIfTensorUpdateOperandEmpty
+struct ReplaceOpIfTensorUpdateOperandZeroElements
     : public OpRewritePattern<TensorUpdateOp> {
   using OpRewritePattern<TensorUpdateOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
     auto operand = op.getUpdate();
-    if (!isTensorOperandEmpty(operand)) return failure();
+    if (!isTensorOperandZeroElements(operand)) return failure();
     rewriter.replaceOp(op, op.getTarget());
     return success();
   }
@@ -919,9 +941,10 @@ void TensorUpdateOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
   results.insert<FoldTensorUpdateOpWithCasts>(context);
   // target:
-  results.insert<ReplaceOpIfTensorOperandEmpty<TensorUpdateOp, 0>>(context);
+  results.insert<ReplaceOpIfTensorOperandZeroElements<TensorUpdateOp, 0>>(
+      context);
   // update:
-  results.insert<ReplaceOpIfTensorUpdateOperandEmpty>(context);
+  results.insert<ReplaceOpIfTensorUpdateOperandZeroElements>(context);
 }
 
 }  // namespace Flow

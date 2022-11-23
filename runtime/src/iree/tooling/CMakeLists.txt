@@ -178,6 +178,7 @@ iree_cc_library(
     iree::base
     iree::base::internal::span
     iree::base::tracing
+    iree::hal
     iree::vm
   PUBLIC
 )
@@ -211,6 +212,7 @@ iree_cc_library(
   DEPS
     ::yaml_util
     iree::base
+    iree::base::internal
     iree::base::internal::file_io
     iree::base::internal::path
     iree::base::tracing

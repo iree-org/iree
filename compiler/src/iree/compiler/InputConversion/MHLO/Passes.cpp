@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
-#include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
+#include "mhlo/transforms/passes.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
@@ -53,6 +53,7 @@ void registerMHLOConversionPassPipeline() {
 // Prepare HLO for use as an input to the Flow dialect.
 void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addPass(mlir::mhlo::createStablehloLegalizeToHloPass());
+  passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(
       mhlo::createLegalizeControlFlowPass());
 

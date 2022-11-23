@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
@@ -48,17 +49,6 @@ verifySupportedTilingOptions(PatternRewriter &rewriter, Operation *op,
                                        "only tiling with scf.for is supported");
   }
   return success();
-}
-
-/// Converts an `OpFoldResult` to a `Value` by building a constant op if
-/// if the `OpFoldResult` is an `IntegerAttr`.
-static Value getValue(OpBuilder &builder, Location loc,
-                      OpFoldResult valueOrAttr) {
-  if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-    return builder.create<arith::ConstantIndexOp>(
-        loc, attr.cast<IntegerAttr>().getInt());
-  }
-  return valueOrAttr.get<Value>();
 }
 
 /// Returns true if loop is untiled. Only checks if the value is statically
@@ -106,10 +96,12 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
           tilableOp.emitOpError("failed to get tiled implementation"));
     }
     assert(
-        tiledOps.size() == 1 &&
+        (tiledOps.size() == 1 ||
+         (tiledOps.size() == 2 &&
+          isa<IREE::LinalgExt::UnPackOp>(tilableOp.getOperation()))) &&
         "expected only a single operation returned from tiling implementation");
-    ret.op = tiledOps[0];
-    for (auto result : llvm::enumerate(ret.op->getResults())) {
+    ret.op.assign(tiledOps);
+    for (auto result : llvm::enumerate(ret.op.back()->getResults())) {
       if (!result.value().getType().isa<RankedTensorType>()) {
         ret.results.push_back(result.value());
         continue;
@@ -121,8 +113,8 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
         SmallVector<OpFoldResult> resultStrides(resultOffsets.size(),
                                                 builder.getIndexAttr(1));
         Value insertSlice = builder.create<tensor::InsertSliceOp>(
-            loc, ret.op->getResult(result.index()), outputs[result.index()],
-            resultOffsets, resultSizes, resultStrides);
+            loc, ret.op.back()->getResult(result.index()),
+            outputs[result.index()], resultOffsets, resultSizes, resultStrides);
         ret.results.push_back(insertSlice);
       }
     }
@@ -150,7 +142,8 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
   // return static_cast<LogicalResult>(
   // tilableOp.emitOpError("expected stride to be 1"));
   //}
-  Value step = getValue(builder, loc, tileSizes[loopDepth]);
+  Value step =
+      getValueOrCreateConstantIndexOp(builder, loc, tileSizes[loopDepth]);
 
   // Update lb, ub and step for cyclic distribution.
   if (!distributionInfo.empty() &&
@@ -175,7 +168,10 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
         // exactly.
         Value inBoundsTileSize = b.create<AffineMinOp>(
             loc, affineMaps,
-            ValueRange{iv, getValue(builder, loc, tileSizes[loopDepth]), ub});
+            ValueRange{iv,
+                       getValueOrCreateConstantIndexOp(builder, loc,
+                                                       tileSizes[loopDepth]),
+                       ub});
         tileSizes[loopDepth] = getAsOpFoldResult(inBoundsTileSize);
         // Recursively proceed to generate the tiled loop for the next level.
         innerReturnValue =
@@ -197,11 +193,13 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
 
 FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TilingInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options) {
-  SmallVector<Value> dest = tilableOp.getDestinationOperands(b);
-  if (dest.empty()) {
-    return static_cast<LogicalResult>(tilableOp.emitOpError(
-        "cannot tile operation without destination operands"));
-  }
+
+  // Gather destination tensors.
+  SmallVector<Value> dest;
+  Location loc = tilableOp.getLoc();
+
+  if (failed(tensor::getOrCreateDestinations(b, loc, tilableOp, dest)))
+    return tilableOp->emitOpError("failed to get destination tensors");
 
   SmallVector<utils::IteratorType> iteratorTypes =
       tilableOp.getLoopIteratorTypes();
@@ -225,7 +223,7 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TilingInterface tilableOp,
 
   // Trivial early exit case of tile sizes being zero for all parallel loops.
   if (llvm::all_of(tileSizes, isUntiledLoop)) {
-    return TiledOp{tilableOp, {}, {}};
+    return TiledOp{{tilableOp}, {}, {}};
   }
 
   SmallVector<Range> loopBounds = tilableOp.getIterationDomain(b);
@@ -265,11 +263,12 @@ TilingInterfaceBaseTilingPattern::matchAndRewriteBase(TilingInterface tilableOp,
   }
 
   FailureOr<TiledOp> res = tileInterfaceOp(rewriter, tilableOp, options);
-  if (failed(res))
+  if (failed(res)) {
     return res;
+  }
   result = *res;
-  if (result.op) {
-    filter.replaceLinalgTransformationFilter(rewriter, result.op);
+  for (auto op : result.op) {
+    filter.replaceLinalgTransformationFilter(rewriter, op);
   }
   return success();
 }
@@ -291,9 +290,9 @@ TilingInterfaceTilingPattern::matchAndRewrite(TilingInterface tilableOp,
     return failure();
   }
   // Check for do-nothing case.
-  if (!tiledOp.op)
+  if (tiledOp.op.empty())
     return failure();
-  if (tiledOp.op != tilableOp) {
+  if (tiledOp.op.back() != tilableOp) {
     if (tiledOp.results.empty()) {
       rewriter.eraseOp(tilableOp);
     } else {
@@ -308,6 +307,12 @@ TilingInterfaceTilingPattern::matchAndRewrite(TilingInterface tilableOp,
 //===----------------------------------------------------------------------===//
 
 namespace {
+/// A simple pattern rewriter that implements no special logic.
+class SimpleRewriter : public PatternRewriter {
+public:
+  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
+};
+
 struct TilingInterfaceTilingPass
     : public TilingInterfaceTilingBase<TilingInterfaceTilingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -397,14 +402,35 @@ void TilingInterfaceTilingPass::runOnOperation() {
           StringAttr::get(context, "tiling_repeated_indices_scatter_input"),
           StringAttr::get(context, "tiling_repeated_indices_scatter_output")));
 
-  patterns.add<TilingInterfaceTilingPattern>(
-      context, linalg::LinalgTilingOptions().setTileSizes({2, 4}),
-      IREE::LinalgExt::LinalgTransformationFilter(
-          StringAttr::get(context, "tiling_pack_input"),
-          StringAttr::get(context, "tiling_pack_output")));
-
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
+  }
+
+  // TODO(hanchung): Deprecate IREE specific logic. We should move to use
+  // upstream scf::tileUsingSCFForOp method. For now only uses it for packing
+  // and unpacking ops.
+  {
+    SimpleRewriter rewriter(context);
+    auto filter = IREE::LinalgExt::LinalgTransformationFilter(
+        StringAttr::get(context, "tiling_pack_input"),
+        StringAttr::get(context, "tiling_pack_output"));
+    auto options = scf::SCFTilingOptions().setTileSizes({2, 4});
+    auto funcOp = getOperation();
+    funcOp->walk([&](Operation *tilableOp) {
+      if (failed(filter.checkAndNotify(rewriter, tilableOp))) {
+        return;
+      }
+
+      FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
+          rewriter, cast<TilingInterface>(tilableOp), options);
+      if (failed(tilingResult))
+        return signalPassFailure();
+      rewriter.replaceOp(tilableOp, tilingResult->replacements);
+
+      for (auto op : tilingResult.value().tiledOps) {
+        filter.replaceLinalgTransformationFilter(rewriter, op);
+      }
+    });
   }
 }
 

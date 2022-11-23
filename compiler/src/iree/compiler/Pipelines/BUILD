@@ -38,6 +38,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Bindings/TFLite/Transforms",
         "//compiler/src/iree/compiler/Dialect/Flow/Transforms",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/HALToVM",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Dialect/HAL/Transforms",
         "//compiler/src/iree/compiler/Dialect/Stream/Transforms",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",

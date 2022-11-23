@@ -33,7 +33,7 @@ def Util_ByteRangeAttr : AttrDef<Util_Dialect, "ByteRange", []> {
 }
 
 def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
-  DeclareAttrInterfaceMethods<SubElementAttrInterface>,
+  SubElementAttrInterface,
   DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [
     "serializeToBuffer",
     "serializeToStream",

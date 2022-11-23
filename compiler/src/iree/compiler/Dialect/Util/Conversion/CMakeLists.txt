@@ -23,6 +23,7 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
+    MLIRPass
     MLIRSCFDialect
     MLIRSupport
     MLIRTransforms

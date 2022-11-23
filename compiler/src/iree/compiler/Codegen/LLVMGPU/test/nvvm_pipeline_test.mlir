@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' %s | FileCheck %s
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' -iree-codegen-llvmgpu-use-mma-sync %s | FileCheck %s -check-prefix=MMASYNC
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline)))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline)))" -iree-codegen-llvmgpu-use-mma-sync %s | FileCheck %s -check-prefix=MMASYNC
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
@@ -94,12 +94,12 @@ hal.executable @dot_dispatch_0 {
 //           CHECK:   llvm.br
 //   CHECK-COUNT-3:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
 //  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-// CHECK-COUNT-128:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
+// CHECK-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
 //   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
 //           CHECK:   llvm.br
 //   CHECK-COUNT-3:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
 //  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-// CHECK-COUNT-128:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
+// CHECK-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
 //   CHECK-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 // -----
@@ -166,7 +166,7 @@ hal.executable @dot_dispatch_0 {
 //   CHECK-LABEL: hal.executable public @dot_dispatch_0
 //         CHECK:   hal.executable.variant public @cuda
 //         CHECK:   llvm.br
-// CHECK-COUNT-8:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
+// CHECK-COUNT-8:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
 //         CHECK:   llvm.br
 // CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
@@ -867,8 +867,9 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 // CHECK-COUNT-5:     nvvm.shfl.sync  bfly
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} : !llvm.ptr<f32, 3>
 //         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load {{.*}} : !llvm.ptr<vector<8xf32>, 3>
-//         CHECK:     "llvm.intr.vector.reduce.fadd"(%{{.*}}, %{{.*}}) {reassoc = false} : (f32, vector<8xf32>) -> f32
+//         CHECK:     llvm.load {{.*}} : !llvm.ptr<f32, 3>
+//         CHECK:     llvm.icmp "sge" {{.*}}, {{.*}} : i64
+// CHECK-COUNT-5:     nvvm.shfl.sync  bfly
 
 // -----
 
@@ -929,8 +930,9 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 // CHECK-COUNT-5:     nvvm.shfl.sync  bfly
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} : !llvm.ptr<f32, 3>
 //         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load {{.*}} : !llvm.ptr<vector<8xf32>, 3>
-//         CHECK:     "llvm.intr.vector.reduce.fadd"(%{{.*}}, %{{.*}}) {reassoc = false} : (f32, vector<8xf32>) -> f32
+//         CHECK:     llvm.load {{.*}} : !llvm.ptr<f32, 3>
+//         CHECK:     llvm.icmp "sge" {{.*}}, {{.*}} : i64
+// CHECK-COUNT-5:     nvvm.shfl.sync  bfly
 //         CHECK:     llvm.fdiv %{{.*}}, %{{.*}}  : vector<4xf32>
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : !llvm.ptr<vector<4xf32>>
 

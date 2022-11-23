@@ -107,8 +107,8 @@ createFusionOfTensorOpsPass(bool fuseMultiUse = false,
 std::unique_ptr<Pass> createInferNumericNarrowingPass();
 
 // Create a pass to initialize all empty tensors after dispatch formation to
-// zero.
-std::unique_ptr<Pass> createInitializeEmptyTensorsPass();
+// zero or uninitialized allocations.
+std::unique_ptr<Pass> createInitializeEmptyTensorsPass(bool zeroFill = false);
 
 // Create a pass to interchange generic ops to force the reduction loop to be
 // the most inner loops.
@@ -146,14 +146,8 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass();
 // Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
 // A dispatch region is created for each tiled loop nest.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDispatchLinalgOnTensorsPass(bool aggressiveFusion = false);
-
-// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
-// A dispatch region is created for each tiled loop nest. (First create
-// DispatchRegionOps, then DispatchWorkgroupsOps.)
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDispatchLinalgOnTensorsViaRegionOpsPass(
-    bool generateWorkloadRegion = true);
+createDispatchLinalgOnTensorsPass(bool aggressiveFusion = false,
+                                  bool generateWorkloadRegion = true);
 
 // Pass to perform dispatch of Linalg on tensor ops by using the transform
 // dialect. Dispatch regions are created as specified by the transform module

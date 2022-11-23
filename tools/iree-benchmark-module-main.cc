@@ -437,20 +437,20 @@ class IREEBenchmark {
 
     // Order matters. Tear down modules first to release resources.
     inputs_.reset();
-    iree_vm_context_release(context_);
-    iree_vm_module_release(main_module_);
-    iree_vm_instance_release(instance_);
+    context_.reset();
+    main_module_.reset();
+    instance_.reset();
 
     // Tear down device last in order to get accurate statistics.
     if (device_allocator_ && FLAG_print_statistics) {
-      IREE_IGNORE_ERROR(
-          iree_hal_allocator_statistics_fprint(stderr, device_allocator_));
+      IREE_IGNORE_ERROR(iree_hal_allocator_statistics_fprint(
+          stderr, device_allocator_.get()));
     }
-    iree_hal_allocator_release(device_allocator_);
-    iree_hal_device_release(device_);
+    device_allocator_.reset();
+    device_.reset();
   };
 
-  iree_hal_device_t* device() const { return device_; }
+  iree_hal_device_t* device() const { return device_.get(); }
 
   iree_status_t Register() {
     IREE_TRACE_SCOPE0("IREEBenchmark::Register");
@@ -478,10 +478,11 @@ class IREEBenchmark {
         iree_tooling_create_instance(host_allocator, &instance_));
 
     IREE_RETURN_IF_ERROR(iree_tooling_load_module_from_flags(
-        instance_, host_allocator, &main_module_));
+        instance_.get(), host_allocator, &main_module_));
 
     IREE_RETURN_IF_ERROR(iree_tooling_create_context_from_flags(
-        instance_, /*user_module_count=*/1, /*user_modules=*/&main_module_,
+        instance_.get(), /*user_module_count=*/1,
+        /*user_modules=*/&main_module_,
         /*default_device_uri=*/iree_string_view_empty(), host_allocator,
         &context_, &device_, &device_allocator_));
 
@@ -494,25 +495,25 @@ class IREEBenchmark {
 
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
-        main_module_, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+        main_module_.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
         iree_string_view_t{function_name.data(), function_name.size()},
         &function));
 
     IREE_CHECK_OK(ParseToVariantList(
-        device_allocator_,
+        device_allocator_.get(),
         iree::span<const std::string>{FLAG_function_inputs.data(),
                                       FLAG_function_inputs.size()},
-        iree_vm_instance_allocator(instance_), &inputs_));
+        iree_vm_instance_allocator(instance_.get()), &inputs_));
 
     iree_string_view_t invocation_model = iree_vm_function_lookup_attr_by_name(
         &function, IREE_SV("iree.abi.model"));
     if (iree_string_view_equal(invocation_model, IREE_SV("coarse-fences"))) {
       // Asynchronous invocation.
-      iree::RegisterAsyncBenchmark(function_name, device_, context_, function,
-                                   inputs_.get());
+      iree::RegisterAsyncBenchmark(function_name, device_.get(), context_.get(),
+                                   function, inputs_.get());
     } else {
       // Synchronous invocation.
-      iree::RegisterGenericBenchmark(function_name, context_, function,
+      iree::RegisterGenericBenchmark(function_name, context_.get(), function,
                                      inputs_.get());
     }
     return iree_ok_status();
@@ -521,11 +522,11 @@ class IREEBenchmark {
   iree_status_t RegisterAllExportedFunctions() {
     IREE_TRACE_SCOPE0("IREEBenchmark::RegisterAllExportedFunctions");
     iree_vm_module_signature_t signature =
-        iree_vm_module_signature(main_module_);
+        iree_vm_module_signature(main_module_.get());
     for (iree_host_size_t i = 0; i < signature.export_function_count; ++i) {
       iree_vm_function_t function;
       IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
-          main_module_, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function));
+          main_module_.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function));
       iree_string_view_t function_name = iree_vm_function_name(&function);
 
       // We run anything with the 'benchmark' attribute.
@@ -534,11 +535,11 @@ class IREEBenchmark {
           &function, IREE_SV("iree.benchmark"));
       if (iree_string_view_equal(benchmark_type, IREE_SV("dispatch"))) {
         iree::RegisterDispatchBenchmark(
-            std::string(function_name.data, function_name.size), context_,
+            std::string(function_name.data, function_name.size), context_.get(),
             function);
       } else if (iree_string_view_equal(benchmark_type, IREE_SV("entry"))) {
         iree::RegisterGenericBenchmark(
-            std::string(function_name.data, function_name.size), context_,
+            std::string(function_name.data, function_name.size), context_.get(),
             function,
             /*inputs=*/nullptr);
       } else {
@@ -567,8 +568,8 @@ class IREEBenchmark {
           if (argument_count == 2) {
             // Only functions taking a (wait, signal) fence pair are run.
             iree::RegisterAsyncBenchmark(
-                std::string(function_name.data, function_name.size), device_,
-                context_, function,
+                std::string(function_name.data, function_name.size),
+                device_.get(), context_.get(), function,
                 /*inputs=*/nullptr);
           }
         } else {
@@ -577,8 +578,8 @@ class IREEBenchmark {
             // Only functions with no inputs are run (because we can't pass
             // anything).
             iree::RegisterGenericBenchmark(
-                std::string(function_name.data, function_name.size), context_,
-                function,
+                std::string(function_name.data, function_name.size),
+                context_.get(), function,
                 /*inputs=*/nullptr);
           }
         }
@@ -587,11 +588,11 @@ class IREEBenchmark {
     return iree_ok_status();
   }
 
-  iree_vm_instance_t* instance_ = nullptr;
-  iree_vm_context_t* context_ = nullptr;
-  iree_hal_device_t* device_ = nullptr;
-  iree_hal_allocator_t* device_allocator_ = nullptr;
-  iree_vm_module_t* main_module_ = nullptr;
+  iree::vm::ref<iree_vm_instance_t> instance_;
+  iree::vm::ref<iree_vm_context_t> context_;
+  iree::vm::ref<iree_hal_device_t> device_;
+  iree::vm::ref<iree_hal_allocator_t> device_allocator_;
+  iree::vm::ref<iree_vm_module_t> main_module_;
   iree::vm::ref<iree_vm_list_t> inputs_;
 };
 }  // namespace

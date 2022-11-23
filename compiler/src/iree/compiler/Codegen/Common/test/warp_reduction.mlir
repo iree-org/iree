@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reduction-to-gpu))))' -cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reduction-to-gpu, cse)))))' %s | FileCheck %s
 
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -125,7 +125,9 @@ hal.executable private @simple_reduce_multi_warp  {
 //   CHECK-DAG:   %[[C8:.*]] = arith.constant 8 : i32
 //   CHECK-DAG:   %[[C16:.*]] = arith.constant 16 : i32
 //   CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : i32
+//   CHECK-DAG:   %[[C2I:.*]] = arith.constant 2 : index
 //   CHECK-DAG:   %[[C32I:.*]] = arith.constant 32 : index
+//   CHECK-DAG:   %[[IDENTITY:.*]] = arith.constant 0.000000e+00 : f32
 //   CHECK-DAG:   %[[TID:.*]] = gpu.thread_id  x
 //   CHECK-DAG:   %[[VCST:.*]] = arith.constant dense<0.000000e+00> : vector<1xf32>
 //       CHECK:   %[[F:.*]] = scf.for %{{.*}} = %{{.*}} to %{{.*}} step %{{.*}} iter_args(%[[V0:.*]] = %[[VCST]]) -> (vector<1xf32>) {
@@ -145,12 +147,27 @@ hal.executable private @simple_reduce_multi_warp  {
 //       CHECK:     %[[S9:.*]] = arith.addf %[[S7]], %[[S8]] : f32
 //       CHECK:     %[[A:.*]] = memref.alloc() : memref<2xf32, 3>
 //       CHECK:     %[[WID:.*]] = arith.divui %[[TID]], %[[C32I]] : index
-//       CHECK:     memref.store %[[S9]], %[[A]][%[[WID]]] : memref<2xf32, 3>
+//       CHECK:     %[[LANE_ID:.*]] = arith.remui %[[TID]], %[[C32I]] : index
+//       CHECK:     %[[LANE0:.*]] = arith.cmpi eq, %[[LANE_ID]], %[[C0]] : index
+//       CHECK:     scf.if %[[LANE0]] { 
+//       CHECK:       memref.store %[[S9]], %[[A]][%[[WID]]] : memref<2xf32, 3>
+//       CHECK:     }
 //       CHECK:     gpu.barrier
-//       CHECK:     %[[VL:.*]] = vector.transfer_read %[[A]][%[[C0]]], %{{.*}} {in_bounds = [true]} : memref<2xf32, 3>, vector<2xf32>
-//       CHECK:     %[[S10:.*]] = vector.reduction <add>, %[[VL]] : vector<2xf32> into f32
-//       CHECK:     %[[S11:.*]] = arith.addf %[[S10]], %[[E]] : f32
-//       CHECK:     %[[B:.*]] = vector.broadcast %[[S11]] : f32 to vector<1xf32>
+//       CHECK:     %[[LOAD_VAL:.*]] = memref.load %[[A]][%[[LANE_ID]]] : memref<2xf32, 3>
+//       CHECK:     %[[USE_IDENTITY:.*]] = arith.cmpi sge, %[[LANE_ID]], %[[C2I]] : index
+//       CHECK:     %[[LANE_VAL:.*]] = arith.select %[[USE_IDENTITY]], %[[IDENTITY]], %[[LOAD_VAL]] : f32
+//       CHECK:     %[[S10:.*]], %{{.*}} = gpu.shuffle  xor %[[LANE_VAL]], %[[C1]], %[[C32]] : f32
+//       CHECK:     %[[S11:.*]] = arith.addf %[[LANE_VAL]], %[[S10]] : f32
+//       CHECK:     %[[S12:.*]], %{{.*}} = gpu.shuffle  xor %[[S11]], %[[C2]], %[[C32]] : f32
+//       CHECK:     %[[S13:.*]] = arith.addf %[[S11]], %[[S12]] : f32
+//       CHECK:     %[[S14:.*]], %{{.*}} = gpu.shuffle  xor %[[S13]], %[[C4]], %[[C32]] : f32
+//       CHECK:     %[[S15:.*]] = arith.addf %[[S13]], %[[S14]] : f32
+//       CHECK:     %[[S16:.*]], %{{.*}} = gpu.shuffle  xor %[[S15]], %[[C8]], %[[C32]] : f32
+//       CHECK:     %[[S17:.*]] = arith.addf %[[S15]], %[[S16]] : f32
+//       CHECK:     %[[S18:.*]], %{{.*}} = gpu.shuffle  xor %[[S17]], %[[C16]], %[[C32]] : f32
+//       CHECK:     %[[S19:.*]] = arith.addf %[[S17]], %[[S18]] : f32
+//       CHECK:     %[[S20:.*]] = arith.addf %[[S19]], %[[E]] : f32
+//       CHECK:     %[[B:.*]] = vector.broadcast %[[S20]] : f32 to vector<1xf32>
 //       CHECK:     scf.yield %[[B]] : vector<1xf32>
 //       CHECK:   }
 //       CHECK:   %[[DIV:.*]] = arith.divf %[[F]], %{{.*}} : vector<1xf32>
@@ -202,5 +219,13 @@ hal.executable private @reduce_then_broadcast  {
 // Check that there is no scf.if generated.
 // If some operations were not distributed we would end up with a scf.if(warp0) block.
 // CHECK-LABEL: func.func @reduce_then_broadcast() {
+//   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C32I:.*]] = arith.constant 32 : index
+//   CHECK-DAG:   %[[TID:.*]] = gpu.thread_id  x
+//       CHECK:   %[[LANE_ID:.*]] = arith.remui %[[TID]], %[[C32I]] : index
+//       CHECK:   %[[LANE0:.*]] = arith.cmpi eq, %[[LANE_ID]], %[[C0]] : index
+//       CHECK:   scf.if %[[LANE0]] { 
+//       CHECK:     memref.store {{.*}} : memref<2xf32, 3>
+//       CHECK:   }
 //   CHECK-NOT:  scf.if
 //       CHECK:  return

@@ -12,20 +12,19 @@ Example usage:
 """
 
 import argparse
-import json
-import os
-import requests
+import pathlib
 
 from typing import Optional
 
 from common.benchmark_presentation import *
 
 
-def get_benchmark_result_markdown(base_benchmark_file: Optional[str],
-                                  target_benchmark_file: Optional[str],
-                                  base_compile_stats_file: Optional[str],
-                                  target_compile_stats_file: Optional[str],
-                                  verbose: bool = False) -> str:
+def get_benchmark_result_markdown(
+    base_benchmark_file: Optional[pathlib.Path],
+    target_benchmark_file: Optional[pathlib.Path],
+    base_compile_stats_file: Optional[pathlib.Path],
+    target_compile_stats_file: Optional[pathlib.Path],
+    verbose: bool = False) -> str:
   """Gets the full markdown summary of all benchmarks in files."""
   base_benchmarks = {}
   target_benchmarks = {}
@@ -68,7 +67,8 @@ def parse_arguments():
   """Parses command-line options."""
 
   def check_file_path(path):
-    if os.path.isfile(path):
+    path = pathlib.Path(path)
+    if path.is_file():
       return path
     else:
       raise ValueError(path)

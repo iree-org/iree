@@ -17,10 +17,10 @@
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Transforms/SideEffectUtils.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-distribute"
 
@@ -43,9 +43,16 @@ struct LLVMGPUDistributePass
 
     IRRewriter rewriter(funcOp->getContext());
     rewriter.setInsertionPoint(funcOp);
+    MLIRContext* ctx = funcOp->getContext();
+    SmallVector<DeviceMappingAttrInterface> threadMappingAttributes = {
+        gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimX),
+        gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimY),
+        gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimZ)};
+
     DiagnosedSilenceableFailure const result =
         mlir::transform::gpu::mapNestedForeachToThreadsImpl(
-            rewriter, funcOp, workgroupSize, false, llvm::None);
+            rewriter, funcOp, workgroupSize, false, llvm::None,
+            threadMappingAttributes);
 
     if (!result.succeeded()) return signalPassFailure();
   }

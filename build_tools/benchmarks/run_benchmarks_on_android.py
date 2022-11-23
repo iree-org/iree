@@ -29,15 +29,18 @@ Example usages:
     /path/to/host/build/dir
 """
 
+import sys
+import pathlib
+
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
+
 import atexit
-import os
-import re
 import subprocess
 import tarfile
 import shutil
-import sys
 
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_definition import (DriverInfo, execute_cmd,
@@ -53,15 +56,16 @@ from common.android_device_utils import (get_android_device_model,
 from common.common_arguments import build_common_argument_parser
 
 # Root directory to perform benchmarks in on the Android device.
-ANDROID_TMPDIR = "/data/local/tmp/iree-benchmarks"
+ANDROID_TMPDIR = pathlib.PurePosixPath("/data/local/tmp/iree-benchmarks")
 
-NORMAL_TOOL_REL_DIR = "normal-tools"
-TRACED_TOOL_REL_DIR = "traced-tools"
+NORMAL_TOOL_REL_DIR = pathlib.PurePosixPath("normal-tools")
+TRACED_TOOL_REL_DIR = pathlib.PurePosixPath("traced-tools")
 
 
-def adb_push_to_tmp_dir(content: str,
-                        relative_dir: str = "",
-                        verbose: bool = False) -> str:
+def adb_push_to_tmp_dir(
+    content: pathlib.Path,
+    relative_dir: pathlib.PurePosixPath = pathlib.PurePosixPath(),
+    verbose: bool = False) -> pathlib.PurePosixPath:
   """Pushes content onto the Android device.
 
   Args:
@@ -71,21 +75,21 @@ def adb_push_to_tmp_dir(content: str,
   Returns:
     The full path to the content on the Android device.
   """
-  filename = os.path.basename(content)
-  android_path = os.path.join(ANDROID_TMPDIR, relative_dir, filename)
+  filename = content.name
+  android_path = ANDROID_TMPDIR / relative_dir / filename
   # When the output is a TTY, keep the default progress info output.
   # In other cases, redirect progress info to null to avoid bloating log files.
   stdout_redirect = None if sys.stdout.isatty() else subprocess.DEVNULL
-  execute_cmd(
-      ["adb", "push", os.path.abspath(content), android_path],
-      verbose=verbose,
-      stdout=stdout_redirect)
+  execute_cmd(["adb", "push", content.resolve(), android_path],
+              verbose=verbose,
+              stdout=stdout_redirect)
   return android_path
 
 
-def adb_execute_and_get_output(cmd_args: Sequence[str],
-                               relative_dir: str = "",
-                               verbose: bool = False) -> str:
+def adb_execute_and_get_output(
+    cmd_args: Sequence[str],
+    relative_dir: pathlib.PurePosixPath = pathlib.PurePosixPath(),
+    verbose: bool = False) -> str:
   """Executes command with adb shell.
 
   Switches to `relative_dir` relative to the android tmp directory before
@@ -99,16 +103,13 @@ def adb_execute_and_get_output(cmd_args: Sequence[str],
   Returns:
     A string for the command output.
   """
-  cmd = ["adb", "shell"]
-  cmd.extend(["cd", os.path.join(ANDROID_TMPDIR, relative_dir)])
-  cmd.append("&&")
+  cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
   cmd.extend(cmd_args)
-
   return execute_cmd_and_get_output(cmd, verbose=verbose)
 
 
 def adb_execute(cmd_args: Sequence[str],
-                relative_dir: str = "",
+                relative_dir: pathlib.PurePosixPath = pathlib.PurePosixPath(),
                 verbose: bool = False) -> subprocess.CompletedProcess:
   """Executes command with adb shell.
 
@@ -123,11 +124,8 @@ def adb_execute(cmd_args: Sequence[str],
   Returns:
     The completed process.
   """
-  cmd = ["adb", "shell"]
-  cmd.extend(["cd", os.path.join(ANDROID_TMPDIR, relative_dir)])
-  cmd.append("&&")
+  cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
   cmd.extend(cmd_args)
-
   return execute_cmd(cmd, verbose=verbose)
 
 
@@ -136,7 +134,7 @@ def is_magisk_su():
   return "MagiskSU" in adb_execute_and_get_output(["su", "--help"])
 
 
-def adb_execute_as_root(cmd_args: Sequence[str]) -> subprocess.CompletedProcess:
+def adb_execute_as_root(cmd_args: Sequence[Any]) -> subprocess.CompletedProcess:
   """Executes the given command as root."""
   cmd = ["su", "-c" if is_magisk_su() else "root"]
   cmd.extend(cmd_args)
@@ -144,7 +142,7 @@ def adb_execute_as_root(cmd_args: Sequence[str]) -> subprocess.CompletedProcess:
 
 
 def adb_start_cmd(cmd_args: Sequence[str],
-                  relative_dir: str,
+                  relative_dir: pathlib.PurePosixPath = pathlib.PurePosixPath(),
                   verbose: bool = False) -> subprocess.Popen:
   """Executes command with adb shell in a directory and returns the handle
   without waiting for completion.
@@ -157,28 +155,24 @@ def adb_start_cmd(cmd_args: Sequence[str],
   Returns:
     A Popen object for the started command.
   """
-  cmd = ["adb", "shell"]
-  cmd.extend(["cd", f"{ANDROID_TMPDIR}/{relative_dir}"])
-  cmd.append("&&")
+  cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
   cmd.extend(cmd_args)
 
   if verbose:
-    cmd_str = " ".join(cmd)
-    print(f"cmd: {cmd_str}")
+    print(f"cmd: {cmd}")
   return subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
 
 
-def get_vmfb_full_path_for_benchmark_case(benchmark_case_dir: str) -> str:
-  flagfile_path = os.path.join(benchmark_case_dir, MODEL_FLAGFILE_NAME)
-  flagfile = open(flagfile_path, "r")
-  flagfile_lines = flagfile.readlines()
-  for line in flagfile_lines:
+def get_vmfb_full_path_for_benchmark_case(
+    benchmark_case_dir: pathlib.Path) -> pathlib.Path:
+  flagfile = benchmark_case_dir / MODEL_FLAGFILE_NAME
+  for line in flagfile.read_text().splitlines():
     flag_name, flag_value = line.strip().split("=")
     if flag_name == "--module_file":
       # Realpath canonicalization matters. The caller may rely on that to track
       # which files it already pushed.
-      return os.path.realpath(os.path.join(benchmark_case_dir, flag_value))
-  raise ValueError(f"{flagfile_path} does not contain a --module_file flag")
+      return (benchmark_case_dir / flag_value).resolve()
+  raise ValueError(f"{flagfile} does not contain a --module_file flag")
 
 
 class AndroidBenchmarkDriver(BenchmarkDriver):
@@ -189,15 +183,19 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     self.already_pushed_files = {}
 
   def run_benchmark_case(self, benchmark_case: BenchmarkCase,
-                         benchmark_results_filename: Optional[str],
-                         capture_filename: Optional[str]) -> None:
+                         benchmark_results_filename: Optional[pathlib.Path],
+                         capture_filename: Optional[pathlib.Path]) -> None:
     benchmark_case_dir = benchmark_case.benchmark_case_dir
-    android_case_dir = os.path.relpath(benchmark_case_dir,
-                                       self.config.root_benchmark_dir)
+    # TODO(#11076): Support run_config.
+    if benchmark_case_dir is None:
+      raise ValueError("benchmark_case_dir can't be None.")
+
+    android_case_dir = pathlib.PurePosixPath(
+        benchmark_case_dir.relative_to(self.config.root_benchmark_dir))
 
     self.__push_vmfb_file(benchmark_case_dir)
-    self.__check_and_push_file(
-        os.path.join(benchmark_case_dir, MODEL_FLAGFILE_NAME), android_case_dir)
+    self.__check_and_push_file(benchmark_case_dir / MODEL_FLAGFILE_NAME,
+                               android_case_dir)
 
     taskset = self.__deduce_taskset(benchmark_case.bench_mode)
 
@@ -214,11 +212,13 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
                          capture_filename=capture_filename,
                          taskset=taskset)
 
-  def __run_benchmark(self, android_case_dir: str, tool_name: str,
-                      driver_info: DriverInfo, results_filename: str,
-                      taskset: str):
-    host_tool_path = os.path.join(self.config.normal_benchmark_tool_dir,
-                                  tool_name)
+  def __run_benchmark(self, android_case_dir: pathlib.PurePosixPath,
+                      tool_name: str, driver_info: DriverInfo,
+                      results_filename: pathlib.Path, taskset: str):
+    if self.config.normal_benchmark_tool_dir is None:
+      raise ValueError("normal_benchmark_tool_dir can't be None.")
+
+    host_tool_path = self.config.normal_benchmark_tool_dir / tool_name
     android_tool = self.__check_and_push_file(host_tool_path,
                                               NORMAL_TOOL_REL_DIR)
     cmd = [
@@ -227,7 +227,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     if tool_name == "iree-benchmark-module":
       cmd.extend(
           get_iree_benchmark_module_arguments(
-              results_filename=f"'{os.path.basename(results_filename)}'",
+              results_filename=f"'{results_filename.name}'",
               driver_info=driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
@@ -239,19 +239,22 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     # return.
     pull_cmd = [
         "adb", "pull",
-        os.path.join(ANDROID_TMPDIR, android_case_dir,
-                     os.path.basename(results_filename)), results_filename
+        ANDROID_TMPDIR / android_case_dir / results_filename.name,
+        results_filename
     ]
     execute_cmd_and_get_output(pull_cmd, verbose=self.verbose)
 
     if self.verbose:
       print(result_json)
 
-  def __run_capture(self, android_case_dir: str, tool_name: str,
-                    capture_filename: str, taskset: str):
+  def __run_capture(self, android_case_dir: pathlib.PurePosixPath,
+                    tool_name: str, capture_filename: pathlib.Path,
+                    taskset: str):
     capture_config = self.config.trace_capture_config
-    host_tool_path = os.path.join(capture_config.traced_benchmark_tool_dir,
-                                  tool_name)
+    if capture_config is None:
+      raise ValueError("capture_config can't be None.")
+
+    host_tool_path = capture_config.traced_benchmark_tool_dir / tool_name
     android_tool = self.__check_and_push_file(host_tool_path,
                                               TRACED_TOOL_REL_DIR)
     run_cmd = [
@@ -288,13 +291,13 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     # Not specified: use the 7th core.
     return "80"
 
-  def __push_vmfb_file(self, benchmark_case_dir: str):
+  def __push_vmfb_file(self, benchmark_case_dir: pathlib.Path):
     vmfb_path = get_vmfb_full_path_for_benchmark_case(benchmark_case_dir)
-    vmfb_dir = os.path.dirname(vmfb_path)
-    vmfb_rel_dir = os.path.relpath(vmfb_dir, self.config.root_benchmark_dir)
-    self.__check_and_push_file(vmfb_path, vmfb_rel_dir)
+    vmfb_rel_dir = vmfb_path.parent.relative_to(self.config.root_benchmark_dir)
+    self.__check_and_push_file(vmfb_path, pathlib.PurePosixPath(vmfb_rel_dir))
 
-  def __check_and_push_file(self, host_path: str, relative_dir: str):
+  def __check_and_push_file(self, host_path: pathlib.Path,
+                            relative_dir: pathlib.PurePosixPath):
     """Checks if the file has been pushed and pushes it if not."""
     android_path = self.already_pushed_files.get(host_path)
     if android_path is not None:
@@ -309,8 +312,8 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
 
 def set_cpu_frequency_scaling_governor(governor: str):
   git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
-  cpu_script = os.path.join(git_root, "build_tools", "benchmarks",
-                            "set_android_scaling_governor.sh")
+  cpu_script = (pathlib.Path(git_root) / "build_tools" / "benchmarks" /
+                "set_android_scaling_governor.sh")
   android_path = adb_push_to_tmp_dir(cpu_script)
   adb_execute_as_root([android_path, governor])
 
@@ -319,12 +322,11 @@ def set_gpu_frequency_scaling_policy(policy: str):
   git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
   device_model = get_android_device_model()
   gpu_name = get_android_gpu_name()
+  benchmarks_tool_dir = pathlib.Path(git_root) / "build_tools" / "benchmarks"
   if device_model == "Pixel-6" or device_model == "Pixel-6-Pro":
-    gpu_script = os.path.join(git_root, "build_tools", "benchmarks",
-                              "set_pixel6_gpu_scaling_policy.sh")
+    gpu_script = benchmarks_tool_dir / "set_pixel6_gpu_scaling_policy.sh"
   elif gpu_name.lower().startswith("adreno"):
-    gpu_script = os.path.join(git_root, "build_tools", "benchmarks",
-                              "set_adreno_gpu_scaling_policy.sh")
+    gpu_script = benchmarks_tool_dir / "set_adreno_gpu_scaling_policy.sh"
   else:
     raise RuntimeError(
         f"Unsupported device '{device_model}' for setting GPU scaling policy")

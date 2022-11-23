@@ -97,7 +97,7 @@ jobs:
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             --env "BUILD_BENCHMARKS_DIR=${BENCHMARKS_OUTPUT_DIR}" \
-            gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
+            gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 \
             build_tools/cmake/build_benchmarks.sh
           echo "::set-output name=benchmarks-dir::${BENCHMARKS_OUTPUT_DIR}"
       - name: "Creating archive of benchmarks"
@@ -106,7 +106,12 @@ jobs:
           BENCHMARKS_ARCHIVE: benchmarks.tar
           BENCHMARKS_DIR: ${{ steps.build.outputs.benchmarks-dir }}
         run: |
-          tar --exclude '*.tflite' --exclude '*.mlir' -czf \
+          # TODO(#10988): Excludes the experimental `models` and iree` dirs for
+          # now.
+          tar --exclude '*.tflite' --exclude '*.mlir' --exclude '*-tf-model' \
+            --exclude "${BENCHMARKS_DIR}/benchmark_suites/models" \
+            --exclude "${BENCHMARKS_DIR}/benchmark_suites/iree" \
+            -czf \
             "${BENCHMARKS_ARCHIVE}" "${BENCHMARKS_DIR}/benchmark_suites"
           echo "::set-output name=benchmarks-archive::${BENCHMARKS_ARCHIVE}"
       - name: "Uploading benchmarks archive"
@@ -130,7 +135,7 @@ jobs:
         target:
           - platform: "riscv"
             architecture: "rv64"
-            docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:e11710158fd09a04ae7accc275a38c95cd59f83fd15a0630a083eb5623807451"
     outputs:
       benchmark-tools-gcs-artifacts: ${{ toJSON(steps.upload.outputs) }}
     env:

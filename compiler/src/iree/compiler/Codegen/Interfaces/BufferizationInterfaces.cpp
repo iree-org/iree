@@ -14,10 +14,9 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/AllocTensorElimination.h"
 #include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
+#include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"
@@ -30,7 +29,7 @@ using mlir::bufferization::BufferizableOpInterface;
 using mlir::bufferization::BufferizationAliasInfo;
 using mlir::bufferization::BufferizationOptions;
 using mlir::bufferization::DialectAnalysisState;
-using mlir::bufferization::eliminateAllocTensors;
+using mlir::bufferization::eliminateEmptyTensors;
 using mlir::bufferization::OneShotBufferizationOptions;
 using mlir::bufferization::replaceOpWithBufferizedValues;
 using mlir::bufferization::replaceOpWithNewBufferizedOp;
@@ -378,16 +377,17 @@ static bool isValueEquivalentToAnInplaceTensorLoadOp(
   return foundOp;
 }
 
-/// Try to eliminate InitTensorOps that are eventually fed into a
-/// DispatchTensorStoreOp. Such InitTensorOps are replaced with matching
+/// Try to eliminate tensor::EmptyOps that are eventually fed into a
+/// DispatchTensorStoreOp. Such tensor::EmptyOps are replaced with matching
 /// DispatchTensorLoadOps. Two conditions must be met:
 ///
 /// * The target must be a "readwrite" tensor.
 /// * All ops along the reverse SSA use-def chain from the
-///   DispatchTensorStoreOp to the InitTensorOp must have bufferized in-place.
-LogicalResult storeTensorOpAnchoredInitTensorEliminationStep(
+///   DispatchTensorStoreOp to the tensor::EmptyOp must have bufferized
+///   in-place.
+LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
     RewriterBase &rewriter, Operation *op, AnalysisState &state) {
-  return eliminateAllocTensors(
+  return eliminateEmptyTensors(
       rewriter, op, state,
       /*anchorMatchFunc=*/
       [&](OpOperand &operand, SmallVector<Value> &) {

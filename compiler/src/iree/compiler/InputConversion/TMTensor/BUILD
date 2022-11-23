@@ -58,6 +58,7 @@ iree_compiler_cc_library(
         ":PassHeaders",
         ":PassesIncGen",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",

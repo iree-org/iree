@@ -137,6 +137,47 @@ class RulesTest(unittest.TestCase):
         )
         """))
 
+  def test_build_iree_benchmark_suite_module_test(self):
+    rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
+        target_name="model_test",
+        model="123_abc",
+        driver="LOCAL_TASK",
+        expected_output="xyz",
+        runner_args=["--x=0", "--y=1"],
+        timeout_secs=10,
+        labels=["defaults", "e2e"],
+        xfail_platforms=["arm", "ppc"],
+        unsupported_platforms=["riscv", "z80"])
+
+    self.assertEqual(
+        rule,
+        textwrap.dedent("""\
+        iree_benchmark_suite_module_test(
+          NAME
+            "model_test"
+          MODEL
+            "123_abc"
+          DRIVER
+            "LOCAL_TASK"
+          EXPECTED_OUTPUT
+            "xyz"
+          TIMEOUT
+            "10"
+          RUNNER_ARGS
+            "--x=0"
+            "--y=1"
+          LABELS
+            "defaults"
+            "e2e"
+          XFAIL_PLATFORMS
+            "arm"
+            "ppc"
+          UNSUPPORTED_PLATFORMS
+            "riscv"
+            "z80"
+        )
+        """))
+
   def test_build_add_dependencies(self):
     rule = cmake_builder.rules.build_add_dependencies(
         target="iree_mlir_suites", deps=["pkg_abcd", "pkg_efgh"])
@@ -147,6 +188,17 @@ class RulesTest(unittest.TestCase):
         add_dependencies(iree_mlir_suites
           pkg_abcd
           pkg_efgh
+        )
+        """))
+
+  def test_build_set(self):
+    rule = cmake_builder.rules.build_set(variable_name="_ABC", value="123")
+
+    self.assertEqual(
+        rule,
+        textwrap.dedent("""\
+        set(_ABC
+          123
         )
         """))
 

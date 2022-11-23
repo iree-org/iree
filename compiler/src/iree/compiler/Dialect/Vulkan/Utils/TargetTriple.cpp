@@ -33,6 +33,7 @@ spirv::Vendor getVendor(const TargetTriple &triple) {
       return spirv::Vendor::Unknown;
     case TargetTripleArch::AMD_RDNAv1:
     case TargetTripleArch::AMD_RDNAv2:
+    case TargetTripleArch::AMD_RDNAv3:
       return spirv::Vendor::AMD;
     case TargetTripleArch::ARM_Valhall:
       return spirv::Vendor::ARM;
@@ -65,6 +66,7 @@ spirv::DeviceType getDeviceType(const TargetTriple &triple) {
       return spirv::DeviceType::CPU;
     case TargetTripleArch::AMD_RDNAv1:
     case TargetTripleArch::AMD_RDNAv2:
+    case TargetTripleArch::AMD_RDNAv3:
     case TargetTripleArch::NV_Turing:
     case TargetTripleArch::NV_Ampere:
       return spirv::DeviceType::DiscreteGPU;
@@ -89,6 +91,12 @@ Vulkan::Version getVersion(const TargetTriple &triple) {
   // SwiftShader and MoltenVK stays at Vulkan 1.1.
   if (triple.getProduct() == TargetTripleProduct::SwiftShader ||
       triple.getProduct() == TargetTripleProduct::MoltenVK) {
+    return Version::V_1_1;
+  }
+
+  // For unknown architecture, be conservative and use a reasonable lowest
+  // denominator.
+  if (triple.getArch() == TargetTripleArch::Unknown) {
     return Version::V_1_1;
   }
 
@@ -146,6 +154,10 @@ void getExtensions(const TargetTriple &triple,
       }
       return;
     }
+    case TargetTripleArch::AMD_RDNAv3: {
+      extensions.push_back(Extension::VK_NV_cooperative_matrix);
+      break;
+    }
     default:
       break;
   }
@@ -154,6 +166,18 @@ void getExtensions(const TargetTriple &triple,
   if (getVendor(triple) == spirv::Vendor::SwiftShader) {
     extensions.push_back(Extension::VK_KHR_storage_buffer_storage_class);
     return;
+  }
+
+  // For unknown architecture, be conservative and use a reasonable lowest
+  // denominator.
+  if (triple.getArch() == TargetTripleArch::Unknown) {
+    // The following extensions have 90%+ device coverage from
+    // https://vulkan.gpuinfo.org/listextensions.php.
+    const std::array<Extension, 2> list = {
+        Extension::VK_KHR_storage_buffer_storage_class,
+        Extension::VK_KHR_variable_pointers,
+    };
+    return extensions.append(list.begin(), list.end());
   }
 
   // Desktop GPUs typically support all extensions we care.
@@ -204,8 +228,6 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
   Builder builder(context);
 
   switch (triple.getArch()) {
-    case TargetTripleArch::Unknown:
-      break;
     case TargetTripleArch::AMD_RDNAv1:
     case TargetTripleArch::AMD_RDNAv2:
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10906
@@ -230,6 +252,34 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       variablePointers = variablePointersStorageBuffer = true;
       break;
+    case TargetTripleArch::AMD_RDNAv3: {
+      maxComputeSharedMemorySize = 65536;
+      maxComputeWorkGroupInvocations = 1024;
+      maxComputeWorkGroupSize = {1024, 1024, 1024};
+
+      subgroupSize = 64;
+      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                         SubgroupFeature::Shuffle |
+                         SubgroupFeature::ShuffleRelative |
+                         SubgroupFeature::Clustered | SubgroupFeature::Quad;
+
+      shaderFloat16 = shaderFloat64 = true;
+      shaderInt8 = shaderInt16 = shaderInt64 = true;
+
+      storageBuffer16BitAccess = storagePushConstant16 = true;
+      uniformAndStorageBuffer16BitAccess = true;
+      storageBuffer8BitAccess = true, storagePushConstant8 = true;
+      uniformAndStorageBuffer8BitAccess = true;
+
+      variablePointers = variablePointersStorageBuffer = true;
+      auto f16t = builder.getF16Type();
+      auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
+      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+          context,
+          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
+          /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
+    } break;
     case TargetTripleArch::Apple_M1:
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
       maxComputeSharedMemorySize = 32768;
@@ -357,6 +407,14 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       }
 
       variablePointers = variablePointersStorageBuffer = true;
+      break;
+    case TargetTripleArch::Unknown:
+      // Use the largest subgroup size we can find across various vendors.
+      subgroupSize = 64;
+      // The following capabilities have 90%+ device coverage (Vulkan 1.1+)
+      // from https://vulkan.gpuinfo.org/listfeaturesextensions.php.
+      variablePointers = variablePointersStorageBuffer = false;
+      // Use Vulkan default for others.
       break;
   }
 

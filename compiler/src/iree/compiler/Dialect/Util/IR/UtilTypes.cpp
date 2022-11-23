@@ -648,7 +648,7 @@ static SmallVector<Value> buildShape(Location loc, ShapedType type,
   unsigned dynamicIdx = 0;
   for (unsigned i = 0; i < type.getRank(); ++i) {
     int64_t dim = type.getDimSize(i);
-    if (dim == ShapedType::kDynamicSize) {
+    if (dim == ShapedType::kDynamic) {
       dims.push_back(dynamicDims[dynamicIdx++]);
     } else {
       dims.push_back(builder.create<arith::ConstantIndexOp>(loc, dim));
@@ -671,15 +671,6 @@ SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
   auto type = result.getType().cast<ShapedType>();
   auto dynamicDims = op.getResultDynamicDims(resultIdx);
   return buildShape(op.getLoc(), type, dynamicDims, builder);
-}
-
-//===----------------------------------------------------------------------===//
-// IREE::Util::CompositeAttr
-//===----------------------------------------------------------------------===//
-
-Attribute CompositeAttr::replaceImmediateSubElements(
-    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
-  return CompositeAttr::get(getContext(), replAttrs);
 }
 
 }  // namespace Util

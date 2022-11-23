@@ -17,10 +17,12 @@ iree_compiler_cc_library(
     srcs = [
         "Partitioning.cpp",
         "Partitioning/ReferencePartitioning.cpp",
+        "ResourceHazards.cpp",
         "ResourceUsage.cpp",
     ],
     hdrs = [
         "Partitioning.h",
+        "ResourceHazards.h",
         "ResourceUsage.h",
     ],
     deps = [

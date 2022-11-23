@@ -129,9 +129,9 @@ class ConvertConv2DNhwcHwcf final
 
     auto nloops = colTensorShape.size();
 
-    StringRef parallel = getParallelIteratorTypeName();
-    StringRef reduction = getReductionIteratorTypeName();
-    SmallVector<StringRef, 3> img2colIterators(nloops, parallel);
+    auto parallel = utils::IteratorType::parallel;
+    auto reduction = utils::IteratorType::reduction;
+    SmallVector<utils::IteratorType, 3> img2colIterators(nloops, parallel);
 
     SmallVector<AffineMap, 4> img2colIndexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
@@ -197,8 +197,8 @@ class ConvertConv2DNhwcHwcf final
       auto lhsMap = AffineMap::get(4, 0, {bDim, mDim, kDim}, getContext());
       auto rhsMap = AffineMap::get(4, 0, {kDim, nDim}, getContext());
       auto resultMap = AffineMap::get(4, 0, {bDim, mDim, nDim}, getContext());
-      SmallVector<StringRef> genericIterators = {parallel, parallel, parallel,
-                                                 reduction};
+      SmallVector<utils::IteratorType> genericIterators = {parallel, parallel,
+                                                           parallel, reduction};
       bool isInt = outputType.getElementType().isa<IntegerType>();
       auto genericOp = rewriter.create<linalg::GenericOp>(
           loc, reshapedOutputType,
@@ -263,8 +263,8 @@ class ConvertDepthwiseConv2DNhwcHwc final
       Value outputTensor = rewriter.create<tensor::EmptyOp>(
           loc, targetShape, operandTensorType.getElementType());
 
-      SmallVector<StringRef> loopAttributeTypes(nloops,
-                                                getParallelIteratorTypeName());
+      SmallVector<utils::IteratorType> loopAttributeTypes(
+          nloops, utils::IteratorType::parallel);
 
       SmallVector<AffineMap> indexingMaps = {
           inversePermutation(
@@ -315,8 +315,8 @@ class ConvertDepthwiseConv2DNhwcHwc final
 
     auto nloops = colTensorShape.size();
 
-    SmallVector<StringRef> loopAttributeTypes(nloops,
-                                              getParallelIteratorTypeName());
+    SmallVector<utils::IteratorType> loopAttributeTypes(
+        nloops, utils::IteratorType::parallel);
 
     SmallVector<AffineMap> indexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),

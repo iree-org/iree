@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='func.func(iree-stream-materialize-copy-on-write)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-stream-materialize-copy-on-write))' %s | FileCheck %s
 
 // Tests that block arguments (including function arguments) are always cloned.
 // Until a whole-program analysis runs we don't know their semantics.
@@ -76,6 +76,7 @@ func.func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.re
 func.func private @tiedDispatches() {
   %c0_i32 = arith.constant 0 : i32
   %c1_i32 = arith.constant 1 : i32
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c16 = arith.constant 16 : index
   %c40 = arith.constant 40 : index
@@ -86,13 +87,13 @@ func.func private @tiedDispatches() {
   %splat1 = stream.async.splat %c1_i32 : i32 -> !stream.resource<*>{%c16}
 
   // CHECK: %[[CLONE0:.+]] = stream.async.clone %[[SPLAT0]]
-  // CHECK: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%[[CLONE0]], %[[SPLAT1]])
+  // CHECK: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%[[CLONE0]][%c0 to %c40 for %c40], %[[SPLAT1]][%c0 to %c16 for %c16])
   // CHECK-SAME: (!stream.resource<*>{%c40}, !stream.resource<*>{%c16}) -> %[[CLONE0]]{%c40}
-  %dispatch0 = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%splat0, %splat1) : (!stream.resource<*>{%c40}, !stream.resource<*>{%c16}) -> %splat0{%c40}
+  %dispatch0 = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%splat0[%c0 to %c40 for %c40], %splat1[%c0 to %c16 for %c16]) : (!stream.resource<*>{%c40}, !stream.resource<*>{%c16}) -> %splat0{%c40}
 
-  // CHECK: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%[[DISPATCH0]], %[[SPLAT0]])
+  // CHECK: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%[[DISPATCH0]][%c0 to %c40 for %c40], %[[SPLAT0]][%c0 to %c40 for %c40])
   // CHECK-SAME: (!stream.resource<*>{%c40}, !stream.resource<*>{%c40}) -> %[[DISPATCH0]]{%c40}
-  %dispatch1 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%dispatch0, %splat0) : (!stream.resource<*>{%c40}, !stream.resource<*>{%c40}) -> %dispatch0{%c40}
+  %dispatch1 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%dispatch0[%c0 to %c40 for %c40], %splat0[%c0 to %c40 for %c40]) : (!stream.resource<*>{%c40}, !stream.resource<*>{%c40}) -> %dispatch0{%c40}
 
   return
 }

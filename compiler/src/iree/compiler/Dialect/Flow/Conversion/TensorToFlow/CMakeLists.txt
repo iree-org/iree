@@ -15,15 +15,19 @@ iree_cc_library(
     TensorToFlow
   HDRS
     "Patterns.h"
+    "Utils.h"
   SRCS
     "Patterns.cpp"
+    "Utils.cpp"
   DEPS
+    LLVMSupport
     MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRMemRefTransforms
     MLIRTensorDialect
+    MLIRTensorUtils
     iree::compiler::Dialect::Flow::IR
   PUBLIC
 )

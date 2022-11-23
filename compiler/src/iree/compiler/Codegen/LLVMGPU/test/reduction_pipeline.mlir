@@ -1,5 +1,4 @@
-
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))" %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -42,20 +41,23 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 //   CHECK-LABEL:  func.func @warp_reduction_dispatch
 //     CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
-//     CHECK-DAG:    %[[C1i:.+]] = arith.constant 1 : index
-//     CHECK-DAG:    %[[C5:.+]] = arith.constant 5 : index
 //     CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : i32
 //     CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : i32
 //     CHECK-DAG:    %[[C4:.+]] = arith.constant 4 : i32
 //     CHECK-DAG:    %[[C8:.+]] = arith.constant 8 : i32
 //     CHECK-DAG:    %[[C16:.+]] = arith.constant 16 : i32
 //     CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : i32
+//     CHECK-DAG:    %[[C16I:.+]] = arith.constant 16 : index
+//     CHECK-DAG:    %[[C32I:.+]] = arith.constant 32 : index
+//     CHECK-DAG:    %[[C2048:.+]] = arith.constant 2048 : index
+//     CHECK-DAG:    %[[C10240:.+]] = arith.constant 10240 : index
+//     CHECK-DAG:    %[[IDENTITY:.+]] = arith.constant 0.000000e+00 : f32
 //     CHECK-DAG:    %[[CF:.+]] = arith.constant 1.000000e+00 : f32
 //     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
 //     CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
-//         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %[[C0]] to %[[C5]] step %[[C1i]] iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<4xf32>) {
-//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} {in_bounds = [true]} : memref<1x5x2048xf32, strided<[10240, 2048, 1], offset: ?>>, vector<4xf32>
-//         CHECK:      %[[A1:.+]] = arith.addf %[[A0]], %[[V]] : vector<4xf32>
+//         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %[[C0]] to %[[C10240]] step %[[C2048]] iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<4xf32>) {
+//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} {in_bounds = [true]} : memref<512x10240xf32>, vector<4xf32>
+//         CHECK:      %[[A1:.+]] = arith.addf %[[V]], %[[A0]] : vector<4xf32>
 //         CHECK:      scf.yield %[[A1]] : vector<4xf32>
 //         CHECK:    }
 //         CHECK:    %[[R1:.+]] = vector.reduction <add>, %[[R0]] : vector<4xf32> into f32
@@ -71,15 +73,30 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    %[[R6:.+]] = arith.addf %[[R5]], %[[S4]] : f32
 //         CHECK:    %[[ALLOC:.+]] = memref.alloc() : memref<16xf32, 3>
 //         CHECK:    %[[WID:.+]] = arith.divui %{{.*}}, %{{.*}} : index
-//         CHECK:    memref.store %[[R6]], %[[ALLOC]][%[[WID]]] : memref<16xf32, 3>
+//         CHECK:    %[[LANE_ID:.*]] = arith.remui %[[TID]], %[[C32I]] : index
+//         CHECK:    %[[LANE0:.*]] = arith.cmpi eq, %[[LANE_ID]], %[[C0]] : index
+//         CHECK:    scf.if %[[LANE0]] { 
+//         CHECK:      memref.store %[[R6]], %[[ALLOC]][%[[WID]]] : memref<16xf32, 3>
+//         CHECK:    }
 //         CHECK:    gpu.barrier
-//         CHECK:    %[[B:.+]] = vector.transfer_read %[[ALLOC]][%[[C0]]], %{{.*}} {in_bounds = [true]} : memref<16xf32, 3>, vector<16xf32>
-//         CHECK:    %[[R7:.+]] = vector.reduction <add>, %[[B]] : vector<16xf32> into f32
-//         CHECK:    %[[R8:.+]] = arith.addf %[[R7]], %[[CF]] : f32
-//         CHECK:    %[[R9:.+]] = vector.broadcast %[[R8]] : f32 to vector<1xf32>
+//         CHECK:    %[[LOAD_VAL:.+]] = memref.load %[[ALLOC]][%[[LANE_ID]]] : memref<16xf32, 3>
+//         CHECK:    %[[USE_IDENTITY:.+]] = arith.cmpi sge, %[[LANE_ID]], %[[C16I]] : index
+//         CHECK:    %[[LANE_VAL:.+]] = arith.select %[[USE_IDENTITY]], %[[IDENTITY]], %[[LOAD_VAL]] : f32
+//         CHECK:    %[[S5:.+]], %{{.*}} = gpu.shuffle  xor %[[LANE_VAL]], %[[C1]], %[[C32]] : f32
+//         CHECK:    %[[R7:.+]] = arith.addf %[[LANE_VAL]], %[[S5]] : f32
+//         CHECK:    %[[S6:.+]], %{{.*}} = gpu.shuffle  xor %[[R7]], %[[C2]], %[[C32]] : f32
+//         CHECK:    %[[R8:.+]] = arith.addf %[[R7]], %[[S6]] : f32
+//         CHECK:    %[[S7:.+]], %{{.*}} = gpu.shuffle  xor %[[R8]], %[[C4]], %[[C32]] : f32
+//         CHECK:    %[[R9:.+]] = arith.addf %[[R8]], %[[S7]] : f32
+//         CHECK:    %[[S8:.+]], %{{.*}} = gpu.shuffle  xor %[[R9]], %[[C8]], %[[C32]] : f32
+//         CHECK:    %[[R10:.+]] = arith.addf %[[R9]], %[[S8]] : f32
+//         CHECK:    %[[S9:.+]], %{{.*}} = gpu.shuffle  xor %[[R10]], %[[C16]], %[[C32]] : f32
+//         CHECK:    %[[R11:.+]] = arith.addf %[[R10]], %[[S9]] : f32
+//         CHECK:    %[[R12:.+]] = arith.addf %[[R11]], %[[CF]] : f32
+//         CHECK:    %[[R13:.+]] = vector.broadcast %[[R12]] : f32 to vector<1xf32>
 //         CHECK:    %[[TID0:.+]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
 //         CHECK:    scf.if %[[TID0]] {
-//         CHECK:      vector.transfer_write %[[R9]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32>
+//         CHECK:      vector.transfer_write %[[R13]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32>
 //         CHECK:    }
 
 // -----
@@ -136,7 +153,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 //   CHECK-LABEL:  func.func @warp_reduction_broadcast_dispatch
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
-//         CHECK:      vector.transfer_read {{.*}} : memref<1x5x2048xf32, strided<[10240, 2048, 1], offset: ?>>, vector<4xf32>
+//         CHECK:      vector.transfer_read {{.*}} : memref<512x10240xf32>, vector<4xf32>
 //         CHECK:      arith.addf {{.*}} : vector<4xf32>
 //         CHECK:      scf.yield
 //         CHECK:    vector.reduction <add>, %{{.*}} : vector<4xf32> into f32
@@ -150,13 +167,27 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    arith.addf
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.addf
-//         CHECK:    memref.store {{.*}} : memref<16xf32, 3>
+//         CHECK:    arith.remui
+//         CHECK:    scf.if
+//         CHECK:      memref.store {{.*}} : memref<16xf32, 3>
+//         CHECK:    }
 //         CHECK:    gpu.barrier
-//         CHECK:    vector.transfer_read
-//         CHECK:    vector.reduction
+//         CHECK:    memref.load
+//         CHECK:    arith.cmpi
+//         CHECK:    arith.select
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
 //         CHECK:    arith.addf
 //         CHECK:    vector.broadcast %{{.*}} : f32 to vector<4xf32>
-//         CHECK:    %15 = arith.divf {{.*}} : vector<4xf32>
+//         CHECK:    arith.divf {{.*}} : vector<4xf32>
 //         CHECK:    scf.for
 //         CHECK:      vector.transfer_write {{.*}} : vector<4xf32>, memref<512x10240xf32>
 //         CHECK:    }

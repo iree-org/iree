@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-assign-import-ordinals))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-assign-import-ordinals)))" --split-input-file %s | FileCheck %s
 
 // Tests that duplicate keys get the same ordinal and that ordinals are assigned
 // in alphabetical order.

@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -24,40 +25,29 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 // Methods to convert the encoding to parameters of the Pack operation
 //===---------------------------------------------------------------------===//
 
-/// Given the `encoding` return (by value) the dimensions of the input that are
-/// tiled (`innerDimsPos`), the tile size to use (`innerTileSizes`) and
-/// permutation for the outer dimensions on the pack op (`outerDimsPerm`).
+/// Given the `encoding` return the `MaterializeEncodingInfo` to use for
+/// materializing the pack op.
 // TODO(ravishankarm): THis is currently hard-coded here for convenience. When
 // used in IREE, this will be computed based on the architecture information in
 // `hal.executable.variant`.
-static LogicalResult getPackOpInfoFromEncoding(
-    TensorEncoding encoding, SmallVector<int64_t> &innerDimsPos,
-    SmallVector<int64_t> &innerTileSizes, SmallVector<int64_t> &outerDimsPerm) {
+static FailureOr<MaterializeEncodingInfo>
+getPackOpInfoFromEncoding(TensorEncoding encoding) {
   switch (encoding) {
   case TensorEncoding::GEMM_LHS:
-    innerDimsPos = {0, 1};
-    innerTileSizes = {8, 4};
-    outerDimsPerm = {};
+    return MaterializeEncodingInfo{{0, 1}, {8, 4}, {}};
     break;
   case TensorEncoding::GEMM_RHS:
-    innerDimsPos = {0, 1};
-    innerTileSizes = {4, 8};
-    outerDimsPerm = {};
+    return MaterializeEncodingInfo{{0, 1}, {4, 8}, {}};
     break;
   case TensorEncoding::GEMM_RESULT:
-    innerDimsPos = {0, 1};
-    innerTileSizes = {8, 8};
-    outerDimsPerm = {};
+    return MaterializeEncodingInfo{{0, 1}, {8, 8}, {}};
     break;
   case TensorEncoding::GEMM_RHS_TRANSPOSE:
-    innerDimsPos = {1, 0};
-    innerTileSizes = {8, 4};
-    outerDimsPerm = {1, 0};
+    return MaterializeEncodingInfo{{1, 0}, {8, 4}, {1, 0}};
     break;
   default:
     return failure();
   }
-  return success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -75,17 +65,21 @@ static Optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
 /// For a given tensor type with an encoding, return the materialized
 /// type to use for it. If no encoding is set, then return the tensor type
 /// itself.
-static RankedTensorType getMaterializedType(RankedTensorType tensorType) {
+static RankedTensorType
+getMaterializedType(RankedTensorType tensorType,
+                    MaterializeEncodingFn materializeEncodingFn) {
   Optional<TensorEncoding> encoding = getEncoding(tensorType);
   if (!encoding)
     return tensorType;
-  SmallVector<int64_t> innerDimsPos, innerTileSizes, outerDimsPerm;
-  if (failed(getPackOpInfoFromEncoding(encoding.value(), innerDimsPos,
-                                       innerTileSizes, outerDimsPerm))) {
+  FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
+      materializeEncodingFn(encoding.value());
+  if (failed(materializeEncodingInfo)) {
     return tensorType;
   }
-  return PackOp::getPackedType(tensorType, innerTileSizes, innerDimsPos,
-                               outerDimsPerm)
+  return PackOp::getPackedType(tensorType,
+                               materializeEncodingInfo->innerTileSizes,
+                               materializeEncodingInfo->innerDimsPos,
+                               materializeEncodingInfo->outerDimsPerm)
       .cast<RankedTensorType>();
 }
 
@@ -123,13 +117,13 @@ static Optional<Value> getPaddingValue(Value &source) {
 /// Utility method to convert from `set_encoding` op to `pack` operation.
 /// For now this takes a `paddingValue` as input. The source is also taken
 /// as input so that these could be used with `OpConversionPatterns`.
-static FailureOr<PackOp> lowerSetEncodingOpToPackOp(RewriterBase &rewriter,
-                                                    SetEncodingOp encodingOp,
-                                                    Value source) {
-  SmallVector<int64_t> innerDimsPos, innerTileSizes, outerDimsPerm;
-  if (failed(getPackOpInfoFromEncoding(encodingOp.getResultTensorEncoding(),
-                                       innerDimsPos, innerTileSizes,
-                                       outerDimsPerm))) {
+static FailureOr<PackOp>
+lowerSetEncodingOpToPackOp(RewriterBase &rewriter, SetEncodingOp encodingOp,
+                           Value source,
+                           MaterializeEncodingFn materializeEncodingFn) {
+  FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
+      materializeEncodingFn(encodingOp.getResultTensorEncoding());
+  if (failed(materializeEncodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled result encoding");
   }
 
@@ -137,16 +131,17 @@ static FailureOr<PackOp> lowerSetEncodingOpToPackOp(RewriterBase &rewriter,
   Location loc = encodingOp.getLoc();
   SmallVector<OpFoldResult> sourceDims = getDims(rewriter, loc, source);
   SmallVector<OpFoldResult> innerTileSizesOfr =
-      getAsOpFoldResult(rewriter, innerTileSizes);
+      getAsOpFoldResult(rewriter, materializeEncodingInfo->innerTileSizes);
   SmallVector<OpFoldResult> resultDims =
       PackOp::getResultShape(rewriter, loc, sourceDims, innerTileSizesOfr,
-                             innerDimsPos, outerDimsPerm);
+                             materializeEncodingInfo->innerDimsPos,
+                             materializeEncodingInfo->outerDimsPerm);
   auto initTensor = rewriter.create<tensor::EmptyOp>(
       loc, resultDims, encodingOp.getSourceType().getElementType());
   Optional<Value> paddingValue = getPaddingValue(source);
-  return rewriter.create<PackOp>(loc, source, initTensor, innerDimsPos,
-                                 innerTileSizesOfr, paddingValue,
-                                 outerDimsPerm);
+  return rewriter.create<PackOp>(
+      loc, source, initTensor, materializeEncodingInfo->innerDimsPos,
+      innerTileSizesOfr, paddingValue, materializeEncodingInfo->outerDimsPerm);
 }
 
 /// Utility method to convert from `set_encoding` op to `pack` operation.
@@ -154,11 +149,11 @@ static FailureOr<PackOp> lowerSetEncodingOpToPackOp(RewriterBase &rewriter,
 /// `OpConversionPatterns`.
 static FailureOr<UnPackOp>
 lowerUnsetEncodingToUnpackOp(RewriterBase &rewriter, UnsetEncodingOp encodingOp,
-                             Value packedValue) {
-  SmallVector<int64_t> innerDimsPos, innerTileSizes, outerDimsPerm;
-  if (failed(getPackOpInfoFromEncoding(encodingOp.getSourceTensorEncoding(),
-                                       innerDimsPos, innerTileSizes,
-                                       outerDimsPerm))) {
+                             Value packedValue,
+                             MaterializeEncodingFn materializeEncodingFn) {
+  FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
+      materializeEncodingFn(encodingOp.getSourceTensorEncoding());
+  if (failed(materializeEncodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled source encoding");
   }
   // Create an `tensor.empty` for the result of the unpack operation.
@@ -169,13 +164,90 @@ lowerUnsetEncodingToUnpackOp(RewriterBase &rewriter, UnsetEncodingOp encodingOp,
       loc, resultDims, encodingOp.getResultType().getElementType());
 
   SmallVector<OpFoldResult> innerTileSizesOfr =
-      getAsOpFoldResult(rewriter, innerTileSizes);
-  return rewriter.create<UnPackOp>(loc, packedValue, initTensor, innerDimsPos,
-                                   innerTileSizesOfr, outerDimsPerm);
+      getAsOpFoldResult(rewriter, materializeEncodingInfo->innerTileSizes);
+  return rewriter.create<UnPackOp>(
+      loc, packedValue, initTensor, materializeEncodingInfo->innerDimsPos,
+      innerTileSizesOfr, materializeEncodingInfo->outerDimsPerm);
+}
+
+/// Utility method to convert from `linalg.matmul` with
+/// - lhs encoding of GEMM_LHS
+/// - rhs encoding of GEMM_RHS_TRANSPOSE
+/// - result encoding of GEMM_RESULT
+/// to linalg.mmt4d op.
+static FailureOr<Operation *>
+lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
+                    ValueRange convertedInputOperands,
+                    ValueRange convertedOutputOperands,
+                    MaterializeEncodingFn materializeEncodingFn) {
+  if (!matmulOp.hasTensorSemantics())
+    return failure();
+  auto inputs = matmulOp.getDpsInputOperands();
+  auto outputs = matmulOp.getDpsInitOperands();
+  Optional<TensorEncoding> lhsEncoding =
+      getEncoding(inputs[0]->get().getType().cast<RankedTensorType>());
+  Optional<TensorEncoding> rhsEncoding =
+      getEncoding(inputs[1]->get().getType().cast<RankedTensorType>());
+  Optional<TensorEncoding> resultEncoding =
+      getEncoding(outputs[0]->get().getType().cast<RankedTensorType>());
+  if (!lhsEncoding || lhsEncoding.value() != TensorEncoding::GEMM_LHS ||
+      !rhsEncoding ||
+      rhsEncoding.value() != TensorEncoding::GEMM_RHS_TRANSPOSE ||
+      !resultEncoding ||
+      resultEncoding.value() != TensorEncoding::GEMM_RESULT) {
+    return failure();
+  }
+  Operation *mmt4DOp = rewriter.create<linalg::Mmt4DOp>(
+      matmulOp.getLoc(), convertedOutputOperands[0].getType(),
+      convertedInputOperands, convertedOutputOperands);
+  return mmt4DOp;
+}
+
+/// Utility method to convert from `linalg.fill` on `tensor` type with encoding
+/// to fill of the materialized type
+static FailureOr<Operation *>
+lowerOpWithEncoding(RewriterBase &rewriter, linalg::FillOp fillOp,
+                    ValueRange convertedInputOperands,
+                    ValueRange convertedOutputOperands,
+                    MaterializeEncodingFn materializeEncodingFn) {
+  if (!fillOp.hasTensorSemantics())
+    return failure();
+  Operation *materializedFillOp = rewriter.create<linalg::FillOp>(
+      fillOp.getLoc(), convertedOutputOperands[0].getType(),
+      convertedInputOperands, convertedOutputOperands);
+  return materializedFillOp;
+}
+
+/// Utility method to convert `tensor.empty` with encoding to a `tensor.empty`
+/// of the materialized type.
+static FailureOr<Operation *>
+lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
+                    ValueRange convertedOperands,
+                    MaterializeEncodingFn materializeEncodingFn) {
+  auto resultType = emptyOp.getResult().getType().cast<RankedTensorType>();
+  Optional<TensorEncoding> encoding = getEncoding(resultType);
+  if (!encoding) {
+    return rewriter.notifyMatchFailure(emptyOp,
+                                       "result type does not have encoding");
+  }
+  FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
+      materializeEncodingFn(encoding.value());
+  if (failed(materializeEncodingInfo)) {
+    return rewriter.notifyMatchFailure(
+        emptyOp, "failed to find materialization info for result type");
+  }
+  SmallVector<OpFoldResult> innerTileSizesOfr =
+      getAsOpFoldResult(rewriter, materializeEncodingInfo->innerTileSizes);
+  SmallVector<OpFoldResult> newShape = PackOp::getResultShape(
+      rewriter, emptyOp.getLoc(), emptyOp.getMixedSizes(), innerTileSizesOfr,
+      materializeEncodingInfo->innerDimsPos,
+      materializeEncodingInfo->outerDimsPerm);
+  Operation *newEmptyOp = rewriter.create<tensor::EmptyOp>(
+      emptyOp.getLoc(), newShape, resultType.getElementType());
+  return newEmptyOp;
 }
 
 namespace {
-
 //===---------------------------------------------------------------------===//
 // Patterns to lower ops with encodings. These are written as
 // dialect conversion patterns for now. These are just drivers around
@@ -184,16 +256,20 @@ namespace {
 
 /// Convert `set_encoding` op to `pack` op.
 struct SetEncodingOpToPackOpConversion
-    : public OpConversionPattern<SetEncodingOp> {
-  using OpConversionPattern<SetEncodingOp>::OpConversionPattern;
+    : public OpMaterializeEncodingPattern<SetEncodingOp> {
+  using OpMaterializeEncodingPattern<
+      SetEncodingOp>::OpMaterializeEncodingPattern;
 
   LogicalResult
   matchAndRewrite(SetEncodingOp encodingOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    MaterializeEncodingFn &materializeEncodingFn =
+        static_cast<MaterializeEncodingTypeConverter *>(getTypeConverter())
+            ->getMaterializeEncodingFn();
     // Pack op needs a padding value. Maybe that is an overkill. For now, just
     // use zero.
-    auto packOp =
-        lowerSetEncodingOpToPackOp(rewriter, encodingOp, adaptor.getSource());
+    auto packOp = lowerSetEncodingOpToPackOp(
+        rewriter, encodingOp, adaptor.getSource(), materializeEncodingFn);
     if (failed(packOp))
       return rewriter.notifyMatchFailure(encodingOp,
                                          "failed to convert to pack op");
@@ -204,14 +280,18 @@ struct SetEncodingOpToPackOpConversion
 
 /// Convert `unset_encoding` op to `unpack` op.
 struct UnsetEncodingOpToPackOpConversion
-    : public OpConversionPattern<UnsetEncodingOp> {
-  using OpConversionPattern<UnsetEncodingOp>::OpConversionPattern;
+    : public OpMaterializeEncodingPattern<UnsetEncodingOp> {
+  using OpMaterializeEncodingPattern<
+      UnsetEncodingOp>::OpMaterializeEncodingPattern;
 
   LogicalResult
   matchAndRewrite(UnsetEncodingOp encodingOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto unpackOp =
-        lowerUnsetEncodingToUnpackOp(rewriter, encodingOp, adaptor.getSource());
+    MaterializeEncodingFn &materializeEncodingFn =
+        static_cast<MaterializeEncodingTypeConverter *>(getTypeConverter())
+            ->getMaterializeEncodingFn();
+    auto unpackOp = lowerUnsetEncodingToUnpackOp(
+        rewriter, encodingOp, adaptor.getSource(), materializeEncodingFn);
     if (failed(unpackOp))
       return rewriter.notifyMatchFailure(encodingOp,
                                          "failed to convert to unpack op");
@@ -220,39 +300,45 @@ struct UnsetEncodingOpToPackOpConversion
   }
 };
 
-/// Convert a linalg.matmul with
-/// - lhs encoding of GEMM_LHS
-/// - rhs encoding of GEMM_RHS_TRANSPOSE
-/// - result encoding of GEMM_RESULT
-/// to linalg.mmt4d op.
-struct MaterializeTiledMatmul : public OpConversionPattern<linalg::MatmulOp> {
-  using OpConversionPattern<linalg::MatmulOp>::OpConversionPattern;
+/// Generic pattern to convert operaiton that is in Destination Passing Style.
+template <typename OpTy>
+struct MaterializeDPSOperation : public OpMaterializeEncodingPattern<OpTy> {
+  using OpMaterializeEncodingPattern<OpTy>::OpMaterializeEncodingPattern;
 
   LogicalResult
-  matchAndRewrite(linalg::MatmulOp matmulOp, OpAdaptor adaptor,
+  matchAndRewrite(OpTy dpsOp, typename OpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!matmulOp.hasTensorSemantics())
+    MaterializeEncodingFn &materializeEncodingFn =
+        static_cast<MaterializeEncodingTypeConverter *>(
+            this->getTypeConverter())
+            ->getMaterializeEncodingFn();
+    FailureOr<Operation *> convertedOp =
+        lowerOpWithEncoding(rewriter, dpsOp, adaptor.getInputs(),
+                            adaptor.getOutputs(), materializeEncodingFn);
+    if (failed(convertedOp))
       return failure();
-    auto inputs = matmulOp.getDpsInputOperands();
-    auto outputs = matmulOp.getDpsInitOperands();
-    Optional<TensorEncoding> lhsEncoding =
-        getEncoding(inputs[0]->get().getType().cast<RankedTensorType>());
-    Optional<TensorEncoding> rhsEncoding =
-        getEncoding(inputs[1]->get().getType().cast<RankedTensorType>());
-    Optional<TensorEncoding> resultEncoding =
-        getEncoding(outputs[0]->get().getType().cast<RankedTensorType>());
-    if (!lhsEncoding || lhsEncoding.value() != TensorEncoding::GEMM_LHS ||
-        !rhsEncoding ||
-        rhsEncoding.value() != TensorEncoding::GEMM_RHS_TRANSPOSE ||
-        !resultEncoding ||
-        resultEncoding.value() != TensorEncoding::GEMM_RESULT) {
+    rewriter.replaceOp(dpsOp, convertedOp.value()->getResults());
+    return success();
+  }
+};
+
+/// Generic pattern to convert an operation.
+template <typename OpTy>
+struct MaterializeOperation : public OpMaterializeEncodingPattern<OpTy> {
+  using OpMaterializeEncodingPattern<OpTy>::OpMaterializeEncodingPattern;
+
+  LogicalResult
+  matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    MaterializeEncodingFn &materializeEncodingFn =
+        static_cast<MaterializeEncodingTypeConverter *>(
+            this->getTypeConverter())
+            ->getMaterializeEncodingFn();
+    FailureOr<Operation *> convertedOp = lowerOpWithEncoding(
+        rewriter, op, adaptor.getOperands(), materializeEncodingFn);
+    if (failed(convertedOp))
       return failure();
-    }
-    rewriter.replaceOpWithNewOp<linalg::Mmt4DOp>(
-        matmulOp,
-        getMaterializedType(
-            outputs[0]->get().getType().cast<RankedTensorType>()),
-        adaptor.getInputs(), adaptor.getOutputs());
+    rewriter.replaceOp(op, convertedOp.value()->getResults());
     return success();
   }
 };
@@ -264,7 +350,7 @@ struct MaterializeTiledMatmul : public OpConversionPattern<linalg::MatmulOp> {
 struct MaterializeEncodingPass
     : public MaterializeEncodingBase<MaterializeEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    return;
+    registry.insert<tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -275,8 +361,8 @@ void MaterializeEncodingPass::runOnOperation() {
 
   {
     RewritePatternSet patterns(context);
-    ConversionTarget target(*context);
-    TypeConverter typeConverter;
+    MaterializeEncodingTypeConverter typeConverter(getPackOpInfoFromEncoding);
+    MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingPatterns(patterns, target, typeConverter);
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns))))
@@ -299,35 +385,48 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 
-void populateMaterializeEncodingPatterns(RewritePatternSet &patterns,
-                                         ConversionTarget &target,
-                                         TypeConverter &typeConverter) {
+MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
+    MaterializeEncodingFn materializeEncodingFn)
+    : materializeEncodingFn(materializeEncodingFn) {
+  addConversion([](IntegerType intType) { return intType; });
+  addConversion([](IndexType indexType) { return indexType; });
+  addConversion([](FloatType floatType) { return floatType; });
+  addConversion([](MemRefType memrefType) { return memrefType; });
+  addConversion(
+      [materializeEncodingFn](RankedTensorType t) -> RankedTensorType {
+        return getMaterializedType(t, materializeEncodingFn);
+      });
+}
 
-  auto typeHasEncoding = [](Type t) -> bool {
-    auto tensorType = t.dyn_cast<RankedTensorType>();
-    return tensorType && tensorType.getEncoding();
-  };
-  auto valueHasEncoding = [&](Value v) -> bool {
-    return typeHasEncoding(v.getType());
-  };
-
-  // Type converted is used to convert the unpacked tensor with tensor encoding
-  // into a packed type.
-  typeConverter.addConversion([&](RankedTensorType t) -> RankedTensorType {
-    return getMaterializedType(t);
-  });
-
+MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
+    MLIRContext &context)
+    : ConversionTarget(context) {
   // Mark any operation that has operands/results with encoding as
   // illegal.
-  auto hasOperandOrResultsWithEncoding = [&](Operation *op) {
-    return llvm::any_of(op->getOperands(), valueHasEncoding) ||
-           llvm::any_of(op->getResults(), valueHasEncoding);
-  };
-  target.markUnknownOpDynamicallyLegal(
-      [&](Operation *op) { return !hasOperandOrResultsWithEncoding(op); });
+  markUnknownOpDynamicallyLegal([](Operation *op) {
+    auto typeHasEncoding = [](Type t) -> bool {
+      auto tensorType = t.dyn_cast<RankedTensorType>();
+      return tensorType && tensorType.getEncoding();
+    };
+    auto valueHasEncoding = [=](Value v) -> bool {
+      return typeHasEncoding(v.getType());
+    };
+    bool hasOperandOrResultsWithEncoding =
+        llvm::any_of(op->getOperands(), valueHasEncoding) ||
+        llvm::any_of(op->getResultTypes(), typeHasEncoding);
+    return !hasOperandOrResultsWithEncoding;
+  });
+}
+
+void populateMaterializeEncodingPatterns(
+    RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
+    MaterializeEncodingTypeConverter &typeConverter) {
 
   // Add all patterns for converting from encoded type to the materialized type
-  patterns.insert<MaterializeTiledMatmul, SetEncodingOpToPackOpConversion,
+  patterns.insert<MaterializeDPSOperation<linalg::FillOp>,
+                  MaterializeDPSOperation<linalg::MatmulOp>,
+                  MaterializeOperation<tensor::EmptyOp>,
+                  SetEncodingOpToPackOpConversion,
                   UnsetEncodingOpToPackOpConversion>(typeConverter,
                                                      patterns.getContext());
   ::mlir::memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);

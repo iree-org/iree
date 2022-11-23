@@ -29,16 +29,20 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRArithDialect
+    MLIRFuncDialect
     MLIRGPUOps
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMemRefDialect
+    MLIRSCFDialect
+    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
     MLIRTilingInterface
     MLIRTransformUtils
+    MLIRViewLikeInterface
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::ProcessorOpInterfaces
     iree::compiler::Dialect::Flow::IR

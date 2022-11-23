@@ -23,6 +23,7 @@ iree_cc_library(
     ::ProcessorOpInterfaces
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
+    MLIRIR
     MLIRLinalgTransformOps
     MLIRLinalgTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
@@ -45,6 +46,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncTransforms
+    MLIRIR
     MLIRLinalgTransforms
     MLIRMemRefDialect
     MLIRSCFTransforms
@@ -73,6 +75,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgStructuredOpsIncGenLib
+    MLIRSupport
     MLIRTensorDialect
   PUBLIC
 )

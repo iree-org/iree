@@ -53,12 +53,9 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 
 /// Patterns for third level tiling to target invocations.
-static void populateTilingToInvocationPatterns(RewritePatternSet &patterns) {
-  linalg::TileSizeComputationFunction getInnerTileSizeFn =
-      [&](OpBuilder &builder, Operation *op) {
-        return getTileSizes(builder, op, 1);
-      };
-
+static void populateTilingToInvocationPatterns(
+    RewritePatternSet &patterns,
+    const linalg::TileSizeComputationFunction &computeFn) {
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
@@ -69,7 +66,7 @@ static void populateTilingToInvocationPatterns(RewritePatternSet &patterns) {
 
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setTileSizeComputationFunction(getInnerTileSizeFn)
+                           .setTileSizeComputationFunction(computeFn)
                            .setDistributionOptions(distributionOptions);
 
   MLIRContext *context = patterns.getContext();
@@ -88,18 +85,16 @@ static void populateTilingToInvocationPatterns(RewritePatternSet &patterns) {
 // Reduction tiling patterns
 //====---------------------------------------------------------------------===//
 
-static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
-  auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
-    return getTileSizes(builder, op, 2);
-  };
-
+static void populateTilingReductionPatterns(
+    RewritePatternSet &patterns,
+    const linalg::TileSizeComputationFunction &computeFn) {
   auto filter = IREE::LinalgExt::LinalgTransformationFilter(
       StringAttr::get(patterns.getContext(), getTileReductionMarker()),
       llvm::None);
 
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setTileSizeComputationFunction(getTileSizeFn);
+                           .setTileSizeComputationFunction(computeFn);
 
   TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNchwFchwOp,
                  linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
@@ -138,9 +133,15 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
   if (!isEntryPoint(funcOp)) return;
 
+  auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
+  if (failed(threadTileComputeFn)) return signalPassFailure();
+  auto reductionTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 2);
+  if (failed(reductionTileComputeFn)) return signalPassFailure();
+
   {  // Tile and distribute to invocations.
     RewritePatternSet invocationTilingPatterns(context);
-    populateTilingToInvocationPatterns(invocationTilingPatterns);
+    populateTilingToInvocationPatterns(invocationTilingPatterns,
+                                       *threadTileComputeFn);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(invocationTilingPatterns)))) {
       funcOp.emitOpError() << "failure in tiling";
@@ -178,7 +179,8 @@ void SPIRVTileAndDistributePass::runOnOperation() {
 
   {  // Tile reduction dimensions.
     RewritePatternSet reductionTilingPatterns(context);
-    populateTilingReductionPatterns(reductionTilingPatterns);
+    populateTilingReductionPatterns(reductionTilingPatterns,
+                                    *reductionTileComputeFn);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(reductionTilingPatterns)))) {
       funcOp.emitOpError() << "failing in tile reduction";

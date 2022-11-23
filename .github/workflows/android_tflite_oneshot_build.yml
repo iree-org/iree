@@ -9,7 +9,7 @@ jobs:
   build_android_with_docker:
     runs-on: ubuntu-20.04
     env:
-      ANDROID_CONTAINER: "gcr.io/iree-oss/gradle-android@sha256:d9d0f880c3ac995b9e8a23bbf8079b80f6842851654016c5f362c747c09aaf93"
+      ANDROID_CONTAINER: "gcr.io/iree-oss/gradle-android@sha256:868038ec2c27b33a13ceee831fdb0cb0ac6e9035205305cc03c4e27b043228de"
     steps:
       - uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:

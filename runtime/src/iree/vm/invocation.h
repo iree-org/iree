@@ -13,6 +13,7 @@
 #include "iree/vm/context.h"
 #include "iree/vm/list.h"
 #include "iree/vm/module.h"
+#include "iree/vm/ref.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -343,5 +344,7 @@ IREE_API_EXPORT void iree_vm_invocation_cancel(
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+IREE_VM_DECLARE_CC_TYPE_ADAPTERS(iree_vm_invocation, iree_vm_invocation_t);
 
 #endif  // IREE_VM_INVOCATION_H_

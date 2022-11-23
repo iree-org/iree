@@ -1,8 +1,8 @@
-// RUN: iree-opt %s  --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
+// RUN: iree-opt %s  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))" \
 // RUN: --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_bufferize_spec.mlir | \
 // RUN: FileCheck %s
 
-// RUN: iree-opt %s  --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
+// RUN: iree-opt %s  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))" \
 // RUN: --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_foreach_to_gpu_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=FOREACH-TO-GPU
 

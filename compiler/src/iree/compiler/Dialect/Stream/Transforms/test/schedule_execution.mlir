@@ -1,10 +1,11 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="func.func(iree-stream-schedule-execution)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-stream-schedule-execution))" %s | FileCheck %s
 
 // Tests basic partitioning of multiple ops.
 
 // CHECK-LABEL: @partitioning
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>, %[[ARG1:.+]]: !stream.resource<external>)
 func.func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
   %c80 = arith.constant 80 : index
@@ -16,14 +17,14 @@ func.func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resour
   // CHECK-SAME: -> !stream.resource<external>{%c20} {
   // CHECK-NEXT: %[[SPLAT0:.+]] = stream.async.splat
   %2 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
-  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%[[SPLAT0]], %[[ARG1_CAPTURE]]) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %[[SPLAT0]]{%c1280}
-  %3 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%2, %arg1) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %2{%c1280}
+  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%[[SPLAT0]][{{.+}}], %[[ARG1_CAPTURE]][{{.+}}]) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %[[SPLAT0]]{%c1280}
+  %3 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%2[%c0 to %c1280 for %c1280], %arg1[%c0 to %c80 for %c80]) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %2{%c1280}
   // CHECK-NEXT: %[[SPLAT1:.+]] = stream.async.splat
   %4 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c20}
-  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%[[ARG0_CAPTURE]], %[[SPLAT1]]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %[[SPLAT1]]{%c20}
-  %5 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%arg0, %4) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %4{%c20}
-  // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1, %c1, %c1](%[[DISPATCH0]], %[[DISPATCH1]]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
-  %6 = stream.async.dispatch @ex::@dispatch_2[%c1, %c1, %c1](%3, %5) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
+  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%[[ARG0_CAPTURE]][{{.+}}], %[[SPLAT1]][{{.+}}]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %[[SPLAT1]]{%c20}
+  %5 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%arg0[%c0 to %c20 for %c20], %4[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %4{%c20}
+  // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1, %c1, %c1](%[[DISPATCH0]][{{.+}}], %[[DISPATCH1]][{{.+}}]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
+  %6 = stream.async.dispatch @ex::@dispatch_2[%c1, %c1, %c1](%3[%c0 to %c1280 for %c1280], %5[%c0 to %c20 for %c20]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
   // CHECK-NEXT: stream.yield %[[DISPATCH2]] : !stream.resource<external>{%c20}
   // CHECK-NEXT: } => !stream.timepoint
   // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[RESULT]] : !stream.resource<external>{%c20}
@@ -40,6 +41,7 @@ func.func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resour
 // CHECK-LABEL: @partitioningWithAffinities
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>)
 func.func @partitioningWithAffinities(%arg0: !stream.resource<external>) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
   %c1280 = arith.constant 1280 : index
@@ -51,10 +53,10 @@ func.func @partitioningWithAffinities(%arg0: !stream.resource<external>) -> !str
   // CHECK-SAME: -> (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) {
   // CHECK-NEXT: %[[SPLAT:.+]] = stream.async.splat
   %splat = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
-  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE]], %[[SPLAT]])
-  %dispatch0 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_0[%c1](%arg0, %splat) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c1280}
-  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[ARG0_CAPTURE]], %[[SPLAT]])
-  %dispatch1 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_1[%c1](%arg0, %splat) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c20}
+  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE]][{{.+}}], %[[SPLAT]][{{.+}}])
+  %dispatch0 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_0[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c1280}
+  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[ARG0_CAPTURE]][{{.+}}], %[[SPLAT]][{{.+}}])
+  %dispatch1 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_1[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c20}
   // CHECK-NEXT: stream.yield %[[DISPATCH0]], %[[DISPATCH1]]
   // CHECK-NEXT: } => !stream.timepoint
 
@@ -64,8 +66,8 @@ func.func @partitioningWithAffinities(%arg0: !stream.resource<external>) -> !str
   // CHECK-SAME: with(%[[TRANSIENTS]]#0 as %[[TRANSIENT0_CAPTURE:.+]]: !stream.resource<transient>{%c1280},
   // CHECK-SAME:      %[[TRANSIENTS]]#1 as %[[TRANSIENT1_CAPTURE:.+]]: !stream.resource<transient>{%c20})
   // CHECK-SAME: -> !stream.resource<external>{%c20}
-  // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1](%[[TRANSIENT0_CAPTURE]], %[[TRANSIENT1_CAPTURE]])
-  %dispatch2 = stream.async.dispatch on(#hal.affinity.queue<[1]>) @ex::@dispatch_2[%c1](%dispatch0, %dispatch1) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
+  // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1](%[[TRANSIENT0_CAPTURE]][{{.+}}], %[[TRANSIENT1_CAPTURE]][{{.+}}])
+  %dispatch2 = stream.async.dispatch on(#hal.affinity.queue<[1]>) @ex::@dispatch_2[%c1](%dispatch0[%c0 to %c1280 for %c1280], %dispatch1[%c0 to %c20 for %c20]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
   // CHECK-NEXT: stream.yield %[[DISPATCH2]]
   // CHECK-NEXT: } => !stream.timepoint
 
@@ -85,6 +87,7 @@ func.func @partitioningWithAffinities(%arg0: !stream.resource<external>) -> !str
 // CHECK-LABEL: @partitioningWithConcurrentAffinities
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>)
 func.func @partitioningWithConcurrentAffinities(%arg0: !stream.resource<external>) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
   %c1280 = arith.constant 1280 : index
@@ -96,8 +99,8 @@ func.func @partitioningWithConcurrentAffinities(%arg0: !stream.resource<external
   // CHECK-SAME: !stream.resource<transient>{%c1280}
   // CHECK-NEXT: %[[SPLAT0:.+]] = stream.async.splat
   %splat = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
-  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE0]], %[[SPLAT0]])
-  %dispatch0 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_0[%c1](%arg0, %splat) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c1280}
+  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE0]][{{.+}}], %[[SPLAT0]][{{.+}}])
+  %dispatch0 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_0[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c1280}
   // CHECK-NEXT: stream.yield %[[DISPATCH0]]
   // CHECK-NEXT: } => !stream.timepoint
 
@@ -106,8 +109,8 @@ func.func @partitioningWithConcurrentAffinities(%arg0: !stream.resource<external
   // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE1:.+]]: !stream.resource<external>{%c20})
   // CHECK-SAME: -> !stream.resource<transient>{%c20} {
   // CHECK-NEXT: %[[SPLAT1:.+]] = stream.async.splat
-  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[ARG0_CAPTURE1]], %[[SPLAT1]])
-  %dispatch1 = stream.async.dispatch on(#hal.affinity.queue<[1]>) @ex::@dispatch_1[%c1](%arg0, %splat) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c20}
+  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[ARG0_CAPTURE1]][{{.+}}], %[[SPLAT1]][{{.+}}])
+  %dispatch1 = stream.async.dispatch on(#hal.affinity.queue<[1]>) @ex::@dispatch_1[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c20}
   // CHECK-NEXT: stream.yield %[[DISPATCH1]]
   // CHECK-NEXT: } => !stream.timepoint
 
@@ -117,8 +120,8 @@ func.func @partitioningWithConcurrentAffinities(%arg0: !stream.resource<external
   // CHECK-SAME: await(%[[JOIN]])
   // CHECK-SAME: with(%[[TRANSIENT0]] as %[[TRANSIENT0_CAPTURE:.+]]: !stream.resource<transient>{%c1280},
   // CHECK-SAME:      %[[TRANSIENT1]] as %[[TRANSIENT1_CAPTURE:.+]]: !stream.resource<transient>{%c20})
-  // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1](%[[TRANSIENT0_CAPTURE]], %[[TRANSIENT1_CAPTURE]])
-  %dispatch2 = stream.async.dispatch on(#hal.affinity.queue<[2]>) @ex::@dispatch_2[%c1](%dispatch0, %dispatch1) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
+  // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1](%[[TRANSIENT0_CAPTURE]][{{.+}}], %[[TRANSIENT1_CAPTURE]][{{.+}}])
+  %dispatch2 = stream.async.dispatch on(#hal.affinity.queue<[2]>) @ex::@dispatch_2[%c1](%dispatch0[%c0 to %c1280 for %c1280], %dispatch1[%c0 to %c20 for %c20]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
   // CHECK-NEXT: stream.yield %[[DISPATCH2]]
   // CHECK-NEXT: } => !stream.timepoint
 
@@ -137,6 +140,7 @@ func.func @partitioningWithConcurrentAffinities(%arg0: !stream.resource<external
 
 // CHECK-LABEL: @partitionWithinBlocks
 func.func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c1280 = arith.constant 1280 : index
   %c255_i32 = arith.constant 255 : i32
@@ -149,8 +153,8 @@ func.func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
   // CHECK: %[[BB1_RESULT:.+]], %[[BB1_TIMEPOINT:.+]] = stream.async.execute await(%[[SPLAT_TIMEPOINT]]) =>
   // CHECK-SAME: with(%[[SPLAT]] as %[[BB1_SPLAT:.+]]: !stream.resource<transient>{%c1280})
   // CHECK-SAME: -> %[[SPLAT]]{%c1280}
-  // CHECK: stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%[[BB1_SPLAT]]) : (!stream.resource<transient>{%c1280}) -> %[[BB1_SPLAT]]{%c1280}
-  %3 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%splat) : (!stream.resource<transient>{%c1280}) -> %splat{%c1280}
+  // CHECK: stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%[[BB1_SPLAT]][{{.+}}]) : (!stream.resource<transient>{%c1280}) -> %[[BB1_SPLAT]]{%c1280}
+  %3 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%splat[%c0 to %c1280 for %c1280]) : (!stream.resource<transient>{%c1280}) -> %splat{%c1280}
   // CHECK: %[[BB1_READY:.+]] = stream.timepoint.await %[[BB1_TIMEPOINT]] => %[[BB1_RESULT]]
   // CHECK: return %[[BB1_READY]]
   return %3 : !stream.resource<transient>
@@ -158,8 +162,8 @@ func.func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
   // CHECK: %[[BB2_RESULT:.+]], %[[BB2_TIMEPOINT:.+]] = stream.async.execute await(%[[SPLAT_TIMEPOINT]]) =>
   // CHECK-SAME: with(%[[SPLAT]] as %[[BB2_SPLAT:.+]]: !stream.resource<transient>{%c1280})
   // CHECK-SAME: -> %[[SPLAT]]{%c1280}
-  // CHECK: stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%[[BB2_SPLAT]]) : (!stream.resource<transient>{%c1280}) -> %[[BB2_SPLAT]]{%c1280}
-  %4 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%splat) : (!stream.resource<transient>{%c1280}) -> %splat{%c1280}
+  // CHECK: stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%[[BB2_SPLAT]][{{.+}}]) : (!stream.resource<transient>{%c1280}) -> %[[BB2_SPLAT]]{%c1280}
+  %4 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%splat[%c0 to %c1280 for %c1280]) : (!stream.resource<transient>{%c1280}) -> %splat{%c1280}
   // CHECK: %[[BB2_READY:.+]] = stream.timepoint.await %[[BB2_TIMEPOINT]] => %[[BB2_RESULT]]
   // CHECK: return %[[BB2_READY]]
   return %4 : !stream.resource<transient>
@@ -207,6 +211,7 @@ func.func @deviceHostDevice() -> !stream.resource<transient> {
 
 // CHECK-LABEL: @dontHoistPastAsserts
 func.func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
   %c80 = arith.constant 80 : index
@@ -219,7 +224,7 @@ func.func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !strea
   // CHECK-NEXT: stream.async.splat
   %2 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch_0
-  %3 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%2, %arg1) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %2{%c1280}
+  %3 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%2[%c0 to %c1280 for %c1280], %arg1[%c0 to %c80 for %c80]) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %2{%c1280}
 
   // CHECK: "assert A"
   cf.assert %cond_a, "assert A"
@@ -228,14 +233,14 @@ func.func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !strea
   // CHECK-NEXT: stream.async.splat
   %4 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c20}
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch_1
-  %5 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%arg0, %4) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %4{%c20}
+  %5 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%arg0[%c0 to %c20 for %c20], %4[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %4{%c20}
 
   // CHECK: "assert B"
   cf.assert %cond_b, "assert B"
 
   // CHECK: stream.async.execute
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch_2
-  %6 = stream.async.dispatch @ex::@dispatch_2[%c1, %c1, %c1](%3, %5) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
+  %6 = stream.async.dispatch @ex::@dispatch_2[%c1, %c1, %c1](%3[%c0 to %c1280 for %c1280], %5[%c0 to %c20 for %c20]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
 
   return %6 : !stream.resource<external>
 }
@@ -255,7 +260,7 @@ func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
   // CHECK-NEXT: stream.async.splat
   %splat = stream.async.splat %c123_i8 : i8 -> !stream.resource<transient>{%c1}
   // CHECK-NEXT: stream.async.dispatch
-  %dispatch0 = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%splat) : (!stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
+  %dispatch0 = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%splat[%c0 to %c1 for %c1]) : (!stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
   // CHECK-NEXT: stream.async.transfer
   %download = stream.async.transfer %dispatch0 : !stream.resource<transient>{%c1} -> !stream.resource<staging>{%c1}
   // CHECK: stream.timepoint.await
@@ -270,7 +275,7 @@ func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
   // CHECK-NEXT: stream.async.transfer
   %upload = stream.async.transfer %updated : !stream.resource<staging>{%c1} -> !stream.resource<transient>{%c1}
   // CHECK-NEXT: stream.async.dispatch
-  %dispatch1 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%upload, %splat) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
+  %dispatch1 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%upload[%c0 to %c1 for %c1], %splat[%c0 to %c1 for %c1]) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
   // CHECK-NEXT: stream.async.transfer
   %result = stream.async.transfer %dispatch1 : !stream.resource<transient>{%c1} -> !stream.resource<external>{%c1}
 
@@ -287,6 +292,7 @@ func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
 
 // CHECK-LABEL: @deviceHostDeviceCrossing
 func.func @deviceHostDeviceCrossing(%arg0: i1) -> !stream.resource<transient> {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
   %c255_i32 = arith.constant 255 : i32
@@ -295,16 +301,16 @@ func.func @deviceHostDeviceCrossing(%arg0: i1) -> !stream.resource<transient> {
   // CHECK-NEXT: stream.async.splat
   %0 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c128}
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch0
-  %1 = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%0) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
+  %1 = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%0[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch1
-  %2 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%1) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
+  %2 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%1[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
 
   // CHECK: arith.select
   %3 = arith.select %arg0, %1, %2 : !stream.resource<transient>
 
   // CHECK: stream.async.execute
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch2
-  %4 = stream.async.dispatch @ex::@dispatch2[%c1, %c1, %c1](%1, %3) : (!stream.resource<transient>{%c128}, !stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
+  %4 = stream.async.dispatch @ex::@dispatch2[%c1, %c1, %c1](%1[%c0 to %c128 for %c128], %3[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}, !stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
 
   // CHECK: return
   return %4 : !stream.resource<transient>
