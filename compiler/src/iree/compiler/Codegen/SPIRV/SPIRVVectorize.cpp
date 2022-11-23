@@ -62,16 +62,16 @@ int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
   return size % 2 == 0 ? 2 : 1;
 }
 
-Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
+Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
-      SmallVector<int64_t, 4> nativeSize(vecType.getRank(), 1);
+      SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
       nativeSize.back() = getComputeVectorSize(vecType.getShape().back());
       return nativeSize;
     }
   } else if (auto vtOp = dyn_cast<VectorTransferOpInterface>(op)) {
     auto vecType = vtOp.getVectorType();
-    SmallVector<int64_t, 4> nativeSize(vecType.getRank(), 1);
+    SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
     for (const auto &dim :
          llvm::enumerate(vtOp.permutation_map().getResults())) {
       if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
@@ -90,7 +90,7 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
     AffineMap resultMap = contractOp.getIndexingMapsArray().back();
     unsigned lastParallelDim =
         resultMap.getDimPosition(resultMap.getNumResults() - 1);
-    SmallVector<int64_t, 4> nativeSize(contractOp.getIteratorTypes().size(), 1);
+    SmallVector<int64_t> nativeSize(contractOp.getIteratorTypes().size(), 1);
     SmallVector<int64_t, 4> bounds;
     contractOp.getIterationBounds(bounds);
     nativeSize[lastParallelDim] = getComputeVectorSize(bounds[lastParallelDim]);
@@ -98,7 +98,7 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
   } else if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
     // Unroll all reduction dimensions by size 1 for vector.multi_reduction.
     auto srcVectorType = reductionOp.getSourceVectorType();
-    auto nativeSize = llvm::to_vector<4>(srcVectorType.getShape());
+    auto nativeSize = llvm::to_vector<>(srcVectorType.getShape());
     auto dims = reductionOp.getReductionDims().getAsValueRange<IntegerAttr>();
     for (const auto &dimAttr : dims) {
       nativeSize[dimAttr.getZExtValue()] = 1;
@@ -108,10 +108,10 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
     auto srcVectorType = reductionOp.getVectorType();
     assert(srcVectorType.getRank() == 1);  // Guaranteed by semantics
     int64_t vectorSize = getComputeVectorSize(srcVectorType.getDimSize(0));
-    return SmallVector<int64_t, 4>{vectorSize};
+    return SmallVector<int64_t>{vectorSize};
   } else if (auto transposeOp = dyn_cast<vector::TransposeOp>(op)) {
     auto vectorType = transposeOp.getResultType();
-    SmallVector<int64_t, 4> nativeSize(vectorType.getRank(), 1);
+    SmallVector<int64_t> nativeSize(vectorType.getRank(), 1);
     nativeSize.back() = getComputeVectorSize(vectorType.getShape().back());
     return nativeSize;
   }

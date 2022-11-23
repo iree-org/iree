@@ -395,11 +395,11 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
   let assemblyFormat = [{
     $source
     `,` `offsets` `=` custom<DynamicIndexList>(
-      $offsets, $static_offsets, "ShapedType::kDynamic")
+      $offsets, $static_offsets)
     `,` `sizes` `=` custom<DynamicIndexList>(
-      $sizes, $static_sizes, "ShapedType::kDynamic")
+      $sizes, $static_sizes)
     `,` `strides` `=` custom<DynamicIndexList>(
-      $strides, $static_strides, "ShapedType::kDynamic")
+      $strides, $static_strides)
     attr-dict `:` type($source) (`{` $source_dims^ `}`)?  `->` type($result)
   }];
 
@@ -515,11 +515,11 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
   let assemblyFormat = [{
     $value `,` $target
     `,` `offsets` `=` custom<DynamicIndexList>(
-      $offsets, $static_offsets, "ShapedType::kDynamic")
+      $offsets, $static_offsets)
     `,` `sizes` `=` custom<DynamicIndexList>(
-      $sizes, $static_sizes, "ShapedType::kDynamic")
+      $sizes, $static_sizes)
     `,` `strides` `=` custom<DynamicIndexList>(
-      $strides, $static_strides, "ShapedType::kDynamic")
+      $strides, $static_strides)
     attr-dict `:` type($value) `->` type($target) (`{` $target_dims^ `}`)?
   }];
 

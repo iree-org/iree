@@ -612,12 +612,12 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
 
 SmallVector<OpFoldResult> transform_dialect::
     TileToForeachThreadAndWorkgroupCountRegionOp::getMixedNumThreads() {
-  return getMixedSizes(getStaticNumThreads(), getNumThreads());
+  return getMixedValues(getStaticNumThreads(), getNumThreads());
 }
 
 SmallVector<OpFoldResult> transform_dialect::
     TileToForeachThreadAndWorkgroupCountRegionOp::getMixedTileSizes() {
-  return getMixedSizes(getStaticTileSizes(), getTileSizes());
+  return getMixedValues(getStaticTileSizes(), getTileSizes());
 }
 
 LogicalResult

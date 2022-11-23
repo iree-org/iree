@@ -145,11 +145,11 @@ void populateVectorizationPatterns(MLIRContext *context,
 
 /// Returns vector shape matching native cooperative op sizes for unrolling
 /// high-D vectors.
-Optional<SmallVector<int64_t, 4>> getCooperativeOpVectorShape(
+Optional<SmallVector<int64_t>> getCooperativeOpVectorShape(
     Operation *op, ArrayRef<int64_t> nativeShape) {
   // Unroll vector.contract ops according to native cooperative matrix size.
   if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
-    return llvm::to_vector<4>(nativeShape);
+    return llvm::to_vector<>(nativeShape);
   }
 
   // Unrolling vector.contract generates vector.{insert|extract}_strided_slice
@@ -165,13 +165,13 @@ Optional<SmallVector<int64_t, 4>> getCooperativeOpVectorShape(
     auto insert =
         writeOp.getVector().getDefiningOp<vector::InsertStridedSliceOp>();
     if (insert) {
-      return llvm::to_vector<4>(insert.getSourceVectorType().getShape());
+      return llvm::to_vector<>(insert.getSourceVectorType().getShape());
     }
 
     // There can exist vector.transfer_write for initializing output. Unroll
     // them to native shape. Native shape is for ([B, ]M, N, K), here we only
     // need ([B, ]M, N).
-    return llvm::to_vector<4>(nativeShape.drop_back());
+    return llvm::to_vector<>(nativeShape.drop_back());
   }
 
   if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
@@ -183,7 +183,7 @@ Optional<SmallVector<int64_t, 4>> getCooperativeOpVectorShape(
       if (sliceType && sliceType != vecType) return llvm::None;
       sliceType = vecType;
     }
-    return llvm::to_vector<4>(sliceType.getShape());
+    return llvm::to_vector<>(sliceType.getShape());
   }
 
   return llvm::None;
