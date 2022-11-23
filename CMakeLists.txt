@@ -288,12 +288,20 @@ if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
   endif()
 endif()
 
-option(IREE_ENABLE_CCACHE "Use ccache if installed to speed up rebuilds." OFF)
+option(IREE_ENABLE_CCACHE
+    "[DEPRECATED: Use CMAKE_<LANG>_COMPILER_LAUNCHER configure options or environment variables instead.] Use ccache if installed."
+    OFF)
 
 if(IREE_ENABLE_CCACHE)
+  message(WARNING
+      "IREE_ENABLE_CCACHE is deprecated. Use CMAKE_<LANG>_COMPILER_LAUNCHER"
+      " configure options or environment variables instead.")
   find_program(CCACHE_PROGRAM ccache)
   if(CCACHE_PROGRAM)
       set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+  else()
+    message(SEND_ERROR
+        "IREE_ENABLE_CCACHE was set, but executable `ccache` was not found.")
   endif()
 endif()
 
