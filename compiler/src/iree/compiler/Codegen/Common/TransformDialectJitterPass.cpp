@@ -60,6 +60,8 @@ using ::mlir::iree_compiler::IREE::transform_dialect::
     ForeachThreadToWorkgroupOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::
+    IREEEraseHALDescriptorTypeFromMemRefOp;
+using ::mlir::iree_compiler::IREE::transform_dialect::
     MapNestedForeachThreadToGpuThreadsOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::
     TileToForeachThreadAndWorkgroupCountRegionOp;
@@ -325,6 +327,9 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
 
   // Step 4. Bufferize.
   variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
+  Value memrefFunc =
+      b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  b.create<IREEEraseHALDescriptorTypeFromMemRefOp>(memrefFunc);
 
   // Step 5. Post-bufferization mapping to blocks and threads.
   // Need to match again since bufferize invalidated all handles.

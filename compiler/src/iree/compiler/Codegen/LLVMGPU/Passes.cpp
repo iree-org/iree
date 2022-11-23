@@ -19,6 +19,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -56,12 +57,19 @@ static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
 
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
-  bool sharedMemCopy =
-      from.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3 ||
-      to.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3;
-  if (sharedMemCopy) builder.create<gpu::BarrierOp>(loc);
+  auto fromType = from.getType().cast<MemRefType>();
+  auto toType = to.getType().cast<MemRefType>();
+
+  bool needsBarrier = false;
+  if (auto attr = fromType.getMemorySpace().dyn_cast_or_null<IntegerAttr>()) {
+    if (attr.getInt() == 3) needsBarrier = true;
+  }
+  if (auto attr = toType.getMemorySpace().dyn_cast_or_null<IntegerAttr>()) {
+    if (attr.getInt() == 3) needsBarrier = true;
+  }
+  if (needsBarrier) builder.create<gpu::BarrierOp>(loc);
   Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
-  if (sharedMemCopy) {
+  if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
     builder.create<gpu::BarrierOp>(loc);
   }
@@ -76,6 +84,10 @@ static void addBufferizePasses(OpPassManager &passManager) {
                                       memcpyFn);
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
+  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
+  // memory space through the stack.
+  passManager.addNestedPass<func::FuncOp>(
+      createEraseHALDescriptorTypeFromMemRefPass());
 }
 
 static void tileAndDistributeToWorkgroup(OpPassManager &pm) {
@@ -436,6 +448,10 @@ void addGPUTransformDialectJitterPasses(OpPassManager &passManager) {
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
   pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
+  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
+  // memory space through the stack.
+  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      createEraseHALDescriptorTypeFromMemRefPass());
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//

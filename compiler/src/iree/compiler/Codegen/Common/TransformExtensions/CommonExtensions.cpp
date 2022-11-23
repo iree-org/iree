@@ -6,8 +6,6 @@
 
 #include "CommonExtensions.h"
 
-#include <iree/compiler/Dialect/HAL/IR/HALOps.h>
-
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
@@ -17,6 +15,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -32,6 +31,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -985,6 +985,38 @@ DiagnosedSilenceableFailure transform_dialect::ConfigExtractPart::apply(
   b.create<LinalgExt::DoNotDCEOperandsOp>(target->getLoc(), values);
 
   transformResults.set(getResultConfigPart().cast<OpResult>(), results);
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// EraseHALDescriptorTypeFromMemRef
+//===---------------------------------------------------------------------===//
+
+void transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::build(
+    OpBuilder &builder, OperationState &result, Value target) {
+  result.addOperands(target);
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes(pdl::OperationType::get(ctx));
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
+  if (targetOps.size() != 1 || !isa<func::FuncOp>(targetOps.front())) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "expects a func::FuncOp as the target op");
+  }
+  auto funcOp = cast<func::FuncOp>(targetOps.front());
+
+  if (failed(eraseHALDescriptorTypeFromMemRef(funcOp))) {
+    return mlir::emitDefiniteFailure(
+        state.getTopLevel(),
+        "failed to erase #hal.descriptor_type as MemRef memory space");
+  }
+
+  transformResults.set(getOperation()->getOpResult(0), targetOps.front());
   return DiagnosedSilenceableFailure::success();
 }
 

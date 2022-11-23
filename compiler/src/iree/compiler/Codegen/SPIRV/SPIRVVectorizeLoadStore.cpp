@@ -407,7 +407,8 @@ Optional<MemRefType> MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   if (newShape.back() % ratio != 0) return {};
   newShape.back() = newShape.back() / ratio;
 
-  return MemRefType::get(newShape, vectorType, {}, type.getMemorySpaceAsInt());
+  return MemRefType::get(newShape, vectorType, MemRefLayoutAttrInterface(),
+                         type.getMemorySpace());
 }
 
 template <typename OpTy>

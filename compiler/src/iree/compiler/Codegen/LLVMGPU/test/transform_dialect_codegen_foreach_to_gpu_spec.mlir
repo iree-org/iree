@@ -9,6 +9,8 @@ transform.structured.canonicalized_sequence failures(propagate) {
   ( mapping = [#gpu.thread<x>, #gpu.thread<y>] )
 
   %variant_op_2 = transform.iree.bufferize %variant_op
+  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_2
+  transform.iree.erase_hal_descriptor_type_from_memref %memref_func
 
   // Get the function to which to apply to.
   %2 = transform.structured.match ops{["linalg.matmul"]} in %variant_op_2

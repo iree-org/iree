@@ -136,6 +136,35 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
   ];
 }
 
+def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
+    "iree.erase_hal_descriptor_type_from_memref",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+  let description = [{
+    Erase #hal.descriptor_type from MemRef memory space to ignore all IREE
+    memory space planning. This is meant to ease transitioning given that
+    various LLVM conversion upstream patterns assumes numeric memory space,
+    especially the default 0.
+
+    Return modes:
+    =============
+    The pass is ran on all FuncOp nested under the top-level op on which
+    the transform dialect interpreter pass is applied.
+
+    If any of the pass on any of the FuncOp fails, the transformation
+    definitely fails. Otherwise the transformation succeeds.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$result);
+
+  let assemblyFormat = "attr-dict $target";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [OpBuilder<(ins "Value":$target)>];
+}
+
 def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
     "iree.foreach_thread_to_workgroup",
     [FunctionalStyleTransformOpTrait,

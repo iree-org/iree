@@ -52,7 +52,7 @@ builtin.module {
   func.func @UpSampling1D() {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:tensor<2x16x3xf32>>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<2x8x3xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(uniform_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<2x8x3xf32>>
     %2 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [2, 1, 3], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x8x3xf32>> -> tensor<2x3xf32>
     flow.dispatch.tensor.store %2, %0, offsets = [0, 0, 0], sizes = [2, 1, 3], strides = [1, 1, 1] : tensor<2x3xf32> -> !flow.dispatch.tensor<readwrite:tensor<2x16x3xf32>>
     return
@@ -64,8 +64,8 @@ builtin.module {
 //   CHECK-DAG:   %[[SOURCE_SUBVIEW:.+]] = memref.subview %[[SOURCE]][0, 0, 0] [2, 1, 3]
 //   CHECK-DAG:   %[[DEST_SUBVIEW:.+]] = memref.subview %[[DEST]][0, 0, 0] [2, 1, 3]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       ins(%[[SOURCE_SUBVIEW]] : memref<2x3xf32, strided<[24, 1]>>)
-//  CHECK-SAME:       outs(%[[DEST_SUBVIEW]] : memref<2x3xf32, strided<[48, 1]>>)
+//  CHECK-SAME:       ins(%[[SOURCE_SUBVIEW]] : memref<2x3xf32, strided<[24, 1]>, #hal.descriptor_type<uniform_buffer>>)
+//  CHECK-SAME:       outs(%[[DEST_SUBVIEW]] : memref<2x3xf32, strided<[48, 1]>, #hal.descriptor_type<storage_buffer>>)
 
 // -----
 
