@@ -630,7 +630,7 @@ jobs:
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
         run: |
           # Not archiving the directory to allow fetching each file as needed
-          # separately. The option `--gzip-in-flight` compresses the files
+          # separately. The option `--gzip-in-flight-all` compresses the files
           # during uploading to save traffic. The files are still uncompressed
           # on GCS.
           # More details: https://cloud.google.com/sdk/gcloud/reference/storage/cp#--gzip-in-flight-all
