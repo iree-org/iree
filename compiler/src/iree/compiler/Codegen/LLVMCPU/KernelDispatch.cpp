@@ -1048,17 +1048,6 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
     }
   }
 
-  OpBuilder builder(op.getContext());
-  builder.setInsertionPoint(op);
-  SmallVector<Range> iterationDomain = op.getIterationDomain(builder);
-  for (int i = 0, e = std::min<int64_t>(numLoops, workgroupTileSizes.size());
-       i < e; ++i) {
-    Optional<int64_t> cstSize = getConstantIntValue(iterationDomain[i].size);
-    if (workgroupTileSizes[i] && cstSize) {
-      workgroupTileSizes[i] = std::min(workgroupTileSizes[i], cstSize.value());
-    }
-  }
-
   return workgroupTileSizes;
 }
 
