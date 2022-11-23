@@ -29,7 +29,6 @@ cd "${ROOT_DIR}"
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 BUILD_DIR="${1:-${IREE_ASAN_BUILD_DIR:-build-asan}}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
-IREE_ENABLE_CCACHE="${IREE_ENABLE_CCACHE:-OFF}"
 
 "$CMAKE_BIN" --version
 ninja --version
@@ -51,7 +50,6 @@ CMAKE_ARGS=(
   "-DIREE_BUILD_MICROBENCHMARKS=ON"
 
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
-  "-DIREE_ENABLE_CCACHE=${IREE_ENABLE_CCACHE}"
 
   # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
   # have enough deps to at least build CUDA support and compile CUDA binaries

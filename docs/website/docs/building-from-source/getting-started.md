@@ -76,7 +76,9 @@ Configure CMake:
 
     # Additional quality of life CMake flags:
     # Enable ccache:
-    #   -DIREE_ENABLE_CCACHE=ON
+    # See https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/ccache.md
+    #   -DCMAKE_C_COMPILER_LAUNCHER=ccache
+    #   -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
     ```
 
 === "Windows"
