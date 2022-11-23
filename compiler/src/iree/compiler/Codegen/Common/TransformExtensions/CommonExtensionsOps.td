@@ -120,8 +120,12 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     No handles are consumed or produced.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                       UnitAttr:$target_gpu);
+  let arguments = (
+      ins PDL_Operation:$target,
+          UnitAttr:$target_gpu,
+          DefaultValuedAttr<BoolAttr, "false">:$test_analysis_only,
+          DefaultValuedAttr<BoolAttr, "false">:$print_conflicts
+  );
   let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "attr-dict $target";
