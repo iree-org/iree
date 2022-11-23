@@ -27,6 +27,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = [
         "reduction.mlir",
+        "reduction_v2.mlir",
         "softmax.mlir",
         "softmax_v2.mlir",
         # First few ops of softmax only, acts as a proxy example.
@@ -38,6 +39,7 @@ iree_lit_test_suite(
     # they need to be included as data.
     data = [
         "reduction_codegen_spec.mlir",
+        "reduction_v2_codegen_spec.mlir",
         "softmax_codegen_spec.mlir",
         "softmax_v2_codegen_spec.mlir",
         #
