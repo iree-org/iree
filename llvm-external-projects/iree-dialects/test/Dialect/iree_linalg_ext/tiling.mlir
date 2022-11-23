@@ -1235,3 +1235,39 @@ func.func @perfect_CKkc_to_KC(%arg0: tensor<32x4x2x4xf32>, %arg1: tensor<8x128xf
 // CHECK:             %[[RES:.+]] = tensor.insert_slice %[[UNPACK]]
 // CHECK-SAME:          into %{{.+}}[%[[K]], %[[C]]] [%[[C2]], %[[C4]]]
 // CHECK:             scf.yield %[[RES]]
+
+// -----
+
+func.func @dynamic_perfect_CKkc_to_KC(%arg0: tensor<?x?x2x2xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = iree_linalg_ext.unpack {__internal_linalg_transform__ = "tiling_pack_input"} %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %arg1 : (tensor<?x?x2x2xf32> tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0)[s0] -> (2, -d0 + s0)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0)[s0] -> (4, -d0 + s0)>
+// CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0) -> (d0 floordiv 2)>
+// CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0) -> (d0 ceildiv 2)>
+// CHECK-LABEL: func.func @dynamic_perfect_CKkc_to_KC
+// CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
+// CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
+// CHECK-DAG:     %[[C0:.*]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.*]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C4:.*]] = arith.constant 4 : index
+// CHECK-DAG:     %[[DIM_0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+// CHECK-DAG:     %[[DIM_1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+// CHECK:         %{{.+}} = scf.for %[[K:.+]] = %[[C0]] to %[[DIM_0]] step %[[C2]]
+// CHECK-DAG:       %[[OUT_K_SZ:.+]] = affine.min #[[MAP0]](%[[K]])[%[[DIM_0]]]
+// CHECK:           %{{.+}} = scf.for %[[C:.+]] = %[[C0]] to %[[DIM_1]] step %[[C4]]
+// CHECK-DAG:         %[[OUT_C_SZ:.+]] = affine.min #[[MAP1]](%[[C]])[%[[DIM_1]]]
+// CHECK-DAG:         %[[IN_K:.+]] = affine.apply #[[MAP2]](%[[K]])
+// CHECK-DAG:         %[[IN_C:.+]] = affine.apply #[[MAP2]](%[[C]])
+// CHECK-DAG:         %[[IN_C_SZ:.+]] = affine.apply #[[MAP3]](%[[OUT_C_SZ]])
+// CHECK:             %[[IN_SLICE:.+]] = tensor.extract_slice %[[IN]]
+// CHECK:               [%[[IN_C]], %[[IN_K]], 0, 0] [%[[IN_C_SZ]], 1, 2, 2]
+// CHECK:             %[[ITER_SLICE:.+]] = tensor.extract_slice %{{.+}}[%[[K]], %[[C]]] [%[[OUT_K_SZ]], %[[OUT_C_SZ]]]
+// CHECK:             %[[UNPACK:.+]] = iree_linalg_ext.unpack
+// CHECK-SAME:          {__internal_linalg_transform__ = "tiling_pack_output"
+// CHECK-SAME:          %[[IN_SLICE]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [2, 2]
+// CHECK-SAME:          into %[[ITER_SLICE]]
+// CHECK:             %[[RES:.+]] = tensor.insert_slice %[[UNPACK]]
+// CHECK-SAME:          into %{{.+}}[%[[K]], %[[C]]] [%[[OUT_K_SZ]], %[[OUT_C_SZ]]]
+// CHECK:             scf.yield %[[RES]]
