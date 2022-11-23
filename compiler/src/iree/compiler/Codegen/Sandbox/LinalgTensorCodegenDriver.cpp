@@ -143,8 +143,8 @@ static LogicalResult getPaddingDims(func::FuncOp funcOp,
   return success();
 }
 
-/// Default method to initialize the tiling options for fusion in IREE. These
-/// could be ovveridden by the command line options if specified.
+/// Default method to get tile sizes for tile-and-fuse in IREE. These could be
+/// ovveridden by the command line options if specified.
 static LogicalResult getTileAndFuseOptionsFromConfig(
     func::FuncOp funcOp, int64_t tilingLevel,
     SmallVector<int64_t> &tileAndFuseSizes, SmallVector<int64_t> &tileOnlySizes,
@@ -359,7 +359,12 @@ struct OutlineOneParentLoopPass
 void LinalgFusePass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
 
-  // Set up tiling and vectorization options.
+  // Set up tile-and-fuse options.
+  // After getting the tile sizes from the root op, it splits the sizes into two
+  // parts: the tile sizes on parallel dims and the tile sizes on reduction
+  // dims. Then tile-and-fuse is applild on parallel dims and tiling is applied
+  // on reduction dims, since we shouldn't blindly fuse ops on reduction dims.
+  // See the getTileAndFuseOptionsFromConfig for more details.
   SmallVector<int64_t> derivedTileAndFuseSizes;
   SmallVector<int64_t> derivedTileOnlySizes;
   SmallVector<int64_t> derivedTileInterchange;
