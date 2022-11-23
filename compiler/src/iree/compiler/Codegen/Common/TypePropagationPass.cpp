@@ -293,6 +293,24 @@ struct LinalgFillTypePropagation
   }
 };
 
+/// Pattern to legalize `tensor.extract` operations.
+struct TensorExtractTypePropagation
+    : public TypePropagationPattern<tensor::ExtractOp> {
+  using TypePropagationPattern<tensor::ExtractOp>::TypePropagationPattern;
+
+  LogicalResult matchAndRewrite(
+      tensor::ExtractOp extractOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const final {
+    Location loc = extractOp.getLoc();
+    Value newExtract = rewriter.create<tensor::ExtractOp>(
+        loc, adaptor.getTensor(), adaptor.getIndices());
+    Value replacement = convertElementType(
+        rewriter, loc, extractOp.getResult().getType(), newExtract);
+    rewriter.replaceOp(extractOp, replacement);
+    return success();
+  }
+};
+
 /// Simple rewrite pattern that just forwards the source as the result if the
 /// result type is not legal (but source type is)
 template <typename OpTy>
@@ -389,11 +407,11 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
     RewritePatternSet patterns(context);
 
     TypePropagationTypeConverter typeConverter;
-    patterns
-        .insert<ConstantOpTypeConversion, ForwardSourceType<arith::ExtUIOp>,
-                ForwardSourceType<arith::TruncIOp>, GenericOpTypePropagation,
-                LinalgFillTypePropagation, LegalizeResultElementType>(
-            typeConverter, context);
+    patterns.insert<ConstantOpTypeConversion, ForwardSourceType<arith::ExtUIOp>,
+                    ForwardSourceType<arith::TruncIOp>,
+                    GenericOpTypePropagation, LinalgFillTypePropagation,
+                    LegalizeResultElementType, TensorExtractTypePropagation>(
+        typeConverter, context);
 
     ConversionTarget target(*context);
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
