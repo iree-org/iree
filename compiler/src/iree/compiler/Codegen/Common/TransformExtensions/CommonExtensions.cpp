@@ -199,7 +199,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getPromoteForeachThreadCaptureToShared())
     addForeachThreadCapturePromotionPatterns(patterns);
   if (getRankReducing()) addRankReducingPatterns(patterns);
-  if (getSimplifyMemrefMetadata())
+  if (getExpandMemrefStridedMetadata())
     memref::populateExpandStridedMetadataPatterns(patterns);
   if (getSwappingPatterns())
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());

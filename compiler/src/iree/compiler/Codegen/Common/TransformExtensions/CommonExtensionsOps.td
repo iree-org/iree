@@ -43,8 +43,9 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       be unsafe wrt parallelism so use carefully!
       - rank_reducing: adds patterns that results in rank-reducing behavior on
       subset-based operations.
-      - simplify_memref_metadata: adds patterns that simplify the uses of
-      memref.extract_strided_metadata and fold to the underlying indices.
+      - expand_memref_strided_metadata: adds patterns that expand memref
+      operations into extract_strided_metadata operations and a materialization
+      of their effect on the metadata (sizes, offset, strides).
       - swapping_patterns: adds patterns that swap operations for a better outcome.
       This is a catch all that can be refined further if/when needed.
       - swap_padding_elide_conditional: refines the tensor.pad +
@@ -72,7 +73,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$canonicalization,
                        UnitAttr:$promote_foreach_thread_capture_to_shared,
                        UnitAttr:$rank_reducing,
-                       UnitAttr:$simplify_memref_metadata,
+                       UnitAttr:$expand_memref_strided_metadata,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns);
   let results = (outs PDL_Operation:$result);
