@@ -495,12 +495,7 @@ struct LinalgStrategyTilePass
                                                 filter);
     else
       tilingPattern.add<LinalgSCFTilingPattern>(ctx, options, filter);
-    if (anchorOpName == tensor::PadOp::getOperationName()) {
-      linalg::LinalgTilingOptions legacyTilingOptions;
-      legacyTilingOptions.setTileSizeComputationFunction(
-          options.tileSizeComputationFunction);
-      populatePadTensorTilingPatterns(tilingPattern, legacyTilingOptions);
-    }
+
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(tilingPattern));
   }
 

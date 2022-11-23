@@ -63,11 +63,10 @@ static FailureOr<Operation *> getRootOp(func::FuncOp funcOp) {
 /// method returns a proper tile sizes vector for each op during tiling.
 static SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
                                               SmallVector<int64_t> tileSizes) {
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  assert(linalgOp && "can only compute tile size on linalg ops");
+  auto tilingOp = cast<TilingInterface>(op);
 
   SmallVector<int64_t> newTileSizes = tileSizes;
-  newTileSizes.resize(linalgOp.getNumLoops(), /*default=*/0);
+  newTileSizes.resize(tilingOp.getLoopIteratorTypes().size(), /*default=*/0);
 
   OpBuilder::InsertionGuard guard(b);
   b.setInsertionPointToStart(
