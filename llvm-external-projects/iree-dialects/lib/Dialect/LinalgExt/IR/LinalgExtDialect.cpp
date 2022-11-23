@@ -38,7 +38,7 @@ void IREELinalgExtDialect::initialize() {
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
       >();
 
-  getContext()->getOrLoadDialect<tensor::TensorDialect>();
+  // getContext()->getOrLoadDialect<tensor::TensorDialect>();
 }
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc"
