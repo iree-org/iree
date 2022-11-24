@@ -179,32 +179,6 @@ static LogicalResult getTileAndFuseOptionsFromConfig(
   return success();
 }
 
-static void populateTileAndFuseOptions(
-    ArrayRef<int64_t> tileAndFuseSizes, ArrayRef<int64_t> tileOnlySizes,
-    ArrayRef<int64_t> tileInterchange,
-    scf::SCFTileAndFuseOptions &tileAndFuseOptions,
-    scf::SCFTilingOptions &tilingOptions) {
-  auto anyNonZeroSizes = [](ArrayRef<int64_t> sizes) {
-    return llvm::any_of(sizes, [](int64_t size) { return size > 0; });
-  };
-
-  if (anyNonZeroSizes(tileAndFuseSizes)) {
-    tileAndFuseOptions.tilingOptions.setTileSizeComputationFunction(
-        [tileAndFuseSizes](OpBuilder &b, Operation *op) {
-          return buildTileSizesForOp(b, op, tileAndFuseSizes);
-        });
-  }
-  tileAndFuseOptions.tilingOptions.setInterchange(tileInterchange);
-
-  if (anyNonZeroSizes(tileOnlySizes)) {
-    tilingOptions.setTileSizeComputationFunction(
-        [tileOnlySizes](OpBuilder &b, Operation *op) {
-          return buildTileSizesForOp(b, op, tileOnlySizes);
-        });
-  }
-  tilingOptions.setInterchange(tileInterchange);
-}
-
 /// Default method to initialize the split reduction size in IREE. These could
 /// be overriden by the command line options if specified.
 static FailureOr<int64_t> getSplitReductionSizeFromConfig(func::FuncOp funcOp) {
@@ -374,7 +348,7 @@ void LinalgFusePass::runOnOperation() {
     return;
   }
   if (!tileSizes.empty()) {
-    // If tile sizes are from the option, we interpret it as the sizes for
+    // If tile sizes are from the option, we interpret it as the config for
     // tile-and-fuse.
     derivedTileAndFuseSizes = llvm::to_vector(tileSizes);
     derivedTileOnlySizes.clear();
@@ -382,14 +356,28 @@ void LinalgFusePass::runOnOperation() {
   if (!tileInterchange.empty()) {
     derivedTileInterchange = llvm::to_vector(tileInterchange);
   }
+
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
   scf::SCFTilingOptions tilingOptions;
-  populateTileAndFuseOptions(derivedTileAndFuseSizes, derivedTileOnlySizes,
-                             derivedTileInterchange, tileAndFuseOptions,
-                             tilingOptions);
-  bool doTileAndFuse =
-      tileAndFuseOptions.tilingOptions.tileSizeComputationFunction != nullptr;
-  bool doTiling = tilingOptions.tileSizeComputationFunction != nullptr;
+  auto anyNonZeroSizes = [](ArrayRef<int64_t> sizes) {
+    return llvm::any_of(sizes, [](int64_t size) { return size > 0; });
+  };
+  bool doTileAndFuse = anyNonZeroSizes(derivedTileAndFuseSizes);
+  if (doTileAndFuse) {
+    tileAndFuseOptions.tilingOptions.setTileSizeComputationFunction(
+        [derivedTileAndFuseSizes](OpBuilder &b, Operation *op) {
+          return buildTileSizesForOp(b, op, derivedTileAndFuseSizes);
+        });
+  }
+  tileAndFuseOptions.tilingOptions.setInterchange(derivedTileInterchange);
+  bool doTiling = anyNonZeroSizes(derivedTileOnlySizes);
+  if (doTiling) {
+    tilingOptions.setTileSizeComputationFunction(
+        [derivedTileOnlySizes](OpBuilder &b, Operation *op) {
+          return buildTileSizesForOp(b, op, derivedTileOnlySizes);
+        });
+  }
+  tilingOptions.setInterchange(derivedTileInterchange);
 
   if (setAnchorOpToRootOp) {
     FailureOr<Operation *> rootOp = getRootOp(funcOp);
