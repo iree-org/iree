@@ -364,20 +364,22 @@ void LinalgFusePass::runOnOperation() {
   };
   bool doTileAndFuse = anyNonZeroSizes(derivedTileAndFuseSizes);
   if (doTileAndFuse) {
-    tileAndFuseOptions.tilingOptions.setTileSizeComputationFunction(
-        [derivedTileAndFuseSizes](OpBuilder &b, Operation *op) {
-          return buildTileSizesForOp(b, op, derivedTileAndFuseSizes);
-        });
+    tileAndFuseOptions.tilingOptions
+        .setTileSizeComputationFunction(
+            [derivedTileAndFuseSizes](OpBuilder &b, Operation *op) {
+              return buildTileSizesForOp(b, op, derivedTileAndFuseSizes);
+            })
+        .setInterchange(derivedTileInterchange);
   }
-  tileAndFuseOptions.tilingOptions.setInterchange(derivedTileInterchange);
   bool doTiling = anyNonZeroSizes(derivedTileOnlySizes);
   if (doTiling) {
-    tilingOptions.setTileSizeComputationFunction(
-        [derivedTileOnlySizes](OpBuilder &b, Operation *op) {
-          return buildTileSizesForOp(b, op, derivedTileOnlySizes);
-        });
+    tilingOptions
+        .setTileSizeComputationFunction(
+            [derivedTileOnlySizes](OpBuilder &b, Operation *op) {
+              return buildTileSizesForOp(b, op, derivedTileOnlySizes);
+            })
+        .setInterchange(derivedTileInterchange);
   }
-  tilingOptions.setInterchange(derivedTileInterchange);
 
   if (setAnchorOpToRootOp) {
     FailureOr<Operation *> rootOp = getRootOp(funcOp);
