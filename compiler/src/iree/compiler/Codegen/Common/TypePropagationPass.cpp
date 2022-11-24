@@ -170,9 +170,8 @@ struct GenericOpTypePropagation
     }
 
     // 2. If there are no operands modified, just return failure.
-    if (modifiedOperandIndex.empty()) {
-      return rewriter.notifyMatchFailure(genericOp, "all types legal");
-    }
+    assert(!modifiedOperandIndex.empty() &&
+           "unexpected all types legal within conversion pattern");
 
     // 3. Create a clone of the operation without cloning its regions.
     auto linalgOp = cast<linalg::LinalgOp>(genericOp.getOperation());
@@ -274,11 +273,6 @@ struct LinalgFillTypePropagation
   LogicalResult matchAndRewrite(
       linalg::FillOp fillOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
-    auto outputType = fillOp.output().getType();
-    auto legalizedOutputType = this->typeConverter->convertType(outputType);
-    if (outputType == legalizedOutputType) {
-      return rewriter.notifyMatchFailure(fillOp, "op already legal");
-    }
     Value value = adaptor.getInputs().front();
     Optional<Type> legalizedElementType =
         getLegalizedElementType(value.getType());
@@ -289,6 +283,24 @@ struct LinalgFillTypePropagation
         rewriter, fillOp->getLoc(), legalizedElementType.value(), value);
     rewriter.replaceOpWithNewOp<linalg::FillOp>(
         fillOp, ValueRange{legalizedValue}, ValueRange{adaptor.getOutputs()});
+    return success();
+  }
+};
+
+/// Pattern to legalize `tensor.extract` operations.
+struct TensorExtractTypePropagation
+    : public TypePropagationPattern<tensor::ExtractOp> {
+  using TypePropagationPattern<tensor::ExtractOp>::TypePropagationPattern;
+
+  LogicalResult matchAndRewrite(
+      tensor::ExtractOp extractOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const final {
+    Location loc = extractOp.getLoc();
+    Value newExtract = rewriter.create<tensor::ExtractOp>(
+        loc, adaptor.getTensor(), adaptor.getIndices());
+    Value replacement = convertElementType(
+        rewriter, loc, extractOp.getResult().getType(), newExtract);
+    rewriter.replaceOp(extractOp, replacement);
     return success();
   }
 };
@@ -306,14 +318,7 @@ struct ForwardSourceType : public TypePropagationPattern<OpTy> {
       return rewriter.notifyMatchFailure(
           op, "unhandled op with multiple operands/results");
     }
-    Type outputType = op->getResult(0).getType();
-    Type legalizedOutputType = this->typeConverter->convertType(outputType);
     Value input = adaptor.getOperands()[0];
-    Value originalInput = op->getOperand(0);
-    if (outputType == legalizedOutputType &&
-        input.getType() == originalInput.getType()) {
-      return rewriter.notifyMatchFailure(op, "op is legal");
-    }
     rewriter.replaceOp(op, input);
     return success();
   }
@@ -334,19 +339,10 @@ struct LegalizeResultElementType : public ConversionPattern {
       return rewriter.notifyMatchFailure(op, "unhandled ops with successors");
     }
     Location loc = op->getLoc();
-    bool illegalOp = llvm::any_of(
-        llvm::zip(op->getOperands(), convertedOperands),
-        [](std::tuple<Value, Value> tuple) {
-          return std::get<0>(tuple).getType() != std::get<1>(tuple).getType();
-        });
     SmallVector<Type> resultTypes;
     for (Type resultType : op->getResultTypes()) {
       Type legalizedType = this->typeConverter->convertType(resultType);
       resultTypes.push_back(legalizedType);
-      illegalOp |= legalizedType != resultType;
-    }
-    if (!illegalOp) {
-      return rewriter.notifyMatchFailure(op, "op is already legal");
     }
     OperationState state(loc, op->getName(), convertedOperands, resultTypes,
                          op->getAttrs());
@@ -389,11 +385,11 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
     RewritePatternSet patterns(context);
 
     TypePropagationTypeConverter typeConverter;
-    patterns
-        .insert<ConstantOpTypeConversion, ForwardSourceType<arith::ExtUIOp>,
-                ForwardSourceType<arith::TruncIOp>, GenericOpTypePropagation,
-                LinalgFillTypePropagation, LegalizeResultElementType>(
-            typeConverter, context);
+    patterns.insert<ConstantOpTypeConversion, ForwardSourceType<arith::ExtUIOp>,
+                    ForwardSourceType<arith::TruncIOp>,
+                    GenericOpTypePropagation, LinalgFillTypePropagation,
+                    LegalizeResultElementType, TensorExtractTypePropagation>(
+        typeConverter, context);
 
     ConversionTarget target(*context);
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {

@@ -297,3 +297,37 @@ func.func @constant_splat_op() {
 }
 // CHECK-LABEL: func.func @constant_splat_op()
 //       CHECK:   arith.constant dense<1> : tensor<4xi8>
+
+// -----
+
+func.func @tensor_extract() {
+  %c0 = arith.constant 0 : index
+  %c13 = arith.constant 13 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64)
+      : !flow.dispatch.tensor<readonly:tensor<14xi8>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64)
+      : !flow.dispatch.tensor<writeonly:tensor<14xi8>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [14], strides = [1]
+      : !flow.dispatch.tensor<readonly:tensor<14xi8>> -> tensor<14xi8>
+  %3 = arith.trunci %2 : tensor<14xi8> to tensor<14xi1>
+  %4 = tensor.empty() : tensor<14xi1>
+  %5 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+      outs(%4 : tensor<14xi1>) {
+  ^bb0(%out: i1):
+    %7 = linalg.index 0 : index
+    %8 = arith.subi %c13, %7 : index
+    %extracted = tensor.extract %3[%8] : tensor<14xi1>
+    linalg.yield %extracted : i1
+  } -> tensor<14xi1>
+  %6 = arith.extui %5 : tensor<14xi1> to tensor<14xi8>
+  flow.dispatch.tensor.store %6, %1, offsets = [0], sizes = [14], strides = [1]
+      : tensor<14xi8> -> !flow.dispatch.tensor<writeonly:tensor<14xi8>>
+  return
+}
+// CHECK-LABEL: func @tensor_extract()
+//       CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<14xi8>>
+//       CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[BINDING]]
+//       CHECK:   %[[EXTRACTED:.+]] = tensor.extract %[[LOAD]]
+//       CHECK:   arith.trunci %[[EXTRACTED]] : i8 to i1
