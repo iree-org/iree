@@ -47,13 +47,23 @@ iree_cc_library(
     # On Windows, include the generated def file.
     $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_SOURCE_DIR}/api_exports.def>
   LINKOPTS
-    # Linux uses a linker script and flag to require defined.
+    # Linux uses a linker script.
     $<$<PLATFORM_ID:Linux>:-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/api_exports.ld>
-    $<$<PLATFORM_ID:Linux>:-Wl,--no-undefined>
-    # MacOS uses a symbol list and flag to require defined.
+    # MacOS uses a symbol list.
     $<$<PLATFORM_ID:Darwin>:-Wl,--exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/api_exports.lst>
-    $<$<PLATFORM_ID:Darwin>:-Wl,-undefined,error>
 )
+
+# If not using sanitizers, ask linkers to error on undefined symbols.
+# For shared libraries, using sanitizers implies undefined symbols on Unix-like.
+if(NOT IREE_ENABLE_ASAN
+    AND NOT IREE_ENABLE_MSAN
+    AND NOT IREE_ENABLE_TSAN
+    AND NOT IREE_ENABLE_UBSAN)
+  target_link_options(iree_compiler_API2_SharedImpl PRIVATE
+    $<$<PLATFORM_ID:Linux>:-Wl,--no-undefined>
+    $<$<PLATFORM_ID:Darwin>:-Wl,-undefined,error>
+  )
+endif()
 
 # DANGER: iree_cc_library links its deps with PUBLIC scope, which causes
 # usage requirements to propagate from dependents to users of the shared
