@@ -12,6 +12,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -41,10 +42,11 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     return failure();
   }
 
+  auto elementType = boundTensorType.getElementType();
   IREE::LinalgExt::MaterializeEncodingFn materializeEncodingFn =
       typeConverter.getMaterializeEncodingFn();
   FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
-      materializeEncodingFn(encoding.getEncoding().getValue());
+      materializeEncodingFn(encoding.getEncoding().getValue(), elementType);
   if (failed(encodingInfo)) {
     return failure();
   }
@@ -86,11 +88,14 @@ static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
 namespace {
 /// Given the `encoding` return the `MaterializeEncodingInfo` to use for
 /// materializing the pack op.
-// TODO(ravishankarm): THis is currently hard-coded here for convenience. When
-// used in IREE, this will be computed based on the architecture information in
-// `hal.executable.variant`.
-static FailureOr<IREE::LinalgExt::MaterializeEncodingInfo>
-getPackOpInfoFromEncoding(IREE::LinalgExt::TensorEncoding encoding) {
+// TODO(bjacob): This is in the process of being actually implemented in a way
+// that actually uses target information.
+static FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> chooseEncodingInfo(
+    IREE::LinalgExt::TensorEncoding encoding, Type elementType, Operation *op) {
+  auto target = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  // TODO: actually use `target` and `elementType`.
+  (void)target;
+  (void)elementType;
   switch (encoding) {
     case IREE::LinalgExt::TensorEncoding::GEMM_LHS:
       return IREE::LinalgExt::MaterializeEncodingInfo{{0, 1}, {8, 4}, {}};
@@ -286,7 +291,10 @@ void IREEMaterializeEncodingPass::runOnOperation() {
     RewritePatternSet materializeEncodingPattern(context);
 
     IREE::LinalgExt::MaterializeEncodingTypeConverter typeConverter(
-        getPackOpInfoFromEncoding);
+        [operation](IREE::LinalgExt::TensorEncoding encoding,
+                    Type elementType) {
+          return chooseEncodingInfo(encoding, elementType, operation);
+        });
     // Add type conversion for `!flow.dispatch.tensor` type.
     typeConverter.addConversion(
         [&typeConverter](IREE::Flow::DispatchTensorType dispatchTensorType) {
