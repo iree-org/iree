@@ -25,7 +25,7 @@ include(CMakeParseArguments)
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
 # TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
 # SHARED: If set, will compile to a shared object.
-#
+# WINDOWS_DEF_FILE: If set, will add a windows .def file to a shared library link
 # Note:
 # By default, iree_cc_library will always create a library named iree_${NAME},
 # and alias target iree::${NAME}. The iree:: form should always be used.
@@ -61,7 +61,7 @@ function(iree_cc_library)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY;SHARED"
-    "NAME"
+    "NAME;WINDOWS_DEF_FILE"
     "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
   )
@@ -109,8 +109,14 @@ function(iree_cc_library)
     add_library(${_OBJECTS_NAME} OBJECT)
     if(_RULE_SHARED)
       add_library(${_NAME} SHARED "$<TARGET_OBJECTS:${_OBJECTS_NAME}>")
+      if(_RULE_WINDOWS_DEF_FILE AND WIN32)
+        target_sources(${_NAME} PRIVATE "${_RULE_WINDOWS_DEF_FILE}")
+      endif()
     else()
       add_library(${_NAME} STATIC "$<TARGET_OBJECTS:${_OBJECTS_NAME}>")
+      if(_RULE_WINDOWS_DEF_FILE AND WIN32)
+        message(SEND_ERROR "If specifying a .def file library must be shared")
+      endif()
     endif()
 
     # Sources get added to the object library.

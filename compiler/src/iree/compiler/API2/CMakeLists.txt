@@ -42,10 +42,11 @@ iree_cc_library(
   SHARED
   NAME
     SharedImpl
+  WINDOWS_DEF_FILE
+    # On Windows, include the generated def file.
+    ${CMAKE_CURRENT_SOURCE_DIR}/api_exports.def
   SRCS
     api_exports.c
-    # On Windows, include the generated def file.
-    $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_SOURCE_DIR}/api_exports.def>
   LINKOPTS
     # Linux uses a linker script.
     $<$<PLATFORM_ID:Linux>:-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/api_exports.ld>
