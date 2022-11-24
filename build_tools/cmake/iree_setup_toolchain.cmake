@@ -4,12 +4,19 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+include(CheckCXXCompilerFlag)
+include(CheckLinkerFlag)
+
 # Appends ${VALUE} to each argument.
 function(iree_append_to_lists VALUE)
   foreach(_VARIABLE ${ARGN})
     set(${_VARIABLE} "${${_VARIABLE}} ${VALUE}" PARENT_SCOPE)
   endforeach(_VARIABLE)
 endfunction()
+
+#-------------------------------------------------------------------------------
+# Linker setup
+#-------------------------------------------------------------------------------
 
 if(IREE_ENABLE_LLD)
   if(IREE_USE_LINKER)
@@ -55,5 +62,86 @@ if(IREE_USE_LINKER)
   endif()
   if(NOT CC_SUPPORTS_CUSTOM_LINKER)
     message(FATAL_ERROR "Compiler '${CMAKE_C_COMPILER}' does not support '${IREE_LINKER_FLAG}'")
+  endif()
+endif()
+
+#-------------------------------------------------------------------------------
+# Sanitizer configurations
+#-------------------------------------------------------------------------------
+
+# Note: we add these flags to the global CMake flags, not to IREE-specific
+# variables such as IREE_DEFAULT_COPTS so that all symbols are consistently
+# defined with the same sanitizer flags, including e.g. standard library
+# symbols that might be used by both IREE and non-IREE (e.g. LLVM) code.
+
+if(IREE_ENABLE_ASAN)
+  string(APPEND CMAKE_CXX_FLAGS " -fsanitize=address")
+  string(APPEND CMAKE_C_FLAGS " -fsanitize=address")
+endif()
+if(IREE_ENABLE_MSAN)
+  string(APPEND CMAKE_CXX_FLAGS " -fsanitize=memory")
+  string(APPEND CMAKE_C_FLAGS " -fsanitize=memory")
+endif()
+if(IREE_ENABLE_TSAN)
+  string(APPEND CMAKE_CXX_FLAGS " -fsanitize=thread")
+  string(APPEND CMAKE_C_FLAGS " -fsanitize=thread")
+endif()
+if(IREE_ENABLE_UBSAN)
+  string(APPEND CMAKE_CXX_FLAGS " -fsanitize=undefined")
+  string(APPEND CMAKE_C_FLAGS " -fsanitize=undefined")
+endif()
+
+#-------------------------------------------------------------------------------
+# Build performance optimizations
+#-------------------------------------------------------------------------------
+
+# Split DWARF breaks debug information out of object files and stores them in
+# separate .dwo files. This reduces a lot of needless I/O during normal build
+# activities. It consists of the -gsplit-dwarf compiler flag and (for maximum
+# effect) the --gdb-index linker flag, which just emits an index to binaries
+# instead of full debug contents. gdb-index is supported by gold and partially
+# supported by LLD (LLD supports it if split-dwarf objects were compiled with
+# ggnu-pubnames).
+# If https://gitlab.kitware.com/cmake/cmake/-/issues/21179 is ever implemented,
+# use that.
+if(IREE_ENABLE_SPLIT_DWARF)
+  check_cxx_compiler_flag(-gsplit-dwarf IREE_SUPPORTS_SPLIT_DWARF)
+  if(IREE_SUPPORTS_SPLIT_DWARF)
+    # Also add -ggnu-pubnames for compilation because it links faster and lld
+    # doesn't do the slow path without it.
+    iree_append_to_lists(" -gsplit-dwarf -ggnu-pubnames"
+      CMAKE_C_FLAGS_DEBUG
+      CMAKE_CXX_FLAGS_DEBUG
+      CMAKE_C_FLAGS_RELWITHDEBINFO
+      CMAKE_CXX_FLAGS_RELWITHDEBINFO
+    )
+  endif()
+  check_linker_flag(CXX "-Wl,--gdb-index" IREE_SUPPORTS_GDB_INDEX)
+  if(IREE_SUPPORTS_GDB_INDEX)
+    message(STATUS "Enabling gdb-index (binaries with debug info are not relocatable)")
+    iree_append_to_lists(" -Wl,--gdb-index"
+      CMAKE_EXE_LINKER_FLAGS_DEBUG
+      CMAKE_MODULE_LINKER_FLAGS_DEBUG
+      CMAKE_SHARED_LINKER_FLAGS_DEBUG
+      CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO
+      CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO
+      CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO
+    )
+  endif()
+endif()
+
+# Thin archives makes static archives that only link to backing object files
+# instead of embedding them. This makes them non-relocatable but is almost
+# always the right thing outside of certain deployment/packaging scenarios.
+if(IREE_ENABLE_THIN_ARCHIVES)
+  execute_process(COMMAND ${CMAKE_AR} -V OUTPUT_VARIABLE IREE_AR_VERSION)
+  if ("${IREE_AR_VERSION}" MATCHES "^GNU ar|LLVM")
+    message(STATUS "Enabling thin archives (static libraries will not be relocatable)")
+    set(CMAKE_C_ARCHIVE_APPEND "<CMAKE_AR> qT <TARGET> <LINK_FLAGS> <OBJECTS>")
+    set(CMAKE_CXX_ARCHIVE_APPEND "<CMAKE_AR> qT <TARGET> <LINK_FLAGS> <OBJECTS>")
+    set(CMAKE_C_ARCHIVE_CREATE "<CMAKE_AR> crT <TARGET> <LINK_FLAGS> <OBJECTS>")
+    set(CMAKE_CXX_ARCHIVE_CREATE "<CMAKE_AR> crT <TARGET> <LINK_FLAGS> <OBJECTS>")
+  else()
+    message(WARNING "Thin archives requested but not supported by ar")
   endif()
 endif()
