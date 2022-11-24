@@ -38,9 +38,13 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/API2/Internal:IREEOptToolEntryPoint",
         "//compiler/src/iree/compiler/API2/Internal:LLDToolEntryPoint",
         "//compiler/src/iree/compiler/API2/Internal:MLIRInterop",
+        "//llvm-external-projects/iree-dialects:CAPI",
         "@llvm-project//mlir:CAPIDebug",
         "@llvm-project//mlir:CAPIIR",
         "@llvm-project//mlir:CAPIInterfaces",
+        "@llvm-project//mlir:CAPILinalg",
+        "@llvm-project//mlir:CAPIPDL",
+        "@llvm-project//mlir:CAPITransformDialect",
     ],
 )
 

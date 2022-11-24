@@ -25,9 +25,13 @@ iree_cc_library(
   NAME
     StaticImpl
   DEPS
+    IREEDialectsCAPI
     MLIRCAPIDebug
     MLIRCAPIIR
     MLIRCAPIInterfaces
+    MLIRCAPILinalg
+    MLIRCAPIPDL
+    MLIRCAPITransformDialect
     iree::compiler::API2::Internal::IREECompileToolEntryPoint
     iree::compiler::API2::Internal::IREEMLIRLSPServerToolEntryPoint
     iree::compiler::API2::Internal::IREEOptToolEntryPoint

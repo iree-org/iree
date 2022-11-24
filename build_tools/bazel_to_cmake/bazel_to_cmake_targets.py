@@ -17,9 +17,7 @@ EXPLICIT_TARGET_MAPPING = {
     "//runtime/src:runtime_defines": [],
 
     # IREE llvm-external-projects
-    "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
-        "IREEPyDMPasses"
-    ],
+    "//llvm-external-projects/iree-dialects:CAPI": ["IREEDialectsCAPI"],
 
     # Disable all hard-coded codegen targets (they are expanded dynamically
     # in CMake).

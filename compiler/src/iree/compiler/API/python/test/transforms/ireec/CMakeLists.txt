@@ -11,10 +11,9 @@ iree_py_test(
     "compiler_options_test.py"
 )
 
-# This test fails while importing chlo, which needs a fix for the stablehlo transition.
-# iree_py_test(
-#   NAME
-#     compile_sample_module
-#   SRCS
-#     "compile_sample_module.py"
-# )
+iree_py_test(
+  NAME
+    compile_sample_module
+  SRCS
+    "compile_sample_module.py"
+)

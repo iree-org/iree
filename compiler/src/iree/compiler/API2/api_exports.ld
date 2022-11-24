@@ -14,6 +14,7 @@ VER_0 {
     ireeCompilerTranslateModuletoVMBytecode;
     ireeMlirLspServerRunMain;
     ireeOptRunMain;
+    ireeRegisterTransformExtensions;
     mlirAffineAddExprGet;
     mlirAffineBinaryOpExprGetLHS;
     mlirAffineBinaryOpExprGetRHS;
@@ -259,6 +260,12 @@ VER_0 {
     mlirFunctionTypeGetNumInputs;
     mlirFunctionTypeGetNumResults;
     mlirFunctionTypeGetResult;
+    mlirGetDialectHandle__iree_input__;
+    mlirGetDialectHandle__iree_linalg_ext__;
+    mlirGetDialectHandle__iree_linalg_transform__;
+    mlirGetDialectHandle__transform__;
+    mlirIREELinalgTransformRegisterPasses;
+    mlirIREETransformRegisterPasses;
     mlirIdentifierEqual;
     mlirIdentifierGet;
     mlirIdentifierGetContext;
@@ -294,6 +301,7 @@ VER_0 {
     mlirIntegerTypeSignedGet;
     mlirIntegerTypeUnsignedGet;
     mlirIsGlobalDebugEnabled;
+    mlirLinalgFillBuiltinNamedOpRegion;
     mlirLocationCallSiteGet;
     mlirLocationEqual;
     mlirLocationFileLineColGet;
@@ -378,6 +386,12 @@ VER_0 {
     mlirOperationStateGet;
     mlirOperationVerify;
     mlirOperationWriteBytecode;
+    mlirPDLAttributeTypeGet;
+    mlirPDLOperationTypeGet;
+    mlirPDLRangeTypeGet;
+    mlirPDLRangeTypeGetElementType;
+    mlirPDLTypeTypeGet;
+    mlirPDLValueTypeGet;
     mlirParsePassPipeline;
     mlirPassManagerAddOwnedPass;
     mlirPassManagerCreate;
@@ -401,6 +415,7 @@ VER_0 {
     mlirRegionInsertOwnedBlock;
     mlirRegionInsertOwnedBlockAfter;
     mlirRegionInsertOwnedBlockBefore;
+    mlirRegisterLinalgPasses;
     mlirShapedTypeGetDimSize;
     mlirShapedTypeGetDynamicSize;
     mlirShapedTypeGetDynamicStrideOrOffset;
@@ -437,6 +452,9 @@ VER_0 {
     mlirSymbolTableLookup;
     mlirSymbolTableReplaceAllSymbolUses;
     mlirSymbolTableWalkSymbolTables;
+    mlirTransformAnyOpTypeGet;
+    mlirTransformOperationTypeGet;
+    mlirTransformOperationTypeGetOperationName;
     mlirTupleTypeGet;
     mlirTupleTypeGetNumTypes;
     mlirTupleTypeGetType;
@@ -465,9 +483,17 @@ VER_0 {
     mlirTypeIsAMemRef;
     mlirTypeIsANone;
     mlirTypeIsAOpaque;
+    mlirTypeIsAPDLAttributeType;
+    mlirTypeIsAPDLOperationType;
+    mlirTypeIsAPDLRangeType;
+    mlirTypeIsAPDLType;
+    mlirTypeIsAPDLTypeType;
+    mlirTypeIsAPDLValueType;
     mlirTypeIsARankedTensor;
     mlirTypeIsAShaped;
     mlirTypeIsATensor;
+    mlirTypeIsATransformAnyOpType;
+    mlirTypeIsATransformOperationType;
     mlirTypeIsATuple;
     mlirTypeIsAUnrankedMemRef;
     mlirTypeIsAUnrankedTensor;

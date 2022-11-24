@@ -13,6 +13,7 @@ EXPORTS
   ireeCompilerTranslateModuletoVMBytecode
   ireeMlirLspServerRunMain
   ireeOptRunMain
+  ireeRegisterTransformExtensions
   mlirAffineAddExprGet
   mlirAffineBinaryOpExprGetLHS
   mlirAffineBinaryOpExprGetRHS
@@ -258,6 +259,12 @@ EXPORTS
   mlirFunctionTypeGetNumInputs
   mlirFunctionTypeGetNumResults
   mlirFunctionTypeGetResult
+  mlirGetDialectHandle__iree_input__
+  mlirGetDialectHandle__iree_linalg_ext__
+  mlirGetDialectHandle__iree_linalg_transform__
+  mlirGetDialectHandle__transform__
+  mlirIREELinalgTransformRegisterPasses
+  mlirIREETransformRegisterPasses
   mlirIdentifierEqual
   mlirIdentifierGet
   mlirIdentifierGetContext
@@ -293,6 +300,7 @@ EXPORTS
   mlirIntegerTypeSignedGet
   mlirIntegerTypeUnsignedGet
   mlirIsGlobalDebugEnabled
+  mlirLinalgFillBuiltinNamedOpRegion
   mlirLocationCallSiteGet
   mlirLocationEqual
   mlirLocationFileLineColGet
@@ -377,6 +385,12 @@ EXPORTS
   mlirOperationStateGet
   mlirOperationVerify
   mlirOperationWriteBytecode
+  mlirPDLAttributeTypeGet
+  mlirPDLOperationTypeGet
+  mlirPDLRangeTypeGet
+  mlirPDLRangeTypeGetElementType
+  mlirPDLTypeTypeGet
+  mlirPDLValueTypeGet
   mlirParsePassPipeline
   mlirPassManagerAddOwnedPass
   mlirPassManagerCreate
@@ -400,6 +414,7 @@ EXPORTS
   mlirRegionInsertOwnedBlock
   mlirRegionInsertOwnedBlockAfter
   mlirRegionInsertOwnedBlockBefore
+  mlirRegisterLinalgPasses
   mlirShapedTypeGetDimSize
   mlirShapedTypeGetDynamicSize
   mlirShapedTypeGetDynamicStrideOrOffset
@@ -436,6 +451,9 @@ EXPORTS
   mlirSymbolTableLookup
   mlirSymbolTableReplaceAllSymbolUses
   mlirSymbolTableWalkSymbolTables
+  mlirTransformAnyOpTypeGet
+  mlirTransformOperationTypeGet
+  mlirTransformOperationTypeGetOperationName
   mlirTupleTypeGet
   mlirTupleTypeGetNumTypes
   mlirTupleTypeGetType
@@ -464,9 +482,17 @@ EXPORTS
   mlirTypeIsAMemRef
   mlirTypeIsANone
   mlirTypeIsAOpaque
+  mlirTypeIsAPDLAttributeType
+  mlirTypeIsAPDLOperationType
+  mlirTypeIsAPDLRangeType
+  mlirTypeIsAPDLType
+  mlirTypeIsAPDLTypeType
+  mlirTypeIsAPDLValueType
   mlirTypeIsARankedTensor
   mlirTypeIsAShaped
   mlirTypeIsATensor
+  mlirTypeIsATransformAnyOpType
+  mlirTypeIsATransformOperationType
   mlirTypeIsATuple
   mlirTypeIsAUnrankedMemRef
   mlirTypeIsAUnrankedTensor

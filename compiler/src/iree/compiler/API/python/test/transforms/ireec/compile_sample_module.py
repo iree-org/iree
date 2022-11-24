@@ -13,8 +13,8 @@ from iree.compiler.transforms import ireec
 # The compiler re-exports API access to a number of dialects. If one of these
 # fails to import, it indicates a build issue.
 from iree.compiler.dialects import arith
-from iree.compiler.dialects import chlo
-from iree.compiler.dialects import mhlo
+#from iree.compiler.dialects import chlo
+#from iree.compiler.dialects import mhlo
 from iree.compiler.dialects import iree_input
 from iree.compiler.dialects import builtin
 from iree.compiler.dialects import linalg
@@ -41,7 +41,7 @@ with ir.Context() as ctx:
 
   options = ireec.CompilerOptions("--iree-hal-target-backends=llvm-cpu")
   print(options)
-  pm = passmanager.PassManager()
+  pm = passmanager.PassManager(anchor_op="builtin.module")
   ireec.build_iree_vm_pass_pipeline(options, pm)
   pm.run(input_module)
 

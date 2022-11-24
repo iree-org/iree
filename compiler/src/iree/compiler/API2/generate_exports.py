@@ -57,6 +57,22 @@ MLIR_C_HEADER_FILES = [
     "Pass.h",
     "Support.h",
     "Transforms.h",
+    "Dialect/Linalg.h",
+    "Dialect/Transform.h",
+    "Dialect/PDL.h",
+]
+
+IREE_DIALECTS_HEADER_FILES = [
+    "Dialects.h",
+]
+
+EXPLICIT_EXPORTS = [
+    # MLIR registration functions that are part of generated code.
+    "mlirRegisterLinalgPasses",
+    "mlirGetDialectHandle__iree_input__",
+    "mlirGetDialectHandle__iree_linalg_ext__",
+    "mlirGetDialectHandle__iree_linalg_transform__",
+    "mlirGetDialectHandle__transform__",
 ]
 
 # Matches statements that start with a well-known function declaration macro.
@@ -71,10 +87,18 @@ FUNC_DECL_SYMBOL_PATTERN = re.compile(r"(?P<symbol>\w+)\(",
 
 
 def main(repo_root: Path, api_root: Path):
-  export_symbols = []
+  export_symbols = list(EXPLICIT_EXPORTS)
   # Collect symbols from local header files.
   for local_name in LOCAL_HEADER_FILES:
     export_symbols.extend(collect_header_exports(api_root / local_name))
+
+  # Collect symbols from iree-dialects header files.
+  for local_name in IREE_DIALECTS_HEADER_FILES:
+    export_symbols.extend(
+        collect_header_exports(
+            repo_root /
+            "llvm-external-projects/iree-dialects/include/iree-dialects-c" /
+            local_name))
 
   # Collect symbols from mlir-c header files.
   mlir_c_dir = repo_root / "third_party/llvm-project/mlir/include/mlir-c"

@@ -100,8 +100,9 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.vector
 
   # mhlo project.
-  MLIRHLOPythonSources
-  MLIRHLOPythonExtensions
+  # TODO: Consider re-enabling these. They have been broken for some time.
+  # MLIRHLOPythonSources
+  # MLIRHLOPythonExtensions
 
   # iree-dialects project.
   IREEDialectsPythonSources
@@ -178,6 +179,25 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}/compiler\"
   DESTINATION \"${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs\"
 )
 ")
+
+# On Windows, the IREECompiler.dll must be physically adjacent to the python
+# extensions. This is only an issue for the build tree (the install tree
+# places things appropriately). There is a lot of unavoidable fragility
+# here. Most notably, the actual name of the DLL must be static and computed
+# the same as where it is built.
+if(WIN32)
+  set(_local_dll_copy
+    "${_PYTHON_BUILD_PREFIX}/iree/compiler/_mlir_libs/IREECompiler.dll")
+  add_custom_command(
+    OUTPUT "${_local_dll_copy}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+      "$<TARGET_FILE:iree_compiler_API2_SharedImpl>"
+      "${_local_dll_copy}"
+    DEPENDS iree_compiler_API2_SharedImpl
+  )
+  add_custom_target(IREEPythonCopyDLL ALL
+    DEPENDS "${_local_dll_copy}")
+endif()
 
 ################################################################################
 # Subdirectories
