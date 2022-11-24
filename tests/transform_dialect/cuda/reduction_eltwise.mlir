@@ -35,7 +35,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
+// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_eltwise_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK
 
 /// Note: the current --iree-codegen-llvmgpu-enable-transform-dialect-jit only works for exactly this reduction atm.
@@ -49,7 +49,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN: FileCheck %s --check-prefix=CHECK
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
+// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_eltwise_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
