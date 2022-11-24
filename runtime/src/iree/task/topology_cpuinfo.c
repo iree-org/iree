@@ -157,6 +157,22 @@ static void iree_task_topology_group_initialize_from_core(
       processor, &out_group->ideal_thread_affinity);
 }
 
+// Populates |our_group| with the information from |processor|.
+static void iree_task_topology_group_initialize_from_processor(
+    uint32_t group_index, const struct cpuinfo_processor* processor,
+    iree_task_topology_group_t* out_group) {
+  
+  iree_task_topology_group_initialize(group_index, out_group);
+
+  // When pinning to threads we'll take into account whether the core is SMT
+  // and use all threads anyway so this alignment is just helpful for debugging.
+  uint32_t processor_i = processor->core->processor_start;
+  out_group->processor_index = processor_i;
+
+  iree_task_topology_set_affinity_from_processor(
+      processor, &out_group->ideal_thread_affinity);
+}
+
 // Fixes constructive_sharing_mask values such that they represent other chosen
 // topology groups instead of processor indices. We do this so that code using
 // the topology groups doesn't need to know anything about which physical
@@ -206,7 +222,6 @@ static void iree_task_topology_initialize_from_physical_cores_with_filter(
     iree_task_topology_core_filter_t filter_fn, uintptr_t filter_fn_data,
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
   max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
-  iree_host_size_t numa_node_id = out_topology->numa_node_id;
   if (!iree_task_topology_is_cpuinfo_available()) {
     iree_task_topology_initialize_fallback(max_core_count, out_topology);
     return;
@@ -216,32 +231,72 @@ static void iree_task_topology_initialize_from_physical_cores_with_filter(
   IREE_TRACE_ZONE_APPEND_VALUE(z0, max_core_count);
   // Count cores that match the filter.
   iree_host_size_t core_count = 0;
-  uint32_t cluster_core_count = cpuinfo_get_cluster(out_topology->numa_node_id)->core_count;
-  for (uint32_t i = 0; i < cluster_core_count; i++) {
+  for (uint32_t i = 0; i < cpuinfo_get_cores_count(); i++) {
     const struct cpuinfo_core* core = cpuinfo_get_core(i);
     if (filter_fn(core, filter_fn_data)) ++core_count;
   }
   core_count = iree_min(core_count, max_core_count);
 
   iree_task_topology_initialize(out_topology);
-  out_topology->numa_node_id = numa_node_id;
 
   // Build each core up to the max allowed.
   // TODO(benvanik): if our group_count <= core_count/2 then distribute better;
   // for now we just do a straight-line through (cores 0-N) when instead we may
   // want to take advantage of L3 cache info (half of groups on one L3 cache,
   // half of groups on another, etc).
-  uint32_t core_start = cpuinfo_get_cluster(out_topology->numa_node_id)->core_start;
   out_topology->group_count = core_count;
-  for (uint32_t core_i = core_start, group_i = 0; group_i < out_topology->group_count;
+  for (uint32_t core_i = 0, group_i = 0; group_i < out_topology->group_count;
        ++core_i) {
     // Rotate the core ID so that we avoid setting the affinity to the calling
     // thread which we assume is something the user has plans for and doesn't
     // want to have our workers stealing their time.
-    const struct cpuinfo_core* core = cpuinfo_get_core(core_i);
+    const struct cpuinfo_core* core = 
+        cpuinfo_get_core(iree_task_topology_rotate_from_base_core(core_i));
     if (filter_fn(core, filter_fn_data)) {
       iree_task_topology_group_initialize_from_core(
-          group_i, core, &out_topology->groups[group_i]);
+        group_i, core, &out_topology->groups[group_i]);
+      ++group_i;
+    }
+  }
+
+  iree_task_topology_fixup_constructive_sharing_masks(out_topology);
+  IREE_TRACE_ZONE_END(z0);
+}
+
+static void iree_task_topology_initialize_from_logical_processors_with_filter(
+    iree_task_topology_core_filter_t filter_fn, uintptr_t filter_fn_data,
+    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+  max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+  iree_host_size_t numa_node_id = out_topology->numa_node_id;
+  if (!iree_task_topology_is_cpuinfo_available()) {
+    iree_task_topology_initialize_fallback(max_core_count, out_topology);
+    return;
+  }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, max_core_count);
+  // Count cores that match the filter.
+  iree_host_size_t processors_count = 0;
+  for (uint32_t i = 0; i < cpuinfo_get_processors_count(); i++) {
+    const struct cpuinfo_processor* processor = cpuinfo_get_processor(i);
+    if (filter_fn(processor->core, filter_fn_data)) ++processors_count;
+  }
+  processors_count = iree_min(processors_count, max_core_count);
+
+  iree_task_topology_initialize(out_topology);
+  out_topology->numa_node_id = numa_node_id;
+
+  uint32_t processor_start = cpuinfo_get_cluster(out_topology->numa_node_id)->processor_start;
+  out_topology->group_count = processors_count;
+  for (uint32_t processor_i = processor_start, group_i = 0; group_i < out_topology->group_count;
+       ++processor_i) {
+    // TODO: Rotate the processor ID so that we avoid setting the affinity to the calling
+    // thread which we assume is something the user has plans for and doesn't
+    // want to have our workers stealing their time.
+    const struct cpuinfo_processor* processor = cpuinfo_get_processor(processor_i);
+    if (filter_fn(processor->core, filter_fn_data)) {
+      iree_task_topology_group_initialize_from_processor(
+        group_i, processor, &out_topology->groups[group_i]);
       ++group_i;
     }
   }
@@ -256,6 +311,12 @@ void iree_task_topology_initialize_from_physical_cores(
       iree_task_topology_core_filter_all, 0, max_core_count, out_topology);
 }
 
+void iree_task_topology_initialize_from_logical_processors(
+    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+  iree_task_topology_initialize_from_logical_processors_with_filter(
+      iree_task_topology_core_filter_all, 0, max_core_count, out_topology);
+}
+
 void iree_task_topology_initialize_with_cluster(
     iree_host_size_t max_core_count, iree_host_size_t numa_node_id,
     iree_task_topology_t* out_topology) {
@@ -265,7 +326,7 @@ void iree_task_topology_initialize_with_cluster(
     return;
   }
 
-  iree_task_topology_initialize_from_physical_cores(
+  iree_task_topology_initialize_from_logical_processors(
     max_core_count, out_topology);
 }
 
