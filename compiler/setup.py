@@ -228,6 +228,9 @@ def prepare_installation():
         "-GNinja",
         "--log-level=VERBOSE",
         "-DIREE_BUILD_PYTHON_BINDINGS=ON",
+        # Disable .so.0 style symlinking. Python wheels don't preserve links,
+        # so this ~doubles the binary size if not disabled (yikes!).
+        "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON",
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
         get_env_cmake_option("IREE_TARGET_BACKEND_CUDA"),
@@ -251,16 +254,13 @@ def prepare_installation():
       print(f"Not re-configuring (already configured)", file=sys.stderr)
 
     # Build.
-    subprocess.check_call([
-        "cmake", "--build", ".", "--target",
-        "compiler/src/iree/compiler/API/python/all"
-    ],
+    subprocess.check_call(["cmake", "--build", ".", "--target", "compiler/all"],
                           cwd=IREE_BINARY_DIR)
     print("Build complete.", file=sys.stderr)
 
-  # Install the directory we care about.
-  install_subdirectory = os.path.join(IREE_BINARY_DIR, "compiler", "src",
-                                      "iree", "compiler", "API", "python")
+  # Perform installation on the entire compiler/ tree as this is guaranteed
+  # to have all of our installation targets.
+  install_subdirectory = os.path.join(IREE_BINARY_DIR, "compiler")
   install_args = [
       "-DCMAKE_INSTALL_DO_STRIP=ON",
       f"-DCMAKE_INSTALL_PREFIX={CMAKE_INSTALL_DIR_ABS}",

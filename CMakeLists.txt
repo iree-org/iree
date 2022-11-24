@@ -647,6 +647,11 @@ else()
     # rules that really should have them in the first place.
     target_include_directories(LLVMSupport PUBLIC ${_COMMON_INCLUDE_DIRS})
     target_include_directories(MLIRSupport PUBLIC ${_COMMON_INCLUDE_DIRS})
+
+    # Also add a library that can be depended on to get LLVM includes setup
+    # properly. bazel_to_cmake targets this for some header only pseudo deps.
+    add_library(IREELLVMIncludeSetup INTERFACE)
+    target_include_directories(IREELLVMIncludeSetup INTERFACE ${_COMMON_INCLUDE_DIRS})
   endfunction()
   _hack_llvm_include_paths()
 endif()

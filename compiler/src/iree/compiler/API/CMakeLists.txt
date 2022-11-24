@@ -33,37 +33,6 @@ if(TARGET lld)
   )
 endif()
 
-add_mlir_public_c_api_library(IREECompilerCAPILib
-  Compiler.cpp
-  Tools.cpp
-  ${_OPTIONAL_SOURCES}
-  PARTIAL_SOURCES_INTENDED
-  # TODO: If installing, complains about IREEVM not being in any export set.
-  DISABLE_INSTALL
-  LINK_COMPONENTS
-    Support
-  LINK_LIBS PUBLIC
-    MLIRIR
-    iree::compiler::ConstEval
-    iree::compiler::Dialect::VM::IR::IR
-    iree::compiler::Dialect::VM::Target::init_targets
-    iree::compiler::Pipelines
-
-    # Passes and dialects.
-    iree::compiler::Tools::init_llvmir_translations
-    iree::compiler::Tools::init_passes_and_dialects
-
-    # All HAL Targets.
-    iree::compiler::Tools::init_targets
-
-    # Tools.
-    iree::compiler::Tools::iree_compile_lib
-
-    ${_OPTIONAL_LINK_LIBS}
-)
-
-add_subdirectory(test)
-
 ################################################################################
 # Language specific bindings.
 # These have an ordering dependency on the backing CAPI being defined.

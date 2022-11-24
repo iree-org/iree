@@ -96,12 +96,8 @@ cc_binary(
     srcs = ["iree-opt-main.cc"],
     tags = ["hostonly"],
     deps = [
-        "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
-        "//compiler/src/iree/compiler/Tools:init_targets",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:MlirOptLib",
-        "@llvm-project//mlir:Support",
+        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/src/iree/compiler/API2:Impl",
     ],
 )
 
@@ -109,10 +105,8 @@ cc_binary(
     name = "iree-mlir-lsp-server",
     srcs = ["iree-mlir-lsp-server.cc"],
     deps = [
-        "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:MlirLspServerLib",
-        "@llvm-project//mlir:Support",
+        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/src/iree/compiler/API2:Impl",
     ],
 )
 
@@ -225,6 +219,7 @@ cc_binary(
     srcs = ["iree-compile-main.cc"],
     tags = ["hostonly"],
     deps = [
-        "//compiler/src/iree/compiler/Tools:iree_compile_lib",
+        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/src/iree/compiler/API2:Impl",
     ],
 )

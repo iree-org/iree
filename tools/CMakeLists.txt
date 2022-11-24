@@ -195,10 +195,12 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-compile-main.cc"
     DEPS
-      iree::compiler::Tools::iree_compile_lib
+      iree::compiler::API2::Headers
+      iree::compiler::API2::Impl
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
+    SETUP_INSTALL_RPATH
   )
 
   iree_cc_binary(
@@ -207,15 +209,12 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-opt-main.cc"
     DEPS
-      LLVMSupport
-      MLIRIR
-      MLIROptLib
-      MLIRSupport
-      iree::compiler::Tools::init_passes_and_dialects
-      iree::compiler::Tools::init_targets
+      iree::compiler::API2::Headers
+      iree::compiler::API2::Impl
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
+    SETUP_INSTALL_RPATH
   )
 
   iree_cc_binary(
@@ -224,12 +223,10 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-mlir-lsp-server.cc"
     DEPS
-      MLIRIR
-      MLIRLspServerLib
-      MLIRSupport
-      iree::compiler::Tools::init_passes_and_dialects
+      iree::compiler::API2::Headers
+      iree::compiler::API2::Impl
     PUBLIC
-    EXCLUDE_FROM_ALL
+    SETUP_INSTALL_RPATH
   )
 
   iree_cc_binary(

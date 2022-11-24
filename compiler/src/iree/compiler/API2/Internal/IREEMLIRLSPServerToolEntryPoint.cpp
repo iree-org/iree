@@ -9,5 +9,13 @@
 // See https://mlir.llvm.org/docs/Tools/MLIRLSP/
 
 #include "iree/compiler/API2/ToolEntryPoints.h"
+#include "iree/compiler/Tools/init_dialects.h"
+#include "mlir/IR/Dialect.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Tools/mlir-lsp-server/MlirLspServerMain.h"
 
-int main(int argc, char **argv) { return ireeMlirLspServerRunMain(argc, argv); }
+int ireeMlirLspServerRunMain(int argc, char **argv) {
+  mlir::DialectRegistry registry;
+  mlir::iree_compiler::registerAllDialects(registry);
+  return failed(mlir::MlirLspServerMain(argc, argv, registry));
+}

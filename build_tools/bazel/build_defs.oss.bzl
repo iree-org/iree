@@ -59,6 +59,19 @@ def iree_compiler_cc_library(deps = [], **kwargs):
         **kwargs
     )
 
+def iree_compiler_cc_test(deps = [], **kwargs):
+    """Used for cc_test targets within the //compiler tree.
+
+    This is a pass-through to the native cc_test which adds specific
+    runtime specific options and deps.
+    """
+    native.cc_test(
+        deps = deps + [
+            "//compiler/src:defs",
+        ],
+        **kwargs
+    )
+
 def iree_runtime_cc_library(deps = [], **kwargs):
     """Used for cc_library targets within the //runtime tree.
 
