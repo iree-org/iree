@@ -1185,7 +1185,9 @@ cmake -GNinja -B ../iree-build/ -S . <span class="se">\</span>
 
 <span class="c1"># Additional quality of life CMake flags:</span>
 <span class="c1"># Enable ccache:</span>
-<span class="c1">#   -DIREE_ENABLE_CCACHE=ON</span>
+<span class="c1"># See https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/ccache.md</span>
+<span class="c1">#   -DCMAKE_C_COMPILER_LAUNCHER=ccache</span>
+<span class="c1">#   -DCMAKE_CXX_COMPILER_LAUNCHER=ccache</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
