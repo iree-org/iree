@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/TargetSelect.h"
@@ -177,38 +178,31 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
     return VectorPreProcStrategy::Peeling;
   }
 
-  auto maybeVariantOp = getExecutableVariantOp(linalgOp);
-  assert(succeeded(maybeVariantOp) && "ExecutableVariantOp not found");
-  auto variantOp = *maybeVariantOp;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
 
   // Default X86 specific strategy.
-  if (isX86(variantOp) && enableVectorPadding) {
+  if (isX86(targetAttr) && enableVectorPadding) {
     // Padding is only enabled on x86. It leads to too much overhead on RISC-V
     // and ARM.
     return VectorPreProcStrategy::Padding;
   }
 
   // Default RISC-V specific strategies.
-  if (isRISCV(variantOp) && enableVectorPeeling) {
+  if (isRISCV(targetAttr) && enableVectorPeeling) {
     return VectorPreProcStrategy::Peeling;
   }
 
   return VectorPreProcStrategy::None;
 }
 
-/// Looks for the `native_vector_size` attribute in the hal.executable.variant
-/// op.
+/// Looks for the `native_vector_size` attribute in the hal.executable.target
+/// looked up from this op.
 static Optional<int64_t> getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
-  auto variantOp =
-      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  if (!variantOp) return llvm::None;
-  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
-  if (!targetAttr) return llvm::None;
-  auto config = targetAttr.getConfiguration();
-  if (!config) return llvm::None;
-  auto nativeVectorSizeAttr = config.getAs<IntegerAttr>("native_vector_size");
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  auto nativeVectorSizeAttr =
+      getConfigIntegerAttr(targetAttr, "native_vector_size");
   if (!nativeVectorSizeAttr) return llvm::None;
-  int64_t nativeVectorSizeVal = nativeVectorSizeAttr.getInt();
+  int64_t nativeVectorSizeVal = nativeVectorSizeAttr->getInt();
   if (!nativeVectorSizeVal) return llvm::None;
   return nativeVectorSizeVal;
 }
@@ -819,13 +813,13 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
 static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
                                            SmallVectorImpl<int64_t> &sizes,
                                            int64_t vectorSize) {
-  auto variantOp = getExecutableVariantOp(op);
-  if (isX86(*variantOp)) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  if (isX86(targetAttr)) {
     sizes.append({8, 32, 16});
     return;
   }
 
-  if (isRISCV(*variantOp)) {
+  if (isRISCV(targetAttr)) {
     // RISC-V natively supports scalar x vector operations so we don't have to
     // vectorize dimension k. Vectorizing dimension k results in a vector load
     // and a sequence of vrgather ops to implemement the broadcast explicitly.
@@ -846,13 +840,12 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
                                                     int64_t vectorSize,
                                                     bool isQuantized) {
   SmallVector<int64_t> matmulTileSizes;
-  auto variantOp = getExecutableVariantOp(entryPointFn);
-  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
   // Compute workgroup tile sizes using heuristics.
-  // TODO: if (isX86(*variantOp) || isRISCV(*variantOp)) {
+  // TODO: if (isX86(targetAttr) || isRISCV(targetAttr)) {
 
-  if (isAArch64(*variantOp)) {
+  if (isAArch64(targetAttr)) {
     if (isQuantized) {
       matmulTileSizes = {vectorSize, vectorSize * 4, vectorSize};
     } else {
@@ -910,12 +903,11 @@ static LogicalResult setRootConfig(
   SmallVector<int64_t> workgroupTileSizes =
       getMatmulWorkgroupSizes(entryPointFn, linalgOp, vectorSize, isQuantized);
 
-  auto variantOp = getExecutableVariantOp(entryPointFn);
-  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
   // Use the default distribution for the matmul loops.
   int64_t defaultMaxSize = defaultWorkgroupTileSize;
-  if (isX86(*variantOp) || isRISCV(*variantOp)) {
+  if (isX86(targetAttr) || isRISCV(targetAttr)) {
     defaultMaxSize = 128;
   }
 
@@ -959,7 +951,7 @@ static LogicalResult setRootConfig(
   // ARM codgen does not switch to use codegen driver based approach, so we have
   // special logic for it. All the new pipeline is expected to use codegen
   // driver based approach.
-  if (isAArch64(*variantOp) && !isQuantized) {
+  if (isAArch64(targetAttr) && !isQuantized) {
     return setAArch64RootConfig(entryPointFn, contractionOp, flowTileSizes,
                                 workgroupTileSizes, vectorSize);
   }
@@ -1269,9 +1261,8 @@ static LogicalResult setTransposeLikeOpRootConfig(
     return success();
   }
 
-  auto variantOp = getExecutableVariantOp(genericOp);
-  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
-  if (!hasAVX2Feature(*variantOp) || !isSupportedTransposeOp(genericOp)) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  if (!hasAVX2Feature(targetAttr) || !isSupportedTransposeOp(genericOp)) {
     return success();
   }
 
@@ -1492,24 +1483,23 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
   assert(isSupported && "conv op is not supported");
 
   SmallVector<int64_t> tileSizes;
-  auto variantOp = getExecutableVariantOp(entryPointFn);
-  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
-  if (isX86(*variantOp)) {
+  if (isX86(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
         .Case<linalg::Conv2DNhwcHwcfOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 3}; })
         .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
-  } else if (isRISCV(*variantOp)) {
+  } else if (isRISCV(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
         .Case<linalg::Conv2DNhwcHwcfOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize, 1, 3}; })
         .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
-  } else if (isAArch64(*variantOp)) {
+  } else if (isAArch64(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
         .Case<linalg::Conv2DNhwcHwcfOp>(
             [&](auto op) { tileSizes = {1, 1, 32, 64, 1, 1, 16}; })
@@ -1709,15 +1699,14 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   Operation *rootOperation = rootOp.value();
 
   if (rootOperation) {
-    auto variantOp = getExecutableVariantOp(entryPointFn);
-    assert(succeeded(variantOp) && "ExecutableVariantOp not found");
-    if (isVMVXBackend(*variantOp)) {
+    auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+    if (isVMVXBackend(targetAttr)) {
       if (failed(setVMVXRootConfigImpl(entryPointFn, rootOperation))) {
         return failure();
       }
     } else {
       auto targetMLTransInfo =
-          TargetMLTransformInfo::getTargetMLTransformInfo(*variantOp);
+          TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
       if (failed(setRootConfigImpl(entryPointFn, rootOperation,
                                    targetMLTransInfo))) {
         return failure();

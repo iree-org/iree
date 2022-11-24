@@ -26,8 +26,8 @@ namespace mlir {
 namespace iree_compiler {
 
 const TargetMLTransformInfo TargetMLTransformInfo::getTargetMLTransformInfo(
-    IREE::HAL::ExecutableVariantOp variantOp) {
-  if (isRISCV(variantOp)) {
+    IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (isRISCV(targetAttr)) {
     return RISCVTargetMLTransformInfo();
   }
 
