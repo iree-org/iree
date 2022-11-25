@@ -146,9 +146,10 @@ static Value tileAndFuseAndDistributeImpl(
   return foreachThreadH;
 }
 
+/// Call tileAndFuseAndDistributeImpl with ArrayRef<int64_t> tilesSizes.
 template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
-static Value tfdWithTileSizes(
+static Value buildTFDWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<int64_t> tileSizes, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
@@ -158,9 +159,10 @@ static Value tfdWithTileSizes(
                            resultingFusedOpsHandles);
 }
 
+/// Call tileAndFuseAndDistributeImpl with a handle to multiple tilesSizes.
 template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
-static Value tfdWithTileSizeHandle(
+static Value buildTFDWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     Value tileSizeHandle, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
@@ -171,9 +173,23 @@ static Value tfdWithTileSizeHandle(
                              threadDimMapping, resultingFusedOpsHandles);
 }
 
+/// Call tileAndFuseAndDistributeImpl with ArrayRef<int64_t> numThreads.
 template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
-static Value tfdWithNumThreadsHandle(
+static Value buildTFDWithNumThreads(
+    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<int64_t> numThreads, ArrayAttr threadDimMapping = {},
+    SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
+  return tileAndFuseAndDistributeImpl<
+      TilingTransformOp, transform::NumThreadsSpec, BatchOrIterativeFusion>(
+      b, rootH, opsHToFuse, numThreads, threadDimMapping,
+      resultingFusedOpsHandles);
+}
+
+/// Call tileAndFuseAndDistributeImpl with a handle to multiple numThreads.
+template <typename TilingTransformOp = TileToForeachThreadOp,
+          typename BatchOrIterativeFusion = BatchFusionSpec>
+static Value buildTFDWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     Value numThreads, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
@@ -219,9 +235,10 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
 /// It runs without interleaved canonicalize, CSE or enabling transforms which
 /// allows the transform dialect to build payload IR and not risk seeing it
 /// being DCE'd away immediately.
+template <typename TileSizesType>
 static Value buildReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
-    Value originalGenericH, ArrayRef<int64_t> tileSizes0Generic) {
+    Value originalGenericH, TileSizesType tileSizes0Generic) {
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
   auto splitReductionTransformOp =
@@ -239,7 +256,7 @@ static Value buildReductionStrategyBlockDistributionPart(
                                                ::mlir::gpu::Blocks::DimX);
   // Step 2. First level of tiling + fusion parallelizes to blocks using
   // `tileSizes`.
-  tfdWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
+  buildTFDWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
       b,
       /*rootH=*/combinerH,
       /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH},
@@ -264,7 +281,7 @@ static Value buildReductionStrategyThreadDistributionPart(
   (void)y;
 
   // clang-format off
-  tfdWithTileSizes<TileToForeachThreadOp>(b,
+  buildTFDWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/parRedH,
                    /*opsHToFuse=*/{fill1dH},
                   // TODO: activate this, we have the information but it does
@@ -273,7 +290,7 @@ static Value buildReductionStrategyThreadDistributionPart(
                   //  /*threadDimMapping=*/b.getArrayAttr({y}));
                    /*tileSizes=*/tileSizes1Fill,
                    /*threadDimMapping=*/b.getArrayAttr({z}));
-  tfdWithTileSizes<TileToForeachThreadOp>(b,
+  buildTFDWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/parParRedH,
                    /*opsHToFuse=*/{fill2dH},
                   // TODO: activate this, we have the information but it does
@@ -330,44 +347,319 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
   distributeVectors(b, funcH);
 }
 
+namespace {
+
+/// A tag indicating the shape being static or dynamic, for use with the
+/// structured op matcher.
+enum class ShapeKind { Static, Dynamic };
+
+/// A placeholder indicating the structured op matcher to check the predicate
+/// for all dimensions.
+struct AllDims {};
+
+/// A placeholder indicating the structured op matcher to check the predicate
+/// for all operands of the relevant kind.
+struct AllOperands {};
+
+/// Base class for predicate parameters that can be described with the single
+/// value. Concrete predicate parameters should inherit this and forward the
+/// constructor via `using Base::Base`.
+template <typename T>
+struct SingleValuePredicateParam {
+  using Base = SingleValuePredicateParam<T>;
+  explicit SingleValuePredicateParam(T value) : value(value) {}
+  const T value;
+};
+
+/// Indicates that the dimension must be divisible by the given value.
+struct DivisibleBy : public SingleValuePredicateParam<int64_t> {
+  using Base::Base;
+};
+
+/// Indicates that the number of entities must be equal to the given value.
+struct NumEqualsTo : public SingleValuePredicateParam<size_t> {
+  using Base::Base;
+};
+
+/// Indicates that the bit width of the elemental type must be equal to the give
+/// value.
+struct ElementTypeBitWidth : public SingleValuePredicateParam<size_t> {
+  using Base::Base;
+};
+
+/// Predicate tag indicating that the affine map is a permutation.
+struct IsPermutation {};
+
+/// Predicate tag indicating that the reduction is produced by a single combiner
+/// operation.
+struct SingleCombinerReduction {};
+
+class StructuredOpMatcher;
+StructuredOpMatcher m_StructuredOp();
+
+/// Structured op matcher with additional predicates attachable through the
+/// fluent, a.k.a. chainable, API. Note that public API must *not* accept
+/// additional callbacks even; new predicates should be added instead when
+/// necessary. Not only this decreases the depth of the callback stack and
+/// increases readability, it also allows us to port the matcher to a
+/// declarative format using PDL and/or Transform dialect in the future. The
+/// latter will become impossible with arbitrary C++ callbacks.
+class StructuredOpMatcher {
+  friend StructuredOpMatcher m_StructuredOp();
+  using PredicateFn = std::function<bool(linalg::LinalgOp)>;
+
+  /// Matches a structured operation if the given predicate is satisfied.
+  StructuredOpMatcher(PredicateFn &&firstPredicate) {
+    predicates.push_back(std::move(firstPredicate));
+  }
+
+ public:
+  /// Matches any structured operation, i.e., operation with LinalgOp interface.
+  StructuredOpMatcher() {}
+
+  /// Creates a matcher for a structured operation with one of the given types.
+  template <typename... OpType>
+  static StructuredOpMatcher create() {
+    return StructuredOpMatcher(
+        [](linalg::LinalgOp op) { return isa<OpType...>(op.getOperation()); });
+  }
+
+  /// Returns the matched operation if the match was successful.
+  linalg::LinalgOp getCaptured() const { return captured; }
+
+  /// Matches the given operation, hook for `matchPattern`.
+  bool match(Operation *op) {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (!linalgOp) return false;
+
+    if (!llvm::all_of(predicates, [linalgOp](const PredicateFn &fn) {
+          return fn(linalgOp);
+        })) {
+      return false;
+    }
+
+    captured = linalgOp;
+    return true;
+  }
+
+  /// Adds a predicate checking that the given iteration space dimension is
+  /// static/dynamic. The dimension index may be negative, in which case
+  /// dimensions are counted from the last one Python-style, or be an AllDims
+  /// tag, in which case all dimensions are checked. This may be eventually
+  /// extended to slices and/or lists of dimensions.
+  StructuredOpMatcher &dim(int64_t dimension, ShapeKind kind) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
+      int64_t transformedDimension =
+          dimension >= 0 ? dimension : shape.size() + dimension;
+      if (transformedDimension >= shape.size()) return false;
+      return ShapedType::isDynamic(shape[transformedDimension]) ^
+             (kind == ShapeKind::Static);
+    });
+    return *this;
+  }
+  StructuredOpMatcher &dim(AllDims tag, ShapeKind kind) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
+      return llvm::all_of(shape, [=](int64_t dimension) {
+        return ShapedType::isDynamic(dimension) ^ (kind == ShapeKind::Static);
+      });
+    });
+    return *this;
+  }
+
+  /// Adds a predicate checking that the given iteration space dimension has the
+  /// given iterator type, e.g., parallel or reduction. The dimension index may
+  /// be negative, in which case dimensions are counted from the last one
+  /// Python-style, or be an AllDims tag, in which case all dimensions are
+  /// checked. This may be eventually extended to slices and/or lists of
+  /// dimensions.
+  StructuredOpMatcher &dim(int64_t dimension, utils::IteratorType kind) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      unsigned rank = linalgOp.getNumLoops();
+      int64_t transformedDimension =
+          dimension >= 0 ? dimension : rank + dimension;
+      if (transformedDimension >= rank) return false;
+
+      utils::IteratorType iteratorKind =
+          linalgOp.getIteratorTypesArray()[transformedDimension];
+      return iteratorKind == kind;
+    });
+    return *this;
+  }
+  StructuredOpMatcher &dim(AllDims tag, utils::IteratorType kind) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      return llvm::all_of(linalgOp.getIteratorTypesArray(),
+                          [=](utils::IteratorType iteratorType) {
+                            return iteratorType == kind;
+                          });
+    });
+    return *this;
+  }
+
+  /// Adds a predicate checking that the given iteration space dimension is
+  /// statically known to be divisible by the given value. The dimension index
+  /// may be negative, in which case dimensions are counted from the last one
+  /// Python-style.
+  StructuredOpMatcher &dim(int64_t dimension, DivisibleBy divisibleBy) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      unsigned rank = linalgOp.getNumLoops();
+      int64_t transformedDimension =
+          dimension >= 0 ? dimension : rank + dimension;
+      if (transformedDimension >= rank) return false;
+
+      int64_t size = linalgOp.getStaticLoopRanges()[transformedDimension];
+      return !ShapedType::isDynamic(size) && (size % divisibleBy.value == 0);
+    });
+    return *this;
+  }
+
+  /// Adds a predicate that recursively applies other predicates to the
+  /// operation defining the `position`-th operand. The position may be
+  /// negative, in which case positions are counted from the last one
+  /// Python-style.
+  template <typename T>
+  std::enable_if_t<
+      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
+                        Operation *>::value,
+      StructuredOpMatcher &>
+  input(int64_t position, T &operandMatcher) {
+    predicates.push_back([position,
+                          &operandMatcher](linalg::LinalgOp linalgOp) -> bool {
+      int64_t transformedPosition =
+          position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
+      if (transformedPosition >= linalgOp.getNumDpsInputs()) return false;
+
+      Operation *definingOp = linalgOp.getDpsInputOperand(transformedPosition)
+                                  ->get()
+                                  .getDefiningOp();
+      if (!definingOp) return false;
+      return operandMatcher.match(definingOp);
+    });
+    return *this;
+  }
+
+  /// Adds a predicate checking that all input operands of the structured op
+  /// have a permutation indexing map.
+  StructuredOpMatcher &input(AllOperands tag, IsPermutation) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      // all_of with a lambda requires const-casting dance, so using a loop.
+      for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
+        if (!linalgOp.getMatchingIndexingMap(operand).isPermutation())
+          return false;
+      }
+      return true;
+    });
+    return *this;
+  }
+
+  /// Adds a predicate checking that the structured op has the given number of
+  /// outputs.
+  StructuredOpMatcher &output(NumEqualsTo num) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      return linalgOp.getNumDpsInits() == num.value;
+    });
+    return *this;
+  }
+
+  /// Adds a predicate checking that the bit width of the elemental type of the
+  /// structured op output at the given position is equal to the given value.
+  StructuredOpMatcher &output(int64_t position, ElementTypeBitWidth width) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      int64_t updatedPosition =
+          position >= 0 ? position : linalgOp.getNumDpsInits() + position;
+      if (updatedPosition >= linalgOp.getNumDpsInits()) return false;
+      auto shapedType = linalgOp.getDpsInitOperand(updatedPosition)
+                            ->get()
+                            .getType()
+                            .dyn_cast<ShapedType>();
+      return shapedType && shapedType.getElementType().isIntOrFloat() &&
+             shapedType.getElementType().getIntOrFloatBitWidth() == width.value;
+    });
+    return *this;
+  }
+
+  /// Adds a predicate checking that the output of the structured op is produced
+  /// by a reduction with a single-operation combinator (such as addf or mulf,
+  /// but not a compare+select pair).
+  StructuredOpMatcher &output(int64_t position, SingleCombinerReduction tag) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      int64_t updatedPosition =
+          position >= 0 ? position : linalgOp.getNumDpsInits() + position;
+      if (updatedPosition >= linalgOp.getNumDpsInits()) return false;
+      SmallVector<Operation *> combinerOps;
+      return matchReduction(linalgOp.getRegionOutputArgs(), updatedPosition,
+                            combinerOps) &&
+             llvm::hasSingleElement(combinerOps);
+    });
+    return *this;
+  }
+
+  /// Adds a predicate that recursively applies other predicates to the
+  /// operation defining the init/out operand corresponding to `position`-th
+  /// output. The position may be negative, in which case positions are counted
+  /// from the last one Python-style.
+  template <typename T>
+  std::enable_if_t<
+      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
+                        Operation *>::value,
+      StructuredOpMatcher &>
+  output(int64_t position, T &operandMatcher) {
+    predicates.push_back([position,
+                          &operandMatcher](linalg::LinalgOp linalgOp) -> bool {
+      int64_t transformedPosition =
+          position >= 0 ? position : linalgOp.getNumDpsInits() + position;
+      if (transformedPosition >= linalgOp.getNumDpsInits()) return false;
+
+      Operation *definingOp = linalgOp.getDpsInitOperand(transformedPosition)
+                                  ->get()
+                                  .getDefiningOp();
+      if (!definingOp) return false;
+      return operandMatcher.match(definingOp);
+    });
+    return *this;
+  }
+
+ private:
+  /// Additional predicates to be checked on the structured op.
+  SmallVector<PredicateFn> predicates;
+
+  /// Matched value.
+  linalg::LinalgOp captured = nullptr;
+};
+
+/// Creates a matcher of an arbitrary structured op.
+StructuredOpMatcher m_StructuredOp() { return StructuredOpMatcher(); }
+
+/// Creates a matcher of a structured op with kinds provided as template
+/// arguments.
+template <typename... OpType>
+StructuredOpMatcher m_StructuredOp() {
+  return StructuredOpMatcher::create<OpType...>();
+}
+
+}  // namespace
+
 static constexpr unsigned cudaWarpSize = 32;
 
 /// Matcher.
 static bool matchGPUReduction(linalg::LinalgOp op,
                               GPUReductionStrategyInfos &info) {
-  // TODO: match the sequence the startegy supports.
-  if (!isa<linalg::GenericOp>(op)) return false;
-  if (op.hasDynamicShape()) return false;
-  SmallVector<unsigned> reductionDims;
-  op.getReductionDims(reductionDims);
-  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
-    return false;
-  if (op.getRegionOutputArgs().size() != 1) return false;
-
-  // Only support projected permutation, this could be extended to projected
-  // permutated with broadcast.
-  if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
-        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
-      }))
-    return false;
-
-  // Only single combiner operations are supported for now.
-  SmallVector<Operation *, 4> combinerOps;
-  if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
-      combinerOps.size() != 1)
-    return false;
-
-  int64_t dimSize = op.getStaticLoopRanges()[reductionDims[0]];
-  if (dimSize % cudaWarpSize != 0) return false;
-
-  const Type elementType = op.getDpsInitOperand(0)
-                               ->get()
-                               .getType()
-                               .cast<ShapedType>()
-                               .getElementType();
-  if (!elementType.isIntOrFloat()) return false;
-  // Reduction distribution only supports 32-bit types now.
-  if (elementType.getIntOrFloatBitWidth() != 32) return false;
+  // TODO: match the sequence the strategy supports.
+  auto fill = m_StructuredOp<linalg::FillOp>();
+  auto pattern = m_StructuredOp()
+                     .dim(AllDims(), ShapeKind::Static)
+                     .dim(-1, utils::IteratorType::reduction)
+                     .dim(-1, DivisibleBy(cudaWarpSize))
+                     // Can be extended to projected permutation with broadcast.
+                     .input(AllOperands(), IsPermutation())
+                     .output(NumEqualsTo(1))
+                     .output(0, fill)
+                     // Only single combiner over 32 bits for now due to
+                     // reduction distribution.
+                     .output(0, ElementTypeBitWidth(32))
+                     .output(0, SingleCombinerReduction());
+  if (!matchPattern(op, pattern)) return false;
 
   // Hardcoded workagroup size, this could be deduced from the reduction dim.
   info.workgroupSize = {32, 2, 1};
@@ -390,21 +682,13 @@ struct CPUReductionStrategyInfos {
 
 static bool matchCPUReduction(linalg::LinalgOp op,
                               CPUReductionStrategyInfos &infos) {
-  // TODO: match the sequence the startegy supports.
-  if (!isa<linalg::GenericOp>(op)) return false;
-  if (op.hasDynamicShape()) return false;
-  SmallVector<unsigned> reductionDims;
-  op.getReductionDims(reductionDims);
-  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
-    return false;
-  if (op.getRegionOutputArgs().size() != 1) return false;
-
-  // Only support projected permutation, this could be extended to projected
-  // permutated with broadcast.
-  if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
-        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
-      }))
-    return false;
+  // TODO: match the sequence the strategy supports.
+  auto fill = m_StructuredOp<linalg::FillOp>();
+  auto pattern = m_StructuredOp()
+                     .dim(AllDims(), ShapeKind::Static)
+                     .dim(-1, utils::IteratorType::reduction)
+                     .output(NumEqualsTo(1))
+                     .output(0, fill);
 
   // TODO: set the right config as expected by the strategy.
   infos.workgroupSize = {1};
