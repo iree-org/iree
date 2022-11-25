@@ -238,7 +238,8 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
 template <typename TileSizesType>
 static Value buildReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
-    Value reductionH, Value fusionRootH, TileSizesType tileSizes0Generic) {
+    Value reductionH, Value optionalFusionRootH,
+    TileSizesType tileSizes0Generic) {
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
   auto splitReductionTransformOp =
@@ -258,13 +259,14 @@ static Value buildReductionStrategyBlockDistributionPart(
   // `tileSizes`. If the fusion root was the reduction op, update it to be the
   // combiner op. Otherwise, fuse the combiner op into root.
   SmallVector<Value> opsHToFuse({originalFillH, splitFillH, splitLinalgH});
-  if (reductionH == fusionRootH) {
-    fusionRootH = combinerH;
+  if (!optionalFusionRootH) {
+    optionalFusionRootH = combinerH;
   } else {
     opsHToFuse.push_back(combinerH);
   }
   buildTFDWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
-      b, fusionRootH, opsHToFuse, tileSizes0Generic, b.getArrayAttr({x}));
+      b, optionalFusionRootH, opsHToFuse, tileSizes0Generic,
+      b.getArrayAttr({x}));
 
   return variantH;
 }
@@ -313,8 +315,8 @@ static Value buildReductionStrategyThreadDistributionPart(
 }
 
 /// Returns a pair of handles to the main reduction operation and the fusion
-/// root, which may or may not be equal. When not equal, there are users of
-/// reduction results into which the reduction may be fused.
+/// root. If the fusion root is null, the reduction operation should be used as
+/// fusion root instead.
 static std::tuple<Value, Value> reductionBlockDistributionHandles(
     ImplicitLocOpBuilder &b, Value variantH, bool hasTrailingEltwise) {
   Value originalGenericH =
@@ -324,7 +326,7 @@ static std::tuple<Value, Value> reductionBlockDistributionHandles(
         b.create<SplitHandlesOp>(originalGenericH, /*numResultHandles=*/2);
     return std::make_tuple(op.getResults()[0], op.getResults()[1]);
   }
-  return std::make_tuple(originalGenericH, originalGenericH);
+  return std::make_tuple(originalGenericH, Value());
 }
 
 // TODO: generalize and automate over and over.
@@ -856,8 +858,7 @@ static LogicalResult buildReductionCpuStrategy(
 
   // Step 1: Distribute to blocks using the current IREE lowering config.
   variantH = buildReductionStrategyBlockDistributionPart(
-      b, variantH, originalFillH, originalGenericH, originalGenericH,
-      tileSizes0Generic);
+      b, variantH, originalFillH, originalGenericH, Value(), tileSizes0Generic);
 
   // Step 2. Rank-reduce and buildVectorizeStrategy.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
@@ -884,12 +885,12 @@ LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
   bool hasTrailingEltwise;
   if (!matchGPUReduction(op, tileSizes, workgroupSize, hasTrailingEltwise))
     return failure();
-  auto startegyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
+  auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
     return buildReductionCudaStrategy(b, variant, tileSizes, workgroupSize,
                                       hasTrailingEltwise);
   };
   // 2. Add the strategy.
-  createTransformRegion(entryPoint, startegyBuilder);
+  createTransformRegion(entryPoint, strategyBuilder);
   return success();
 }
 
