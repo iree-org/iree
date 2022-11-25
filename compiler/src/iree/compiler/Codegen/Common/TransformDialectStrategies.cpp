@@ -314,6 +314,15 @@ static Value buildReductionStrategyThreadDistributionPart(
   return variantH;
 }
 
+/// Structure to hold the parameters related to GPU reduction strategy.
+struct GPUReductionStrategyInfos {
+  std::array<int64_t, 3> workgroupSize;
+  SmallVector<int64_t> workgroupTileSizes;
+  SmallVector<int64_t> fillSecondTileSizes;
+  SmallVector<int64_t> genericSecondTileSizes;
+  bool hasTrailingEltwise;
+};
+
 /// Returns a pair of handles to the main reduction operation and the fusion
 /// root. If the fusion root is null, the reduction operation should be used as
 /// fusion root instead.
@@ -332,22 +341,22 @@ static std::tuple<Value, Value> reductionBlockDistributionHandles(
 // TODO: generalize and automate over and over.
 // TODO: significantly shrink this down.
 static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
-                                       TileSizesListType &tileSizes,
-                                       std::array<int64_t, 3> &workgroupSize,
-                                       bool hasTrailingEltwise) {
+                                       const GPUReductionStrategyInfos &infos) {
   // Step 0. Match the ops.
   Value originalFillH =
       b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
   auto [reductionH, fusionRootH] =
-      reductionBlockDistributionHandles(b, variantH, hasTrailingEltwise);
+      reductionBlockDistributionHandles(b, variantH, infos.hasTrailingEltwise);
 
   // Step 1: Distribute to blocks using the current IREE lowering config.
   variantH = buildReductionStrategyBlockDistributionPart(
-      b, variantH, originalFillH, reductionH, fusionRootH, tileSizes[0]);
+      b, variantH, originalFillH, reductionH, fusionRootH,
+      infos.workgroupTileSizes);
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   variantH = buildReductionStrategyThreadDistributionPart(
-      b, variantH, tileSizes[1], tileSizes[2], hasTrailingEltwise);
+      b, variantH, infos.fillSecondTileSizes, infos.genericSecondTileSizes,
+      infos.hasTrailingEltwise);
 
   // Step 3. Rank-reduce and vectorize.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
@@ -361,7 +370,7 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may ned hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = mapToBlockAndThreads(b, funcH, workgroupSize);
+  funcH = mapToBlockAndThreads(b, funcH, infos.workgroupSize);
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   distributeVectors(b, funcH);
@@ -754,9 +763,8 @@ OptionalStructuredOpMatcher m_OptionalStructuredOp() {
 static constexpr unsigned cudaWarpSize = 32;
 
 /// Matcher.
-static bool matchGPUReduction(linalg::LinalgOp op, TileSizesListType &tileSizes,
-                              std::array<int64_t, 3> &workgroupSize,
-                              bool &hasTrailingEltwise) {
+static bool matchGPUReduction(linalg::LinalgOp op,
+                              GPUReductionStrategyInfos &info) {
   // TODO: match the sequence the strategy supports.
   auto fill = m_StructuredOp<linalg::FillOp>();
   auto trailingEltwise = m_StructuredOp<linalg::GenericOp>()
@@ -781,27 +789,29 @@ static bool matchGPUReduction(linalg::LinalgOp op, TileSizesListType &tileSizes,
                      .result(0, HasAnyUse(), maybeTrailingEltwise);
   if (!matchPattern(op, pattern)) return false;
 
-  hasTrailingEltwise = maybeTrailingEltwise.succeeded();
+  info.hasTrailingEltwise = maybeTrailingEltwise.succeeded();
 
   // Hardcoded workagroup size, this could be deduced from the reduction dim.
-  workgroupSize = {32, 2, 1};
+  info.workgroupSize = {32, 2, 1};
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   // Tile all the parallel dimension to 1.
-  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
-  SmallVector<int64_t, 4> fillTileSize = {1, 0, 0};
-  SmallVector<int64_t, 4> genericTileSize = {1, 1, 0};
-  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
-  tileSizes.emplace_back(std::move(fillTileSize));
-  tileSizes.emplace_back(std::move(genericTileSize));
+  info.workgroupTileSizes.append(numLoops, 1);
+  info.fillSecondTileSizes = {1, 0, 0};
+  info.genericSecondTileSizes = {1, 1, 0};
   return true;
 }
 
+/// Structure to hold the parameters related to GPU reduction strategy.
+struct CPUReductionStrategyInfos {
+  std::array<int64_t, 1> workgroupSize;
+  SmallVector<int64_t> tileSizes;
+};
+
 static bool matchCPUReduction(linalg::LinalgOp op,
-                              SmallVector<int64_t> &tileSize,
-                              std::array<int64_t, 3> &workgroupSize) {
+                              CPUReductionStrategyInfos &infos) {
   // TODO: match the sequence the strategy supports.
   auto fill = m_StructuredOp<linalg::FillOp>();
   auto pattern = m_StructuredOp()
@@ -810,14 +820,14 @@ static bool matchCPUReduction(linalg::LinalgOp op,
                      .output(NumEqualsTo(1))
                      .output(0, fill);
 
-  // Hardcoded workagroup size, this could be deduced from the reduction dim.
-  workgroupSize = {32, 2, 1};
+  // TODO: set the right config as expected by the strategy.
+  infos.workgroupSize = {1};
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   // Tile all the parallel dimension to 1.
-  tileSize.append(numLoops, 1);
+  infos.tileSizes.append(numLoops, 1);
   return true;
 }
 
@@ -845,8 +855,8 @@ static void createTransformRegion(func::FuncOp entryPoint,
 // TODO: generalize and automate over and over.
 // TODO: significantly shrink this down.
 static LogicalResult buildReductionCpuStrategy(
-    ImplicitLocOpBuilder &b, Value variantH, ArrayRef<int64_t> workgroupSize,
-    ArrayRef<int64_t> tileSizes0Generic) {
+    ImplicitLocOpBuilder &b, Value variantH,
+    const CPUReductionStrategyInfos &info) {
   // Step 0. Fetch transform information from the config and materialize it in
   // the payload IR.
   // TODO: this still requires specific knowledge of ops present in the IR
@@ -858,7 +868,7 @@ static LogicalResult buildReductionCpuStrategy(
 
   // Step 1: Distribute to blocks using the current IREE lowering config.
   variantH = buildReductionStrategyBlockDistributionPart(
-      b, variantH, originalFillH, originalGenericH, Value(), tileSizes0Generic);
+      b, variantH, originalFillH, originalGenericH, Value(), info.tileSizes);
 
   // Step 2. Rank-reduce and buildVectorizeStrategy.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
@@ -880,14 +890,10 @@ static LogicalResult buildReductionCpuStrategy(
 LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
                                                        linalg::LinalgOp op) {
   // 1. Match
-  TileSizesListType tileSizes;
-  std::array<int64_t, 3> workgroupSize;
-  bool hasTrailingEltwise;
-  if (!matchGPUReduction(op, tileSizes, workgroupSize, hasTrailingEltwise))
-    return failure();
+  GPUReductionStrategyInfos infos;
+  if (!matchGPUReduction(op, infos)) return failure();
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    return buildReductionCudaStrategy(b, variant, tileSizes, workgroupSize,
-                                      hasTrailingEltwise);
+    return buildReductionCudaStrategy(b, variant, infos);
   };
   // 2. Add the strategy.
   createTransformRegion(entryPoint, strategyBuilder);
@@ -897,11 +903,10 @@ LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
 LogicalResult matchAndSetCPUReductionTransformStrategy(func::FuncOp entryPoint,
                                                        linalg::LinalgOp op) {
   // 1. Match
-  SmallVector<int64_t> tileSize;
-  std::array<int64_t, 3> workgroupSize;
-  if (!matchCPUReduction(op, tileSize, workgroupSize)) return failure();
+  CPUReductionStrategyInfos infos;
+  if (!matchCPUReduction(op, infos)) return failure();
   auto startegyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    return buildReductionCpuStrategy(b, variant, tileSize, workgroupSize);
+    return buildReductionCpuStrategy(b, variant, infos);
   };
   // 2. Add the strategy.
   createTransformRegion(entryPoint, startegyBuilder);
