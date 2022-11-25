@@ -22,3 +22,11 @@ iree_cc_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# Move to bin/ directory and systematically name more appropriately.
+# See: https://github.com/iree-org/iree/issues/11297
+set_target_properties(iree_compiler_API2_test_api-test-binary
+  PROPERTIES
+  OUTPUT_NAME "test-iree-compiler-api-test-binary"
+  RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/tools"
+)
