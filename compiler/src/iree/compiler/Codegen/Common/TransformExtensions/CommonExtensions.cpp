@@ -537,7 +537,7 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
 static LogicalResult lowerWorkgroupCountComputingRegion(
     transform::TransformState &state, RewriterBase &rewriter, Location loc,
     HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> tileSizes,
-    Optional<ArrayAttr> mapping) {
+    ArrayAttr mapping) {
   Region &r = exportOp.getWorkgroupCount();
   if (!r.hasOneBlock()) {
     return rewriter.notifyMatchFailure(exportOp,
@@ -601,7 +601,7 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
   workgroupCount.resize(3, rewriter.getIndexAttr(1));
   permutedWorkgroupCount.resize(3, rewriter.getIndexAttr(1));
   int mappingId = 0;
-  for (DeviceMappingAttrInterface map : mapping->getValue()) {
+  for (DeviceMappingAttrInterface map : mapping) {
     permutedWorkgroupCount[map.getMappingId()] = workgroupCount[mappingId++];
   }
   rewriter.replaceOp(
@@ -652,9 +652,15 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
   /// Lower the workgroup count region in keeping with the way dispatch
   /// regions are created by default in IREEs compilation flow.
   IRRewriter rewriter(getContext());
+  auto mappingAttr = getMappingAttr();
+  if (!mappingAttr) {
+    return mlir::emitDefiniteFailure(
+        exportOp.value(),
+        "cannot to lower workgroup count region without a `mapping` attribute");
+  }
   if (failed(lowerWorkgroupCountComputingRegion(
           state, rewriter, getLoc(), exportOp.value(), getMixedTileSizes(),
-          getMapping()))) {
+          mappingAttr))) {
     return mlir::emitDefiniteFailure(exportOp.value(),
                                      "failed to lower workgroup count region");
   }

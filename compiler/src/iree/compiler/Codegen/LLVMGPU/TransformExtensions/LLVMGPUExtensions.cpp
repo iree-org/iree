@@ -288,9 +288,9 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
            << "export op is missing --- the transform is not applied";
   }
 
-  Optional<ArrayAttr> maybeAttr = exportOp.getWorkgroupSize();
+  ArrayAttr maybeAttr = exportOp.getWorkgroupSizeAttr();
   // TODO: Pervasive 3 constant in IREE.
-  if (!maybeAttr || maybeAttr->size() != 3) {
+  if (!maybeAttr || maybeAttr.size() != 3) {
     // Return a silenceable failure and set the expected 1 result to nullptr.
     results.assign(1, nullptr);
     return emitDefaultSilenceableFailure(target)
@@ -298,7 +298,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
               "--- the transform is not applied";
   }
 
-  int64_t workgroupSizeX = (*maybeAttr)[0].cast<IntegerAttr>().getInt();
+  int64_t workgroupSizeX = maybeAttr[0].cast<IntegerAttr>().getInt();
   int64_t warpSize = getWarpSize();
   if (workgroupSizeX % warpSize != 0) {
     // Return a silenceable failure and set the expected 1 result to nullptr.

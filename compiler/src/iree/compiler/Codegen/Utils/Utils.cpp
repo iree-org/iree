@@ -71,23 +71,23 @@ llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
   return exportOps;
 }
 
-Optional<StringAttr> getConfigStringAttr(
-    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef stringAttr) {
-  if (!targetAttr) return llvm::None;
+StringAttr getConfigStringAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
+                               StringRef stringAttr) {
+  if (!targetAttr) return nullptr;
   auto config = targetAttr.getConfiguration();
-  if (!config) return llvm::None;
+  if (!config) return nullptr;
   auto attr = config.getAs<StringAttr>(stringAttr);
-  if (!attr) return llvm::None;
+  if (!attr) return nullptr;
   return attr;
 }
 
-Optional<IntegerAttr> getConfigIntegerAttr(
-    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr) {
-  if (!targetAttr) return llvm::None;
+IntegerAttr getConfigIntegerAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 StringRef integerAttr) {
+  if (!targetAttr) return nullptr;
   auto config = targetAttr.getConfiguration();
-  if (!config) return llvm::None;
+  if (!config) return nullptr;
   auto attr = config.getAs<IntegerAttr>(integerAttr);
-  if (!attr) return llvm::None;
+  if (!attr) return nullptr;
   return attr;
 }
 
@@ -95,7 +95,7 @@ Optional<llvm::Triple> getTargetTriple(
     IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto triple = getConfigStringAttr(targetAttr, "target_triple");
   if (!triple) return llvm::None;
-  return llvm::Triple(triple.value().str());
+  return llvm::Triple(triple.str());
 }
 
 /// Returns the CPU target features associated with the `hal.executable.variant`
@@ -103,7 +103,7 @@ Optional<llvm::Triple> getTargetTriple(
 Optional<StringRef> getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
   if (!cpuFeatures) return llvm::None;
-  return cpuFeatures->getValue();
+  return cpuFeatures.getValue();
 }
 
 bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {

@@ -255,8 +255,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
   if (!skipThreadLevel) {  // Tile and distribute to invocations.
     RewritePatternSet tilingPatterns(context);
-    IREE::LinalgExt::LinalgTransformationFilter filter({workgroupMarker},
-                                                       llvm::None);
+    IREE::LinalgExt::LinalgTransformationFilter filter({workgroupMarker}, {});
     populateTilingToInvocationPatterns(tilingPatterns, filter,
                                        *threadTileComputeFn);
     if (failed(

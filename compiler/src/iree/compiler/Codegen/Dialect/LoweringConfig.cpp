@@ -255,8 +255,8 @@ IREE::Codegen::TranslationInfoAttr getTranslationInfo(
 }
 
 SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
-  if (Optional<ArrayAttr> workgroupSizeAttrList = exportOp.getWorkgroupSize()) {
-    return getIntegerVals(*workgroupSizeAttrList);
+  if (ArrayAttr workgroupSizeAttrList = exportOp.getWorkgroupSizeAttr()) {
+    return getIntegerVals(workgroupSizeAttrList);
   }
   return {};
 }

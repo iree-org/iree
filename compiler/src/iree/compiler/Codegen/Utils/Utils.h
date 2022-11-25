@@ -44,14 +44,14 @@ FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp);
 FailureOr<IREE::HAL::ExecutableVariantOp> getExecutableVariantOp(Operation *op);
 
 /// Returns the StringAttr with the name `stringAttr` in the `targetAttr`, if
-/// found.
-Optional<StringAttr> getConfigStringAttr(
-    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef stringAttr);
+/// found. Otherwise, returns a null StringAttr.
+StringAttr getConfigStringAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
+                               StringRef stringAttr);
 
 /// Returns the IntegerAttr with the name `integerAttr` in the `targetAttr`, if
-/// found.
-Optional<IntegerAttr> getConfigIntegerAttr(
-    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr);
+/// found. Otherwise, returns a null StringAttr.
+IntegerAttr getConfigIntegerAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 StringRef integerAttr);
 
 /// Returns the LLVM Target triple associated with the `targetAttr`, if set.
 Optional<llvm::Triple> getTargetTriple(

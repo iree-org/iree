@@ -1124,7 +1124,7 @@ static std::string getStringAttrFromTargetAttr(ModuleOp module,
                                                StringRef attrName) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(module);
   auto stringAttr = getConfigStringAttr(targetAttr, attrName);
-  return stringAttr ? stringAttr.value().str() : std::string("");
+  return stringAttr ? stringAttr.str() : std::string("");
 }
 
 void ConvertToLLVMPass::runOnOperation() {
