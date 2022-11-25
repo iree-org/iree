@@ -13,6 +13,24 @@ package(
 )
 
 iree_compiler_cc_library(
+    name = "Embed",
+    srcs = [
+        "Embed.cpp",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Tools:init_llvmir_translations",
+        "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
+        "//compiler/src/iree/compiler/Tools:init_targets",
+        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
+        "//compiler/src/iree/compiler/Pipelines",
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "IREECompileToolEntryPoint",
     srcs = [
         "IREECompileToolEntryPoint.cpp",
