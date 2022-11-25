@@ -391,7 +391,9 @@ setup(
         CMakeExtension("iree.compiler._mlir_libs._mlir"),
         CMakeExtension("iree.compiler._mlir_libs._ireeDialects"),
         CMakeExtension("iree.compiler._mlir_libs._ireecTransforms"),
-        CMakeExtension("iree.compiler._mlir_libs._mlirHlo"),
+        # TODO: MHLO has been broken for a while so disabling. If re-enabling,
+        # it also needs to be enabled on the build side.
+        # CMakeExtension("iree.compiler._mlir_libs._mlirHlo"),
         CMakeExtension("iree.compiler._mlir_libs._mlirLinalgPasses"),
     ],
     cmdclass={
