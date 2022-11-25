@@ -238,11 +238,12 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
 template <typename TileSizesType>
 static Value buildReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
-    Value originalGenericH, TileSizesType tileSizes0Generic) {
+    Value reductionH, Value optionalFusionRootH,
+    TileSizesType tileSizes0Generic) {
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
   auto splitReductionTransformOp =
-      b.create<SplitReductionOp>(originalGenericH,
+      b.create<SplitReductionOp>(reductionH,
                                  /*splitFactor=*/2,
                                  /*insertSplitDimension=*/1);
   Value splitFillH = splitReductionTransformOp.getFillOp();
@@ -255,35 +256,45 @@ static Value buildReductionStrategyBlockDistributionPart(
   auto x = mlir::gpu::GPUBlockMappingAttr::get(b.getContext(),
                                                ::mlir::gpu::Blocks::DimX);
   // Step 2. First level of tiling + fusion parallelizes to blocks using
-  // `tileSizes`.
+  // `tileSizes`. If the fusion root was the reduction op, update it to be the
+  // combiner op. Otherwise, fuse the combiner op into root.
+  SmallVector<Value> opsHToFuse({originalFillH, splitFillH, splitLinalgH});
+  if (!optionalFusionRootH) {
+    optionalFusionRootH = combinerH;
+  } else {
+    opsHToFuse.push_back(combinerH);
+  }
   buildTFDWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
-      b,
-      /*rootH=*/combinerH,
-      /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH},
-      tileSizes0Generic, b.getArrayAttr({x}));
+      b, optionalFusionRootH, opsHToFuse, tileSizes0Generic,
+      b.getArrayAttr({x}));
 
   return variantH;
 }
 
 static Value buildReductionStrategyThreadDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, ArrayRef<int64_t> tileSizes1Fill,
-    ArrayRef<int64_t> tileSizes1Generic) {
+    ArrayRef<int64_t> tileSizes1Generic, bool hasTrailingEltwise) {
   // TODO: Relying on ordering is brittle, harden this.
-  auto [fill2dH, parParRedH, fill1dH, parRedH] = matchAndUnpack<4>(
-      b, variantH,
-      ArrayRef<StringRef>{linalg::GenericOp::getOperationName(),
-                          linalg::FillOp::getOperationName()});
+  Value matchedH = b.create<MatchOp>(
+      variantH, ArrayRef<StringRef>{linalg::GenericOp::getOperationName(),
+                                    linalg::FillOp::getOperationName()});
+  auto split = b.create<SplitHandlesOp>(
+      matchedH, /*numResultHandles=*/hasTrailingEltwise ? 5 : 4);
+  Value firstFusionRootH = split.getResults()[1];
+  SmallVector<Value> firstFusionGroupHs{split.getResults()[0]};
+  Value secondFusionRootH = split.getResults().back();
+  SmallVector<Value> secondFusionGroupHs =
+      split.getResults().drop_front(2).drop_back();
+
   auto z = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
                                                 ::mlir::gpu::Threads::DimZ);
   auto y = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
                                                 ::mlir::gpu::Threads::DimY);
-  (void)z;
-  (void)y;
 
   // clang-format off
   buildTFDWithTileSizes<TileToForeachThreadOp>(b,
-                   /*rootH=*/parRedH,
-                   /*opsHToFuse=*/{fill1dH},
+                   /*rootH=*/secondFusionRootH,
+                   /*opsHToFuse=*/secondFusionGroupHs,
                   // TODO: activate this, we have the information but it does
                   // not generate the IR we want atm.
                   //  /*tileSizes=*/tileSizes1Fill,
@@ -291,8 +302,8 @@ static Value buildReductionStrategyThreadDistributionPart(
                    /*tileSizes=*/tileSizes1Fill,
                    /*threadDimMapping=*/b.getArrayAttr({z}));
   buildTFDWithTileSizes<TileToForeachThreadOp>(b,
-                   /*rootH=*/parParRedH,
-                   /*opsHToFuse=*/{fill2dH},
+                   /*rootH=*/firstFusionRootH,
+                   /*opsHToFuse=*/firstFusionGroupHs,
                   // TODO: activate this, we have the information but it does
                   // not generate the IR we want atm.
                   //  /*tileSizes=*/tileSizes1Generic,
@@ -309,7 +320,23 @@ struct GPUReductionStrategyInfos {
   SmallVector<int64_t> workgroupTileSizes;
   SmallVector<int64_t> fillSecondTileSizes;
   SmallVector<int64_t> genericSecondTileSizes;
+  bool hasTrailingEltwise;
 };
+
+/// Returns a pair of handles to the main reduction operation and the fusion
+/// root. If the fusion root is null, the reduction operation should be used as
+/// fusion root instead.
+static std::tuple<Value, Value> reductionBlockDistributionHandles(
+    ImplicitLocOpBuilder &b, Value variantH, bool hasTrailingEltwise) {
+  Value originalGenericH =
+      b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
+  if (hasTrailingEltwise) {
+    auto op =
+        b.create<SplitHandlesOp>(originalGenericH, /*numResultHandles=*/2);
+    return std::make_tuple(op.getResults()[0], op.getResults()[1]);
+  }
+  return std::make_tuple(originalGenericH, Value());
+}
 
 // TODO: generalize and automate over and over.
 // TODO: significantly shrink this down.
@@ -318,16 +345,18 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
   // Step 0. Match the ops.
   Value originalFillH =
       b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
-  Value originalGenericH =
-      b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
+  auto [reductionH, fusionRootH] =
+      reductionBlockDistributionHandles(b, variantH, infos.hasTrailingEltwise);
 
   // Step 1: Distribute to blocks using the current IREE lowering config.
   variantH = buildReductionStrategyBlockDistributionPart(
-      b, variantH, originalFillH, originalGenericH, infos.workgroupTileSizes);
+      b, variantH, originalFillH, reductionH, fusionRootH,
+      infos.workgroupTileSizes);
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   variantH = buildReductionStrategyThreadDistributionPart(
-      b, variantH, infos.fillSecondTileSizes, infos.genericSecondTileSizes);
+      b, variantH, infos.fillSecondTileSizes, infos.genericSecondTileSizes,
+      infos.hasTrailingEltwise);
 
   // Step 3. Rank-reduce and vectorize.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
@@ -360,6 +389,10 @@ struct AllDims {};
 /// A placeholder indicating the structured op matcher to check the predicate
 /// for all operands of the relevant kind.
 struct AllOperands {};
+
+/// A tag indicating to look for any user of the operation's result that would
+/// satisfy the predicate.
+struct HasAnyUse {};
 
 /// Base class for predicate parameters that can be described with the single
 /// value. Concrete predicate parameters should inherit this and forward the
@@ -514,6 +547,15 @@ class StructuredOpMatcher {
     return *this;
   }
 
+  /// Adds a predicate checking that the structured op has the given number of
+  /// inputs.
+  StructuredOpMatcher &input(NumEqualsTo num) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      return linalgOp.getNumDpsInputs() == num.value;
+    });
+    return *this;
+  }
+
   /// Adds a predicate that recursively applies other predicates to the
   /// operation defining the `position`-th operand. The position may be
   /// negative, in which case positions are counted from the last one
@@ -558,6 +600,19 @@ class StructuredOpMatcher {
   StructuredOpMatcher &output(NumEqualsTo num) {
     predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
       return linalgOp.getNumDpsInits() == num.value;
+    });
+    return *this;
+  }
+
+  /// Adds a predicate checking that all output operands of the structured op
+  /// have a permutation indexing map.
+  StructuredOpMatcher &output(AllOperands tag, IsPermutation) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
+        if (!linalgOp.getMatchingIndexingMap(operand).isPermutation())
+          return false;
+      }
+      return true;
     });
     return *this;
   }
@@ -620,6 +675,28 @@ class StructuredOpMatcher {
     return *this;
   }
 
+  /// Adds a predicate that recursively applies to users of the `position`-th
+  /// result of the structured op. Succeeds if any user matches the predicate.
+  template <typename T>
+  std::enable_if_t<
+      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
+                        Operation *>::value,
+      StructuredOpMatcher &>
+  result(int64_t position, HasAnyUse tag, T &resultUserMatcher) {
+    predicates.push_back([&resultUserMatcher,
+                          position](linalg::LinalgOp linalgOp) -> bool {
+      int64_t transformedPosition =
+          position >= 0 ? position : linalgOp->getNumResults() + position;
+      if (transformedPosition >= linalgOp->getNumResults()) return false;
+
+      return llvm::any_of(linalgOp->getResult(transformedPosition).getUsers(),
+                          [&resultUserMatcher](Operation *op) {
+                            return resultUserMatcher.match(op);
+                          });
+    });
+    return *this;
+  }
+
  private:
   /// Additional predicates to be checked on the structured op.
   SmallVector<PredicateFn> predicates;
@@ -638,6 +715,49 @@ StructuredOpMatcher m_StructuredOp() {
   return StructuredOpMatcher::create<OpType...>();
 }
 
+class OptionalStructuredOpMatcher;
+OptionalStructuredOpMatcher m_OptionalStructuredOp(
+    StructuredOpMatcher &&nested);
+
+/// A wrapper around a structured op matcher that injects optionality. The
+/// wrapped predicates will get applied for capturing purposes, but the `match`
+/// of this class will always succeed to allow the matching to continue. One can
+/// check if the wrapped match actually succeeded by checking if the operation
+/// was captured.
+class OptionalStructuredOpMatcher {
+  friend OptionalStructuredOpMatcher m_OptionalStructuredOp(
+      StructuredOpMatcher &&nested);
+  explicit OptionalStructuredOpMatcher(StructuredOpMatcher &&nested)
+      : nested(nested) {}
+
+ public:
+  /// Returns true if the wrapped matcher succeeded as indicated by the capture.
+  bool succeeded() const { return nested.getCaptured(); }
+
+  /// Runs the wrapped matcher and returns true regardless of its result.
+  bool match(Operation *op) {
+    (void)nested.match(op);
+    return true;
+  }
+
+ private:
+  /// Actual structured matcher.
+  StructuredOpMatcher nested;
+};
+
+/// Makes the given structured op matcher optional.
+OptionalStructuredOpMatcher m_OptionalStructuredOp(
+    StructuredOpMatcher &&nested) {
+  return OptionalStructuredOpMatcher(std::move(nested));
+}
+
+/// Creates an optional matcher for ops with the kinds provided as template
+/// arguments.
+template <typename... OpType>
+OptionalStructuredOpMatcher m_OptionalStructuredOp() {
+  return m_OptionalStructuredOp(m_StructuredOp<OpType...>());
+}
+
 }  // namespace
 
 static constexpr unsigned cudaWarpSize = 32;
@@ -647,6 +767,13 @@ static bool matchGPUReduction(linalg::LinalgOp op,
                               GPUReductionStrategyInfos &info) {
   // TODO: match the sequence the strategy supports.
   auto fill = m_StructuredOp<linalg::FillOp>();
+  auto trailingEltwise = m_StructuredOp<linalg::GenericOp>()
+                             .input(AllOperands(), IsPermutation())
+                             .output(AllOperands(), IsPermutation())
+                             .input(NumEqualsTo(1))
+                             .output(NumEqualsTo(1));
+  auto maybeTrailingEltwise =
+      m_OptionalStructuredOp(std::move(trailingEltwise));
   auto pattern = m_StructuredOp()
                      .dim(AllDims(), ShapeKind::Static)
                      .dim(-1, utils::IteratorType::reduction)
@@ -658,8 +785,11 @@ static bool matchGPUReduction(linalg::LinalgOp op,
                      // Only single combiner over 32 bits for now due to
                      // reduction distribution.
                      .output(0, ElementTypeBitWidth(32))
-                     .output(0, SingleCombinerReduction());
+                     .output(0, SingleCombinerReduction())
+                     .result(0, HasAnyUse(), maybeTrailingEltwise);
   if (!matchPattern(op, pattern)) return false;
+
+  info.hasTrailingEltwise = maybeTrailingEltwise.succeeded();
 
   // Hardcoded workagroup size, this could be deduced from the reduction dim.
   info.workgroupSize = {32, 2, 1};
@@ -738,7 +868,7 @@ static LogicalResult buildReductionCpuStrategy(
 
   // Step 1: Distribute to blocks using the current IREE lowering config.
   variantH = buildReductionStrategyBlockDistributionPart(
-      b, variantH, originalFillH, originalGenericH, info.tileSizes);
+      b, variantH, originalFillH, originalGenericH, Value(), info.tileSizes);
 
   // Step 2. Rank-reduce and buildVectorizeStrategy.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
@@ -762,11 +892,11 @@ LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
   // 1. Match
   GPUReductionStrategyInfos infos;
   if (!matchGPUReduction(op, infos)) return failure();
-  auto startegyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
+  auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
     return buildReductionCudaStrategy(b, variant, infos);
   };
   // 2. Add the strategy.
-  createTransformRegion(entryPoint, startegyBuilder);
+  createTransformRegion(entryPoint, strategyBuilder);
   return success();
 }
 
