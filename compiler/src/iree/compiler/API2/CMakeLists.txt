@@ -54,8 +54,9 @@ iree_cc_library(
   LINKOPTS
     # Linux uses a linker script.
     $<$<PLATFORM_ID:Linux>:-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/api_exports.ld>
-    # MacOS uses a symbol list.
-    $<$<PLATFORM_ID:Darwin>:-Wl,--exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/api_exports.lst>
+    # MacOS uses a symbol list. Note that this option is only accepted
+    # with a single dash.
+    $<$<PLATFORM_ID:Darwin>:-Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/api_exports.macos.lst>
 )
 
 # If not using sanitizers, ask linkers to error on undefined symbols.
