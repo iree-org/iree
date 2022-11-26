@@ -40,6 +40,7 @@ import re
 from typing import List
 
 LOCAL_HEADER_FILES = [
+    "Embed.h",
     "MLIRInterop.h",
     "ToolEntryPoints.h",
 ]
@@ -78,7 +79,8 @@ EXPLICIT_EXPORTS = [
 # Matches statements that start with a well-known function declaration macro.
 # The group 'decl' contains the statement after the macro.
 MACRO_STATEMENT_PATTERN = re.compile(
-    r"\n(MLIR_CAPI_EXPORTED)\s+(?P<decl>[^\;]+);", re.MULTILINE | re.DOTALL)
+    r"\n(MLIR_CAPI_EXPORTED|IREE_EMBED_EXPORTED)\s+(?P<decl>[^\;]+);",
+    re.MULTILINE | re.DOTALL)
 
 # Given a statement suspected to be a function declaration, extract the
 # function symbol.

@@ -12,6 +12,27 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    Embed
+  SRCS
+    "Embed.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRSupport
+    iree::compiler::API2::Headers
+    iree::compiler::Dialect::VM::Target::C
+    iree::compiler::Dialect::VM::Target::init_targets
+    iree::compiler::Pipelines
+    iree::compiler::Tools::init_llvmir_translations
+    iree::compiler::Tools::init_passes_and_dialects
+    iree::compiler::Tools::init_targets
+    iree::compiler::Utils
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     IREECompileToolEntryPoint
   SRCS
     "IREECompileToolEntryPoint.cpp"

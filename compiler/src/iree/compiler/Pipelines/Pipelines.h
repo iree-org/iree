@@ -38,6 +38,26 @@ enum class IREEVMPipelinePhase {
   End,
 };
 
+// Enumerates names and descriptions for pipeline phase values.
+inline static void enumerateIREEVMPipelinePhases(
+    std::function<void(IREEVMPipelinePhase, StringRef name, StringRef desc)>
+        callback) {
+  callback(IREEVMPipelinePhase::End, "end",
+           "Complete the full compilation pipeline.");
+  callback(IREEVMPipelinePhase::Input, "input",
+           "Performs input processing and lowering into core IREE "
+           "input dialects (linalg/etc).");
+  callback(IREEVMPipelinePhase::ABI, "abi",
+           "Adjusts program ABI for the specified execution environment.");
+  callback(IREEVMPipelinePhase::Flow, "flow",
+           "Compiles up to the `flow` dialect.");
+  callback(IREEVMPipelinePhase::Stream, "stream",
+           "Compiles up to the `stream` dialect.");
+  callback(IREEVMPipelinePhase::HAL, "hal",
+           "Compiles up to the `hal` dialect, including codegen.");
+  callback(IREEVMPipelinePhase::VM, "vm", "Compiles up to the `vm` dialect.");
+}
+
 // Builds a pass pipeline to perform end-to-end compilation from a
 // supported MLIR-based input to the IREE vm dialect.
 //

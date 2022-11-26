@@ -22,6 +22,7 @@ exports_files([
 iree_compiler_cc_library(
     name = "Headers",
     hdrs = [
+        "Embed.h",
         "MLIRInterop.h",
         "ToolEntryPoints.h",
     ],
@@ -33,6 +34,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "StaticImpl",
     deps = [
+        "//compiler/src/iree/compiler/API2/Internal:Embed",
         "//compiler/src/iree/compiler/API2/Internal:IREECompileToolEntryPoint",
         "//compiler/src/iree/compiler/API2/Internal:IREEMLIRLSPServerToolEntryPoint",
         "//compiler/src/iree/compiler/API2/Internal:IREEOptToolEntryPoint",

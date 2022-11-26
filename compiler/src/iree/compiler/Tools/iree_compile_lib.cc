@@ -11,40 +11,11 @@
 #include <string>
 #include <type_traits>
 
-#include "iree/compiler/ConstEval/Passes.h"
-#include "iree/compiler/Dialect/VM/Target/init_targets.h"
+#include "iree/compiler/API2/Embed.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
-#include "iree/compiler/Tools/init_dialects.h"
-#include "iree/compiler/Tools/init_llvmir_translations.h"
-#include "iree/compiler/Tools/init_passes.h"
-#include "iree/compiler/Tools/init_targets.h"
-#include "iree/compiler/Utils/PassUtils.h"
-#include "iree/compiler/Utils/TracingUtils.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SMLoc.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/IR/AsmState.h"
-#include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Verifier.h"
-#include "mlir/Parser/Parser.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Support/FileUtilities.h"
-#include "mlir/Support/LogicalResult.h"
-#include "mlir/Support/Timing.h"
-#include "mlir/Support/ToolUtilities.h"
-#include "mlir/Tools/mlir-translate/Translation.h"
-
-#ifdef IREE_HAVE_C_OUTPUT_FORMAT
-#include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
-#include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
 
 namespace mlir {
 namespace iree_compiler {
@@ -72,13 +43,6 @@ enum class CompileMode {
   hal_executable,
 };
 
-IREEVMPipelineHooks &getHooks() {
-  static IREEVMPipelineHooks hooks = {
-      // buildConstEvalPassPipelineCallback =
-      [](OpPassManager &pm) { pm.addPass(ConstEval::createJitGlobalsPass()); }};
-  return hooks;
-}
-
 }  // namespace
 
 }  // namespace iree_compiler
@@ -87,39 +51,7 @@ IREEVMPipelineHooks &getHooks() {
 int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
   static llvm::cl::OptionCategory mainOptions("IREE Main Options");
-
-  // Global/static registrations.
-  // Allegedly need to register passes to get good reproducers
-  // TODO: Verify this (I think that this was fixed some time ago).
-  mlir::iree_compiler::registerAllPasses();
-  mlir::iree_compiler::registerHALTargetBackends();
-  mlir::iree_compiler::registerVMTargets();
-
-  // MLIRContext registration and hooks.
-  mlir::DialectRegistry registry;
-  mlir::iree_compiler::registerAllDialects(registry);
-  mlir::iree_compiler::registerLLVMIRTranslations(registry);
-
-  // Register MLIRContext command-line options like
-  // -mlir-print-op-on-diagnostic.
-  mlir::registerMLIRContextCLOptions();
-  // Register assembly printer command-line options like
-  // -mlir-print-op-generic.
-  mlir::registerAsmPrinterCLOptions();
-  // Register pass manager command-line options like -mlir-print-ir-*.
-  mlir::registerPassManagerCLOptions();
-  mlir::registerDefaultTimingManagerCLOptions();
-
-  // Flag options structs (must resolve prior to CLI parsing).
-  auto &bindingOptions = BindingOptions::FromFlags::get();
-  auto &inputOptions = InputDialectOptions::FromFlags::get();
-  auto &highLevelOptimizationOptions =
-      HighLevelOptimizationOptions::FromFlags::get();
-  auto &schedulingOptions = SchedulingOptions::FromFlags::get();
-  auto &halTargetOptions = IREE::HAL::TargetOptions::FromFlags::get();
-  auto &vmTargetOptions = IREE::VM::TargetOptions::FromFlags::get();
-  auto &bytecodeTargetOptions =
-      IREE::VM::BytecodeTargetOptions::FromFlags::get();
+  ireeCompilerGlobalInitialize(/*initializeCommandLine=*/true);
 
   // General command line flags.
   llvm::cl::opt<std::string> inputFilename(
@@ -161,28 +93,15 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       llvm::cl::desc("Verifies the IR for correctness throughout compilation."),
       llvm::cl::init(true));
 
-  llvm::cl::opt<IREEVMPipelinePhase> compileTo(
+  llvm::cl::opt<llvm::StringRef> compileTo(
       "compile-to",
       llvm::cl::desc(
           "Compilation phase to run up until before emitting output."),
-      llvm::cl::values(
-          clEnumValN(IREEVMPipelinePhase::Input, "input",
-                     "Performs input processing and lowering into core IREE "
-                     "input dialects (linalg/etc)."),
-          clEnumValN(
-              IREEVMPipelinePhase::ABI, "abi",
-              "Adjusts program ABI for the specified execution environment."),
-          clEnumValN(IREEVMPipelinePhase::Flow, "flow",
-                     "Compiles up to the `flow` dialect."),
-          clEnumValN(IREEVMPipelinePhase::Stream, "stream",
-                     "Compiles up to the `stream` dialect."),
-          clEnumValN(IREEVMPipelinePhase::HAL, "hal",
-                     "Compiles up to the `hal` dialect, including codegen."),
-          clEnumValN(IREEVMPipelinePhase::VM, "vm",
-                     "Compiles up to the `vm` dialect."),
-          clEnumValN(IREEVMPipelinePhase::End, "end",
-                     "Complete the full compilation pipeline.")),
-      llvm::cl::init(IREEVMPipelinePhase::End));
+      llvm::cl::init("end"));
+  enumerateIREEVMPipelinePhases(
+      [&](IREEVMPipelinePhase phase, StringRef name, StringRef desc) {
+        compileTo.getParser().addLiteralOption(name, name, desc);
+      });
 
   // Misc options.
   llvm::cl::opt<bool> splitInputFile(
@@ -196,146 +115,159 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
           "Lists all registered target backends for executable compilation."),
       llvm::cl::init(false), llvm::cl::ValueDisallowed,
       llvm::cl::callback([&](const bool &) {
-        auto registeredTargetBackends =
-            IREE::HAL::getRegisteredTargetBackends();
         llvm::outs() << "Registered target backends:\n";
-        for (auto &registeredTargetBackend : registeredTargetBackends) {
-          llvm::outs() << "  " << registeredTargetBackend << "\n";
-        }
+        ireeCompilerEnumerateRegisteredHALTargetBackends(
+            [](const char *backend, void *userData) {
+              llvm::outs() << "  " << backend << "\n";
+            },
+            nullptr);
         exit(0);
       }));
 
-// Optional output formats.
-#ifdef IREE_HAVE_C_OUTPUT_FORMAT
-  auto cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
-#endif
-
   llvm::cl::ParseCommandLineOptions(argc, argv, "IREE compilation driver\n");
 
-  std::string errorMessage;
-  auto input = mlir::openInputFile(inputFilename, &errorMessage);
-  if (!input) {
-    llvm::errs() << errorMessage << "\n";
-    return 1;
+  // If a HAL executable is being compiled, it is only valid to output in that
+  // form.
+  if (compileMode == CompileMode::hal_executable) {
+    outputFormat = OutputFormat::hal_executable;
   }
 
-  auto output = mlir::openOutputFile(outputFilename, &errorMessage);
-  if (!output) {
-    llvm::errs() << errorMessage << "\n";
-    return 1;
-  }
+  // Stash our globals in an RAII instance.
+  struct MainState {
+    iree_compiler_session_t *session = ireeCompilerSessionCreate();
+    iree_compiler_source_t *source = nullptr;
+    iree_compiler_output_t *output = nullptr;
+    SmallVector<iree_compiler_source_t *> splitSources;
 
-  /// Processes the memory buffer with a new MLIRContext.
-  auto processBuffer = [&](std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
-                           llvm::raw_ostream &os) -> LogicalResult {
-    mlir::MLIRContext context;
-    context.allowUnregisteredDialects();
-    context.appendDialectRegistry(registry);
-    llvm::SourceMgr sourceMgr;
-    sourceMgr.AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());
-    mlir::SourceMgrDiagnosticHandler diagHandler(sourceMgr, &context);
-
-    // Parse source.
-    auto module = parseSourceFile<ModuleOp>(sourceMgr, &context);
-    if (!module || failed(verify(*module))) {
-      return failure();
+    ~MainState() {
+      for (auto *splitSource : splitSources) {
+        ireeCompilerSourceDestroy(splitSource);
+      }
+      ireeCompilerOutputDestroy(output);
+      ireeCompilerSourceDestroy(source);
+      ireeCompilerSessionDestroy(session);
+      ireeCompilerGlobalShutdown();
     }
+    void handleError(iree_compiler_error_t *error) {
+      const char *msg = ireeCompilerErrorGetMessage(error);
+      llvm::errs() << "error opening input file: " << msg << "\n";
+      ireeCompilerErrorDestroy(error);
+    }
+  };
+  MainState s;
 
-    // Main compilation pipeline.
-    PassManager passManager(&context);
-    passManager.enableVerifier(verifyIR);
-    mlir::applyPassManagerCLOptions(passManager);
-    mlir::applyDefaultTimingPassManagerCLOptions(passManager);
-    passManager.addInstrumentation(std::make_unique<PassTracing>());
+  // Open input and output files.
+  if (auto error = ireeCompilerSourceOpenFile(s.session, inputFilename.c_str(),
+                                              &s.source)) {
+    s.handleError(error);
+    return 1;
+  }
+  if (auto error =
+          ireeCompilerOutputOpenFile(outputFilename.c_str(), &s.output)) {
+    s.handleError(error);
+    return 1;
+  }
 
+  auto processBuffer = [&](iree_compiler_source_t *source) -> bool {
+    // Stash per-invocation state in an RAII instance.
+    struct InvState {
+      InvState(MainState &s) { inv = ireeCompilerInvocationCreate(s.session); }
+      ~InvState() { ireeCompilerInvocationDestroy(inv); }
+      iree_compiler_invocation_t *inv;
+    };
+    InvState r(s);
+
+    ireeCompilerInvocationEnableConsoleDiagnostics(r.inv);
+    ireeCompilerInvocationSetCompileToPhase(r.inv,
+                                            std::string(compileTo).c_str());
+    ireeCompilerInvocationSetVerifyIR(r.inv, verifyIR);
+    if (!ireeCompilerInvocationParseSource(r.inv, source)) return false;
+
+    // Switch on compileMode to choose a pipeline to run.
     switch (compileMode) {
       case CompileMode::std:
-        buildIREEVMTransformPassPipeline(
-            bindingOptions, inputOptions, highLevelOptimizationOptions,
-            schedulingOptions, halTargetOptions, vmTargetOptions, getHooks(),
-            passManager, compileTo);
-
+        if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_STD))
+          return false;
         break;
       case CompileMode::vm:
         break;
       case CompileMode::hal_executable: {
-        // Override the output format.
-        outputFormat = OutputFormat::hal_executable;
-        auto executableOps =
-            llvm::to_vector<4>(module->getOps<IREE::HAL::ExecutableOp>());
-        auto sourceOps =
-            llvm::to_vector<4>(module->getOps<IREE::HAL::ExecutableSourceOp>());
-        size_t usableOpCount = executableOps.size() + sourceOps.size();
-        if (usableOpCount != 1) {
-          return module->emitError()
-                 << "HAL executable translation requires "
-                    "exactly 1 top level hal.executable/hal.executable.source "
-                    "op";
-        }
-        auto executableOptions = IREE::HAL::TargetOptions::FromFlags::get();
-        IREE::HAL::buildHALTransformPassPipeline(passManager,
-                                                 executableOptions);
+        if (!ireeCompilerInvocationPipeline(
+                r.inv, IREE_COMPILER_PIPELINE_HAL_EXECUTABLE))
+          return false;
         break;
       }
       default:
         llvm::errs() << "INTERNAL ERROR: unknown compile mode\n";
-        return failure();
+        return false;
     }
 
-    if (failed(passManager.run(module.get()))) {
-      llvm::errs() << "compilation failed\n";
-      return failure();
-    }
-
-    if (compileTo != IREEVMPipelinePhase::End) {
-      // Ending early and just emitting IR.
-      os << module.get();
-      return success();
+    // Ending early and just emitting IR.
+    if (compileTo != "end") {
+      if (auto error = ireeCompilerInvocationOutputIR(r.inv, s.output)) {
+        s.handleError(error);
+        return false;
+      }
+      return true;
     }
 
     // Switch based on output format.
+    iree_compiler_error_t *outputError = nullptr;
     switch (outputFormat) {
       case OutputFormat::vm_asm:
-        os << module.get();
-        return success();
+        outputError = ireeCompilerInvocationOutputIR(r.inv, s.output);
+        break;
       case OutputFormat::vm_bytecode:
-        return translateModuleToBytecode(module.get(), bytecodeTargetOptions,
-                                         os);
+        outputError = ireeCompilerInvocationOutputVMBytecode(r.inv, s.output);
+        break;
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
       case OutputFormat::vm_c:
-        return mlir::iree_compiler::IREE::VM::translateModuleToC(
-            module.get(), cTargetOptions, os);
+        outputError = ireeCompilerInvocationOutputVMCSource(r.inv, s.output);
+        break;
 #endif  // IREE_HAVE_C_OUTPUT_FORMAT
       case OutputFormat::hal_executable: {
-        // Extract the serialized binary representation from the executable.
-        auto executableOp =
-            *(module->getOps<IREE::HAL::ExecutableOp>().begin());
-        auto binaryOps = llvm::to_vector<4>(
-            executableOp.getOps<IREE::HAL::ExecutableBinaryOp>());
-        if (binaryOps.size() != 1) {
-          return executableOp.emitError() << "executable translation failed to "
-                                             "produce exactly 1 binary for "
-                                             "the input executable";
-        }
-        auto binaryOp = binaryOps.front();
-        auto rawData = binaryOp.getData().getRawData();
-        os.write(rawData.data(), rawData.size());
-        return success();
+        outputError =
+            ireeCompilerInvocationOutputHALExecutable(r.inv, s.output);
+        break;
       }
       default:
         llvm::errs() << "INTERNAL ERROR: Unknown output format\n";
-        return failure();
+        return false;
     }
+
+    if (outputError) {
+      s.handleError(outputError);
+      return false;
+    }
+    return true;
   };
 
+  // Process buffers, either via splitting or all at once.
   if (splitInputFile) {
-    if (failed(mlir::splitAndProcessBuffer(std::move(input), processBuffer,
-                                           output->os())))
+    if (auto error = ireeCompilerSourceSplit(
+            s.source,
+            [](iree_compiler_source_t *source, void *userData) {
+              MainState *userState = static_cast<MainState *>(userData);
+              userState->splitSources.push_back(source);
+            },
+            static_cast<void *>(&s))) {
+      s.handleError(error);
       return 1;
+    }
+
+    bool hadFailure = false;
+    for (auto *splitSource : s.splitSources) {
+      if (!processBuffer(splitSource)) {
+        hadFailure = true;
+      }
+    }
+    if (hadFailure) {
+      return 1;
+    }
   } else {
-    if (failed(processBuffer(std::move(input), output->os()))) return 1;
+    if (!processBuffer(s.source)) return 1;
   }
 
-  output->keep();
+  ireeCompileOutputKeep(s.output);
   return 0;
 }

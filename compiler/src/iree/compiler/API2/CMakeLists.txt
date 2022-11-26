@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     Headers
   HDRS
+    "Embed.h"
     "MLIRInterop.h"
     "ToolEntryPoints.h"
   DEPS
@@ -32,6 +33,7 @@ iree_cc_library(
     MLIRCAPILinalg
     MLIRCAPIPDL
     MLIRCAPITransformDialect
+    iree::compiler::API2::Internal::Embed
     iree::compiler::API2::Internal::IREECompileToolEntryPoint
     iree::compiler::API2::Internal::IREEMLIRLSPServerToolEntryPoint
     iree::compiler::API2::Internal::IREEOptToolEntryPoint
