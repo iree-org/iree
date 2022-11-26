@@ -127,6 +127,7 @@ Session::Session(GlobalInit &globalInit) : globalInit(globalInit) {
     bindingOptions = *globalInit.clBindingOptions;
     inputOptions = *globalInit.clInputOptions;
     highLevelOptimizationOptions = *globalInit.clHighLevelOptimizationOptions;
+    schedulingOptions = *globalInit.clSchedulingOptions;
     halTargetOptions = *globalInit.clHalTargetOptions;
     vmTargetOptions = *globalInit.clVmTargetOptions;
     bytecodeTargetOptions = *globalInit.clBytecodeTargetOptions;
