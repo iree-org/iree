@@ -132,7 +132,9 @@ Session::Session(GlobalInit &globalInit) : globalInit(globalInit) {
     vmTargetOptions = *globalInit.clVmTargetOptions;
     bytecodeTargetOptions = *globalInit.clBytecodeTargetOptions;
     // TODO: Make C target options like the others.
+#ifdef IREE_HAVE_C_OUTPUT_FORMAT
     cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
+#endif
   }
 }
 
