@@ -18,7 +18,10 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRParser
+    MLIRSupport
     iree::compiler::API2::Headers
+    iree::compiler::Dialect::VM::Target::C
     iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Pipelines
     iree::compiler::Tools::init_llvmir_translations
