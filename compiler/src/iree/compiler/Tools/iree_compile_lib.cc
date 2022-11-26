@@ -135,8 +135,8 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   // Stash our globals in an RAII instance.
   struct MainState {
     iree_compiler_session_t *session = ireeCompilerSessionCreate();
-    iree_compiler_source_t *source = ireeCompilerSourceCreate(session);
-    iree_compiler_output_t *output = ireeCompilerOutputCreate();
+    iree_compiler_source_t *source = nullptr;
+    iree_compiler_output_t *output = nullptr;
     SmallVector<iree_compiler_source_t *> splitSources;
 
     ~MainState() {
@@ -157,13 +157,13 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   MainState s;
 
   // Open input and output files.
-  if (auto error =
-          ireeCompilerSourceOpenFile(s.source, inputFilename.c_str())) {
+  if (auto error = ireeCompilerSourceOpenFile(s.session, inputFilename.c_str(),
+                                              &s.source)) {
     s.handleError(error);
     return 1;
   }
   if (auto error =
-          ireeCompilerOutputOpenFile(s.output, outputFilename.c_str())) {
+          ireeCompilerOutputOpenFile(outputFilename.c_str(), &s.output)) {
     s.handleError(error);
     return 1;
   }

@@ -559,24 +559,25 @@ bool ireeCompilerRunPipeline(struct iree_compiler_run_t *run,
   return unwrap(run)->runPipeline(pipeline);
 }
 
-struct iree_compiler_source_t *ireeCompilerSourceCreate(
-    struct iree_compiler_session_t *session) {
-  return wrap(new Source(*unwrap(session)));
-}
-
 void ireeCompilerSourceDestroy(struct iree_compiler_source_t *source) {
   delete unwrap(source);
 }
 
 struct iree_compiler_error_t *ireeCompilerSourceOpenFile(
-    struct iree_compiler_source_t *source, const char *filePath) {
-  return wrap(unwrap(source)->openFile(filePath));
+    struct iree_compiler_session_t *session, const char *filePath,
+    struct iree_compiler_source_t **out_source) {
+  auto source = new Source(*unwrap(session));
+  *out_source = wrap(source);
+  return wrap(source->openFile(filePath));
 }
 
 struct iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
-    struct iree_compiler_source_t *source, const char *bufferName,
-    const char *buffer, size_t length) {
-  return wrap(unwrap(source)->wrapBuffer(bufferName, buffer, length));
+    struct iree_compiler_session_t *session, const char *bufferName,
+    const char *buffer, size_t length,
+    struct iree_compiler_source_t **out_source) {
+  auto source = new Source(*unwrap(session));
+  *out_source = wrap(source);
+  return wrap(source->wrapBuffer(bufferName, buffer, length));
 }
 
 struct iree_compiler_error_t *ireeCompilerSourceSplit(
@@ -586,17 +587,15 @@ struct iree_compiler_error_t *ireeCompilerSourceSplit(
   return wrap(unwrap(source)->split(callback, userData));
 }
 
-struct iree_compiler_output_t *ireeCompilerOutputCreate() {
-  return wrap(new Output());
-}
-
 void ireeCompilerOutputDestroy(struct iree_compiler_output_t *output) {
   delete unwrap(output);
 }
 
 struct iree_compiler_error_t *ireeCompilerOutputOpenFile(
-    struct iree_compiler_output_t *output, const char *filePath) {
-  return wrap(unwrap(output)->openFile(filePath));
+    const char *filePath, struct iree_compiler_output_t **out_output) {
+  auto output = new Output();
+  *out_output = wrap(output);
+  return wrap(output->openFile(filePath));
 }
 
 void ireeCompileOutputKeep(struct iree_compiler_output_t *output) {

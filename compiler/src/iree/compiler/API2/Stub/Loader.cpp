@@ -198,24 +198,22 @@ struct iree_compiler_error_t *ireeCompilerRunOutputHALExecutable(
   return __ireeCompilerRunOutputHALExecutable(run, output);
 }
 
-struct iree_compiler_source_t *ireeCompilerSourceCreate(
-    struct iree_compiler_session_t *session) {
-  return __ireeCompilerSourceCreate(session);
-}
-
 void ireeCompilerSourceDestroy(struct iree_compiler_source_t *source) {
   __ireeCompilerSourceDestroy(source);
 }
 
 struct iree_compiler_error_t *ireeCompilerSourceOpenFile(
-    struct iree_compiler_source_t *source, const char *filePath) {
-  return __ireeCompilerSourceOpenFile(source, filePath);
+    iree_compiler_session_t *session, const char *filePath,
+    struct iree_compiler_source_t **out_source) {
+  return __ireeCompilerSourceOpenFile(session, filePath, out_source);
 }
 
 struct iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
-    struct iree_compiler_source_t *source, const char *bufferName,
-    const char *buffer, size_t length) {
-  return __ireeCompilerSourceWrapBuffer(source, bufferName, buffer, length);
+    iree_compiler_session_t *session, const char *bufferName,
+    const char *buffer, size_t length,
+    struct iree_compiler_source_t **out_source) {
+  return __ireeCompilerSourceWrapBuffer(session, bufferName, buffer, length,
+                                        out_source);
 }
 
 struct iree_compiler_error_t *ireeCompilerSourceSplit(
@@ -225,17 +223,13 @@ struct iree_compiler_error_t *ireeCompilerSourceSplit(
   return __ireeCompilerSourceSplit(source, callback, userData);
 }
 
-struct iree_compiler_output_t *ireeCompilerOutputCreate() {
-  return __ireeCompilerOutputCreate();
-}
-
 void ireeCompilerOutputDestroy(struct iree_compiler_output_t *output) {
   __ireeCompilerOutputDestroy(output);
 }
 
 struct iree_compiler_error_t *ireeCompilerOutputOpenFile(
-    struct iree_compiler_output_t *output, const char *filePath) {
-  return __ireeCompilerOutputOpenFile(output, filePath);
+    const char *filePath, struct iree_compiler_output_t **out_output) {
+  return __ireeCompilerOutputOpenFile(filePath, out_output);
 }
 
 void ireeCompileOutputKeep(struct iree_compiler_output_t *output) {

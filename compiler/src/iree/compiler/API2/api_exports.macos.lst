@@ -11,7 +11,6 @@ _ireeCompilerOptionsCreate
 _ireeCompilerOptionsDestroy
 _ireeCompilerOptionsGetFlags
 _ireeCompilerOptionsSetFlags
-_ireeCompilerOutputCreate
 _ireeCompilerOutputDestroy
 _ireeCompilerOutputOpenFile
 _ireeCompilerOutputWrite
@@ -33,7 +32,6 @@ _ireeCompilerRunSetCompileToPhase
 _ireeCompilerRunSetVerifyIR
 _ireeCompilerSessionCreate
 _ireeCompilerSessionDestroy
-_ireeCompilerSourceCreate
 _ireeCompilerSourceDestroy
 _ireeCompilerSourceOpenFile
 _ireeCompilerSourceSplit

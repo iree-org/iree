@@ -13,7 +13,6 @@ VER_0 {
     ireeCompilerOptionsDestroy;
     ireeCompilerOptionsGetFlags;
     ireeCompilerOptionsSetFlags;
-    ireeCompilerOutputCreate;
     ireeCompilerOutputDestroy;
     ireeCompilerOutputOpenFile;
     ireeCompilerOutputWrite;
@@ -35,7 +34,6 @@ VER_0 {
     ireeCompilerRunSetVerifyIR;
     ireeCompilerSessionCreate;
     ireeCompilerSessionDestroy;
-    ireeCompilerSourceCreate;
     ireeCompilerSourceDestroy;
     ireeCompilerSourceOpenFile;
     ireeCompilerSourceSplit;

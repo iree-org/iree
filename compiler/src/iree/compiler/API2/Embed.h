@@ -192,22 +192,24 @@ ireeCompilerRunOutputHALExecutable(struct iree_compiler_run_t *run,
 // references to backing resources.
 //===----------------------------------------------------------------------===//
 
-// Create and destroy source instances.
-IREE_EMBED_EXPORTED struct iree_compiler_source_t *ireeCompilerSourceCreate(
-    struct iree_compiler_session_t *session);
+// Destroy source instances.
 IREE_EMBED_EXPORTED void ireeCompilerSourceDestroy(
     struct iree_compiler_source_t *source);
 
 // Opens the source from a file. This is used for normal text assembly file
 // sources.
+// Must be destroyed with ireeCompilerSourceDestroy().
 IREE_EMBED_EXPORTED struct iree_compiler_error_t *ireeCompilerSourceOpenFile(
-    struct iree_compiler_source_t *source, const char *filePath);
+    iree_compiler_session_t *session, const char *filePath,
+    struct iree_compiler_source_t **out_source);
 
 // Wraps an existing buffer in memory. The |buffer| must be null terminated, and
 // the null must be accounted for in the |length|.
+// Must be destroyed with ireeCompilerSourceDestroy().
 IREE_EMBED_EXPORTED struct iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
-    struct iree_compiler_source_t *source, const char *bufferName,
-    const char *buffer, size_t length);
+    iree_compiler_session_t *session, const char *bufferName,
+    const char *buffer, size_t length,
+    struct iree_compiler_source_t **out_source);
 
 // Splits the current source buffer, invoking a callback for each "split"
 // within it. This is per the usual MLIR split rules (see
@@ -231,14 +233,14 @@ IREE_EMBED_EXPORTED struct iree_compiler_error_t *ireeCompilerSourceSplit(
 // from the actual process of compilation in arbitrary ways.
 //===----------------------------------------------------------------------===//
 
-// Create and destroy output instances.
-IREE_EMBED_EXPORTED struct iree_compiler_output_t *ireeCompilerOutputCreate();
+// Destroy output instances.
 IREE_EMBED_EXPORTED void ireeCompilerOutputDestroy(
     struct iree_compiler_output_t *output);
 
 // Opens a file for the output.
+// Must be destroyed via ireeCompilerOutputDestroy().
 IREE_EMBED_EXPORTED struct iree_compiler_error_t *ireeCompilerOutputOpenFile(
-    struct iree_compiler_output_t *output, const char *filePath);
+    const char *filePath, struct iree_compiler_output_t **out_output);
 
 // For file or other persistent outputs, by default they will be deleted on
 // destroy. It is necessary to call |ireeCompileOutputKeep| in order to have

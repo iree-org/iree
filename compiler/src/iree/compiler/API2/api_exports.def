@@ -12,7 +12,6 @@ EXPORTS
   ireeCompilerOptionsDestroy
   ireeCompilerOptionsGetFlags
   ireeCompilerOptionsSetFlags
-  ireeCompilerOutputCreate
   ireeCompilerOutputDestroy
   ireeCompilerOutputOpenFile
   ireeCompilerOutputWrite
@@ -34,7 +33,6 @@ EXPORTS
   ireeCompilerRunSetVerifyIR
   ireeCompilerSessionCreate
   ireeCompilerSessionDestroy
-  ireeCompilerSourceCreate
   ireeCompilerSourceDestroy
   ireeCompilerSourceOpenFile
   ireeCompilerSourceSplit
