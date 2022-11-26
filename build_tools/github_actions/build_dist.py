@@ -164,6 +164,7 @@ def build_main_dist():
   print("*** Packaging ***")
   dist_entries = [
       "bin",
+      "lib",
       "tests",
   ]
   dist_archive = os.path.join(
