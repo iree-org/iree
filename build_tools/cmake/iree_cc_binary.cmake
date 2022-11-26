@@ -172,12 +172,16 @@ function(iree_cc_binary)
       endif()
       # See: https://cmake.org/cmake/help/latest/module/GNUInstallDirs.html
       # Assume relative path as a sibling of the lib dir.
-      set(_install_rpath "${_origin_prefix}:${_origin_prefix}/../${CMAKE_INSTALL_LIBDIR}")
-      if(CMAKE_INSTALL_LIBDIR)
-        cmake_path(IS_ABSOLUTE CMAKE_INSTALL_LIBDIR _is_abs_libdir)
+      set(_lib_dir "${CMAKE_INSTALL_LIBDIR}")
+      if (NOT _lib_dir)
+        set(_lib_dir "lib")
+      endif()
+      set(_install_rpath "${_origin_prefix}:${_origin_prefix}/../${_lib_dir}")
+      if(_lib_dir)
+        cmake_path(IS_ABSOLUTE _lib_dir _is_abs_libdir)
         if(_is_abs_libdir)
           # Use the libdir verbatim.
-          set(_install_rpath "${_origin_prefix}:${CMAKE_INSTALL_LIBDIR}")
+          set(_install_rpath "${_origin_prefix}:${_lib_dir}")
         endif()
       endif()
       set_target_properties(${_NAME} PROPERTIES
