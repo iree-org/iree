@@ -244,7 +244,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   if (splitInputFile) {
     if (auto error = ireeCompilerSourceSplit(
             s.source,
-            [](struct iree_compiler_source_t *source, void *userData) {
+            [](iree_compiler_source_t *source, void *userData) {
               MainState *userState = static_cast<MainState *>(userData);
               userState->splitSources.push_back(source);
             },

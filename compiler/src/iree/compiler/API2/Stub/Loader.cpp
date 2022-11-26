@@ -107,11 +107,11 @@ bool ireeCompilerLoadLibrary(const char *libraryPath) {
 // Trampoline functions.
 ////////////////////////////////////////////////////////////////////////////////
 
-void ireeCompilerErrorDestroy(struct iree_compiler_error_t *error) {
+void ireeCompilerErrorDestroy(iree_compiler_error_t *error) {
   return __ireeCompilerErrorDestroy(error);
 }
 
-const char *ireeCompilerErrorGetMessage(struct iree_compiler_error_t *error) {
+const char *ireeCompilerErrorGetMessage(iree_compiler_error_t *error) {
   return __ireeCompilerErrorGetMessage(error);
 }
 
@@ -135,108 +135,107 @@ void ireeCompilerEnumerateRegisteredHALTargetBackends(
   __ireeCompilerEnumerateRegisteredHALTargetBackends(callback, userData);
 }
 
-struct iree_compiler_session_t *ireeCompilerSessionCreate() {
+iree_compiler_session_t *ireeCompilerSessionCreate() {
   assertLoaded();
   return __ireeCompilerSessionCreate();
 }
 
-void ireeCompilerSessionDestroy(struct iree_compiler_session_t *session) {
+void ireeCompilerSessionDestroy(iree_compiler_session_t *session) {
   assertLoaded();
   __ireeCompilerSessionDestroy(session);
 }
 
-struct iree_compiler_run_t *ireeCompilerRunCreate(
-    struct iree_compiler_session_t *session) {
+iree_compiler_run_t *ireeCompilerRunCreate(iree_compiler_session_t *session) {
   return __ireeCompilerRunCreate(session);
 }
 
-void ireeCompilerRunEnableConsoleDiagnostics(struct iree_compiler_run_t *run) {
+void ireeCompilerRunEnableConsoleDiagnostics(iree_compiler_run_t *run) {
   __ireeCompilerRunEnableConsoleDiagnostics(run);
 }
 
-void ireeCompilerRunDestroy(struct iree_compiler_run_t *run) {
+void ireeCompilerRunDestroy(iree_compiler_run_t *run) {
   __ireeCompilerRunDestroy(run);
 }
 
-bool ireeCompilerRunParseSource(struct iree_compiler_run_t *run,
-                                struct iree_compiler_source_t *source) {
+bool ireeCompilerRunParseSource(iree_compiler_run_t *run,
+                                iree_compiler_source_t *source) {
   return __ireeCompilerRunParseSource(run, source);
 }
 
-void ireeCompilerRunSetCompileToPhase(struct iree_compiler_run_t *run,
+void ireeCompilerRunSetCompileToPhase(iree_compiler_run_t *run,
                                       const char *phase) {
   __ireeCompilerRunSetCompileToPhase(run, phase);
 }
 
-IREE_EMBED_EXPORTED void ireeCompilerRunSetVerifyIR(
-    struct iree_compiler_run_t *run, bool enable) {
+IREE_EMBED_EXPORTED void ireeCompilerRunSetVerifyIR(iree_compiler_run_t *run,
+                                                    bool enable) {
   __ireeCompilerRunSetVerifyIR(run, enable);
 }
 
-bool ireeCompilerRunPipeline(struct iree_compiler_run_t *run,
+bool ireeCompilerRunPipeline(iree_compiler_run_t *run,
                              enum iree_compiler_pipeline_t pipeline) {
   return __ireeCompilerRunPipeline(run, pipeline);
 }
 
-struct iree_compiler_error_t *ireeCompilerRunOutputIR(
-    struct iree_compiler_run_t *run, struct iree_compiler_output_t *output) {
+iree_compiler_error_t *ireeCompilerRunOutputIR(iree_compiler_run_t *run,
+                                               iree_compiler_output_t *output) {
   return __ireeCompilerRunOutputIR(run, output);
 }
 
-struct iree_compiler_error_t *ireeCompilerRunOutputVMBytecode(
-    struct iree_compiler_run_t *run, struct iree_compiler_output_t *output) {
+iree_compiler_error_t *ireeCompilerRunOutputVMBytecode(
+    iree_compiler_run_t *run, iree_compiler_output_t *output) {
   return __ireeCompilerRunOutputVMBytecode(run, output);
 }
 
-struct iree_compiler_error_t *ireeCompilerRunOutputVMCSource(
-    struct iree_compiler_run_t *run, struct iree_compiler_output_t *output) {
+iree_compiler_error_t *ireeCompilerRunOutputVMCSource(
+    iree_compiler_run_t *run, iree_compiler_output_t *output) {
   return __ireeCompilerRunOutputVMCSource(run, output);
 }
 
-struct iree_compiler_error_t *ireeCompilerRunOutputHALExecutable(
-    struct iree_compiler_run_t *run, struct iree_compiler_output_t *output) {
+iree_compiler_error_t *ireeCompilerRunOutputHALExecutable(
+    iree_compiler_run_t *run, iree_compiler_output_t *output) {
   return __ireeCompilerRunOutputHALExecutable(run, output);
 }
 
-void ireeCompilerSourceDestroy(struct iree_compiler_source_t *source) {
+void ireeCompilerSourceDestroy(iree_compiler_source_t *source) {
   __ireeCompilerSourceDestroy(source);
 }
 
-struct iree_compiler_error_t *ireeCompilerSourceOpenFile(
+iree_compiler_error_t *ireeCompilerSourceOpenFile(
     iree_compiler_session_t *session, const char *filePath,
-    struct iree_compiler_source_t **out_source) {
+    iree_compiler_source_t **out_source) {
   return __ireeCompilerSourceOpenFile(session, filePath, out_source);
 }
 
-struct iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
+iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
     iree_compiler_session_t *session, const char *bufferName,
-    const char *buffer, size_t length,
-    struct iree_compiler_source_t **out_source) {
+    const char *buffer, size_t length, iree_compiler_source_t **out_source) {
   return __ireeCompilerSourceWrapBuffer(session, bufferName, buffer, length,
                                         out_source);
 }
 
-struct iree_compiler_error_t *ireeCompilerSourceSplit(
-    struct iree_compiler_source_t *source,
-    void (*callback)(struct iree_compiler_source_t *source, void *userData),
+iree_compiler_error_t *ireeCompilerSourceSplit(
+    iree_compiler_source_t *source,
+    void (*callback)(iree_compiler_source_t *source, void *userData),
     void *userData) {
   return __ireeCompilerSourceSplit(source, callback, userData);
 }
 
-void ireeCompilerOutputDestroy(struct iree_compiler_output_t *output) {
+void ireeCompilerOutputDestroy(iree_compiler_output_t *output) {
   __ireeCompilerOutputDestroy(output);
 }
 
-struct iree_compiler_error_t *ireeCompilerOutputOpenFile(
-    const char *filePath, struct iree_compiler_output_t **out_output) {
+iree_compiler_error_t *ireeCompilerOutputOpenFile(
+    const char *filePath, iree_compiler_output_t **out_output) {
   return __ireeCompilerOutputOpenFile(filePath, out_output);
 }
 
-void ireeCompileOutputKeep(struct iree_compiler_output_t *output) {
+void ireeCompileOutputKeep(iree_compiler_output_t *output) {
   __ireeCompileOutputKeep(output);
 }
 
-struct iree_compiler_error_t *ireeCompilerOutputWrite(
-    struct iree_compiler_output_t *output, const void *data, size_t length) {
+iree_compiler_error_t *ireeCompilerOutputWrite(iree_compiler_output_t *output,
+                                               const void *data,
+                                               size_t length) {
   return __ireeCompilerOutputWrite(output, data, length);
 }

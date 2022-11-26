@@ -143,8 +143,7 @@ struct Source {
 
   Error *openFile(const char *filePath);
   Error *wrapBuffer(const char *bufferName, const char *buffer, size_t length);
-  Error *split(void (*callback)(struct iree_compiler_source_t *source,
-                                void *userData),
+  Error *split(void (*callback)(iree_compiler_source_t *source, void *userData),
                void *userData);
   const llvm::MemoryBuffer *getMemoryBuffer() {
     return sourceMgr.getMemoryBuffer(1);
@@ -177,7 +176,7 @@ Error *Source::wrapBuffer(const char *bufferName, const char *buffer,
   return nullptr;
 }
 
-Error *Source::split(void (*callback)(struct iree_compiler_source_t *source,
+Error *Source::split(void (*callback)(iree_compiler_source_t *source,
                                       void *userData),
                      void *userData) {
   const char splitMarkerConst[] = "// -----";
@@ -203,7 +202,7 @@ Error *Source::split(void (*callback)(struct iree_compiler_source_t *source,
     Source *subSource = new Source(session);
     subSource->sourceMgr.AddNewSourceBuffer(std::move(subMemBuffer),
                                             llvm::SMLoc());
-    callback((struct iree_compiler_source_t *)subSource, userData);
+    callback((iree_compiler_source_t *)subSource, userData);
   }
 
   return nullptr;
@@ -432,40 +431,32 @@ bool isShutdown = false;
 // Internal to ABI type casters.
 //===----------------------------------------------------------------------===//
 
-Error *unwrap(struct iree_compiler_error_t *error) { return (Error *)error; }
+Error *unwrap(iree_compiler_error_t *error) { return (Error *)error; }
 
-struct iree_compiler_error_t *wrap(Error *error) {
-  return (struct iree_compiler_error_t *)error;
+iree_compiler_error_t *wrap(Error *error) {
+  return (iree_compiler_error_t *)error;
 }
 
-Session *unwrap(struct iree_compiler_session_t *session) {
-  return (Session *)session;
+Session *unwrap(iree_compiler_session_t *session) { return (Session *)session; }
+
+iree_compiler_session_t *wrap(Session *session) {
+  return (iree_compiler_session_t *)session;
 }
 
-struct iree_compiler_session_t *wrap(Session *session) {
-  return (struct iree_compiler_session_t *)session;
+Run *unwrap(iree_compiler_run_t *run) { return (Run *)run; }
+
+iree_compiler_run_t *wrap(Run *run) { return (iree_compiler_run_t *)run; }
+
+Source *unwrap(iree_compiler_source_t *source) { return (Source *)source; }
+
+iree_compiler_source_t *wrap(Source *source) {
+  return (iree_compiler_source_t *)source;
 }
 
-Run *unwrap(struct iree_compiler_run_t *run) { return (Run *)run; }
+Output *unwrap(iree_compiler_output_t *output) { return (Output *)output; }
 
-struct iree_compiler_run_t *wrap(Run *run) {
-  return (struct iree_compiler_run_t *)run;
-}
-
-Source *unwrap(struct iree_compiler_source_t *source) {
-  return (Source *)source;
-}
-
-struct iree_compiler_source_t *wrap(Source *source) {
-  return (struct iree_compiler_source_t *)source;
-}
-
-Output *unwrap(struct iree_compiler_output_t *output) {
-  return (Output *)output;
-}
-
-struct iree_compiler_output_t *wrap(Output *output) {
-  return (struct iree_compiler_output_t *)output;
+iree_compiler_output_t *wrap(Output *output) {
+  return (iree_compiler_output_t *)output;
 }
 
 }  // namespace
@@ -483,11 +474,11 @@ void ireeCompilerEnumerateRegisteredHALTargetBackends(
   }
 }
 
-void ireeCompilerErrorDestroy(struct iree_compiler_error_t *error) {
+void ireeCompilerErrorDestroy(iree_compiler_error_t *error) {
   delete unwrap(error);
 }
 
-const char *ireeCompilerErrorGetMessage(struct iree_compiler_error_t *error) {
+const char *ireeCompilerErrorGetMessage(iree_compiler_error_t *error) {
   return unwrap(error)->message.c_str();
 }
 
@@ -515,7 +506,7 @@ void ireeCompilerGlobalShutdown() {
   globalInit = nullptr;
 }
 
-struct iree_compiler_session_t *ireeCompilerSessionCreate() {
+iree_compiler_session_t *ireeCompilerSessionCreate() {
   if (!globalInit) {
     fprintf(stderr, "FATAL ERROR: Not initialized\n");
     abort();
@@ -523,87 +514,84 @@ struct iree_compiler_session_t *ireeCompilerSessionCreate() {
   return wrap(new Session(*globalInit));
 }
 
-void ireeCompilerSessionDestroy(struct iree_compiler_session_t *session) {
+void ireeCompilerSessionDestroy(iree_compiler_session_t *session) {
   delete unwrap(session);
 }
 
-struct iree_compiler_run_t *ireeCompilerRunCreate(
-    struct iree_compiler_session_t *session) {
+iree_compiler_run_t *ireeCompilerRunCreate(iree_compiler_session_t *session) {
   return wrap(new Run(*unwrap(session)));
 }
 
-void ireeCompilerRunEnableConsoleDiagnostics(struct iree_compiler_run_t *run) {
+void ireeCompilerRunEnableConsoleDiagnostics(iree_compiler_run_t *run) {
   unwrap(run)->enableConsoleDiagnosticHandler = true;
 }
 
-void ireeCompilerRunDestroy(struct iree_compiler_run_t *run) {
-  delete unwrap(run);
-}
+void ireeCompilerRunDestroy(iree_compiler_run_t *run) { delete unwrap(run); }
 
-bool ireeCompilerRunParseSource(struct iree_compiler_run_t *run,
-                                struct iree_compiler_source_t *source) {
+bool ireeCompilerRunParseSource(iree_compiler_run_t *run,
+                                iree_compiler_source_t *source) {
   return unwrap(run)->parseSource(*unwrap(source));
 }
 
-void ireeCompilerRunSetCompileToPhase(struct iree_compiler_run_t *run,
+void ireeCompilerRunSetCompileToPhase(iree_compiler_run_t *run,
                                       const char *phase) {
   unwrap(run)->compileToPhaseName = std::string(phase);
 }
 
-void ireeCompilerRunSetVerifyIR(struct iree_compiler_run_t *run, bool enable) {
+void ireeCompilerRunSetVerifyIR(iree_compiler_run_t *run, bool enable) {
   unwrap(run)->enableVerifier = enable;
 }
 
-bool ireeCompilerRunPipeline(struct iree_compiler_run_t *run,
+bool ireeCompilerRunPipeline(iree_compiler_run_t *run,
                              enum iree_compiler_pipeline_t pipeline) {
   return unwrap(run)->runPipeline(pipeline);
 }
 
-void ireeCompilerSourceDestroy(struct iree_compiler_source_t *source) {
+void ireeCompilerSourceDestroy(iree_compiler_source_t *source) {
   delete unwrap(source);
 }
 
-struct iree_compiler_error_t *ireeCompilerSourceOpenFile(
-    struct iree_compiler_session_t *session, const char *filePath,
-    struct iree_compiler_source_t **out_source) {
+iree_compiler_error_t *ireeCompilerSourceOpenFile(
+    iree_compiler_session_t *session, const char *filePath,
+    iree_compiler_source_t **out_source) {
   auto source = new Source(*unwrap(session));
   *out_source = wrap(source);
   return wrap(source->openFile(filePath));
 }
 
-struct iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
-    struct iree_compiler_session_t *session, const char *bufferName,
-    const char *buffer, size_t length,
-    struct iree_compiler_source_t **out_source) {
+iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
+    iree_compiler_session_t *session, const char *bufferName,
+    const char *buffer, size_t length, iree_compiler_source_t **out_source) {
   auto source = new Source(*unwrap(session));
   *out_source = wrap(source);
   return wrap(source->wrapBuffer(bufferName, buffer, length));
 }
 
-struct iree_compiler_error_t *ireeCompilerSourceSplit(
-    struct iree_compiler_source_t *source,
-    void (*callback)(struct iree_compiler_source_t *source, void *userData),
+iree_compiler_error_t *ireeCompilerSourceSplit(
+    iree_compiler_source_t *source,
+    void (*callback)(iree_compiler_source_t *source, void *userData),
     void *userData) {
   return wrap(unwrap(source)->split(callback, userData));
 }
 
-void ireeCompilerOutputDestroy(struct iree_compiler_output_t *output) {
+void ireeCompilerOutputDestroy(iree_compiler_output_t *output) {
   delete unwrap(output);
 }
 
-struct iree_compiler_error_t *ireeCompilerOutputOpenFile(
-    const char *filePath, struct iree_compiler_output_t **out_output) {
+iree_compiler_error_t *ireeCompilerOutputOpenFile(
+    const char *filePath, iree_compiler_output_t **out_output) {
   auto output = new Output();
   *out_output = wrap(output);
   return wrap(output->openFile(filePath));
 }
 
-void ireeCompileOutputKeep(struct iree_compiler_output_t *output) {
+void ireeCompileOutputKeep(iree_compiler_output_t *output) {
   unwrap(output)->keep();
 }
 
-struct iree_compiler_error_t *ireeCompilerOutputWrite(
-    struct iree_compiler_output_t *output, const void *data, size_t length) {
+iree_compiler_error_t *ireeCompilerOutputWrite(iree_compiler_output_t *output,
+                                               const void *data,
+                                               size_t length) {
   llvm::raw_fd_ostream *os = unwrap(output)->outputStream;
   if (!os) {
     return wrap(new Error("output not open for streaming"));
@@ -612,22 +600,22 @@ struct iree_compiler_error_t *ireeCompilerOutputWrite(
   return wrap(unwrap(output)->getWriteError());
 }
 
-iree_compiler_error_t *ireeCompilerRunOutputIR(
-    struct iree_compiler_run_t *run, struct iree_compiler_output_t *output) {
+iree_compiler_error_t *ireeCompilerRunOutputIR(iree_compiler_run_t *run,
+                                               iree_compiler_output_t *output) {
   return wrap(unwrap(run)->outputIR(*unwrap(output)));
 }
 
 iree_compiler_error_t *ireeCompilerRunOutputVMBytecode(
-    struct iree_compiler_run_t *run, struct iree_compiler_output_t *output) {
+    iree_compiler_run_t *run, iree_compiler_output_t *output) {
   return wrap(unwrap(run)->outputVMBytecode(*unwrap(output)));
 }
 
 iree_compiler_error_t *ireeCompilerRunOutputVMCSource(
-    struct iree_compiler_run_t *run, struct iree_compiler_output_t *output) {
+    iree_compiler_run_t *run, iree_compiler_output_t *output) {
   return wrap(unwrap(run)->outputVMCSource(*unwrap(output)));
 }
 
 iree_compiler_error_t *ireeCompilerRunOutputHALExecutable(
-    struct iree_compiler_run_t *run, struct iree_compiler_output_t *output) {
+    iree_compiler_run_t *run, iree_compiler_output_t *output) {
   return wrap(unwrap(run)->outputHALExecutable(*unwrap(output)));
 }
