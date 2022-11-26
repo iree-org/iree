@@ -8,6 +8,17 @@ EXPORTS
   ireeCompilerGetAPIVersion
   ireeCompilerGlobalInitialize
   ireeCompilerGlobalShutdown
+  ireeCompilerInvocationCreate
+  ireeCompilerInvocationDestroy
+  ireeCompilerInvocationEnableConsoleDiagnostics
+  ireeCompilerInvocationOutputHALExecutable
+  ireeCompilerInvocationOutputIR
+  ireeCompilerInvocationOutputVMBytecode
+  ireeCompilerInvocationOutputVMCSource
+  ireeCompilerInvocationParseSource
+  ireeCompilerInvocationPipeline
+  ireeCompilerInvocationSetCompileToPhase
+  ireeCompilerInvocationSetVerifyIR
   ireeCompilerOptionsCreate
   ireeCompilerOptionsDestroy
   ireeCompilerOptionsGetFlags
@@ -18,19 +29,8 @@ EXPORTS
   ireeCompilerRegisterAllDialects
   ireeCompilerRegisterAllPasses
   ireeCompilerRegisterTargetBackends
-  ireeCompilerRunCreate
-  ireeCompilerRunDestroy
-  ireeCompilerRunEnableConsoleDiagnostics
   ireeCompilerRunLldMain
   ireeCompilerRunMain
-  ireeCompilerRunOutputHALExecutable
-  ireeCompilerRunOutputIR
-  ireeCompilerRunOutputVMBytecode
-  ireeCompilerRunOutputVMCSource
-  ireeCompilerRunParseSource
-  ireeCompilerRunPipeline
-  ireeCompilerRunSetCompileToPhase
-  ireeCompilerRunSetVerifyIR
   ireeCompilerSessionCreate
   ireeCompilerSessionDestroy
   ireeCompilerSourceDestroy

@@ -240,9 +240,9 @@ void Output::keep() {
   if (outputFile) outputFile->keep();
 }
 
-// Run corresponds to iree_compiler_run_t
-struct Run {
-  Run(Session &session);
+// Invocation corresponds to iree_compiler_invocation_t
+struct Invocation {
+  Invocation(Session &session);
   bool parseSource(Source &source);
   bool runPipeline(enum iree_compiler_pipeline_t pipeline);
   Error *outputIR(Output &output);
@@ -275,7 +275,8 @@ struct Run {
   bool enableConsoleDiagnosticHandler = false;
 };
 
-Run::Run(Session &session) : session(session), passManager(&session.context) {
+Invocation::Invocation(Session &session)
+    : session(session), passManager(&session.context) {
   if (session.globalInit.usesCommandLine) {
     mlir::applyPassManagerCLOptions(passManager);
     mlir::applyDefaultTimingPassManagerCLOptions(passManager);
@@ -283,7 +284,7 @@ Run::Run(Session &session) : session(session), passManager(&session.context) {
   passManager.addInstrumentation(std::make_unique<PassTracing>());
 }
 
-bool Run::parseSource(Source &source) {
+bool Invocation::parseSource(Source &source) {
   if (enableConsoleDiagnosticHandler) {
     diagnosticHandler = std::make_unique<SourceMgrDiagnosticHandler>(
         source.sourceMgr, &session.context);
@@ -297,7 +298,7 @@ bool Run::parseSource(Source &source) {
   return true;
 }
 
-bool Run::runPipeline(enum iree_compiler_pipeline_t pipeline) {
+bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   switch (pipeline) {
     case IREE_COMPILER_PIPELINE_STD: {
       // Parse the compile to phase name.
@@ -352,12 +353,12 @@ bool Run::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   return true;
 }
 
-Error *Run::outputIR(Output &output) {
+Error *Invocation::outputIR(Output &output) {
   (*output.outputStream) << *parsedModule.get();
   return output.getWriteError();
 }
 
-Error *Run::outputVMBytecode(Output &output) {
+Error *Invocation::outputVMBytecode(Output &output) {
   auto vmModule = llvm::dyn_cast<IREE::VM::ModuleOp>(*parsedModule);
   auto builtinModule = llvm::dyn_cast<mlir::ModuleOp>(*parsedModule);
   LogicalResult result = failure();
@@ -376,7 +377,7 @@ Error *Run::outputVMBytecode(Output &output) {
   return output.getWriteError();
 }
 
-Error *Run::outputVMCSource(Output &output) {
+Error *Invocation::outputVMCSource(Output &output) {
 #ifndef IREE_HAVE_C_OUTPUT_FORMAT
   return new Error("VM C source output not enabled");
 #else
@@ -400,7 +401,7 @@ Error *Run::outputVMCSource(Output &output) {
 #endif
 }
 
-Error *Run::outputHALExecutable(Output &output) {
+Error *Invocation::outputHALExecutable(Output &output) {
   // Extract the serialized binary representation from the executable.
   auto &block = (*parsedModule)->getRegion(0).front();
   auto executableOp = *(block.getOps<IREE::HAL::ExecutableOp>().begin());
@@ -443,9 +444,13 @@ iree_compiler_session_t *wrap(Session *session) {
   return (iree_compiler_session_t *)session;
 }
 
-Run *unwrap(iree_compiler_run_t *run) { return (Run *)run; }
+Invocation *unwrap(iree_compiler_invocation_t *inv) {
+  return (Invocation *)inv;
+}
 
-iree_compiler_run_t *wrap(Run *run) { return (iree_compiler_run_t *)run; }
+iree_compiler_invocation_t *wrap(Invocation *inv) {
+  return (iree_compiler_invocation_t *)inv;
+}
 
 Source *unwrap(iree_compiler_source_t *source) { return (Source *)source; }
 
@@ -518,33 +523,38 @@ void ireeCompilerSessionDestroy(iree_compiler_session_t *session) {
   delete unwrap(session);
 }
 
-iree_compiler_run_t *ireeCompilerRunCreate(iree_compiler_session_t *session) {
-  return wrap(new Run(*unwrap(session)));
+iree_compiler_invocation_t *ireeCompilerInvocationCreate(
+    iree_compiler_session_t *session) {
+  return wrap(new Invocation(*unwrap(session)));
 }
 
-void ireeCompilerRunEnableConsoleDiagnostics(iree_compiler_run_t *run) {
-  unwrap(run)->enableConsoleDiagnosticHandler = true;
+void ireeCompilerInvocationEnableConsoleDiagnostics(
+    iree_compiler_invocation_t *inv) {
+  unwrap(inv)->enableConsoleDiagnosticHandler = true;
 }
 
-void ireeCompilerRunDestroy(iree_compiler_run_t *run) { delete unwrap(run); }
-
-bool ireeCompilerRunParseSource(iree_compiler_run_t *run,
-                                iree_compiler_source_t *source) {
-  return unwrap(run)->parseSource(*unwrap(source));
+void ireeCompilerInvocationDestroy(iree_compiler_invocation_t *inv) {
+  delete unwrap(inv);
 }
 
-void ireeCompilerRunSetCompileToPhase(iree_compiler_run_t *run,
-                                      const char *phase) {
-  unwrap(run)->compileToPhaseName = std::string(phase);
+bool ireeCompilerInvocationParseSource(iree_compiler_invocation_t *inv,
+                                       iree_compiler_source_t *source) {
+  return unwrap(inv)->parseSource(*unwrap(source));
 }
 
-void ireeCompilerRunSetVerifyIR(iree_compiler_run_t *run, bool enable) {
-  unwrap(run)->enableVerifier = enable;
+void ireeCompilerInvocationSetCompileToPhase(iree_compiler_invocation_t *inv,
+                                             const char *phase) {
+  unwrap(inv)->compileToPhaseName = std::string(phase);
 }
 
-bool ireeCompilerRunPipeline(iree_compiler_run_t *run,
-                             enum iree_compiler_pipeline_t pipeline) {
-  return unwrap(run)->runPipeline(pipeline);
+void ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *inv,
+                                       bool enable) {
+  unwrap(inv)->enableVerifier = enable;
+}
+
+bool ireeCompilerInvocationPipeline(iree_compiler_invocation_t *inv,
+                                    enum iree_compiler_pipeline_t pipeline) {
+  return unwrap(inv)->runPipeline(pipeline);
 }
 
 void ireeCompilerSourceDestroy(iree_compiler_source_t *source) {
@@ -600,22 +610,22 @@ iree_compiler_error_t *ireeCompilerOutputWrite(iree_compiler_output_t *output,
   return wrap(unwrap(output)->getWriteError());
 }
 
-iree_compiler_error_t *ireeCompilerRunOutputIR(iree_compiler_run_t *run,
-                                               iree_compiler_output_t *output) {
-  return wrap(unwrap(run)->outputIR(*unwrap(output)));
+iree_compiler_error_t *ireeCompilerInvocationOutputIR(
+    iree_compiler_invocation_t *inv, iree_compiler_output_t *output) {
+  return wrap(unwrap(inv)->outputIR(*unwrap(output)));
 }
 
-iree_compiler_error_t *ireeCompilerRunOutputVMBytecode(
-    iree_compiler_run_t *run, iree_compiler_output_t *output) {
-  return wrap(unwrap(run)->outputVMBytecode(*unwrap(output)));
+iree_compiler_error_t *ireeCompilerInvocationOutputVMBytecode(
+    iree_compiler_invocation_t *inv, iree_compiler_output_t *output) {
+  return wrap(unwrap(inv)->outputVMBytecode(*unwrap(output)));
 }
 
-iree_compiler_error_t *ireeCompilerRunOutputVMCSource(
-    iree_compiler_run_t *run, iree_compiler_output_t *output) {
-  return wrap(unwrap(run)->outputVMCSource(*unwrap(output)));
+iree_compiler_error_t *ireeCompilerInvocationOutputVMCSource(
+    iree_compiler_invocation_t *inv, iree_compiler_output_t *output) {
+  return wrap(unwrap(inv)->outputVMCSource(*unwrap(output)));
 }
 
-iree_compiler_error_t *ireeCompilerRunOutputHALExecutable(
-    iree_compiler_run_t *run, iree_compiler_output_t *output) {
-  return wrap(unwrap(run)->outputHALExecutable(*unwrap(output)));
+iree_compiler_error_t *ireeCompilerInvocationOutputHALExecutable(
+    iree_compiler_invocation_t *inv, iree_compiler_output_t *output) {
+  return wrap(unwrap(inv)->outputHALExecutable(*unwrap(output)));
 }

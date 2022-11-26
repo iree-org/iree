@@ -30,10 +30,10 @@ int main(int argc, char **argv) {
   // Session.
   auto *session = ireeCompilerSessionCreate();
 
-  // Run.
-  auto *run = ireeCompilerRunCreate(session);
-  ireeCompilerRunEnableConsoleDiagnostics(run);
-  ireeCompilerRunDestroy(run);
+  // Invocation.
+  auto *inv = ireeCompilerInvocationCreate(session);
+  ireeCompilerInvocationEnableConsoleDiagnostics(inv);
+  ireeCompilerInvocationDestroy(inv);
 
   ireeCompilerSessionDestroy(session);
 

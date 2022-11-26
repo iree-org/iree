@@ -145,56 +145,58 @@ void ireeCompilerSessionDestroy(iree_compiler_session_t *session) {
   __ireeCompilerSessionDestroy(session);
 }
 
-iree_compiler_run_t *ireeCompilerRunCreate(iree_compiler_session_t *session) {
-  return __ireeCompilerRunCreate(session);
+iree_compiler_invocation_t *ireeCompilerInvocationCreate(
+    iree_compiler_session_t *session) {
+  return __ireeCompilerInvocationCreate(session);
 }
 
-void ireeCompilerRunEnableConsoleDiagnostics(iree_compiler_run_t *run) {
-  __ireeCompilerRunEnableConsoleDiagnostics(run);
+void ireeCompilerInvocationEnableConsoleDiagnostics(
+    iree_compiler_invocation_t *run) {
+  __ireeCompilerInvocationEnableConsoleDiagnostics(run);
 }
 
-void ireeCompilerRunDestroy(iree_compiler_run_t *run) {
-  __ireeCompilerRunDestroy(run);
+void ireeCompilerInvocationDestroy(iree_compiler_invocation_t *run) {
+  __ireeCompilerInvocationDestroy(run);
 }
 
-bool ireeCompilerRunParseSource(iree_compiler_run_t *run,
-                                iree_compiler_source_t *source) {
-  return __ireeCompilerRunParseSource(run, source);
+bool ireeCompilerInvocationParseSource(iree_compiler_invocation_t *run,
+                                       iree_compiler_source_t *source) {
+  return __ireeCompilerInvocationParseSource(run, source);
 }
 
-void ireeCompilerRunSetCompileToPhase(iree_compiler_run_t *run,
-                                      const char *phase) {
-  __ireeCompilerRunSetCompileToPhase(run, phase);
+void ireeCompilerInvocationSetCompileToPhase(iree_compiler_invocation_t *run,
+                                             const char *phase) {
+  __ireeCompilerInvocationSetCompileToPhase(run, phase);
 }
 
-IREE_EMBED_EXPORTED void ireeCompilerRunSetVerifyIR(iree_compiler_run_t *run,
-                                                    bool enable) {
-  __ireeCompilerRunSetVerifyIR(run, enable);
+IREE_EMBED_EXPORTED void ireeCompilerInvocationSetVerifyIR(
+    iree_compiler_invocation_t *run, bool enable) {
+  __ireeCompilerInvocationSetVerifyIR(run, enable);
 }
 
-bool ireeCompilerRunPipeline(iree_compiler_run_t *run,
-                             enum iree_compiler_pipeline_t pipeline) {
-  return __ireeCompilerRunPipeline(run, pipeline);
+bool ireeCompilerInvocationPipeline(iree_compiler_invocation_t *run,
+                                    enum iree_compiler_pipeline_t pipeline) {
+  return __ireeCompilerInvocationPipeline(run, pipeline);
 }
 
-iree_compiler_error_t *ireeCompilerRunOutputIR(iree_compiler_run_t *run,
-                                               iree_compiler_output_t *output) {
-  return __ireeCompilerRunOutputIR(run, output);
+iree_compiler_error_t *ireeCompilerInvocationOutputIR(
+    iree_compiler_invocation_t *run, iree_compiler_output_t *output) {
+  return __ireeCompilerInvocationOutputIR(run, output);
 }
 
-iree_compiler_error_t *ireeCompilerRunOutputVMBytecode(
-    iree_compiler_run_t *run, iree_compiler_output_t *output) {
-  return __ireeCompilerRunOutputVMBytecode(run, output);
+iree_compiler_error_t *ireeCompilerInvocationOutputVMBytecode(
+    iree_compiler_invocation_t *run, iree_compiler_output_t *output) {
+  return __ireeCompilerInvocationOutputVMBytecode(run, output);
 }
 
-iree_compiler_error_t *ireeCompilerRunOutputVMCSource(
-    iree_compiler_run_t *run, iree_compiler_output_t *output) {
-  return __ireeCompilerRunOutputVMCSource(run, output);
+iree_compiler_error_t *ireeCompilerInvocationOutputVMCSource(
+    iree_compiler_invocation_t *run, iree_compiler_output_t *output) {
+  return __ireeCompilerInvocationOutputVMCSource(run, output);
 }
 
-iree_compiler_error_t *ireeCompilerRunOutputHALExecutable(
-    iree_compiler_run_t *run, iree_compiler_output_t *output) {
-  return __ireeCompilerRunOutputHALExecutable(run, output);
+iree_compiler_error_t *ireeCompilerInvocationOutputHALExecutable(
+    iree_compiler_invocation_t *run, iree_compiler_output_t *output) {
+  return __ireeCompilerInvocationOutputHALExecutable(run, output);
 }
 
 void ireeCompilerSourceDestroy(iree_compiler_source_t *source) {

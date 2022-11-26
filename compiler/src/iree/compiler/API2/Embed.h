@@ -41,7 +41,7 @@ extern "C" {
 // Opaque structures.
 typedef struct iree_compiler_error_t iree_compiler_error_t;
 typedef struct iree_compiler_session_t iree_compiler_session_t;
-typedef struct iree_compiler_run_t iree_compiler_run_t;
+typedef struct iree_compiler_invocation_t iree_compiler_invocation_t;
 typedef struct iree_compiler_source_t iree_compiler_source_t;
 typedef struct iree_compiler_output_t iree_compiler_output_t;
 
@@ -117,33 +117,34 @@ IREE_EMBED_EXPORTED void ireeCompilerSessionDestroy(
 // compiler.
 //===----------------------------------------------------------------------===//
 
-IREE_EMBED_EXPORTED iree_compiler_run_t *ireeCompilerRunCreate(
+IREE_EMBED_EXPORTED iree_compiler_invocation_t *ireeCompilerInvocationCreate(
     iree_compiler_session_t *session);
 
 // Enables default, pretty-printed diagnostics to the console. This is usually
 // the right thing to do for command-line tools, but other mechanisms are
 // preferred for library use.
-IREE_EMBED_EXPORTED void ireeCompilerRunEnableConsoleDiagnostics(
-    iree_compiler_run_t *run);
+IREE_EMBED_EXPORTED void ireeCompilerInvocationEnableConsoleDiagnostics(
+    iree_compiler_invocation_t *run);
 
 // Destroys a run.
-IREE_EMBED_EXPORTED void ireeCompilerRunDestroy(iree_compiler_run_t *run);
+IREE_EMBED_EXPORTED void ireeCompilerInvocationDestroy(
+    iree_compiler_invocation_t *run);
 
 // Parses a source into this instance in preparation for performing a
 // compilation action.
 // Returns false and emits diagnostics on failure.
-IREE_EMBED_EXPORTED bool ireeCompilerRunParseSource(
-    iree_compiler_run_t *run, iree_compiler_source_t *source);
+IREE_EMBED_EXPORTED bool ireeCompilerInvocationParseSource(
+    iree_compiler_invocation_t *run, iree_compiler_source_t *source);
 
 // Sets a mnemonic phase name to run compilation to. Default is "end".
 // The meaning of this is pipeline specific. See IREEVMPipelinePhase
 // for the standard pipeline.
-IREE_EMBED_EXPORTED void ireeCompilerRunSetCompileToPhase(
-    iree_compiler_run_t *run, const char *phase);
+IREE_EMBED_EXPORTED void ireeCompilerInvocationSetCompileToPhase(
+    iree_compiler_invocation_t *run, const char *phase);
 
 // Enables/disables verification of IR after each pass. Defaults to enabled.
-IREE_EMBED_EXPORTED void ireeCompilerRunSetVerifyIR(iree_compiler_run_t *run,
-                                                    bool enable);
+IREE_EMBED_EXPORTED void ireeCompilerInvocationSetVerifyIR(
+    iree_compiler_invocation_t *run, bool enable);
 
 // Runs a compilation pipeline.
 // Returns false and emits diagnostics on failure.
@@ -151,30 +152,33 @@ enum iree_compiler_pipeline_t {
   IREE_COMPILER_PIPELINE_STD = 0,
   IREE_COMPILER_PIPELINE_HAL_EXECUTABLE = 1,
 };
-IREE_EMBED_EXPORTED bool ireeCompilerRunPipeline(
-    iree_compiler_run_t *run, enum iree_compiler_pipeline_t pipeline);
+IREE_EMBED_EXPORTED bool ireeCompilerInvocationPipeline(
+    iree_compiler_invocation_t *run, enum iree_compiler_pipeline_t pipeline);
 
 // Outputs the current compiler state as textual IR to the output.
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerRunOutputIR(
-    iree_compiler_run_t *run, iree_compiler_output_t *output);
+IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerInvocationOutputIR(
+    iree_compiler_invocation_t *run, iree_compiler_output_t *output);
 
 // Assuming that the compiler has produced VM IR, converts it to bytecode
 // and outputs it. This is a valid next step after running the
 // IREE_COMPILER_PIPELINE_STD pipeline.
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerRunOutputVMBytecode(
-    iree_compiler_run_t *run, iree_compiler_output_t *output);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerInvocationOutputVMBytecode(iree_compiler_invocation_t *run,
+                                       iree_compiler_output_t *output);
 
 // Assuming that the compiler has produced VM IR, converts it to textual
 // C source and output it. This is a valid next step after running the
 // IREE_COMPILER_PIPELINE_STD pipeline.
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerRunOutputVMCSource(
-    iree_compiler_run_t *run, iree_compiler_output_t *output);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerInvocationOutputVMCSource(iree_compiler_invocation_t *run,
+                                      iree_compiler_output_t *output);
 
 // Outputs the contents of a single HAL executable as binary data.
 // This is a valid next step after running the
 // IREE_COMPILER_PIPELINE_HAL_EXECUTABLE pipeline.
-IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerRunOutputHALExecutable(
-    iree_compiler_run_t *run, iree_compiler_output_t *output);
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerInvocationOutputHALExecutable(iree_compiler_invocation_t *run,
+                                          iree_compiler_output_t *output);
 
 //===----------------------------------------------------------------------===//
 // Sources.

@@ -169,30 +169,31 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   }
 
   auto processBuffer = [&](iree_compiler_source_t *source) -> bool {
-    // Stash per-run state in an RAII instance.
-    struct RunState {
-      RunState(MainState &s) { run = ireeCompilerRunCreate(s.session); }
-      ~RunState() { ireeCompilerRunDestroy(run); }
-      iree_compiler_run_t *run;
+    // Stash per-invocation state in an RAII instance.
+    struct InvState {
+      InvState(MainState &s) { inv = ireeCompilerInvocationCreate(s.session); }
+      ~InvState() { ireeCompilerInvocationDestroy(inv); }
+      iree_compiler_invocation_t *inv;
     };
-    RunState r(s);
+    InvState r(s);
 
-    ireeCompilerRunEnableConsoleDiagnostics(r.run);
-    ireeCompilerRunSetCompileToPhase(r.run, std::string(compileTo).c_str());
-    ireeCompilerRunSetVerifyIR(r.run, verifyIR);
-    if (!ireeCompilerRunParseSource(r.run, source)) return false;
+    ireeCompilerInvocationEnableConsoleDiagnostics(r.inv);
+    ireeCompilerInvocationSetCompileToPhase(r.inv,
+                                            std::string(compileTo).c_str());
+    ireeCompilerInvocationSetVerifyIR(r.inv, verifyIR);
+    if (!ireeCompilerInvocationParseSource(r.inv, source)) return false;
 
     // Switch on compileMode to choose a pipeline to run.
     switch (compileMode) {
       case CompileMode::std:
-        if (!ireeCompilerRunPipeline(r.run, IREE_COMPILER_PIPELINE_STD))
+        if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_STD))
           return false;
         break;
       case CompileMode::vm:
         break;
       case CompileMode::hal_executable: {
-        if (!ireeCompilerRunPipeline(r.run,
-                                     IREE_COMPILER_PIPELINE_HAL_EXECUTABLE))
+        if (!ireeCompilerInvocationPipeline(
+                r.inv, IREE_COMPILER_PIPELINE_HAL_EXECUTABLE))
           return false;
         break;
       }
@@ -203,7 +204,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
 
     // Ending early and just emitting IR.
     if (compileTo != "end") {
-      if (auto error = ireeCompilerRunOutputIR(r.run, s.output)) {
+      if (auto error = ireeCompilerInvocationOutputIR(r.inv, s.output)) {
         s.handleError(error);
         return false;
       }
@@ -214,18 +215,19 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     iree_compiler_error_t *outputError = nullptr;
     switch (outputFormat) {
       case OutputFormat::vm_asm:
-        outputError = ireeCompilerRunOutputIR(r.run, s.output);
+        outputError = ireeCompilerInvocationOutputIR(r.inv, s.output);
         break;
       case OutputFormat::vm_bytecode:
-        outputError = ireeCompilerRunOutputVMBytecode(r.run, s.output);
+        outputError = ireeCompilerInvocationOutputVMBytecode(r.inv, s.output);
         break;
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
       case OutputFormat::vm_c:
-        outputError = ireeCompilerRunOutputVMCSource(r.run, s.output);
+        outputError = ireeCompilerInvocationOutputVMCSource(r.inv, s.output);
         break;
 #endif  // IREE_HAVE_C_OUTPUT_FORMAT
       case OutputFormat::hal_executable: {
-        outputError = ireeCompilerRunOutputHALExecutable(r.run, s.output);
+        outputError =
+            ireeCompilerInvocationOutputHALExecutable(r.inv, s.output);
         break;
       }
       default:
