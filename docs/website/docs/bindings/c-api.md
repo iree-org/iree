@@ -181,7 +181,7 @@ IREE_CHECK_OK(iree_vm_context_resolve_function(
 ``` c
 // (Application-specific I/O buffer setup, making data available to the device)
 
-IREE_CHECK_OK(iree_vm_invoke(context, main_function,
+IREE_CHECK_OK(iree_vm_invoke(context, main_function, IREE_VM_INVOCATION_FLAG_NONE,
                              /*policy=*/NULL, inputs, outputs,
                              iree_allocator_system()));
 
