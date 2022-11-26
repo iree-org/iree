@@ -170,9 +170,19 @@ function(iree_cc_binary)
       if(APPLE)
         set(_origin_prefix "@loader_path")
       endif()
+      # See: https://cmake.org/cmake/help/latest/module/GNUInstallDirs.html
+      # Assume relative path as a sibling of the lib dir.
+      set(_install_rpath "${_origin_prefix}:${_origin_prefix}/../${CMAKE_INSTALL_LIBDIR}")
+      if(CMAKE_INSTALL_LIBDIR)
+        cmake_path(IS_ABSOLUTE CMAKE_INSTALL_LIBDIR _is_abs_libdir)
+        if(_is_abs_libdir)
+          # Use the libdir verbatim.
+          set(_install_rpath "${_origin_prefix}:${CMAKE_INSTALL_LIBDIR}")
+        endif()
+      endif()
       set_target_properties(${_NAME} PROPERTIES
         BUILD_WITH_INSTALL_RPATH OFF
-        INSTALL_RPATH "${_origin_prefix}:${_origin_prefix}/../lib"
+        INSTALL_RPATH "${_install_rpath}"
       )
     endif()
   endif()
