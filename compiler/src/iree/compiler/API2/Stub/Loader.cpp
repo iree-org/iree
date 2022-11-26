@@ -61,6 +61,13 @@ void *lookupLibrarySymbol(DlHandle lib, const char *symbol) {
 }  // namespace
 #endif
 
+// Some operating systems have a prefix for cdecl exported symbols.
+#if __APPLE__
+#define IREE_CDECL_SYMBOL_PREFIX "_"
+#else
+#define IREE_CDECL_SYMBOL_PREFIX ""
+#endif
+
 namespace {
 DlHandle libraryHandle = nullptr;
 
@@ -87,13 +94,13 @@ bool ireeCompilerLoadLibrary(const char *libraryPath) {
     return false;
   }
 
-#define HANDLE_SYMBOL(fn_name)                                                 \
-  __##fn_name = (decltype(__##fn_name))lookupLibrarySymbol(localLibraryHandle, \
-                                                           #fn_name);          \
-  if (!__##fn_name) {                                                          \
-    fprintf(stderr, "IREE COMPILER ERROR: Could not find symbol %s\n",         \
-            #fn_name);                                                         \
-    return false;                                                              \
+#define HANDLE_SYMBOL(fn_name)                                         \
+  __##fn_name = (decltype(__##fn_name))lookupLibrarySymbol(            \
+      localLibraryHandle, IREE_CDECL_SYMBOL_PREFIX #fn_name);          \
+  if (!__##fn_name) {                                                  \
+    fprintf(stderr, "IREE COMPILER ERROR: Could not find symbol %s\n", \
+            #fn_name);                                                 \
+    return false;                                                      \
   }
 #include "iree/compiler/API2/Stub/HandleSymbols.inc"
 #undef HANDLE_SYMBOL
