@@ -262,7 +262,11 @@ struct Run {
 
   Session &session;
   PassManager passManager;
-  std::unique_ptr<ScopedDiagnosticHandler> diagnosticHandler;
+  // Should be capturing the base ScopedDiagnosticHandler class so that we
+  // can parameterize what kind of handler, but this issue needs to be fixed
+  // first:
+  //   https://github.com/llvm/llvm-project/issues/59212
+  std::unique_ptr<SourceMgrDiagnosticHandler> diagnosticHandler;
 
   OwningOpRef<Operation *> parsedModule;
 
@@ -282,7 +286,7 @@ Run::Run(Session &session) : session(session), passManager(&session.context) {
 
 bool Run::parseSource(Source &source) {
   if (enableConsoleDiagnosticHandler) {
-    diagnosticHandler = std::make_unique<mlir::SourceMgrDiagnosticHandler>(
+    diagnosticHandler = std::make_unique<SourceMgrDiagnosticHandler>(
         source.sourceMgr, &session.context);
   }
 
