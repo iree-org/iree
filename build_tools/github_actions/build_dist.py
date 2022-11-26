@@ -137,18 +137,22 @@ def build_main_dist():
 
   # CMake configure.
   print("*** Configuring ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      f"-B{BUILD_DIR}",
-      "--log-level=VERBOSE",
-      f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
-      f"-DCMAKE_BUILD_TYPE=Release",
-      f"-DIREE_BUILD_COMPILER=ON",
-      f"-DIREE_BUILD_PYTHON_BINDINGS=OFF",
-      f"-DIREE_BUILD_SAMPLES=OFF",
-  ] + extra_cmake_flags,
-                 check=True)
+  subprocess.run(
+      [
+          sys.executable,
+          CMAKE_CI_SCRIPT,
+          f"-B{BUILD_DIR}",
+          "--log-level=VERBOSE",
+          f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
+          # On some distributions, this will install to lib64. We would like
+          # consistency in built packages, so hard-code it.
+          "-DCMAKE_INSTALL_LIBDIR=lib",
+          f"-DCMAKE_BUILD_TYPE=Release",
+          f"-DIREE_BUILD_COMPILER=ON",
+          f"-DIREE_BUILD_PYTHON_BINDINGS=OFF",
+          f"-DIREE_BUILD_SAMPLES=OFF",
+      ] + extra_cmake_flags,
+      check=True)
 
   print("*** Building ***")
   subprocess.run([
@@ -164,6 +168,7 @@ def build_main_dist():
   print("*** Packaging ***")
   dist_entries = [
       "bin",
+      "lib",
       "tests",
   ]
   dist_archive = os.path.join(
