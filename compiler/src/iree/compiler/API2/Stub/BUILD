@@ -13,16 +13,16 @@ package(
 )
 
 iree_compiler_cc_library(
-  name = "Stub",
-  hdrs = [
-    "Loader.h",
-  ],
-  srcs = [
-    "Loader.cpp",
-    "HandleSymbols.inc",
-  ],
-  deps = [
-    "//build_tools:dl",
-    "//compiler/src/iree/compiler/API2:Headers",
-  ],
+    name = "Stub",
+    srcs = [
+        "HandleSymbols.inc",
+        "Loader.cpp",
+    ],
+    hdrs = [
+        "Loader.h",
+    ],
+    deps = [
+        "//build_tools:dl",
+        "//compiler/src/iree/compiler/API2:Headers",
+    ],
 )
