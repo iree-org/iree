@@ -1340,7 +1340,7 @@ configurations.</p>
 
 <div class="highlight"><pre><span></span><code><span class="c1">// (Application-specific I/O buffer setup, making data available to the device)</span>
 
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_invoke</span><span class="p">(</span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">main_function</span><span class="p">,</span><span class="w"></span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_invoke</span><span class="p">(</span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">main_function</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_VM_INVOCATION_FLAG_NONE</span><span class="p">,</span><span class="w"></span>
 <span class="w">                             </span><span class="cm">/*policy=*/</span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="p">,</span><span class="w"> </span><span class="n">outputs</span><span class="p">,</span><span class="w"></span>
 <span class="w">                             </span><span class="n">iree_allocator_system</span><span class="p">()));</span><span class="w"></span>
 
