@@ -41,6 +41,9 @@ iree_cc_test(
 
 # Must be a build dependency but not a library dep (we depend on it at
 # runtime).
-add_dependencies(
-  iree_compiler_API2_Stub_LoaderTest
-  iree::compiler::API2::SharedImpl)
+# TODO: Find a better way to do this.
+if(IREE_BUILD_TESTS)
+  add_dependencies(
+    iree_compiler_API2_Stub_LoaderTest
+    iree::compiler::API2::SharedImpl)
+endif()
