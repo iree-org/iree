@@ -48,21 +48,13 @@ RUN apt-get update \
 ##############
 
 ######## Python ########
-RUN apt-get update \
-  && apt-get install -y \
-    python3.10 \
-    python3.10-dev \
-  && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 \
-  && apt-get install -y \
-    python3-pip \
-    python3-setuptools \
-    python3-distutils \
-    python3-venv \
-    python3.10-venv \
-  && python3 -m pip install --upgrade pip>=21.3 \
-  && python3 -m pip install --upgrade setuptools \
-  && python3 -m pip install --ignore-installed \
-    requests
+WORKDIR /install-python
+
+ARG PYTHON_VERSION=3.10
+
+COPY runtime/bindings/python/iree/runtime/build_requirements.txt build_tools/docker/context/install_python_deps.sh ./
+RUN ./install_python_deps.sh "${PYTHON_VERSION}" \
+  && rm -rf /install-python
 
 ENV PYTHON_BIN /usr/bin/python3
 ##############
@@ -113,8 +105,11 @@ ENV BLIS_DIR="/opt/blis"
 ######## MMPERF ########
 COPY build_tools/docker/context/setup_mmperf.sh /usr/local/bin
 
+ARG MMPERF_SHA="ae523a3"
+
 # Generate a version of mmperf for CPU.
 RUN mkdir -p "/usr/local/src/mmperf" \
-    && /usr/local/bin/setup_mmperf.sh "/usr/local/src/mmperf" "ae523a3"
+    && /usr/local/bin/setup_mmperf.sh "/usr/local/src/mmperf" "${MMPERF_SHA}"
 
+ENV MMPERF_REPO_DIR="/usr/local/src/mmperf/mmperf"
 ############## \

@@ -20,18 +20,21 @@
 #
 # Usage:
 #    ./build_mmperf.sh \
-#        <mmperf repo dir> \
 #        <mmperf build dir> \
-#        <backend> e.g. "cpu", "cuda".
+#        <backend> e.g. "cpu", "cuda". \
+#        <iree sha> (optional) \
+#        <mmperf repo dir> (optional)
 
 set -xeuo pipefail
 
-export REPO_DIR=$1
-export BUILD_DIR=$2
+export BUILD_DIR=$1
 # Either `cpu` or `cuda`.
-export BACKEND=$3
+export BACKEND=$2
+export IREE_SHA=${3:-"origin/main"}
+export REPO_DIR=${4:-${MMPERF_REPO_DIR}}
 
 pushd ${REPO_DIR}
+source mmperf.venv/bin/activate
 
 # Set all repos as a safe directory. Since this repo was created in the
 # DockerFile under `root`, git will not run commands on this repo as a
@@ -40,12 +43,10 @@ for i in $(find ${REPO_DIR} -name '.git' | xargs dirname); do
   git config --global --add safe.directory $i
 done
 
-source mmperf.venv/bin/activate
-
 # Update IREE.
 pushd external/iree
 git fetch
-git checkout origin/main
+git checkout ${IREE_SHA}
 git submodule update --init --jobs 8 --depth 1
 popd # external/iree
 
@@ -77,10 +78,10 @@ elif [[ ${BACKEND} == "cpu" ]]; then
     -DUSE_BLIS=ON
     -DUSE_TVM=ON
   )
-  MKL_DIR=/opt/intel/mkl BLIS_DIR=/opt/blis cmake "${args[@]}" -B ${BUILD_DIR} ${REPO_DIR}
+  MKL_DIR=${MKL_DIR} BLIS_DIR=${BLIS_DIR} cmake "${args[@]}" -B ${BUILD_DIR} ${REPO_DIR}
 else
   echo "Error: Unsupported backend."
-  return 1
+  exit 1
 fi
 
 cmake --build ${BUILD_DIR} --verbose

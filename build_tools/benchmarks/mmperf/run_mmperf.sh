@@ -18,15 +18,15 @@
 #
 # Usage:
 #    ./run_mmperf.sh \
-#        <mmperf repo dir> \
 #        <mmperf build dir> \
-#        <results directory>
+#        <results directory> \
+#        <mmperf repo dir> (optional)
 
 set -xeuo pipefail
 
-export REPO_DIR=$1
-export BUILD_DIR=$2
-export REPORT_DIR=$3
+export BUILD_DIR=$1
+export REPORT_DIR=$2
+export REPO_DIR=${3:-${MMPERF_REPO_DIR}}
 
 source ${REPO_DIR}/mmperf.venv/bin/activate
 
