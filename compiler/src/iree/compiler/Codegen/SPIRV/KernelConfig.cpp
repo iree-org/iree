@@ -33,12 +33,11 @@
 
 #define DEBUG_TYPE "iree-spirv-kernel-config"
 
+using llvm::divideCeil;
 using llvm::APIntOps::GreatestCommonDivisor;
 
-// The default number of subgroups to use per workgroup.
-constexpr unsigned numSubgroupsPerWorkgroup = 4;
-// The default number of tiles along each dimension to use per workgroup.
-constexpr unsigned numTilesPerSubgroupDim = 2;
+// The default number of tiles along K dimension to use per workgroup.
+constexpr unsigned numTilesPerSubgroupDimK = 2;
 
 constexpr int kMaxVectorNumBits = 128;
 
@@ -534,9 +533,9 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   // to see if the problem size is too small; for such cases, "shift" the
   // parallelism to x.
   if (dimM < bestThreadM) {
-    int64_t factor = llvm::PowerOf2Ceil(llvm::divideCeil(bestThreadM, dimM));
+    int64_t factor = llvm::PowerOf2Ceil(divideCeil(bestThreadM, dimM));
     bestX *= factor;
-    bestY = llvm::divideCeil(bestY, factor);
+    bestY = divideCeil(bestY, factor);
   }
 
   LLVM_DEBUG({
@@ -639,8 +638,10 @@ struct CooperativeMatrixSize {
 /// Returns the cooperative matrix (M, N, K) sizes that are supported by the
 /// target environment and match the given parameters.
 static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
-    spirv::ResourceLimitsAttr resourceLimits, Type aType, Type bType,
-    Type cType, int64_t m, int64_t n, int64_t k) {
+    spirv::ResourceLimitsAttr resourceLimits,
+    const unsigned numSubgroupsPerWorkgroup,
+    const unsigned numMNTilesPerSubgroup, Type aType, Type bType, Type cType,
+    int64_t m, int64_t n, int64_t k) {
   auto properties = resourceLimits.getCooperativeMatrixPropertiesNv()
                         .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
   for (auto property : properties) {
@@ -659,8 +660,10 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
     uint64_t mTotalTileCount = m / matmulM;
 
     uint64_t remainingWarps = numSubgroupsPerWorkgroup;
-    uint64_t remainingTiles = numTilesPerSubgroupDim * numTilesPerSubgroupDim;
-    uint64_t warpSqrt = 1ull << (llvm::Log2_64(remainingWarps) / 2);
+    uint64_t remainingTiles = numMNTilesPerSubgroup;
+    // Assign more warps to the M dimension (used later) to balance thread
+    // counts along X and Y dimensions.
+    uint64_t warpSqrt = 1ull << (divideCeil(llvm::Log2_64(remainingWarps), 2));
     uint64_t tileSqrt = 1ull << (llvm::Log2_64(remainingTiles) / 2);
 
     int64_t mWarpCount = 0, nWarpCount = 0;
@@ -711,7 +714,7 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
 
     const uint64_t kTotalTileCount = k / matmulK;
     APInt kGCD = GreatestCommonDivisor(APInt(64, kTotalTileCount),
-                                       APInt(64, numTilesPerSubgroupDim));
+                                       APInt(64, numTilesPerSubgroupDimK));
     int64_t kTileCount = kGCD.getSExtValue();
 
     LLVM_DEBUG({
@@ -732,8 +735,10 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
 
 namespace detail {
 
-LogicalResult setCooperativeMatrixConfig(const spirv::TargetEnv &targetEnv,
-                                         linalg::LinalgOp op) {
+LogicalResult setCooperativeMatrixConfig(
+    const spirv::TargetEnv &targetEnv, linalg::LinalgOp op,
+    const unsigned numSubgroupsPerWorkgroup,
+    const unsigned numMNTilesPerSubgroup) {
   LLVM_DEBUG(llvm::dbgs() << "trying to matmul tensorcore config...\n");
   // This configuration is only for cooperative matrix.
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
@@ -775,8 +780,9 @@ LogicalResult setCooperativeMatrixConfig(const spirv::TargetEnv &targetEnv,
 
   spirv::ResourceLimitsAttr resourceLimits = targetEnv.getResourceLimits();
   Optional<CooperativeMatrixSize> coopMatSize = getCooperativeMatrixSize(
-      resourceLimits, getElementType(lhs), getElementType(rhs),
-      getElementType(init), dimM, dimN, dimK);
+      resourceLimits, numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
+      getElementType(lhs), getElementType(rhs), getElementType(init), dimM,
+      dimN, dimK);
   if (!coopMatSize) return success();
 
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
@@ -1087,7 +1093,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
         // If the workload is too small and we cannot distribute to more than 2
         // workgroups, try a smaller tile size to increase parallelism.
         if (partitionedLoops.size() == 1 && candidate > subgroupSize &&
-            llvm::divideCeil(loopBound, candidate) <= 2) {
+            divideCeil(loopBound, candidate) <= 2) {
           continue;
         }
 
