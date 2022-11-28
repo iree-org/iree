@@ -350,6 +350,7 @@ class BenchmarkInfo:
     ) = name.split()
     model_source = model_source.strip("()")
     model_tags = model_tags.strip("[]").split(",")
+
     if mode_tags.startswith("[") and mode_tags.endswith("]"):
       bench_mode, compile_tags = mode_tags.strip("[]").split("][")
       bench_mode = mode_tags.split(",")

@@ -18,6 +18,7 @@
 
 set(LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS
   "--iree-input-type=mhlo"
+  "--iree-llvm-target-cpu=cascadelake"
   "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
 )
 

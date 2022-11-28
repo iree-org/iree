@@ -6,7 +6,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Runs all matched benchmark suites on a Linux device."""
 
-import json
 import sys
 import pathlib
 
@@ -20,6 +19,7 @@ import shutil
 import tarfile
 import pathlib
 import typing
+import json
 
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
@@ -154,14 +154,13 @@ def main(args):
   commit = get_git_commit_hash("HEAD")
   benchmark_config = BenchmarkConfig.build_from_args(args, commit)
 
-  if args.run_configs_json is None:
+  if args.run_config is None:
     benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
         benchmark_config.root_benchmark_dir)
   else:
-    with open(args.run_configs_json, "r") as run_configs_file:
-      run_configs_data = json.load(run_configs_file)
+    run_config_data = json.loads(args.run_config.read_text())
     run_configs = serialization.unpack_and_deserialize(
-        data=run_configs_data,
+        data=run_config_data,
         root_type=typing.List[iree_definitions.E2EModelRunConfig])
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
         run_configs=run_configs)
