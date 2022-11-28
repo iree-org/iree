@@ -94,7 +94,7 @@ struct MaterializeEncodingInfo {
   SmallVector<int64_t> outerDimsPerm;
 };
 using MaterializeEncodingFn =
-    std::function<FailureOr<MaterializeEncodingInfo>(TensorEncoding, Type)>;
+    std::function<FailureOr<MaterializeEncodingInfo>(RankedTensorType)>;
 
 /// TypeConverter to use for materializing the encoding.
 struct MaterializeEncodingTypeConverter : public TypeConverter {

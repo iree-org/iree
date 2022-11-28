@@ -42,11 +42,10 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     return failure();
   }
 
-  auto elementType = boundTensorType.getElementType();
   IREE::LinalgExt::MaterializeEncodingFn materializeEncodingFn =
       typeConverter.getMaterializeEncodingFn();
   FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
-      materializeEncodingFn(encoding.getEncoding().getValue(), elementType);
+      materializeEncodingFn(boundTensorType);
   if (failed(encodingInfo)) {
     return failure();
   }
@@ -86,17 +85,27 @@ static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
 }
 
 namespace {
+/// Extract encoding from the `tensorType` if specified.
+static Optional<IREE::LinalgExt::TensorEncoding> getEncoding(
+    RankedTensorType tensorType) {
+  auto encodingAttr = tensorType.getEncoding()
+                          .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
+  if (!encodingAttr) return llvm::None;
+  return encodingAttr.getEncoding().getValue();
+}
+
 /// Given the `encoding` return the `MaterializeEncodingInfo` to use for
 /// materializing the pack op.
 // TODO(bjacob): This is in the process of being actually implemented in a way
 // that actually uses target information.
 static FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> chooseEncodingInfo(
-    IREE::LinalgExt::TensorEncoding encoding, Type elementType, Operation *op) {
+    RankedTensorType tensorType, Operation *op) {
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  // TODO: actually use `target` and `elementType`.
+  // TODO: actually use `target`.
   (void)target;
-  (void)elementType;
-  switch (encoding) {
+  Optional<IREE::LinalgExt::TensorEncoding> encoding = getEncoding(tensorType);
+  if (!encoding) return failure();
+  switch (*encoding) {
     case IREE::LinalgExt::TensorEncoding::GEMM_LHS:
       return IREE::LinalgExt::MaterializeEncodingInfo{{0, 1}, {8, 4}, {}};
       break;
@@ -291,9 +300,8 @@ void IREEMaterializeEncodingPass::runOnOperation() {
     RewritePatternSet materializeEncodingPattern(context);
 
     IREE::LinalgExt::MaterializeEncodingTypeConverter typeConverter(
-        [operation](IREE::LinalgExt::TensorEncoding encoding,
-                    Type elementType) {
-          return chooseEncodingInfo(encoding, elementType, operation);
+        [operation](RankedTensorType tensorType) {
+          return chooseEncodingInfo(tensorType, operation);
         });
     // Add type conversion for `!flow.dispatch.tensor` type.
     typeConverter.addConversion(
