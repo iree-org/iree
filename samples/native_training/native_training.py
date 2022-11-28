@@ -10,21 +10,8 @@ import os
 import functorch
 from functorch._src.compile_utils import strip_overloads
 import iree_torch
-import numpy as np
-from sklearn.datasets import make_regression
-from sklearn.model_selection import train_test_split
 import torch
 import torch_mlir
-
-# Dataset
-X, y, coef = make_regression(n_features=3, coef=True)
-X = torch.from_numpy(X).to(dtype=torch.float32)
-y = torch.from_numpy(y).to(dtype=torch.float32)
-X, X_test, y, y_test = train_test_split(X, y)
-
-# Weights
-w = torch.zeros(X.shape[1:])
-b = torch.tensor(0.)
 
 
 def _get_argparse():
@@ -85,7 +72,17 @@ def main():
   #
   # Training
   #
-  train_args = (w, b, X_test[:1], y_test[:1])
+  #
+
+  # We use placeholder dummy values for tracing the model, since the training
+  # functions themselves are stateless.  The real data will be fed in at call
+  # time.
+  w = torch.tensor([1.0, 1.0, 1.0], dtype=torch.float32)
+  b = torch.tensor(1.0, dtype=torch.float32)
+  X_test = torch.tensor([[1.0, 1.0, 1.0]], dtype=torch.float32)
+  y_test = torch.tensor([1.0], dtype=torch.float32)
+
+  train_args = (w, b, X_test, y_test)
   graph = functorch.make_fx(train)(*train_args)
 
   # TODO: Remove once https://github.com/llvm/torch-mlir/issues/1495
