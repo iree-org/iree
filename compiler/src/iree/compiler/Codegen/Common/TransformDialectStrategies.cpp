@@ -244,6 +244,9 @@ struct ReductionSplitResult {
   /// Handle to the original fill operation, may be null if the operation was
   /// not re-matched.
   Value originalFillH;
+  /// Handle to the trailing fill operation, may be null if the operation was
+  /// not re-matched.
+  Value trailingEltwiseH;
 };
 
 /// Builds transform IR requesting to bubble up the "expand_shape" operation
@@ -251,7 +254,8 @@ struct ReductionSplitResult {
 /// leading elementwise operation.
 static ReductionSplitResult buildExpansionBubbleUp(
     ImplicitLocOpBuilder &b, Value variantH,
-    SplitReductionOp splitReductionTransformOp, bool hasLeadingEltwise) {
+    SplitReductionOp splitReductionTransformOp, bool hasLeadingEltwise,
+    bool hasTrailingEltwise) {
   ReductionSplitResult result;
   if (!hasLeadingEltwise) {
     result.splitFillH = splitReductionTransformOp.getFillOp();
@@ -266,30 +270,33 @@ static ReductionSplitResult buildExpansionBubbleUp(
                          b.getUnitAttr());
   std::tie(result.originalFillH, result.splitFillH) =
       matchAndUnpack<2>(b, variantH, linalg::FillOp::getOperationName());
-  std::tie(result.leadingEltwiseH, result.splitLinalgH, result.combinerH) =
-      matchAndUnpack<3>(b, variantH, linalg::GenericOp::getOperationName());
+  if (hasTrailingEltwise) {
+    std::tie(result.leadingEltwiseH, result.splitLinalgH, result.combinerH,
+             result.trailingEltwiseH) =
+        matchAndUnpack<4>(b, variantH, linalg::GenericOp::getOperationName());
+  } else {
+    std::tie(result.leadingEltwiseH, result.splitLinalgH, result.combinerH) =
+        matchAndUnpack<3>(b, variantH, linalg::GenericOp::getOperationName());
+  }
   return result;
 }
 
 /// Distribute to blocks using the current IREE lowering config.
-///
-/// The tiling and distributing to blocks is done within a transform SequenceOp.
-/// It runs without interleaved canonicalize, CSE or enabling transforms which
-/// allows the transform dialect to build payload IR and not risk seeing it
-/// being DCE'd away immediately.
 template <typename TileSizesType>
 static Value buildReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
     Value reductionH, Value optionalFusionRootH,
-    TileSizesType tileSizes0Generic, bool hasLeadingEltwise = false) {
+    TileSizesType tileSizes0Generic, bool hasLeadingEltwise = false,
+    bool hasTrailingEltwise = false) {
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
   auto splitReductionTransformOp =
       b.create<SplitReductionOp>(reductionH,
                                  /*splitFactor=*/2,
                                  /*insertSplitDimension=*/1);
-  ReductionSplitResult rs = buildExpansionBubbleUp(
-      b, variantH, splitReductionTransformOp, hasLeadingEltwise);
+  ReductionSplitResult rs =
+      buildExpansionBubbleUp(b, variantH, splitReductionTransformOp,
+                             hasLeadingEltwise, hasTrailingEltwise);
 
   // TODO: IREE needs own workgroup mapping attribute.
   // TODO: num of GPU block mapping attr is statically known here which is
@@ -306,6 +313,8 @@ static Value buildReductionStrategyBlockDistributionPart(
   if (!optionalFusionRootH) {
     optionalFusionRootH = rs.combinerH;
   } else {
+    optionalFusionRootH =
+        rs.trailingEltwiseH ? rs.trailingEltwiseH : optionalFusionRootH;
     opsHToFuse.push_back(rs.combinerH);
   }
   if (rs.leadingEltwiseH) {
@@ -414,7 +423,8 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
   // Step 1: Distribute to blocks using the current IREE lowering config.
   variantH = buildReductionStrategyBlockDistributionPart(
       b, variantH, originalFillH, reductionH, fusionRootH,
-      infos.workgroupTileSizes, infos.hasLeadingEltwise);
+      infos.workgroupTileSizes, infos.hasLeadingEltwise,
+      infos.hasTrailingEltwise);
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   variantH = buildReductionStrategyThreadDistributionPart(
