@@ -14,6 +14,8 @@
 name: mmperf
 
 on:
+  schedule:
+    - cron: '0 13 * * *'
   workflow_dispatch:
 
 env:
@@ -52,7 +54,7 @@ jobs:
       - name: "Calculating version info"
         id: iree
         run: |
-          export IREE_SHA=$(git rev-parse --short=4 HEAD)
+          export IREE_SHA=$(git rev-parse --short HEAD)
           echo "iree-sha=${IREE_SHA}" >> $GITHUB_OUTPUT
           export GCS_ARTIFACT_DIR="$(date +'%Y-%m-%d').sha_${IREE_SHA}.timestamp_$(date +'%s')"
           echo "artifact-upload-dir=${GCS_ARTIFACT_DIR}" >> $GITHUB_OUTPUT
