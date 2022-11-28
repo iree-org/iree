@@ -1849,3 +1849,76 @@ iree_bytecode_module(
 add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-09cb5300-7f73-45cf-9f68-e114c77ca030
 )
+
+iree_import_tf_model(
+  TARGET_NAME
+    "${PACKAGE_NAME}_iree-imported-model-39d157ad-f0ec-4a76-963b-d783beaed60f"
+  SOURCE
+    "${ROOT_ARTIFACTS_DIR}/models/39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF"
+  ENTRY_FUNCTION
+    "forward"
+  OUTPUT_MLIR_FILE
+    "${ROOT_ARTIFACTS_DIR}/iree/39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF/BertForMaskedLMTF.mlir"
+)
+
+add_dependencies(iree-benchmark-import-models
+  ${PACKAGE_NAME}_iree-imported-model-39d157ad-f0ec-4a76-963b-d783beaed60f
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree/39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF/BertForMaskedLMTF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree/39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/BertForMaskedLMTF.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${PACKAGE_NAME}_iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-6d0d5716-5525-44ad-b71d-8075ee1583a6"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree/39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF/BertForMaskedLMTF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree/39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF/6d0d5716-5525-44ad-b71d-8075ee1583a6/BertForMaskedLMTF.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${PACKAGE_NAME}_iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-6d0d5716-5525-44ad-b71d-8075ee1583a6
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-09cb5300-7f73-45cf-9f68-e114c77ca030"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree/39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF/BertForMaskedLMTF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree/39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF/09cb5300-7f73-45cf-9f68-e114c77ca030/BertForMaskedLMTF.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${PACKAGE_NAME}_iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-09cb5300-7f73-45cf-9f68-e114c77ca030
+)
