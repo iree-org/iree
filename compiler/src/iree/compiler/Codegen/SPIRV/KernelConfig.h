@@ -57,8 +57,10 @@ LogicalResult setMatmulOpConfig(
 /// Sets CodeGen configurations via attributes to the given matmul `linalgOp`
 /// with tile sizes for cooperative matrix, if possible for the given matmul
 /// size.
-LogicalResult setCooperativeMatrixConfig(const spirv::TargetEnv &targetEnv,
-                                         linalg::LinalgOp op);
+LogicalResult setCooperativeMatrixConfig(
+    const spirv::TargetEnv &targetEnv, linalg::LinalgOp op,
+    const unsigned numSubgroupsPerWorkgroup,
+    const unsigned numMNTilesPerSubgroup);
 
 /// Sets CodeGen configuration for GPUs from a specific vendor.
 ///

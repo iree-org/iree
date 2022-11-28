@@ -68,7 +68,7 @@ hal.executable public @matmul_256x1024x128_div_add {
   }
 }
 
-//  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [32, 32], [0, 0, 32], [16, 16, 16]{{\]}}>
+//  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]{{\]}}>
 //  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 //CHECK-LABEL: hal.executable.export public @matmul_256x1024x128_div_add
 // CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -136,7 +136,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
   }
 }
 
-//  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64], [1, 32, 32], [0, 0, 0, 32], [1, 16, 16, 16]{{\]}}>
+//  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 128], [1, 32, 64], [0, 0, 0, 32], [1, 16, 16, 16]{{\]}}>
 //  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 //CHECK-LABEL: hal.executable.export public @batch_matmul_16x128x256x512_div
 // CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -202,7 +202,7 @@ hal.executable @generic_batch_matmul_32x8x512x64 {
   }
 }
 
-//  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64], [1, 32, 32], [0, 0, 0, 32], [1, 16, 16, 16]{{\]}}>
+//  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 128], [1, 32, 64], [0, 0, 0, 32], [1, 16, 16, 16]{{\]}}>
 //  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 //CHECK-LABEL: hal.executable.export public @generic_batch_matmul_32x8x512x64
 // CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -262,7 +262,7 @@ hal.executable public @batch_matmul_16x1024x1024x80 {
   }
 }
 
-//  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64], [1, 32, 32], [0, 0, 0, 16], [1, 16, 16, 16]{{\]}}>
+//  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 128], [1, 32, 64], [0, 0, 0, 16], [1, 16, 16, 16]{{\]}}>
 //  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 //CHECK-LABEL: hal.executable.export public @batch_matmul_16x1024x1024x80
 // CHECK-SAME:   translation_info = #[[$TRANSLATION]]
