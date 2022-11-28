@@ -1564,6 +1564,15 @@ static LogicalResult setRootConfig(
   SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn->getContext(), pipeline);
+
+  // Always vectorize the ops for VMVX pipeline because stack allocation is not
+  // allowed.
+  if (pipeline == DispatchLoweringPassPipeline::VMVXDefault) {
+    for (int i = 0, e = ubs.size(); i < e; ++i) {
+      if (ubs[i] == ShapedType::kDynamic) ubs[i] = 1;
+    }
+  }
+
   setTranslationInfo(entryPointFn, translationInfo);
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
