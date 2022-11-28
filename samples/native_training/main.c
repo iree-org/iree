@@ -15,16 +15,15 @@ float y[] = {14.0f};
 float loss[] = {1.0f};
 
 void print_state() {
-    fprintf(stdout, "Weights:");
-    for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(w); ++i) {
-        fprintf(stdout, " %f", w[i]);
-    }
-    fprintf(stdout, ", Bias: %f", b[0]);
-    fprintf(stdout, ", Loss: %f\n", loss[0]);
+  fprintf(stdout, "Weights:");
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(w); ++i) {
+    fprintf(stdout, " %f", w[i]);
+  }
+  fprintf(stdout, ", Bias: %f", b[0]);
+  fprintf(stdout, ", Loss: %f\n", loss[0]);
 }
 
 iree_status_t train(iree_runtime_session_t* session) {
-
   // Lookup the entry point function.
   iree_runtime_call_t call;
   IREE_RETURN_IF_ERROR(iree_runtime_call_initialize_by_name(
@@ -41,32 +40,36 @@ iree_status_t train(iree_runtime_session_t* session) {
   iree_hal_buffer_view_t* arg2 = NULL;
   iree_hal_buffer_view_t* arg3 = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
-      iree_runtime_session_device_allocator(session), IREE_ARRAYSIZE(shape_w), shape_w,
-      IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+      iree_runtime_session_device_allocator(session), IREE_ARRAYSIZE(shape_w),
+      shape_w, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       (iree_hal_buffer_params_t){
           .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
       },
       iree_make_const_byte_span(w, sizeof(w)), &arg0));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
-      iree_runtime_session_device_allocator(session), IREE_ARRAYSIZE(shape_b), shape_b,
-      IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+      iree_runtime_session_device_allocator(session), IREE_ARRAYSIZE(shape_b),
+      shape_b, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       (iree_hal_buffer_params_t){
           .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
       },
       iree_make_const_byte_span(b, sizeof(b)), &arg1));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
-      iree_runtime_session_device_allocator(session), IREE_ARRAYSIZE(shape_X), shape_X,
-      IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+      iree_runtime_session_device_allocator(session), IREE_ARRAYSIZE(shape_X),
+      shape_X, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       (iree_hal_buffer_params_t){
           .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
       },
       iree_make_const_byte_span(X, sizeof(X)), &arg2));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
-      iree_runtime_session_device_allocator(session), IREE_ARRAYSIZE(shape_y), shape_y,
-      IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+      iree_runtime_session_device_allocator(session), IREE_ARRAYSIZE(shape_y),
+      shape_y, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       (iree_hal_buffer_params_t){
           .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
@@ -75,16 +78,16 @@ iree_status_t train(iree_runtime_session_t* session) {
 
   // Setup call inputs with our buffers.
   IREE_RETURN_IF_ERROR(
-    iree_runtime_call_inputs_push_back_buffer_view(&call, arg0));
+      iree_runtime_call_inputs_push_back_buffer_view(&call, arg0));
   iree_hal_buffer_view_release(arg0);
   IREE_RETURN_IF_ERROR(
-    iree_runtime_call_inputs_push_back_buffer_view(&call, arg1));
+      iree_runtime_call_inputs_push_back_buffer_view(&call, arg1));
   iree_hal_buffer_view_release(arg1);
   IREE_RETURN_IF_ERROR(
-    iree_runtime_call_inputs_push_back_buffer_view(&call, arg2));
+      iree_runtime_call_inputs_push_back_buffer_view(&call, arg2));
   iree_hal_buffer_view_release(arg2);
   IREE_RETURN_IF_ERROR(
-    iree_runtime_call_inputs_push_back_buffer_view(&call, arg3));
+      iree_runtime_call_inputs_push_back_buffer_view(&call, arg3));
   iree_hal_buffer_view_release(arg3);
 
   // Invoke the function
@@ -92,31 +95,28 @@ iree_status_t train(iree_runtime_session_t* session) {
 
   // Update weights
   iree_hal_buffer_view_t* result = NULL;
-  IREE_RETURN_IF_ERROR(iree_runtime_call_outputs_pop_front_buffer_view(
-    &call, &result));
+  IREE_RETURN_IF_ERROR(
+      iree_runtime_call_outputs_pop_front_buffer_view(&call, &result));
   IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
-    iree_runtime_session_device(session),
-    iree_hal_buffer_view_buffer(result), 0, &w,
-    sizeof(w), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
-    iree_infinite_timeout()));
+      iree_runtime_session_device(session), iree_hal_buffer_view_buffer(result),
+      0, &w, sizeof(w), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+      iree_infinite_timeout()));
 
   // Update bias
-  IREE_RETURN_IF_ERROR(iree_runtime_call_outputs_pop_front_buffer_view(
-    &call, &result));
+  IREE_RETURN_IF_ERROR(
+      iree_runtime_call_outputs_pop_front_buffer_view(&call, &result));
   IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
-    iree_runtime_session_device(session),
-    iree_hal_buffer_view_buffer(result), 0, &b,
-    sizeof(b), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
-    iree_infinite_timeout()));
+      iree_runtime_session_device(session), iree_hal_buffer_view_buffer(result),
+      0, &b, sizeof(b), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+      iree_infinite_timeout()));
 
   // Update loss
-  IREE_RETURN_IF_ERROR(iree_runtime_call_outputs_pop_front_buffer_view(
-    &call, &result));
+  IREE_RETURN_IF_ERROR(
+      iree_runtime_call_outputs_pop_front_buffer_view(&call, &result));
   IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
-    iree_runtime_session_device(session),
-    iree_hal_buffer_view_buffer(result), 0, &loss,
-    sizeof(loss), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
-    iree_infinite_timeout()));
+      iree_runtime_session_device(session), iree_hal_buffer_view_buffer(result),
+      0, &loss, sizeof(loss), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+      iree_infinite_timeout()));
   iree_hal_buffer_view_release(result);
 
   return iree_ok_status();
@@ -188,9 +188,9 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    fprintf(
-        stderr,
-        "Usage: native-training </path/to/native_training.vmfb> [<driver_name>]\n");
+    fprintf(stderr,
+            "Usage: native-training </path/to/native_training.vmfb> "
+            "[<driver_name>]\n");
     fprintf(stderr, "  (See the README for this sample for details)\n ");
     return -1;
   }
