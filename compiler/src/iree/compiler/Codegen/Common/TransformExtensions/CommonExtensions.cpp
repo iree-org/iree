@@ -204,6 +204,10 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getSwappingPatterns())
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());
   if (getAdditionalIreePatterns()) addAdditionalIreePatterns(patterns);
+  if (getBubbleCollapseExpand()) {
+    linalg::populateFoldReshapeOpsByExpansionPatterns(
+        patterns, [](OpOperand *) { return true; });
+  }
 
   TrackingListener listener(state);
   GreedyRewriteConfig config;

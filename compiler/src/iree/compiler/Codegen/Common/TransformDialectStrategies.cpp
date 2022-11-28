@@ -229,6 +229,48 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
   return funcH;
 }
 
+/// Various handles produced by reduction splitting.
+struct ReductionSplitResult {
+  /// Handle to the leading elementwise operation, may be null if no such
+  /// operation is present.
+  Value leadingEltwiseH;
+  /// Handle to the fill operation feeding the init of a higher-rank
+  /// more-parallel reduction.
+  Value splitFillH;
+  /// Handle to the higher-rank more-parallel reduction.
+  Value splitLinalgH;
+  /// Handle to the final reduction.
+  Value combinerH;
+  /// Handle to the original fill operation, may be null if the operation was
+  /// not re-matched.
+  Value originalFillH;
+};
+
+/// Builds transform IR requesting to bubble up the "expand_shape" operation
+/// produced as parent of reduction splitting if necessary for fusion of the
+/// leading elementwise operation.
+static ReductionSplitResult buildExpansionBubbleUp(
+    ImplicitLocOpBuilder &b, Value variantH,
+    SplitReductionOp splitReductionTransformOp, bool hasLeadingEltwise) {
+  ReductionSplitResult result;
+  if (!hasLeadingEltwise) {
+    result.splitFillH = splitReductionTransformOp.getFillOp();
+    result.splitLinalgH = splitReductionTransformOp.getSplitLinalgOp();
+    result.combinerH = splitReductionTransformOp.getCombiningLinalgOp();
+    return result;
+  }
+
+  auto funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  auto applyPatterns = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/false);
+  applyPatterns->setAttr(applyPatterns.getBubbleCollapseExpandAttrName(),
+                         b.getUnitAttr());
+  std::tie(result.originalFillH, result.splitFillH) =
+      matchAndUnpack<2>(b, variantH, linalg::FillOp::getOperationName());
+  std::tie(result.leadingEltwiseH, result.splitLinalgH, result.combinerH) =
+      matchAndUnpack<3>(b, variantH, linalg::GenericOp::getOperationName());
+  return result;
+}
+
 /// Distribute to blocks using the current IREE lowering config.
 ///
 /// The tiling and distributing to blocks is done within a transform SequenceOp.
@@ -239,16 +281,16 @@ template <typename TileSizesType>
 static Value buildReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
     Value reductionH, Value optionalFusionRootH,
-    TileSizesType tileSizes0Generic) {
+    TileSizesType tileSizes0Generic, bool hasLeadingEltwise = false) {
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
   auto splitReductionTransformOp =
       b.create<SplitReductionOp>(reductionH,
                                  /*splitFactor=*/2,
                                  /*insertSplitDimension=*/1);
-  Value splitFillH = splitReductionTransformOp.getFillOp();
-  Value splitLinalgH = splitReductionTransformOp.getSplitLinalgOp();
-  Value combinerH = splitReductionTransformOp.getCombiningLinalgOp();
+  ReductionSplitResult rs = buildExpansionBubbleUp(
+      b, variantH, splitReductionTransformOp, hasLeadingEltwise);
+
   // TODO: IREE needs own workgroup mapping attribute.
   // TODO: num of GPU block mapping attr is statically known here which is
   // brittle. In the future, the builder of scf.foreach_thread can trim the
@@ -258,33 +300,51 @@ static Value buildReductionStrategyBlockDistributionPart(
   // Step 2. First level of tiling + fusion parallelizes to blocks using
   // `tileSizes`. If the fusion root was the reduction op, update it to be the
   // combiner op. Otherwise, fuse the combiner op into root.
-  SmallVector<Value> opsHToFuse({originalFillH, splitFillH, splitLinalgH});
+  SmallVector<Value> opsHToFuse(
+      {rs.originalFillH ? rs.originalFillH : originalFillH, rs.splitFillH,
+       rs.splitLinalgH});
   if (!optionalFusionRootH) {
-    optionalFusionRootH = combinerH;
+    optionalFusionRootH = rs.combinerH;
   } else {
-    opsHToFuse.push_back(combinerH);
+    opsHToFuse.push_back(rs.combinerH);
   }
-  buildTFDWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
-      b, optionalFusionRootH, opsHToFuse, tileSizes0Generic,
-      b.getArrayAttr({x}));
+  if (rs.leadingEltwiseH) {
+    opsHToFuse.push_back(rs.leadingEltwiseH);
+  }
+
+  // The presence of leading elementwise operation implies that dispatch region
+  // formation happened using another transform dialect script and doesn't need
+  // the workgroup count part.
+  if (hasLeadingEltwise) {
+    buildTFDWithTileSizes<TileToForeachThreadOp>(b, optionalFusionRootH,
+                                                 opsHToFuse, tileSizes0Generic,
+                                                 b.getArrayAttr({x}));
+  } else {
+    buildTFDWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
+        b, optionalFusionRootH, opsHToFuse, tileSizes0Generic,
+        b.getArrayAttr({x}));
+  }
 
   return variantH;
 }
 
 static Value buildReductionStrategyThreadDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, ArrayRef<int64_t> tileSizes1Fill,
-    ArrayRef<int64_t> tileSizes1Generic, bool hasTrailingEltwise) {
+    ArrayRef<int64_t> tileSizes1Generic, bool hasLeadingEltwise,
+    bool hasTrailingEltwise) {
   // TODO: Relying on ordering is brittle, harden this.
   Value matchedH = b.create<MatchOp>(
       variantH, ArrayRef<StringRef>{linalg::GenericOp::getOperationName(),
                                     linalg::FillOp::getOperationName()});
   auto split = b.create<SplitHandlesOp>(
-      matchedH, /*numResultHandles=*/hasTrailingEltwise ? 5 : 4);
-  Value firstFusionRootH = split.getResults()[1];
-  SmallVector<Value> firstFusionGroupHs{split.getResults()[0]};
+      matchedH,
+      /*numResultHandles=*/4 + hasLeadingEltwise + hasTrailingEltwise);
+  Value firstFusionRootH = split.getResults()[1 + hasLeadingEltwise];
+  SmallVector<Value> firstFusionGroupHs =
+      split.getResults().take_front(1 + hasLeadingEltwise);
   Value secondFusionRootH = split.getResults().back();
   SmallVector<Value> secondFusionGroupHs =
-      split.getResults().drop_front(2).drop_back();
+      split.getResults().drop_front(2 + hasLeadingEltwise).drop_back();
 
   auto z = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
                                                 ::mlir::gpu::Threads::DimZ);
@@ -320,22 +380,25 @@ struct GPUReductionStrategyInfos {
   SmallVector<int64_t> workgroupTileSizes;
   SmallVector<int64_t> fillSecondTileSizes;
   SmallVector<int64_t> genericSecondTileSizes;
+  bool hasLeadingEltwise;
   bool hasTrailingEltwise;
 };
 
-/// Returns a pair of handles to the main reduction operation and the fusion
-/// root. If the fusion root is null, the reduction operation should be used as
-/// fusion root instead.
-static std::tuple<Value, Value> reductionBlockDistributionHandles(
-    ImplicitLocOpBuilder &b, Value variantH, bool hasTrailingEltwise) {
+/// Returns a triple of handles: the leading elementwise operation, the
+/// reduction operation and the fusion root. The leading elementwise and the
+/// fusion root may be null. If the fusion root is null, the reduction operation
+/// should be used as fusion root instead.
+static std::tuple<Value, Value, Value> reductionBlockDistributionHandles(
+    ImplicitLocOpBuilder &b, Value variantH, bool hasLeadingEltwise,
+    bool hasTrailingEltwise) {
   Value originalGenericH =
       b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
-  if (hasTrailingEltwise) {
-    auto op =
-        b.create<SplitHandlesOp>(originalGenericH, /*numResultHandles=*/2);
-    return std::make_tuple(op.getResults()[0], op.getResults()[1]);
-  }
-  return std::make_tuple(originalGenericH, Value());
+  auto op = b.create<SplitHandlesOp>(
+      originalGenericH,
+      /*numResultHandles=*/1 + hasLeadingEltwise + hasTrailingEltwise);
+  return std::make_tuple(hasLeadingEltwise ? op.getResults().front() : Value(),
+                         op.getResults().drop_front(hasLeadingEltwise).front(),
+                         hasTrailingEltwise ? op.getResults().back() : Value());
 }
 
 // TODO: generalize and automate over and over.
@@ -345,18 +408,18 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
   // Step 0. Match the ops.
   Value originalFillH =
       b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
-  auto [reductionH, fusionRootH] =
-      reductionBlockDistributionHandles(b, variantH, infos.hasTrailingEltwise);
+  auto [leadingH, reductionH, fusionRootH] = reductionBlockDistributionHandles(
+      b, variantH, infos.hasLeadingEltwise, infos.hasTrailingEltwise);
 
   // Step 1: Distribute to blocks using the current IREE lowering config.
   variantH = buildReductionStrategyBlockDistributionPart(
       b, variantH, originalFillH, reductionH, fusionRootH,
-      infos.workgroupTileSizes);
+      infos.workgroupTileSizes, infos.hasLeadingEltwise);
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   variantH = buildReductionStrategyThreadDistributionPart(
       b, variantH, infos.fillSecondTileSizes, infos.genericSecondTileSizes,
-      infos.hasTrailingEltwise);
+      infos.hasLeadingEltwise, infos.hasTrailingEltwise);
 
   // Step 3. Rank-reduce and vectorize.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
@@ -772,14 +835,18 @@ static bool matchGPUReduction(linalg::LinalgOp op,
                              .output(AllOperands(), IsPermutation())
                              .input(NumEqualsTo(1))
                              .output(NumEqualsTo(1));
+  auto leadingEltwise = trailingEltwise;
   auto maybeTrailingEltwise =
       m_OptionalStructuredOp(std::move(trailingEltwise));
+  auto maybeLeadingEltwise = m_OptionalStructuredOp(std::move(leadingEltwise));
   auto pattern = m_StructuredOp()
                      .dim(AllDims(), ShapeKind::Static)
                      .dim(-1, utils::IteratorType::reduction)
                      .dim(-1, DivisibleBy(cudaWarpSize))
                      // Can be extended to projected permutation with broadcast.
                      .input(AllOperands(), IsPermutation())
+                     // TODO: we want to accept any input position here.
+                     .input(0, maybeLeadingEltwise)
                      .output(NumEqualsTo(1))
                      .output(0, fill)
                      // Only single combiner over 32 bits for now due to
@@ -789,6 +856,7 @@ static bool matchGPUReduction(linalg::LinalgOp op,
                      .result(0, HasAnyUse(), maybeTrailingEltwise);
   if (!matchPattern(op, pattern)) return false;
 
+  info.hasLeadingEltwise = maybeLeadingEltwise.succeeded();
   info.hasTrailingEltwise = maybeTrailingEltwise.succeeded();
 
   // Hardcoded workagroup size, this could be deduced from the reduction dim.
@@ -843,13 +911,18 @@ static void createTransformRegion(func::FuncOp entryPoint,
   auto topLevelTransformModule = b.create<ModuleOp>(loc);
   Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
   b.setInsertionPointToStart(&topLevelTransformRegion.front());
-  b.create<::transform_ext::CanonicalizedSequenceOp>(
+  auto sequence = b.create<::transform_ext::CanonicalizedSequenceOp>(
       loc, transform::FailurePropagationMode::Suppress,
       [&](OpBuilder &b, Location loc, Value variantH) {
         ImplicitLocOpBuilder ib(loc, b);
         buildStrategy(ib, variantH);
         b.create<transform::YieldOp>(loc);
       });
+  (void)sequence;
+  LLVM_DEBUG(DBGS() << "transformation script:\n");
+  LLVM_DEBUG(DBGS() << "verification: " << sequence.verify().succeeded()
+                    << "\n");
+  LLVM_DEBUG(sequence.print(DBGS()));
 }
 
 // TODO: generalize and automate over and over.
