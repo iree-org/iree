@@ -40,6 +40,15 @@ func.func @vecadd2d() -> (!type) {
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/vecadd2d_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK
 
+// RUN: iree-opt %s --iree-hal-target-backends=cuda \
+// RUN:     --iree-abi-transformation-pipeline \
+// RUN:     --iree-flow-transformation-pipeline  \
+// RUN:     --iree-stream-transformation-pipeline \
+// RUN:     --iree-hal-configuration-pipeline | \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
+// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/vecadd2d_codegen_spec_partial_tile.mlir | \
+// RUN: FileCheck %s --check-prefix=CHECK-PARTIAL-TILE
+
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/vecadd2d_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=vecadd2d --device=cuda |\
@@ -56,6 +65,11 @@ func.func @vecadd2d() -> (!type) {
 //     CHECK:  %[[BLKX:.*]] = hal.interface.workgroup.id[0] : index
 //     CHECK:  memref.subview %0[%[[BLKZ:.*]], %[[BLKX:.*]]]
 
+//     CHECK-PARTIAL-TILE:  hal.executable.export 
+//     CHECK-PARTIAL-TILE:  bb0(%[[DEV:.*]]: !hal.device, %[[A1:.*]]: index, %[[A2:.*]]: index):
+//     CHECK-PARTIAL-TILE:  %[[c1:.*]] = arith.constant 1 : index
+//     CHECK-PARTIAL-TILE:  %[[dim:.*]] = affine.apply #map()[%[[A2]]]
+//     CHECK-PARTIAL-TILE:  hal.return %[[c1]], %[[c1]], %[[dim]] : index, index, index
 
 //      EXEC: EXEC @vecadd2d
 //      EXEC: result[0]: hal.buffer_view
