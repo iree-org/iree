@@ -40,4 +40,3 @@ EFFICIENTNET_V2_S_FP32 = common_definitions.Model(
     "https://storage.googleapis.com/iree-model-artifacts/efficientnet-v2-s-tf-model.tar.gz",
     entry_function="forward",
     input_types=["1x384x384x3xf32"])
-
