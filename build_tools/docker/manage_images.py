@@ -50,6 +50,7 @@ IMAGES_TO_DEPENDENCIES = {
     "riscv": ["base"],
     "gradle-android": ["base"],
     "frontends": ["android"],
+    "mmperf": [],
     "shark": [],
     "swiftshader": ["base"],
     "samples": ["swiftshader"],

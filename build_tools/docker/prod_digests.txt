@@ -13,3 +13,4 @@ gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:b3b096e4b96746c3ae4cc52e8800
 gcr.io/iree-oss/shark@sha256:c72ef54dcb6ec485e8a96b0dfc43307875f4c4c7619f7fdc60bf5220a5672259
 gcr.io/iree-oss/base-bleeding-edge@sha256:99a5d6324b464bac19f78cd7fe50c8d5068dde9bf96af18686e91f1356ed586a
 gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:50301f9ccc0bf63c4d498c225444cc5585218612d15b83d06e4f4672ab2dfc03
+gcr.io/iree-oss/mmperf@sha256:7a7f66eb4ff1f0c36b01fb2b5c99c9c01814fc18754537f4140e86081439cd8c
