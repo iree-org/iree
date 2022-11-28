@@ -25,6 +25,7 @@ SMALL = [
 # Large models that require more computational resources.
 LARGE = [
     tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
+    tf_models.BERT_FOR_MASKED_LM_FP32_SEQLEN512,
 ]
 
 ALL = SMALL + LARGE

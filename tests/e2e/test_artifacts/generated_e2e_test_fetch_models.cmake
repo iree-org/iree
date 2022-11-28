@@ -117,3 +117,13 @@ iree_fetch_artifact(
     "${ROOT_ARTIFACTS_DIR}/models/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
   UNPACK
 )
+
+iree_fetch_artifact(
+  NAME
+    "model-39d157ad-f0ec-4a76-963b-d783beaed60f"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/bert-for-masked-lm-seq512-tf-model.tar.gz"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/models/39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF"
+  UNPACK
+)
