@@ -2410,6 +2410,7 @@ LogicalResult WinogradInputTransformOp::verify() {
         "expected output rank to be equal to input rank + 2");
   }
   const SmallVector<int64_t> imageDims = imageDimensions();
+  const size_t numImageDims = imageDims.size();
   llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
                                                 imageDims.end());
   if (imageDims.size() != 2) {
@@ -2426,11 +2427,17 @@ LogicalResult WinogradInputTransformOp::verify() {
   const int64_t inputTileSize = getInputTileSize();
   SmallVector<int64_t> expectedOutputShape(getOutputOperandRank(),
                                            inputTileSize);
+  int outputIndex;
   for (int i = 0; i < inputShape.size(); i++) {
+    outputIndex = i + numImageDims;
+    if (ShapedType::isDynamic(inputShape[i])) {
+      expectedOutputShape[outputIndex] = inputShape[i];
+      continue;
+    }
     if (!imageDimsSet.contains(i)) {
-      expectedOutputShape[i + 2] = inputShape[i];
+      expectedOutputShape[outputIndex] = inputShape[i];
     } else {
-      expectedOutputShape[i + 2] =
+      expectedOutputShape[outputIndex] =
           std::ceil((float)(inputShape[i] - kernelSize + 1) / outputTileSize);
     }
   }
