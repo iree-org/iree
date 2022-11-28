@@ -42,16 +42,26 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
 
 /// Emit warp reduction code sequence for a given input.
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
-                           vector::CombiningKind kind, uint32_t size) {
+                           vector::CombiningKind kind, uint32_t warpSize,
+                           uint32_t numLaneToReduce) {
   Value laneVal = input;
+  assert(llvm::isPowerOf2_32(numLaneToReduce));
   // Parallel reduction using butterfly shuffles.
-  for (uint64_t i = 1; i < size; i <<= 1) {
+  for (uint64_t i = 1; i < numLaneToReduce; i <<= 1) {
     Value shuffled = builder
                          .create<gpu::ShuffleOp>(loc, laneVal, i,
-                                                 /*width=*/size,
+                                                 /*width=*/warpSize,
                                                  /*mode=*/gpu::ShuffleMode::XOR)
                          .getShuffleResult();
     laneVal = makeArithReduction(builder, loc, kind, laneVal, shuffled);
+  }
+  // Broadcast the result to all the lanes.
+  if (warpSize != numLaneToReduce) {
+    laneVal = builder
+                  .create<gpu::ShuffleOp>(loc, laneVal, 0,
+                                          /*width=*/warpSize,
+                                          /*mode=*/gpu::ShuffleMode::IDX)
+                  .getShuffleResult();
   }
   return laneVal;
 }
@@ -104,7 +114,7 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
       "Group reduction only support for sizes aligned on warp size for now.");
   // First reduce on a single thread to get per lane reduction value.
   Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-  laneVal = warpReduction(loc, builder, laneVal, kind, warpSize);
+  laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize);
   // if we have more than one warp, reduce across warps.
   if (size > warpSize) {
     uint32_t numWarp = size / warpSize;
@@ -133,17 +143,19 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
     // Further reduce the outputs from each warps with a single warp reduce.
     Value loadVal = builder.create<memref::LoadOp>(loc, alloc, laneId);
     Value cstNumWarp = builder.create<arith::ConstantIndexOp>(loc, numWarp);
-    // Pad with identity element if numel < warpSize for valid warp reduction.
-    Value useIdentityElement = builder.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::sge, laneId, cstNumWarp);
-    Attribute identityAttr =
-        getCombiningKindIdentity(builder, kind, loadVal.getType());
-    assert(identityAttr && "Unknown identity value for the reduction");
-    // TODO: Avoid reduction across all lanes if numWarp <= warpSize/2.
-    Value identity = builder.create<arith::ConstantOp>(loc, identityAttr);
-    Value selectedInput = builder.create<arith::SelectOp>(
-        loc, useIdentityElement, identity, loadVal);
-    laneVal = warpReduction(loc, builder, selectedInput, kind, warpSize);
+    if (!llvm::isPowerOf2_32(numWarp)) {
+      // Pad with identity element if numel < warpSize for valid warp reduction.
+      Value useIdentityElement = builder.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::sge, laneId, cstNumWarp);
+      numWarp = llvm::PowerOf2Ceil(numWarp);
+      Attribute identityAttr =
+          getCombiningKindIdentity(builder, kind, loadVal.getType());
+      assert(identityAttr && "Unknown identity value for the reduction");
+      Value identity = builder.create<arith::ConstantOp>(loc, identityAttr);
+      loadVal = builder.create<arith::SelectOp>(loc, useIdentityElement,
+                                                identity, loadVal);
+    }
+    laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp);
   }
   return laneVal;
 }
