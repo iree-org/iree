@@ -37,14 +37,67 @@ hal.executable private @buffer_types {
 // Check that without the Int64 capability emulation produces expected i32 ops.
 //
 // CHECK-LABEL: func.func @buffer_types
-//       CHECK:   [[CST1:%.+]]      = arith.constant dense<[1, 0]> : vector<2xi32>
 //       CHECK:   [[REF_I32:%.+]]   = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8xi32, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   [[REF_I64_0:%.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   [[REF_I64_1:%.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
-//       CHECK:   [[VI32:%.+]]      = memref.load [[REF_I32]][{{%.+}}] : memref<8xi32, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   [[VI64:%.+]]      = memref.load [[REF_I64_0]][{{%.+}}] : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   {{%.+}}           = arith.addui_carry {{%.+}}, {{%.+}} : i32, i1
 //       CHECK:   memref.store {{%.+}}, [[REF_I64_1]][{{%.+}}] : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
+//       CHECK:   return
+
+// -----
+
+hal.executable private @emulate_1d_vector {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<>>}> {
+    hal.executable.export public @emulate_1d_vector ordinal(0)
+      layout(#hal.pipeline.layout<push_constants = 0,
+                                  sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @emulate_1d_vector() {
+        %c95232 = arith.constant 95232 : index
+        %c32 = arith.constant 32 : index
+        %c0 = arith.constant 0 : index
+        %c36864 = arith.constant 36864 : index
+        %c1523712 = arith.constant 1523712 : index
+        %c96 = arith.constant 96 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c96}
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c1523712) alignment(64) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c36864}
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c36864}
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %3 = gpu.thread_id  x
+        %4 = arith.muli %workgroup_id_x, %c32 : index
+        %5 = arith.addi %3, %4 : index
+        %6 = memref.load %0[%5] : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
+        %7 = arith.extsi %6 : vector<4xi32> to vector<4xi64>
+        %8 = arith.extui %6 : vector<4xi32> to vector<4xi64>
+        %9 = arith.muli %7, %8 : vector<4xi64>
+        %10 = arith.addi %7, %9 : vector<4xi64>
+        %11 = arith.trunci %10 : vector<4xi64> to vector<4xi32>
+        %12 = arith.muli %workgroup_id_y, %c96 : index
+        %13 = arith.addi %5, %12 : index
+        %14 = arith.addi %13, %c95232 : index
+        memref.store %11, %2[%14] : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
+        return
+      }
+    }
+  }
+}
+
+// Check that i64 emulation handles 1-D vector ops and does not introduce
+// 2-D vectors.
+//
+// CHECK-LABEL: func.func @emulate_1d_vector
+//       CHECK:   [[LOAD:%.+]]     = memref.load {{%.+}}[{{%.+}}] : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
+//       CHECK:   {{%.+}}          = arith.muli {{%.+}}, {{%.+}} : vector<4xi32>
+//       CHECK:   {{%.+}}          = arith.addi {{%.+}}, {{%.+}} : vector<4xi32>
+//       CHECK:   {{%.+}}, {{%.+}} = arith.addui_carry {{%.+}}, {{%.+}} : vector<4xi32>, vector<4xi1>
+//       CHECK:   memref.store {{%.+}}, {{%.+}}[{{%.+}}] : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   return
 
 // -----
