@@ -210,6 +210,12 @@ int main(int argc, char** argv) {
     iree_status_ignore(result);
     return -1;
   }
+
+  if (*loss > 0.1f) {
+    fprintf(stdout, "Loss unexpectedly high\n");
+    return -1;
+  }
+
   fprintf(stdout, "\nSuccess!\n");
   return 0;
 }
