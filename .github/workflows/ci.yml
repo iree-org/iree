@@ -116,7 +116,7 @@ jobs:
           submodules: true
       - name: "Building IREE"
         env:
-          IREE_WRITE_REMOTE_SCCACHE: ${{ needs.setup.outputs.write-caches }}
+          IREE_WRITE_REMOTE_SCCACHE: 1
           SCCACHE_GCS_OAUTH_URL: http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token
         run: |
           ./build_tools/github_actions/docker_run.sh \
