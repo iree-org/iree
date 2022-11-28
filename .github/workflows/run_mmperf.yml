@@ -15,7 +15,6 @@ name: mmperf
 
 on:
   workflow_dispatch:
-  pull_request:
 
 env:
   GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
@@ -80,7 +79,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/mmperf@sha256:7a7f66eb4ff1f0c36b01fb2b5c99c9c01814fc18754537f4140e86081439cd8c \
-          ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cpu"
+          ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cpu" "${IREE_SHA}"
       - name: "Running mmperf on CPU"
         run: |
           mkdir ${RESULTS_DIR}
@@ -115,7 +114,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/mmperf@sha256:7a7f66eb4ff1f0c36b01fb2b5c99c9c01814fc18754537f4140e86081439cd8c \
-          ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cuda"
+          ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cuda" "${IREE_SHA}"
       - name: "Removing unused files"
         run: |
           find "${BUILD_DIR}" -type f -name "*.a" -o -type f -name "*.o" \
