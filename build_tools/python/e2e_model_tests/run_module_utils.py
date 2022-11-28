@@ -31,7 +31,7 @@ def build_run_flags_for_execution_config(
     gpu_id: str = "0") -> List[str]:
   """Returns the IREE run module flags of the execution config."""
 
-  run_flags = module_execution_config.extra_flags
+  run_flags = list(module_execution_config.extra_flags)
   driver = module_execution_config.driver
   if driver == RuntimeDriver.CUDA:
     run_flags.append(f"--device=cuda://{gpu_id}")

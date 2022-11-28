@@ -211,10 +211,6 @@ def parse_argument():
       type=str,
       default="0",
       help="GPU ID to run the benchmark, e.g., '0' or 'GPU-<UUID>'")
-  arg_parser.add_argument("--run_config",
-                          type=pathlib.Path,
-                          default=None,
-                          help="JSON file of the run configs")
 
   return arg_parser.parse_args()
 
