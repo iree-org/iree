@@ -94,8 +94,7 @@ def main():
 
   mlir = torch_mlir.compile(graph,
                             train_args,
-                            output_type=torch_mlir.OutputType.LINALG_ON_TENSORS,
-                            use_tracing=False)
+                            output_type=torch_mlir.OutputType.LINALG_ON_TENSORS)
 
   vmfb = iree_torch.compile_to_vmfb(mlir, args.iree_backend)
   with open(args.output_file, "wb") as f:
