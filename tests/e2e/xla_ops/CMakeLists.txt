@@ -545,17 +545,17 @@ iree_check_single_backend_test_suite(
     "reduce_window.mlir"
     "remainder.mlir"
     "reshape.mlir"
-    # "reverse.mlir"  # TODO(#10908): fix (NumWorkgroups)
+    "reverse.mlir"
     "rng_normal.mlir"
     "rng_uniform.mlir"
     "round.mlir"
     "rsqrt.mlir"
-    # "scatter.mlir"  # TODO(#10908): fix (NumWorkgroups)
+    "scatter.mlir"
     "scatter_dynamic.mlir"
     "select.mlir"
     "sine.mlir"
     "slice.mlir"
-    # "sort.mlir"  # TODO(#10908): fix (NumWorkgroups)
+    "sort.mlir"
     "sqrt.mlir"
     "subtract.mlir"
     "tanh.mlir"
@@ -569,4 +569,5 @@ iree_check_single_backend_test_suite(
   #   "webgpu"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
+    "--iree-codegen-gpu-native-math-precision=true"  # TODO(#11321): Infer/flip default
 )
