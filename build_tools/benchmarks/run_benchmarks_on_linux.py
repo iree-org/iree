@@ -13,16 +13,12 @@ import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 from typing import Any, List, Optional
-import subprocess
 import atexit
-import shutil
-import tarfile
-import pathlib
-import typing
 import json
-
-# Add build_tools python dir to the search path.
-sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
+import shutil
+import subprocess
+import tarfile
+import typing
 
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
@@ -30,8 +26,7 @@ from common.benchmark_config import BenchmarkConfig
 from common.benchmark_definition import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash, get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start
 from common.common_arguments import build_common_argument_parser
 from common.linux_device_utils import get_linux_device_info
-from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework.device_specs import device_parameters
+from e2e_test_framework.definitions import iree_definitions
 from e2e_test_framework import serialization
 from e2e_test_artifacts import iree_artifacts
 from e2e_model_tests import run_module_utils

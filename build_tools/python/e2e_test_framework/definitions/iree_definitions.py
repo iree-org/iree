@@ -7,7 +7,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
+from typing import List
 import dataclasses
 
 from e2e_test_framework.definitions import common_definitions
@@ -38,8 +38,6 @@ class RuntimeLoader(Enum):
   EMBEDDED_ELF = "embedded-elf"
   VMVX_MODULE = "vmvx-module"
   SYSTEM_LIBRARY = "system-library"
-  CUDA = "cuda"
-  VULKAN = "vulkan"
 
 
 class RuntimeDriver(Enum):
