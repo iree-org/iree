@@ -184,7 +184,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
         return signalPassFailure();
       }
 
-      bool lowerToAVX2 = hasAVX2Feature(variantOp);
+      bool lowerToAVX2 = hasAVX2Feature(variantOp.getTarget());
       if (!testLoweringConfiguration) {
         switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:

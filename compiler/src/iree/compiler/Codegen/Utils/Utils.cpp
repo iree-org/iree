@@ -71,11 +71,8 @@ llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
   return exportOps;
 }
 
-/// Returns the StringAttr with the name `stringAttr` in the configuration of
-/// `variantOp`, in found.
-static Optional<StringAttr> getConfigStringAttr(
-    IREE::HAL::ExecutableVariantOp variantOp, StringRef stringAttr) {
-  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+Optional<StringAttr> getConfigStringAttr(
+    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef stringAttr) {
   if (!targetAttr) return llvm::None;
   auto config = targetAttr.getConfiguration();
   if (!config) return llvm::None;
@@ -84,41 +81,57 @@ static Optional<StringAttr> getConfigStringAttr(
   return attr;
 }
 
-/// Returns the LLVM Target triple associated with the `hal.executable.variant`
-/// operation if set.
-static Optional<llvm::Triple> getTargetTriple(
-    IREE::HAL::ExecutableVariantOp variantOp) {
-  auto triple = getConfigStringAttr(variantOp, "target_triple");
+Optional<IntegerAttr> getConfigIntegerAttr(
+    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr) {
+  if (!targetAttr) return llvm::None;
+  auto config = targetAttr.getConfiguration();
+  if (!config) return llvm::None;
+  auto attr = config.getAs<IntegerAttr>(integerAttr);
+  if (!attr) return llvm::None;
+  return attr;
+}
+
+Optional<llvm::Triple> getTargetTriple(
+    IREE::HAL::ExecutableTargetAttr targetAttr) {
+  auto triple = getConfigStringAttr(targetAttr, "target_triple");
   if (!triple) return llvm::None;
   return llvm::Triple(triple.value().str());
 }
 
 /// Returns the CPU target features associated with the `hal.executable.variant`
 /// operation, if set.
-static Optional<StringRef> getCpuFeatures(
-    IREE::HAL::ExecutableVariantOp variantOp) {
-  auto cpuFeatures = getConfigStringAttr(variantOp, "cpu_features");
+Optional<StringRef> getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
   if (!cpuFeatures) return llvm::None;
   return cpuFeatures->getValue();
 }
 
-bool isX86(IREE::HAL::ExecutableVariantOp variantOp) {
-  Optional<llvm::Triple> triple = getTargetTriple(variantOp);
+bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
   return triple && triple.value().isX86();
 }
 
-bool isAArch64(IREE::HAL::ExecutableVariantOp variantOp) {
-  Optional<llvm::Triple> triple = getTargetTriple(variantOp);
+bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
   return triple && triple.value().isAArch64();
+}
+
+bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isRISCV();
+}
+
+bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return targetAttr.getBackend().getValue().startswith("vmvx");
 }
 
 // TODO(dcaballe): If we have to check for a significantly large number of
 // features in the future, we may want to consider a persistent state to carry
 // over processed HAL information or keeping the TTI instance alive and query
 // subtarget features data structure.
-static bool hasFeature(IREE::HAL::ExecutableVariantOp variantOp,
+static bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr,
                        StringRef feature) {
-  Optional<StringRef> features = getCpuFeatures(variantOp);
+  Optional<StringRef> features = getCpuFeatures(targetAttr);
   if (!features) {
     return false;
   }
@@ -136,29 +149,20 @@ static bool hasFeature(IREE::HAL::ExecutableVariantOp variantOp,
   return false;
 }
 
-/// Returns true if the 'variantOp' contains '+avx2' in its cpu features.
-bool hasAVX2Feature(IREE::HAL::ExecutableVariantOp variantOp) {
-  return hasFeature(variantOp, "+avx2");
+bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+avx2");
 }
 
-/// Returns true if the 'variantOp' contains '+v' in its cpu features.
-bool hasVFeature(IREE::HAL::ExecutableVariantOp variantOp) {
-  return hasFeature(variantOp, "+v");
+bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+v");
 }
 
-/// Returns true if the 'variantOp' contains '+zve32x' in its cpu features.
-bool hasZve32xFeature(IREE::HAL::ExecutableVariantOp variantOp) {
-  return hasFeature(variantOp, "+zve32x");
+bool hasZve32xFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+zve32x");
 }
 
-/// Returns true if the 'variantOp' contains '+zve64x' in its cpu features.
-bool hasZve64xFeature(IREE::HAL::ExecutableVariantOp variantOp) {
-  return hasFeature(variantOp, "+zve64x");
-}
-
-bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp) {
-  Optional<llvm::Triple> triple = getTargetTriple(variantOp);
-  return triple && triple.value().isRISCV();
+bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+zve64x");
 }
 
 bool isReadOnly(Value v) {
