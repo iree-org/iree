@@ -57,10 +57,12 @@ iree_compiler_cc_library(
     srcs = [
         "CommonExtensions.cpp",
         "CommonExtensionsOps.cpp.inc",
+        "TransformMatchers.cpp",
     ],
     hdrs = [
         "CommonExtensions.h",
         "CommonExtensionsOps.h.inc",
+        "TransformMatchers.h",
     ],
     deps = [
         ":CommonExtensionsOpGen",
@@ -75,11 +77,14 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MemRefDialect",
