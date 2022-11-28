@@ -13,7 +13,7 @@ import pathlib
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
-from typing import List, Optional
+from typing import Any, List, Optional
 import subprocess
 import atexit
 import shutil
@@ -34,6 +34,7 @@ from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_parameters
 from e2e_test_framework import serialization
 from e2e_test_artifacts import iree_artifacts
+from e2e_model_tests import run_module_utils
 
 
 class LinuxBenchmarkDriver(BenchmarkDriver):
@@ -49,20 +50,23 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
 
     if benchmark_case.run_config is not None:
       run_config = benchmark_case.run_config
+
       module_path = iree_artifacts.get_module_path(
           run_config.module_generation_config,
           root_dir_path=pathlib.Path(self.config.root_benchmark_dir))
       run_flags = [f"--module_file={module_path}"]
-      run_flags += iree_definitions.get_run_flags_of_model(
+
+      run_flags += run_module_utils.build_run_flags_for_model(
           model=run_config.module_generation_config.imported_model.model,
           model_input_data=run_config.input_data)
-      run_flags += iree_definitions.get_run_flags_of_execution_config(
+      run_flags += run_module_utils.build_run_flags_for_execution_config(
           module_execution_config=run_config.module_execution_config,
           gpu_id=self.gpu_id)
 
-      wrapper_cmds = self.__build_wrapper_cmds_for_device_spec(
+      wrapper_cmds = run_module_utils.build_linux_wrapper_cmds_for_device_spec(
           run_config.target_device_spec)
     else:
+      # TODO(#11076): Remove legacy path.
       if benchmark_case.benchmark_case_dir is None:
         raise ValueError(
             "benchmark_case_dir can't be None if run_config is None.")
@@ -89,21 +93,6 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                          run_flags=run_flags,
                          wrapper_cmds=wrapper_cmds)
 
-  def __build_wrapper_cmds_for_device_spec(
-      self, device_spec: common_definitions.DeviceSpec) -> List[str]:
-    affinity_mask = None
-    for param in device_spec.device_parameters:
-      if param == device_parameters.OCTA_CORES:
-        affinity_mask = "0xFF"
-      else:
-        raise ValueError(f"Unsupported device parameter: {param}.")
-
-    cmds = []
-    if affinity_mask is not None:
-      cmds += ["taskset", affinity_mask]
-
-    return cmds
-
   def __parse_flagfile(self, case_dir: pathlib.Path) -> List[str]:
     return [
         line.strip()
@@ -111,11 +100,15 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     ]
 
   def __run_benchmark(self, benchmark_case: BenchmarkCase,
-                      results_filename: str, run_flags: List[str],
-                      wrapper_cmds: List[str]):
+                      results_filename: pathlib.Path, run_flags: List[str],
+                      wrapper_cmds: List[Any]):
+    if self.config.normal_benchmark_tool_dir is None:
+      raise ValueError("normal_benchmark_tool_dir can't be None.")
+
     tool_name = benchmark_case.benchmark_tool_name
-    tool_path = os.path.join(self.config.normal_benchmark_tool_dir, tool_name)
+    tool_path = self.config.normal_benchmark_tool_dir / tool_name
     cmd = wrapper_cmds + [tool_path] + run_flags
+
     if tool_name == "iree-benchmark-module":
       cmd.extend(
           get_iree_benchmark_module_arguments(
@@ -128,14 +121,14 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     if self.verbose:
       print(result_json)
 
-  def __run_capture(self, benchmark_case: BenchmarkCase, capture_filename: str,
-                    run_flags: List[str], wrapper_cmds: List[str]):
+  def __run_capture(self, benchmark_case: BenchmarkCase,
+                    capture_filename: pathlib.Path, run_flags: List[str],
+                    wrapper_cmds: List[Any]):
     capture_config = self.config.trace_capture_config
     if capture_config is None:
       raise ValueError("capture_config can't be None.")
 
-    tool_path = os.path.join(capture_config.traced_benchmark_tool_dir,
-                             benchmark_case.benchmark_tool_name)
+    tool_path = capture_config.traced_benchmark_tool_dir / benchmark_case.benchmark_tool_name
     cmd = wrapper_cmds + [tool_path] + run_flags
     process = subprocess.Popen(cmd,
                                env={"TRACY_NO_EXIT": "1"},
@@ -224,11 +217,10 @@ def parse_argument():
       type=str,
       default="0",
       help="GPU ID to run the benchmark, e.g., '0' or 'GPU-<UUID>'")
-  #TODO
-  arg_parser.add_argument("--run_configs_json",
-                          type=pathlib.PurePath,
+  arg_parser.add_argument("--run_config",
+                          type=pathlib.Path,
                           default=None,
-                          help="JSON file of run configs")
+                          help="JSON file of the run configs")
 
   return arg_parser.parse_args()
 

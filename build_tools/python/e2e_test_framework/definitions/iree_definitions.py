@@ -129,31 +129,3 @@ class E2EModelRunConfig(object):
   module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
   input_data: common_definitions.ModelInputData
-
-
-def get_run_flags_of_model(
-    model: common_definitions.Model,
-    model_input_data: common_definitions.ModelInputData) -> List[str]:
-  """Returns the IREE run module flags for the model and its inputs."""
-
-  args = [f"--entry_function={model.entry_function}"]
-  if model_input_data != common_definitions.ZEROS_MODEL_INPUT_DATA:
-    raise ValueError("Currently only support all-zeros data.")
-  args += [
-      f"--function_input={input_type}=0" for input_type in model.input_types
-  ]
-  return args
-
-
-def get_run_flags_of_execution_config(
-    module_execution_config: ModuleExecutionConfig,
-    gpu_id: str = "0") -> List[str]:
-  """Returns the IREE run module flags of the execution config."""
-
-  run_flags = module_execution_config.extra_flags
-  driver = module_execution_config.driver
-  if driver == RuntimeDriver.CUDA:
-    run_flags.append(f"--device=cuda://{gpu_id}")
-  else:
-    run_flags.append(f"--device={driver.value}")
-  return run_flags

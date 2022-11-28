@@ -7,8 +7,7 @@
 
 from typing import List
 
-from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_model_tests import test_definitions
+from e2e_model_tests import test_definitions, run_module_utils
 import cmake_builder.rules
 
 
@@ -24,7 +23,7 @@ def generate_rules() -> List[str]:
 
   for test_config in test_definitions.TEST_CONFIGS:
     model = test_config.model
-    runner_args = iree_definitions.get_run_flags_of_model(
+    runner_args = run_module_utils.build_run_flags_for_model(
         model=model,
         model_input_data=test_config.input_data) + test_config.extra_test_flags
     cmake_rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
