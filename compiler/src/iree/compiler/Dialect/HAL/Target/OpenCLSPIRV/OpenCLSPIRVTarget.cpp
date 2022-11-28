@@ -97,10 +97,10 @@ static spirv::TargetEnvAttr getSPIRVTargetEnv(
        spirv::Extension::SPV_EXT_shader_atomic_float_min_max,
        spirv::Extension::SPV_KHR_linkonce_odr},
       context);
-  return spirv::TargetEnvAttr::get(triple, spirv::Vendor::Unknown,
-                                   spirv::DeviceType::Unknown,
-                                   spirv::TargetEnvAttr::kUnknownDeviceID,
-                                   spirv::getDefaultResourceLimits(context));
+  return spirv::TargetEnvAttr::get(
+      triple, spirv::getDefaultResourceLimits(context),
+      spirv::ClientAPI::Unknown, spirv::Vendor::Unknown,
+      spirv::DeviceType::Unknown, spirv::TargetEnvAttr::kUnknownDeviceID);
   return {};
 }
 
