@@ -43,50 +43,13 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                          benchmark_results_filename: Optional[pathlib.Path],
                          capture_filename: Optional[pathlib.Path]) -> None:
 
-    if benchmark_case.run_config is not None:
-      run_config = benchmark_case.run_config
-
-      module_path = iree_artifacts.get_module_path(
-          run_config.module_generation_config,
-          root_dir_path=pathlib.Path(self.config.root_benchmark_dir))
-      run_flags = [f"--module_file={module_path}"]
-
-      run_flags += run_module_utils.build_run_flags_for_model(
-          model=run_config.module_generation_config.imported_model.model,
-          model_input_data=run_config.input_data)
-      run_flags += run_module_utils.build_run_flags_for_execution_config(
-          module_execution_config=run_config.module_execution_config,
-          gpu_id=self.gpu_id)
-
-      wrapper_cmds = run_module_utils.build_linux_wrapper_cmds_for_device_spec(
-          run_config.target_device_spec)
-    else:
-      # TODO(#11076): Remove legacy path.
-      if benchmark_case.benchmark_case_dir is None:
-        raise ValueError(
-            "benchmark_case_dir can't be None if run_config is None.")
-
-      run_flags = self.__parse_flagfile(benchmark_case.benchmark_case_dir)
-      # Replace the CUDA device flag with the specified GPU.
-      if benchmark_case.driver_info.driver_name == "cuda":
-        run_flags = list(
-            filter(lambda flag: not flag.startswith("--device"), run_flags))
-        run_flags.append(f"--device=cuda://{self.gpu_id}")
-      # TODO(pzread): Taskset should be derived from CPU topology.
-      # Only use the low 8 cores.
-      wrapper_cmds = ["taskset", "0xFF"]
-
     if benchmark_results_filename:
       self.__run_benchmark(benchmark_case=benchmark_case,
-                           results_filename=benchmark_results_filename,
-                           run_flags=run_flags,
-                           wrapper_cmds=wrapper_cmds)
+                           results_filename=benchmark_results_filename)
 
     if capture_filename:
       self.__run_capture(benchmark_case=benchmark_case,
-                         capture_filename=capture_filename,
-                         run_flags=run_flags,
-                         wrapper_cmds=wrapper_cmds)
+                         capture_filename=capture_filename)
 
   def __parse_flagfile(self, case_dir: pathlib.Path) -> List[str]:
     return [
@@ -94,15 +57,54 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         for line in (case_dir / MODEL_FLAGFILE_NAME).read_text().splitlines()
     ]
 
+  def __build_tool_cmds(self, benchmark_case: BenchmarkCase,
+                        tool_path: pathlib.Path) -> List[Any]:
+    run_config = benchmark_case.run_config
+    if run_config is None:
+      # TODO(#11076): Remove legacy path.
+      if benchmark_case.benchmark_case_dir is None:
+        raise ValueError(
+            "benchmark_case_dir can't be None if run_config is None.")
+
+      # TODO(pzread): Taskset should be derived from CPU topology.
+      # Only use the low 8 cores.
+      cmds = ["taskset", "0xFF", tool_path]
+
+      run_flags = self.__parse_flagfile(benchmark_case.benchmark_case_dir)
+      # Replace the CUDA device flag with the specified GPU.
+      if benchmark_case.driver_info.driver_name == "cuda":
+        run_flags = list(
+            filter(lambda flag: not flag.startswith("--device"), run_flags))
+        run_flags.append(f"--device=cuda://{self.gpu_id}")
+
+      return cmds + run_flags
+
+    cmds: List[Any] = run_module_utils.build_linux_wrapper_cmds_for_device_spec(
+        run_config.target_device_spec)
+    cmds += [tool_path]
+
+    module_path = iree_artifacts.get_module_path(
+        run_config.module_generation_config,
+        root_dir_path=self.config.root_benchmark_dir)
+    cmds += [f"--module_file={module_path}"]
+    cmds += run_module_utils.build_run_flags_for_model(
+        model=run_config.module_generation_config.imported_model.model,
+        model_input_data=run_config.input_data)
+    cmds += run_module_utils.build_run_flags_for_execution_config(
+        module_execution_config=run_config.module_execution_config,
+        gpu_id=self.gpu_id)
+
+    return cmds
+
   def __run_benchmark(self, benchmark_case: BenchmarkCase,
-                      results_filename: pathlib.Path, run_flags: List[str],
-                      wrapper_cmds: List[Any]):
+                      results_filename: pathlib.Path):
     if self.config.normal_benchmark_tool_dir is None:
       raise ValueError("normal_benchmark_tool_dir can't be None.")
 
     tool_name = benchmark_case.benchmark_tool_name
     tool_path = self.config.normal_benchmark_tool_dir / tool_name
-    cmd = wrapper_cmds + [tool_path] + run_flags
+    cmd = self.__build_tool_cmds(benchmark_case=benchmark_case,
+                                 tool_path=tool_path)
 
     if tool_name == "iree-benchmark-module":
       cmd.extend(
@@ -117,14 +119,14 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
       print(result_json)
 
   def __run_capture(self, benchmark_case: BenchmarkCase,
-                    capture_filename: pathlib.Path, run_flags: List[str],
-                    wrapper_cmds: List[Any]):
+                    capture_filename: pathlib.Path):
     capture_config = self.config.trace_capture_config
     if capture_config is None:
       raise ValueError("capture_config can't be None.")
 
     tool_path = capture_config.traced_benchmark_tool_dir / benchmark_case.benchmark_tool_name
-    cmd = wrapper_cmds + [tool_path] + run_flags
+    cmd = self.__build_tool_cmds(benchmark_case=benchmark_case,
+                                 tool_path=tool_path)
     process = subprocess.Popen(cmd,
                                env={"TRACY_NO_EXIT": "1"},
                                cwd=benchmark_case.benchmark_case_dir,
@@ -150,6 +152,7 @@ def main(args):
   benchmark_config = BenchmarkConfig.build_from_args(args, commit)
 
   if args.run_config is None:
+    # TODO(#11076): Remove legacy path.
     benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
         benchmark_config.root_benchmark_dir)
   else:

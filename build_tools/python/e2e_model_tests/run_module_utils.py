@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Utils that help launch iree run module tools."""
 
-from typing import List
+from typing import Any, List
 
 from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework.definitions.iree_definitions import ModuleExecutionConfig, RuntimeDriver
@@ -17,13 +17,13 @@ def build_run_flags_for_model(
     model_input_data: common_definitions.ModelInputData) -> List[str]:
   """Returns the IREE run module flags for the model and its inputs."""
 
-  args = [f"--entry_function={model.entry_function}"]
+  run_flags = [f"--entry_function={model.entry_function}"]
   if model_input_data != common_definitions.ZEROS_MODEL_INPUT_DATA:
     raise ValueError("Currently only support all-zeros data.")
-  args += [
+  run_flags += [
       f"--function_input={input_type}=0" for input_type in model.input_types
   ]
-  return args
+  return run_flags
 
 
 def build_run_flags_for_execution_config(
