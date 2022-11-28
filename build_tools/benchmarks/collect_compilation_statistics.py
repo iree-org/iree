@@ -195,11 +195,16 @@ def main(args: argparse.Namespace):
             f"Module path isn't a module cmake target: {module_path}")
       compilation_time_ms = target_build_time_map[cmake_target]
 
+      if benchmark_case.run_config is not None:
+        compile_tags = benchmark_case.run_config.module_generation_config.compile_config.tags
+      else:
+        # TODO(#11071): Remove legacy path.
+        compile_tags = benchmark_case.bench_mode
       compilation_info = CompilationInfo(model_name=benchmark_case.model_name,
                                          model_tags=benchmark_case.model_tags,
                                          model_source=category,
                                          target_arch=benchmark_case.target_arch,
-                                         bench_mode=benchmark_case.bench_mode)
+                                         compile_tags=compile_tags)
       compilation_statistics = CompilationStatistics(
           compilation_info=compilation_info,
           module_component_sizes=module_component_sizes,
