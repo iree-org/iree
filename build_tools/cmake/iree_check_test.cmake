@@ -238,6 +238,11 @@ function(iree_check_single_backend_test_suite)
     # such as when cross compiling, then we can't easily check for which
     # compiler target backends are enabled. Just assume all are enabled and only
     # rely on the runtime HAL driver check above for filtering.
+
+    # HACK: Always skip WebGPU when cross compiling until it has a HAL driver.
+    if(${_NORMALIZED_TARGET_BACKEND} STREQUAL "webgpu")
+      return()
+    endif()
   else()
     # We are building the host tools, so check enabled compiler target backends.
     if(NOT IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
