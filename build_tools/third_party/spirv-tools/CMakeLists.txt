@@ -9,7 +9,7 @@ include(FetchContent)
 FetchContent_Declare(
   spirv-tools
   GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools.git
-  GIT_TAG ff07cfd86fa229525659f6b81058b3171a67bef1 # 2021-12-10
+  GIT_TAG 00018e58af055a74fd88718af8cca8de34c25106 # 2022-11-25
 )
 
 set(SKIP_SPIRV_TOOLS_INSTALL OFF CACHE BOOL "" FORCE)
