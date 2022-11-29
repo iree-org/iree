@@ -65,7 +65,7 @@ static SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
                                               ArrayRef<int64_t> tileSizes) {
   auto tilingOp = cast<TilingInterface>(op);
 
-  SmallVector<int64_t> newTileSizes = llvm::to_vector(tileSizes);
+  SmallVector<int64_t> newTileSizes(tileSizes);
   newTileSizes.resize(tilingOp.getLoopIteratorTypes().size(), /*default=*/0);
 
   OpBuilder::InsertionGuard guard(b);
