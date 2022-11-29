@@ -33,6 +33,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     unspecified order:
       - additional_iree_patterns: fancy patterns we shortcut into the system,
       will need to be sliced out better in the future.
+      - bubble_collapse_expand: bubble `expand_shape` up and `collapse_shape`
+      down across Linalg ops.
       - canonicalization: adds all the canonicalization patterns of all
       registered dialects and ops.
       - promote_foreach_thread_capture_to_shared: adds patterns that rewrite
@@ -70,6 +72,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
   let arguments = (ins PDL_Operation:$target,
                        UnitAttr:$additional_iree_patterns,
+                       UnitAttr:$bubble_collapse_expand,
                        UnitAttr:$canonicalization,
                        UnitAttr:$promote_foreach_thread_capture_to_shared,
                        UnitAttr:$rank_reducing,
