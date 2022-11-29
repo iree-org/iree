@@ -26,8 +26,8 @@ BUILD_DIR="build-emscripten"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 
 cd "${ROOT_DIR}"
-source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
-source "${ROOT_DIR}/build_tools/cmake/setup_ccache.sh"
+source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
 cd "${BUILD_DIR}"
 

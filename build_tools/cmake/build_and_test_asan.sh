@@ -28,8 +28,8 @@ BUILD_DIR="${1:-${IREE_ASAN_BUILD_DIR:-build-asan}}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 
 cd "${ROOT_DIR}"
-source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
-source "${ROOT_DIR}/build_tools/cmake/setup_ccache.sh"
+source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
 
 CMAKE_ARGS=(

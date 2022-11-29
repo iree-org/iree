@@ -15,8 +15,8 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 BUILD_DIR="${1:-${IREE_RUNTIME_SMALL_BUILD_DIR:-build-runtime-small}}"
 
 cd "${ROOT_DIR}"
-source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
-source "${ROOT_DIR}/build_tools/cmake/setup_ccache.sh"
+source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
 "${CMAKE_BIN?}" -B "${BUILD_DIR}" \
   -G Ninja . \

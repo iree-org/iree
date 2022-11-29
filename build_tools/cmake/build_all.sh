@@ -17,8 +17,8 @@ IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
 
 cd "${ROOT_DIR}"
-source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
-source "${ROOT_DIR}/build_tools/cmake/setup_ccache.sh"
+source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"

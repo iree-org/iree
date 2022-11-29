@@ -18,8 +18,8 @@ ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 BUILD_DIR="${1:-${IREE_TSAN_BUILD_DIR:-build-tsan}}"
 
 cd "${ROOT_DIR}"
-source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
-source "${ROOT_DIR}/build_tools/cmake/setup_ccache.sh"
+source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
 CMAKE_ARGS=(
   "-G" "Ninja"

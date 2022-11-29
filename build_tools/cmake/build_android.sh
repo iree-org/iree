@@ -21,8 +21,8 @@ BUILD_BENCHMARK_SUITE_DIR="${BUILD_BENCHMARK_SUITE_DIR:-$ROOT_DIR/build-benchmar
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
 cd "${ROOT_DIR}"
-source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
-source "${ROOT_DIR}/build_tools/cmake/setup_ccache.sh"
+source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
 declare -a args=(
   -G Ninja

@@ -19,8 +19,8 @@ CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-OFF}"
 
 cd "${ROOT_DIR}"
-source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
-source "${ROOT_DIR}/build_tools/cmake/setup_ccache.sh"
+source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
 mkdir -p "${INSTALL_DIR}"
 
