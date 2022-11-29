@@ -24,21 +24,12 @@
 set -xeuo pipefail
 
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
-cd "${ROOT_DIR}"
-
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 BUILD_DIR="${1:-${IREE_ASAN_BUILD_DIR:-build-asan}}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 
-"$CMAKE_BIN" --version
-ninja --version
+cd "${ROOT_DIR}"
+source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
 
-if [[ -d "${BUILD_DIR}" ]]; then
-  echo "Build directory '${BUILD_DIR}' already exists. Will use cached results there."
-else
-  echo "Build directory '${BUILD_DIR}' does not already exist. Creating a new one."
-  mkdir "${BUILD_DIR}"
-fi
 
 CMAKE_ARGS=(
   "-G" "Ninja"

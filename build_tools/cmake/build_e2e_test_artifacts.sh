@@ -16,25 +16,15 @@
 set -xeuo pipefail
 
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
-cd "${ROOT_DIR}"
-
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+BUILD_DIR="${BUILD_DIR:-$ROOT_DIR/build-e2e-test-artifacts}"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/iree_tf_compiler}"
-BUILD_E2E_TEST_ARTIFACTS_DIR="${BUILD_E2E_TEST_ARTIFACTS_DIR:-$ROOT_DIR/build-e2e-test-artifacts}"
 
-"$CMAKE_BIN" --version
-ninja --version
-
-if [[ -d "${BUILD_E2E_TEST_ARTIFACTS_DIR}" ]]; then
-  echo "${BUILD_E2E_TEST_ARTIFACTS_DIR} directory already exists. Will use cached results there."
-else
-  echo "${BUILD_E2E_TEST_ARTIFACTS_DIR} directory does not already exist. Creating a new one."
-  mkdir "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
-fi
+cd "${ROOT_DIR}"
+source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
 
 echo "Configuring to build e2e test artifacts"
-"${CMAKE_BIN}" -B "${BUILD_E2E_TEST_ARTIFACTS_DIR}" \
+"${CMAKE_BIN}" -B "${BUILD_DIR}" \
   -G Ninja \
   -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}" \
   -DIREE_BUILD_EXPERIMENTAL_E2E_TEST_ARTIFACTS=ON \
@@ -46,6 +36,6 @@ echo "Configuring to build e2e test artifacts"
 
 echo "Building e2e test artifacts"
 "${CMAKE_BIN}" \
-  --build "${BUILD_E2E_TEST_ARTIFACTS_DIR}" \
+  --build "${BUILD_DIR}" \
   --target iree-e2e-test-artifacts \
   -- -k 0

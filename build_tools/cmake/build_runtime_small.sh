@@ -9,27 +9,17 @@
 # This uses previously cached build results and does not clear build
 # directories.
 
-set -e
-set -x
+set -xeuo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
-cd ${ROOT_DIR?}
+BUILD_DIR="${1:-${IREE_RUNTIME_SMALL_BUILD_DIR:-build-runtime-small}}"
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-"${CMAKE_BIN?}" --version
-ninja --version
+cd "${ROOT_DIR}"
+source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
 
-if [ -d "build-runtime-small" ]
-then
-  echo "build-runtime-small directory already exists. Will use cached results there."
-else
-  echo "build-runtime-small directory does not already exist. Creating a new one."
-  mkdir build-runtime-small
-fi
-cd build-runtime-small
-
-"${CMAKE_BIN?}" -G Ninja .. \
+"${CMAKE_BIN?}" -B "${BUILD_DIR}" \
+  -G Ninja . \
   -DCMAKE_BUILD_TYPE=MinSizeRel \
   -DIREE_SIZE_OPTIMIZED=ON \
   -DIREE_BUILD_COMPILER=OFF
-"${CMAKE_BIN?}" --build . -- -k 0
+"${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0

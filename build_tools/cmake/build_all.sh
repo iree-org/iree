@@ -11,23 +11,13 @@
 set -xeuo pipefail
 
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
-cd "${ROOT_DIR}"
-
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 BUILD_DIR="${1:-${IREE_BUILD_DIR:-build}}"
 INSTALL_DIR="${IREE_INSTALL_DIR:-${BUILD_DIR}/install}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
 
-"$CMAKE_BIN" --version
-ninja --version
-
-if [[ -d "${BUILD_DIR}" ]]; then
-  echo "Build directory '${BUILD_DIR}' already exists. Will use cached results there."
-else
-  echo "Build directory '${BUILD_DIR}' does not already exist. Creating a new one."
-  mkdir "${BUILD_DIR}"
-fi
+cd "${ROOT_DIR}"
+source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
 
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"

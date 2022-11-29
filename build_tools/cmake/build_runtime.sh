@@ -12,11 +12,11 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
-
+ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 BUILD_DIR="${1:-${IREE_RUNTIME_BUILD_DIR:-build-runtime}}"
 
-source "${SCRIPT_DIR}/setup_build.sh"
+cd "${ROOT_DIR}"
+source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
 
 "${CMAKE_BIN}" -B "${BUILD_DIR}" -G Ninja . \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \

@@ -14,11 +14,11 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
-
+ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 BUILD_DIR="${1:-${IREE_TSAN_BUILD_DIR:-build-tsan}}"
 
-source "${SCRIPT_DIR}/setup_build.sh"
+cd "${ROOT_DIR}"
+source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
 
 CMAKE_ARGS=(
   "-G" "Ninja"
@@ -75,10 +75,10 @@ export IREE_CUDA_DISABLE=1
 export IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE=notsan
 
 # Run all tests, once
-"${SCRIPT_DIR}/ctest_all.sh" "${BUILD_DIR}"
+"${ROOT_DIR}/build_tools/cmake/ctest_all.sh" "${BUILD_DIR}"
 
 # Re-run many times certain tests that are cheap and prone to nondeterministic
 # failure (typically, IREE runtime tests exercising multi-threading features).
 export IREE_CTEST_TESTS_REGEX="(^iree/base/|^iree/task/)"
 export IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT=32
-"${SCRIPT_DIR}/ctest_all.sh" "${BUILD_DIR}"
+"${ROOT_DIR}/build_tools/cmake/ctest_all.sh" "${BUILD_DIR}"
