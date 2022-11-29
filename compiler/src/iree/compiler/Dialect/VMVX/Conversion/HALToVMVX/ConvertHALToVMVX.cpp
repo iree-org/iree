@@ -199,7 +199,7 @@ struct ConvertHALInterfaceConstantLoadOp
     auto byteOffset = rewriter.createOrFold<arith::MulIOp>(
         op.getLoc(), elementSize, constantIndex);
     rewriter.replaceOpWithNewOp<IREE::Util::BufferLoadOp>(
-        op, resultType, constantsArg, constantsSize, byteOffset);
+        op, resultType, constantsArg, constantsSize, byteOffset, elementSize);
     return success();
   }
 };

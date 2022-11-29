@@ -184,9 +184,11 @@ struct ResourceLoadOpPattern
                                       adaptor.getSourceSize(), rewriter);
     auto loadType =
         getTypeConverter()->convertType(loadOp.getResult().getType());
+    auto elementSize =
+        rewriter.createOrFold<IREE::Util::SizeOfOp>(loc, loadType);
     rewriter.replaceOpWithNewOp<IREE::Util::BufferLoadOp>(
         loadOp, loadType, storage.buffer, storage.bufferSize,
-        adaptor.getSourceOffset());
+        adaptor.getSourceOffset(), elementSize);
     return success();
   }
 };
@@ -200,9 +202,11 @@ struct ResourceStoreOpPattern
     auto loc = storeOp.getLoc();
     auto storage = getResourceStorage(loc, adaptor.getTarget(),
                                       adaptor.getTargetSize(), rewriter);
+    auto elementSize = rewriter.createOrFold<IREE::Util::SizeOfOp>(
+        loc, adaptor.getValue().getType());
     rewriter.replaceOpWithNewOp<IREE::Util::BufferStoreOp>(
         storeOp, adaptor.getValue(), storage.buffer, storage.bufferSize,
-        adaptor.getTargetOffset());
+        adaptor.getTargetOffset(), elementSize);
     return success();
   }
 };

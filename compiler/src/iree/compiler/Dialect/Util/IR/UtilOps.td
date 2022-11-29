@@ -838,6 +838,7 @@ def Util_BufferSliceOp : Util_PureOp<"buffer.slice", [
   MemoryEffects<[MemAlloc, MemRead]>,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
   let summary = [{clones a subregion of a buffer}];
   let description = [{
@@ -865,8 +866,6 @@ def Util_BufferSliceOp : Util_PureOp<"buffer.slice", [
     Value getOperandSize(unsigned idx) { return getSourceSize(); }
     Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
-
-  let hasCanonicalizer = 1;
 }
 
 def Util_BufferSubspanOp : Util_PureOp<"buffer.subspan", [
@@ -875,6 +874,7 @@ def Util_BufferSubspanOp : Util_PureOp<"buffer.subspan", [
   DeclareOpInterfaceMethods<ViewLikeOpInterface>,
   Util_SizeAwareOp,
   Util_SubrangeOp,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
     "getTiedResultOperandIndex",
@@ -996,6 +996,7 @@ def Util_BufferStorageOp : Util_PureOp<"buffer.storage", [
 def Util_BufferCopyOp : Util_Op<"buffer.copy", [
   MemoryEffects<[MemRead, MemWrite]>,
   Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
   let summary = [{copies a range of bytes between buffers}];
   let description = [{
@@ -1025,13 +1026,12 @@ def Util_BufferCopyOp : Util_Op<"buffer.copy", [
     Value getOperandSize(unsigned idx) { return idx == 0 ? getSourceSize() : getTargetSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
-
-  let hasCanonicalizer = 1;
 }
 
 def Util_BufferCompareOp : Util_PureOp<"buffer.compare", [
   MemoryEffects<[MemRead]>,
   Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
   let summary = [{compares a range of two buffers}];
   let description = [{
@@ -1064,13 +1064,12 @@ def Util_BufferCompareOp : Util_PureOp<"buffer.compare", [
     Value getOperandSize(unsigned idx) { return idx == 0 ? getLhsSize() : getRhsSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
-
-  let hasCanonicalizer = 1;
 }
 
 def Util_BufferFillOp : Util_Op<"buffer.fill", [
   MemoryEffects<[MemWrite]>,
   Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
   let summary = [{fills a range of bytes with a value}];
   let description = [{
@@ -1098,13 +1097,12 @@ def Util_BufferFillOp : Util_Op<"buffer.fill", [
     Value getOperandSize(unsigned idx) { return getTargetSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
-
-  let hasCanonicalizer = 1;
 }
 
 def Util_BufferLoadOp : Util_Op<"buffer.load", [
   MemoryEffects<[MemRead]>,
   Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
   let summary = [{loads a value from a buffer}];
   let description = [{
@@ -1115,14 +1113,15 @@ def Util_BufferLoadOp : Util_Op<"buffer.load", [
   let arguments = (ins
     Util_BufferType:$source,
     Util_Size:$source_size,
-    Util_Offset:$source_offset
+    Util_Offset:$source_offset,
+    Util_Size:$length
   );
   let results = (outs
     Util_Primitive:$result
   );
 
   let assemblyFormat = [{
-    $source `[` $source_offset `]`
+    $source `[` $source_offset `for` $length `]`
     `:` type($source) `` `{` $source_size `}` `->` type($result)
     attr-dict-with-keyword
   }];
@@ -1132,13 +1131,13 @@ def Util_BufferLoadOp : Util_Op<"buffer.load", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
-  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def Util_BufferStoreOp : Util_Op<"buffer.store", [
   MemoryEffects<[MemWrite]>,
   Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
   let summary = [{stores a value into a buffer}];
   let description = [{
@@ -1150,12 +1149,13 @@ def Util_BufferStoreOp : Util_Op<"buffer.store", [
     Util_Primitive:$source,
     Util_BufferType:$target,
     Util_Size:$target_size,
-    Util_Offset:$target_offset
+    Util_Offset:$target_offset,
+    Util_Size:$length
   );
 
   let assemblyFormat = [{
     $source `,`
-    $target `[` $target_offset `]`
+    $target `[` $target_offset `for` $length `]`
     `:` type($source) `->` type($target) `` `{` $target_size `}`
     attr-dict-with-keyword
   }];
@@ -1164,8 +1164,6 @@ def Util_BufferStoreOp : Util_Op<"buffer.store", [
     Value getOperandSize(unsigned idx) { return getTargetSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
-
-  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
