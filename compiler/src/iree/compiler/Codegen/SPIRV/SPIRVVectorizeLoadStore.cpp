@@ -511,7 +511,7 @@ struct ProcessSubgroupMMALoad final
 
     rewriter.replaceOpWithNewOp<gpu::SubgroupMmaLoadMatrixOp>(
         loadOp, loadOp.getType(), adaptor.getSrcMemref(), indices.value(),
-        newLeadDimSize);
+        newLeadDimSize, loadOp.getTransposeAttr());
     return success();
   }
 };
