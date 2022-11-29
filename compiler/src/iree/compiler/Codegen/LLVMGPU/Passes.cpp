@@ -228,9 +228,15 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
       createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+#if 0 // manigupta (enable/disable)
   if (pipelineDepth > 1)
     nestedModulePM.addNestedPass<func::FuncOp>(
+<<<<<<< HEAD
         createGPUMultiBuffering(pipelineDepth));
+=======
+        createLLVMGPUMultiBuffering(pipelineDepth));
+#endif
+>>>>>>> b9e9a9e4d (passed 128x128x64 +(mma.sync + ldsm) -(smem swizzle, mainloop-pipelining))
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -268,7 +274,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorToGPU());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
-#if 0
+#if 0 // manigupta (enable/disable)
   // Pipeline memory operations.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUPipeliningPass(/*epiloguePeeling=*/false, pipelineDepth));

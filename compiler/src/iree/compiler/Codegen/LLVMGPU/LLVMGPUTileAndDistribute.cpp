@@ -218,12 +218,12 @@ struct LLVMGPUTileAndDistributePass
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
         getEntryPoint(funcOp)->getWorkgroupSize().value(),
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-#if 0
-    int64_t flatWorkgroupSize =
-        workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+#if 1 // manigupta (enable/disable shared memory for A/B)
+    //int64_t flatWorkgroupSize =
+    //    workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
     // Only promote to workgroup size if there are multiple warps.
 
-    if (flatWorkgroupSize > kWarpSize) {
+    // if (flatWorkgroupSize > kWarpSize) {
       RewritePatternSet promotionPatterns(&getContext());
 
       populateContractPromotionPatterns(promotionPatterns, {0, 1});
@@ -234,7 +234,7 @@ struct LLVMGPUTileAndDistributePass
       }
       // Insert barriers before and after copies to workgroup memory.
       insertBarriersAroundSharedMemoryCopy(funcOp);
-    }
+    //}
 #endif
 
     {

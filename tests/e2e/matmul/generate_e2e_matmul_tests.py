@@ -213,30 +213,31 @@ def get_test_compilation_infos(
   elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore:
     tile_workgroup_size_pairs = [
         # WarpShape = 1x1 (1 warp = 32 threads)
-        # TileWorkgroupSizePair([[16, 8, 16]], [32, 1, 1]), # PASSED uses ld.global and mma.sync (shared memory is disabled, one warp issues single mma.sync)
-        # TileWorkgroupSizePair([[16, 16, 16]], [32, 1, 1]), # DOES NOT COMPILE (Compilation BUG error: 'scf.for' op  along control flow edge from Region #0 to Region #0: source type #0 )
-        # TileWorkgroupSizePair([[32, 32, 32]], [32, 1, 1]), # DOES NOT COMPILE (Compilation BUG error: 'scf.for' op  along control flow edge from Region #0 to Region #0: source type #0 )
+        #TileWorkgroupSizePair([[16, 8, 16]], [32, 1, 1]), # FAILED (1x1 MMA.SYNC per warp for math)
+        TileWorkgroupSizePair([[16, 16, 16]], [32, 1, 1]), # PASSED (1x2 MMA.SYNC per warp for math)
+        TileWorkgroupSizePair([[32, 32, 32]], [32, 1, 1]), # PASSED (2x2 MMA.SYNC per warp for math)
         
         # WarpShape = 2x1 (2 warps = 64 threads)
-        #TileWorkgroupSizePair([[16, 16, 16]], [64, 1, 1]), # PASSED uses ld.global and mma.sync (shared memory is disabled, each warp issue single mma.sync)
-        #TileWorkgroupSizePair([[32, 8, 16]], [64, 1, 1]),  # PASSED uses ld.global and mma.sync (shared memory is disabled, each warp issue single mma.sync)
-        #TileWorkgroupSizePair([[32, 16, 16]], [64, 1, 1]), # DOES NOT COMPILE (Compilation BUG error: 'scf.for' op  along control flow edge from Region #0 to Region #0: source type #0 )
-        #TileWorkgroupSizePair([[16, 32, 16]], [64, 1, 1]), # DOES NOT COMPILE  
+        #TileWorkgroupSizePair([[16, 16, 16]], [64, 1, 1]), # Not-checked
+        #TileWorkgroupSizePair([[32, 8, 16]], [64, 1, 1]),  # Not-checked
+        #TileWorkgroupSizePair([[32, 16, 16]], [64, 1, 1]), # FAILED 
+        TileWorkgroupSizePair([[16, 32, 16]], [64, 1, 1]),  # PASSED 
         
         # WarpShape = 1x2 (2 warps = 64 threads)
         #TileWorkgroupSizePair([[16, 16, 16]], [32, 2, 1]), # DOES NOT COMPILE ('nvvm.mma.sync' op unimplemented variant for MMA shape <8, 16, 16>) [This is expected]
-        TileWorkgroupSizePair([[16, 32, 16]], [32, 2, 1]), # PASSED (Uses FFMA not mma.sync)
-        #TileWorkgroupSizePair([[16, 64, 16]], [32, 2, 1]), # PASSED
+        #TileWorkgroupSizePair([[16, 32, 16]], [32, 2, 1]), # PASSED (Uses FFMA not mma.sync)
+        #TileWorkgroupSizePair([[16, 64, 16]], [32, 2, 1]), # DOES NOT COMPILE (bcoz of recent changes error: Cannot determine operandId this vector::TransferReadOp is used as in the vector::TransferContractOp)
         #TileWorkgroupSizePair([[16, 128, 16]], [32, 2, 1]),# PASSED
         
-        TileWorkgroupSizePair([[32, 8, 16]], [32, 2, 1]),  # PASSED (1 MMA.SYNC per warp for math) 
-        TileWorkgroupSizePair([[32, 16, 16]], [32, 2, 1]), # COMPILES but fails correctness (2 MMA.SYNC per warp for math)
-        TileWorkgroupSizePair([[32, 32, 16]], [32, 2, 1]), # COMPILES but fails correctness (4 MMA.SYNC per warp for math)
+        #TileWorkgroupSizePair([[32, 8, 16]], [32, 2, 1]),  # PASSED (1 MMA.SYNC per warp for math) 
+        TileWorkgroupSizePair([[32, 16, 16]], [32, 2, 1]), # PASSED (2 MMA.SYNC per warp for math)
+        TileWorkgroupSizePair([[32, 32, 16]], [32, 2, 1]), # PASSED (4 MMA.SYNC per warp for math)
 
         # WarpShape = 2x2
-        #TileWorkgroupSizePair([[32, 32, 16]], [64, 2, 1]),   # DOES NOT COMPILE (Compilation BUG error: 'scf.for' op  along control flow edge from Region #0 to Region #0: source type #0 ) 
-        #TileWorkgroupSizePair([[64, 64, 64]], [64, 2, 1]),   # FAILED
-        #TileWorkgroupSizePair([[128, 128, 64]], [64, 2, 1]), # FAILED uses ld.global and mma.sync (shared memory is disabled)
+        #TileWorkgroupSizePair([[32, 16, 16]], [64, 2, 1]),   # FAILED uses ld.global and mma.sync (shared memory is disabled)
+        TileWorkgroupSizePair([[32, 32, 16]], [64, 2, 1]),   # PASSED
+        TileWorkgroupSizePair([[64, 64, 64]], [64, 2, 1]),   # PASSED
+        TileWorkgroupSizePair([[128, 128, 64]], [64, 2, 1]), # PASSED
 
         # WarpShape = 4x1
         #TileWorkgroupSizePair([[32, 32, 16]], [64, 1, 1]), # FAILED
