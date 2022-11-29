@@ -26,7 +26,7 @@ class RunModuleTuilsTest(unittest.TestCase):
     flags = run_module_utils.build_run_flags_for_model(
         model, common_definitions.ZEROS_MODEL_INPUT_DATA)
 
-    self.assertCountEqual(flags, [
+    self.assertEqual(flags, [
         "--entry_function=main", "--function_input=1xf32=0",
         "--function_input=2x2xf32=0"
     ])
@@ -42,7 +42,7 @@ class RunModuleTuilsTest(unittest.TestCase):
     flags = run_module_utils.build_run_flags_for_execution_config(
         execution_config)
 
-    self.assertCountEqual(flags, ["--task=10", "--device=local-task"])
+    self.assertEqual(flags, ["--task=10", "--device=local-task"])
 
   def test_build_run_flags_for_execution_config_with_cuda(self):
     execution_config = iree_definitions.ModuleExecutionConfig(
@@ -55,7 +55,7 @@ class RunModuleTuilsTest(unittest.TestCase):
     flags = run_module_utils.build_run_flags_for_execution_config(
         execution_config, gpu_id="3")
 
-    self.assertCountEqual(flags, ["--device=cuda://3"])
+    self.assertEqual(flags, ["--device=cuda://3"])
 
   def test_build_linux_wrapper_cmds_for_device_spec(self):
     device_spec = common_definitions.DeviceSpec(
