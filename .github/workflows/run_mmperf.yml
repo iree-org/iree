@@ -17,6 +17,7 @@ on:
   schedule:
     - cron: '0 13 * * *'
   workflow_dispatch:
+  pull_request:
 
 env:
   GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
@@ -30,8 +31,8 @@ jobs:
       BASE_REF: HEAD^
       PR_TITLE: ${{ github.event.pull_request.title }}
       PR_BODY: ${{ github.event.pull_request.body }}
+      IREE_SHA: ${{ github.sha }}
     outputs:
-      iree-sha: ${{ steps.iree.outputs.iree-sha }}
       artifact-upload-dir: ${{ steps.iree.outputs.artifact-upload-dir }}
       should-run: ${{ steps.configure.outputs.should-run }}
       runner-env: ${{ steps.configure.outputs.runner-env }}
@@ -54,8 +55,6 @@ jobs:
       - name: "Calculating version info"
         id: iree
         run: |
-          IREE_SHA=`git rev-parse HEAD`
-          echo "iree-sha=${IREE_SHA}" >> $GITHUB_OUTPUT
           export GCS_ARTIFACT_DIR="$(date +'%Y-%m-%d').sha_${IREE_SHA}.timestamp_$(date +'%s')"
           echo "artifact-upload-dir=${GCS_ARTIFACT_DIR}" >> $GITHUB_OUTPUT
 
@@ -69,7 +68,7 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      IREE_SHA: ${{ needs.setup.outputs.iree-sha }}
+      IREE_SHA: ${{ github.sha }}
       BUILD_DIR: mmperf-build-cpu
       RESULTS_DIR: mmperf-results-cpu
       GCS_UPLOAD_PARENT_DIR: "gs://mmperf-benchmark-artifacts/cpu"
@@ -103,7 +102,7 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      IREE_SHA: ${{ needs.setup.outputs.iree-sha }}
+      IREE_SHA: ${{ github.sha }}
       BUILD_DIR: mmperf-build-cuda
     outputs:
       build-dir: ${{ env.BUILD_DIR }}
