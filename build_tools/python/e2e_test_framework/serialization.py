@@ -6,9 +6,10 @@
 """Helpers to serialize/deserialize objects."""
 
 from enum import Enum
-from typing import Any, Dict, Optional, OrderedDict, Sequence, Tuple, Type, Union
+from typing import Any, Dict, Optional, OrderedDict, Sequence, Tuple, Type, TypeVar, Union
 import collections
 import dataclasses
+import typing
 
 # types.NoneType is only added after Python 3.10.
 NONE_TYPE = type(None)
@@ -44,10 +45,13 @@ def serialize_and_pack(obj,
   }
 
 
+T = TypeVar('T')
+
+
 def unpack_and_deserialize(data,
-                           root_type: Type,
+                           root_type: Type[T],
                            root_obj_field_name="root_obj",
-                           keyed_obj_map_field_name="keyed_obj_map"):
+                           keyed_obj_map_field_name="keyed_obj_map") -> T:
   """Unpacks and deserializes the data back to the typed object.
 
   Args:
@@ -58,9 +62,10 @@ def unpack_and_deserialize(data,
   Returns:
     A deserialized object.
   """
-  return _deserialize(data=data[root_obj_field_name],
-                      obj_type=root_type,
-                      keyed_obj_map=data[keyed_obj_map_field_name])
+  obj = _deserialize(data=data[root_obj_field_name],
+                     obj_type=root_type,
+                     keyed_obj_map=data[keyed_obj_map_field_name])
+  return typing.cast(root_type, obj)
 
 
 def _serialize(obj, keyed_obj_map: OrderedDict[str, Any]):
