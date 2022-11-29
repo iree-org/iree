@@ -110,6 +110,7 @@ def VK_TTA_CPU       : I32EnumAttrCase<"CPU", 1, "cpu">;
 def VK_TTA_RDNAv1    : I32EnumAttrCase<"AMD_RDNAv1", 100, "rdna1">;
 def VK_TTA_RDNAv2    : I32EnumAttrCase<"AMD_RDNAv2", 101, "rdna2">;
 def VK_TTA_RDNAv3    : I32EnumAttrCase<"AMD_RDNAv3", 102, "rdna3">;
+def VK_TTA_RDNAv4    : I32EnumAttrCase<"AMD_RDNAv4", 103, "rdna4">;
 // Apple Silicon GPU
 def VK_TTA_M1        : I32EnumAttrCase<"Apple_M1", 200, "m1">;
 // ARM Mali GPU
@@ -123,7 +124,7 @@ def VK_TTA_Adreno    : I32EnumAttrCase<"QC_Adreno", 500, "adreno">;
 def VK_TargetArchAttr : VK_I32EnumAttr<
   "TargetTripleArch", "recognized target architecture", [
     VK_TTA_Unknown, VK_TTA_CPU, VK_TTA_RDNAv1, VK_TTA_RDNAv2,
-    VK_TTA_RDNAv3, VK_TTA_M1, VK_TTA_Valhall, VK_TTA_Turing, VK_TTA_Ampere,
+    VK_TTA_RDNAv3, VK_TTA_RDNAv4, VK_TTA_M1, VK_TTA_Valhall, VK_TTA_Turing, VK_TTA_Ampere,
     VK_TTA_Adreno,
   ]>;
 
