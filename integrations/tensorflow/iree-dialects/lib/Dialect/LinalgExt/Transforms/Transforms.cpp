@@ -896,12 +896,11 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
     }
     // The dimensions map in the order of output dimensions. Since the
     // interchange is applied, we have to undo it for input.
-    if (auto outerDims = packOp.getOuterDimsPerm()) {
-      inputExprs = undoInterchange<AffineExpr>(
-          inputExprs, extractFromI64ArrayAttr(outerDims));
+    if (!packOp.getOuterDimsPerm().empty()) {
+      inputExprs =
+          undoInterchange<AffineExpr>(inputExprs, packOp.getOuterDimsPerm());
     }
-    for (auto en :
-         llvm::enumerate(extractFromI64ArrayAttr(packOp.getInnerDimsPos()))) {
+    for (auto en : llvm::enumerate(packOp.getInnerDimsPos())) {
       inputExprs[en.value()] =
           rewriter.getAffineDimExpr(inputRank + en.index());
     }
@@ -967,8 +966,7 @@ struct GeneralizeUnPackOpPattern : OpRewritePattern<UnPackOp> {
         loc, readType, unpackOp.getInput(), readOffsets, readSizes,
         readStrides);
 
-    SmallVector<int64_t> innerDimsPos =
-        extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
+    ArrayRef<int64_t> innerDimsPos = unpackOp.getInnerDimsPos();
     auto interchangeVector =
         computeInterchangeFromDimPos(innerDimsPos, outputRank);
     SmallVector<int64_t> transpShape =

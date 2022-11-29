@@ -582,9 +582,7 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
                        ShapedType::kDynamic);
 
   build(builder, state, returnType, source, sourceDynamicDims, offsets, sizes,
-        strides, builder.getI64ArrayAttr(staticOffsets),
-        builder.getI64ArrayAttr(staticSizes),
-        builder.getI64ArrayAttr(staticStrides));
+        strides, staticOffsets, staticSizes, staticStrides);
   state.addAttributes(attributes);
 }
 
@@ -689,9 +687,7 @@ void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
                        ShapedType::kDynamic);
 
   build(builder, state, ArrayRef<Type>(), value, target, targetDynamicDims,
-        offsets, sizes, strides, builder.getI64ArrayAttr(staticOffsets),
-        builder.getI64ArrayAttr(staticSizes),
-        builder.getI64ArrayAttr(staticStrides));
+        offsets, sizes, strides, staticOffsets, staticSizes, staticStrides);
   state.addAttributes(attributes);
 }
 
