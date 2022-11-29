@@ -16,6 +16,7 @@ BUILD_DIR="${1:-${IREE_RUNTIME_SMALL_BUILD_DIR:-build-runtime-small}}"
 
 cd "${ROOT_DIR}"
 source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
+source "${ROOT_DIR}/build_tools/cmake/setup_ccache.sh"
 
 "${CMAKE_BIN?}" -B "${BUILD_DIR}" \
   -G Ninja . \
@@ -23,3 +24,7 @@ source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
   -DIREE_SIZE_OPTIMIZED=ON \
   -DIREE_BUILD_COMPILER=OFF
 "${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0
+
+if (( IREE_READ_REMOTE_CCACHE == 1 )); then
+  ccache --show-stats
+fi

@@ -29,6 +29,7 @@ IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 
 cd "${ROOT_DIR}"
 source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
+source "${ROOT_DIR}/build_tools/cmake/setup_ccache.sh"
 
 
 CMAKE_ARGS=(
@@ -63,6 +64,10 @@ echo "------------------"
 echo "Building microbenchmark suites"
 echo "------------------"
 "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
+
+if (( IREE_READ_REMOTE_CCACHE == 1 )); then
+  ccache --show-stats
+fi
 
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}

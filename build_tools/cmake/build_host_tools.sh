@@ -20,6 +20,7 @@ IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-OFF}"
 
 cd "${ROOT_DIR}"
 source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
+source "${ROOT_DIR}/build_tools/cmake/setup_ccache.sh"
 
 mkdir -p "${INSTALL_DIR}"
 
@@ -47,3 +48,7 @@ declare -a CMAKE_ARGS=(
 
 "${CMAKE_BIN}" "${CMAKE_ARGS[@]}"
 "${CMAKE_BIN}" --build "${BUILD_DIR}" --target install -- -k 0
+
+if (( IREE_READ_REMOTE_CCACHE == 1 )); then
+  ccache --show-stats
+fi
