@@ -509,7 +509,6 @@ SortOp::getTiledImplementation(OpBuilder &builder,
          sizes.size() == static_cast<size_t>(rank));
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
-  Location loc = getLoc();
   SmallVector<Value> tiledOperands(getOutputs().size());
   for (auto en : llvm::enumerate(getOutputs())) {
     tiledOperands[en.index()] =
@@ -830,7 +829,6 @@ FftOp::getTiledImplementation(OpBuilder &builder,
                               ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
-  Location loc = getLoc();
   SmallVector<Value> tiledOperands(3);
   tiledOperands[0] = getStage();
   tiledOperands[1] = getRealCoeff();
@@ -1033,7 +1031,6 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
          sizes.size() == static_cast<size_t>(rank));
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
-  Location loc = getLoc();
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(
       getSlice(builder, getLoc(), input(), offsets, sizes, strides));
