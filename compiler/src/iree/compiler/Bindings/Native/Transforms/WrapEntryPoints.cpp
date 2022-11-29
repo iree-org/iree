@@ -24,18 +24,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace ABI {
 
-// Returns the invocation model specified on |op| or the |defaultModel|.
-static IREE::ABI::InvocationModel getInvocationModel(
-    Operation *op, IREE::ABI::InvocationModel defaultModel) {
-  auto modelAttr = op->getAttrOfType<StringAttr>("iree.abi.model");
-  if (!modelAttr) return defaultModel;
-  if (modelAttr == "coarse-fences") {
-    return IREE::ABI::InvocationModel::CoarseFences;
-  } else {
-    return IREE::ABI::InvocationModel::Sync;
-  }
-}
-
 // Maps a source type to the native ABI type.
 static Type mapToABIType(Type type) {
   if (type.isa<TensorType>()) {
@@ -45,10 +33,10 @@ static Type mapToABIType(Type type) {
 }
 
 // Creates the corresponding wrapper function for the given import function.
-static func::FuncOp createImportWrapperFunc(
-    IREE::ABI::InvocationModel invocationModel, func::FuncOp importOp,
-    FunctionType oldImportType, FunctionType newImportType,
-    StringRef privateName) {
+static func::FuncOp createImportWrapperFunc(func::FuncOp importOp,
+                                            FunctionType oldImportType,
+                                            FunctionType newImportType,
+                                            StringRef privateName) {
   // Create the internal wrapper function with the original import signature.
   auto wrapperOp =
       func::FuncOp::create(importOp.getLoc(), privateName, oldImportType);
@@ -62,148 +50,40 @@ static func::FuncOp createImportWrapperFunc(
   SmallVector<DictionaryAttr, 4> resultAttrDict;
   importOp.getAllResultAttrs(resultAttrDict);
   wrapperOp.setAllResultAttrs(resultAttrDict);
-  switch (invocationModel) {
-    default:
-    case IREE::ABI::InvocationModel::Sync:
-      break;
-    case IREE::ABI::InvocationModel::CoarseFences:
-      argAttrDict.push_back(nullptr);  // wait
-      argAttrDict.push_back(nullptr);  // signal
-      break;
-  }
-
-  // Update the import type and propagate back the attributes we may have
-  // modified above.
-  importOp.setType(newImportType);
-  importOp.setAllArgAttrs(argAttrDict);
-  importOp.setAllResultAttrs(resultAttrDict);
 
   auto *entryBlock = wrapperOp.addEntryBlock();
   auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
 
-  // Gather tensor arguments we may need to handle specially.
-  SmallVector<Value> entryArgs = {entryBlock->getArguments().begin(),
-                                  entryBlock->getArguments().end()};
-  SmallVector<size_t> tensorArgIndices;
-  SmallVector<Value> tensorArgs;
-  for (auto [argIndex, arg] : llvm::enumerate(entryArgs)) {
-    auto oldType = oldImportType.getInput(argIndex);
-    if (oldType.isa<TensorType>()) {
-      tensorArgIndices.push_back(argIndex);
-      tensorArgs.push_back(arg);
-    }
-  }
-
-  // Side-effecting imports need to have a host-wait inserted on them today.
-  // We could add more configuration options here but for now we require that
-  // users mark their functions 'nosideeffects' to avoid the host wait.
-  const bool hasSideEffects = !importOp->hasAttr("nosideeffects");
-
-  // When running async we insert a barrier on tensor arguments and attach that
-  // to the fence we pass to the import for waiting. We'll also allocate the
-  // signal fence that the import must signal when the returned tensors are
-  // ready.
-  Value waitFence;
-  Value signalFence;
-  switch (invocationModel) {
-    default:
-    case IREE::ABI::InvocationModel::Sync:
-      // No fences.
-      break;
-    case IREE::ABI::InvocationModel::CoarseFences: {
-      // HACK: this is relying on the fact that there's only one HAL device.
-      // We should instead have a way of creating fences on the device that
-      // is used to produce the tensors we're wrapping.
-      auto device =
-          entryBuilder.create<IREE::HAL::ExSharedDeviceOp>(importOp.getLoc());
-
-      // When exporting a fence we need to put a barrier between the rest of the
-      // program and the tensors consumed by the import.
-      if (tensorArgs.empty()) {
-        // No tensors passed to the import - pass in an immediate signal.
-        waitFence = entryBuilder.create<IREE::Util::NullOp>(
-            importOp.getLoc(), entryBuilder.getType<IREE::HAL::FenceType>());
-      } else {
-        waitFence = entryBuilder.create<IREE::HAL::FenceCreateOp>(
-            importOp.getLoc(), entryBuilder.getType<IREE::HAL::FenceType>(),
-            device, IREE::HAL::FenceFlagBitfield::None);
-        auto barrierOp = entryBuilder.create<IREE::HAL::TensorBarrierOp>(
-            importOp.getLoc(), tensorArgs, waitFence);
-        for (auto [argIndex, readyArg] :
-             llvm::zip_equal(tensorArgIndices, barrierOp.getResults())) {
-          entryArgs[argIndex] = readyArg;
-        }
-      }
-
-      // When the import produces resources we need to pass in a fence it can
-      // signal when execution is ready.
-      // TODO(benvanik): always pass in a signal fence? could be useful if we
-      // want to allow for async work using fences that's not device-related.
-      const bool haveTensorResults =
-          llvm::any_of(oldImportType.getResults(),
-                       [](Type type) { return type.isa<TensorType>(); });
-      if (!haveTensorResults && !hasSideEffects) {
-        // No tensors returned from import - pass in an immediate signal.
-        signalFence = entryBuilder.create<IREE::Util::NullOp>(
-            importOp.getLoc(), entryBuilder.getType<IREE::HAL::FenceType>());
-      } else {
-        signalFence = entryBuilder.create<IREE::HAL::FenceCreateOp>(
-            importOp.getLoc(), entryBuilder.getType<IREE::HAL::FenceType>(),
-            device, IREE::HAL::FenceFlagBitfield::None);
-      }
-      break;
-    }
-  }
-
   // Marshal arguments.
   SmallVector<Value> arguments;
-  for (auto [argIndex, arg] : llvm::enumerate(entryArgs)) {
-    auto oldType = oldImportType.getInput(argIndex);
-    auto newType = newImportType.getInput(argIndex);
+  for (auto arg : llvm::enumerate(entryBlock->getArguments())) {
+    auto oldType = oldImportType.getInput(arg.index());
+    auto newType = newImportType.getInput(arg.index());
     if (oldType.isa<TensorType>()) {
       // This is where we could perform type casting or in-place storage binding
       // if the user had any attrs specifying it.
-      // NOTE: we insert a barrier on this above if needed so that the wait
-      // fence will be signaled when the tensor is ready for consumption by the
-      // import.
-      auto argLoc = arg.getLoc();
-      auto exportOp =
-          entryBuilder.create<IREE::HAL::TensorExportOp>(argLoc, newType, arg);
+      auto argLoc = arg.value().getLoc();
+      auto exportOp = entryBuilder.create<IREE::HAL::TensorExportOp>(
+          argLoc, newType, arg.value());
       arguments.push_back(exportOp.getTarget());
     } else {
-      arguments.push_back(arg);
+      arguments.push_back(arg.value());
     }
   }
-  if (waitFence) arguments.push_back(waitFence);
-  if (signalFence) arguments.push_back(signalFence);
 
   // Make the call with the updated types.
   auto callOp =
       entryBuilder.create<func::CallOp>(importOp.getLoc(), importOp, arguments);
 
-  // If the call has side-effects then we need to wait on its signal fence on
-  // the host. This is because they may have launched a thread of their own to
-  // perform work that we can't track.
-  if (hasSideEffects && signalFence) {
-    auto timeoutMillis =
-        entryBuilder.create<arith::ConstantIntOp>(importOp.getLoc(), -1, 32);
-    entryBuilder.create<IREE::HAL::FenceAwaitOp>(importOp.getLoc(),
-                                                 entryBuilder.getI32Type(),
-                                                 timeoutMillis, signalFence);
-  }
-
   // Marshal results.
   SmallVector<Value> results;
-  for (auto [resultIndex, result] : llvm::enumerate(callOp.getResults())) {
-    auto oldType = oldImportType.getResult(resultIndex);
+  for (auto result : llvm::enumerate(callOp.getResults())) {
+    auto oldType = oldImportType.getResult(result.index());
     if (oldType.isa<TensorType>()) {
-      // NOTE: we set the import pending on the signal fence from the import
-      // indicating when the returned tensor is ready for consumption by the
-      // program.
       results.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
-          importOp.getLoc(), oldType, result, signalFence));
+          importOp.getLoc(), oldType, result.value()));
     } else {
-      results.push_back(result);
+      results.push_back(result.value());
     }
   }
 
@@ -230,20 +110,14 @@ static LogicalResult wrapImportFunc(IREE::ABI::InvocationModel invocationModel,
   }
 
   // Convert import signature types to those required by the binding ABI.
+  //
+  // NOTE: this is where we could change our signature to provide additional
+  // values from the runtime bindings as may be required - like semaphores for
+  // async behavior or cancellation.
   auto oldImportType = importOp.getFunctionType();
   SmallVector<Type> inputTypes;
   for (auto oldType : oldImportType.getInputs()) {
     inputTypes.push_back(mapToABIType(oldType));
-  }
-  auto fenceType = IREE::HAL::FenceType::get(importOp.getContext());
-  switch (invocationModel) {
-    default:
-    case IREE::ABI::InvocationModel::Sync:
-      break;
-    case IREE::ABI::InvocationModel::CoarseFences:
-      inputTypes.push_back(fenceType);  // wait
-      inputTypes.push_back(fenceType);  // signal
-      break;
   }
   SmallVector<Type> resultTypes;
   for (auto oldType : oldImportType.getResults()) {
@@ -252,16 +126,17 @@ static LogicalResult wrapImportFunc(IREE::ABI::InvocationModel invocationModel,
   auto newImportType =
       FunctionType::get(importOp.getContext(), inputTypes, resultTypes);
 
-  // Create the wrapper function that matches the original internal types but
-  // calls out to the updated import using ABI types.
-  auto wrapperOp = createImportWrapperFunc(
-      invocationModel, importOp, oldImportType, newImportType, privateName);
-  if (!wrapperOp) return failure();
-  moduleOp.insert(++Block::iterator(importOp), wrapperOp);
-
   // Update the import to the new type and mark it as being converted so we
   // don't try to convert it again.
+  importOp.setType(newImportType);
   importOp->setAttr("iree.abi.stub", UnitAttr::get(importOp.getContext()));
+
+  // Create the wrapper function that matches the original internal types but
+  // calls out to the updated import using ABI types.
+  auto wrapperOp = createImportWrapperFunc(importOp, oldImportType,
+                                           newImportType, privateName);
+  if (!wrapperOp) return failure();
+  moduleOp.insert(++Block::iterator(importOp), wrapperOp);
 
   return success();
 }
@@ -299,8 +174,8 @@ static void populateReflectionAttrs(IREE::ABI::InvocationModel invocationModel,
 static func::FuncOp createExportWrapperFunc(
     IREE::ABI::InvocationModel invocationModel, func::FuncOp exportOp,
     StringRef publicName) {
-  // Copy arg/result attrs from the export op to the wrapper function.
-  // We may want to remove them from the export but would need to filter.
+  // Copy arg/result attrs from the import op to the wrapper function.
+  // We may want to remove them from the import but would need to filter.
   SmallVector<DictionaryAttr, 4> argAttrDict;
   exportOp.getAllArgAttrs(argAttrDict);
   SmallVector<DictionaryAttr, 4> resultAttrDict;
@@ -313,10 +188,10 @@ static func::FuncOp createExportWrapperFunc(
   // async behavior or cancellation.
   auto oldExportType = exportOp.getFunctionType();
   SmallVector<Type> inputTypes;
+  auto fenceType = IREE::HAL::FenceType::get(exportOp.getContext());
   for (auto oldType : oldExportType.getInputs()) {
     inputTypes.push_back(mapToABIType(oldType));
   }
-  auto fenceType = IREE::HAL::FenceType::get(exportOp.getContext());
   switch (invocationModel) {
     default:
     case IREE::ABI::InvocationModel::Sync:
@@ -528,8 +403,8 @@ class WrapEntryPointsPass
     // This will preserve the internal types (tensors/etc) but change the import
     // to taking the ABI types and rewrite calls.
     for (auto importOp : importOps) {
-      if (failed(wrapImportFunc(getInvocationModel(importOp, invocationModel),
-                                moduleOp, importOp, symbolTable))) {
+      if (failed(wrapImportFunc(invocationModel, moduleOp, importOp,
+                                symbolTable))) {
         return signalPassFailure();
       }
     }
@@ -538,8 +413,8 @@ class WrapEntryPointsPass
     // This will change the export to taking the ABI types and preserve the
     // internal types.
     for (auto exportOp : exportOps) {
-      if (failed(wrapExportFunc(getInvocationModel(exportOp, invocationModel),
-                                moduleOp, exportOp, symbolTable))) {
+      if (failed(wrapExportFunc(invocationModel, moduleOp, exportOp,
+                                symbolTable))) {
         return signalPassFailure();
       }
     }
