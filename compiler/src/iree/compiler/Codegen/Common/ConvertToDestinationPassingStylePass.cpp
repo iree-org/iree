@@ -276,18 +276,6 @@ static LogicalResult duplicateInitTensorOps(OpBuilder &b,
   return success();
 }
 
-static SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
-  auto opAttributes = op.getAttributeNames();
-  llvm::StringSet<> elidedAttrs;
-  elidedAttrs.insert(opAttributes.begin(), opAttributes.end());
-  SmallVector<NamedAttribute> preservedAttrs;
-  for (auto attr : op->getAttrs()) {
-    if (elidedAttrs.count(attr.getName())) continue;
-    preservedAttrs.push_back(attr);
-  }
-  return preservedAttrs;
-}
-
 // Checks if the `inOperand` can be used in place of the `outOperand`
 // to mimic in-place update behavior for parallel elementwise ops.
 static bool canUseInOperandAsOutOperand(
@@ -368,7 +356,7 @@ struct AdaptLinalgInputOperandToOutputOperand
                                                utils::IteratorType::parallel);
     auto newOp = rewriter.create<linalg::GenericOp>(
         loc, op.getResultTypes(), newOperands, operand->get(), maps, iterTypes,
-        /*bodyBuild=*/nullptr, PruneAttributeList(op));
+        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(op));
     rewriter.inlineRegionBefore(op.getRegion(), newOp.getRegion(),
                                 newOp.getRegion().begin());
 
