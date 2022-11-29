@@ -1706,8 +1706,11 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
   SmallVector<Value> dynamicTileSizes;
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
                              ShapedType::kDynamic);
-  build(builder, state, output.getType(), source, output, outerDimsPerm,
-        innerDimsPos, dynamicTileSizes, staticTileSizes,
+  build(builder, state, output.getType(), source, output,
+        outerDimsPerm.empty() ? nullptr
+                              : builder.getDenseI64ArrayAttr(outerDimsPerm),
+        builder.getDenseI64ArrayAttr(innerDimsPos), dynamicTileSizes,
+        builder.getDenseI64ArrayAttr(staticTileSizes),
         (paddingValue ? paddingValue.value() : nullptr));
 }
 
@@ -2096,8 +2099,11 @@ void UnPackOp::build(OpBuilder &builder, OperationState &state, Value source,
   SmallVector<Value> dynamicTileSizes;
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
                              ShapedType::kDynamic);
-  build(builder, state, output.getType(), source, output, outerDimsPerm,
-        innerDimsPos, dynamicTileSizes, staticTileSizes);
+  build(builder, state, output.getType(), source, output,
+        outerDimsPerm.empty() ? nullptr
+                              : builder.getDenseI64ArrayAttr(outerDimsPerm),
+        builder.getDenseI64ArrayAttr(innerDimsPos), dynamicTileSizes,
+        builder.getDenseI64ArrayAttr(staticTileSizes));
 }
 
 SmallVector<OpFoldResult> UnPackOp::getMixedTiles() {
