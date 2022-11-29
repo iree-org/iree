@@ -82,6 +82,14 @@ def LinalgExtVectorization:
                     "createLinalgExtVectorizationPass()";
 }
 
+def TileAndDecomposeWinogradInputTransform :
+    Pass<"iree-linalg-ext-tile-and-decompose-winograd-input", "func::FuncOp"> {
+  let summary =
+      "Tiles and decomposes winograd input transform op into linalg ops";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createTileAndDecomposeWinogradInputTransformPass()";
+}
+
 //===---------------------------------------------------------------------====//
 // Codegen Strategy passes moved into IREE
 // TODO: Deprecate all this.

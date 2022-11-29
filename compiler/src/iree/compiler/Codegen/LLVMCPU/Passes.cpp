@@ -141,6 +141,8 @@ static void addTileAndDistributePasses(
       createFoldAffineMinInDistributedLoopsPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createTileAndDecomposeWinogradInputTransformPass());
 }
 
 //===---------------------------------------------------------------------===//

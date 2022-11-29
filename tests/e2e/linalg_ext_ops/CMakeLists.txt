@@ -80,6 +80,7 @@ iree_check_single_backend_test_suite(
     "sort.mlir"
     "top-k.mlir"
     "unpack.mlir"
+    "winograd_input.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
