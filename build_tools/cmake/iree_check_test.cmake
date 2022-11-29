@@ -242,6 +242,7 @@ function(iree_check_single_backend_test_suite)
     # No driver, so this is a special configuration. The assumption above
     # might not be true, so skip (these tests are _probably_ already being
     # built on the host anyway, so no need to build when cross compiling).
+    # TODO(#11354): Use a different test function / move compile to test-time
     if(NOT DEFINED _RULE_DRIVER)
       return()
     endif()
