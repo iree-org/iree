@@ -411,7 +411,7 @@ struct LinearizeMMALoadIndices final
 
     rewriter.replaceOpWithNewOp<gpu::SubgroupMmaLoadMatrixOp>(
         loadOp, loadOp.getType(), adaptor.getSrcMemref(), linearIndex,
-        loadOp.getLeadDimension());
+        loadOp.getLeadDimension(), loadOp.getTransposeAttr());
     return success();
   }
 };
@@ -678,7 +678,8 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
         op.getLoc(), addMap, ValueRange{op.getIndices().front(), offset});
     if constexpr (std::is_same<OpType, gpu::SubgroupMmaLoadMatrixOp>::value) {
       rewriter.replaceOpWithNewOp<gpu::SubgroupMmaLoadMatrixOp>(
-          op, op.getType(), newSubspan, newIndex, op.getLeadDimension());
+          op, op.getType(), newSubspan, newIndex, op.getLeadDimension(),
+          op.getTransposeAttr());
     } else if constexpr (std::is_same<OpType,
                                       gpu::SubgroupMmaStoreMatrixOp>::value) {
       rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
