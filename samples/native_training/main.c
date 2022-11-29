@@ -117,27 +117,26 @@ iree_status_t train(iree_runtime_session_t* session, struct State* state) {
       iree_runtime_call_outputs_pop_front_buffer_view(&call, &result));
   IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
       iree_runtime_session_device(session), iree_hal_buffer_view_buffer(result),
-      0, &state->loss, sizeof(state->loss), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
-      iree_infinite_timeout()));
+      0, &state->loss, sizeof(state->loss),
+      IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
   iree_hal_buffer_view_release(result);
 
   return iree_ok_status();
 }
 
 iree_status_t run_sample(iree_string_view_t bytecode_module_path,
-                         iree_string_view_t driver_name,
-                         struct State* state) {
+                         iree_string_view_t driver_name, struct State* state) {
   iree_status_t status = iree_ok_status();
 
   //===-------------------------------------------------------------------===//
   // Instance configuration (this should be shared across sessions).
-  fprintf(stdout, "Configuring IREE runtime instance and '%s' device\n",
-          driver_name.data);
   iree_runtime_instance_options_t instance_options;
   iree_runtime_instance_options_initialize(&instance_options);
   iree_runtime_instance_options_use_all_available_drivers(&instance_options);
   iree_runtime_instance_t* instance = NULL;
   if (iree_status_is_ok(status)) {
+    fprintf(stdout, "Configuring IREE runtime instance and '%s' device\n",
+            driver_name.data);
     status = iree_runtime_instance_create(&instance_options,
                                           iree_allocator_system(), &instance);
   }
@@ -151,31 +150,36 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
 
   //===-------------------------------------------------------------------===//
   // Session configuration (one per loaded module to hold module state).
-  fprintf(stdout, "Creating IREE runtime session\n");
   iree_runtime_session_options_t session_options;
   iree_runtime_session_options_initialize(&session_options);
   iree_runtime_session_t* session = NULL;
   if (iree_status_is_ok(status)) {
+    fprintf(stdout, "Creating IREE runtime session\n");
     status = iree_runtime_session_create_with_device(
         instance, &session_options, device,
         iree_runtime_instance_host_allocator(instance), &session);
   }
   iree_hal_device_release(device);
 
-  fprintf(stdout, "Loading bytecode module at '%s'\n",
-          bytecode_module_path.data);
   if (iree_status_is_ok(status)) {
+    fprintf(stdout, "Loading bytecode module at '%s'\n",
+            bytecode_module_path.data);
     status = iree_runtime_session_append_bytecode_module_from_file(
         session, bytecode_module_path.data);
   }
   //===-------------------------------------------------------------------===//
 
   //===-------------------------------------------------------------------===//
-  fprintf(stdout, "Training...\n");
-  print_state(state);
-  for (int i = 0; i < 10; i++) {
-    IREE_RETURN_IF_ERROR(train(session, state));
+  if (iree_status_is_ok(status)) {
+    fprintf(stdout, "Training...\n");
     print_state(state);
+    for (int i = 0; i < 10; i++) {
+      status = train(session, state);
+      print_state(state);
+      if (!iree_status_is_ok(status)) {
+        break;
+      }
+    }
   }
   //===-------------------------------------------------------------------===//
 
@@ -189,7 +193,6 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
 }
 
 int main(int argc, char** argv) {
-
   // Parse args
   if (argc < 2) {
     fprintf(stderr,
@@ -208,11 +211,11 @@ int main(int argc, char** argv) {
 
   // Run training
   struct State state = {
-    {4.0f, 4.0f, 5.0f},  // w
-    {2.0f}, // b
-    {1.0f, 1.0f, 1.0f}, // X
-    {14.0f}, // y
-    {1.0f}, // loss
+      {4.0f, 4.0f, 5.0f},  // w
+      {2.0f},              // b
+      {1.0f, 1.0f, 1.0f},  // X
+      {14.0f},             // y
+      {1.0f},              // loss
   };
   iree_status_t result = run_sample(bytecode_module_path, driver_name, &state);
   if (!iree_status_is_ok(result)) {
