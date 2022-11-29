@@ -6,18 +6,25 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build benchmark suites for IREE using a host tools directory.
-# Designed for CI, but can be run locally.
+# Build benchmark suites using a host tools directory.
+#
+# The required IREE_HOST_BINARY_ROOT environment variable indicates the location
+# of the precompiled IREE binaries.
+#
+# Designed for CI, but can be run locally. The desired build directory can be
+# passed as the first argument. Otherwise, it uses the environment variable
+# IREE_BUILD_BENCHMARKS_DIR, defaulting to "build-benchmarks". It reuses the
+# build directory if it already exists. Expects to be run from the root of the
+# IREE repository.
+
 
 set -xeuo pipefail
 
-ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
-BUILD_DIR="${IREE_BUILD_BENCHMARKS_DIR:-$ROOT_DIR/build-benchmarks}"
+BUILD_DIR="${1:-${IREE_BUILD_BENCHMARKS_DIR:-build-benchmarks}}"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/iree_tf_compiler}"
 
-cd "${ROOT_DIR}"
-source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
+source build_tools/cmake/setup_build.sh
 
 echo "Configuring to build benchmarks"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \

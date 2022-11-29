@@ -619,9 +619,9 @@ jobs:
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            --env "BUILD_E2E_TEST_ARTIFACTS_DIR=${BUILD_E2E_TEST_ARTIFACTS_DIR}" \
             gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
-            build_tools/cmake/build_e2e_test_artifacts.sh
+            build_tools/cmake/build_e2e_test_artifacts.sh \
+            "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "::set-output name=e2e-test-artifacts-dir::${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts"
       - name: "Uploading e2e test artifacts"
         id: upload
@@ -697,7 +697,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
-            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
+            --env "IREE_BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
             --env "${PLATFORM^^}_ABI=${ABI}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
@@ -707,7 +707,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
-            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
+            --env "IREE_BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
             --env "BUILD_PRESET=test" \
             "${DOCKER_IMAGE}" \
             bash -euo pipefail -c \
@@ -809,7 +809,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
-            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
+            --env "IREE_BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
             --env "BUILD_PRESET=benchmark-suite-test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             --env "BUILD_BENCHMARK_SUITE_DIR=${BUILD_BENCHMARK_SUITE_DIR}" \
