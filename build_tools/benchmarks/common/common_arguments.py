@@ -139,7 +139,7 @@ def build_common_argument_parser():
   parser.add_argument("--run_config",
                       type=check_file_path,
                       default=None,
-                      help="JSON file of the run configs")
+                      help="JSON file of the run config")
 
   return parser
 

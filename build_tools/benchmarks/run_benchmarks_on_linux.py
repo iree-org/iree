@@ -13,12 +13,12 @@ import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 from typing import Any, List, Optional
+import typing
 import atexit
 import json
 import shutil
 import subprocess
 import tarfile
-import typing
 
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
@@ -73,8 +73,9 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
       run_flags = self.__parse_flagfile(benchmark_case.benchmark_case_dir)
       # Replace the CUDA device flag with the specified GPU.
       if benchmark_case.driver_info.driver_name == "cuda":
-        run_flags = list(
-            filter(lambda flag: not flag.startswith("--device"), run_flags))
+        run_flags = [
+            flag for flag in run_flags if not flag.startswith("--device")
+        ]
         run_flags.append(f"--device=cuda://{self.gpu_id}")
 
       return cmds + run_flags
