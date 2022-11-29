@@ -201,7 +201,7 @@ struct LinalgEnablingOptions {
 /// Create a LinalgStrategyTileAndFusePass.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgStrategyTileAndFusePass(
-    StringRef opName = "", const linalg::LinalgTilingAndFusionOptions &opt = {},
+    StringRef opName = "", const scf::SCFTileAndFuseOptions &options = {},
     const LinalgExt::LinalgTransformationFilter &filter =
         LinalgExt::LinalgTransformationFilter());
 
