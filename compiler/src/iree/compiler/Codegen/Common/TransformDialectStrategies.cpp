@@ -496,6 +496,13 @@ struct ElementTypeBitWidth : public SingleValuePredicateParam<size_t> {
 /// Predicate tag indicating that the affine map is a permutation.
 struct IsPermutation {};
 
+/// Indicates that the match is optional. The matcher is still expected to run
+/// and capture if successful. The parameter can be set to false
+struct OptionalMatch : public SingleValuePredicateParam<bool> {
+  OptionalMatch() : Base(true) {}
+  explicit OptionalMatch(bool set) : Base(set) {}
+};
+
 /// Predicate tag indicating that the reduction is produced by a single combiner
 /// operation.
 struct SingleCombinerReduction {};
@@ -550,9 +557,9 @@ class StructuredOpMatcher {
 
   /// Adds a predicate checking that the given iteration space dimension is
   /// static/dynamic. The dimension index may be negative, in which case
-  /// dimensions are counted from the last one Python-style, or be an AllDims
-  /// tag, in which case all dimensions are checked. This may be eventually
-  /// extended to slices and/or lists of dimensions.
+  /// dimensions are counted from the last one (i.e. Python-style), or be an
+  /// AllDims tag, in which case all dimensions are checked. This may be
+  /// eventually extended to slices and/or lists of dimensions.
   StructuredOpMatcher &dim(int64_t dimension, ShapeKind kind) {
     predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
       SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
@@ -577,8 +584,8 @@ class StructuredOpMatcher {
   /// Adds a predicate checking that the given iteration space dimension has the
   /// given iterator type, e.g., parallel or reduction. The dimension index may
   /// be negative, in which case dimensions are counted from the last one
-  /// Python-style, or be an AllDims tag, in which case all dimensions are
-  /// checked. This may be eventually extended to slices and/or lists of
+  /// (i.e. Python-style), or be an AllDims tag, in which case all dimensions
+  /// are checked. This may be eventually extended to slices and/or lists of
   /// dimensions.
   StructuredOpMatcher &dim(int64_t dimension, utils::IteratorType kind) {
     predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
@@ -606,7 +613,7 @@ class StructuredOpMatcher {
   /// Adds a predicate checking that the given iteration space dimension is
   /// statically known to be divisible by the given value. The dimension index
   /// may be negative, in which case dimensions are counted from the last one
-  /// Python-style.
+  /// (i.e. Python-style).
   StructuredOpMatcher &dim(int64_t dimension, DivisibleBy divisibleBy) {
     predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
       unsigned rank = linalgOp.getNumLoops();
@@ -632,15 +639,18 @@ class StructuredOpMatcher {
   /// Adds a predicate that recursively applies other predicates to the
   /// operation defining the `position`-th operand. The position may be
   /// negative, in which case positions are counted from the last one
-  /// Python-style.
+  /// (i.e. Python-style). When the match is optional, the predicate check
+  /// succeeds as long as the `position` is in bounds. The matcher is executed
+  /// if there is a defining operation for the input operand.
   template <typename T>
   std::enable_if_t<
       llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
                         Operation *>::value,
       StructuredOpMatcher &>
-  input(int64_t position, T &operandMatcher) {
-    predicates.push_back([position,
-                          &operandMatcher](linalg::LinalgOp linalgOp) -> bool {
+  input(int64_t position, T &operandMatcher,
+        OptionalMatch optional = OptionalMatch(false)) {
+    predicates.push_back([position, &operandMatcher,
+                          optional](linalg::LinalgOp linalgOp) -> bool {
       int64_t transformedPosition =
           position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
       if (transformedPosition >= linalgOp.getNumDpsInputs()) return false;
@@ -648,8 +658,11 @@ class StructuredOpMatcher {
       Operation *definingOp = linalgOp.getDpsInputOperand(transformedPosition)
                                   ->get()
                                   .getDefiningOp();
-      if (!definingOp) return false;
-      return operandMatcher.match(definingOp);
+      if (!definingOp) return optional.value;
+      // We MUST run the matcher at this point, even if the match is optional,
+      // to allow for capture.
+      if (operandMatcher.match(definingOp)) return true;
+      return optional.value;
     });
     return *this;
   }
@@ -726,14 +739,17 @@ class StructuredOpMatcher {
   /// Adds a predicate that recursively applies other predicates to the
   /// operation defining the init/out operand corresponding to `position`-th
   /// output. The position may be negative, in which case positions are counted
-  /// from the last one Python-style.
+  /// from the last one (i.e. Python-style). When the match is optional, the
+  /// predicate check succeeds as long as the `position` is in bounds. The
+  /// matcher executed if there is a defining operation for the output operand.
   template <typename T>
   std::enable_if_t<
       llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
                         Operation *>::value,
       StructuredOpMatcher &>
-  output(int64_t position, T &operandMatcher) {
-    predicates.push_back([position,
+  output(int64_t position, T &operandMatcher,
+         OptionalMatch optional = OptionalMatch(false)) {
+    predicates.push_back([position, optional,
                           &operandMatcher](linalg::LinalgOp linalgOp) -> bool {
       int64_t transformedPosition =
           position >= 0 ? position : linalgOp.getNumDpsInits() + position;
@@ -742,30 +758,41 @@ class StructuredOpMatcher {
       Operation *definingOp = linalgOp.getDpsInitOperand(transformedPosition)
                                   ->get()
                                   .getDefiningOp();
-      if (!definingOp) return false;
-      return operandMatcher.match(definingOp);
+      if (!definingOp) return optional.value;
+      // We MUST run the matcher at this point, even if the match is optional,
+      // to allow for capture.
+      if (operandMatcher.match(definingOp)) return true;
+      return optional.value;
     });
     return *this;
   }
 
   /// Adds a predicate that recursively applies to users of the `position`-th
   /// result of the structured op. Succeeds if any user matches the predicate.
+  /// When the match is optional, the predicate check succeeds as long as the
+  /// `position` is in bounds, after running the given matcher.
   template <typename T>
   std::enable_if_t<
       llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
                         Operation *>::value,
       StructuredOpMatcher &>
-  result(int64_t position, HasAnyUse tag, T &resultUserMatcher) {
-    predicates.push_back([&resultUserMatcher,
+  result(int64_t position, HasAnyUse tag, T &resultUserMatcher,
+         OptionalMatch optional = OptionalMatch(false)) {
+    predicates.push_back([&resultUserMatcher, optional,
                           position](linalg::LinalgOp linalgOp) -> bool {
       int64_t transformedPosition =
           position >= 0 ? position : linalgOp->getNumResults() + position;
       if (transformedPosition >= linalgOp->getNumResults()) return false;
 
-      return llvm::any_of(linalgOp->getResult(transformedPosition).getUsers(),
-                          [&resultUserMatcher](Operation *op) {
-                            return resultUserMatcher.match(op);
-                          });
+      // We MUST run the matcher at this point, even if the match is optional,
+      // to allow for capture.
+      if (llvm::any_of(linalgOp->getResult(transformedPosition).getUsers(),
+                       [&resultUserMatcher](Operation *op) {
+                         return resultUserMatcher.match(op);
+                       })) {
+        return true;
+      }
+      return optional.value;
     });
     return *this;
   }
@@ -788,49 +815,6 @@ StructuredOpMatcher m_StructuredOp() {
   return StructuredOpMatcher::create<OpType...>();
 }
 
-class OptionalStructuredOpMatcher;
-OptionalStructuredOpMatcher m_OptionalStructuredOp(
-    StructuredOpMatcher &&nested);
-
-/// A wrapper around a structured op matcher that injects optionality. The
-/// wrapped predicates will get applied for capturing purposes, but the `match`
-/// of this class will always succeed to allow the matching to continue. One can
-/// check if the wrapped match actually succeeded by checking if the operation
-/// was captured.
-class OptionalStructuredOpMatcher {
-  friend OptionalStructuredOpMatcher m_OptionalStructuredOp(
-      StructuredOpMatcher &&nested);
-  explicit OptionalStructuredOpMatcher(StructuredOpMatcher &&nested)
-      : nested(nested) {}
-
- public:
-  /// Returns true if the wrapped matcher succeeded as indicated by the capture.
-  bool succeeded() const { return nested.getCaptured(); }
-
-  /// Runs the wrapped matcher and returns true regardless of its result.
-  bool match(Operation *op) {
-    (void)nested.match(op);
-    return true;
-  }
-
- private:
-  /// Actual structured matcher.
-  StructuredOpMatcher nested;
-};
-
-/// Makes the given structured op matcher optional.
-OptionalStructuredOpMatcher m_OptionalStructuredOp(
-    StructuredOpMatcher &&nested) {
-  return OptionalStructuredOpMatcher(std::move(nested));
-}
-
-/// Creates an optional matcher for ops with the kinds provided as template
-/// arguments.
-template <typename... OpType>
-OptionalStructuredOpMatcher m_OptionalStructuredOp() {
-  return m_OptionalStructuredOp(m_StructuredOp<OpType...>());
-}
-
 }  // namespace
 
 static constexpr unsigned cudaWarpSize = 32;
@@ -846,9 +830,6 @@ static bool matchGPUReduction(linalg::LinalgOp op,
                              .input(NumEqualsTo(1))
                              .output(NumEqualsTo(1));
   auto leadingEltwise = trailingEltwise;
-  auto maybeTrailingEltwise =
-      m_OptionalStructuredOp(std::move(trailingEltwise));
-  auto maybeLeadingEltwise = m_OptionalStructuredOp(std::move(leadingEltwise));
   auto pattern = m_StructuredOp()
                      .dim(AllDims(), ShapeKind::Static)
                      .dim(-1, utils::IteratorType::reduction)
@@ -856,18 +837,18 @@ static bool matchGPUReduction(linalg::LinalgOp op,
                      // Can be extended to projected permutation with broadcast.
                      .input(AllOperands(), IsPermutation())
                      // TODO: we want to accept any input position here.
-                     .input(0, maybeLeadingEltwise)
+                     .input(0, leadingEltwise, OptionalMatch())
                      .output(NumEqualsTo(1))
                      .output(0, fill)
                      // Only single combiner over 32 bits for now due to
                      // reduction distribution.
                      .output(0, ElementTypeBitWidth(32))
                      .output(0, SingleCombinerReduction())
-                     .result(0, HasAnyUse(), maybeTrailingEltwise);
+                     .result(0, HasAnyUse(), trailingEltwise, OptionalMatch());
   if (!matchPattern(op, pattern)) return false;
 
-  info.hasLeadingEltwise = maybeLeadingEltwise.succeeded();
-  info.hasTrailingEltwise = maybeTrailingEltwise.succeeded();
+  info.hasLeadingEltwise = leadingEltwise.getCaptured() != nullptr;
+  info.hasTrailingEltwise = trailingEltwise.getCaptured() != nullptr;
 
   // Hardcoded workagroup size, this could be deduced from the reduction dim.
   info.workgroupSize = {32, 2, 1};
