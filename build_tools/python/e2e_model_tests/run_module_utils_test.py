@@ -11,7 +11,7 @@ from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_parameters
 
 
-class RunModuleTuilsTest(unittest.TestCase):
+class RunModuleUtilsTest(unittest.TestCase):
 
   def test_build_run_flags_for_model(self):
     model = common_definitions.Model(

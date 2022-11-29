@@ -81,7 +81,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
 
     cmds: List[Any] = run_module_utils.build_linux_wrapper_cmds_for_device_spec(
         run_config.target_device_spec)
-    cmds += [tool_path]
+    cmds.append(tool_path)
 
     module_path = iree_artifacts.get_module_path(
         run_config.module_generation_config,
