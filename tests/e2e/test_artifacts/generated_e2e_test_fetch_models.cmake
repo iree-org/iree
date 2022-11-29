@@ -127,3 +127,13 @@ iree_fetch_artifact(
     "${ROOT_ARTIFACTS_DIR}/models/39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF"
   UNPACK
 )
+
+iree_fetch_artifact(
+  NAME
+    "model-ebe7897f-5613-435b-a330-3cb967704e5e"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/efficientnet-v2-s-tf-model.tar.gz"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/models/ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF"
+  UNPACK
+)

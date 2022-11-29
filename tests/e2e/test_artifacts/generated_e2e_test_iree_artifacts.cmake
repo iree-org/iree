@@ -1922,3 +1922,76 @@ iree_bytecode_module(
 add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-09cb5300-7f73-45cf-9f68-e114c77ca030
 )
+
+iree_import_tf_model(
+  TARGET_NAME
+    "${PACKAGE_NAME}_iree-imported-model-ebe7897f-5613-435b-a330-3cb967704e5e"
+  SOURCE
+    "${ROOT_ARTIFACTS_DIR}/models/ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF"
+  ENTRY_FUNCTION
+    "forward"
+  OUTPUT_MLIR_FILE
+    "${ROOT_ARTIFACTS_DIR}/iree/ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF/EfficientNetV2STF.mlir"
+)
+
+add_dependencies(iree-benchmark-import-models
+  ${PACKAGE_NAME}_iree-imported-model-ebe7897f-5613-435b-a330-3cb967704e5e
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree/ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF/EfficientNetV2STF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree/ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/EfficientNetV2STF.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${PACKAGE_NAME}_iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-6d0d5716-5525-44ad-b71d-8075ee1583a6"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree/ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF/EfficientNetV2STF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree/ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF/6d0d5716-5525-44ad-b71d-8075ee1583a6/EfficientNetV2STF.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${PACKAGE_NAME}_iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-6d0d5716-5525-44ad-b71d-8075ee1583a6
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-09cb5300-7f73-45cf-9f68-e114c77ca030"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree/ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF/EfficientNetV2STF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree/ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF/09cb5300-7f73-45cf-9f68-e114c77ca030/EfficientNetV2STF.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${PACKAGE_NAME}_iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-09cb5300-7f73-45cf-9f68-e114c77ca030
+)
