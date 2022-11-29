@@ -158,6 +158,7 @@ hal.executable @matmul_f32_128x256x64 {
 //           CHECK:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
 //           CHECK:   memref.alloc() : memref<3x64x20xf32, 3>
 //           CHECK:   memref.alloc() : memref<3x16x68xf32, 3>
+// TODO: transfer_writes should be forwarded to the following transfer_reads
 //   CHECK-COUNT-8:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<128x256xf32, #hal.descriptor_type<storage_buffer>>
 //   CHECK-COUNT-8:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<128x256xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //           CHECK:   vector.transfer_read %{{.+}}, %[[CST0]] {__pipelining_first_stage__, in_bounds = [true]} : memref<128x512xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
@@ -168,7 +169,6 @@ hal.executable @matmul_f32_128x256x64 {
 //           CHECK:   vector.transfer_write %{{.+}}, %{{.+}} {__pipelining_first_stage__, in_bounds = [true]} : vector<4xf32>, memref<3x16x68xf32, 3>
 //           CHECK:   vector.transfer_read %{{.+}}, %[[CST0]] {__pipelining_first_stage__, in_bounds = [true]} : memref<512x256xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //           CHECK:   vector.transfer_write %{{.+}}, %{{.+}} {__pipelining_first_stage__, in_bounds = [true]} : vector<4xf32>, memref<3x16x68xf32, 3>
-//           CHECK:   gpu.barrier {__pipelining_first_stage__}
 //           CHECK:   vector.transfer_read %{{.+}}, %[[CST0]] {__pipelining_first_stage__, in_bounds = [true]} : memref<128x512xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //           CHECK:   vector.transfer_write %{{.+}}, %{{.+}} {__pipelining_first_stage__, in_bounds = [true]} : vector<4xf32>, memref<3x64x20xf32, 3>
 //           CHECK:   vector.transfer_read %{{.+}}, %[[CST0]] {__pipelining_first_stage__, in_bounds = [true]} : memref<128x512xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>

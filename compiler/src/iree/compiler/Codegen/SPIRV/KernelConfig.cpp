@@ -55,6 +55,36 @@ bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
          llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops());
 }
 
+// Check if the given linalg op is fused with another op that may result
+// in too much shared memory usage.
+static bool fusedOpMayUseExtraSharedMemory(linalg::LinalgOp matmul) {
+  if (matmul->getNumResults() != 1) return true;
+
+  func::FuncOp entryPoint = matmul->getParentOfType<func::FuncOp>();
+
+  auto getResultBits = [](linalg::LinalgOp linalgOp) {
+    auto shapedType = linalgOp->getResult(0).getType().cast<ShapedType>();
+    return shapedType.getElementType().getIntOrFloatBitWidth();
+  };
+  auto matmulResultBits = getResultBits(matmul);
+
+  bool fusedWithOp = false;
+  entryPoint.walk([&](linalg::LinalgOp linalgOp) {
+    if (linalgOp == matmul || isMatmulOrBatchMatmul(linalgOp) ||
+        isa<linalg::FillOp>(linalgOp)) {
+      return WalkResult::advance();
+    }
+
+    if (linalgOp->getNumResults() != 1 ||
+        getResultBits(linalgOp) != matmulResultBits) {
+      fusedWithOp = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return fusedWithOp;
+}
+
 //===----------------------------------------------------------------------===//
 // Convolution Default Configuration
 //===----------------------------------------------------------------------===//
@@ -599,6 +629,15 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   // depth.
   auto pipelineDepth = softwarePipelineDepth ? softwarePipelineDepth : 1;
   auto storeStage = softwarePipelineStoreStage;
+
+  // TODO: Remove this check once either bufferization doesn't produce an extra
+  // buffer when fused with something like elementwise extf, or the shared
+  // memory calculation incorporates the fused op properly.
+  if ((pipelineDepth != 1 || storeStage != 1) &&
+      fusedOpMayUseExtraSharedMemory(op)) {
+    pipelineDepth = 1;
+    storeStage = 1;
+  }
 
   // Try to adjust tiling sizes to fit in shared memory.
   auto usePromotionPipeline =
