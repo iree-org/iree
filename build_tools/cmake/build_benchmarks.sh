@@ -6,31 +6,28 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build benchmark suites for IREE using a host tools directory.
-# Designed for CI, but can be run locally.
+# Build benchmark suites using a host tools directory.
+#
+# The required IREE_HOST_BINARY_ROOT environment variable indicates the location
+# of the precompiled IREE binaries.
+#
+# Designed for CI, but can be run locally. The desired build directory can be
+# passed as the first argument. Otherwise, it uses the environment variable
+# IREE_BUILD_BENCHMARKS_DIR, defaulting to "build-benchmarks". It reuses the
+# build directory if it already exists. Expects to be run from the root of the
+# IREE repository.
+
 
 set -xeuo pipefail
 
-ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
-cd "${ROOT_DIR}"
-
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+BUILD_DIR="${1:-${IREE_BUILD_BENCHMARKS_DIR:-build-benchmarks}}"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/iree_tf_compiler}"
-BUILD_BENCHMARKS_DIR="${BUILD_BENCHMARKS_DIR:-$ROOT_DIR/build-benchmarks}"
 
-"$CMAKE_BIN" --version
-ninja --version
-
-if [[ -d "${BUILD_BENCHMARKS_DIR}" ]]; then
-  echo "${BUILD_BENCHMARKS_DIR} directory already exists. Will use cached results there."
-else
-  echo "${BUILD_BENCHMARKS_DIR} directory does not already exist. Creating a new one."
-  mkdir "${BUILD_BENCHMARKS_DIR}"
-fi
+source build_tools/cmake/setup_build.sh
 
 echo "Configuring to build benchmarks"
-"${CMAKE_BIN}" -B "${BUILD_BENCHMARKS_DIR}" \
+"${CMAKE_BIN}" -B "${BUILD_DIR}" \
   -G Ninja \
   -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}" \
   -DIREE_BUILD_BENCHMARKS=ON \
@@ -43,6 +40,6 @@ echo "Configuring to build benchmarks"
 
 echo "Building benchmark artifacts"
 "${CMAKE_BIN}" \
-  --build "${BUILD_BENCHMARKS_DIR}" \
+  --build "${BUILD_DIR}" \
   --target iree-benchmark-suites iree-microbenchmark-suites \
   -- -k 0
