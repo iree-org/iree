@@ -128,6 +128,7 @@ static void linkAndOptimize(llvm::Module &module,
   llvm::legacy::PassManager MPM;
   llvm::PassManagerBuilder builder;
   builder.OptLevel = 2;
+  builder.OptLevel = 2;
   builder.SizeLevel = 0;
   builder.Inliner = llvm::createFunctionInliningPass();
   builder.LoopVectorize = false;
