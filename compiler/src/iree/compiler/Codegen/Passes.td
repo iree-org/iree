@@ -28,7 +28,7 @@ def ConvertToDestinationPassingStyle :
   let options = [
     Option<"useWARForCooperativeMatrixCodegen", "use-war-for-cooperative-matrix-codegen",
            "bool", /*default=*/"false",
-           "WAR for failure in Cooperative matrix codegen pipelines">
+           "WAR for failure in Cooperative matrix codegen pipelines. See #10648.">
   ];
 }
 

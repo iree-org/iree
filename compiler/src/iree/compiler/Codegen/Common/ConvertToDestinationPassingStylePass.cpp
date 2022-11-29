@@ -276,8 +276,7 @@ static LogicalResult duplicateInitTensorOps(OpBuilder &b,
   return success();
 }
 
-static SmallVector<NamedAttribute> PruneAttributeList(
-    linalg::GenericOp op, bool useWARForCooperativeMatrixCodegen = false) {
+static SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
   auto opAttributes = op.getAttributeNames();
   llvm::StringSet<> elidedAttrs;
   elidedAttrs.insert(opAttributes.begin(), opAttributes.end());

@@ -103,7 +103,7 @@ static void tileAndDistributeToWorkgroup(
 }
 
 static void tileAndBufferize(OpPassManager &pm) {
-  tileAndDistributeToWorkgroup(pm, /*useWARForCooperativeMatrixCodegen =*/true);
+  tileAndDistributeToWorkgroup(pm, /*useWARForCooperativeMatrixCodegen=*/true);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   addBufferizePasses(nestedModulePM);

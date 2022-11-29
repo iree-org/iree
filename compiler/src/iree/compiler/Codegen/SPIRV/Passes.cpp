@@ -276,8 +276,8 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
 
 void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   addTileAndDistributeToWorkgroupsPasses(
-      pm, /*useFuseTensorPadWithConsumerPass = */ false,
-      /*useWARForCooperativeMatrixCodegen = */ true);
+      pm, /*useFuseTensorPadWithConsumerPass=*/false,
+      /*useWARForCooperativeMatrixCodegen=*/true);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
 
@@ -324,8 +324,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
                                                 unsigned pipelineDepth) {
   LLVM_DEBUG(llvm::dbgs() << "Pipeline Depth: " << pipelineDepth << "\n");
   addTileAndDistributeToWorkgroupsPasses(
-      pm, /*useFuseTensorPadWithConsumerPass = */ false,
-      /*useWARForCooperativeMatrixCodegen = */ true);
+      pm, /*useFuseTensorPadWithConsumerPass=*/false,
+      /*useWARForCooperativeMatrixCodegen=*/true);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
