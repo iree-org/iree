@@ -225,7 +225,6 @@ if(IREE_BUILD_COMPILER)
     DEPS
       iree::compiler::API2::Headers
       iree::compiler::API2::Impl
-    PUBLIC
     SETUP_INSTALL_RPATH
   )
 
