@@ -277,7 +277,7 @@ static void iree_task_topology_initialize_from_logical_processors_with_filter(
   IREE_TRACE_ZONE_APPEND_VALUE(z0, max_core_count);
   // Count cores that match the filter.
   iree_host_size_t processors_count = 0;
-  for (uint32_t i = 0; i < cpuinfo_get_processors_count(); i++) {
+  for (uint32_t i = 0; i < cpuinfo_get_cores_count(); i++) {
     const struct cpuinfo_processor* processor = cpuinfo_get_processor(i);
     if (filter_fn(processor->core, filter_fn_data)) ++processors_count;
   }

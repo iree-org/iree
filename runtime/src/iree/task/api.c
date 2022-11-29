@@ -139,6 +139,9 @@ iree_status_t iree_task_executor_create_from_flags(
     }
     num_nodes++;
   }
+  if (iree_string_view_is_empty(numa_nodes)) {
+    num_nodes = 1;
+  }
 
   *out_executor = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);

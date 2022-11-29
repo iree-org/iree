@@ -63,6 +63,9 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
     }
     num_nodes++;
   }
+  if (iree_string_view_is_empty(nodes_value)) {
+    num_nodes = 1;
+  }
 
   iree_hal_task_device_params_t default_params;
   iree_hal_task_device_params_initialize(&default_params);
