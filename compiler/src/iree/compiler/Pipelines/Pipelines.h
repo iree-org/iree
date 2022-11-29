@@ -42,8 +42,6 @@ enum class IREEVMPipelinePhase {
 inline static void enumerateIREEVMPipelinePhases(
     std::function<void(IREEVMPipelinePhase, StringRef name, StringRef desc)>
         callback) {
-  callback(IREEVMPipelinePhase::End, "end",
-           "Complete the full compilation pipeline.");
   callback(IREEVMPipelinePhase::Input, "input",
            "Performs input processing and lowering into core IREE "
            "input dialects (linalg/etc).");
@@ -56,6 +54,8 @@ inline static void enumerateIREEVMPipelinePhases(
   callback(IREEVMPipelinePhase::HAL, "hal",
            "Compiles up to the `hal` dialect, including codegen.");
   callback(IREEVMPipelinePhase::VM, "vm", "Compiles up to the `vm` dialect.");
+  callback(IREEVMPipelinePhase::End, "end",
+           "Complete the full compilation pipeline.");
 }
 
 // Builds a pass pipeline to perform end-to-end compilation from a

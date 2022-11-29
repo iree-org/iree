@@ -11,10 +11,8 @@
 
 set -xeuo pipefail
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
 BUILD_DIR="${1:-${IREE_RUNTIME_SMALL_BUILD_DIR:-build-runtime-small}}"
 
-cd "${ROOT_DIR}"
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
 

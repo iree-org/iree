@@ -21,11 +21,9 @@ then
     exit 1
 fi
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
 BUILD_DIR="build-emscripten"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 
-cd "${ROOT_DIR}"
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
 

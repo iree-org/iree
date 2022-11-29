@@ -90,18 +90,20 @@ static void addBufferizePasses(OpPassManager &passManager) {
       createEraseHALDescriptorTypeFromMemRefPass());
 }
 
-static void tileAndDistributeToWorkgroup(OpPassManager &pm) {
+static void tileAndDistributeToWorkgroup(
+    OpPassManager &pm, bool useWARForCooperativeMatrixCodegen = false) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
+      createConvertToDestinationPassingStylePass(
+          useWARForCooperativeMatrixCodegen));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
 
 static void tileAndBufferize(OpPassManager &pm) {
-  tileAndDistributeToWorkgroup(pm);
+  tileAndDistributeToWorkgroup(pm, /*useWARForCooperativeMatrixCodegen=*/true);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   addBufferizePasses(nestedModulePM);

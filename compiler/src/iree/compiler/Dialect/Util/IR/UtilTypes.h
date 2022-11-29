@@ -77,6 +77,32 @@ struct ValueAccess {
   static ValueAccess DiscardWrite() { return ValueAccess(false, true, true); }
 };
 
+// An (offset, length) range within a size-aware resource.
+struct SubrangeOperand {
+  // Base resource the subrange references into.
+  Value resource;
+  // Size of the full base resource.
+  Value resourceSize;
+  // Offset into the base resource the range begins.
+  Value offset;
+  // Total length of the range within the base resource.
+  Value length;
+};
+
+//===----------------------------------------------------------------------===//
+// Op utilities common in util patterns and folders
+//===----------------------------------------------------------------------===//
+
+// Returns true if |value| can be used by the operation at the insertion point.
+bool isValueUsableForOp(Value value, Block *block,
+                        Block::iterator insertionPoint);
+// Returns true if |value| can be used by |op|.
+bool isValueUsableForOp(Value value, Operation *op);
+
+// Tries to reorder the producer of |value| above |consumerOp|.
+// Returns true if the move was successful.
+bool tryMoveProducerBefore(Value value, Operation *consumerOp);
+
 //===----------------------------------------------------------------------===//
 // Global and structural interface utilities
 //===----------------------------------------------------------------------===//
@@ -120,12 +146,6 @@ void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices,
     SmallVector<int64_t, 4> &tiedOperandIndices);
-
-// Returns true if |value| can be used by the operation at the insertion point.
-bool isValueUsableForOp(Value value, Block *block,
-                        Block::iterator insertionPoint);
-// Returns true if |value| can be used by |op|.
-bool isValueUsableForOp(Value value, Operation *op);
 
 //===----------------------------------------------------------------------===//
 // Shape-aware interface utilities

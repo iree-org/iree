@@ -6,31 +6,24 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Note: this script diverges from the non-ASan build in a few ways:
-#   * The CMake build sets `IREE_ENABLE_ASAN=ON`
-#   * Omit optional components that don't work with ASan (e.g. Python bindings)
-#   * Some tests that fail under ASan are individually excluded
+# Build and test, using CMake/CTest, with AddressSanitizer instrumentation.
 #
-# The desired build directory can be passed as
-# the first argument. Otherwise, it uses the environment variable
-# IREE_ASAN_BUILD_DIR, defaulting to "build-asan". Designed for CI, but
-# can be run manually. This reuses the build directory if it already exists.
+# See https://clang.llvm.org/docs/AddressSanitizer.html. Components that don't
+# work with ASan (e.g. Python bindings) are disabled. Some tests that fail under
+# ASan are individually excluded.
 #
-# Build and test the project with CMake with ASan enabled and using
-# SwiftShader's software Vulkan driver.
-# ASan docs: https://clang.llvm.org/docs/AddressSanitizer.html
-
+# The desired build directory can be passed as the first argument. Otherwise, it
+# uses the environment variable IREE_ASAN_BUILD_DIR, defaulting to "build-asan".
+# Designed for CI, but can be run manually. It reuses the build directory if it
+# already exists. Expects to be run from the root of the IREE repository.
 
 set -xeuo pipefail
 
-ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 BUILD_DIR="${1:-${IREE_ASAN_BUILD_DIR:-build-asan}}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 
-cd "${ROOT_DIR}"
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
-
 
 CMAKE_ARGS=(
   "-G" "Ninja"

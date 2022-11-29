@@ -117,7 +117,8 @@ static void addBufferizePasses(OpPassManager &passManager,
 //===----------------------------------------------------------------------===//
 
 static void addTileAndDistributeToWorkgroupsPasses(
-    OpPassManager &passManager, bool useFuseTensorPadWithConsumerPass = false) {
+    OpPassManager &passManager, bool useFuseTensorPadWithConsumerPass = false,
+    bool useWARForCooperativeMatrixCodegen = false) {
   passManager.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = passManager.nest<ModuleOp>();
   if (useFuseTensorPadWithConsumerPass) {
@@ -125,7 +126,8 @@ static void addTileAndDistributeToWorkgroupsPasses(
         createFuseTensorPadWithConsumerPass());
   }
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
+      createConvertToDestinationPassingStylePass(
+          useWARForCooperativeMatrixCodegen));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
@@ -273,7 +275,9 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
 }
 
 void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
-  addTileAndDistributeToWorkgroupsPasses(pm);
+  addTileAndDistributeToWorkgroupsPasses(
+      pm, /*useFuseTensorPadWithConsumerPass=*/false,
+      /*useWARForCooperativeMatrixCodegen=*/true);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
 
@@ -319,7 +323,9 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
 void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
                                                 unsigned pipelineDepth) {
   LLVM_DEBUG(llvm::dbgs() << "Pipeline Depth: " << pipelineDepth << "\n");
-  addTileAndDistributeToWorkgroupsPasses(pm);
+  addTileAndDistributeToWorkgroupsPasses(
+      pm, /*useFuseTensorPadWithConsumerPass=*/false,
+      /*useWARForCooperativeMatrixCodegen=*/true);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);

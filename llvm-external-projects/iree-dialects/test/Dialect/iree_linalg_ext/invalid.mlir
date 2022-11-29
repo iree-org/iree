@@ -659,3 +659,25 @@ func.func @illegal_unset_encoding_op_with_shape_change(%arg0 : tensor<20x30xf32,
   %0 = iree_linalg_ext.unset_encoding %arg0: tensor<20x30xf32, #iree_linalg_ext.encoding<GEMM_LHS>> -> tensor<10x20xf32>
   return %0 : tensor<10x20xf32>
 }
+
+// -----
+
+func.func @illegal_winograd_input_shape(%arg0: tensor<1x10x10x32xf32>) -> tensor<8x8x1x6x6x32xf32> {
+  %0 = tensor.empty() : tensor<8x8x1x6x6x32xf32>
+  // expected-error @+1 {{incompatible output shape}}
+  %1 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2])
+    ins(%arg0 : tensor<1x10x10x32xf32>) outs(%0 : tensor<8x8x1x6x6x32xf32>) -> tensor<8x8x1x6x6x32xf32>
+  return %1 : tensor<8x8x1x6x6x32xf32>
+}
+
+// -----
+
+func.func @illegal_winograd_input_rank(%arg0: tensor<1x10x10x32xf32>) -> tensor<8x8x1x6xf32> {
+  %0 = tensor.empty() : tensor<8x8x1x6xf32>
+  // expected-error @+1 {{expected output rank to be equal to input rank + 2}}
+  %1 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2])
+    ins(%arg0 : tensor<1x10x10x32xf32>) outs(%0 : tensor<8x8x1x6xf32>) -> tensor<8x8x1x6xf32>
+  return %1 : tensor<8x8x1x6xf32>
+}
+
+// -----

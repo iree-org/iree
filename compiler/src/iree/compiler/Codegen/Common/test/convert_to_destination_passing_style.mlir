@@ -527,9 +527,9 @@ func.func @three_init_tensor_uses() {
 //  CHECK-SAME:       outs(%[[LOAD]] :
 //       CHECK:   %[[MATMUL:.+]] = linalg.matmul
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
-//  CHECK-SAME:       outs(%[[MATMUL]] :
+//  CHECK-SAME:       ins(%{{.+}}, %[[MATMUL]] :
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       outs(%[[GENERIC]] :
+//  CHECK-SAME:       ins(%[[GENERIC]] :
 
 // -----
 
@@ -723,3 +723,91 @@ func.func @clone_index_computations() {
 //       CHECK:   scf.for
 //       CHECK:     %[[TILESIZE:.+]] = affine.min
 //       CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[OUTPUT]], offsets = [{{.+}}], sizes = [%[[TILESIZE]]]
+
+// -----
+
+func.func @gemm_gather() {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f32
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<128x256xf32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<256x512xf32>>
+  %2 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<2x512xf32>>
+  %3 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<128xi32>>
+  %result = hal.interface.binding.subspan set(0) binding(5) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+  %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 256], strides = [1, 1] 
+      : !flow.dispatch.tensor<readonly:tensor<128x256xf32>> -> tensor<128x256xf32>
+  %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 512], strides = [1, 1] 
+      : !flow.dispatch.tensor<readonly:tensor<256x512xf32>> -> tensor<256x512xf32>
+  %6 = flow.dispatch.tensor.load %2, offsets= [0, 0], sizes= [2, 512], strides= [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<2x512xf32>> -> tensor<2x512xf32>
+  %7 = flow.dispatch.tensor.load %3, offsets = [0], sizes= [128], strides = [1]
+      : !flow.dispatch.tensor<readonly:tensor<128xi32>> -> tensor<128xi32>
+  %8 = tensor.empty() : tensor<128x512xf32>
+  %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<128x512xf32>) -> tensor<128x512xf32>
+  %10 = linalg.matmul ins(%4, %5 : tensor<128x256xf32>, tensor<256x512xf32>)
+      outs(%9 : tensor<128x512xf32>) -> tensor<128x512xf32>
+  %11 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%10, %7 : tensor<128x512xf32>, tensor<128xi32>) outs(%8 : tensor<128x512xf32>) {
+    ^bb0(%b0 : f32, %b1 : i32, %b2 : f32):
+        %12 = linalg.index 1 : index
+        %13 = arith.index_cast %b1 : i32 to index
+        %14 = tensor.extract %6[%13, %12] : tensor<2x512xf32>
+        %15 = arith.addf %b0, %14 : f32
+        linalg.yield %15 : f32
+      } -> tensor<128x512xf32>
+  flow.dispatch.tensor.store %11, %result, offsets= [0, 0], sizes = [128, 512], strides= [1, 1]
+      : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+  return
+}
+// CHECK-LABEL: func @gemm_gather
+//       CHECK:   %[[GEMM:.+]] = linalg.matmul
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%{{[a-zA-Z0-9]+}} :
+//  CHECK-SAME:       outs(%[[GEMM]] :
+
+// -----
+
+func.func @reduce_broadcast_generic() {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f32
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<10x1024xf32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<10xf32>>
+  %2 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<10x1024xf32>>
+  %3 = flow.dispatch.tensor.load %0, offsets= [0, 0], sizes = [10, 1024], strides= [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<10x1024xf32>> -> tensor<10x1024xf32>
+  %4 = flow.dispatch.tensor.load %1, offsets= [0], sizes = [10], strides= [1]
+      : !flow.dispatch.tensor<readonly:tensor<10xf32>> -> tensor<10xf32>
+  %5 = tensor.empty() : tensor<10x1024xf32>
+  %6 = tensor.empty() : tensor<10xf32>
+  %7 = linalg.fill ins(%cst : f32) outs(%6 : tensor<10xf32>) -> tensor<10xf32>
+  %8:2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%3, %4 : tensor<10x1024xf32>, tensor<10xf32>) outs(%5, %7 : tensor<10x1024xf32>, tensor<10xf32>) {
+   ^bb0(%arg1: f32, %arg2: f32, %arg3: f32, %arg4: f32):
+      %18 = arith.subf %arg1, %arg2 : f32
+      %19 = math.exp %18 : f32
+      %20 = arith.addf %19, %arg4 : f32
+      linalg.yield %19, %20 : f32, f32
+  } -> (tensor<10x1024xf32>, tensor<10xf32>)
+  %9 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%8#0, %8#1 : tensor<10x1024xf32>, tensor<10xf32>) outs(%5 : tensor<10x1024xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):
+      %18 = arith.divf %arg1, %arg2 : f32
+      linalg.yield %18 : f32
+    } -> tensor<10x1024xf32>
+  flow.dispatch.tensor.store %9, %2, offsets = [0, 0], sizes= [10, 1024], strides= [1, 1]
+      : tensor<10x1024xf32> -> !flow.dispatch.tensor<writeonly:tensor<10x1024xf32>>
+  return
+}
+// CHECK-LABEL: func @reduce_broadcast_generic
+//       CHECK:   %[[OUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(4)
+//       CHECK:   %[[OUT:.+]] = flow.dispatch.tensor.load %[[OUT_BINDING]]
+//       CHECK:   %[[RESULT:.+]]:2 = linalg.generic
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[RESULT]]#0, %[[RESULT]]#1 :
+//  CHECK-SAME:       outs(%[[OUT]] :

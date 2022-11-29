@@ -9,7 +9,7 @@
 
 #include <limits>
 
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -22,7 +22,7 @@ struct TargetMLTransformInfo {
       std::numeric_limits<unsigned>::max();
 
   static const TargetMLTransformInfo getTargetMLTransformInfo(
-      IREE::HAL::ExecutableVariantOp variantOp);
+      IREE::HAL::ExecutableTargetAttr targetAttr);
 };
 
 }  // namespace iree_compiler

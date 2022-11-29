@@ -93,14 +93,16 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       llvm::cl::desc("Verifies the IR for correctness throughout compilation."),
       llvm::cl::init(true));
 
-  llvm::cl::opt<llvm::StringRef> compileTo(
+  llvm::cl::opt<IREEVMPipelinePhase> compileTo(
       "compile-to",
       llvm::cl::desc(
           "Compilation phase to run up until before emitting output."),
-      llvm::cl::init("end"));
+      llvm::cl::init(IREEVMPipelinePhase::End));
+  SmallVector<std::string> compileToPhases;
   enumerateIREEVMPipelinePhases(
       [&](IREEVMPipelinePhase phase, StringRef name, StringRef desc) {
-        compileTo.getParser().addLiteralOption(name, name, desc);
+        compileTo.getParser().addLiteralOption(name, phase, desc);
+        compileToPhases.push_back(name.str());
       });
 
   // Misc options.
@@ -178,8 +180,8 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     InvState r(s);
 
     ireeCompilerInvocationEnableConsoleDiagnostics(r.inv);
-    ireeCompilerInvocationSetCompileToPhase(r.inv,
-                                            std::string(compileTo).c_str());
+    ireeCompilerInvocationSetCompileToPhase(
+        r.inv, compileToPhases[static_cast<int>(compileTo.getValue())].c_str());
     ireeCompilerInvocationSetVerifyIR(r.inv, verifyIR);
     if (!ireeCompilerInvocationParseSource(r.inv, source)) return false;
 
@@ -203,7 +205,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     }
 
     // Ending early and just emitting IR.
-    if (compileTo != "end") {
+    if (compileTo != IREEVMPipelinePhase::End) {
       if (auto error = ireeCompilerInvocationOutputIR(r.inv, s.output)) {
         s.handleError(error);
         return false;

@@ -41,6 +41,7 @@ hal.executable @warp_reduction_dispatch {
 }
 
 //   CHECK-LABEL:  func.func @warp_reduction_dispatch
+//     CHECK-DAG:    %[[C0I:.+]] = arith.constant 0 : i32
 //     CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 //     CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : i32
 //     CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : i32
@@ -48,7 +49,6 @@ hal.executable @warp_reduction_dispatch {
 //     CHECK-DAG:    %[[C8:.+]] = arith.constant 8 : i32
 //     CHECK-DAG:    %[[C16:.+]] = arith.constant 16 : i32
 //     CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : i32
-//     CHECK-DAG:    %[[C4I:.+]] = arith.constant 4 : index
 //     CHECK-DAG:    %[[C32I:.+]] = arith.constant 32 : index
 //     CHECK-DAG:    %[[C512:.+]] = arith.constant 512 : index
 //     CHECK-DAG:    %[[C10240:.+]] = arith.constant 10240 : index
@@ -81,19 +81,12 @@ hal.executable @warp_reduction_dispatch {
 //         CHECK:    }
 //         CHECK:    gpu.barrier
 //         CHECK:    %[[LOAD_VAL:.+]] = memref.load %[[ALLOC]][%[[LANE_ID]]] : memref<4xf32, 3>
-//         CHECK:    %[[USE_IDENTITY:.+]] = arith.cmpi sge, %[[LANE_ID]], %[[C4I]] : index
-//         CHECK:    %[[LANE_VAL:.+]] = arith.select %[[USE_IDENTITY]], %[[IDENTITY]], %[[LOAD_VAL]] : f32
-//         CHECK:    %[[S5:.+]], %{{.*}} = gpu.shuffle  xor %[[LANE_VAL]], %[[C1]], %[[C32]] : f32
-//         CHECK:    %[[R7:.+]] = arith.addf %[[LANE_VAL]], %[[S5]] : f32
+//         CHECK:    %[[S5:.+]], %{{.*}} = gpu.shuffle  xor %[[LOAD_VAL]], %[[C1]], %[[C32]] : f32
+//         CHECK:    %[[R7:.+]] = arith.addf %[[LOAD_VAL]], %[[S5]] : f32
 //         CHECK:    %[[S6:.+]], %{{.*}} = gpu.shuffle  xor %[[R7]], %[[C2]], %[[C32]] : f32
 //         CHECK:    %[[R8:.+]] = arith.addf %[[R7]], %[[S6]] : f32
-//         CHECK:    %[[S7:.+]], %{{.*}} = gpu.shuffle  xor %[[R8]], %[[C4]], %[[C32]] : f32
-//         CHECK:    %[[R9:.+]] = arith.addf %[[R8]], %[[S7]] : f32
-//         CHECK:    %[[S8:.+]], %{{.*}} = gpu.shuffle  xor %[[R9]], %[[C8]], %[[C32]] : f32
-//         CHECK:    %[[R10:.+]] = arith.addf %[[R9]], %[[S8]] : f32
-//         CHECK:    %[[S9:.+]], %{{.*}} = gpu.shuffle  xor %[[R10]], %[[C16]], %[[C32]] : f32
-//         CHECK:    %[[R11:.+]] = arith.addf %[[R10]], %[[S9]] : f32
-//         CHECK:    %[[R12:.+]] = arith.addf %[[R11]], %[[CF]] : f32
+//         CHECK:    %[[S7:.+]], %{{.*}} = gpu.shuffle  idx %[[R8]], %[[C0I]], %[[C32]] : f32
+//         CHECK:    %[[R12:.+]] = arith.addf %[[S7]], %[[CF]] : f32
 //         CHECK:    %[[R13:.+]] = vector.splat %[[R12]] : vector<1xf32>
 //         CHECK:    %[[TID0:.+]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
 //         CHECK:    scf.if %[[TID0]] {

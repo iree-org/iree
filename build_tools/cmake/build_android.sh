@@ -6,21 +6,28 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Cross-compile the IREE project towards Android with CMake. Designed for CI,
-# but can be run manually.
+# Cross-compile the runtime using CMake targeting Android
 #
-# Requires pre-compiled IREE and TF integrations host tools. Also requires that
-# ANDROID_ABI and ANDROID_NDK variables be set
+# The required IREE_HOST_BINARY_ROOT environment variable indicates the location
+# of the precompiled IREE binaries. Also requires that ANDROID_ABI and
+# ANDROID_NDK variables be set. The BUILD_PRESET environment variable indicates
+# how the project should be configured: "test", "benchmark",
+# "benchmark-with-tracing", or "benchmark-suite-test". Defaults to "test".
+#
+# The desired build directory can be passed as the first argument. Otherwise, it
+# uses the environment variable IREE_ANDROID_BUILD_DIR, defaulting to
+# "build-android". Designed for CI, but can be run manually. It reuses the build
+# directory if it already exists. Expects to be run from the root of the IREE
+# repository.
+
 
 set -xeuo pipefail
 
-ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
-BUILD_DIR="${IREE_BUILD_ANDROID_DIR:-$ROOT_DIR/build-android}"
+BUILD_DIR="${1:-${IREE_BUILD_ANDROID_DIR:-build-android}}"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
-BUILD_BENCHMARK_SUITE_DIR="${BUILD_BENCHMARK_SUITE_DIR:-$ROOT_DIR/build-benchmarks/benchmark_suites}"
+BUILD_BENCHMARK_SUITE_DIR="${BUILD_BENCHMARK_SUITE_DIR:-build-benchmarks/benchmark_suites}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
-cd "${ROOT_DIR}"
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
 

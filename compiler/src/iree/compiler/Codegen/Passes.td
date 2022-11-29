@@ -25,6 +25,11 @@ def ConvertToDestinationPassingStyle :
   let summary =
       "Transforms the code to make the dispatch use destination-passing style";
   let constructor = "mlir::iree_compiler::createConvertToDestinationPassingStylePass()";
+  let options = [
+    Option<"useWARForCooperativeMatrixCodegen", "use-war-for-cooperative-matrix-codegen",
+           "bool", /*default=*/"false",
+           "WAR for failure in Cooperative matrix codegen pipelines. See #10648.">
+  ];
 }
 
 def DecomposeLinalgGeneric :

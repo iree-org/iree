@@ -106,7 +106,8 @@ createRemoveSingleIterationLoopPass();
 /// destination-passing style, which is better suited for the upstream
 /// comprehensive bufferization pass.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createConvertToDestinationPassingStylePass();
+createConvertToDestinationPassingStylePass(
+    bool useWARForCooperativeMatrixCodegen = false);
 
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.

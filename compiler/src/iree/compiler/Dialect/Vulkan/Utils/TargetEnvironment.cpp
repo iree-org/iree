@@ -193,9 +193,9 @@ spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv) {
 
   auto triple = spirv::VerCapExtAttr::get(
       spvVersion, spvCapabilities, spvExtensions, vkTargetEnv.getContext());
-  return spirv::TargetEnvAttr::get(triple, vkTargetEnv.getVendorID(),
-                                   vkTargetEnv.getDeviceType(),
-                                   vkTargetEnv.getDeviceID(), spvLimits);
+  return spirv::TargetEnvAttr::get(
+      triple, spvLimits, spirv::ClientAPI::Vulkan, vkTargetEnv.getVendorID(),
+      vkTargetEnv.getDeviceType(), vkTargetEnv.getDeviceID());
 }
 
 }  // namespace Vulkan

@@ -82,6 +82,14 @@ def LinalgExtVectorization:
                     "createLinalgExtVectorizationPass()";
 }
 
+def TileAndDecomposeWinogradInputTransform :
+    Pass<"iree-linalg-ext-tile-and-decompose-winograd-input", "func::FuncOp"> {
+  let summary =
+      "Tiles and decomposes winograd input transform op into linalg ops";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createTileAndDecomposeWinogradInputTransformPass()";
+}
+
 //===---------------------------------------------------------------------====//
 // Codegen Strategy passes moved into IREE
 // TODO: Deprecate all this.
@@ -157,7 +165,7 @@ def LinalgStrategyVectorizePass
     : Pass<"iree-linalg-strategy-vectorize-pass", "func::FuncOp"> {
   let summary = "Configurable pass to apply pattern-based linalg vectorization.";
   let constructor = "createLinalgStrategyVectorizePass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
+  let dependentDialects = ["linalg::LinalgDialect", "vector::VectorDialect"];
   let options = [
     Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
       "Which func op is the anchor to latch on.">,

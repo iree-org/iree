@@ -31,6 +31,7 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -52,6 +53,13 @@ class ConvertToDestinationPassingStylePass
           ConvertToDestinationPassingStylePass> {
  public:
   ConvertToDestinationPassingStylePass() = default;
+  ConvertToDestinationPassingStylePass(bool useWARForCooperativeMatrixCodegen) {
+    this->useWARForCooperativeMatrixCodegen = useWARForCooperativeMatrixCodegen;
+  }
+  ConvertToDestinationPassingStylePass(
+      const ConvertToDestinationPassingStylePass &pass) {
+    useWARForCooperativeMatrixCodegen = pass.useWARForCooperativeMatrixCodegen;
+  }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
@@ -269,16 +277,38 @@ static LogicalResult duplicateInitTensorOps(OpBuilder &b,
   return success();
 }
 
-static SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
-  auto opAttributes = op.getAttributeNames();
-  llvm::StringSet<> elidedAttrs;
-  elidedAttrs.insert(opAttributes.begin(), opAttributes.end());
-  SmallVector<NamedAttribute> preservedAttrs;
-  for (auto attr : op->getAttrs()) {
-    if (elidedAttrs.count(attr.getName())) continue;
-    preservedAttrs.push_back(attr);
+// Checks if the `inOperand` can be used in place of the `outOperand`
+// to mimic in-place update behavior for parallel elementwise ops.
+static bool canUseInOperandAsOutOperand(
+    OpOperand *inOperand, OpOperand *outOperand,
+    bool useWARForCooperativeMatrixCodegen = false) {
+  if (isReadOnly(inOperand->get())) {
+    return false;
   }
-  return preservedAttrs;
+
+  if (inOperand->getOwner() != outOperand->getOwner()) return false;
+
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(inOperand->getOwner());
+  if (!linalgOp) return false;
+
+  if (linalgOp.getMatchingIndexingMap(inOperand) !=
+      linalgOp.getMatchingIndexingMap(outOperand)) {
+    return false;
+  }
+
+  if (inOperand->get().getType() != outOperand->get().getType()) return false;
+
+  if (useWARForCooperativeMatrixCodegen) {
+    return true;
+  }
+
+  if (auto producerOp = inOperand->get().getDefiningOp<linalg::LinalgOp>()) {
+    if (succeeded(linalg::vectorizeLinalgOpPrecondition(linalgOp)) &&
+        succeeded(linalg::vectorizeLinalgOpPrecondition(producerOp))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 namespace {
@@ -287,7 +317,11 @@ namespace {
 /// https://github.com/iree-org/iree/issues/8303
 struct AdaptLinalgInputOperandToOutputOperand
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  AdaptLinalgInputOperandToOutputOperand(MLIRContext *context,
+                                         bool useWARForCooperativeMatrixCodegen,
+                                         PatternBenefit benefit = 1)
+      : OpRewritePattern(context, benefit),
+        useWARForCooperativeMatrixCodegen(useWARForCooperativeMatrixCodegen) {}
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
@@ -306,10 +340,9 @@ struct AdaptLinalgInputOperandToOutputOperand
     SmallVector<Value> newOperands;
     SmallVector<AffineMap> maps;
     for (auto in : op.getDpsInputOperands()) {
-      if (!operand && !isReadOnly(in->get()) &&
-          op.getMatchingIndexingMap(in) ==
-              op.getMatchingIndexingMap(outputOperand) &&
-          in->get().getType() == outputOperand->get().getType()) {
+      if (!operand &&
+          canUseInOperandAsOutOperand(in, outputOperand,
+                                      useWARForCooperativeMatrixCodegen)) {
         operand = in;
       } else {
         newOperands.push_back(in->get());
@@ -324,7 +357,7 @@ struct AdaptLinalgInputOperandToOutputOperand
                                                utils::IteratorType::parallel);
     auto newOp = rewriter.create<linalg::GenericOp>(
         loc, op.getResultTypes(), newOperands, operand->get(), maps, iterTypes,
-        /*bodyBuild=*/nullptr, PruneAttributeList(op));
+        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(op));
     rewriter.inlineRegionBefore(op.getRegion(), newOp.getRegion(),
                                 newOp.getRegion().begin());
 
@@ -337,6 +370,9 @@ struct AdaptLinalgInputOperandToOutputOperand
     rewriter.replaceOp(op, newOp.getResults());
     return success();
   }
+
+ private:
+  bool useWARForCooperativeMatrixCodegen;
 };
 
 struct RemoveCstOutsDependency
@@ -380,8 +416,9 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
 
   {
     RewritePatternSet patterns(context);
-    patterns.insert<AdaptLinalgInputOperandToOutputOperand,
-                    RemoveCstOutsDependency>(context);
+    patterns.insert<AdaptLinalgInputOperandToOutputOperand>(
+        context, useWARForCooperativeMatrixCodegen);
+    patterns.insert<RemoveCstOutsDependency>(context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
@@ -413,8 +450,10 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createConvertToDestinationPassingStylePass() {
-  return std::make_unique<ConvertToDestinationPassingStylePass>();
+createConvertToDestinationPassingStylePass(
+    bool useWARForCooperativeMatrixCodegen) {
+  return std::make_unique<ConvertToDestinationPassingStylePass>(
+      useWARForCooperativeMatrixCodegen);
 }
 
 }  // namespace iree_compiler

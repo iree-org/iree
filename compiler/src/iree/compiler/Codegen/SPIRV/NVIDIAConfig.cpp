@@ -24,10 +24,9 @@
 
 using llvm::APIntOps::GreatestCommonDivisor;
 
-// The default number of subgroups to use per workgroup.
-constexpr unsigned numSubgroupsPerWorkgroup = 4;
-// The default number of tiles along each dimension to use per workgroup.
-constexpr unsigned numTilesPerSubgroupDim = 2;
+constexpr unsigned NVIDIANumSubgroupsPerWorkgroup = 4;
+// The number of tiles along M and N dimensions per workgroup.
+constexpr unsigned NVIDIANumMNTilesPerSubgroup = 4;
 
 namespace mlir {
 namespace iree_compiler {
@@ -37,7 +36,10 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
                                            const spirv::TargetEnv &targetEnv) {
   // First try to see if we can use tensor cores.
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-  if (failed(setCooperativeMatrixConfig(targetEnv, op))) return failure();
+  if (failed(setCooperativeMatrixConfig(targetEnv, op,
+                                        NVIDIANumSubgroupsPerWorkgroup,
+                                        NVIDIANumMNTilesPerSubgroup)))
+    return failure();
   if (getLoweringConfig(op)) return success();
 
   const int subgroupSize = limits.getSubgroupSize();

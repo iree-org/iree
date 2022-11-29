@@ -27,9 +27,16 @@ namespace detail {
 
 constexpr unsigned AMDSoftwarePipelineDepth = 2;
 
+constexpr unsigned AMDNumSubgroupsPerWorkgroup = 4;
+// The number of tiles along M and N dimensions per workgroup.
+constexpr unsigned AMDNumMNTilesPerSubgroup = 8;
+
 static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
                                         const spirv::TargetEnv &targetEnv) {
-  if (failed(setCooperativeMatrixConfig(targetEnv, op))) return failure();
+  if (failed(setCooperativeMatrixConfig(targetEnv, op,
+                                        AMDNumSubgroupsPerWorkgroup,
+                                        AMDNumMNTilesPerSubgroup)))
+    return failure();
   if (getLoweringConfig(op)) return success();
 
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();

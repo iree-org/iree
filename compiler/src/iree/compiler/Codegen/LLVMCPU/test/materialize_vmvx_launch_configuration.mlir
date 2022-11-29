@@ -73,7 +73,7 @@ hal.executable @copy_op_dynamic {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<VMVXDefault>
 //      CHECK: hal.executable.export public @copy_op_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -116,4 +116,70 @@ hal.executable private @static_1d_fft_stage2  {
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: func.func @static_1d_fft_stage2()
 //       CHECK:   iree_linalg_ext.fft
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>
+]>
+hal.executable @fusion_quant_matmul_generic {
+  hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
+    hal.executable.export @fusion_quant_matmul_generic layout(#pipeline_layout)
+    builtin.module {
+      func.func @fusion_quant_matmul_generic() {
+        %c0_i32 = arith.constant 0 : i32
+        %c-128_i32 = arith.constant -128 : i32
+        %c1101627623_i32 = arith.constant 1101627623 : i32
+        %c36_i8 = arith.constant 36 : i8
+        %c127_i32 = arith.constant 127 : i32
+        %c107520 = arith.constant 107520 : index
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = arith.index_castui %0 : i32 to index
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<3360x32xi8>>
+        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32xi32>>
+        %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c107520) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32xi32>>
+        %5 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<?x3360xi8>>{%1}
+        %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<?x32xi8>>{%1}
+        %7 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%1, 3360], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x3360xi8>>{%1} -> tensor<?x3360xi8>
+        %8 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [3360, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<3360x32xi8>> -> tensor<3360x32xi8>
+        %9 = flow.dispatch.tensor.load %3, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readonly:tensor<32xi32>> -> tensor<32xi32>
+        %10 = flow.dispatch.tensor.load %4, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readonly:tensor<32xi32>> -> tensor<32xi32>
+        %11 = tensor.empty(%1) : tensor<?x32xi8>
+        %12 = tensor.empty(%1) : tensor<?x32xi32>
+        %13 = linalg.fill ins(%c0_i32 : i32) outs(%12 : tensor<?x32xi32>) -> tensor<?x32xi32>
+        %14 = linalg.matmul ins(%7, %8 : tensor<?x3360xi8>, tensor<3360x32xi8>) outs(%13 : tensor<?x32xi32>) -> tensor<?x32xi32>
+        %15 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%9, %14, %10 : tensor<32xi32>, tensor<?x32xi32>, tensor<32xi32>) outs(%11 : tensor<?x32xi8>) {
+        ^bb0(%in: i32, %in_0: i32, %in_1: i32, %out: i8):
+          %16 = arith.muli %in_1, %c-128_i32 : i32
+          %17 = arith.subi %in_0, %16 : i32
+          %18 = arith.addi %in, %17 : i32
+          %19 = "tosa.apply_scale"(%18, %c1101627623_i32, %c36_i8) {double_round = true} : (i32, i32, i8) -> i32
+          %20 = arith.addi %19, %c-128_i32 : i32
+          %21 = arith.cmpi slt, %20, %c-128_i32 : i32
+          %22 = arith.select %21, %c-128_i32, %20 : i32
+          %23 = arith.cmpi sgt, %20, %c127_i32 : i32
+          %24 = arith.select %23, %c127_i32, %22 : i32
+          %25 = arith.trunci %24 : i32 to i8
+          linalg.yield %25 : i8
+        } -> tensor<?x32xi8>
+        flow.dispatch.tensor.store %15, %6, offsets = [0, 0], sizes = [%1, 32], strides = [1, 1] : tensor<?x32xi8> -> !flow.dispatch.tensor<writeonly:tensor<?x32xi8>>{%1}
+        return
+      }
+    }
+  }
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16, 0]]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<VMVXDefault>
+//       CHECK: hal.executable.export public @fusion_quant_matmul_generic
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//       CHECK: func.func @fusion_quant_matmul_generic()
+//       CHECK:   linalg.matmul
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]

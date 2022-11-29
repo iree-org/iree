@@ -77,23 +77,20 @@ hal.executable private @subgroup_reduce {
 // CHECK:   spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 // CHECK:   %[[LOAD_VAL:.+]] = spirv.Load "Workgroup" {{.+}} : f32
-// CHECK:   %[[USE_IDENTITY:.+]] = spirv.SGreaterThanEqual {{.+}}, %[[C8]] : i32
-// CHECK:   %[[LANE_VAL:.+]] = spirv.Select %[[USE_IDENTITY]], %[[F0]], %[[LOAD_VAL]] : i1, f32
-// CHECK:   %[[S4:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[LANE_VAL]], %[[C1]] : f32, i32
-// CHECK:   %[[ADD7:.+]] = spirv.FAdd %[[LANE_VAL]], %[[S4]] : f32
+// CHECK:   %[[S4:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[LOAD_VAL]], %[[C1]] : f32, i32
+// CHECK:   %[[ADD7:.+]] = spirv.FAdd %[[LOAD_VAL]], %[[S4]] : f32
 // CHECK:   %[[S5:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD7]], %[[C2]] : f32, i32
 // CHECK:   %[[ADD8:.+]] = spirv.FAdd %[[ADD7]], %[[S5]] : f32
 // CHECK:   %[[S6:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD8]], %[[C4]] : f32, i32
 // CHECK:   %[[ADD9:.+]] = spirv.FAdd %[[ADD8]], %[[S6]] : f32
-// CHECK:   %[[S7:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD9]], %[[C8]] : f32, i32
-// CHECK:   %[[ADD10:.+]] = spirv.FAdd %[[ADD9]], %[[S7]] : f32
-//         CHECK:   spirv.FAdd %[[ADD10]], %[[F0]] : f32
+// CHECK:   %[[S7:.+]] = spirv.GroupNonUniformShuffle <Subgroup> %[[ADD9]], %[[C0]] : f32, i32
+// CHECK:   %[[ADD10:.+]] = spirv.FAdd %[[S7]], %[[F0]] : f32
 
 // CHECK:   %[[EQ:.+]] = spirv.IEqual %{{.+}}, %[[C0]] : i32
 // CHECK:   spirv.mlir.selection {
 // CHECK:     spirv.BranchConditional %[[EQ]], ^bb1, ^bb2
 // CHECK:   ^bb1:
-// CHECK:     spirv.Store "StorageBuffer" %{{.+}}, %{{.+}} : f32
+// CHECK:     spirv.Store "StorageBuffer" %{{.+}}, %[[ADD10]] : f32
 // CHECK:     spirv.Branch ^bb2
 // CHECK:   ^bb2:
 // CHECK:     spirv.mlir.merge

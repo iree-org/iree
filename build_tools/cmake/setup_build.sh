@@ -20,5 +20,5 @@ if [[ -d "${BUILD_DIR}" ]]; then
   echo "'${BUILD_DIR}' directory already exists. Will use cached results there."
 else
   echo "'${BUILD_DIR}' directory does not already exist. Creating a new one."
-  mkdir "${BUILD_DIR}"
+  mkdir -p "${BUILD_DIR}"
 fi
