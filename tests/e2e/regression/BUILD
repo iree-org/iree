@@ -152,7 +152,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "--iree-flow-enable-aggressive-fusion",
-        "--iree-llvmcpu-fail-unbound-dynamic-stack-allocation=false"
+        "--iree-llvmcpu-fail-unbound-dynamic-stack-allocation=false",
     ],
     driver = "local-task",
     target_backend="llvm-cpu",
