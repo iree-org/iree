@@ -44,6 +44,162 @@ static void computeLoopParams(SmallVectorImpl<Value> &lbs,
   }
 }
 
+class ReifyWinogradInputTransform final
+    : public OpRewritePattern<WinogradInputTransformOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(WinogradInputTransformOp inputOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = inputOp.getLoc();
+    auto funcOp = inputOp->getParentOfType<func::FuncOp>();
+    if (!funcOp) {
+      return rewriter.notifyMatchFailure(
+          inputOp, "Could not find parent of type funcOp");
+    }
+
+    const float *BT{nullptr};
+    const float *B{nullptr};
+    const int64_t inputTileSize = inputOp.getInputTileSize();
+    const int64_t outputTileSize = inputOp.getOutputTileSize();
+    switch (outputTileSize) {
+    case 6:
+      B = IREE::LinalgExt::Winograd::B_6x6_3x3;
+      BT = IREE::LinalgExt::Winograd::BT_6x6_3x3;
+      break;
+    default:
+      return failure();
+    }
+    /// The two values below are the transpose(B) [BTV]
+    /// and B [BV] constant matrices that convert the input
+    /// tile to the Winograd domain.
+    Value BTV = IREE::LinalgExt::createValueFrom2DConstant(
+        BT, inputTileSize, inputTileSize, loc, rewriter);
+    Value BV = IREE::LinalgExt::createValueFrom2DConstant(
+        B, inputTileSize, inputTileSize, loc, rewriter);
+
+    Value input = inputOp.input();
+    Value output = inputOp.output();
+    auto outputType = output.getType().cast<ShapedType>();
+    auto inputType = input.getType().cast<ShapedType>();
+    ArrayRef<int64_t> inputShape = inputType.getShape();
+    Type elementType = outputType.getElementType();
+    SmallVector<int64_t> imageDims = inputOp.imageDimensions();
+    const size_t numImageDims = imageDims.size();
+    llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
+                                                  imageDims.end());
+    SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
+
+    rewriter.setInsertionPointToStart(&funcOp.getBody().front());
+    Value zeroF32 = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(elementType));
+    Value scratch =
+        rewriter.create<tensor::EmptyOp>(loc, inputTileSquare, elementType);
+
+    rewriter.setInsertionPoint(inputOp);
+    SmallVector<Value> lbs, ubs, steps;
+    computeLoopParams(lbs, ubs, steps, output, numImageDims, loc, rewriter);
+    // Construct loops
+    scf::LoopNest loopNest = scf::buildLoopNest(
+        rewriter, loc, lbs, ubs, steps, ValueRange({output}),
+        [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
+            ValueRange iterArgs) -> scf::ValueVector { return {iterArgs[0]}; });
+
+    // Extract input slice
+    auto one = rewriter.getIndexAttr(1);
+    auto zero = rewriter.getIndexAttr(0);
+    auto inputTileSizeAttr = rewriter.getIndexAttr(inputTileSize);
+    SmallVector<OpFoldResult> strides(inputOp.getInputOperandRank(), one);
+    SmallVector<OpFoldResult> sizes(inputOp.getInputOperandRank(), one);
+    SmallVector<OpFoldResult> offsets(inputOp.getInputOperandRank(), zero);
+    SmallVector<Value> ivs;
+    for (scf::ForOp loop : loopNest.loops) {
+      ivs.push_back(loop.getInductionVar());
+    }
+    for (int i = 0; i < inputShape.size(); i++) {
+      if (!imageDimsSet.contains(i)) {
+        offsets[i] = ivs[i];
+      } else {
+        rewriter.setInsertionPointToStart(loopNest.loops[i].getBody());
+        AffineExpr dim0;
+        auto it = rewriter.getAffineConstantExpr(inputTileSize);
+        auto ot = rewriter.getAffineConstantExpr(outputTileSize);
+        auto delta = rewriter.getAffineConstantExpr(inputShape[i]);
+        bindDims(rewriter.getContext(), dim0);
+        AffineMap scaleMap =
+            AffineMap::get(1, 0, {dim0 * ot}, rewriter.getContext());
+        offsets[i] = rewriter.createOrFold<AffineApplyOp>(loc, scaleMap,
+                                                          ValueRange{ivs[i]});
+        AffineMap minMap =
+            AffineMap::get(1, 0, {-dim0 + delta, it}, rewriter.getContext());
+        sizes[i] = rewriter.createOrFold<AffineMinOp>(
+            loc, minMap,
+            ValueRange{
+                getValueOrCreateConstantIndexOp(rewriter, loc, offsets[i])});
+      }
+    }
+    rewriter.setInsertionPointToStart(loopNest.loops.back().getBody());
+    auto tensorType = RankedTensorType::get(
+        SmallVector<int64_t>(numImageDims, ShapedType::kDynamic), elementType);
+    Value dynamicSlice = rewriter.create<tensor::ExtractSliceOp>(
+        loc, tensorType, input, offsets, sizes, strides);
+
+    // Copy input slice into zeroed padded scratch space
+    strides = SmallVector<OpFoldResult>(numImageDims, one);
+    offsets = SmallVector<OpFoldResult>(numImageDims, zero);
+    sizes = SmallVector<OpFoldResult>{sizes[1], sizes[2]};
+    linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
+        loc, ValueRange{zeroF32}, ValueRange{scratch});
+    Value inputSlice = rewriter.create<tensor::InsertSliceOp>(
+        loc, dynamicSlice, fillOp.result(), offsets, sizes, strides);
+
+    // Extract output slice
+    strides = SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
+    offsets = SmallVector<OpFoldResult>(numImageDims, zero);
+    offsets.append(ivs.begin(), ivs.end());
+    sizes = SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
+    sizes[0] = sizes[1] = inputTileSizeAttr;
+    tensorType = RankedTensorType::get(inputTileSquare, elementType);
+    Value iterArg = loopNest.loops.back().getRegionIterArg(0);
+    Value outputSlice = rewriter.create<tensor::ExtractSliceOp>(
+        loc, tensorType, iterArg, offsets, sizes, strides);
+
+    // Create computation
+    Value result, AMatrix, BMatrix;
+    linalg::MatmulOp matmulOp;
+    for (int i = 0; i < 2; i++) {
+      fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32},
+                                               ValueRange{outputSlice});
+      if (i == 0) {
+        AMatrix = inputSlice;
+        BMatrix = BV;
+      } else {
+        AMatrix = BTV;
+        BMatrix = result;
+      }
+      matmulOp = rewriter.create<linalg::MatmulOp>(
+          loc, tensorType, ValueRange{AMatrix, BMatrix}, fillOp.result());
+      result = matmulOp.getResult(0);
+    }
+
+    // Insert results into output slice
+    Value updatedOutput = rewriter.create<tensor::InsertSliceOp>(
+        loc, result, iterArg, offsets, sizes, strides);
+
+    // Replace returned value
+    if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
+            loopNest.loops.back().getBody()->getTerminator())) {
+      rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, updatedOutput);
+    }
+    inputOp.getResults()[0].replaceAllUsesWith(loopNest.getResults()[0]);
+    return success();
+  }
+};
+
+} // namespace
+
+namespace {
+
 class ReifyWinogradOutputTransform final
     : public OpRewritePattern<WinogradOutputTransformOp> {
 public:
@@ -190,9 +346,9 @@ public:
 } // namespace
 
 namespace {
-struct TileAndDecomposeWinogradOutputTransformPass
-    : public TileAndDecomposeWinogradOutputTransformBase<
-          TileAndDecomposeWinogradOutputTransformPass> {
+struct TileAndDecomposeWinogradTransformPass
+    : public TileAndDecomposeWinogradTransformBase<
+          TileAndDecomposeWinogradTransformPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
                     linalg::LinalgDialect, scf::SCFDialect,
@@ -203,10 +359,11 @@ struct TileAndDecomposeWinogradOutputTransformPass
 };
 } // namespace
 
-void TileAndDecomposeWinogradOutputTransformPass::runOnOperation() {
+void TileAndDecomposeWinogradTransformPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(&getContext());
-  patterns.insert<ReifyWinogradOutputTransform>(context);
+  patterns.insert<ReifyWinogradInputTransform, ReifyWinogradOutputTransform>(
+      context);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
@@ -214,8 +371,8 @@ void TileAndDecomposeWinogradOutputTransformPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createTileAndDecomposeWinogradOutputTransformPass() {
-  return std::make_unique<TileAndDecomposeWinogradOutputTransformPass>();
+createTileAndDecomposeWinogradTransformPass() {
+  return std::make_unique<TileAndDecomposeWinogradTransformPass>();
 }
 
 } // namespace LinalgExt

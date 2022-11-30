@@ -2661,8 +2661,8 @@ SmallVector<Operation *> WinogradOutputTransformOp::getTiledImplementation(
     resultTypes.push_back(tiledOperands[1].getType());
   }
 
-  Operation *tiledOp = cast<DestinationStyleOpInterface>(getOperation())
-                           .clone(builder, loc, resultTypes, tiledOperands);
+  Operation *tiledOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
   return {tiledOp};
 }
