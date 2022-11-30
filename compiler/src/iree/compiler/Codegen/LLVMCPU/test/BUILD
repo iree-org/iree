@@ -27,6 +27,7 @@ iree_lit_test_suite(
             "check_ir_before_llvm_conversion.mlir",
             "check_ir_before_llvm_conversion_not_fail_unbound.mlir",
             "convert_to_llvm.mlir",
+            "data_tiling_pipeline.mlir",
             "emit_vectorization_remarks.mlir",
             "hal_executable_constants.mlir",
             "hal_interface_bindings.mlir",
