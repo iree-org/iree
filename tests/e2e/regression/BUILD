@@ -148,7 +148,7 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "aggressive_fusion_test",
     srcs = [
-        "softmax.mlir"
+        "softmax.mlir",
     ],
     compiler_flags = [
         "--iree-flow-enable-aggressive-fusion",
