@@ -141,6 +141,9 @@ void registerUtilExternalModels(DialectRegistry &registry) {
             LinalgOpTiedOpInterface<LinalgExt::TopkOp>>(*ctx);
         LinalgExt::WinogradInputTransformOp::attachInterface<
             LinalgOpTiedOpInterface<LinalgExt::WinogradInputTransformOp>>(*ctx);
+        LinalgExt::WinogradOutputTransformOp::attachInterface<
+            LinalgOpTiedOpInterface<LinalgExt::WinogradOutputTransformOp>>(
+            *ctx);
       });
 }
 
