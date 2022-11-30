@@ -96,6 +96,11 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
     ArrayRef<int64_t> workgroupSize) {
   auto pipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
+
+  assert(translationInfo.getSoftwarePipelineStoreStage() == 1 &&
+         "Store to workgroup memory currently expected to happen in stage 1 of "
+         "software pipeline.");
+
   unsigned softwarePipelinedepth = translationInfo.getSoftwarePipelineDepth();
   StringRef pipelineName = stringifyEnum(pipeline);
   if (workgroupSize.empty()) {
