@@ -115,7 +115,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 256], [8, 8], [0, 0, 32]]>
-#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize pipeline_depth = 2>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize multibuffer_count = 2>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,

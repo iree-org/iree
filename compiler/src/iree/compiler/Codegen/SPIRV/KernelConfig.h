@@ -24,8 +24,9 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// By default don't do any pipelining.
-constexpr unsigned defaultSoftwarePipelineDepth = 1;
+/// By default don't do multiple buffering.
+constexpr unsigned defaultMultiBufferCount = 1;
+/// By default store in stage 1 for software pipelining.
 constexpr unsigned defaultSoftwarePipelineStoreStage = 1;
 
 /// Computes the total number of bytes if promoting both matmul LHS and RHS with
@@ -54,7 +55,7 @@ LogicalResult setMatmulOpConfig(
     spirv::ResourceLimitsAttr limits, linalg::LinalgOp linalgOp,
     std::array<int64_t, 2> bestWorkgroupSizeXY,
     std::array<int64_t, 3> bestThreadTileSizeMNK, bool enablePromotion = false,
-    unsigned softwarePipelineDepth = defaultSoftwarePipelineDepth,
+    unsigned multiBufferCount = defaultMultiBufferCount,
     unsigned softwarePipelineStoreStage = defaultSoftwarePipelineStoreStage);
 
 /// Sets CodeGen configurations via attributes to the given matmul `linalgOp`

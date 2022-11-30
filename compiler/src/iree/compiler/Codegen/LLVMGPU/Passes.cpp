@@ -209,7 +209,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
 }
 
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
-                                        unsigned pipelineDepth) {
+                                        unsigned bufferCount) {
   tileAndBufferize(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -218,9 +218,9 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
       createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
-  if (pipelineDepth > 1)
+  if (bufferCount > 1)
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createGPUMultiBuffering(pipelineDepth));
+        createGPUMultiBuffering(bufferCount));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -259,7 +259,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 
   // Pipeline memory operations.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUPipeliningPass(/*epiloguePeeling=*/false, pipelineDepth));
+      createGPUPipeliningPass(/*epiloguePeeling=*/false, bufferCount));
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {

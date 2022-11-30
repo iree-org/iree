@@ -80,7 +80,7 @@ class CompilationInfo:
   # Translation Info
   dispatch_lowering_pass_pipeline: str
   workload_per_wg: typing.List[int]
-  software_pipeline_depth: int
+  multibuffer_count: int
   # Compilation info
   workgroup_size: typing.List[int]
 
@@ -225,7 +225,7 @@ def get_test_compilation_infos(
                 a for a in reversed(tile_workgroup_size_pair.tile_size[0:2])
             ],
             workgroup_size=tile_workgroup_size_pair.workgroup_size,
-            software_pipeline_depth=4))
+            multibuffer_count=4))
   return compilation_infos
 
 
@@ -400,7 +400,7 @@ def generate_function(
         f"#compilation{generate_function.compilation_index} = #iree_codegen.compilation_info<\n"
         f"  lowering_config = <tile_sizes = {compilation_info.tile_sizes}>,\n"
         f"  translation_info = <{dispatch_lowering_pass_pipeline}\n"
-        f"  pipeline_depth = {compilation_info.software_pipeline_depth}>,\n"
+        f"  multibuffer_count = {compilation_info.multibuffer_count}>,\n"
         f"  workgroup_size = {compilation_info.workgroup_size_str()}>\n")
     compilation_info_attr = f"{{compilation_info = #compilation{generate_function.compilation_index}}} "
     func_definition = func_definition + compilation_info_string

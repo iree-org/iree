@@ -171,7 +171,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
         addGPUMatmulTensorCorePassPipeline(
             executableLoweringPipeline,
-            translationInfo.value().getSoftwarePipelineDepth());
+            translationInfo.value().getMultiBufferCount());
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::
           LLVMGPUTransposeSharedMem:

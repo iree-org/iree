@@ -397,7 +397,7 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
-                                        unsigned pipelineDepth);
+                                        unsigned bufferCount);
 
 enum class GPUPromoteSharedMemPattern {
   ContractionOpPattern = 0,
@@ -500,7 +500,7 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
 void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
-                                                unsigned pipelineDepth,
+                                                unsigned bufferCount,
                                                 unsigned storeStage);
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing

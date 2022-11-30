@@ -113,7 +113,7 @@ def IREECodegen_TranslationInfoAttr :
 
   let assemblyFormat = [{
     `<` `` $passPipeline
-    (`pipeline_depth` `=` $softwarePipelineDepth^)?
+    (`multibuffer_count` `=` $multiBufferCount^)?
     (`store_stage` `=` $softwarePipelineStoreStage^)? `>`
   }];
 
@@ -121,13 +121,13 @@ def IREECodegen_TranslationInfoAttr :
     AttrParameter<"IREE::Codegen::DispatchLoweringPassPipelineAttr",
         "Name of the pipeline to be invoked on the translation unit.">:$passPipeline,
     OptionalParameter<"unsigned",
-        "The software pipeline depth to be used">:$softwarePipelineDepth,
+        "The number of buffers to use for software pipelining">:$multiBufferCount,
     DefaultValuedParameter<"unsigned", "1",
         "The software pipeline stage to place stores">:$softwarePipelineStoreStage
   );
   let builders = [
     AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
-        CArg<"unsigned", "0">:$softwarePipelineDepth,
+        CArg<"unsigned", "0">:$multiBufferCount,
         CArg<"unsigned", "1">:$softwarePipelineStoreStage)>
   ];
   let extraClassDeclaration = [{

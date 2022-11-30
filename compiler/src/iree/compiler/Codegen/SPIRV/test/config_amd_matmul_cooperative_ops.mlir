@@ -323,6 +323,6 @@ hal.executable public @matmul_256x1024x8 {
   }
 }
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize pipeline_depth = 1>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize multibuffer_count = 1>
 // CHECK-LABEL: hal.executable.export public @matmul_256x1024x8
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]

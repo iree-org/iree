@@ -101,7 +101,7 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
          "Store to workgroup memory currently expected to happen in stage 1 of "
          "software pipeline.");
 
-  unsigned softwarePipelinedepth = translationInfo.getSoftwarePipelineDepth();
+  unsigned softwarePipelinedepth = translationInfo.getMultiBufferCount();
   StringRef pipelineName = stringifyEnum(pipeline);
   if (workgroupSize.empty()) {
     return op->emitOpError("expected workgroup size for GPU pipelines");

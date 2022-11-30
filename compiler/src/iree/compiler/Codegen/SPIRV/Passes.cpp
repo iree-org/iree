@@ -323,11 +323,11 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
 }
 
 void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
-                                                unsigned pipelineDepth,
+                                                unsigned bufferCount,
                                                 unsigned storeStage) {
   // Guards against 0 for consistency with older user provided tuning configs.
-  pipelineDepth = pipelineDepth ? pipelineDepth : 1;
-  LLVM_DEBUG(llvm::dbgs() << "Non-zero Pipeline Depth: " << pipelineDepth
+  bufferCount = bufferCount ? bufferCount : 1;
+  LLVM_DEBUG(llvm::dbgs() << "Non-zero Pipeline Depth: " << bufferCount
                           << "\n";);
   addTileAndDistributeToWorkgroupsPasses(
       pm, /*useFuseTensorPadWithConsumerPass=*/false,
@@ -341,9 +341,9 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
-  if (pipelineDepth > 1 || storeStage == 0)
+  if (bufferCount > 1 || storeStage == 0)
     nestedModulePM.addNestedPass<func::FuncOp>(createGPUMultiBuffering(
-        storeStage == 0 ? pipelineDepth + 1 : pipelineDepth));
+        storeStage == 0 ? bufferCount + 1 : bufferCount));
 
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -365,7 +365,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
       createOptimizeVectorTransferPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
-      /*epiloguePeeling=*/true, pipelineDepth, storeStage));
+      /*epiloguePeeling=*/true, bufferCount, storeStage));
 
   addLoopMaterializationPasses(nestedModulePM);
 }
