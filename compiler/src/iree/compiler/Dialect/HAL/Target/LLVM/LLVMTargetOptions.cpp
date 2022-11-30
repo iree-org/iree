@@ -26,8 +26,8 @@ LLVMTargetOptions getDefaultLLVMTargetOptions() {
   static std::once_flag onceFlag;
   std::call_once(onceFlag, [&]() {
     // Host target triple.
-    targetOptions.targetTriple = llvm::sys::getDefaultTargetTriple();
-    targetOptions.targetCPU = llvm::sys::getHostCPUName().str();
+    targetOptions.target.triple = llvm::sys::getDefaultTargetTriple();
+    targetOptions.target.cpu = llvm::sys::getHostCPUName().str();
     {
       llvm::SubtargetFeatures features;
       llvm::StringMap<bool> hostFeatures;
@@ -36,7 +36,7 @@ LLVMTargetOptions getDefaultLLVMTargetOptions() {
           features.AddFeature(feature.first(), feature.second);
         }
       }
-      targetOptions.targetCPUFeatures = features.getString();
+      targetOptions.target.cpuFeatures = features.getString();
     }
 
     // LLVM loop optimization options.
@@ -66,7 +66,7 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
 
   static llvm::cl::opt<std::string> clTargetTriple(
       "iree-llvm-target-triple", llvm::cl::desc("LLVM target machine triple"),
-      llvm::cl::init(targetOptions.targetTriple));
+      llvm::cl::init(targetOptions.target.triple));
   static llvm::cl::opt<std::string> clTargetCPU(
       "iree-llvm-target-cpu",
       llvm::cl::desc(
@@ -91,13 +91,13 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       "iree-llvm-slp-vectorization", llvm::cl::init(false),
       llvm::cl::desc("Enable LLVM SLP Vectorization opt"));
 
-  targetOptions.targetTriple = clTargetTriple;
-  llvm::Triple targetTriple(targetOptions.targetTriple);
+  targetOptions.target.triple = clTargetTriple;
+  llvm::Triple targetTriple(targetOptions.target.triple);
   if (clTargetCPU != "host") {
-    targetOptions.targetCPU = clTargetCPU;
+    targetOptions.target.cpu = clTargetCPU;
   }
   if (clTargetCPUFeatures != "host") {
-    targetOptions.targetCPUFeatures = clTargetCPUFeatures;
+    targetOptions.target.cpuFeatures = clTargetCPUFeatures;
   }
 
   // LLVM opt options.
@@ -177,7 +177,7 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
     targetTriple.setEnvironment(llvm::Triple::EnvironmentType::EABI);
     targetTriple.setOS(llvm::Triple::OSType::UnknownOS);
     targetTriple.setObjectFormat(llvm::Triple::ObjectFormatType::ELF);
-    targetOptions.targetTriple = targetTriple.str();
+    targetOptions.target.triple = targetTriple.str();
   }
 
   static llvm::cl::opt<bool> clLinkStatic(

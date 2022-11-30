@@ -193,7 +193,7 @@ class EmbeddedLinkerTool : public LinkerTool {
 };
 
 std::unique_ptr<LinkerTool> createEmbeddedLinkerTool(
-    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
+    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
   return std::make_unique<EmbeddedLinkerTool>(targetTriple, targetOptions);
 }
 

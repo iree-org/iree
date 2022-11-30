@@ -23,11 +23,15 @@ enum class SanitizerKind {
   kThread,
 };
 
+struct LLVMTarget {
+  std::string triple;
+  std::string cpu;
+  std::string cpuFeatures;
+};
+
 struct LLVMTargetOptions {
-  // Target machine configuration.
-  std::string targetTriple;
-  std::string targetCPU;
-  std::string targetCPUFeatures;
+  // Default target machine configuration.
+  LLVMTarget target;
 
   llvm::PipelineTuningOptions pipelineTuningOptions;
   // Optimization level to be used by the LLVM optimizer (middle-end).
