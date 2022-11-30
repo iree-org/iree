@@ -189,9 +189,10 @@ class ConvertConv2DNhwcHwcf final
       result = matmulOp.getResults().front();
     } else {
       // For cases where batch is not 1, we need to keep the batch dimension
-      // separate. However the batch dimension is only used in indexing the
-      // input and output. So we cannot use existing linalg named ops like
-      // linalg.batch_matmul; doing it with a linalg.generic instead.
+      // separate. Because the filter does not share the same batch dimension,
+      // the batch dimension is only used in indexing the input and output. Thus
+      // we cannot use existing linalg named ops like linalg.batch_matmul.
+      // i.e. (B x) M x K * K x N = (B x) M x N
       AffineExpr bDim, mDim, nDim, kDim;
       bindDims(getContext(), bDim, mDim, nDim, kDim);
       auto lhsMap = AffineMap::get(4, 0, {bDim, mDim, kDim}, getContext());
@@ -491,9 +492,10 @@ class ConvertConv2DNchwFchw final
       result = matmulOp.getResults().front();
     } else {
       // For cases where batch is not 1, we need to keep the batch dimension
-      // separate. However the batch dimension is only used in indexing the
-      // input and output. So we cannot use existing linalg named ops like
-      // linalg.batch_matmul; doing it with a linalg.generic instead.
+      // separate. Because the filter does not share the same batch dimension,
+      // the batch dimension is only used in indexing the input and output. Thus
+      // we cannot use existing linalg named ops like linalg.batch_matmul.
+      // i.e. M x K * (B x) K x N = (B x) M x N
       AffineExpr bDim, mDim, nDim, kDim;
       bindDims(getContext(), bDim, mDim, nDim, kDim);
       auto lhsMap = AffineMap::get(4, 0, {mDim, kDim}, getContext());
