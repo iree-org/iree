@@ -36,6 +36,8 @@ struct DescriptorSetLayout {
   SmallVector<DescriptorSetLayoutBinding> bindings;
 };
 
+using PipelineResourceMap = SmallVector<std::pair<unsigned, unsigned>>;
+
 struct PipelineLayout {
   // Total number of 32-bit push constants allocated. Not all dispatchable
   // functions using this layout will use all constants.
@@ -44,7 +46,7 @@ struct PipelineLayout {
   SmallVector<DescriptorSetLayout> setLayouts;
   // Mapping of flattened source resource bindings into the descriptor sets.
   // Matches 1:1 with the IREE::Stream::CmdDispatchOp::resources.
-  SmallVector<std::pair<unsigned, unsigned>> resourceMap;
+  PipelineResourceMap resourceMap;
 
   void print(llvm::raw_ostream &os) const;
 };
