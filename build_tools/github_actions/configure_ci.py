@@ -57,8 +57,9 @@ def skip_path(path: str) -> bool:
 
 def set_output(d: Mapping[str, str]):
   print(f"Setting outputs: {d}")
-  for k, v in d.items():
-    print(f"::set-output name={k}::{v}")
+  step_output_file = os.environ["GITHUB_OUTPUT"]
+  with open(step_output_file, "a") as f:
+    f.writelines(f"{k}={v}" "\n" for k, v in d.items())
 
 
 def get_trailers() -> Mapping[str, str]:
