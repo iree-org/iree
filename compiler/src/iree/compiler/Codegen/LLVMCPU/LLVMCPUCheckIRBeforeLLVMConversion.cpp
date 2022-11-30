@@ -62,7 +62,8 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
     return signalPassFailure();
   }
   int maxAllocationSizeInBits = clMaxAllocationSizeInBytes * 8;
-  if (totalBits > maxAllocationSizeInBits) {
+  if (clFailUnboundDynamicStackAllocation &&
+      totalBits > maxAllocationSizeInBits) {
     moduleOp.emitOpError(
         "expected total size of stack allocation is not greater than ")
         << clMaxAllocationSizeInBytes.getValue() << " bytes, but got "
