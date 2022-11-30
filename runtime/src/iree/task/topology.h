@@ -76,6 +76,7 @@ void iree_task_topology_group_initialize(uint8_t group_index,
 // We can add the more common heuristics over time to the core and leave the
 // edge cases for applications to construct.
 typedef struct iree_task_topology_t {
+  iree_host_size_t numa_node_id;
   iree_host_size_t group_count;
   iree_task_topology_group_t groups[IREE_TASK_EXECUTOR_MAX_WORKER_COUNT];
 } iree_task_topology_t;
@@ -125,6 +126,9 @@ void iree_task_topology_initialize_from_group_count(
 // Initializes a topology with one group for each physical core in the machine.
 void iree_task_topology_initialize_from_physical_cores(
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology);
+
+void iree_task_topology_initialize_with_cluster(
+  iree_host_size_t max_core_count, iree_host_size_t numa_node_id, iree_task_topology_t* out_topology);
 
 #ifdef __cplusplus
 }  // extern "C"

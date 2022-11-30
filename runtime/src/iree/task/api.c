@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cpuinfo.h>
 #include "iree/task/api.h"
 
 #include <stdbool.h>
@@ -75,26 +76,36 @@ IREE_FLAG(
     "detected and used when --task_topology_group_count=0 and is ignored\n"
     "otherwise.\n");
 
+IREE_FLAG(
+    string, task_numa_nodes, "",
+    "Creates executors for specified CPU NUMA nodes.\n");
+
 // TODO(benvanik): add --task_topology_dump to dump out the current machine
 // configuration as seen by the topology utilities.
 
 iree_status_t iree_task_topology_initialize_from_flags(
     iree_task_topology_t* out_topology) {
   IREE_ASSERT_ARGUMENT(out_topology);
+  iree_host_size_t numa_node_id = out_topology->numa_node_id;
   iree_task_topology_initialize(out_topology);
 
-  if (FLAG_task_topology_group_count != 0) {
-    iree_task_topology_initialize_from_group_count(
-        FLAG_task_topology_group_count, out_topology);
-  } else if (strcmp(FLAG_task_topology_mode, "physical_cores") == 0) {
-    iree_task_topology_initialize_from_physical_cores(
-        FLAG_task_topology_max_group_count, out_topology);
+  if (strlen(FLAG_task_numa_nodes) != 0) {
+    iree_task_topology_initialize_with_cluster(
+        FLAG_task_topology_max_group_count, numa_node_id, out_topology);
   } else {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "one of --task_topology_group_count or --task_topology_mode must be "
-        "specified and be a valid value; have --task_topology_mode=%s.",
-        FLAG_task_topology_mode);
+    if (FLAG_task_topology_group_count != 0) {
+        iree_task_topology_initialize_from_group_count(
+            FLAG_task_topology_group_count, out_topology);
+    } else if (strcmp(FLAG_task_topology_mode, "physical_cores") == 0) {
+        iree_task_topology_initialize_from_physical_cores(
+            FLAG_task_topology_max_group_count, out_topology);
+    } else {
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "one of --task_topology_group_count or --task_topology_mode must be "
+            "specified and be a valid value; have --task_topology_mode=%s.",
+            FLAG_task_topology_mode);
+    }
   }
 
   return iree_ok_status();
@@ -107,21 +118,52 @@ iree_status_t iree_task_topology_initialize_from_flags(
 iree_status_t iree_task_executor_create_from_flags(
     iree_allocator_t host_allocator, iree_task_executor_t** out_executor) {
   IREE_ASSERT_ARGUMENT(out_executor);
+  const char *task_numa_nodes = FLAG_task_numa_nodes;
+  iree_string_view_t numa_nodes = iree_string_view_trim(iree_make_string_view(
+      task_numa_nodes, strlen(task_numa_nodes)));
+  iree_host_size_t num_nodes = 0;
+  cpuinfo_initialize();
+  iree_host_size_t cpuinfo_node_count = cpuinfo_get_clusters_count();
+  iree_host_size_t *nodes = (iree_host_size_t*) malloc(cpuinfo_node_count * sizeof(iree_host_size_t));
+  while (!iree_string_view_is_empty(numa_nodes)) {
+    iree_string_view_t key_value;
+    iree_string_view_split(numa_nodes, ',', &key_value, &numa_nodes);
+    char node_str[3];
+    strncpy(node_str, key_value.data, key_value.size);
+    iree_host_size_t input_node = (iree_host_size_t) strtol(node_str, NULL, 10);
+    nodes[num_nodes] = input_node;
+    if (input_node > cpuinfo_node_count - 1) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "input_node %lu out of range (0 - %zu)",
+                              input_node,
+                              cpuinfo_node_count - 1);
+    }
+    num_nodes++;
+  }
+  if (iree_string_view_is_empty(numa_nodes)) {
+    num_nodes = 1;
+  }
+
   *out_executor = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_task_executor_options_t options;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_task_executor_options_initialize_from_flags(&options));
+  iree_status_t status;
+  for (int i = 0; i < num_nodes; i++) {
+    iree_task_topology_t topology;
 
-  iree_task_topology_t topology;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+    topology.numa_node_id = nodes[i];
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_task_topology_initialize_from_flags(&topology));
+    
+    iree_task_executor_options_t options;
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_task_executor_options_initialize_from_flags(&options));
 
-  iree_status_t status = iree_task_executor_create(
-      options, &topology, host_allocator, out_executor);
+    status = iree_task_executor_create(
+        options, &topology, host_allocator, &out_executor[i]);
 
-  iree_task_topology_deinitialize(&topology);
+    iree_task_topology_deinitialize(&topology);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;

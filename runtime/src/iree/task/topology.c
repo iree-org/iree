@@ -82,8 +82,10 @@ void iree_task_topology_initialize_from_group_count(
     iree_host_size_t group_count, iree_task_topology_t* out_topology) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, group_count);
+  iree_host_size_t numa_node_id = out_topology->numa_node_id;
 
   iree_task_topology_initialize(out_topology);
+  out_topology->numa_node_id = numa_node_id;
   for (iree_host_size_t i = 0; i < group_count; ++i) {
     iree_task_topology_group_t* group = &out_topology->groups[i];
     iree_task_topology_group_initialize(i, group);

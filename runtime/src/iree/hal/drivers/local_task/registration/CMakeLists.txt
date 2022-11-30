@@ -19,6 +19,8 @@ iree_cc_library(
     "driver_module.c"
   DEPS
     iree::base
+    iree::base::internal
+    iree::base::internal::path
     iree::hal
     iree::hal::drivers::local_task::task_driver
     iree::hal::local::loaders::registration

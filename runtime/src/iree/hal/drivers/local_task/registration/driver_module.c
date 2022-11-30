@@ -4,12 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cpuinfo.h>
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
 
 #include <inttypes.h>
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/path.h"
 #include "iree/hal/drivers/local_task/task_driver.h"
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/task/api.h"
@@ -38,6 +40,35 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
                             (int)driver_name.size, driver_name.data);
   }
 
+  iree_string_view_t uri = iree_string_view_trim(iree_make_string_view(
+      driver_name.data, strlen(driver_name.data)));
+  iree_string_view_t name, device_path, params_str, nodes_name, nodes_value;
+  iree_uri_split(uri, &name, &device_path, &params_str);
+  iree_string_view_t remaining = params_str;
+  iree_string_view_split(remaining, '=', &nodes_name, &nodes_value);
+  nodes_name = iree_string_view_trim(nodes_name);
+  nodes_value = iree_string_view_trim(nodes_value);
+  int num_nodes = 0;
+  cpuinfo_initialize();
+  int max_node = cpuinfo_get_clusters_count() - 1;
+  char node_str[2] = {0};
+  while (!iree_string_view_is_empty(nodes_value)) {
+    iree_string_view_t key_value;
+    iree_string_view_split(nodes_value, ',', &key_value, &nodes_value);
+    strncpy(node_str, key_value.data, key_value.size);
+    long input_node = strtol(node_str, NULL, 10);
+    if (input_node > max_node) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "input_node %lu out of range (0 - %d)",
+                              input_node,
+                              max_node);
+    }
+    num_nodes++;
+  }
+  if (iree_string_view_is_empty(nodes_value)) {
+    num_nodes = 1;
+  }
+
   iree_hal_task_device_params_t default_params;
   iree_hal_task_device_params_initialize(&default_params);
 
@@ -61,7 +92,7 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_driver_create(
-        driver_name, &default_params, /*queue_count=*/1, &executor,
+        driver_name, &default_params, /*queue_count=*/num_nodes, &executor,
         loader_count, loaders, device_allocator, host_allocator, out_driver);
   }
 
