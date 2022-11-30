@@ -55,8 +55,6 @@ iree_bytecode_module(
     arithmetic_ops
   SRC
     "arithmetic_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -67,8 +65,6 @@ iree_bytecode_module(
     arithmetic_ops_f32
   SRC
     "arithmetic_ops_f32.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -79,8 +75,6 @@ iree_bytecode_module(
     arithmetic_ops_i64
   SRC
     "arithmetic_ops_i64.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -91,8 +85,6 @@ iree_bytecode_module(
     assignment_ops
   SRC
     "assignment_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -103,8 +95,6 @@ iree_bytecode_module(
     assignment_ops_f32
   SRC
     "assignment_ops_f32.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -115,8 +105,6 @@ iree_bytecode_module(
     assignment_ops_i64
   SRC
     "assignment_ops_i64.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -127,8 +115,6 @@ iree_bytecode_module(
     buffer_ops
   SRC
     "buffer_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -139,8 +125,6 @@ iree_bytecode_module(
     call_ops
   SRC
     "call_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -151,8 +135,6 @@ iree_bytecode_module(
     comparison_ops
   SRC
     "comparison_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -163,8 +145,6 @@ iree_bytecode_module(
     comparison_ops_f32
   SRC
     "comparison_ops_f32.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -175,8 +155,6 @@ iree_bytecode_module(
     comparison_ops_i64
   SRC
     "comparison_ops_i64.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -187,8 +165,6 @@ iree_bytecode_module(
     control_flow_ops
   SRC
     "control_flow_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -199,8 +175,6 @@ iree_bytecode_module(
     conversion_ops
   SRC
     "conversion_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -211,8 +185,6 @@ iree_bytecode_module(
     conversion_ops_f32
   SRC
     "conversion_ops_f32.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -223,8 +195,6 @@ iree_bytecode_module(
     conversion_ops_i64
   SRC
     "conversion_ops_i64.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -235,8 +205,6 @@ iree_bytecode_module(
     global_ops
   SRC
     "global_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -247,8 +215,6 @@ iree_bytecode_module(
     global_ops_f32
   SRC
     "global_ops_f32.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -259,8 +225,6 @@ iree_bytecode_module(
     global_ops_i64
   SRC
     "global_ops_i64.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -271,8 +235,6 @@ iree_bytecode_module(
     list_ops
   SRC
     "list_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -283,8 +245,6 @@ iree_bytecode_module(
     list_ops_i64
   SRC
     "list_ops_i64.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -295,8 +255,6 @@ iree_bytecode_module(
     list_variant_ops
   SRC
     "list_variant_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -307,8 +265,6 @@ iree_bytecode_module(
     ref_ops
   SRC
     "ref_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -319,8 +275,6 @@ iree_bytecode_module(
     shift_ops
   SRC
     "shift_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -331,8 +285,6 @@ iree_bytecode_module(
     shift_ops_i64
   SRC
     "shift_ops_i64.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -356,8 +308,6 @@ iree_bytecode_module(
     async_ops
   SRC
     "async_ops.mlir"
-  COMPILE_TOOL
-    iree-compile
   FLAGS
     "--compile-mode=vm"
   PUBLIC

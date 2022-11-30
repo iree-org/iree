@@ -59,7 +59,6 @@ c_embed_data(
 iree_bytecode_module(
     name = "arithmetic_ops",
     src = "arithmetic_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -68,7 +67,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "arithmetic_ops_f32",
     src = "arithmetic_ops_f32.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -77,7 +75,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "arithmetic_ops_i64",
     src = "arithmetic_ops_i64.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -86,7 +83,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "assignment_ops",
     src = "assignment_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -95,7 +91,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "assignment_ops_f32",
     src = "assignment_ops_f32.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -104,7 +99,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "assignment_ops_i64",
     src = "assignment_ops_i64.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -113,7 +107,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "buffer_ops",
     src = "buffer_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -122,7 +115,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "call_ops",
     src = "call_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -131,7 +123,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "comparison_ops",
     src = "comparison_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -140,7 +131,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "comparison_ops_f32",
     src = "comparison_ops_f32.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -149,7 +139,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "comparison_ops_i64",
     src = "comparison_ops_i64.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -158,7 +147,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "control_flow_ops",
     src = "control_flow_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -167,7 +155,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "conversion_ops",
     src = "conversion_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -176,7 +163,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "conversion_ops_f32",
     src = "conversion_ops_f32.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -185,7 +171,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "conversion_ops_i64",
     src = "conversion_ops_i64.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -194,7 +179,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "global_ops",
     src = "global_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -203,7 +187,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "global_ops_f32",
     src = "global_ops_f32.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -212,7 +195,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "global_ops_i64",
     src = "global_ops_i64.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -221,7 +203,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "list_ops",
     src = "list_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -230,7 +211,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "list_ops_i64",
     src = "list_ops_i64.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -239,7 +219,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "list_variant_ops",
     src = "list_variant_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -248,7 +227,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "ref_ops",
     src = "ref_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -257,7 +235,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "shift_ops",
     src = "shift_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -266,7 +243,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "shift_ops_i64",
     src = "shift_ops_i64.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
@@ -285,7 +261,6 @@ c_embed_data(
 iree_bytecode_module(
     name = "async_ops",
     src = "async_ops.mlir",
-    compile_tool = "//tools:iree-compile",
     flags = [
         "--compile-mode=vm",
     ],
