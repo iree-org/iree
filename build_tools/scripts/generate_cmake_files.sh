@@ -6,6 +6,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Run all CMake file generators with proper output paths.
+
 set -euo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
