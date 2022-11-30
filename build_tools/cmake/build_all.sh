@@ -21,6 +21,7 @@ IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
 
 source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"
@@ -64,3 +65,7 @@ echo "------------------"
 echo "Building test deps"
 echo "------------------"
 "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
+
+if (( IREE_READ_REMOTE_CCACHE == 1 )); then
+  ccache --show-stats
+fi
