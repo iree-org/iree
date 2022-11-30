@@ -927,6 +927,23 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 }
 
 //===----------------------------------------------------------------------===//
+// Winograd Default Configuration
+//===----------------------------------------------------------------------===//
+
+static LogicalResult setWinogradOpConfig(
+    spirv::ResourceLimitsAttr limits,
+    IREE::LinalgExt::WinogradInputTransformOp op) {
+  // Tiling is already done by tile and decompose, so we only set pipeline and
+  // workgroup size
+  auto pipeline = CodeGenPipeline::SPIRVWinogradVectorize;
+  std::array<int64_t, 3> workgroupSize = {32, 4, 4};
+  TileSizesListType tileSizes = {{1, 32}};
+  return setOpConfigAndEntryPointFnTranslation(
+      op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
+      workgroupSize);
+}
+
+//===----------------------------------------------------------------------===//
 // Reduction Default Configuration
 //===----------------------------------------------------------------------===//
 
@@ -1329,6 +1346,10 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
       .Case<IREE::LinalgExt::FftOp>([limits](IREE::LinalgExt::FftOp op) {
         return setFftOpConfig(limits, op);
       })
+      .Case<IREE::LinalgExt::WinogradInputTransformOp>(
+          [&](IREE::LinalgExt::WinogradInputTransformOp op) {
+            return setWinogradOpConfig(limits, op);
+          })
       .Default([](Operation *) { return success(); });
 };
 
