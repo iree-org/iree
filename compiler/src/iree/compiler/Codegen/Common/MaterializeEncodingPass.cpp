@@ -111,7 +111,7 @@ enum class MatmulOperandRole {
   RESULT,
 };
 
-static Optional<MatmulType> GetMatmulType(TensorEncoding encoding) {
+static Optional<MatmulType> getMatmulType(TensorEncoding encoding) {
   switch (encoding) {
     case TensorEncoding::MATMUL_F32F32F32_LHS:
     case TensorEncoding::MATMUL_F32F32F32_RHS:
@@ -128,7 +128,7 @@ static Optional<MatmulType> GetMatmulType(TensorEncoding encoding) {
   }
 }
 
-static Optional<MatmulOperandRole> GetMatmulOperandRole(
+static Optional<MatmulOperandRole> getMatmulOperandRole(
     TensorEncoding encoding) {
   switch (encoding) {
     case TensorEncoding::MATMUL_F32F32F32_LHS:
@@ -227,8 +227,8 @@ static FailureOr<MaterializeEncodingInfo> chooseEncodingInfo(
     RankedTensorType tensorType, ExecutableTargetAttr target) {
   Optional<TensorEncoding> encoding = getEncoding(tensorType);
   if (!encoding) return failure();
-  auto matmulType = GetMatmulType(*encoding);
-  auto matmulOperandRole = GetMatmulOperandRole(*encoding);
+  auto matmulType = getMatmulType(*encoding);
+  auto matmulOperandRole = getMatmulOperandRole(*encoding);
   MaterializeEncodingInfo encodingInfo;
   if (matmulType && matmulOperandRole) {
     encodingInfo =
