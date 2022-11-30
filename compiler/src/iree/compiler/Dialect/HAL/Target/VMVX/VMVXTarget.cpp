@@ -29,6 +29,50 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+static llvm::cl::opt<std::string> clVMVXTuneFor(
+    "iree-vmvx-tune-for",
+    llvm::cl::desc(
+        "Hint to make IR more likely to perform well on the given target CPU "
+        "architecture, or architecture+features (example: \"aarch64\", "
+        "\"aarch64+dotprod+i8mm\"). The first component is the CPU "
+        "architecture, as in the first component of a LLVM target triple. "
+        "Optionally, any additional `+`-delimited components are CPU features "
+        "as in "
+        "--iree-llvm-target-cpu-features. This affects heuristics selecting "
+        "tile sizes. While "
+        "VMVX bytecode is always portable, certain fast code paths (ukernels) "
+        "require specific tile sizes. This may go away in the future if we "
+        "find better ways to reconcile portability and performance."),
+    llvm::cl::init(""));
+
+static IREE::HAL::ExecutableTargetAttr getVMVXExecutableTarget(
+    MLIRContext *context, StringRef backend, StringRef format) {
+  SmallVector<NamedAttribute> config;
+  auto addConfig = [context](SmallVector<NamedAttribute> &config,
+                             StringRef name, StringRef value) {
+    config.emplace_back(StringAttr::get(context, name),
+                        StringAttr::get(context, value));
+  };
+  if (!clVMVXTuneFor.empty()) {
+    auto initialSplit = StringRef(clVMVXTuneFor).split('+');
+    addConfig(config, "target_triple", initialSplit.first);
+    StringRef cpu_features_to_parse = initialSplit.second;
+    std::string cpu_features_out;
+    while (!cpu_features_to_parse.empty()) {
+      if (!cpu_features_out.empty()) cpu_features_out += ',';
+      cpu_features_out += '+';
+      auto split = cpu_features_to_parse.split('+');
+      cpu_features_out += split.first;
+      cpu_features_to_parse = split.second;
+    }
+    addConfig(config, "cpu_features", cpu_features_out);
+  }
+
+  return IREE::HAL::ExecutableTargetAttr::get(
+      context, StringAttr::get(context, backend),
+      StringAttr::get(context, format), DictionaryAttr::get(context, config));
+}
+
 class VMVXTargetBackend final : public TargetBackend {
  public:
   VMVXTargetBackend() = default;
@@ -129,8 +173,7 @@ class VMVXTargetBackend final : public TargetBackend {
 
   IREE::HAL::ExecutableTargetAttr getExecutableTarget(
       MLIRContext *context) const {
-    return IREE::HAL::ExecutableTargetAttr::get(context, "vmvx",
-                                                "vmvx-bytecode-fb");
+    return getVMVXExecutableTarget(context, "vmvx", "vmvx-bytecode-fb");
   }
 };
 
@@ -172,8 +215,7 @@ class VMVXInlineTargetBackend final : public TargetBackend {
 
   IREE::HAL::ExecutableTargetAttr getExecutableTarget(
       MLIRContext *context) const {
-    return IREE::HAL::ExecutableTargetAttr::get(context, "vmvx-inline",
-                                                "vmvx-ir");
+    return getVMVXExecutableTarget(context, "vmvx-inline", "vmvx-ir");
   }
 };
 
