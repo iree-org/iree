@@ -162,7 +162,7 @@ LogicalResult ScatterOp::verify() {
     return op->emitOpError("expected index depth is static");
   }
 
-  auto dimMap = dimensionMap();
+  ArrayRef<int64_t> dimMap = getDimensionMap();
   if (dimMap.size() != indexDepth) {
     return op->emitOpError("invalid number of dimension map entries ");
   }
@@ -330,9 +330,8 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
     resultTypes.push_back(tiledOriginal.getType());
   }
   Operation *tiledScatterOp =
-      cast<DestinationStyleOpInterface>(getOperation())
-          .clone(builder, loc, resultTypes,
-                 ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
+      mlir::clone(builder, getOperation(), resultTypes,
+                  ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
   return {tiledScatterOp};
 }
 
@@ -379,7 +378,7 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
     starts[it.index() + offset] = it.value();
   }
 
-  auto dimMap = dimensionMap();
+  ArrayRef<int64_t> dimMap = getDimensionMap();
 
   for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
     loadIndices.back() = b.create<arith::ConstantIndexOp>(loc, i);
@@ -510,7 +509,6 @@ SortOp::getTiledImplementation(OpBuilder &builder,
          sizes.size() == static_cast<size_t>(rank));
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
-  Location loc = getLoc();
   SmallVector<Value> tiledOperands(getOutputs().size());
   for (auto en : llvm::enumerate(getOutputs())) {
     tiledOperands[en.index()] =
@@ -522,8 +520,8 @@ SortOp::getTiledImplementation(OpBuilder &builder,
     resultTypes = llvm::to_vector<4>(
         llvm::map_range(tiledOperands, [&](Value v) { return v.getType(); }));
   }
-  Operation *tiledSortOp = cast<DestinationStyleOpInterface>(getOperation())
-                               .clone(builder, loc, resultTypes, tiledOperands);
+  Operation *tiledSortOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
   return {tiledSortOp};
 }
 
@@ -831,7 +829,6 @@ FftOp::getTiledImplementation(OpBuilder &builder,
                               ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
-  Location loc = getLoc();
   SmallVector<Value> tiledOperands(3);
   tiledOperands[0] = getStage();
   tiledOperands[1] = getRealCoeff();
@@ -845,8 +842,8 @@ FftOp::getTiledImplementation(OpBuilder &builder,
       resultTypes.push_back(tiledOperands.back().getType());
     }
   }
-  Operation *tiledFftOp = cast<DestinationStyleOpInterface>(getOperation())
-                              .clone(builder, loc, resultTypes, tiledOperands);
+  Operation *tiledFftOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
   return {tiledFftOp};
 }
 
@@ -1034,7 +1031,6 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
          sizes.size() == static_cast<size_t>(rank));
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
-  Location loc = getLoc();
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(
       getSlice(builder, getLoc(), input(), offsets, sizes, strides));
@@ -1060,8 +1056,8 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
     resultTypes.push_back(tiledOperands[2].getType());
   }
 
-  Operation *tiledScanOp = cast<DestinationStyleOpInterface>(getOperation())
-                               .clone(builder, loc, resultTypes, tiledOperands);
+  Operation *tiledScanOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
   return {tiledScanOp};
 }
 
@@ -1209,8 +1205,8 @@ ReverseOp::getTiledImplementation(OpBuilder &builder,
         getSlice(builder, loc, output(), mirrorOffsets, sizes, strides));
   }
 
-  Operation *tiledRevOp = cast<DestinationStyleOpInterface>(getOperation())
-                              .clone(builder, loc, resultTypes, tiledOperands);
+  Operation *tiledRevOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
   return {tiledRevOp};
 }
@@ -1486,8 +1482,8 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
     resultTypes.push_back(tiledOperands[tiledOperands.size() - 1].getType());
   }
 
-  Operation *tiledTopkOp = cast<DestinationStyleOpInterface>(getOperation())
-                               .clone(builder, loc, resultTypes, tiledOperands);
+  Operation *tiledTopkOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
   return {tiledTopkOp};
 }
 
@@ -1550,10 +1546,10 @@ static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
                 "applies to only pack or unpack operations");
   SmallVector<OpFoldResult> mixedInnerTiles;
   unsigned dynamicValIndex = 0;
-  for (Attribute attr : op.getStaticInnerTiles()) {
-    auto tileAttr = attr.cast<IntegerAttr>();
-    if (!ShapedType::isDynamic(tileAttr.getInt()))
-      mixedInnerTiles.push_back(tileAttr);
+  OpBuilder b(op.getContext());
+  for (int64_t tileSize : op.getStaticInnerTiles()) {
+    if (!ShapedType::isDynamic(tileSize))
+      mixedInnerTiles.push_back(b.getIndexAttr(tileSize));
     else
       mixedInnerTiles.push_back(op.getInnerTiles()[dynamicValIndex++]);
   }
@@ -1581,8 +1577,7 @@ static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
                 "applies to only pack or unpack operations");
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
-  SmallVector<int64_t> dimsToBlock =
-      extractFromI64ArrayAttr(op.getInnerDimsPos());
+  ArrayRef<int64_t> dimsToBlock = op.getInnerDimsPos();
   SmallVector<OpFoldResult> tiles = op.getMixedTiles();
   assert(tiles.size() == dimsToBlock.size() &&
          "tiles must match indices of dimension to block");
@@ -1624,10 +1619,8 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
                                 ? packOrUnPack.getInputType()
                                 : packOrUnPack.getOutputType();
   int64_t unpackedRank = unpackedType.getRank();
-  SmallVector<int64_t> innerDimsPos =
-      extractFromI64ArrayAttr(packOrUnPack.getInnerDimsPos());
-  SmallVector<int64_t> outerDimPerm =
-      extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPerm());
+  ArrayRef<int64_t> innerDimsPos = packOrUnPack.getInnerDimsPos();
+  ArrayRef<int64_t> outerDimPerm = packOrUnPack.getOuterDimsPerm();
   // Verify tiles. Make sure each provided tile is non-zero.
   SmallVector<OpFoldResult> mixedTiles = packOrUnPack.getMixedTiles();
   if (hasZeros(mixedTiles))
@@ -1715,9 +1708,9 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
                              ShapedType::kDynamic);
   build(builder, state, output.getType(), source, output,
         outerDimsPerm.empty() ? nullptr
-                              : builder.getI64ArrayAttr(outerDimsPerm),
-        builder.getI64ArrayAttr(innerDimsPos), dynamicTileSizes,
-        builder.getI64ArrayAttr(staticTileSizes),
+                              : builder.getDenseI64ArrayAttr(outerDimsPerm),
+        builder.getDenseI64ArrayAttr(innerDimsPos), dynamicTileSizes,
+        builder.getDenseI64ArrayAttr(staticTileSizes),
         (paddingValue ? paddingValue.value() : nullptr));
 }
 
@@ -1842,10 +1835,8 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
   // the point loop? However, if we interchange `ivs` once more to go to the
   // canonical blocking format: ABCabc, this connection becomes trivial: Each
   // point loop is pointLoopsOffset + inputRank away from the tiled loop.
-  SmallVector<int64_t> dimsToInnerBlock =
-      extractFromI64ArrayAttr(packOp.getInnerDimsPos());
-  SmallVector<int64_t> dimsToOuterBlock =
-      extractFromI64ArrayAttr(packOp.getOuterDimsPerm());
+  ArrayRef<int64_t> dimsToInnerBlock = packOp.getInnerDimsPos();
+  ArrayRef<int64_t> dimsToOuterBlock = packOp.getOuterDimsPerm();
 
   SmallVector<Value> interchangedIvs = ivs;
   SmallVector<int64_t> interchangeVector =
@@ -1980,8 +1971,7 @@ PackOp::getTiledImplementation(OpBuilder &builder,
 
   // The tiling is applied on interchanged dimensions. We have to undo the
   // interchange to map sizes and offsets to the original input.
-  SmallVector<int64_t> dimsToOuterBlock =
-      extractFromI64ArrayAttr(getOuterDimsPerm());
+  ArrayRef<int64_t> dimsToOuterBlock = getOuterDimsPerm();
   SmallVector<OpFoldResult> origOffsets(offsets.begin(), offsets.end());
   SmallVector<OpFoldResult> origSizes(sizes.begin(), sizes.end());
   if (!dimsToOuterBlock.empty()) {
@@ -2052,8 +2042,7 @@ PackOp::getTiledImplementation(OpBuilder &builder,
   }
 
   Operation *tiledPackOp =
-      cast<DestinationStyleOpInterface>(getOperation())
-          .clone(builder, loc, tiledResultTypes, tiledOperands);
+      mlir::clone(builder, getOperation(), tiledResultTypes, tiledOperands);
 
   return {tiledPackOp};
 }
@@ -2112,9 +2101,9 @@ void UnPackOp::build(OpBuilder &builder, OperationState &state, Value source,
                              ShapedType::kDynamic);
   build(builder, state, output.getType(), source, output,
         outerDimsPerm.empty() ? nullptr
-                              : builder.getI64ArrayAttr(outerDimsPerm),
-        builder.getI64ArrayAttr(innerDimsPos), dynamicTileSizes,
-        builder.getI64ArrayAttr(staticTileSizes));
+                              : builder.getDenseI64ArrayAttr(outerDimsPerm),
+        builder.getDenseI64ArrayAttr(innerDimsPos), dynamicTileSizes,
+        builder.getDenseI64ArrayAttr(staticTileSizes));
 }
 
 SmallVector<OpFoldResult> UnPackOp::getMixedTiles() {
@@ -2168,14 +2157,14 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   assert(inputIvsPointLoops.size() + inputIvs.size() == getInputRank() &&
          "expect same number of iduction variables equals to input rank");
   // interchange the point loops induction variables based on `inner_dim_pos`.
-  SmallVector<int64_t> innerDims = extractFromI64ArrayAttr(getInnerDimsPos());
+  ArrayRef<int64_t> innerDims = getInnerDimsPos();
   SmallVector<int64_t> interchangeVector =
       computeInterchangeFromDimPos(innerDims, getOutputRank());
   SmallVector<Value> interchangedInputIvsPointLoops = inputIvsPointLoops;
   interchangedInputIvsPointLoops = interchange<Value>(
       interchangedInputIvsPointLoops, interchangeVector, /*offset=*/0);
   // interchange the tiled loops induction variables based on `outer_dims_perm`.
-  SmallVector<int64_t> outerDims = extractFromI64ArrayAttr(getOuterDimsPerm());
+  ArrayRef<int64_t> outerDims = getOuterDimsPerm();
   if (!outerDims.empty()) {
     inputIvs = interchange<Value>(inputIvs, outerDims, /*offset=*/0);
   }
@@ -2313,8 +2302,7 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   // The tiling is applied on output dimensions. We have to apply the
   // interchange on input dimensions if outer_dims_perm is set.
   int64_t inputRank = getInputRank();
-  SmallVector<int64_t> dimsToOuterBlock =
-      extractFromI64ArrayAttr(getOuterDimsPerm());
+  ArrayRef<int64_t> dimsToOuterBlock = getOuterDimsPerm();
   if (!dimsToOuterBlock.empty()) {
     SmallVector<int64_t> vec =
         computeInterchangeFromDimPos(dimsToOuterBlock, inputRank);
@@ -2348,8 +2336,7 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   tiledResultTypes.push_back(tiledOperands[1].getType());
 
   Operation *tiledUnpackOp =
-      cast<DestinationStyleOpInterface>(getOperation())
-          .clone(builder, loc, tiledResultTypes, tiledOperands);
+      mlir::clone(builder, getOperation(), tiledResultTypes, tiledOperands);
 
   if (isPerfectTilingCase)
     return {tiledUnpackOp};
@@ -2515,8 +2502,8 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
     resultTypes.push_back(tiledOperands[1].getType());
   }
 
-  Operation *tiledOp = cast<DestinationStyleOpInterface>(getOperation())
-                           .clone(builder, loc, resultTypes, tiledOperands);
+  Operation *tiledOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
   return {tiledOp};
 }
@@ -2698,9 +2685,7 @@ struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
                                 : opOperand->get());
     }
     // Clone op.
-    Operation *newOp =
-        cast<DestinationStyleOpInterface>(op.getOperation())
-            .clone(rewriter, op->getLoc(), newResultTypes, newOperands);
+    Operation *newOp = mlir::clone(rewriter, op, newResultTypes, newOperands);
     SmallVector<Value, 4> replacements;
     replacements.reserve(newOp->getNumResults());
     for (auto result : llvm::zip(op->getResults(), newOp->getResults())) {

@@ -923,15 +923,17 @@ struct LinalgExtPackConversion
     }
 
     int64_t innerDimsPos[2] = {0, 1};
-    if (ArrayAttr innerDimsPosAttr = op.getInnerDimsPosAttr()) {
-      innerDimsPos[0] = innerDimsPosAttr[0].cast<IntegerAttr>().getInt();
-      innerDimsPos[1] = innerDimsPosAttr[1].cast<IntegerAttr>().getInt();
+    ArrayRef<int64_t> innerDimsPosArr = op.getInnerDimsPos();
+    if (!innerDimsPosArr.empty()) {
+      innerDimsPos[0] = innerDimsPosArr[0];
+      innerDimsPos[1] = innerDimsPosArr[1];
     }
 
     int64_t outerDimsPerm[2] = {0, 1};
-    if (ArrayAttr outerDimsPermAttr = op.getOuterDimsPermAttr()) {
-      outerDimsPerm[0] = outerDimsPermAttr[0].cast<IntegerAttr>().getInt();
-      outerDimsPerm[1] = outerDimsPermAttr[1].cast<IntegerAttr>().getInt();
+    ArrayRef<int64_t> outerDimsPosArr = op.getOuterDimsPerm();
+    if (!outerDimsPosArr.empty()) {
+      outerDimsPerm[0] = outerDimsPosArr[0];
+      outerDimsPerm[1] = outerDimsPosArr[1];
     }
 
     int flags = 0;
@@ -1059,15 +1061,17 @@ struct LinalgExtUnpackConversion
     }
 
     int64_t innerDimsPos[2] = {0, 1};
-    if (ArrayAttr innerDimsPosAttr = op.getInnerDimsPosAttr()) {
-      innerDimsPos[0] = innerDimsPosAttr[0].cast<IntegerAttr>().getInt();
-      innerDimsPos[1] = innerDimsPosAttr[1].cast<IntegerAttr>().getInt();
+    ArrayRef<int64_t> innerDimsPosArr = op.getInnerDimsPos();
+    if (!innerDimsPosArr.empty()) {
+      innerDimsPos[0] = innerDimsPosArr[0];
+      innerDimsPos[1] = innerDimsPosArr[1];
     }
 
     int64_t outerDimsPerm[2] = {0, 1};
-    if (ArrayAttr outerDimsPermAttr = op.getOuterDimsPermAttr()) {
-      outerDimsPerm[0] = outerDimsPermAttr[0].cast<IntegerAttr>().getInt();
-      outerDimsPerm[1] = outerDimsPermAttr[1].cast<IntegerAttr>().getInt();
+    ArrayRef<int64_t> outerDimsPosArr = op.getOuterDimsPerm();
+    if (!outerDimsPosArr.empty()) {
+      outerDimsPerm[0] = outerDimsPosArr[0];
+      outerDimsPerm[1] = outerDimsPosArr[1];
     }
 
     int flags = 0;
