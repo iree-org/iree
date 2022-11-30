@@ -17,7 +17,7 @@
 #
 # Designed for CI, but can be run locally. The desired build directory can be
 # passed as the first argument. Otherwise, it uses the environment variable
-# IREE_BUILD_E2E_TEST_ARTIFACTS_DIR, defaulting to "build-e2e-test-artifacts".
+# IREE_E2E_TEST_ARTIFACTS_DIR, defaulting to "build-e2e-test-artifacts".
 # It reuses the build directory if it already exists. Expects to be run from the
 # root of the IREE repository.
 
