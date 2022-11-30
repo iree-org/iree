@@ -952,7 +952,7 @@ struct LinalgExtVectorizationPass
     // Apply tiling to make outer dims be all 1s.
     {
       SimpleRewriter rewriter(ctx);
-      auto packTilingOptions =
+      auto packOptions = scf::SCFTileAndFuseOptions().setTilingOptions(
           scf::SCFTilingOptions().setTileSizeComputationFunction(
               [](OpBuilder &builder, Operation *op) {
                 Location loc = op->getLoc();
@@ -960,15 +960,16 @@ struct LinalgExtVectorizationPass
                 SmallVector<Value> tileSizes(
                     inputRank, builder.create<arith::ConstantIndexOp>(loc, 1));
                 return tileSizes;
-              });
+              }));
       auto funcOp = getOperation();
       funcOp->walk([&](LinalgExt::PackOp op) {
-        FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-            rewriter, cast<TilingInterface>(op.getOperation()),
-            packTilingOptions);
-        if (failed(tilingResult))
+        FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+            scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(rewriter, op,
+                                                                  packOptions);
+        if (failed(tileAndFuseResult))
           return signalPassFailure();
-        rewriter.replaceOp(op, tilingResult->replacements);
+        rewriter.replaceOp(op,
+                           tileAndFuseResult->replacements[op.getResult(0)]);
       });
 
       auto unpackTilingOptions =
