@@ -53,8 +53,7 @@ struct FoldUnpackWithExtractSliceOp
     Value output = rewriter.create<tensor::EmptyOp>(
         sliceOp.getLoc(), sliceOp.getMixedSizes(), elementType);
     rewriter.replaceOpWithNewOp<UnPackOp>(
-        sliceOp, unpackOp.getInput(), output,
-        unpackOp.getInnerDimsPos(),
+        sliceOp, unpackOp.getInput(), output, unpackOp.getInnerDimsPos(),
         unpackOp.getMixedTiles(), unpackOp.getOuterDimsPerm());
     return success();
   }
