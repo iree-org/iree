@@ -145,6 +145,10 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     Type rhsElemType = getElemType(origRhs);
     Type outElemType = getElemType(origOut);
 
+    if (!lhsElemType || !rhsElemType || !outElemType) {
+      return failure();
+    }
+
     TensorEncoding lhsEncoding;
     TensorEncoding rhsEncoding;
     TensorEncoding outEncoding;
