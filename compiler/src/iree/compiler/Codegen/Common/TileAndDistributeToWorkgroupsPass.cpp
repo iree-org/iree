@@ -82,17 +82,7 @@ static LogicalResult getTileAndDistributeConfig(
   }
 
   partitionableLoops =
-      partitionableLoopInterface.getPartitionableLoops(kNumMaxParallelDims);
-  // For now assert that number of partitionable loops are less than the
-  // supported max.
-  // TODO(ravishankarm): Relax this restriction.
-  if (partitionableLoops.size() > kNumMaxParallelDims) {
-    return rootOp.value()->emitOpError(
-               "expected number of partitionable loops to be less than or "
-               "equal to ")
-           << kNumMaxParallelDims;
-  }
-
+      partitionableLoopInterface.getPartitionableLoops(llvm::None);
   IREE::Codegen::LoweringConfigAttr rootOpConfig = getLoweringConfig(*rootOp);
   if (!rootOpConfig) {
     return rootOp.value()->emitOpError(
@@ -208,8 +198,18 @@ struct LowerDispatchWorkgroupCountForDagRootOp
     // slowest varying.
     SmallVector<Value> numWorkgroups;
     for (auto partitionedLoop : llvm::reverse(partitionedLoops)) {
-      numWorkgroups.push_back(getValueOrCreateConstantIndexOp(
-          rewriter, loc, numTiles[partitionedLoop]));
+      Value numTileAlongDim = getValueOrCreateConstantIndexOp(
+          rewriter, loc, numTiles[partitionedLoop]);
+      if (numWorkgroups.size() == kNumMaxParallelDims) {
+        // IREE runtime only has 3 ID dimensions. After all the num of tiles are
+        // combined into one.
+        AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
+        AffineExpr s1 = rewriter.getAffineSymbolExpr(1);
+        numWorkgroups.back() = makeComposedAffineApply(
+            rewriter, loc, s0 * s1, {numWorkgroups.back(), numTileAlongDim});
+        continue;
+      }
+      numWorkgroups.push_back(numTileAlongDim);
     }
     Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     numWorkgroups.resize(kNumMaxParallelDims, one);
@@ -374,7 +374,8 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
     auto linalgTilingOptions =
         linalg::LinalgTilingOptions()
-            .setDistributionOptions(getIREELinalgLoopDistributionOptions())
+            .setDistributionOptions(
+                getIREELinalgLoopDistributionOptions(tileSizes))
             .setInterchange(llvm::to_vector<4>(
                 llvm::map_range(interchange,
                                 [](int64_t v) -> unsigned {
