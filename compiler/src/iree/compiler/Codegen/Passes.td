@@ -566,9 +566,9 @@ def SPIRVMapMemRefStorageClass :
   let constructor = "mlir::iree_compiler::createSPIRVMapMemRefStorageClassPass()";
 }
 
-def SPIRVAnnotateLoops : Pass<"iree-spirv-annotate-loops", "func::FuncOp"> {
-  let summary = "Annotate innermost loops with spirv distribute attribute";
-  let constructor = "mlir::iree_compiler::createSPIRVAnnotateLoopsPass()";
+def SPIRVAnnotateWinogradLoops : Pass<"iree-spirv-annotate-winograd-loops", "func::FuncOp"> {
+  let summary = "Annotate innermost Winograd loops with spirv distribute attribute";
+  let constructor = "mlir::iree_compiler::createSPIRVAnnotateWinogradLoopsPass()";
 }
 
 //------------------------------------------------------------------------------

@@ -23,7 +23,7 @@ iree_compiler_cc_library(
         "MaliConfig.cpp",
         "NVIDIAConfig.cpp",
         "Passes.cpp",
-        "SPIRVAnnotateLoops.cpp",
+        "SPIRVAnnotateWinogradLoops.cpp",
         "SPIRVBreakDownLargeVector.cpp",
         "SPIRVCreateFastSlowPath.cpp",
         "SPIRVDistribute.cpp",

@@ -14,7 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "annotate_loops.mlir"
+    "annotate_winograd_loops.mlir"
     "break_down_large_vector.mlir"
     "config_adreno_conv.mlir"
     "config_adreno_matmul.mlir"

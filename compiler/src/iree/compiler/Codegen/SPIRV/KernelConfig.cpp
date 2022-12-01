@@ -934,7 +934,9 @@ static LogicalResult setWinogradOpConfig(
     spirv::ResourceLimitsAttr limits,
     IREE::LinalgExt::WinogradInputTransformOp op) {
   // Tiling is already done by tile and decompose, so we only set pipeline and
-  // workgroup size
+  // workgroup size. The tile sizes below are placeholders and were obtained
+  // by manual tuning on the AMD Navi2 GPU on a small set of convolution
+  // sizes found in the StableDiffusion model.
   auto pipeline = CodeGenPipeline::SPIRVWinogradVectorize;
   std::array<int64_t, 3> workgroupSize = {32, 4, 4};
   TileSizesListType tileSizes = {{1, 32}};
