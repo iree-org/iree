@@ -648,7 +648,8 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
         SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
         Value splitDim;
         for (size_t dim = 0; dim < numParallelDims; ++dim) {
-          if (numParallelDims > 3 && dim >= 2) {
+          if (numParallelDims > kNumMaxParallelDims &&
+              dim >= kNumMaxParallelDims - 1) {
             if (!splitDim) {
               splitDim =
                   buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(

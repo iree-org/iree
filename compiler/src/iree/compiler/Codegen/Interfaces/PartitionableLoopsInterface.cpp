@@ -45,7 +45,7 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
   if (maxNumPartitionedLoops.has_value() &&
       parallelLoops.size() > maxNumPartitionedLoops.value()) {
     parallelLoops =
-        llvm::to_vector(llvm::ArrayRef<unsigned>(parallelLoops)
+        llvm::to_vector(llvm::makeArrayRef(parallelLoops)
                             .take_back(maxNumPartitionedLoops.value()));
   }
   return parallelLoops;
@@ -102,13 +102,14 @@ struct OuterParallelAsPartitionableLoops
       }
       partitionableLoops.push_back(iteratorType.index());
     }
-    if (maxNumPartitionedLoops.has_value() &&
-        partitionableLoops.size() > maxNumPartitionedLoops.value()) {
-      partitionableLoops.erase(partitionableLoops.begin(),
-                               std::next(partitionableLoops.begin(),
-                                         partitionableLoops.size() -
-                                             maxNumPartitionedLoops.value()));
+    if (!maxNumPartitionedLoops.has_value() ||
+        partitionableLoops.size() <= maxNumPartitionedLoops.value()) {
+      return partitionableLoops;
     }
+    partitionableLoops.erase(
+        partitionableLoops.begin(),
+        std::next(partitionableLoops.begin(),
+                  partitionableLoops.size() - maxNumPartitionedLoops.value()));
     return partitionableLoops;
   }
 };
@@ -137,13 +138,14 @@ struct FftOpPartitionableLoops
     if (!fftOp.hasCoeff()) {
       partitionableLoops.pop_back();
     }
-    if (maxNumPartitionedLoops.has_value() &&
-        partitionableLoops.size() > maxNumPartitionedLoops.value()) {
-      partitionableLoops.erase(partitionableLoops.begin(),
-                               std::next(partitionableLoops.begin(),
-                                         partitionableLoops.size() -
-                                             maxNumPartitionedLoops.value()));
+    if (!maxNumPartitionedLoops.has_value() ||
+        partitionableLoops.size() <= maxNumPartitionedLoops.value()) {
+      return partitionableLoops;
     }
+    partitionableLoops.erase(
+        partitionableLoops.begin(),
+        std::next(partitionableLoops.begin(),
+                  partitionableLoops.size() - maxNumPartitionedLoops.value()));
     return partitionableLoops;
   }
 };
@@ -165,13 +167,14 @@ struct AllParallelAsPartitionableLoops
       }
       partitionableLoops.push_back(iteratorType.index());
     }
-    if (maxNumPartitionedLoops.has_value() &&
-        partitionableLoops.size() > maxNumPartitionedLoops.value()) {
-      partitionableLoops.erase(partitionableLoops.begin(),
-                               std::next(partitionableLoops.begin(),
-                                         partitionableLoops.size() -
-                                             maxNumPartitionedLoops.value()));
+    if (!maxNumPartitionedLoops.has_value() ||
+        partitionableLoops.size() <= maxNumPartitionedLoops.value()) {
+      return partitionableLoops;
     }
+    partitionableLoops.erase(
+        partitionableLoops.begin(),
+        std::next(partitionableLoops.begin(),
+                  partitionableLoops.size() - maxNumPartitionedLoops.value()));
     return partitionableLoops;
   }
 };
