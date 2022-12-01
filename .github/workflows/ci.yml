@@ -297,6 +297,8 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Building runtime"
+        env:
+          BUILD_PRESET: "test"
         # Note ccache is read-only here since this job runs on a GitHub-hosted runner
         # and GitHub runners don't have write access to GCS
         run: |
@@ -330,6 +332,8 @@ jobs:
       - name: "Configuring MSVC"
         uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
       - name: "Building runtime"
+        env:
+          BUILD_PRESET: "test"
         run: ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
       - name: "Testing runtime"
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
