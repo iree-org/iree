@@ -1745,9 +1745,9 @@ module {
 //  CHECK-NEXT:     %[[ARG1:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128x128xf32>>
 //       CHECK:     %[[LOAD0:.+]] = flow.dispatch.tensor.load %[[ARG1]]
 //       CHECK:     %[[FILL0:.+]] = linalg.fill
+//       CHECK:     %[[FILL1:.+]] = linalg.fill
 //       CHECK:     %[[GENERIC0:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[LOAD0]] : tensor<12x128x128xf32>) outs(%[[FILL0]] : tensor<12x128xf32>)
-//       CHECK:     %[[FILL1:.+]] = linalg.fill
 //       CHECK:     %[[GENERIC1:.+]]:2 = linalg.generic
 //  CHECK-SAME:         ins(%[[LOAD0]], %[[GENERIC0]] : tensor<12x128x128xf32>, tensor<12x128xf32>)
 //  CHECK-SAME:         outs(%{{.*}}, %[[FILL1]] : tensor<12x128x128xf32>, tensor<12x128xf32>)
