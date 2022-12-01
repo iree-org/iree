@@ -308,12 +308,19 @@ void ExecutableTargetAttr::print(AsmPrinter &p) const {
 std::string ExecutableTargetAttr::getSymbolNameFragment() {
   std::string name = getFormat().getValue().lower();
   if (auto config = getConfiguration()) {
-    for (StringRef configField : {"target_triple", "cpu_features"}) {
-      if (auto attr = config.getAs<StringAttr>(configField)) {
-        if (!attr.getValue().empty()) {
-          name += '_';
-          name += attr.getValue().lower();
-        }
+    if (auto targetTripleAttr = config.getAs<StringAttr>("target_triple")) {
+      StringRef arch = targetTripleAttr.getValue().split('-').first;
+      if (!(arch.empty() || arch == "unknown" ||
+            StringRef(name).endswith(arch))) {
+        name += '_';
+        name += arch.lower();
+      }
+    }
+    if (auto cpuFeaturesAttr = config.getAs<StringAttr>("cpu_feature")) {
+      StringRef cpuFeatures = cpuFeaturesAttr.getValue();
+      if (!cpuFeatures.empty()) {
+        name += '_';
+        name += cpuFeatures.lower();
       }
     }
   }
