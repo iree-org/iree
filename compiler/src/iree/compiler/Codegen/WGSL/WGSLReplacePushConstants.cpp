@@ -135,6 +135,10 @@ class WGSLReplacePushConstantsPass
 
     // We could store into a tensor<Nxi32>, but vec4s are better supported, so
     // we'll use tensor<Nxvector<4xi32>> instead.
+    // Compute how many vec4s to use, i.e.
+    //   max index 0 -> 1 vec4
+    //   max index 3 -> 1 vec4
+    //   max index 4 -> 2 vec4s
     uint64_t numberOfVec4s = maxConstantIndex / 4 + 1;
 
     // hal.interface.binding.subspan ->
