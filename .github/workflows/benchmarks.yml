@@ -100,7 +100,7 @@ jobs:
           - platform: "linux"
             architecture: "x86_64"
             docker_image: "gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4"
-            # Assume the builder is Linux x86_64.
+            # Builds tools on the host and assumes the builder is Linux x86_64.
             build_script: "./build_tools/cmake/build_runtime.sh"
           - platform: "riscv"
             architecture: "rv64"
