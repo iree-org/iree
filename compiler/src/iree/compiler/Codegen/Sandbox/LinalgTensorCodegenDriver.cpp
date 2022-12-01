@@ -736,9 +736,7 @@ void LinalgVectorLoweringPass::runOnOperation() {
           .setVectorMultiReductionLowering(vectorMultiReductionLowering)
           .setVectorTransferSplit(vectorTransferSplit);
   VectorTransferToSCFOptions vectorTransferToSCFOptions =
-      VectorTransferToSCFOptions()
-          .enableFullUnroll(unrollVectorTransfers)
-          .enableLowerPermutationMaps();
+      VectorTransferToSCFOptions().enableFullUnroll(unrollVectorTransfers);
 
   LinalgVectorLoweringOptions vectorLoweringOptions =
       LinalgVectorLoweringOptions()
