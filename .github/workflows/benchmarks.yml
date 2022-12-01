@@ -97,6 +97,9 @@ jobs:
     strategy:
       matrix:
         target:
+          - platform: "linux"
+            architecture: "x86_64"
+            docker_image: "gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4"
           - platform: "riscv"
             architecture: "rv64"
             docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"

@@ -14,12 +14,14 @@ steps:
         --volume="/etc/group:/etc/group:ro" \
         --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
         --workdir="$$IREE_DOCKER_WORKDIR" \
+        --env "LINUX_ARCH=x86_64" \
+        --env "BUILD_PRESET=benchmark" \
         --rm \
         $${DOCKER_IMAGE} \
-        build_tools/cmake/build_linux_benchmark_tools.sh linux-x86_64
+        build_tools/cmake/build_linux.sh linux-x86_64
       tar -czvf iree-linux-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz \
-        build-targets/linux-x86_64/tools/iree-benchmark-module \
-        build-targets/linux-x86_64/tools/build_config.txt
+        build-linux/tools/iree-benchmark-module \
+        build-linux/tools/build_config.txt
     agents:
       - "queue=build"
     artifact_paths:
@@ -39,10 +41,10 @@ steps:
       python3 build_tools/benchmarks/run_benchmarks_on_linux.py \
         --device_model=GCP-c2-standard-16 \
         --cpu_uarch=CascadeLake \
-        --normal_benchmark_tool_dir=build-targets/linux-x86_64/tools/ \
+        --normal_benchmark_tool_dir=build-linux/tools/ \
         -o "benchmark-results-gcp-cpu-$${BUILDKITE_BUILD_NUMBER}.json" \
         --verbose \
-        build-targets/linux-x86_64
+        build-linux
     agents:
       - "gcp:machine-type=c2-standard-16"
       - "queue=benchmark-x86_64"

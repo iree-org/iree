@@ -14,12 +14,14 @@ steps:
         --volume="/etc/group:/etc/group:ro" \
         --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
         --workdir="$$IREE_DOCKER_WORKDIR" \
+        --env "LINUX_ARCH=cuda" \
+        --env "BUILD_PRESET=benchmark" \
         --rm \
         $${DOCKER_IMAGE} \
-        build_tools/cmake/build_linux_benchmark_tools.sh linux-cuda
+        build_tools/cmake/build_linux.sh linux-cuda
       tar -czvf iree-linux-cuda-tools-${BUILDKITE_BUILD_NUMBER}.tgz \
-        build-targets/linux-cuda/tools/iree-benchmark-module \
-        build-targets/linux-cuda/tools/build_config.txt
+        build-linux/tools/iree-benchmark-module \
+        build-linux/tools/build_config.txt
     agents:
       - "queue=build"
     artifact_paths:
@@ -38,11 +40,11 @@ steps:
       tar -xzvf "iree-linux-cuda-tools-$${BUILDKITE_BUILD_NUMBER}.tgz"
       python3 build_tools/benchmarks/run_benchmarks_on_linux.py \
         --device_model=GCP-a2-highgpu-1g \
-        --normal_benchmark_tool_dir=build-targets/linux-cuda/tools/ \
+        --normal_benchmark_tool_dir=build-linux/tools/ \
         --driver_filter_regex=cuda \
         -o "benchmark-results-gcp-gpu-a100-$${BUILDKITE_BUILD_NUMBER}.json" \
         --verbose \
-        build-targets/linux-cuda
+        build-linux
     agents:
       - "gcp:machine-type=a2-highgpu-1g"
       - "queue=benchmark-cuda"
