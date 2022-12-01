@@ -12,6 +12,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
+#include "iree/compiler/Codegen/Common/TransformExtensions/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -31,6 +32,7 @@
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
 
 using namespace mlir;
@@ -991,6 +993,106 @@ DiagnosedSilenceableFailure transform_dialect::ConfigExtractPart::apply(
 
   transformResults.set(getResultConfigPart().cast<OpResult>(), results);
   return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// RegisterMatchCallbacksOp
+//===---------------------------------------------------------------------===//
+
+/// Match callback for "_test_match_callback" hook. Matches any payload
+/// operations associated with operand handles unless they have the
+/// "test.iree_transform_do_not_match" attribute, in which case produces a
+/// silenceable failure.
+static DiagnosedSilenceableFailure testMatchCallbackCallback(
+    transform_dialect::MatchCallbackResult &res, Location loc,
+    const transform::TransformState &state, ValueRange handles) {
+  bool hadFailures = false;
+  for (Value handle : handles) {
+    if (llvm::any_of(state.getPayloadOps(handle), [](Operation *op) {
+          return op->hasAttr("test.iree_transform_do_not_match");
+        })) {
+      res.addPayloadGroup(ArrayRef<Operation *>());
+      hadFailures = true;
+    } else {
+      res.addPayloadGroup(state.getPayloadOps(handle));
+    }
+  }
+  if (hadFailures) return emitSilenceableFailure(loc) << "failed to match";
+  return DiagnosedSilenceableFailure::success();
+}
+
+DiagnosedSilenceableFailure transform_dialect::RegisterMatchCallbacksOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  auto &registry = state.addExtension<MatchCallbacksRegistry>();
+  registry.registerCallback("_test_match_callback", testMatchCallbackCallback);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::RegisterMatchCallbacksOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // TODO: it doesn't really modify the payload, we need a separate resource for
+  // this mapping.
+  transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// MatchCallbackOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::MatchCallbackOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  auto setEmptyResults = [&results, this] {
+    for (OpResult value : getResults()) {
+      results.set(value, {});
+    }
+  };
+  auto errorOut = [this, &setEmptyResults] {
+    setEmptyResults();
+    return emitSilenceableError();
+  };
+
+  auto *registry = state.getExtension<MatchCallbacksRegistry>();
+  if (!registry) return errorOut() << "match registry not available";
+
+  const MatchCallbacksRegistry::MatchCallbackFn *callback =
+      registry->get(getCallbackName());
+  if (!callback) {
+    return errorOut() << "callback '" << getCallbackName()
+                      << "' not found in the registry";
+  }
+
+  MatchCallbackResult result;
+  DiagnosedSilenceableFailure status =
+      (*callback)(result, getLoc(), state, getInputs());
+  if (!status.succeeded()) {
+    setEmptyResults();
+    if (status.isDefiniteFailure()) return status;
+    if (getFailurePropagationMode() ==
+        transform::FailurePropagationMode::Propagate) {
+      return emitSilenceableError() << "failed to match";
+    } else {
+      return DiagnosedSilenceableFailure::success();
+    }
+  }
+  if (getNumResults() != result.getNumPayloadGroups()) {
+    return errorOut()
+           << "callback produced a different number of handles than expected ( "
+           << result.getNumPayloadGroups() << " vs " << getNumResults() << " )";
+  }
+
+  for (OpResult value : getResults()) {
+    results.set(value, result.getPayloadGroup(value.getResultNumber()));
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::MatchCallbackOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getInputs(), effects);
+  transform::producesHandle(getOutputs(), effects);
+  // TODO: it doesn't really modify the payload, we need a separate resource for
+  // this mapping.
+  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES

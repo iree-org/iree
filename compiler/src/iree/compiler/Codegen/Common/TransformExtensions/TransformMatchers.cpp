@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Common/TransformExtensions/TransformMatchers.h"
 
+#include "mlir/Analysis/SliceAnalysis.h"
+
 using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
@@ -148,4 +150,19 @@ transform_dialect::StructuredOpMatcher::output(int64_t position,
            llvm::hasSingleElement(combinerOps);
   });
   return *this;
+}
+
+//===---------------------------------------------------------------------===//
+// MatchCallbackResult.
+//===---------------------------------------------------------------------===//
+
+ArrayRef<Operation *> transform_dialect::MatchCallbackResult::getPayloadGroup(
+    unsigned position) const {
+  assert(position < payloadGroupLengths.size());
+  int64_t start = 0;
+  for (unsigned i = 0; i < position; ++i) {
+    start += payloadGroupLengths[i];
+  }
+  return llvm::makeArrayRef(payloadOperations)
+      .slice(start, payloadGroupLengths[position]);
 }

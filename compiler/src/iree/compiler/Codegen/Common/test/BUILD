@@ -42,6 +42,7 @@ iree_lit_test_suite(
             "tile_and_distribute_to_workgroups.mlir",
             "tile_reduction.mlir",
             "transform_dialect_apply_pattern_op.mlir",
+            "transform_ops_invalid.mlir",
             "transpose_canonicalization.mlir",
             "type_propagation.mlir",
             "vectorize_tensor_pad.mlir",

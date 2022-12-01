@@ -11,8 +11,9 @@
 #include <cstdint>
 #include <functional>
 
-#include "mlir/Analysis/SliceAnalysis.h"
+#include "llvm/ADT/StringMap.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Matchers.h"
 
 namespace mlir::iree_compiler::IREE::transform_dialect {
@@ -276,6 +277,87 @@ inline StructuredOpMatcher m_StructuredOp() {
   return StructuredOpMatcher::create<OpType...>();
 }
 
+//===---------------------------------------------------------------------===//
+// MatchCallback functionality.
+//===---------------------------------------------------------------------===//
+
+/// Additional results of the C++ callback usable in the `match_callback`
+/// transform operation. Conceptually, a list of lists of payload operations to
+/// be associated with each result handle.
+class MatchCallbackResult {
+ public:
+  /// Returns the number of lists of payload operations.
+  unsigned getNumPayloadGroups() const { return payloadGroupLengths.size(); }
+
+  /// Returns the `position`-th list of payload operations.
+  ArrayRef<Operation *> getPayloadGroup(unsigned position) const;
+
+  /// Adds a new list of payload operations to the list of lists. The new list
+  /// must not contain null operations.
+  template <typename Range>
+  unsigned addPayloadGroup(Range operations) {
+    int64_t originalLength = payloadOperations.size();
+    assert(llvm::all_of(operations, [](Operation *op) -> bool { return op; }) &&
+           "null operation");
+    llvm::append_range(payloadOperations, operations);
+    payloadGroupLengths.push_back(payloadOperations.size() - originalLength);
+    return payloadGroupLengths.size() - 1;
+  }
+  void addPayloadGroup(ArrayRef<Operation *> operations) {
+    addPayloadGroup<ArrayRef<Operation *>>(operations);
+  }
+
+  /// Adds a new singleton list of payload operation to the list of lists if the
+  /// operation is non-null, adds an empty list otherwise. Useful for results of
+  /// optional matches.
+  void addPotentiallyEmptyPayloadGroup(Operation *op) {
+    if (!op)
+      addPayloadGroup(ArrayRef<Operation *>());
+    else
+      addPayloadGroup(ArrayRef<Operation *>(op));
+  }
+
+ private:
+  /// The flat list of all payload opreations. `payloadGroupLengths` can be used
+  /// to compute the sublist that corresponds to one nested list.
+  // TODO: if somebody implements such a flattened vector generically, use it.
+  SmallVector<Operation *> payloadOperations;
+  SmallVector<int64_t> payloadGroupLengths;
+};
+
+/// A transform state extension that maintains the mapping between callback
+/// names as strings usable in `match_callback` and their implementations.
+class MatchCallbacksRegistry : public transform::TransformState::Extension {
+ public:
+  using MatchCallbackFn = std::function<DiagnosedSilenceableFailure(
+      MatchCallbackResult &, Location, const transform::TransformState &,
+      ValueRange)>;
+
+  /// Constructs the extension.
+  MatchCallbacksRegistry(transform::TransformState &state)
+      : transform::TransformState::Extension(state) {}
+
+  /// Registers the given function as a callback with the given name. The name
+  /// must not be already present in the registry. The callback must be
+  /// convertible to MatchCallbackFn.
+  template <typename Fn>
+  void registerCallback(StringRef name, Fn &&fn) {
+    bool succeeded = callbacks.try_emplace(name, std::forward<Fn>(fn)).second;
+    (void)succeeded;
+    assert(succeeded && "adding a callback with a repeated name");
+  }
+
+  /// Returns a pointer to the implementation of the callback with the given
+  /// name, or null if it is not present in the registry.
+  const MatchCallbackFn *get(StringRef name) const {
+    auto iter = callbacks.find(name);
+    if (iter == callbacks.end()) return nullptr;
+    return &iter->getValue();
+  }
+
+ private:
+  llvm::StringMap<MatchCallbackFn> callbacks;
+};
 }  // namespace mlir::iree_compiler::IREE::transform_dialect
 
 #endif  // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_TRANSFORMMATCHERS_H_
