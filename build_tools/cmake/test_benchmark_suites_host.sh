@@ -14,7 +14,7 @@ ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-E2E_TEST_ARTIFACTS_DIR="$(realpath ${E2E_TEST_ARTIFACTS_DIR:-$ROOT_DIR/build-benchmarks/benchmark_suites})"
+E2E_TEST_ARTIFACTS_DIR="$(realpath ${E2E_TEST_ARTIFACTS_DIR:-$ROOT_DIR/build-e2e-test-artifacts/e2e_test_artifacts})"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 BUILD_HOST_DIR="${BUILD_HOST_DIR:-build-benchmark-suites-test}"
 
