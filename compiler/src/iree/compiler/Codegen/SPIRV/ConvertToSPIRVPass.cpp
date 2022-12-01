@@ -335,10 +335,14 @@ void ConvertToSPIRVPass::runOnOperation() {
           "expected workgroup_size attribute to be set for SPIR-V lowering");
       return signalPassFailure();
     }
+    Optional<int64_t> subgroupSize = getSubgroupSize(exportOp);
     auto workgroupSize32 = llvm::to_vector<4>(llvm::map_range(
         workgroupSize, [](int64_t v) { return static_cast<int32_t>(v); }));
-    funcOp->setAttr(spirv::getEntryPointABIAttrName(),
-                    spirv::getEntryPointABIAttr(workgroupSize32, context));
+    Optional<int> subgroupSize32;
+    if (subgroupSize) subgroupSize32 = *subgroupSize;
+    funcOp->setAttr(
+        spirv::getEntryPointABIAttrName(),
+        spirv::getEntryPointABIAttr(context, workgroupSize32, subgroupSize32));
   }
 
   spirv::TargetEnvAttr targetAttr = getSPIRVTargetEnvAttr(moduleOp);

@@ -263,15 +263,27 @@ SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
   return {};
 }
 
+llvm::Optional<int64_t> getSubgroupSize(
+    IREE::HAL::ExecutableExportOp exportOp) {
+  if (IntegerAttr attr = exportOp.getSubgroupSizeAttr()) {
+    return attr.getValue().getSExtValue();
+  }
+  return {};
+}
+
 void setTranslationInfo(IREE::HAL::ExecutableExportOp exportOp,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
-                        ArrayRef<int64_t> workgroupSize) {
+                        ArrayRef<int64_t> workgroupSize,
+                        Optional<int64_t> subgroupSize) {
+  MLIRContext *context = exportOp->getContext();
   exportOp->setAttr(kTranslationInfoAttrName, translationInfo);
   // The workgroup size is set on the entry point op directly.
   if (!workgroupSize.empty()) {
-    MLIRContext *context = exportOp->getContext();
     auto attrs = getIndexIntegerArrayAttr(context, workgroupSize);
     exportOp.setWorkgroupSizeAttr(attrs);
+  }
+  if (subgroupSize) {
+    exportOp.setSubgroupSizeAttr(Builder(context).getIndexAttr(*subgroupSize));
   }
 }
 

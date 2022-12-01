@@ -60,6 +60,9 @@ inline IREE::Codegen::TranslationInfoAttr getTranslationInfo(
 /// Returns the workgroup size specified on the `exportOp`.
 SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp);
 
+/// Returns the subgroup size specified on the `exportOp`.
+llvm::Optional<int64_t> getSubgroupSize(IREE::HAL::ExecutableExportOp exportOp);
+
 /// Set the translate executable info with the entry point op. Overwrites the
 /// existing attributes.
 // TODO(ravishankarm, benvanik): Eventually all the information needed for the
@@ -67,14 +70,17 @@ SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp);
 // information.
 void setTranslationInfo(IREE::HAL::ExecutableExportOp exportOp,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
-                        ArrayRef<int64_t> workgroupSize = {});
+                        ArrayRef<int64_t> workgroupSize = {},
+                        llvm::Optional<int64_t> subgroupSize = {});
 inline void setTranslationInfo(
     func::FuncOp entryPointFn,
     IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize = {}) {
+    ArrayRef<int64_t> workgroupSize = {},
+    llvm::Optional<int64_t> subgroupSize = {}) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
       getEntryPoint(entryPointFn);
-  return setTranslationInfo(*exportOp, translationInfo, workgroupSize);
+  return setTranslationInfo(*exportOp, translationInfo, workgroupSize,
+                            subgroupSize);
 }
 
 /// Sets the translation info on the `hal.executable.export` op
@@ -84,14 +90,15 @@ inline void setTranslationInfo(
 inline void setTranslationInfo(
     func::FuncOp entryPointFn,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize, unsigned softwarePipelineDepth = 0,
+    ArrayRef<int64_t> workgroupSize, llvm::Optional<int64_t> subgroupSize = {},
+    unsigned softwarePipelineDepth = 0,
     unsigned softwarePipelineStoreStage = 1) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
       getEntryPoint(entryPointFn);
   MLIRContext *context = entryPointFn.getContext();
   auto translationInfo =
       IREE::Codegen::TranslationInfoAttr::get(context, passPipeline);
-  setTranslationInfo(*exportOp, translationInfo, workgroupSize);
+  setTranslationInfo(*exportOp, translationInfo, workgroupSize, subgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
@@ -139,7 +146,9 @@ void setLoweringConfig(Operation *op, IREE::Codegen::LoweringConfigAttr config);
 inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     func::FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize = {}, unsigned softwarePipelineDepth = 0,
+    ArrayRef<int64_t> workgroupSize = {},
+    llvm::Optional<int64_t> subgroupSize = {},
+    unsigned softwarePipelineDepth = 0,
     unsigned softwarePipelineStoreStage = 1) {
   MLIRContext *context = entryPointFn.getContext();
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
@@ -147,7 +156,8 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn->getContext(), passPipeline, softwarePipelineDepth,
       softwarePipelineStoreStage);
-  setTranslationInfo(entryPointFn, translationInfo, workgroupSize);
+  setTranslationInfo(entryPointFn, translationInfo, workgroupSize,
+                     subgroupSize);
   return success();
 }
 
