@@ -20,8 +20,9 @@ LogicalResult setUserConfig(
   }
 
   SmallVector<int64_t> workgroupSize = compilationInfo.getWorkgroupSizeVals();
+  llvm::Optional<int64_t> subgroupSize = compilationInfo.getSubgroupSize();
   setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
-                     workgroupSize);
+                     workgroupSize, subgroupSize);
 
   setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
   eraseCompilationInfo(computeOp);

@@ -190,15 +190,17 @@ LogicalResult LoweringConfigAttr::verify(
 
 CompilationInfoAttr CompilationInfoAttr::get(
     MLIRContext *context, LoweringConfigAttr configAttr,
-    TranslationInfoAttr translationInfo, ArrayRef<int64_t> workgroupSize) {
+    TranslationInfoAttr translationInfo, ArrayRef<int64_t> workgroupSize,
+    llvm::Optional<int64_t> subgroupSize) {
   ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
-  return get(context, configAttr, translationInfo, workgroupSizeAttr);
+  return get(context, configAttr, translationInfo, workgroupSizeAttr,
+             subgroupSize);
 }
 
 LogicalResult CompilationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     LoweringConfigAttr loweringConfig, TranslationInfoAttr translationInfo,
-    ArrayAttr workgroupSize) {
+    ArrayAttr workgroupSize, llvm::Optional<int64_t> subgroupSize) {
   if (!loweringConfig) {
     return emitError() << "missing lowering config";
   }
