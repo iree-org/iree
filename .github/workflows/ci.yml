@@ -811,11 +811,12 @@ jobs:
         run: gcloud alpha storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+      # TODO(#11136): Only download the needed artifacts instead of everything.
       - name: "Downloading e2e test artifacts"
         run: |
           mkdir -p ${E2E_TEST_ARTIFACTS_DIR}
           gcloud alpha storage cp -r "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/*" "${E2E_TEST_ARTIFACTS_DIR}"
-      - name: "Download benchmark suite module expected output"
+      - name: "Download benchmark expected output"
         env:
           EXPECTED_OUTPUT_GSC_ARTIFACT: gs://iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy
           EXPECTED_OUTPUT_FILE: deeplab_v3_fp32_input_0_expected_output.npy

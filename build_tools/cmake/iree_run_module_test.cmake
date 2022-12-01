@@ -265,7 +265,7 @@ function(iree_benchmark_suite_module_test)
     ${ARGN}
   )
 
-  # Benchmark suite needs to be stored at the location of
+  # Benchmark artifacts needs to be stored at the location of
   # `IREE_E2E_TEST_ARTIFACTS_DIR` or the test target is bypassed.
   if(NOT DEFINED IREE_E2E_TEST_ARTIFACTS_DIR)
     return()
