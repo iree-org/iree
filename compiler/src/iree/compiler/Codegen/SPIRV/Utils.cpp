@@ -37,6 +37,19 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
   return config.getAs<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
 }
 
+llvm::Optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp) {
+  auto moduleOp = funcOp->getParentOfType<ModuleOp>();
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
+      getAllEntryPoints(moduleOp);
+  auto exportOp = exportOps.lookup(funcOp.getName());
+  if (!exportOp) return llvm::None;
+  if (auto size = exportOp.getSubgroupSize()) return size->getSExtValue();
+
+  spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(funcOp);
+  if (!target) return llvm::None;
+  return target.getResourceLimits().getSubgroupSize();
+}
+
 FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
                                                  int tilingLevel) {
   SmallVector<Operation *> computeOps;
