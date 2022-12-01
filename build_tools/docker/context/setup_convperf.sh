@@ -18,20 +18,20 @@
 
 set -xeuo pipefail
 
-export REPO_DIR=$1
-export REPO_SHA=$2
+export REPO_DIR="$1"
+export REPO_SHA="$2"
 
-pushd ${REPO_DIR}
+pushd "${REPO_DIR}"
 
 mkdir convperf
 pushd convperf
 git init
 git fetch --depth 1 https://github.com/nod-ai/convperf.git "${REPO_SHA}"
-git checkout ${REPO_SHA}
+git checkout "${REPO_SHA}"
 git submodule update --init --recursive --jobs 8 --depth 1
 
 # Checkout a specific commit.
-git checkout ${REPO_SHA}
+git checkout "${REPO_SHA}"
 
 # Create virtual environment.
 python3 -m venv convperf.venv
@@ -48,4 +48,4 @@ chmod -R 777 .
 git restore .
 git submodule foreach --recursive git restore .
 
-popd # ${REPO_DIR}
+popd # "${REPO_DIR}"

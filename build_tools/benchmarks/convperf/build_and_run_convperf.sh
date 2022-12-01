@@ -17,54 +17,53 @@
 #    ./build_and_run_convperf.sh \
 #        <convperf build dir> \
 #        <convperf results dir> \
-#        <iree SHA> \
+#        <iree commit branch or sha> \
 #        <convperf repo dir> (optional)
 
 set -xeuo pipefail
 
 export BUILD_DIR=$1
 export RESULTS_DIR=$2
-export IREE_SHA=${3:-"origin/main"}
-export REPO_DIR=${4:-${CONVPERF_REPO_DIR}}
+export IREE_COMMIT=${3:-"origin/main"}
+export REPO_DIR=${4:-"${CONVPERF_REPO_DIR}"}
 
 pushd ${REPO_DIR}
 source convperf.venv/bin/activate
 
 # Set all repos as a safe directory. Since this repo was created in the
-# DockerFile under `root`, git will not run commands on this repo as a
+# Dockerfile under `root`, git will not run commands on this repo as a
 # non-root user unless it is marked safe.
-for i in $(find ${REPO_DIR} -name '.git' | xargs dirname); do
+for i in $(find "${REPO_DIR}" -name '.git' | xargs dirname); do
   git config --global --add safe.directory $i
 done
 
 # Update IREE.
 pushd external/iree
-git fetch https://github.com/iree-org/iree "${IREE_SHA}"
-git checkout "${IREE_SHA}"
+git fetch https://github.com/iree-org/iree "${IREE_COMMIT}"
+git checkout "${IREE_COMMIT}"
 git submodule update --init --jobs 8 --depth 1
 popd # external/iree
 
 popd # ${REPO_DIR}
 
 # Build ConvPerf.
-cmake -GNinja -B ${BUILD_DIR} ${REPO_DIR}
-cmake --build ${BUILD_DIR} --verbose
+cmake -GNinja -B "${BUILD_DIR}" "${REPO_DIR}"
+cmake --build "${BUILD_DIR}"
 
 # Run ConvPerf for several threading configurations.
 declare -a threads=( 1 2 4 8 16 )
 
-for i in "${threads[@]}"
-do
-  python3 ${REPO_DIR}/convperf.py \
-      --benchmark_tool ${BUILD_DIR}/tools/benchmark_conv \
+for i in "${threads[@]}"; do
+  python3 "${REPO_DIR}/convperf.py" \
+      --benchmark_tool "${BUILD_DIR}/tools/benchmark_conv" \
       --runners iree,xsmm \
       --benchmark_sizes \
-      ${REPO_DIR}/benchmark_sizes/resnet50.json \
-      --num_threads=$i
+      "${REPO_DIR}/benchmark_sizes/resnet50.json" \
+      --num_threads="$i"
 
-  python ${REPO_DIR}/convperf.py --visualize --runtimes_file runtimes.json
-  mv runtimes.json ${RESULTS_DIR}/resnet50_thread$i.json
-  mv convs.png ${RESULTS_DIR}/resnet50_thread$i.png
+  python "${REPO_DIR}/convperf.py" --visualize --runtimes_file runtimes.json
+  mv runtimes.json "${RESULTS_DIR}/resnet50_thread$i.json"
+  mv convs.png "${RESULTS_DIR}/resnet50_thread$i.png"
 done
 
 
