@@ -51,14 +51,10 @@ using namespace mlir;
 
 // TODO: significantly better namespacing.
 using ::mlir::iree_compiler::IREE::transform_dialect::AllDims;
-using ::mlir::iree_compiler::IREE::transform_dialect::AllOperands;
 using ::mlir::iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::ConfigExtractPart;
-using ::mlir::iree_compiler::IREE::transform_dialect::DivisibleBy;
-using ::mlir::iree_compiler::IREE::transform_dialect::ElementTypeBitWidth;
 using ::mlir::iree_compiler::IREE::transform_dialect::
     ForeachThreadToWorkgroupOp;
-using ::mlir::iree_compiler::IREE::transform_dialect::HasAnyUse;
 using ::mlir::iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::
     IREEEraseHALDescriptorTypeFromMemRefOp;
@@ -67,9 +63,8 @@ using ::mlir::iree_compiler::IREE::transform_dialect::m_StructuredOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::
     MapNestedForeachThreadToGpuThreadsOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::NumEqualsTo;
-using ::mlir::iree_compiler::IREE::transform_dialect::OptionalMatch;
 using ::mlir::iree_compiler::IREE::transform_dialect::ShapeKind;
-using ::mlir::iree_compiler::IREE::transform_dialect::SingleCombinerReduction;
+using ::mlir::iree_compiler::IREE::transform_dialect::StructuredOpMatcher;
 using ::mlir::iree_compiler::IREE::transform_dialect::
     TileToForeachThreadAndWorkgroupCountRegionOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::
@@ -472,28 +467,8 @@ static constexpr unsigned cudaWarpSize = 32;
 static bool matchGPUReduction(linalg::LinalgOp op,
                               GPUReductionStrategyInfos &info) {
   // TODO: match the sequence the strategy supports.
-  auto fill = m_StructuredOp<linalg::FillOp>();
-  auto trailingEltwise = m_StructuredOp<linalg::GenericOp>()
-                             .input(AllOperands(), IsPermutation())
-                             .output(AllOperands(), IsPermutation())
-                             .input(NumEqualsTo(1))
-                             .output(NumEqualsTo(1));
-  auto leadingEltwise = trailingEltwise;
-  auto pattern = m_StructuredOp()
-                     .dim(AllDims(), ShapeKind::Static)
-                     .dim(-1, utils::IteratorType::reduction)
-                     .dim(-1, DivisibleBy(cudaWarpSize))
-                     // Can be extended to projected permutation with broadcast.
-                     .input(AllOperands(), IsPermutation())
-                     // TODO: we want to accept any input position here.
-                     .input(0, leadingEltwise, OptionalMatch())
-                     .output(NumEqualsTo(1))
-                     .output(0, fill)
-                     // Only single combiner over 32 bits for now due to
-                     // reduction distribution.
-                     .output(0, ElementTypeBitWidth(32))
-                     .output(0, SingleCombinerReduction())
-                     .result(0, HasAnyUse(), trailingEltwise, OptionalMatch());
+  StructuredOpMatcher pattern, fill, leadingEltwise, trailingEltwise;
+  makeGPUReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise);
   if (!matchPattern(op, pattern)) return false;
 
   info.hasLeadingEltwise = leadingEltwise.getCaptured() != nullptr;
