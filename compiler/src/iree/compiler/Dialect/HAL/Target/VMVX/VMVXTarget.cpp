@@ -29,32 +29,31 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-static llvm::cl::opt<std::string> clVMVXTuneFor(
-    "iree-vmvx-tune-for",
+static llvm::cl::opt<std::string> clVMVXTuneCPU(
+    "iree-vmvx-tune-cpu",
     llvm::cl::desc(
         "Hint to make IR more likely to perform well on the given target CPU "
-        "architecture, or architecture+features (example: \"aarch64\", "
-        "\"aarch64+dotprod+i8mm\"). The first component is the CPU "
-        "architecture, as in the first component of a LLVM target triple. "
-        "Optionally, any additional `+`-delimited components are CPU features "
-        "as in "
-        "--iree-llvm-target-cpu-features. This affects heuristics selecting "
-        "tile sizes. While "
-        "VMVX bytecode is always portable, certain fast code paths (ukernels) "
-        "require specific tile sizes. This may go away in the future if we "
-        "find better ways to reconcile portability and performance."),
+        "architectures+features. Comma-separated list. Each comma-delimited "
+        "entry is of the form `arch[+feature1[+feature2...]]` where "
+        "`arch` is a valid arch as in the first component of a llvm target "
+        "triple, and `feature1`, `feature2`, ... are as in "
+        "`--iree-llvm-target-cpu-features`. "
+        "Example: \"--iree-vmvx-tune-cpu=aarch64,aarch64+dotprod\" means "
+        "generate two variants, one for vanilla AArch64 and one for AArch64 "
+        "with the ARMv8.2 optional feature `dotprod`. "),
     llvm::cl::init(""));
 
 static IREE::HAL::ExecutableTargetAttr getVMVXExecutableTarget(
-    MLIRContext *context, StringRef backend, StringRef format) {
+    MLIRContext *context, StringRef backend, StringRef format,
+    StringRef tuneCPU) {
   SmallVector<NamedAttribute> config;
   auto addConfig = [context](SmallVector<NamedAttribute> &config,
                              StringRef name, StringRef value) {
     config.emplace_back(StringAttr::get(context, name),
                         StringAttr::get(context, value));
   };
-  if (!clVMVXTuneFor.empty()) {
-    auto initialSplit = StringRef(clVMVXTuneFor).split('+');
+  if (!tuneCPU.empty()) {
+    auto initialSplit = tuneCPU.split('+');
     addConfig(config, "target_triple", initialSplit.first);
     StringRef cpu_features_to_parse = initialSplit.second;
     std::string cpu_features_out;
@@ -73,6 +72,19 @@ static IREE::HAL::ExecutableTargetAttr getVMVXExecutableTarget(
       StringAttr::get(context, format), DictionaryAttr::get(context, config));
 }
 
+static ArrayAttr getVMVXExecutableTargets(MLIRContext *context,
+                                          StringRef backend, StringRef format) {
+  SmallVector<Attribute> targetAttrs;
+  StringRef commaSeparatedTuneCPU = clVMVXTuneCPU;
+  do {
+    auto split = commaSeparatedTuneCPU.split(',');
+    targetAttrs.push_back(
+        getVMVXExecutableTarget(context, backend, format, split.first));
+    commaSeparatedTuneCPU = split.second;
+  } while (!commaSeparatedTuneCPU.empty());
+  return ArrayAttr::get(context, targetAttrs);
+}
+
 class VMVXTargetBackend final : public TargetBackend {
  public:
   VMVXTargetBackend() = default;
@@ -89,8 +101,9 @@ class VMVXTargetBackend final : public TargetBackend {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getStringAttr("executable_targets"),
-                             getExecutableTargets(context));
+    configItems.emplace_back(
+        b.getStringAttr("executable_targets"),
+        getVMVXExecutableTargets(context, "vmvx", "vmvx-bytecode-fb"));
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::DeviceTargetAttr::get(
@@ -162,19 +175,6 @@ class VMVXTargetBackend final : public TargetBackend {
 
     return success();
   }
-
- private:
-  ArrayAttr getExecutableTargets(MLIRContext *context) const {
-    SmallVector<Attribute> targetAttrs;
-    // This is where we would multiversion.
-    targetAttrs.push_back(getExecutableTarget(context));
-    return ArrayAttr::get(context, targetAttrs);
-  }
-
-  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
-      MLIRContext *context) const {
-    return getVMVXExecutableTarget(context, "vmvx", "vmvx-bytecode-fb");
-  }
 };
 
 class VMVXInlineTargetBackend final : public TargetBackend {
@@ -193,8 +193,9 @@ class VMVXInlineTargetBackend final : public TargetBackend {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getStringAttr("executable_targets"),
-                             getExecutableTargets(context));
+    configItems.emplace_back(
+        b.getStringAttr("executable_targets"),
+        getVMVXExecutableTargets(context, "vmvx-inline", "vmvx-ir"));
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::DeviceTargetAttr::get(
@@ -203,19 +204,6 @@ class VMVXInlineTargetBackend final : public TargetBackend {
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
-  }
-
- private:
-  ArrayAttr getExecutableTargets(MLIRContext *context) const {
-    SmallVector<Attribute> targetAttrs;
-    // This is where we would multiversion.
-    targetAttrs.push_back(getExecutableTarget(context));
-    return ArrayAttr::get(context, targetAttrs);
-  }
-
-  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
-      MLIRContext *context) const {
-    return getVMVXExecutableTarget(context, "vmvx-inline", "vmvx-ir");
   }
 };
 
