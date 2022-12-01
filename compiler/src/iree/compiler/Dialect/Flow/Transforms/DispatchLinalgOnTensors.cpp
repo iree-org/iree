@@ -653,7 +653,8 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
     for (OpOperand &operand : candidate->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
       if (!producer) continue;
-      if (hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
+      if (isClonableIntoDispatchOp(producer) ||
+          hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
         continue;
       }
 
@@ -798,6 +799,12 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
   SmallVector<Operation *> roots(numRoots, nullptr);
   DenseMap<unsigned, SmallVector<Operation *>> producers;
 
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After deciding fusion groups ---\n";
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
   // TODO: Incrementally add ops to an empty DispatchGroupOp instead of
   // annotating fusion group IDs via attributes.
   funcOp.walk([&](Operation *op) {
@@ -854,6 +861,12 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
     regionOps.push_back(regionOp);
   }
 
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After creating flow.dispatch.region ---\n";
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
   // Clone additional producers and rewrite to DispatchWorkgroupsOp.
   SmallVector<Flow::DispatchWorkgroupsOp> result;
   for (auto regionOp : regionOps) {
@@ -865,6 +878,12 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
 
     result.push_back(*maybeWorkgroupOp);
   }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After creating flow.dispatch.workgroups ---\n";
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
 
   return result;
 }
@@ -1031,12 +1050,6 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   if (failed(maybeWorkgroupsOps)) return signalPassFailure();
   SmallVector<Flow::DispatchWorkgroupsOp> workgroupsOps = *maybeWorkgroupsOps;
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n--- After first step of dispatch region formation ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
   // Step 2: Rewrite InsertSliceOps to FlowUpdateOps.
   if (failed(convertInsertSliceOps(rewriter, funcOp, workgroupsOps,
                                    generateWorkloadRegion)))
@@ -1053,6 +1066,12 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
           rewriter, funcOp, generateWorkloadRegion);
   if (failed(newWorkgroupsOps)) return signalPassFailure();
   workgroupsOps.append(newWorkgroupsOps->begin(), newWorkgroupsOps->end());
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After other conversions ---\n";
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
 
   // A few extra canonicalizations/lowerings.
   {
