@@ -82,12 +82,12 @@ def LinalgExtVectorization:
                     "createLinalgExtVectorizationPass()";
 }
 
-def TileAndDecomposeWinogradInputTransform :
-    Pass<"iree-linalg-ext-tile-and-decompose-winograd-input", "func::FuncOp"> {
+def TileAndDecomposeWinogradTransform :
+    Pass<"iree-linalg-ext-tile-and-decompose-winograd", "func::FuncOp"> {
   let summary =
-      "Tiles and decomposes winograd input transform op into linalg ops";
+      "Tiles and decomposes winograd transform ops into linalg ops";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createTileAndDecomposeWinogradInputTransformPass()";
+                    "createTileAndDecomposeWinogradTransformPass()";
 }
 
 //===---------------------------------------------------------------------====//
