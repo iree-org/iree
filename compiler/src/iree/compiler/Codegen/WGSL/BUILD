@@ -26,5 +26,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:VectorDialect",
     ],
 )
