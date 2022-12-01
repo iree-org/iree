@@ -458,8 +458,6 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 
   // Tile to GPU invocations and vectorize.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVCreateFastSlowPathPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVAnnotateLoopsPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());

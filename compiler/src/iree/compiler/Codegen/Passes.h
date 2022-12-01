@@ -582,7 +582,7 @@ createSPIRVMapMemRefStorageClassPass();
 ///
 void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm);
 
-/// Annotates the innermost loops with the spirv distribute attribute
+/// Annotates the innermost loops with the spirv distribute attribute.
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVAnnotateLoopsPass();
 
 //----------------------------------------------------------------------------//

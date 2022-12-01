@@ -42,26 +42,15 @@ class SPIRVAnnotateLoopsPass final
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     SmallVector<scf::ForOp, 4> forOps;
-    bool afterWorkgroupLoops{false};
-    funcOp.walk([&](Operation *op) {
-      if (isa<IREE::Flow::DispatchTensorLoadOp>(op)) {
-        afterWorkgroupLoops = true;
-      }
-      if (isa<IREE::Flow::DispatchTensorStoreOp>(op)) {
-        afterWorkgroupLoops = false;
-      }
-      if (afterWorkgroupLoops) {
-        if (auto forOp = dyn_cast<scf::ForOp>(op)) forOps.push_back(forOp);
-      }
+    funcOp.walk([&](scf::ForOp forOp) {
+      if (!isTiledAndDistributedLoop(forOp)) forOps.push_back(forOp);
     });
 
     MLIRContext *context = &getContext();
     OpBuilder builder(context);
     const char *attrName = getSPIRVDistributeAttrName();
-    // Can only distribute to a maximum of 3 loops
-    int maxIndex{2};
     for (auto forOp : llvm::enumerate(forOps)) {
-      if (forOp.index() > maxIndex) break;
+      if (forOp.index() > kNumGPUDims) break;
       forOp.value()->setAttr(attrName, builder.getIndexAttr(forOp.index()));
     }
   }
