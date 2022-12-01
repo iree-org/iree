@@ -279,7 +279,7 @@ function(iree_benchmark_suite_module_test)
   string(TOUPPER "${_PLATFORM}" _UPPER_PLATFORM)
   set(_IREE_MODULE_COMPILE_CONFIG_ID "${IREE_MODULE_COMPILE_CONFIG_ID_${_UPPER_PLATFORM}}")
   if("${_IREE_MODULE_COMPILE_CONFIG_ID}" STREQUAL "")
-    message(WARNING "No compile config for ${_PLATFORM}. Skip ${_RULE_MODEL}.")
+    message(SEND_ERROR "No compile config for ${_PLATFORM}. Skip ${_RULE_MODEL}.")
     return()
   endif()
   # Drop the UUID prefix ".{8}-.{4}-.{4}-.{4}-.{12}_", 37 characters in total.
