@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "collapse_reduction.mlir"
     "conv1x1_to_matmul.mlir"
     "conv2d_to_img2col.mlir"
+    "conv2d_to_winograd.mlir"
     "convert_region_to_workgroups.mlir"
     "deduplicate_executables.mlir"
     "detach_elementwise_from_named_ops.mlir"

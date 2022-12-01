@@ -44,6 +44,12 @@ def ConvertConv2DToImg2Col :
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2DToImg2ColPass()";
 }
 
+def ConvertConv2DToWinograd :
+    Pass<"iree-flow-convert-conv2d-to-winograd", ""> {
+  let summary = "Convert linalg convolution ops to winograd based implementation";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2DToWinogradPass()";
+}
+
 def ConvertRegionToWorkgroups :
     Pass<"iree-flow-convert-region-to-workgroups", ""> {
   let summary = "Convert DispatchRegion ops to Workgroups ops.";

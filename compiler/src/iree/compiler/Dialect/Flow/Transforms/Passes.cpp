@@ -60,6 +60,11 @@ static llvm::cl::opt<bool> clEnableConvToImg2Col(
     llvm::cl::desc("Enable converting convolution ops to img2col form."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableConvToWinograd(
+    "iree-flow-enable-conv-winograd-transform",
+    llvm::cl::desc("Enable converting convolution ops to winograd form."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
     "iree-flow-enable-padding-linalg-ops",
     llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
@@ -271,6 +276,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // transpose.
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
+      .addPredicatedPass(clEnableConvToWinograd,
+                         createConvertConv2DToWinogradPass)
       // Enable data tiling after all linalg level transformations.
       .addPredicatedPass(clEnableDataTiling, createSetEncodingPass)
       ////////////////////////////////////////////////////////////////////////
