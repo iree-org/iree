@@ -1573,8 +1573,9 @@ static LogicalResult setRootConfig(
     }
   }
 
-  if (failed(setTranslationInfo(entryPointFn, translationInfo)))
+  if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
     return failure();
+  }
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
@@ -1605,8 +1606,9 @@ static LogicalResult setRootConfig(
       iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn->getContext(), pipeline);
-  if (failed(setTranslationInfo(entryPointFn, translationInfo)))
+  if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
     return failure();
+  }
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
@@ -1728,8 +1730,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   if (!getTranslationInfo(entryPointFn)) {
     // Fall back, just set the translation to CPUDefault.
     if (failed(setTranslationInfo(entryPointFn,
-                                  DispatchLoweringPassPipeline::CPUDefault)))
+                                  DispatchLoweringPassPipeline::CPUDefault))) {
       return failure();
+    }
   }
 
   return success();
