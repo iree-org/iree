@@ -25,7 +25,10 @@ std::string replaceAllSubstrs(const std::string &str, const std::string &match,
                               const std::string &substitute);
 
 // Sanitizes a symbol name for compatibility with common targets (C, file
-// systems, debug databases, etc).
+// systems, debug databases, etc). Characters outside the allowed range are
+// replaced by `_`.
+//
+// If coalesce_delims is true then consecutive `_` are replaced by a single `_`.
 //
 // MLIR identifiers must match this regex:
 //   (letter|[_]) (letter|digit|[_$.])*
@@ -37,7 +40,10 @@ std::string replaceAllSubstrs(const std::string &str, const std::string &match,
 //  `abc` -> `abc`
 //  `a.b` -> `a_b`
 //  `a$-æb` -> `a___b`
-std::string sanitizeSymbolName(StringRef name);
+//
+// If coalesce_delims is true then:
+//  `a$-æb` -> `a_b`
+std::string sanitizeSymbolName(StringRef name, bool coalesce_delims = false);
 
 // Sanitizes a file name for compatibility with common file systems.
 //

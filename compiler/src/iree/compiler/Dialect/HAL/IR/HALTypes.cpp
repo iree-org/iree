@@ -306,7 +306,18 @@ void ExecutableTargetAttr::print(AsmPrinter &p) const {
 }
 
 std::string ExecutableTargetAttr::getSymbolNameFragment() {
-  return sanitizeSymbolName(getFormat().getValue().lower());
+  std::string name = getFormat().getValue().lower();
+  if (auto config = getConfiguration()) {
+    for (StringRef configField : {"target_triple", "cpu_features"}) {
+      if (auto attr = config.getAs<StringAttr>(configField)) {
+        if (!attr.getValue().empty()) {
+          name += '_';
+          name += attr.getValue().lower();
+        }
+      }
+    }
+  }
+  return sanitizeSymbolName(name, /*coalesce_delims=*/true);
 }
 
 Attribute ExecutableTargetAttr::getMatchExpression() {

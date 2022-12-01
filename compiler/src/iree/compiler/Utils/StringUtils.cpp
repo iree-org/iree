@@ -27,14 +27,16 @@ std::string replaceAllSubstrs(const std::string &str, const std::string &match,
   return copy;
 }
 
-std::string sanitizeSymbolName(StringRef name) {
+std::string sanitizeSymbolName(StringRef name, bool coalesce_delims) {
   std::string result;
   result.reserve(name.size());
+  const char delim = '_';
   for (size_t i = 0; i < name.size(); ++i) {
     char c = name[i];
     if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
           (c >= '0' && c <= '9') || c == '_')) {
-      c = '_';
+      c = delim;
+      if (coalesce_delims && !result.empty() && result.back() == c) continue;
     }
     result.push_back(c);
   }
