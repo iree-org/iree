@@ -958,6 +958,9 @@ jobs:
       # Configurations
       - asan
       - tsan
+      - small_runtime
+      - gcc
+      - tracing
 
       # Crosscompilation
       - cross_compile_and_test
