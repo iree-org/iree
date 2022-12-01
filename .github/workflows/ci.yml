@@ -765,9 +765,6 @@ jobs:
             gcr.io/iree-oss/emscripten@sha256:20847a0a9503852d9594f3c4e7e633b913b450240b097d378dcd42d22ac0948e \
             build_tools/cmake/build_runtime_emscripten.sh
 
-  # TODO(#10391): Update the benchmark dependency with the new benchmark
-  # framework. The step only requires the compiled benchmark modules, not the
-  # result from the benchmark.
   test_benchmark_suites:
     needs: [setup, build_all, build_e2e_test_artifacts]
     if: needs.setup.outputs.should-run == 'true'
