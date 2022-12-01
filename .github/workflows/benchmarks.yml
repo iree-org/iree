@@ -133,9 +133,7 @@ jobs:
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
             --env "BUILD_PRESET=benchmark" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            "${DOCKER_IMAGE}" \
-            "${BUILD_SCRIPT}" \
-            "${BUILD_TOOLS_DIR}/build"
+            "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build"
       - name: "Compiling the benchmark tools with tracing"
         id: build-with-tracing
         run: |
@@ -143,9 +141,7 @@ jobs:
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
             --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            "${DOCKER_IMAGE}" \
-            "{BUILD_SCRIPT}" \
-            "${BUILD_TOOLS_DIR}/build-traced"
+            "${DOCKER_IMAGE}" "{BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
       - name: "Creating the benchmark tools archive"
         id: archive
         env:

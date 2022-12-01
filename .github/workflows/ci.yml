@@ -297,12 +297,11 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Building runtime"
-        env:
-          BUILD_PRESET: "test"
         # Note ccache is read-only here since this job runs on a GitHub-hosted runner
         # and GitHub runners don't have write access to GCS
         run: |
           ./build_tools/github_actions/docker_run.sh \
+            --env "BUILD_PRESET=test" \
             gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
             ./build_tools/cmake/build_runtime.sh \
             "${BUILD_DIR}"
