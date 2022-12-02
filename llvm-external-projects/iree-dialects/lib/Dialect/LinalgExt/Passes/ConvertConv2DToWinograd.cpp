@@ -117,46 +117,54 @@ public:
     const int64_t inputTileSize = outputTileSize + kernelSize - 1;
 
     DenseIntOrFPElementsAttr kernelAttr;
-    if (matchPattern(kernel, m_Constant(&kernelAttr))) {
-      Operation *constOp = kernel.getDefiningOp();
-      ShapedType type = constOp->getResult(0).getType().cast<ShapedType>();
-      Type elementType = type.getElementType();
-      assert(elementType.isa<FloatType>());
-      ArrayRef<int64_t> shape = type.getShape();
-      DenseElementsAttr::iterator_range<APFloat> nonSplatValues =
-          kernelAttr.getValues<APFloat>();
-      bool isSplat = kernelAttr.isSplat();
-      float splatValue{0.0};
-      if (isSplat) {
-        splatValue = kernelAttr.getSplatValue<APFloat>().convertToFloat();
-      }
-      SmallVector<int64_t> resultShape{inputTileSize * inputTileSize, shape[2],
-                                       shape[3]};
-      auto resultType = RankedTensorType::get(resultShape, elementType);
-      auto foldedKernelAttr =
-          foldFilterTransform(shape, inputTileSize, kernelSize, resultType,
-                              IREE::LinalgExt::Winograd::G_6x6_3x3, isSplat,
-                              splatValue, nonSplatValues, elementType);
-      rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, foldedKernelAttr);
-      return success();
+    if (!matchPattern(kernel, m_Constant(&kernelAttr))) {
+      return failure();
     }
-    return failure();
+
+    Operation *constOp = kernel.getDefiningOp();
+    ShapedType type = constOp->getResult(0).getType().cast<ShapedType>();
+    Type elementType = type.getElementType();
+    assert(elementType.isa<FloatType>());
+    ArrayRef<int64_t> shape = type.getShape();
+    DenseElementsAttr::iterator_range<APFloat> nonSplatValues =
+        kernelAttr.getValues<APFloat>();
+    bool isSplat = kernelAttr.isSplat();
+    float splatValue{0.0};
+    if (isSplat) {
+      splatValue = kernelAttr.getSplatValue<APFloat>().convertToFloat();
+    }
+    SmallVector<int64_t> resultShape{inputTileSize * inputTileSize, shape[2],
+                                     shape[3]};
+    auto resultType = RankedTensorType::get(resultShape, elementType);
+    auto foldedKernelAttr =
+        foldFilterTransform(shape, inputTileSize, kernelSize, resultType,
+                            IREE::LinalgExt::Winograd::G_6x6_3x3, isSplat,
+                            splatValue, nonSplatValues, elementType);
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, foldedKernelAttr);
+    return success();
   }
 };
 
 } // namespace
 
 static Value
-createCollapseOrExpand(Value tensor, Location loc, PatternRewriter &rewriter,
-                       SmallVectorImpl<int64_t> &outputShape,
-                       SmallVectorImpl<ReassociationIndices> &reassociations,
-                       bool collapse) {
+createCollapse(Value tensor, Location loc, PatternRewriter &rewriter,
+               SmallVectorImpl<int64_t> &outputShape,
+               SmallVectorImpl<ReassociationIndices> &reassociations) {
   auto tensorType = tensor.getType().cast<ShapedType>();
   auto elementTy = tensorType.getElementType();
   auto resultType = RankedTensorType::get(outputShape, elementTy);
-  if (collapse)
-    return rewriter.create<tensor::CollapseShapeOp>(loc, resultType, tensor,
-                                                    reassociations);
+  return rewriter.create<tensor::CollapseShapeOp>(loc, resultType, tensor,
+                                                  reassociations);
+}
+
+static Value
+createExpand(Value tensor, Location loc, PatternRewriter &rewriter,
+             SmallVectorImpl<int64_t> &outputShape,
+             SmallVectorImpl<ReassociationIndices> &reassociations) {
+  auto tensorType = tensor.getType().cast<ShapedType>();
+  auto elementTy = tensorType.getElementType();
+  auto resultType = RankedTensorType::get(outputShape, elementTy);
   return rewriter.create<tensor::ExpandShapeOp>(loc, resultType, tensor,
                                                 reassociations);
 }
@@ -297,8 +305,8 @@ public:
         resultShape[0] * resultShape[1],
         resultShape[2] * resultShape[3] * resultShape[4], resultShape[5]};
     SmallVector<ReassociationIndices> reassociations = {{0, 1}, {2, 3, 4}, {5}};
-    Value collapsedWinogradInput = createCollapseOrExpand(
-        winogradInput, loc, rewriter, collapsedShape, reassociations, true);
+    Value collapsedWinogradInput = createCollapse(
+        winogradInput, loc, rewriter, collapsedShape, reassociations);
 
     // Add BatchMatmulOp
     SmallVector<int64_t> bmmShape(collapsedShape.begin(), collapsedShape.end());
@@ -320,8 +328,8 @@ public:
                                           resultShape[2], resultShape[3],
                                           resultShape[4], outputShape[3]};
     reassociations = {{0, 1}, {2, 3, 4}, {5}};
-    Value expandedBmmResult = createCollapseOrExpand(
-        bmmResult, loc, rewriter, expandedShape, reassociations, false);
+    Value expandedBmmResult =
+        createExpand(bmmResult, loc, rewriter, expandedShape, reassociations);
 
     // Convert back into original domain
     SmallVector<int64_t> paddedResultShape(outputShape.size(), 0);
