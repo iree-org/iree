@@ -183,11 +183,15 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
     MLIRContext* context = &getContext();
 
     unsigned pipelineStoreStage = storeStage;
+    unsigned maxDepth = depth;
+
     // Mark the loop with shared memory copy for pipelining.
-    funcOp.walk([pipelineStoreStage](scf::ForOp forOp) {
+    funcOp.walk([pipelineStoreStage, maxDepth](scf::ForOp forOp) {
       bool copyToWorkgroupMemory = false;
       OpBuilder builder(forOp.getContext());
       SmallVector<Operation*> barriers;
+      SmallVector<Operation*> vectorLoads;
+      SmallVector<Operation*> vectorStores;
       for (Operation& op : forOp.getBody()->getOperations()) {
         // Pipeline the most inner for op that should be a flat region.
         if (op.getNumRegions() > 0) return;
@@ -212,25 +216,40 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
         auto ldSrcType = ld.getSource().getType().cast<MemRefType>();
         if (!hasDefaultOrHALAddressSpace(ldSrcType) || !ld->hasOneUse())
           continue;
+
         auto st =
             dyn_cast<vector::TransferWriteOp>(ld->use_begin()->getOwner());
         if (!st) continue;
         auto stSrcType = st.getSource().getType().cast<MemRefType>();
-        if (!hasSharedMemoryAddressSpace(stSrcType)) continue;
+        if (!hasSharedMemoryAddressSpace(stSrcType)) {
+          continue;
+        }
         copyToWorkgroupMemory = true;
+        vectorLoads.push_back(ld);
+        vectorStores.push_back(st);
         ld->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
         if (pipelineStoreStage == 0)
           st->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
       }
       if (copyToWorkgroupMemory) {
+        // Move barrier to just before stores to workgroup memory.
+        if (!barriers.empty() && pipelineStoreStage == 0 && maxDepth == 0) {
+          for (auto st : llvm::reverse(vectorStores)) {
+            st->moveAfter(vectorLoads.back());
+          }
+          barriers.front()->moveAfter(vectorLoads.back());
+        }
+
         forOp->setAttr(kPipeliningLoopMarker, builder.getUnitAttr());
-        if (pipelineStoreStage == 0 && !barriers.empty()) {
+        if (maxDepth > 0 && pipelineStoreStage == 0 && !barriers.empty()) {
           barriers.front()->erase();
         }
       }
     });
+
+    if (maxDepth == 0) return;
+
     scf::PipeliningOption options;
-    unsigned maxDepth = depth;
     auto getSchedule = [maxDepth](
                            scf::ForOp forOp,
                            std::vector<std::pair<Operation*, unsigned>>& ops) {
