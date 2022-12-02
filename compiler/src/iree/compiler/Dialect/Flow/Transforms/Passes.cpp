@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -194,6 +195,8 @@ static void buildOptionalPreprocessingPassPipeline(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
       .addPredicatedPass(clEnableConvToImg2Col,
                          IREE::Flow::createConvertConv2DToImg2ColPass)
+      .addPredicatedPass(clEnableConvToWinograd,
+                         IREE::LinalgExt::createConvertConv2DToWinogradPass)
       .addPredicatedPass(
           !clMmt4dTargetOptions.empty(),
           []() {
@@ -276,8 +279,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // transpose.
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
-      .addPredicatedPass(clEnableConvToWinograd,
-                         createConvertConv2DToWinogradPass)
       // Enable data tiling after all linalg level transformations.
       .addPredicatedPass(clEnableDataTiling, createSetEncodingPass)
       ////////////////////////////////////////////////////////////////////////
