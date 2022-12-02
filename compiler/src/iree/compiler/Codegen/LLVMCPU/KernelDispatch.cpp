@@ -1573,7 +1573,9 @@ static LogicalResult setRootConfig(
     }
   }
 
-  setTranslationInfo(entryPointFn, translationInfo);
+  if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
+    return failure();
+  }
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
@@ -1604,7 +1606,9 @@ static LogicalResult setRootConfig(
       iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn->getContext(), pipeline);
-  setTranslationInfo(entryPointFn, translationInfo);
+  if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
+    return failure();
+  }
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
@@ -1725,8 +1729,10 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 
   if (!getTranslationInfo(entryPointFn)) {
     // Fall back, just set the translation to CPUDefault.
-    setTranslationInfo(entryPointFn, DispatchLoweringPassPipeline::CPUDefault,
-                       /*workgroupSize=*/ArrayRef<int64_t>{});
+    if (failed(setTranslationInfo(entryPointFn,
+                                  DispatchLoweringPassPipeline::CPUDefault))) {
+      return failure();
+    }
   }
 
   return success();
@@ -1764,14 +1770,14 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
                                      TransformDialectInterpreterCodegen);
-      setTranslationInfo(funcOp, translationInfo);
+      if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
       continue;
     }
     if (clCPUEnableTransformDialectJit) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
                                      TransformDialectJitterCodegen);
-      setTranslationInfo(funcOp, translationInfo);
+      if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
       continue;
     }
 

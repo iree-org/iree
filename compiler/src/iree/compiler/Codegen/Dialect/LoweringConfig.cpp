@@ -273,20 +273,29 @@ llvm::Optional<int64_t> getSubgroupSize(
   return {};
 }
 
-void setTranslationInfo(IREE::HAL::ExecutableExportOp exportOp,
-                        IREE::Codegen::TranslationInfoAttr translationInfo,
-                        ArrayRef<int64_t> workgroupSize,
-                        Optional<int64_t> subgroupSize) {
+LogicalResult setDispatchConfig(func::FuncOp entryPoint,
+                                ArrayRef<int64_t> workgroupSize,
+                                llvm::Optional<int64_t> subgroupSize) {
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
+  if (failed(exportOp)) return failure();
   MLIRContext *context = exportOp->getContext();
-  exportOp->setAttr(kTranslationInfoAttrName, translationInfo);
-  // The workgroup size is set on the entry point op directly.
   if (!workgroupSize.empty()) {
-    auto attrs = getIndexIntegerArrayAttr(context, workgroupSize);
-    exportOp.setWorkgroupSizeAttr(attrs);
+    auto attr = getIndexIntegerArrayAttr(context, workgroupSize);
+    exportOp->setWorkgroupSizeAttr(attr);
   }
   if (subgroupSize) {
-    exportOp.setSubgroupSizeAttr(Builder(context).getIndexAttr(*subgroupSize));
+    exportOp->setSubgroupSizeAttr(Builder(context).getIndexAttr(*subgroupSize));
   }
+  return success();
+}
+
+LogicalResult setTranslationInfo(
+    func::FuncOp entryPoint,
+    IREE::Codegen::TranslationInfoAttr translationInfo) {
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
+  if (failed(exportOp)) return failure();
+  exportOp.value()->setAttr(kTranslationInfoAttrName, translationInfo);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

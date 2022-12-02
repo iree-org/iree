@@ -1061,9 +1061,7 @@ transform_ext::LowerVectorsOp::apply(mlir::transform::TransformResults &results,
       .setVectorTransferSplit(vectorTransferSplit);
 
   VectorTransferToSCFOptions vectorTransferToSCFOptions =
-      VectorTransferToSCFOptions()
-          .enableFullUnroll(getUnrollVectorTransfers())
-          .enableLowerPermutationMaps();
+      VectorTransferToSCFOptions().enableFullUnroll(getUnrollVectorTransfers());
 
   int maxTransferRank = 1;
 

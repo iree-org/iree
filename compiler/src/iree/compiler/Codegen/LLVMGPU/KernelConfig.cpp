@@ -353,8 +353,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
-  auto partitionedLoops =
-      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+  auto partitionedLoops = interfaceOp.getPartitionableLoops(llvm::None);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
@@ -554,8 +553,8 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                .getElementType();
   if (!elementType.isIntOrFloat()) return failure();
   unsigned bitWidth = elementType.getIntOrFloatBitWidth();
-  // Reduction distribution only supports 32-bit types now.
-  if (bitWidth != 32) return failure();
+  // Reduction distribution only supports 8/16/32 bit types now.
+  if (bitWidth != 32 && bitWidth != 16 && bitWidth != 8) return failure();
 
   const unsigned largestLoadSizeInBits = 128;
   unsigned vectorSize = largestLoadSizeInBits / bitWidth;
@@ -880,7 +879,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
                                      TransformDialectInterpreterCodegen);
-      setTranslationInfo(funcOp, translationInfo);
+      if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
       if (clGPUCodegenTransformDialectTileSizes.empty()) continue;
     }
 

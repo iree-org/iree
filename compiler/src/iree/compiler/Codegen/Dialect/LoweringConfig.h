@@ -57,48 +57,39 @@ inline IREE::Codegen::TranslationInfoAttr getTranslationInfo(
   return getTranslationInfo(*exportOp);
 }
 
+// TODO(ravishankarm, benvanik): Eventually all the information needed for the
+// lowering will be consolidated into a single attribute with richer
+// information.
+
 /// Returns the workgroup size specified on the `exportOp`.
 SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp);
 
 /// Returns the subgroup size specified on the `exportOp`.
 llvm::Optional<int64_t> getSubgroupSize(IREE::HAL::ExecutableExportOp exportOp);
 
-/// Set the translate executable info with the entry point op. Overwrites the
-/// existing attributes.
-// TODO(ravishankarm, benvanik): Eventually all the information needed for the
-// lowering will be consolidated into a single attribute with richer
-// information.
-void setTranslationInfo(IREE::HAL::ExecutableExportOp exportOp,
-                        IREE::Codegen::TranslationInfoAttr translationInfo,
-                        ArrayRef<int64_t> workgroupSize = {},
-                        llvm::Optional<int64_t> subgroupSize = {});
-inline void setTranslationInfo(
-    func::FuncOp entryPointFn,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize = {},
-    llvm::Optional<int64_t> subgroupSize = {}) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
-      getEntryPoint(entryPointFn);
-  return setTranslationInfo(*exportOp, translationInfo, workgroupSize,
-                            subgroupSize);
-}
+/// Sets and overwrites the dispatch workgroup/subgroup size for the given entry
+/// point function. Returns failure if the given entry point is not exported via
+/// hal.executable.export.
+LogicalResult setDispatchConfig(func::FuncOp entryPoint,
+                                ArrayRef<int64_t> workgroupSize,
+                                llvm::Optional<int64_t> subgroupSize);
 
-/// Sets the translation info on the `hal.executable.export` op
-/// corresponding to the `entryPointFn`. Returns failure if a translation info
-/// is already set on the entry point op and is incompatible with what is being
-/// set.
-inline void setTranslationInfo(
-    func::FuncOp entryPointFn,
+/// Sets and overwites the translate executable info for the given entry point.
+/// Returns failure if the given entry point is not exported via
+/// hal.executable.export.
+LogicalResult setTranslationInfo(
+    func::FuncOp entryPoint,
+    IREE::Codegen::TranslationInfoAttr translationInfo);
+
+inline LogicalResult setTranslationInfo(
+    func::FuncOp entryPoint,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize, llvm::Optional<int64_t> subgroupSize = {},
     unsigned softwarePipelineDepth = 0,
     unsigned softwarePipelineStoreStage = 1) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
-      getEntryPoint(entryPointFn);
-  MLIRContext *context = entryPointFn.getContext();
-  auto translationInfo =
-      IREE::Codegen::TranslationInfoAttr::get(context, passPipeline);
-  setTranslationInfo(*exportOp, translationInfo, workgroupSize, subgroupSize);
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPoint.getContext(), passPipeline, softwarePipelineDepth,
+      softwarePipelineStoreStage);
+  return setTranslationInfo(entryPoint, translationInfo);
 }
 
 //===----------------------------------------------------------------------===//
@@ -153,12 +144,10 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
   MLIRContext *context = entryPointFn.getContext();
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
   setLoweringConfig(op, config);
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), passPipeline, softwarePipelineDepth,
-      softwarePipelineStoreStage);
-  setTranslationInfo(entryPointFn, translationInfo, workgroupSize,
-                     subgroupSize);
-  return success();
+  if (failed(setDispatchConfig(entryPointFn, workgroupSize, subgroupSize)))
+    return failure();
+  return setTranslationInfo(entryPointFn, passPipeline, softwarePipelineDepth,
+                            softwarePipelineStoreStage);
 }
 
 //===----------------------------------------------------------------------===//

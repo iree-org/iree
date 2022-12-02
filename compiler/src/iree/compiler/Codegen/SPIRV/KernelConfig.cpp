@@ -971,8 +971,8 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
       op.getOutputs()[0].getType().cast<ShapedType>().getElementType();
   if (!elementType.isIntOrFloat()) return failure();
   unsigned bitWidth = elementType.getIntOrFloatBitWidth();
-  // Reduction distribution only supports 32-bit types now.
-  if (bitWidth != 32) return failure();
+  // Reduction distribution only supports 8/16/32 bit types now.
+  if (bitWidth != 32 && bitWidth != 16 && bitWidth != 8) return failure();
 
   // Let each thread handle `vectorSize` elements.
   unsigned vectorSize = kMaxVectorNumBits / bitWidth;
@@ -1113,7 +1113,15 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                  Optional<int64_t> lossFactor = llvm::None) {
     LLVM_DEBUG(llvm::dbgs() << "\nLoss factor: " << lossFactor << "\n");
     initConfiguration();
-
+    // If there are more than 3 parallel dim try to tile the extra higher level
+    // dimensions to 1 for extra dimensions.
+    if (isa<linalg::GenericOp>(linalgOp.getOperation())) {
+      SmallVector<int64_t> ranges = linalgOp.getStaticLoopRanges();
+      for (int64_t i = 0, e = workgroupTileSizes.size(); i < e; i++) {
+        if (workgroupTileSizes[i] != 0) break;
+        if (ranges[i] != 1) workgroupTileSizes[i] = 1;
+      }
+    }
     // Scan from the innermost shape dimension and try to deduce the
     // configuration for the corresponding GPU workgroup dimension.
     int64_t wgDim = 0;
