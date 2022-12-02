@@ -224,9 +224,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(passManager)
-      .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass)
       .addPass(IREE::Flow::createDetachElementwiseFromNamedOpsPass)
-      .addPass(mlir::createLinalgNamedOpConversionPass);
+      .addPass(mlir::createLinalgNamedOpConversionPass)
+      .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass);
 
   // Optional pre-processing passes.
   buildOptionalPreprocessingPassPipeline(passManager);
