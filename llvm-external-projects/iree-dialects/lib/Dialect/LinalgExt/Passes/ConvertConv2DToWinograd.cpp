@@ -42,6 +42,10 @@ static bool hasAllOneValues(DenseIntElementsAttr attr) {
   return llvm::all_of(attr, [](APInt element) { return element.isOne(); });
 }
 
+// TODO: Make this a user-settable parameter once we have support
+// for more tile sizes
+static constexpr int64_t outputTileSize = 6;
+
 /// This function computes the Winograd filter transform when
 /// the filter is known to be a constant. Specifically, this
 /// function computes matmul(G, matmul(F, transpose(G))) where
@@ -89,6 +93,58 @@ static DenseElementsAttr foldFilterTransform(
   }
   return DenseElementsAttr::get(outputType, output);
 }
+
+namespace {
+
+class FoldWinogradFilterTransform final
+    : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
+                                PatternRewriter &rewriter) const override {
+    // Check that kernel size = 3x3
+    Value kernel = convOp.getInputs()[1];
+    auto kernelType = kernel.getType().cast<ShapedType>();
+    if (!kernelType)
+      return failure();
+    ArrayRef<int64_t> kernelShape = kernelType.getShape();
+    const int64_t kh = kernelShape[0];
+    const int64_t kw = kernelShape[1];
+    if ((kh != 3) || (kw != 3))
+      return failure();
+    const int64_t kernelSize = kh;
+    const int64_t inputTileSize = outputTileSize + kernelSize - 1;
+
+    DenseIntOrFPElementsAttr kernelAttr;
+    if (matchPattern(kernel, m_Constant(&kernelAttr))) {
+      Operation *constOp = kernel.getDefiningOp();
+      ShapedType type = constOp->getResult(0).getType().cast<ShapedType>();
+      Type elementType = type.getElementType();
+      assert(elementType.isa<FloatType>());
+      ArrayRef<int64_t> shape = type.getShape();
+      DenseElementsAttr::iterator_range<APFloat> nonSplatValues =
+          kernelAttr.getValues<APFloat>();
+      bool isSplat = kernelAttr.isSplat();
+      float splatValue{0.0};
+      if (isSplat) {
+        splatValue = kernelAttr.getSplatValue<APFloat>().convertToFloat();
+      }
+      SmallVector<int64_t> resultShape{inputTileSize * inputTileSize, shape[2],
+                                       shape[3]};
+      auto resultType = RankedTensorType::get(resultShape, elementType);
+      auto foldedKernelAttr =
+          foldFilterTransform(shape, inputTileSize, kernelSize, resultType,
+                              IREE::LinalgExt::Winograd::G_6x6_3x3, isSplat,
+                              splatValue, nonSplatValues, elementType);
+      rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, foldedKernelAttr);
+      return success();
+    }
+    return failure();
+  }
+};
+
+} // namespace
 
 static Value
 createCollapseOrExpand(Value tensor, Location loc, PatternRewriter &rewriter,
@@ -186,58 +242,21 @@ public:
     if (!hasAllOneValues(convOp.getDilations()))
       return failure();
 
-    // Check that kernel size = 3x3
+    // Check that kernel has been constant folded (by validating rank = 3)
     Value kernel = convOp.getInputs()[1];
     auto kernelType = kernel.getType().cast<ShapedType>();
     if (!kernelType)
       return failure();
-    ArrayRef<int64_t> kernelShape = kernelType.getShape();
     Type elementType = kernelType.getElementType();
-    const int64_t kh = kernelShape[0];
-    const int64_t kw = kernelShape[1];
-    if ((kh != 3) || (kw != 3))
+    ArrayRef<int64_t> kernelShape = kernelType.getShape();
+    if (kernelShape.size() != 3)
       return failure();
-    const int64_t kernelSize = kh;
 
-    // TODO: Make this a user-settable parameter once we have support
-    // for more tile sizes
-    const int64_t outputTileSize = 6;
+    const int64_t kernelSize = 3;
     const int64_t inputTileSize = outputTileSize + kernelSize - 1;
 
-    // Determine if filter transform can be constant folded (only true for
-    // inference)
-    Location loc = convOp.getLoc();
-    bool constantFoldFilter{false};
-    Value foldedKernel;
-    DenseIntOrFPElementsAttr kernelAttr;
-    if (matchPattern(kernel, m_Constant(&kernelAttr))) {
-      Operation *constOp = kernel.getDefiningOp();
-      ShapedType type = constOp->getResult(0).getType().cast<ShapedType>();
-      Type elementType = type.getElementType();
-      assert(elementType.isa<FloatType>());
-      ArrayRef<int64_t> shape = type.getShape();
-      DenseElementsAttr::iterator_range<APFloat> nonSplatValues =
-          kernelAttr.getValues<APFloat>();
-      bool isSplat = kernelAttr.isSplat();
-      float splatValue{0.0};
-      if (isSplat) {
-        splatValue = kernelAttr.getSplatValue<APFloat>().convertToFloat();
-      }
-      SmallVector<int64_t> resultShape{inputTileSize * inputTileSize, shape[2],
-                                       shape[3]};
-      auto resultType = RankedTensorType::get(resultShape, elementType);
-      auto foldedKernelAttr =
-          foldFilterTransform(shape, inputTileSize, kernelSize, resultType,
-                              IREE::LinalgExt::Winograd::G_6x6_3x3, isSplat,
-                              splatValue, nonSplatValues, elementType);
-      foldedKernel = rewriter.replaceOpWithNewOp<arith::ConstantOp>(
-          constOp, foldedKernelAttr);
-      constantFoldFilter = true;
-    }
-    if (!constantFoldFilter)
-      return failure();
-
     // Create winograd input transform op
+    Location loc = convOp.getLoc();
     Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
     Value input = convOp.getInputs()[0];
@@ -292,7 +311,7 @@ public:
     auto fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zero},
                                                   ValueRange{emptyTensor});
     auto bmmOp = rewriter.create<linalg::BatchMatmulOp>(
-        loc, bmmOutputType, ValueRange({collapsedWinogradInput, foldedKernel}),
+        loc, bmmOutputType, ValueRange({collapsedWinogradInput, kernel}),
         ValueRange({fillOp.result()}));
     Value bmmResult = bmmOp.getResult(0);
 
@@ -348,7 +367,8 @@ struct ConvertConv2DToWinogradPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
-    patterns.insert<ConvertConv2DNhwcHwcf>(context);
+    patterns.insert<FoldWinogradFilterTransform, ConvertConv2DNhwcHwcf>(
+        context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();

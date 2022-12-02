@@ -193,10 +193,10 @@ void buildGlobalOptimizationPassPipeline(
 /// uses case.
 static void buildOptionalPreprocessingPassPipeline(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
-      .addPredicatedPass(clEnableConvToImg2Col,
-                         IREE::Flow::createConvertConv2DToImg2ColPass)
       .addPredicatedPass(clEnableConvToWinograd,
                          IREE::LinalgExt::createConvertConv2DToWinogradPass)
+      .addPredicatedPass(clEnableConvToImg2Col,
+                         IREE::Flow::createConvertConv2DToImg2ColPass)
       .addPredicatedPass(
           !clMmt4dTargetOptions.empty(),
           []() {
