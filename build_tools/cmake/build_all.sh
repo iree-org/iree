@@ -56,18 +56,23 @@ declare -a CMAKE_ARGS=(
   "-DIREE_TARGET_BACKEND_WEBGPU=${IREE_TARGET_BACKEND_WEBGPU}"
 )
 
-"$CMAKE_BIN" "${CMAKE_ARGS[@]}"
-echo "Building all"
-echo "------------"
-"$CMAKE_BIN" --build "${BUILD_DIR}" -- -k 0
-
-echo "Building 'install'"
+# DO NOT SUBMIT
+echo "Building 'iree-compile'"
 echo "------------------"
-"${CMAKE_BIN}" --build "${BUILD_DIR}" --target install -- -k 0
+"${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-compile -- -k 0
 
-echo "Building test deps"
-echo "------------------"
-"$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
+# "$CMAKE_BIN" "${CMAKE_ARGS[@]}"
+# echo "Building all"
+# echo "------------"
+# "$CMAKE_BIN" --build "${BUILD_DIR}" -- -k 0
+
+# echo "Building 'install'"
+# echo "------------------"
+# "${CMAKE_BIN}" --build "${BUILD_DIR}" --target install -- -k 0
+
+# echo "Building test deps"
+# echo "------------------"
+# "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
 
 if (( IREE_READ_REMOTE_CCACHE == 1 )); then
   ccache --show-stats
