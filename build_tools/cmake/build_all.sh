@@ -25,7 +25,8 @@ IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
 IREE_TARGET_BACKEND_WEBGPU="${IREE_TARGET_BACKEND_WEBGPU:-ON}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
+# DO NOT SUBMIT
+# source build_tools/cmake/setup_ccache.sh
 
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"
