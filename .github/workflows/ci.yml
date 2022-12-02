@@ -768,17 +768,17 @@ jobs:
             abi: arm64-v8a
             docker_image: "gcr.io/iree-oss/android@sha256:e5f45760ab2dc8a1d72dc6e9d90056719bedac5678ee90e6d9f9b958172b4834"
             # No test_script
-          - famliy: riscv
+          - family: riscv
             platform: linux-rv64
             abi: lp64d
             docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
             test_script: "./build_tools/cmake/test_riscv.sh"
-          - famliy: riscv
+          - family: riscv
             platform: linux-rv32
             abi: ilp32d
             docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
             test_script: "./build_tools/cmake/test_riscv.sh"
-          - famliy: riscv
+          - family: riscv
             platform: baremetal-rv32
             abi: ilp32
             docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
@@ -810,7 +810,7 @@ jobs:
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=${DOCKER_IMAGE}" \
             --env "${FAMILY^^}_PLATFORM=${PLATFORM}" \
-            --env "${FAMLIY^^}_ABI=${ABI}" \
+            --env "${FAMILY^^}_ABI=${ABI}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
