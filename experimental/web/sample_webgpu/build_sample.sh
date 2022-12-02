@@ -46,11 +46,13 @@ INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
 echo "=== Compiling sample MLIR files to VM FlatBuffer outputs (.vmfb) ==="
 COMPILE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
 
+# TODO(#11321): Enable iree-codegen-gpu-native-math-precision by default?
 compile_sample() {
   echo "  Compiling '$1' sample for WebGPU..."
   ${COMPILE_TOOL?} $3 \
     --iree-input-type=$2 \
     --iree-hal-target-backends=webgpu \
+    --iree-codegen-gpu-native-math-precision=true \
     --o ${BINARY_DIR}/$1_webgpu.vmfb
 }
 
