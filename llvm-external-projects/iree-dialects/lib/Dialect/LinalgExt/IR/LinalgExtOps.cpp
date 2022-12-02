@@ -1655,7 +1655,7 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   // by the pack operation, and that the output shape
   // represents full tiles.
   ShapedType expectedPackedType = PackOp::getPackedType(
-      unpackedType, packOrUnPack.getStaticTiles(), innerDimsPos, outerDimPerm);
+      unpackedType, packOrUnPack.getMixedTiles(), innerDimsPos, outerDimPerm);
   if (!isSmallerThan(expectedPackedType.getShape(), packedType.getShape())) {
     return op->emitError("the shape of output is not large enough to hold the "
                          "packed data. Expected at least ")
@@ -1774,26 +1774,31 @@ SmallVector<OpFoldResult> PackOp::getResultShape(OpBuilder &builder) {
 }
 
 ShapedType PackOp::getPackedType(ShapedType sourceType,
-                                 ArrayRef<int64_t> innerTileSizes,
+                                 ArrayRef<OpFoldResult> innerTileSizes,
                                  ArrayRef<int64_t> innerDimsPos,
                                  ArrayRef<int64_t> outerDimsPerm) {
   SmallVector<int64_t> resultShape = llvm::to_vector(sourceType.getShape());
   for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
     if (ShapedType::isDynamic(resultShape[tiledDim.value()]))
       continue;
-    if (ShapedType::isDynamic(innerTileSizes[tiledDim.index()])) {
+    Attribute innerTileSizeAttr =
+        innerTileSizes[tiledDim.index()].dyn_cast<Attribute>();
+    if (!innerTileSizeAttr) {
       resultShape[tiledDim.value()] = ShapedType::kDynamic;
       continue;
     }
-    resultShape[tiledDim.value()] = ceilDiv(resultShape[tiledDim.value()],
-                                            innerTileSizes[tiledDim.index()]);
+    int64_t innerTileSize = innerTileSizeAttr.cast<IntegerAttr>().getInt();
+    resultShape[tiledDim.value()] =
+        ceilDiv(resultShape[tiledDim.value()], innerTileSize);
   }
 
   // Swap tile loops if outer_dims_perm is available.
   resultShape = interchange<int64_t>(resultShape, outerDimsPerm, /*offset=*/0);
 
   // Append the inner tile dimensions.
-  resultShape.append(innerTileSizes.begin(), innerTileSizes.end());
+  for (OpFoldResult tileSize : innerTileSizes) {
+    resultShape.push_back(getAttrValueOrDynamic(tileSize));
+  }
   return TypeSwitch<ShapedType, ShapedType>(sourceType)
       .Case<RankedTensorType>([&](auto shapedType) {
         return RankedTensorType::get(resultShape, shapedType.getElementType());

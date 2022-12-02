@@ -93,6 +93,15 @@ SmallVector<OpFoldResult> toOpFoldResult(MLIRContext *context,
   return result;
 }
 
+int64_t getAttrValueOrDynamic(OpFoldResult ofr) {
+  if (Attribute attr = ofr.dyn_cast<Attribute>()) {
+    if (IntegerAttr iattr = attr.dyn_cast<IntegerAttr>()) {
+      return iattr.getInt();
+    }
+  }
+  return ShapedType::kDynamic;
+}
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

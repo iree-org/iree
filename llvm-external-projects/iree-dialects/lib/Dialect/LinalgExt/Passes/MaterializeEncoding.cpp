@@ -47,15 +47,8 @@ getMaterializedType(RankedTensorType tensorType,
   if (failed(materializeEncodingInfo)) {
     return tensorType;
   }
-  SmallVector<int64_t> staticTileSizes;
-  for (OpFoldResult tileDim : materializeEncodingInfo->innerTileSizes) {
-    if (Attribute tileDimAttr = tileDim.dyn_cast<Attribute>()) {
-      staticTileSizes.push_back(tileDimAttr.cast<IntegerAttr>().getInt());
-    } else {
-      staticTileSizes.push_back(ShapedType::kDynamic);
-    }
-  }
-  return PackOp::getPackedType(tensorType, staticTileSizes,
+  return PackOp::getPackedType(tensorType,
+                               materializeEncodingInfo->innerTileSizes,
                                materializeEncodingInfo->innerDimsPos,
                                materializeEncodingInfo->outerDimsPerm)
       .cast<RankedTensorType>();

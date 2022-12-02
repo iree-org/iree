@@ -62,6 +62,7 @@ Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
 IntegerAttr toIntegerAttr(MLIRContext *context, int64_t i);
 SmallVector<OpFoldResult> toOpFoldResult(MLIRContext *context,
                                          ArrayRef<int64_t> array);
+int64_t getAttrValueOrDynamic(OpFoldResult ofr);
 
 } // namespace LinalgExt
 } // namespace IREE

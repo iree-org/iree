@@ -669,7 +669,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     // to allow getting the type of the destination while creating the `pack`
     // op.
     static ShapedType getPackedType(ShapedType sourceType,
-        ArrayRef<int64_t> innerTileSizes, ArrayRef<int64_t> innerDimsPos,
+        ArrayRef<OpFoldResult> innerTileSizes, ArrayRef<int64_t> innerDimsPos,
         ArrayRef<int64_t> outerDimsPerm = {});
 
     // Method to implement for specifying output range for
