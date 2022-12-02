@@ -59,6 +59,10 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
 Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
                                 Location loc, PatternRewriter &rewriter);
 
+IntegerAttr toIntegerAttr(MLIRContext *context, int64_t i);
+SmallVector<OpFoldResult> toOpFoldResult(MLIRContext *context,
+                                         ArrayRef<int64_t> array);
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

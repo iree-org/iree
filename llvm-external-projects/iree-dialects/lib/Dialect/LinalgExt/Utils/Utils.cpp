@@ -80,6 +80,19 @@ Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
                RankedTensorType::get(shape, rewriter.getF32Type()), vector));
 }
 
+IntegerAttr toIntegerAttr(MLIRContext *context, int64_t i) {
+  return IntegerAttr::get(IntegerType::get(context, 64), APInt(64, i));
+}
+
+SmallVector<OpFoldResult> toOpFoldResult(MLIRContext *context,
+                                         ArrayRef<int64_t> array) {
+  SmallVector<OpFoldResult> result;
+  for (int64_t i : array) {
+    result.emplace_back(toIntegerAttr(context, i));
+  }
+  return result;
+}
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

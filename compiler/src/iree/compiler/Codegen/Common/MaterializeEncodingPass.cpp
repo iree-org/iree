@@ -10,6 +10,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -27,6 +28,8 @@ namespace iree_compiler {
 using IREE::HAL::ExecutableTargetAttr;
 using IREE::LinalgExt::MaterializeEncodingInfo;
 using IREE::LinalgExt::TensorEncoding;
+using IREE::LinalgExt::toIntegerAttr;
+using IREE::LinalgExt::toOpFoldResult;
 
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
 /// returns the materialized shape of the `dispatchTensorType`. The
@@ -58,13 +61,10 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
 
   SmallVector<OpFoldResult, 4> targetShape =
       getMixedValues(dispatchTensorType.getShape(), dynamicDims, builder);
-  SmallVector<OpFoldResult> innerTileSizes = llvm::to_vector(llvm::map_range(
-      encodingInfo->innerTileSizes,
-      [&](int64_t v) -> OpFoldResult { return builder.getIndexAttr(v); }));
   SmallVector<OpFoldResult> convertedTargetShape =
       IREE::LinalgExt::PackOp::getResultShape(
-          builder, loc, targetShape, innerTileSizes, encodingInfo->innerDimsPos,
-          encodingInfo->outerDimsPerm);
+          builder, loc, targetShape, encodingInfo->innerTileSizes,
+          encodingInfo->innerDimsPos, encodingInfo->outerDimsPerm);
   return convertedTargetShape;
 }
 
@@ -188,21 +188,25 @@ static MatmulTileParams chooseMatmulTileParams(MatmulType type,
 }
 
 static MaterializeEncodingInfo chooseEncodingInfoForMatmul(
-    MatmulType type, MatmulOperandRole operandRole,
+    MLIRContext *context, MatmulType type, MatmulOperandRole operandRole,
     ExecutableTargetAttr target) {
   MatmulTileParams tileParams = chooseMatmulTileParams(type, target);
   MaterializeEncodingInfo encodingInfo;
   encodingInfo.innerDimsPos = {0, 1};
   if (operandRole == MatmulOperandRole::LHS) {
-    encodingInfo.innerTileSizes = {tileParams.M, tileParams.K};
+    encodingInfo.innerTileSizes =
+        toOpFoldResult(context, {tileParams.M, tileParams.K});
   } else if (operandRole == MatmulOperandRole::RHS) {
-    encodingInfo.innerTileSizes = {tileParams.K, tileParams.N};
+    encodingInfo.innerTileSizes =
+        toOpFoldResult(context, {tileParams.K, tileParams.N});
   } else if (operandRole == MatmulOperandRole::RHS_TRANSPOSE) {
-    encodingInfo.innerTileSizes = {tileParams.N, tileParams.K};
+    encodingInfo.innerTileSizes =
+        toOpFoldResult(context, {tileParams.N, tileParams.K});
     encodingInfo.innerDimsPos = {1, 0};
     encodingInfo.outerDimsPerm = {1, 0};
   } else if (operandRole == MatmulOperandRole::RESULT) {
-    encodingInfo.innerTileSizes = {tileParams.M, tileParams.N};
+    encodingInfo.innerTileSizes =
+        toOpFoldResult(context, {tileParams.M, tileParams.N});
   } else {
     assert(false);  // already validated.
     return {};
@@ -211,32 +215,39 @@ static MaterializeEncodingInfo chooseEncodingInfoForMatmul(
 }
 
 static void AdjustTileSizesToNarrowStaticShape(
-    MaterializeEncodingInfo &encodingInfo, ArrayRef<int64_t> shape) {
+    MLIRContext *context, MaterializeEncodingInfo &encodingInfo,
+    ArrayRef<int64_t> shape) {
   for (size_t i = 0; i < shape.size(); i++) {
     int64_t size = shape[encodingInfo.innerDimsPos[i]];
     if (!ShapedType::isDynamic(size)) {
-      int64_t &tileSize = encodingInfo.innerTileSizes[i];
-      while (tileSize > size) {
-        tileSize = llvm::PowerOf2Ceil(tileSize) / 2;
+      if (Attribute tileSizeAttr =
+              encodingInfo.innerTileSizes[i].dyn_cast<Attribute>()) {
+        int64_t tileSize = tileSizeAttr.cast<IntegerAttr>().getInt();
+        while (tileSize > size) {
+          tileSize = llvm::PowerOf2Ceil(tileSize) / 2;
+        }
+        encodingInfo.innerTileSizes[i] = toIntegerAttr(context, tileSize);
       }
     }
   }
 }
 
 static FailureOr<MaterializeEncodingInfo> chooseEncodingInfo(
-    RankedTensorType tensorType, ExecutableTargetAttr target) {
+    MLIRContext *context, RankedTensorType tensorType,
+    ExecutableTargetAttr target) {
   Optional<TensorEncoding> encoding = getEncoding(tensorType);
   if (!encoding) return failure();
   auto matmulType = getMatmulType(*encoding);
   auto matmulOperandRole = getMatmulOperandRole(*encoding);
   MaterializeEncodingInfo encodingInfo;
   if (matmulType && matmulOperandRole) {
-    encodingInfo =
-        chooseEncodingInfoForMatmul(*matmulType, *matmulOperandRole, target);
+    encodingInfo = chooseEncodingInfoForMatmul(context, *matmulType,
+                                               *matmulOperandRole, target);
   } else {
     return failure();
   }
-  AdjustTileSizesToNarrowStaticShape(encodingInfo, tensorType.getShape());
+  AdjustTileSizesToNarrowStaticShape(context, encodingInfo,
+                                     tensorType.getShape());
   return encodingInfo;
 }
 
@@ -417,8 +428,8 @@ void IREEMaterializeEncodingPass::runOnOperation() {
     RewritePatternSet materializeEncodingPattern(context);
     auto targetAttr = ExecutableTargetAttr::lookup(operation);
     IREE::LinalgExt::MaterializeEncodingTypeConverter typeConverter(
-        [targetAttr](RankedTensorType tensorType) {
-          return chooseEncodingInfo(tensorType, targetAttr);
+        [context, targetAttr](RankedTensorType tensorType) {
+          return chooseEncodingInfo(context, tensorType, targetAttr);
         });
     // Add type conversion for `!flow.dispatch.tensor` type.
     typeConverter.addConversion(

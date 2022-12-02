@@ -90,7 +90,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtToLoopsPass();
 /// Container of information needed to materialize the pack operation.
 struct MaterializeEncodingInfo {
   SmallVector<int64_t> innerDimsPos;
-  SmallVector<int64_t> innerTileSizes;
+  SmallVector<OpFoldResult> innerTileSizes;
   SmallVector<int64_t> outerDimsPerm;
 };
 using MaterializeEncodingFn =

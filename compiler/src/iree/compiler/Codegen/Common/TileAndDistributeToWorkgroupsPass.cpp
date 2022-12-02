@@ -130,8 +130,7 @@ getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
       return packOp.emitOpError(
           "unhandled distribution of pack op with dynamic inner tile size");
     }
-    encodingInfo.innerTileSizes.push_back(
-        tileSize.get<Attribute>().cast<IntegerAttr>().getInt());
+    encodingInfo.innerTileSizes.push_back(tileSize);
   }
   encodingInfo.innerDimsPos = llvm::to_vector(packOp.getInnerDimsPos());
   encodingInfo.outerDimsPerm = llvm::to_vector(packOp.getOuterDimsPerm());
@@ -256,15 +255,10 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
     ValueRange workload = workgroupCountOp.getOperands();
     // The workload represents the unpacked shape. Get the workload of the
     // packed shape.
-    auto getAsOpFoldResults = [&](ArrayRef<int64_t> intVals) {
-      return llvm::to_vector(llvm::map_range(
-          intVals,
-          [&](int64_t i) -> OpFoldResult { return rewriter.getIndexAttr(i); }));
-    };
     SmallVector<OpFoldResult> resultShape =
         IREE::LinalgExt::PackOp::getResultShape(
             rewriter, workgroupCountOp.getLoc(), getAsOpFoldResult(workload),
-            getAsOpFoldResults(materializeEncodingInfo.innerTileSizes),
+            materializeEncodingInfo.innerTileSizes,
             materializeEncodingInfo.innerDimsPos,
             materializeEncodingInfo.outerDimsPerm);
 
