@@ -62,13 +62,28 @@ function(iree_bytecode_module)
     set(_COMPILE_TOOL "iree-compile")
   endif()
 
+  iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
+
+  # Extend _RULE_DEPENDS with the compiler library implementation so changes
+  # to the compiler dynamic library trigger rebuilding bytecode modules.
+  #
+  # There is a dependency chain between:
+  #     code -> static library -> shared library -> tools -> generated files
+  # * On Linux, code changes link the shared library _and_ the tools, which
+  #   triggers rebuilding generated files
+  # * On Windows, code changes link _just_ the shared library, which does _not_
+  #   trigger rebuilding generated files
+  # This makes the dependency explicit, at the potential cost of extra rebuilds.
+  #
+  # Note: Other COMPILE_TOOLs may use different implementations
+  list(APPEND _DEPENDS "${_RULE_DEPENDS}")
+  list(APPEND _DEPENDS "iree::compiler::API2::SharedImpl")
+
   if(DEFINED _RULE_MODULE_FILE_NAME)
     set(_MODULE_FILE_NAME "${_RULE_MODULE_FILE_NAME}")
   else()
     set(_MODULE_FILE_NAME "${_RULE_NAME}.vmfb")
   endif()
-
-  iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
 
   set(_ARGS "--output-format=vm-bytecode")
   list(APPEND _ARGS "${_RULE_FLAGS}")
@@ -133,7 +148,7 @@ function(iree_bytecode_module)
       ${_COMPILE_TOOL_EXECUTABLE}
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
-      ${_RULE_DEPENDS}
+      ${_DEPENDS}
     COMMENT
       "Generating ${_MODULE_FILE_NAME} from ${_FRIENDLY_NAME}"
     VERBATIM
