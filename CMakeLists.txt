@@ -886,8 +886,8 @@ if(IREE_TARGET_BACKEND_WEBGPU)
   #   * https://dawn.googlesource.com/tint/
   #   * https://chromium.googlesource.com/vulkan-deps/+/refs/heads/main/DEPS
   # or they can be updated independently
-  set(IREE_TINT_TAG         "874d1b66186ff8d0cb249bc73ccaea08144c36b0")  # 2022-10-21
-  set(IREE_SPIRV_TOOLS_TAG  "ff07cfd86fa229525659f6b81058b3171a67bef1")  # 2021-12-10
+  set(IREE_TINT_TAG         "30d45f72d562efda45f3b63b29cc05918138d439")  # 2022-11-28
+  set(IREE_SPIRV_TOOLS_TAG  "00018e58af055a74fd88718af8cca8de34c25106")  # 2022-11-25
 
   iree_set_spirv_headers_cmake_options()
   add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
