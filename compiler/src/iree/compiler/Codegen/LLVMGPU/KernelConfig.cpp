@@ -879,7 +879,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
                                      TransformDialectInterpreterCodegen);
-      setTranslationInfo(funcOp, translationInfo);
+      if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
       if (clGPUCodegenTransformDialectTileSizes.empty()) continue;
     }
 
