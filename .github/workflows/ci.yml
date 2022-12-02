@@ -187,12 +187,16 @@ jobs:
         uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
       - name: "Building IREE"
         run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+      - name: "Checking build directory (root)"
+        run: ls "${BUILD_DIR}"
+      - name: "Checking build directory (tools)"
+        run: ls "${BUILD_DIR}/tools"
       - name: "Trying iree-compile (basic)"
-        run: ${BUILD_DIR}/tools/iree-compile.exe --iree-hal-target-backends=vmvx ./samples/models/simple_abs.mlir -o ${BUILD_DIR}/simple_abs.vmfb
+        run: "${BUILD_DIR}/tools/iree-compile.exe --iree-hal-target-backends=vmvx ./samples/models/simple_abs.mlir -o ${BUILD_DIR}/simple_abs.vmfb"
       - name: "Trying iree-compile (test)"
-        run: ${BUILD_DIR}/tools/iree-compile.exe --iree-hal-target-backends=vmvx --output-format=vm-bytecode --compile-mode=vm ./runtime/src/iree/vm/test/conversion_ops.mlir -o ${BUILD_DIR}/conversion_ops.vmfb
+        run: "${BUILD_DIR}/tools/iree-compile.exe --iree-hal-target-backends=vmvx --output-format=vm-bytecode --compile-mode=vm ./runtime/src/iree/vm/test/conversion_ops.mlir -o ${BUILD_DIR}/conversion_ops.vmfb"
       - name: "Trying iree-compile (test LLVM)"
-        run: ${BUILD_DIR}/tools/iree-compile.exe --iree-hal-target-backends=llvm-cpu --output-format=vm-bytecode --compile-mode=vm --iree-llvm-embedded-linker-path="${BUILD_DIR}/third_party/llvm-project/llvm/bin/lld.exe" --iree-llvm-wasm-linker-path="${BUILD_DIR}/third_party/llvm-project/llvm/bin/lld.exe" ./runtime/src/iree/vm/test/conversion_ops.mlir -o ${BUILD_DIR}/conversion_ops_llvm.vmfb
+        run: "${BUILD_DIR}/tools/iree-compile.exe --iree-hal-target-backends=llvm-cpu --output-format=vm-bytecode --compile-mode=vm --iree-llvm-embedded-linker-path=${BUILD_DIR}/third_party/llvm-project/llvm/bin/lld.exe --iree-llvm-wasm-linker-path=${BUILD_DIR}/third_party/llvm-project/llvm/bin/lld.exe ./runtime/src/iree/vm/test/conversion_ops.mlir -o ${BUILD_DIR}/conversion_ops_llvm.vmfb"
       # - name: "Testing IREE"
       #   run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
