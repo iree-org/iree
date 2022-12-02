@@ -154,10 +154,6 @@ void getExtensions(const TargetTriple &triple,
       }
       return;
     }
-    case TargetTripleArch::AMD_RDNAv3: {
-      extensions.push_back(Extension::VK_NV_cooperative_matrix);
-      break;
-    }
     default:
       break;
   }
@@ -181,16 +177,18 @@ void getExtensions(const TargetTriple &triple,
   }
 
   // Desktop GPUs typically support all extensions we care.
-  const std::array<Extension, 6> desktop = {
+  const std::array<Extension, 7> desktop = {
       Extension::VK_KHR_16bit_storage,
       Extension::VK_KHR_8bit_storage,
       Extension::VK_KHR_shader_float16_int8,
       Extension::VK_KHR_spirv_1_4,
       Extension::VK_KHR_storage_buffer_storage_class,
-      Extension::VK_KHR_variable_pointers};
+      Extension::VK_KHR_variable_pointers,
+      Extension::VK_EXT_subgroup_size_control};
 
   extensions.append(desktop.begin(), desktop.end());
-  if (getVendor(triple) == spirv::Vendor::NVIDIA) {
+  if (getVendor(triple) == spirv::Vendor::NVIDIA ||
+      triple.getArch() == TargetTripleArch::AMD_RDNAv3) {
     extensions.push_back(Extension::VK_NV_cooperative_matrix);
   }
 }
@@ -212,6 +210,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
   int subgroupSize = 32;
   SubgroupFeature subgroupFeatures = SubgroupFeature::Basic;
+  Optional<int> minSubgroupSize, maxSubgroupSize;
 
   bool shaderFloat16 = false, shaderFloat64 = false;
   bool shaderInt8 = false, shaderInt16 = false, shaderInt64 = false;
@@ -228,6 +227,15 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
   Builder builder(context);
 
   switch (triple.getArch()) {
+    case TargetTripleArch::AMD_RDNAv3: {
+      auto f16t = builder.getF16Type();
+      auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
+      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+          context,
+          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
+          /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
+    }
+      LLVM_FALLTHROUGH;
     case TargetTripleArch::AMD_RDNAv1:
     case TargetTripleArch::AMD_RDNAv2:
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10906
@@ -235,7 +243,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       maxComputeWorkGroupInvocations = 1024;
       maxComputeWorkGroupSize = {1024, 1024, 1024};
 
-      subgroupSize = 64;
+      subgroupSize = 64, minSubgroupSize = 32, maxSubgroupSize = 64;
       subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
                          SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
                          SubgroupFeature::Shuffle |
@@ -252,34 +260,6 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       variablePointers = variablePointersStorageBuffer = true;
       break;
-    case TargetTripleArch::AMD_RDNAv3: {
-      maxComputeSharedMemorySize = 65536;
-      maxComputeWorkGroupInvocations = 1024;
-      maxComputeWorkGroupSize = {1024, 1024, 1024};
-
-      subgroupSize = 64;
-      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
-                         SubgroupFeature::Shuffle |
-                         SubgroupFeature::ShuffleRelative |
-                         SubgroupFeature::Clustered | SubgroupFeature::Quad;
-
-      shaderFloat16 = shaderFloat64 = true;
-      shaderInt8 = shaderInt16 = shaderInt64 = true;
-
-      storageBuffer16BitAccess = storagePushConstant16 = true;
-      uniformAndStorageBuffer16BitAccess = true;
-      storageBuffer8BitAccess = true, storagePushConstant8 = true;
-      uniformAndStorageBuffer8BitAccess = true;
-
-      variablePointers = variablePointersStorageBuffer = true;
-      auto f16t = builder.getF16Type();
-      auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
-      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
-          context,
-          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-          /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
-    } break;
     case TargetTripleArch::Apple_M1:
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
       maxComputeSharedMemorySize = 32768;
@@ -349,7 +329,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       maxComputeWorkGroupInvocations = 1024;
       maxComputeWorkGroupSize = {1024, 1024, 64};
 
-      subgroupSize = 32;
+      subgroupSize = 32, minSubgroupSize = 32, maxSubgroupSize = 32;
       subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
                          SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
                          SubgroupFeature::Shuffle |
@@ -428,7 +408,8 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       getBoolAttr(shaderFloat64), getBoolAttr(shaderInt16),
       getBoolAttr(shaderInt64),
       SubgroupFeatureAttr::get(context, subgroupFeatures), subgroupSize,
-      getBoolAttr(storageBuffer16BitAccess), getBoolAttr(storagePushConstant16),
+      minSubgroupSize, maxSubgroupSize, getBoolAttr(storageBuffer16BitAccess),
+      getBoolAttr(storagePushConstant16),
       getBoolAttr(uniformAndStorageBuffer16BitAccess),
       getBoolAttr(storageBuffer8BitAccess), getBoolAttr(storagePushConstant8),
       getBoolAttr(uniformAndStorageBuffer8BitAccess),

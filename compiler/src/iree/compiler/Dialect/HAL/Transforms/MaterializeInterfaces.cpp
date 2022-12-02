@@ -259,7 +259,8 @@ static LogicalResult declareEntryPointOps(
           exportOp.getLoc(),
           targetBuilder.getStringAttr(exportOp.getFunctionRef()),
           targetBuilder.getIndexAttr(ordinal), layoutAttr, ArrayAttr{},
-          IntegerAttr{});
+          /*subgroup_size=*/IntegerAttr{},
+          /*workgroup_local_memory=*/IntegerAttr{});
 
       // Clone the workgroup count calculation function.
       if (!exportOp.getWorkgroupCount().empty()) {
