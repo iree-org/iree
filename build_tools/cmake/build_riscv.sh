@@ -22,7 +22,7 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_BUILD_RISCV_DIR:-build-riscv}}"
-RISCV_ARCH="${RISCV_ARCH:-rv64}"
+RISCV_PLATFORM="${RISCV_PLATFORM:-linux-rv64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts}"
@@ -30,7 +30,7 @@ BUILD_PRESET="${BUILD_PRESET:-test}"
 
 source build_tools/cmake/setup_build.sh
 
-echo "Build riscv target with the config of ${RISCV_ARCH}"
+echo "Build riscv target with the config of ${RISCV_PLATFORM}"
 TOOLCHAIN_FILE="$(realpath build_tools/cmake/riscv.toolchain.cmake)"
 declare -a args
 args=(
@@ -38,18 +38,18 @@ args=(
   "-B" "${BUILD_DIR}"
   -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}"
   -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}"
-  -DRISCV_CPU="${RISCV_ARCH}"
+  -DRISCV_CPU="${RISCV_PLATFORM}"
   -DRISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS}"
   -DIREE_BUILD_COMPILER=OFF
   # CPU info doesn't work on RISCV
   -DIREE_ENABLE_CPUINFO=OFF
 )
 
-if [[ "${RISCV_ARCH}" == "rv64" || "${RISCV_ARCH}" == "rv32-linux" ]]; then
+if [[ "${RISCV_PLATFORM}" == "linux-rv64" || "${RISCV_PLATFORM}" == "linux-rv32" ]]; then
   args+=(
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
   )
-elif [[ "${RISCV_ARCH}" == "rv32-baremetal" ]]; then
+elif [[ "${RISCV_PLATFORM}" == "baremetal-rv32" ]]; then
   args+=(
     # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
@@ -96,16 +96,14 @@ esac
 
 "${CMAKE_BIN}" "${args[@]}"
 
-if [[ "${BUILD_PRESET}" == "benchmark-suite-test" ]] && \
-   [[ "${RISCV_ARCH}" == "rv64" || "${RISCV_ARCH}" == "rv32-linux" ]]; then
-  echo "Building iree-run-module and run-module-test deps for RISC-V"
-  echo "------------------------------------------------------------"
-  "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-run-module \
-    iree-run-module-test-deps -- -k 0
-else
-  "${CMAKE_BIN}" --build "${BUILD_DIR}" -- -k 0
-
-  if [[ "${RISCV_ARCH}" == "rv64" || "${RISCV_ARCH}" == "rv32-linux" ]]; then
+if [[ "${RISCV_PLATFORM}" == "linux-rv64" || "${RISCV_PLATFORM}" == "linux-rv32" ]]; then
+  if [[ "${BUILD_PRESET}" == "benchmark-suite-test" ]]; then
+    echo "Building iree-run-module and run-module-test deps for RISC-V"
+    echo "------------------------------------------------------------"
+    "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-run-module \
+      iree-run-module-test-deps -- -k 0
+  else
+    "${CMAKE_BIN}" --build "${BUILD_DIR}" -- -k 0
     echo "Building test deps for RISC-V"
     echo "-----------------------------"
     "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0

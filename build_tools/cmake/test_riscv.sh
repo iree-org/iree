@@ -16,7 +16,7 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_BUILD_RISCV_DIR:-build-riscv}}"
-RISCV_ARCH="${RISCV_ARCH:-rv64}"
+RISCV_PLATFORM="${RISCV_PLATFORM:-linux-rv64}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
 # Environment variable used by the emulator.
@@ -77,7 +77,7 @@ tools_ctest_args=(
 echo "******** Running tools CTest ********"
 ctest ${tools_ctest_args[@]}
 
-if [[ "${RISCV_ARCH}" == "rv32-linux" ]]; then
+if [[ "${RISCV_PLATFORM}" == "linux-rv32" ]]; then
   # mhlo.power is also disabled because musl math library is not compiled for
   # 32-bit.
   test_exclude_args+=(
