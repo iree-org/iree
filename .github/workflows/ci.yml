@@ -191,6 +191,8 @@ jobs:
         run: ls "${BUILD_DIR}"
       - name: "Checking build directory (tools)"
         run: ls "${BUILD_DIR}/tools"
+      - name: "Trying iree-compile (help)"
+        run: "${BUILD_DIR}/tools/iree-compile.exe --help"
       - name: "Trying iree-compile (basic)"
         run: "${BUILD_DIR}/tools/iree-compile.exe --iree-hal-target-backends=vmvx ./samples/models/simple_abs.mlir -o ${BUILD_DIR}/simple_abs.vmfb"
       - name: "Trying iree-compile (test)"
