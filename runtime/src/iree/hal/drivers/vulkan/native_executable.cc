@@ -65,17 +65,25 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
     iree_hal_vulkan_entry_point_t* out_entry_points) {
   IREE_TRACE_SCOPE();
   uint8_t* scratch_memory = NULL;
+  size_t create_info_size =
+      pipeline_count * sizeof(VkComputePipelineCreateInfo);
+  size_t spec_map_size =
+      executable_params->constant_count * sizeof(VkSpecializationMapEntry);
+  size_t subgroup_control_size =
+      pipeline_count *
+      sizeof(VkPipelineShaderStageRequiredSubgroupSizeCreateInfo);
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       logical_device->host_allocator(),
-      pipeline_count * sizeof(VkComputePipelineCreateInfo) +
-          executable_params->constant_count * sizeof(VkSpecializationMapEntry),
+      create_info_size + spec_map_size + subgroup_control_size,
       (void**)&scratch_memory));
   VkComputePipelineCreateInfo* create_infos =
       (VkComputePipelineCreateInfo*)scratch_memory;
   VkSpecializationMapEntry* spec_map_entries =
-      (VkSpecializationMapEntry*)(scratch_memory +
-                                  pipeline_count *
-                                      sizeof(VkComputePipelineCreateInfo));
+      (VkSpecializationMapEntry*)(scratch_memory + create_info_size);
+  VkPipelineShaderStageRequiredSubgroupSizeCreateInfo* subgroup_control_entries =
+      (VkPipelineShaderStageRequiredSubgroupSizeCreateInfo*)(scratch_memory +
+                                                             create_info_size +
+                                                             spec_map_size);
 
   VkSpecializationInfo spec_info;
   memset(&spec_info, 0, sizeof(spec_info));
@@ -91,6 +99,8 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
 
   flatbuffers_string_vec_t entry_points_vec =
       iree_SpirVExecutableDef_entry_points_get(executable_def);
+  flatbuffers_uint32_vec_t subgroup_sizes_vec =
+      iree_SpirVExecutableDef_subgroup_sizes_get(executable_def);
   for (iree_host_size_t entry_ordinal = 0; entry_ordinal < pipeline_count;
        ++entry_ordinal) {
     VkComputePipelineCreateInfo* create_info = &create_infos[entry_ordinal];
@@ -115,13 +125,25 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
     VkPipelineShaderStageCreateInfo* stage_create_info = &create_info->stage;
     stage_create_info->sType =
         VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stage_create_info->pNext = NULL;
     stage_create_info->flags = 0;
     stage_create_info->stage = VK_SHADER_STAGE_COMPUTE_BIT;
     stage_create_info->module = shader_module;
     stage_create_info->pName =
         flatbuffers_string_vec_at(entry_points_vec, entry_ordinal);
     stage_create_info->pSpecializationInfo = &spec_info;
+
+    // If subgroup size is not 0, request the said subgroup size via
+    // VK_EXT_subgroup_size_control (promoted to core since v1.3).
+    stage_create_info->pNext = NULL;
+    if (uint32_t subgroup_size =
+            flatbuffers_uint32_vec_at(subgroup_sizes_vec, entry_ordinal)) {
+      subgroup_control_entries[entry_ordinal].sType =
+          VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO;
+      subgroup_control_entries[entry_ordinal].pNext = NULL;
+      subgroup_control_entries[entry_ordinal].requiredSubgroupSize =
+          subgroup_size;
+      stage_create_info->pNext = &subgroup_control_entries[entry_ordinal];
+    }
   }
 
   VkPipeline* pipelines =
