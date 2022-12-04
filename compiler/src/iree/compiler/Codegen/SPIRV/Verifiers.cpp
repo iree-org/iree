@@ -144,7 +144,8 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   // Verify shared memory usage of operands after tiling <= maxSharedMemory.
   unsigned tilingSharedMemSizeBytes = getTileBytes(
       workgroupTileSizes[0], workgroupTileSizes[1], reductionTileSizes[2],
-      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth());
+      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth(),
+      false);
   unsigned totalSharedMemSizeBytes = getMultiBufferMemoryUsage(
       tilingSharedMemSizeBytes, pipelineDepth,
       translationInfo.getSoftwarePipelineStoreStage());
@@ -328,10 +329,21 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
         "subgroup_tile_m)");
   }
 
+  // Check if the C matrix will be promoted for computing shared memory usage.
+  bool promoteC = false;
+  SmallVector<Operation *> computeOps;
+  if (!failed(getComputeOps(op->getParentOfType<func::FuncOp>(), computeOps))) {
+    unsigned count = 0;
+    for (Operation *computeOp : computeOps) {
+      if (!isa<linalg::FillOp>(computeOp)) ++count;
+    }
+    promoteC = count > 1;
+  }
+
   // Verify shared memory usage of operands after tiling <= maxSharedMemory.
-  unsigned tilingSharedMemSizeBytes =
-      getTileBytes(workgroupTileSizes[0], workgroupTileSizes[1],
-                   reductionTileSizes[2], lhsType.getIntOrFloatBitWidth());
+  unsigned tilingSharedMemSizeBytes = getTileBytes(
+      workgroupTileSizes[0], workgroupTileSizes[1], reductionTileSizes[2],
+      lhsType.getIntOrFloatBitWidth(), promoteC);
   unsigned totalSharedMemSizeBytes = getMultiBufferMemoryUsage(
       tilingSharedMemSizeBytes, translationInfo.getSoftwarePipelineDepth(),
       translationInfo.getSoftwarePipelineStoreStage());

@@ -25,8 +25,11 @@ namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
-constexpr unsigned AMDSoftwarePipelineDepth = 2;
-constexpr unsigned AMDSoftwarePipelineStoreStage = 0;
+constexpr unsigned AMDSimtSoftwarePipelineDepth = 2;
+constexpr unsigned AMDSimtSoftwarePipelineStoreStage = 0;
+
+constexpr unsigned AMDCoopMatrixSoftwarePipelineDepth = 1;
+constexpr unsigned AMDCoopMatrixSoftwarePipelineStoreStage = 0;
 
 constexpr unsigned AMDNumSubgroupsPerWorkgroup = 4;
 // The number of tiles along M and N dimensions per workgroup.
@@ -34,9 +37,10 @@ constexpr unsigned AMDNumMNTilesPerSubgroup = 8;
 
 static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
                                         const spirv::TargetEnv &targetEnv) {
-  if (failed(setCooperativeMatrixConfig(targetEnv, op,
-                                        AMDNumSubgroupsPerWorkgroup,
-                                        AMDNumMNTilesPerSubgroup)))
+  if (failed(setCooperativeMatrixConfig(
+          targetEnv, op, AMDNumSubgroupsPerWorkgroup, AMDNumMNTilesPerSubgroup,
+          AMDCoopMatrixSoftwarePipelineDepth,
+          AMDCoopMatrixSoftwarePipelineStoreStage)))
     return failure();
   if (getLoweringConfig(op)) return success();
 
@@ -51,8 +55,9 @@ static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
     threadMNK = {8, 4, 16};
   }
   return setMatmulOpConfig(limits, op, workgroupXY, threadMNK,
-                           /*enablePromotion=*/true, AMDSoftwarePipelineDepth,
-                           AMDSoftwarePipelineStoreStage);
+                           /*enablePromotion=*/true,
+                           AMDSimtSoftwarePipelineDepth,
+                           AMDSimtSoftwarePipelineStoreStage);
 }
 
 // RDNA architecture:

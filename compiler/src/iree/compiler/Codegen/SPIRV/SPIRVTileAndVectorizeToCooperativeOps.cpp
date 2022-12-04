@@ -257,9 +257,8 @@ class CombineContractTranspose final
 // Main pass
 //===----------------------------------------------------------------------===//
 
-class SPIRVTileAndVectorizeToCooperativeOpsPass final
-    : public SPIRVTileAndVectorizeToCooperativeOpsBase<
-          SPIRVTileAndVectorizeToCooperativeOpsPass> {
+class SPIRVTileToCooperativeOpsPass final
+    : public SPIRVTileToCooperativeOpsBase<SPIRVTileToCooperativeOpsPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect, linalg::LinalgDialect,
@@ -321,6 +320,40 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
+  }
+};
+
+class SPIRVVectorizeToCooperativeOpsPass final
+    : public SPIRVVectorizeToCooperativeOpsBase<
+          SPIRVVectorizeToCooperativeOpsPass> {
+ public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<gpu::GPUDialect, linalg::LinalgDialect,
+                    vector::VectorDialect>();
+  }
+
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    func::FuncOp funcOp = getOperation();
+
+    // First we need to discover the CodeGen lowering configuration. It was
+    // decided earlier and attached to a linalg op as an attribute.
+
+    linalg::LinalgOp rootOp;
+    funcOp.walk([&](linalg::LinalgOp linalgOp) {
+      if (isMatmulOrBatchMatmul(linalgOp) && getLoweringConfig(linalgOp)) {
+        rootOp = linalgOp;
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    });
+    if (!rootOp) {
+      funcOp.emitError("expected lowering confg on a (batch) matmul op");
+      return signalPassFailure();
+    }
+
+    SmallVector<int64_t> cooperativeOpSize = getTargetCooperativeOpSize(rootOp);
+    SmallVector<int64_t> subgroupCounts = deduceSubgroupCounts(rootOp);
 
     // Now vectorize and unroll to native cooperative sizes.
 
@@ -409,8 +442,13 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVTileAndVectorizeToCooperativeOpsPass() {
-  return std::make_unique<SPIRVTileAndVectorizeToCooperativeOpsPass>();
+createSPIRVTileToCooperativeOpsPass() {
+  return std::make_unique<SPIRVTileToCooperativeOpsPass>();
+}
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVVectorizeToCooperativeOpsPass() {
+  return std::make_unique<SPIRVVectorizeToCooperativeOpsPass>();
 }
 
 }  // namespace iree_compiler
