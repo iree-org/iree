@@ -69,9 +69,11 @@ transform.structured.canonicalized_sequence failures(suppress) {
   %func_2 = transform.iree.apply_patterns %func_1 { rank_reducing }
   %func_3 = transform.structured.vectorize %func_2
 
-  // Step 5. Bufferize.
+  // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================
   %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
+  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_2
+  transform.iree.erase_hal_descriptor_type_from_memref %memref_func
 
   // Step 6. Post-bufferization mapping to blocks and threads.
   // ===========================================================================

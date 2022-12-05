@@ -60,6 +60,8 @@ using ::mlir::iree_compiler::IREE::transform_dialect::
     ForeachThreadToWorkgroupOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::HasAnyUse;
 using ::mlir::iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
+using ::mlir::iree_compiler::IREE::transform_dialect::
+    IREEEraseHALDescriptorTypeFromMemRefOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::IsPermutation;
 using ::mlir::iree_compiler::IREE::transform_dialect::m_StructuredOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::
@@ -448,8 +450,11 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = buildVectorizeStrategy(b, funcH);
 
-  // Step 4. Bufferize.
+  // Step 4. Bufferize and drop HAL decriptor from memref ops.
   variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
+  Value memrefFunc =
+      b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  b.create<IREEEraseHALDescriptorTypeFromMemRefOp>(memrefFunc);
 
   // Step 5. Post-bufferization mapping to blocks and threads.
   // Need to match again since bufferize invalidated all handles.
@@ -583,8 +588,11 @@ static LogicalResult buildReductionCpuStrategy(
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = buildVectorizeStrategy(b, funcH);
 
-  // Step 3. Bufferize.
+  // Step 3. Bufferize and drop HAL decriptor from memref ops.
   variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
+  Value memrefFunc =
+      b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  b.create<IREEEraseHALDescriptorTypeFromMemRefOp>(memrefFunc);
 
   // Step 4. Post-bufferization mapping to blocks only.
   // Need to match again since bufferize invalidated all handles.
