@@ -135,7 +135,7 @@ class SPIRVTileAndPromotePass final
   void runOnOperation() override;
 
  private:
-  /// Prmotes C matrix to shared memory when necessary and returns success if no
+  /// Promotes C matrix to shared memory when necessary and returns success if no
   /// error happens.
   LogicalResult doPromoteCMatrix(func::FuncOp funcOp) const;
 
