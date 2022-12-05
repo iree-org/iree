@@ -39,7 +39,10 @@ module {
     return
   }
 }
-// CHECK: #compilation = #iree_codegen.compilation_info<lowering_config = <tile_sizes = []>, translation_info = <CPUDefault>>
+// CHECK: #config = #iree_codegen.lowering_config<tile_sizes = []>
+// CHECK: #translation = #iree_codegen.translation_info<CPUDefault>
+// CHECK: #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
+
 
 // -----
 
@@ -53,4 +56,7 @@ module {
     return
   }
 }
-// CHECK: #compilation = #iree_codegen.compilation_info<lowering_config = <tile_sizes = []>, translation_info = <CPUDefault>, workgroup_size = [16, 4, 1], subgroup_size = 32>
+// CHECK: #config = #iree_codegen.lowering_config<tile_sizes = []>
+// CHECK: #translation = #iree_codegen.translation_info<CPUDefault>
+// CHECK: #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation, workgroup_size = [16, 4, 1], subgroup_size = 32>
+
