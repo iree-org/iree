@@ -103,7 +103,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-mmt4d-target-options=arch=aarch64"
+    "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -289,7 +289,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-mmt4d-target-options=arch=aarch64"
+    "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -495,7 +495,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-mmt4d-target-options=arch=aarch64"
+    "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -724,7 +724,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-mmt4d-target-options=arch=aarch64"
+    "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -933,7 +933,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
+    "--iree-flow-enable-data-tiling"
     "--iree-llvm-target-cpu-features=+dotprod"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
@@ -1215,7 +1215,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-mmt4d-target-options=arch=aarch64"
+    "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -1438,7 +1438,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-mmt4d-target-options=arch=aarch64"
+    "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
