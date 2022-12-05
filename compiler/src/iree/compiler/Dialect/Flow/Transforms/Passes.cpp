@@ -105,11 +105,6 @@ static llvm::cl::opt<bool> clEnableDataTiling(
     "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clDisableFusionOfTensorOps(
-    "iree-disable-fusion-of-tensor-ops",
-    llvm::cl::desc("Disable fusion of tensor operations pass"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<std::string> clMmt4dTargetOptions(
     "iree-flow-mmt4d-target-options",
     llvm::cl::desc("Convert linalg.matmul ops to MMT4D ops targetting the "
@@ -266,11 +261,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       // Elementwise fusion.
-      .addPredicatedPass(
-          !clDisableFusionOfTensorOps,
-          []() {
-            return createFusionOfTensorOpsPass(clEnableAggressiveFusion);
-          })
+      .addPass([]() {
+        return createFusionOfTensorOpsPass(clEnableAggressiveFusion);
+      })
       .addPredicatedPass(clEnableLinalgDetensorize,
                          mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
