@@ -1,10 +1,11 @@
 # Python
+.env
+.env.bat
 *.pyc
 **/.ipynb_checkpoints/
 .pytype/
 
 # Visual Studio files
-.env
 .vs/
 .vscode/
 *.sdf
