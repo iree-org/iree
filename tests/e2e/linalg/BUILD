@@ -37,7 +37,6 @@ iree_check_single_backend_test_suite(
     name = "check_winograd_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
     compiler_flags = [
-        "--iree-input-type=none",
         "--iree-flow-enable-conv-winograd-transform",
     ],
     driver = "local-task",
@@ -80,7 +79,6 @@ iree_check_single_backend_test_suite(
     name = "check_winograd_vulkan-spirv_vulkan",
     srcs = VULKAN_SRCS,
     compiler_flags = [
-        "--iree-input-type=none",
         "--iree-flow-enable-conv-winograd-transform",
     ],
     driver = "local-task",

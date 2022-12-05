@@ -33,7 +33,6 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=none"
     "--iree-flow-enable-conv-winograd-transform"
 )
 
@@ -73,7 +72,6 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=none"
     "--iree-flow-enable-conv-winograd-transform"
 )
 
