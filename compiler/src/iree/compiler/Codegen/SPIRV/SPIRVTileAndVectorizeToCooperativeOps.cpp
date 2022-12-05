@@ -292,17 +292,14 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     // Then tile and distribute to subgroups.
 
     {
-      unsigned subgroupSize = 0;
-      if (spirv::TargetEnvAttr attr = getSPIRVTargetEnvAttr(rootOp)) {
-        subgroupSize = attr.getResourceLimits().getSubgroupSize();
-      }
+      Optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
       if (!subgroupSize) {
-        funcOp.emitError("expected !spirv.target_env for subgroup size");
+        funcOp.emitError("failed to query subgroup size");
         return signalPassFailure();
       }
       RewritePatternSet subgroupTilingPatterns(context);
       SmallVector<int64_t> subgroupTileSizes = getTileSizes(rootOp, 1);
-      populateTilingToSubgroupPatterns(subgroupCounts, subgroupSize,
+      populateTilingToSubgroupPatterns(subgroupCounts, *subgroupSize,
                                        subgroupTileSizes,
                                        subgroupTilingPatterns);
       if (failed(applyPatternsAndFoldGreedily(
