@@ -341,21 +341,27 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
 
   result.addRegion(std::move(bodyRegion));
   result.addRegion(std::move(workloadCountRegion));
-  result.addTypes(resultTypes);
+  result.addAttribute("operand_segment_sizes",
+                      parser.getBuilder().getDenseI32ArrayAttr(
+                          {static_cast<int32_t>(allOperands.size()),
+                           static_cast<int32_t>(workloadOperands.size())}));
 
-  if (parser.resolveOperands(allOperands, parser.getBuilder().getIndexType(),
-                             result.operands))
-    return failure();
   if (parser.resolveOperands(workloadOperands,
                              parser.getBuilder().getIndexType(),
                              workloadOperandsLoc, result.operands))
     return failure();
 
+  result.addTypes(resultTypes);
+  if (parser.resolveOperands(allOperands, parser.getBuilder().getIndexType(),
+                             result.operands))
+    return failure();
   return success();
 }
 
 void DispatchRegionOp::print(OpAsmPrinter &p) {
-  p.printOptionalAttrDict((*this)->getAttrs());
+  SmallVector<StringRef, 1> elidedAttrs;
+  elidedAttrs.push_back("operand_segment_sizes");
+  p.printOptionalAttrDictWithKeyword((*this)->getAttrs(), elidedAttrs);
   if (!getWorkload().empty()) {
     p << "[" << getWorkload() << "]";
   }

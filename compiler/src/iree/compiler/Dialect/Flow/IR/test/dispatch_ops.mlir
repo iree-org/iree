@@ -117,14 +117,14 @@ func.func @inplaceTypeChange(%arg0: tensor<4x?xf32>) -> tensor<?x4xf32> {
 // CHECK-LABEL: @region
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<?x?xf32>)
 func.func @region(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // CHECK: %[[R:.*]] = flow.dispatch.region {operand_segment_sizes = array<i32: 2, 0>} -> (tensor<?x?xf32>{%{{.*}}, %{{.*}}}) {
+  // CHECK: %[[R:.*]] = flow.dispatch.region -> (tensor<?x?xf32>{%{{.*}}, %{{.*}}}) {
   // CHECK:   flow.return %[[ARG0]] : tensor<?x?xf32>
   // CHECK: }
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
   %d1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
-  %r = flow.dispatch.region { operand_segment_sizes = array<i32: 2, 0> } -> (tensor<?x?xf32>{%d0, %d1}) {
+  %r = flow.dispatch.region -> (tensor<?x?xf32>{%d0, %d1}) {
     flow.return %arg0 : tensor<?x?xf32>
   }
   // CHECK: return %[[R]]
@@ -136,10 +136,10 @@ func.func @region(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
 // CHECK-LABEL: @regionStaticShape
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<5x10xf32>)
 func.func @regionStaticShape(%arg0: tensor<5x10xf32>) -> tensor<5x10xf32> {
-  // CHECK: %[[R:.*]] = flow.dispatch.region {operand_segment_sizes = array<i32: 0, 0>} -> (tensor<5x10xf32>) {
+  // CHECK: %[[R:.*]] = flow.dispatch.region -> (tensor<5x10xf32>) {
   // CHECK:   flow.return %[[ARG0]] : tensor<5x10xf32>
   // CHECK: }
-  %r = flow.dispatch.region {operand_segment_sizes = array<i32: 0, 0>} -> (tensor<5x10xf32>) {
+  %r = flow.dispatch.region -> (tensor<5x10xf32>) {
     flow.return %arg0 : tensor<5x10xf32>
   }
   // CHECK: return %[[R]]

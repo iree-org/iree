@@ -801,22 +801,25 @@ FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
 
   return result;
 }
+
 /// Create Flow::DispatchGroupsOps based on a fusion heuristic.
-static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
-    TensorDimTrackingRewriter &rewriter, FunctionOpInterface funcOp,
-    DominanceInfo const &dominanceInfo, bool generateWorkloadRegion,
-    bool aggressiveFusion) {
-  mlir::FunctionOpInterface funcOp = getOperation();
-
-  DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
-  TensorDimTrackingRewriter rewriter(funcOp);
-
+static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
+                                        FunctionOpInterface funcOp,
+                                        DominanceInfo const &dominanceInfo,
+                                        bool generateWorkloadRegion,
+                                        bool aggressiveFusion) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
   // attribute
   unsigned numRoots =
       decideFusableLinalgOps(funcOp, dominanceInfo, aggressiveFusion);
   SmallVector<Operation *> roots(numRoots, nullptr);
   DenseMap<unsigned, SmallVector<Operation *>> producers;
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After deciding fusion groups ---\n";
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
 
   // TODO: Incrementally add ops to an empty DispatchGroupOp instead of
   // annotating fusion group IDs via attributes.
@@ -842,19 +845,19 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
     Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None;
     if (generateWorkloadRegion) {
       auto maybeBuilder = getWorkloadBuilder(rewriter, /*rootOp=*/it.value());
-      if (failed(maybeBuilder)) return signalPassFailure();
+      if (failed(maybeBuilder)) return failure();
       workloadBuilder = *maybeBuilder;
     }
 
     // Simplify tensor::DimOps.
     SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-    if (failed(simplifyDimOps(rewriter, dimOps))) return signalPassFailure();
+    if (failed(simplifyDimOps(rewriter, dimOps))) return failure();
 
     // Create fusion group.
     Flow::DispatchRegionOp regionOp;
     auto maybeRegionOp =
         Flow::wrapOpInDispatchRegion(rewriter, it.value(), workloadBuilder);
-    if (failed(maybeRegionOp)) return signalPassFailure();
+    if (failed(maybeRegionOp)) return failure();
     regionOp = *maybeRegionOp;
 
     // Sort producers topologically. All producers must be in the same block
@@ -867,12 +870,21 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
     for (Operation *producer : llvm::reverse(producers[it.index()])) {
       auto newRegionOp =
           movePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp);
-      if (failed(newRegionOp)) return signalPassFailure();
+      if (failed(newRegionOp)) return failure();
       regionOp = *newRegionOp;
     }
     regionOps.push_back(regionOp);
   }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After creating flow.dispatch.region ---\n";
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
+  return success();
 }
+
 /// Wrap a single op in a DispatchWorkgroupsOp.
 static FailureOr<Flow::DispatchWorkgroupsOp> wrapInWorkgroupsOp(
     TensorDimTrackingRewriter &rewriter, Operation *op,
@@ -1129,10 +1141,12 @@ void FormDispatchWorkgroupsPass::runOnOperation() {
 
 /// Create dispatch.region Ops based on a fusion heuristic.
 void FormDispatchRegionsPass::runOnOperation() {
-  createFusionGroups(TensorDimTrackingRewriter & rewriter,
-                     FunctionOpInterface funcOp,
-                     const DominanceInfo &dominanceInfo,
-                     bool generateWorkloadRegion, bool aggressiveFusion);
+  mlir::FunctionOpInterface funcOp = getOperation();
+  DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
+  TensorDimTrackingRewriter rewriter(funcOp);
+  if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo,
+                                generateWorkloadRegion, aggressiveFusion)))
+    return signalPassFailure();
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

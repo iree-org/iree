@@ -3,7 +3,7 @@
 // CHECK-LABEL: func @single_op(
 //  CHECK-SAME:   %[[arg0:.*]]: tensor<?x?xf32>, %[[s1:.*]]: index, %[[s2:.*]]: index
 func.func @single_op(%arg0: tensor<?x?xf32>, %s1: index, %s2: index) -> tensor<?x?xf32> {
-  // CHECK: %[[region:.*]] = flow.dispatch.region {operand_segment_sizes = array<i32: 2, 0>} -> (tensor<?x?xf32>{%[[s1]], %[[s2]]}) {
+  // CHECK: %[[region:.*]] = flow.dispatch.region -> (tensor<?x?xf32>{%[[s1]], %[[s2]]}) {
   // CHECK:   %[[slice:.*]] = tensor.extract_slice %[[arg0]]
   // CHECK:   flow.return %[[slice]]
   // CHECK: }
@@ -32,7 +32,7 @@ func.func @clone_preceding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1: 
   // CHECK-DAG: %[[dim0:.*]] = tensor.dim %[[arg1]], %[[c0]]
   // CHECK-DAG: %[[dim1:.*]] = tensor.dim %[[arg1]], %[[c1]]
   // CHECK: %[[dummy:.*]] = "test.dummy"
-  // CHECK: %[[region:.*]] = flow.dispatch.region {operand_segment_sizes = array<i32: 2, 0>} -> (tensor<?x?xf32>{%[[dim0]], %[[dim1]]}) {
+  // CHECK: %[[region:.*]] = flow.dispatch.region -> (tensor<?x?xf32>{%[[dim0]], %[[dim1]]}) {
   // CHECK:   %[[dummy_clone:.*]] = "test.dummy"
   // CHECK:   %[[insert:.*]] = tensor.insert_slice %[[dummy_clone]] into %[[arg1]]
   // CHECK:   flow.return %[[insert]]
@@ -64,7 +64,7 @@ func.func @move_preceding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1: i
   // CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
   // CHECK-DAG: %[[dim0:.*]] = tensor.dim %[[arg1]], %[[c0]]
   // CHECK-DAG: %[[dim1:.*]] = tensor.dim %[[arg1]], %[[c1]]
-  // CHECK: %[[region:.*]]:2 = flow.dispatch.region {operand_segment_sizes = array<i32: 4, 0>} -> (tensor<?x?xf32>{%[[dim0]], %[[dim1]]}, tensor<?x?xf32>{%[[s1]], %[[s2]]}) {
+  // CHECK: %[[region:.*]]:2 = flow.dispatch.region -> (tensor<?x?xf32>{%[[dim0]], %[[dim1]]}, tensor<?x?xf32>{%[[s1]], %[[s2]]}) {
   // CHECK:   %[[slice:.*]] = tensor.extract_slice %[[arg0]]
   // CHECK:   %[[insert:.*]] = tensor.insert_slice %[[slice]] into %[[arg1]]
   // CHECK:   flow.return %[[insert]], %[[slice]]
@@ -159,7 +159,7 @@ func.func @move_succeeding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1: 
   // CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
   // CHECK-DAG: %[[dim0:.*]] = tensor.dim %[[arg1]], %[[c0]]
   // CHECK-DAG: %[[dim1:.*]] = tensor.dim %[[arg1]], %[[c1]]
-  // CHECK: %[[region:.*]]:2 = flow.dispatch.region {operand_segment_sizes = array<i32: 4, 0>} -> (tensor<?x?xf32>{%[[s1]], %[[s2]]}, tensor<?x?xf32>{%[[dim0]], %[[dim1]]}) {
+  // CHECK: %[[region:.*]]:2 = flow.dispatch.region -> (tensor<?x?xf32>{%[[s1]], %[[s2]]}, tensor<?x?xf32>{%[[dim0]], %[[dim1]]}) {
   // CHECK:   %[[slice:.*]] = tensor.extract_slice %[[arg0]]
   // CHECK:   %[[insert:.*]] = tensor.insert_slice %[[slice]] into %[[arg1]]
   // CHECK:   flow.return %[[slice]], %[[insert]]
@@ -186,7 +186,7 @@ transform.with_pdl_patterns {
 // -----
 
 // CHECK-LABEL: func @move_multiple_succeeding
-//  CHECK-NEXT:   flow.dispatch.region {operand_segment_sizes = array<i32: 0, 0>} -> (tensor<50x90xf32>, tensor<50x90xf32>, tensor<50x90xf32>, tensor<50x90xf32>, tensor<50x90xf32>, tensor<600x700xf32>)
+//  CHECK-NEXT:   flow.dispatch.region -> (tensor<50x90xf32>, tensor<50x90xf32>, tensor<50x90xf32>, tensor<50x90xf32>, tensor<50x90xf32>, tensor<600x700xf32>)
 //  CHECK-NEXT:   "test.dummy_op"
 //  CHECK-NEXT:   "test.first_user"
 //  CHECK-NEXT:   "test.second_user"
@@ -224,7 +224,7 @@ transform.with_pdl_patterns {
 // CHECK-LABEL: func @clone_succeeding(
 //  CHECK-SAME:   %[[arg0:.*]]: tensor<?x?xf32>, %[[arg1:.*]]: tensor<?x?xf32>, %[[s1:.*]]: index, %[[s2:.*]]: index
 func.func @clone_succeeding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1: index, %s2: index) -> (tensor<?x?xf32>, tensor<?x?xf32>) {
-  // CHECK: %[[region:.*]] = flow.dispatch.region {operand_segment_sizes = array<i32: 2, 0>} -> (tensor<?x?xf32>{%[[s1]], %[[s2]]}) {
+  // CHECK: %[[region:.*]] = flow.dispatch.region -> (tensor<?x?xf32>{%[[s1]], %[[s2]]}) {
   // CHECK:   %[[slice:.*]] = tensor.extract_slice %[[arg0]]
   // CHECK:   tensor.insert_slice %[[slice]] into %[[arg1]]
   // CHECK:   flow.return %[[slice]]
@@ -259,7 +259,7 @@ func.func @reify_result_dims_regression(%s1: index, %s2: index) -> (tensor<4x?xf
   // CHECK: %[[c1:.*]] = arith.constant 1 : index
   // CHECK: %[[dim1:.*]] = tensor.dim %[[dest]], %[[c1]]
   // CHECK: %[[src:.*]] = "test.dummy_src"
-  // CHECK: %[[region:.*]] = flow.dispatch.region {operand_segment_sizes = array<i32: 1, 0>} -> (tensor<4x?xf32>{%[[dim1]]}) {
+  // CHECK: %[[region:.*]] = flow.dispatch.region -> (tensor<4x?xf32>{%[[dim1]]}) {
   // CHECK:   %[[insert:.*]] = tensor.insert_slice %[[src]] into %[[dest]]
   // CHECK:   flow.return %[[insert]]
   // CHECK: }
