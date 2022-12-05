@@ -68,6 +68,8 @@ static DenseElementsAttr foldFilterTransform(
   const int &ic = shape[2];
   const int &oc = shape[3];
   const int64_t numElements = inputTileSize * inputTileSize * ic * oc;
+  FloatType floatType = elementType.cast<FloatType>();
+  bool losesInfo;
   SmallVector<APFloat> output(numElements, APFloat(0.0f));
   for (int d0 = 0; d0 < inputTileSize; d0++) {
     for (int d1 = 0; d1 < inputTileSize; d1++) {
@@ -87,6 +89,10 @@ static DenseElementsAttr foldFilterTransform(
           }
           int odx = index(d0, d1, d2, d3, inputTileSize, inputTileSize, ic, oc);
           output[odx] = accum;
+          if (floatType.isF16()) {
+            output[odx].convert(APFloat::IEEEhalf(),
+                                APFloat::rmNearestTiesToEven, &losesInfo);
+          }
         }
       }
     }
