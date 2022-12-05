@@ -140,7 +140,7 @@ py_binary(
     name = "e2e_matmul_mmt4d_%s_small_ukernel" % lhs_rhs_type,
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
-        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
+        "--iree-flow-enable-data-tiling",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [

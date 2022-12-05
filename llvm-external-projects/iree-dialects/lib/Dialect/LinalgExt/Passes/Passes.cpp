@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -85,6 +86,44 @@ bool LinalgTransformationFilter::hasReplacementFilter(Operation *op) const {
   auto attr = op->getAttr(LinalgTransforms::kLinalgTransformMarker)
                   .dyn_cast<StringAttr>();
   return attr && attr == *replacement;
+}
+
+FailureOr<SmallVector<OpFoldResult>>
+getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
+                     RankedTensorType tensorType,
+                     MaterializeEncodingInfo materializeEncodingInfo,
+                     RuntimeTileSizeFn runtimeTileSizeFn) {
+  ArrayRef<int64_t> staticTileSizes = materializeEncodingInfo.innerTileSizes;
+  if (llvm::all_of(staticTileSizes,
+                   [](int64_t i) { return !ShapedType::isDynamic(i); })) {
+    return SmallVector<OpFoldResult>(
+        llvm::map_range(staticTileSizes, [&](int64_t v) {
+          return rewriter.getI64IntegerAttr(v);
+        }));
+  }
+  assert(runtimeTileSizeFn &&
+         "When dynamic tile sizes are generated, a RuntimeTileSizeFn "
+         "should be provided.");
+
+  FailureOr<SmallVector<Value>> runtimeTileSizes =
+      runtimeTileSizeFn(tensorType, rewriter, loc);
+  if (failed(runtimeTileSizes)) {
+    return failure();
+  }
+
+  SmallVector<OpFoldResult> result(staticTileSizes.size());
+  for (size_t i = 0; i < result.size(); ++i) {
+    if (staticTileSizes[i] == ShapedType::kDynamic) {
+      result[i] = (*runtimeTileSizes)[i];
+    } else if (tensorType.isDynamicDim(i)) {
+      result[i] =
+          rewriter.create<arith::ConstantIndexOp>(loc, staticTileSizes[i])
+              .getResult();
+    } else {
+      result[i] = rewriter.getI64IntegerAttr(staticTileSizes[i]);
+    }
+  }
+  return result;
 }
 
 namespace detail {

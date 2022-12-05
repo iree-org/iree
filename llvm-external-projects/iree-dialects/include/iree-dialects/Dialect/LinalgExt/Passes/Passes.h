@@ -94,15 +94,17 @@ struct MaterializeEncodingInfo {
   SmallVector<int64_t> outerDimsPerm;
   unsigned srcRank = 0;
 };
+
 using MaterializeEncodingFn =
     std::function<FailureOr<MaterializeEncodingInfo>(RankedTensorType)>;
 
+using RuntimeTileSizeFn = std::function<FailureOr<SmallVector<Value>>(
+    RankedTensorType, OpBuilder &, Location)>;
+
 /// TypeConverter to use for materializing the encoding.
 struct MaterializeEncodingTypeConverter : public TypeConverter {
-  MaterializeEncodingTypeConverter(MaterializeEncodingFn materializeEncodingFn);
-  MaterializeEncodingFn &getMaterializeEncodingFn() {
-    return materializeEncodingFn;
-  }
+  MaterializeEncodingTypeConverter(MaterializeEncodingFn fn);
+  MaterializeEncodingFn &getEncodingFn() { return materializeEncodingFn; }
 
 private:
   MaterializeEncodingFn materializeEncodingFn;
@@ -115,10 +117,17 @@ struct MaterializeEncodingConversionTarget : public ConversionTarget {
 
 /// Base class for patterns that materialize encoding.
 template <typename OpTy>
-struct OpMaterializeEncodingPattern : public OpConversionPattern<OpTy> {
-  OpMaterializeEncodingPattern(MaterializeEncodingTypeConverter &typeConverter,
-                               MLIRContext *context, PatternBenefit benefit = 1)
-      : OpConversionPattern<OpTy>(typeConverter, context, benefit) {}
+class OpMaterializeEncodingPattern : public OpConversionPattern<OpTy> {
+public:
+  OpMaterializeEncodingPattern(MLIRContext *context,
+                               MaterializeEncodingTypeConverter &typeConverter,
+                               RuntimeTileSizeFn runtimeTileSizeFn = {},
+                               PatternBenefit benefit = 1)
+      : OpConversionPattern<OpTy>(typeConverter, context, benefit),
+        runtimeTileSizeFn(runtimeTileSizeFn) {}
+
+protected:
+  const RuntimeTileSizeFn runtimeTileSizeFn;
 };
 
 /// Method to populate the patterns to convert operations that have operands
@@ -130,7 +139,8 @@ struct OpMaterializeEncodingPattern : public OpConversionPattern<OpTy> {
 void populateMaterializeEncodingPatterns(
     RewritePatternSet &patterns,
     MaterializeEncodingConversionTarget &conversionTarget,
-    MaterializeEncodingTypeConverter &typeConverter);
+    MaterializeEncodingTypeConverter &typeConverter,
+    RuntimeTileSizeFn runtimeTileSizeFn = {});
 
 /// Pass to apply patterns specified by `populateMaterializeEncodingPass`.
 std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass();
@@ -346,6 +356,12 @@ struct LinalgVectorLoweringOptions {
     return *this;
   }
 };
+
+FailureOr<SmallVector<OpFoldResult>>
+getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
+                     RankedTensorType tensorType,
+                     MaterializeEncodingInfo materializeEncodingInfo,
+                     RuntimeTileSizeFn runtimeTileSizeFn);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgStrategyLowerVectorsPass(

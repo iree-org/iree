@@ -113,21 +113,23 @@ static LogicalResult getTileAndDistributeConfig(
 /// Get the materialization information from a `iree_linalg_ext.pack` operation.
 static FailureOr<IREE::LinalgExt::MaterializeEncodingInfo>
 getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
-  IREE::LinalgExt::MaterializeEncodingInfo encodingInfo;
+  IREE::LinalgExt::MaterializeEncodingInfo materializeEncodingInfo;
   SmallVector<OpFoldResult> mixedTileSizes = packOp.getMixedTiles();
-  encodingInfo.innerTileSizes.reserve(mixedTileSizes.size());
+  materializeEncodingInfo.innerTileSizes.reserve(mixedTileSizes.size());
   for (auto tileSize : mixedTileSizes) {
     if (tileSize.is<Value>()) {
-      encodingInfo.innerTileSizes.push_back(ShapedType::kDynamic);
+      materializeEncodingInfo.innerTileSizes.push_back(ShapedType::kDynamic);
     } else {
-      encodingInfo.innerTileSizes.push_back(
+      materializeEncodingInfo.innerTileSizes.push_back(
           tileSize.get<Attribute>().cast<IntegerAttr>().getInt());
     }
   }
-  encodingInfo.innerDimsPos = llvm::to_vector(packOp.getInnerDimsPos());
-  encodingInfo.outerDimsPerm = llvm::to_vector(packOp.getOuterDimsPerm());
-  encodingInfo.srcRank = packOp.getInputRank();
-  return encodingInfo;
+  materializeEncodingInfo.innerDimsPos =
+      llvm::to_vector(packOp.getInnerDimsPos());
+  materializeEncodingInfo.outerDimsPerm =
+      llvm::to_vector(packOp.getOuterDimsPerm());
+  materializeEncodingInfo.srcRank = packOp.getInputRank();
+  return materializeEncodingInfo;
 }
 
 //===---------------------------------------------------------------------===//
@@ -247,10 +249,11 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
           IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp> {
   LowerDispatchWorkgroupCountFromSetEncodingOp(
       MLIRContext *context,
-      IREE::LinalgExt::MaterializeEncodingInfo encodingInfo,
-      PatternBenefit benefit = 1)
+      IREE::LinalgExt::MaterializeEncodingInfo materializeEncodingInfo,
+      ArrayRef<OpFoldResult> tileSizes, PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
-        materializeEncodingInfo(std::move(encodingInfo)) {}
+        materializeEncodingInfo(std::move(materializeEncodingInfo)),
+        tileSizes(tileSizes) {}
 
   LogicalResult matchAndRewrite(
       IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp workgroupCountOp,
@@ -258,16 +261,10 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
     ValueRange workload = workgroupCountOp.getOperands();
     // The workload represents the unpacked shape. Get the workload of the
     // packed shape.
-    auto getAsOpFoldResults = [&](ArrayRef<int64_t> intVals) {
-      return llvm::to_vector(llvm::map_range(
-          intVals,
-          [&](int64_t i) -> OpFoldResult { return rewriter.getIndexAttr(i); }));
-    };
     SmallVector<OpFoldResult> resultShape =
         IREE::LinalgExt::PackOp::getResultShape(
             rewriter, workgroupCountOp.getLoc(), getAsOpFoldResult(workload),
-            getAsOpFoldResults(materializeEncodingInfo.innerTileSizes),
-            materializeEncodingInfo.innerDimsPos,
+            tileSizes, materializeEncodingInfo.innerDimsPos,
             materializeEncodingInfo.outerDimsPerm);
     resultShape.resize(materializeEncodingInfo.srcRank);
 
@@ -281,6 +278,7 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
 
  private:
   IREE::LinalgExt::MaterializeEncodingInfo materializeEncodingInfo;
+  SmallVector<OpFoldResult> tileSizes;
 };
 
 //===---------------------------------------------------------------------===//
@@ -341,13 +339,14 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
           partitionableLoops);
       if (auto packRootOp =
               dyn_cast_or_null<IREE::LinalgExt::PackOp>(dispatchRootOp)) {
-        FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
-            getMaterializationInfo(packRootOp);
-        if (failed(encodingInfo)) {
+        FailureOr<IREE::LinalgExt::MaterializeEncodingInfo>
+            materializeEncodingInfo = getMaterializationInfo(packRootOp);
+        if (failed(materializeEncodingInfo)) {
           return signalPassFailure();
         }
         patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
-            context, encodingInfo.value());
+            context, materializeEncodingInfo.value(),
+            packRootOp.getMixedTiles());
       }
       if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
         exportOp.emitOpError("failed to lower number of workgroups");

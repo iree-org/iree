@@ -1747,37 +1747,11 @@ SmallVector<int64_t> PackOp::getStaticTiles() {
   return ::getStaticTiles(*this);
 }
 
-SmallVector<OpFoldResult> PackOp::getResultShape(
-    OpBuilder &builder, Location loc, ArrayRef<OpFoldResult> sourceDims,
-    ArrayRef<OpFoldResult> innerTileSizes, ArrayRef<int64_t> innerDimsPos,
-    ArrayRef<int64_t> outerDimsPerm) {
-  SmallVector<OpFoldResult> resultDims = llvm::to_vector(sourceDims);
-
-  AffineExpr s0, s1;
-  bindSymbols(builder.getContext(), s0, s1);
-  AffineExpr ceilDivExpr = s0.ceilDiv(s1);
-  for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
-    resultDims[tiledDim.value()] = makeComposedFoldedAffineApply(
-        builder, loc, ceilDivExpr,
-        {resultDims[tiledDim.value()], innerTileSizes[tiledDim.index()]});
-  }
-  if (!outerDimsPerm.empty()) {
-    resultDims =
-        interchange<OpFoldResult>(resultDims, outerDimsPerm, /*offset=*/0);
-  }
-  resultDims.append(innerTileSizes.begin(), innerTileSizes.end());
-  return resultDims;
-}
-
-SmallVector<OpFoldResult> PackOp::getResultShape(OpBuilder &builder) {
-  return tensor::createDimValues(builder, getLoc(), getOutput());
-}
-
-ShapedType PackOp::getPackedType(ShapedType sourceType,
-                                 ArrayRef<int64_t> innerTileSizes,
-                                 ArrayRef<int64_t> innerDimsPos,
-                                 ArrayRef<int64_t> outerDimsPerm) {
-  SmallVector<int64_t> resultShape = llvm::to_vector(sourceType.getShape());
+SmallVector<int64_t> getPackOpResultTypeShape(ArrayRef<int64_t> sourceShape,
+                                              ArrayRef<int64_t> innerTileSizes,
+                                              ArrayRef<int64_t> innerDimsPos,
+                                              ArrayRef<int64_t> outerDimsPerm) {
+  SmallVector<int64_t> resultShape = llvm::to_vector(sourceShape);
   for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
     if (ShapedType::isDynamic(resultShape[tiledDim.value()]))
       continue;
@@ -1794,12 +1768,76 @@ ShapedType PackOp::getPackedType(ShapedType sourceType,
 
   // Append the inner tile dimensions.
   resultShape.append(innerTileSizes.begin(), innerTileSizes.end());
+  return resultShape;
+}
+
+SmallVector<int64_t> getStaticValues(ArrayRef<OpFoldResult> ofrs) {
+  SmallVector<int64_t> result;
+  for (auto o : ofrs) {
+    if (o.dyn_cast<Value>())
+      result.push_back(ShapedType::kDynamic);
+    else
+      result.push_back(getConstantIntValue(o).value_or(ShapedType::kDynamic));
+  }
+  return result;
+}
+
+SmallVector<OpFoldResult> PackOp::getResultShape(
+    OpBuilder &builder, Location loc, ArrayRef<OpFoldResult> sourceDims,
+    ArrayRef<OpFoldResult> innerTileSizes, ArrayRef<int64_t> innerDimsPos,
+    ArrayRef<int64_t> outerDimsPerm) {
+
+  SmallVector<OpFoldResult> resultDims = llvm::to_vector(sourceDims);
+
+  AffineExpr s0, s1;
+  bindSymbols(builder.getContext(), s0, s1);
+  AffineExpr ceilDivExpr = s0.ceilDiv(s1);
+  for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
+
+    resultDims[tiledDim.value()] = makeComposedFoldedAffineApply(
+        builder, loc, ceilDivExpr,
+        {resultDims[tiledDim.value()], innerTileSizes[tiledDim.index()]});
+  }
+  if (!outerDimsPerm.empty()) {
+    resultDims =
+        interchange<OpFoldResult>(resultDims, outerDimsPerm, /*offset=*/0);
+  }
+  resultDims.append(innerTileSizes.begin(), innerTileSizes.end());
+
+  SmallVector<int64_t> resultTypeShape = getPackOpResultTypeShape(
+      getStaticValues(sourceDims), getStaticValues(innerTileSizes),
+      innerDimsPos, outerDimsPerm);
+
+  for (unsigned i = 0; i < resultDims.size(); ++i) {
+    if (resultTypeShape[i] == ShapedType::kDynamic) {
+
+      Value v = getValueOrCreateConstantIndexOp(builder, loc, resultDims[i]);
+
+      resultDims[i] = v;
+    }
+  }
+
+  return resultDims;
+}
+
+SmallVector<OpFoldResult> PackOp::getResultShape(OpBuilder &builder) {
+  return tensor::createDimValues(builder, getLoc(), getOutput());
+}
+
+ShapedType PackOp::getPackedType(ShapedType sourceType,
+                                 ArrayRef<int64_t> innerTileSizes,
+                                 ArrayRef<int64_t> innerDimsPos,
+                                 ArrayRef<int64_t> outerDimsPerm) {
+  SmallVector<int64_t> resultTypeShape = getPackOpResultTypeShape(
+      sourceType.getShape(), innerTileSizes, innerDimsPos, outerDimsPerm);
+
   return TypeSwitch<ShapedType, ShapedType>(sourceType)
       .Case<RankedTensorType>([&](auto shapedType) {
-        return RankedTensorType::get(resultShape, shapedType.getElementType());
+        return RankedTensorType::get(resultTypeShape,
+                                     shapedType.getElementType());
       })
       .Case<MemRefType>([&](auto shapedType) {
-        return MemRefType::get(resultShape, shapedType.getElementType());
+        return MemRefType::get(resultTypeShape, shapedType.getElementType());
       })
       .Default([&](Type t) {
         assert(false && "unexpected type");
@@ -2330,6 +2368,10 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
     auto empty = builder.create<tensor::EmptyOp>(
         loc, outputExpandedSizes, getOutputType().getElementType());
     tiledOperands.push_back(empty.getResult());
+  }
+
+  for (auto tile : getInnerTiles()) {
+    tiledOperands.push_back(tile);
   }
 
   SmallVector<Type, 4> tiledResultTypes;

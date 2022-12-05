@@ -56,11 +56,6 @@ static llvm::cl::opt<bool> clEnablePadConsumerFusion(
     llvm::cl::desc("Flag to enable the fusion for pad + consumer"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableMicrokernels(
-    "iree-vmvx-enable-microkernels",
-    llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clEnableMicrokernelsDecomposeLinalgGeneric(
     "iree-vmvx-enable-microkernels-decompose-linalg-generic",
     llvm::cl::desc("Enables decomposition of linalg.generic ops when "
@@ -433,14 +428,15 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addVMVXDefaultPassPipeline(OpPassManager &passManager) {
+void addVMVXDefaultPassPipeline(OpPassManager &passManager,
+                                bool enableMicrokernels) {
   addTileAndDistributePasses(passManager,
                              /*useFuseTensorPadWithConsumerPass=*/false);
 
   // Tensor-level micro-kernel optimizations.
   // Note that this must be done post-tiling because it changes the structure
   // of the dispatch region such that tiling is not always possible.
-  if (clEnableMicrokernels && clEnableMicrokernelsDecomposeLinalgGeneric) {
+  if (enableMicrokernels && clEnableMicrokernelsDecomposeLinalgGeneric) {
     passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
         createDecomposeLinalgGenericPass());
   }
@@ -454,7 +450,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager) {
       createRemoveSingleIterationLoopPass());
 
   // Convert buffer-level microkernels.
-  if (clEnableMicrokernels) {
+  if (enableMicrokernels) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createVMVXLowerLinalgMicrokernelsPass());
   }
