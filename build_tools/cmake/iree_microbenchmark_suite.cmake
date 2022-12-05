@@ -33,6 +33,7 @@ function(iree_microbenchmark_suite)
     set(_MODULE_FILE_NAME "${_RULE_NAME}_${_SRC}.vmfb")
     set(_TARGET_NAME "${PACKAGE_NAME}_${_MODULE_FILE_NAME}")
     iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE "${_COMPILE_TOOL}")
+    iree_get_shared_library_path(_COMPILER_SHARED_LIBRARY "iree::compiler::API2::SharedImpl" "IREECompiler")
     set(_ARGS "${_RULE_FLAGS}")
     get_filename_component(_TRANSLATE_SRC_PATH "${_TRANSLATE_SRC}" REALPATH)
     list(APPEND _ARGS "${_TRANSLATE_SRC_PATH}")
@@ -48,6 +49,7 @@ function(iree_microbenchmark_suite)
       # Changes to either the compiler tool or the input source should rebuild.
       DEPENDS
         "${_COMPILE_TOOL_EXECUTABLE}"
+        "${_COMPILER_SHARED_LIBRARY}"
         "${_TRANSLATE_SRC}"
       VERBATIM
     )

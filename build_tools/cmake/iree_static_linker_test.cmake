@@ -70,8 +70,6 @@ function(iree_static_linker_test)
     return()
   endif()
 
-  iree_get_executable_path(_COMPILER_TOOL "iree-compile")
-
   iree_package_name(_PACKAGE_NAME)
   iree_package_ns(_PACKAGE_NS)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
