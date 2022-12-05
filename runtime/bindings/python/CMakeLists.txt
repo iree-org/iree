@@ -71,6 +71,7 @@ iree_py_library(
     "iree/runtime/system_setup.py"
     "iree/runtime/tracing.py"
     "iree/runtime/scripts/iree_benchmark_trace/__main__.py"
+    "iree/runtime/scripts/iree_benchmark_module/__main__.py"
     "iree/runtime/scripts/iree_run_trace/__main__.py"
     "iree/runtime/scripts/iree_run_module/__main__.py"
     ${_PYTHON_EXTRA_SRCS}
