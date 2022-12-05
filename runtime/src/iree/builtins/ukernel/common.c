@@ -6,8 +6,11 @@
 
 #include "iree/builtins/ukernel/common.h"
 
+#ifdef IREE_UK_ENABLE_VALIDATION
 IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status) {
   switch (status) {
+    case iree_uk_status_ok:
+      return "OK";
     case iree_uk_status_bad_flags:
       return "bad mmt4d flags";
     case iree_uk_status_bad_type:
@@ -22,3 +25,4 @@ IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status) {
       return "unknown";
   }
 }
+#endif
