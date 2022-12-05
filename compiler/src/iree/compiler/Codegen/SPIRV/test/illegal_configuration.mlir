@@ -378,7 +378,7 @@ hal.executable private @matmul_tensors {
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [128, 2, 1]>
+    workgroup_size = [128, 2, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -401,7 +401,7 @@ hal.executable public @matmul_tensor {
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
-        subgroup_size = 64>
+        subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64>
        >}> {
     hal.executable.export public @matmul_tensor layout(#pipeline_layout)
     builtin.module {
@@ -431,7 +431,7 @@ hal.executable public @matmul_tensor {
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [8, 8, 8]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [128, 2, 1]>
+    workgroup_size = [128, 2, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -454,7 +454,7 @@ hal.executable public @matmul_tensor {
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
-        subgroup_size = 64>
+        subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64>
        >}> {
     hal.executable.export public @matmul_tensor layout(#pipeline_layout)
     builtin.module {
@@ -484,7 +484,7 @@ hal.executable public @matmul_tensor {
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[32, 32], [8, 8], [0, 0, 4], [16, 16, 16]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [256, 4, 1]>
+    workgroup_size = [256, 4, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -507,7 +507,7 @@ hal.executable public @matmul_tensor {
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
-        subgroup_size = 64>
+        subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64>
        >}> {
     hal.executable.export public @matmul_tensor layout(#pipeline_layout)
     builtin.module {
@@ -537,7 +537,7 @@ hal.executable public @matmul_tensor {
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [64, 2, 1]>
+    workgroup_size = [64, 2, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -560,7 +560,7 @@ hal.executable public @matmul_tensor {
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
-        subgroup_size = 64>
+        subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64>
        >}> {
     hal.executable.export public @matmul_tensor layout(#pipeline_layout)
     builtin.module {
@@ -590,7 +590,7 @@ hal.executable public @matmul_tensor {
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [128, 4, 1]>
+    workgroup_size = [128, 4, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -613,7 +613,7 @@ hal.executable public @matmul_tensor {
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
-        subgroup_size = 64>
+        subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64>
        >}> {
     hal.executable.export public @matmul_tensor layout(#pipeline_layout)
     builtin.module {
@@ -643,7 +643,7 @@ hal.executable public @matmul_tensor {
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[32, 32], [32, 32], [0, 0, 16], [16, 16, 16]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [64, 1, 1]>
+    workgroup_size = [64, 1, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -666,7 +666,7 @@ hal.executable public @matmul_tensor {
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
-        subgroup_size = 64>
+        subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64>
        >}> {
     hal.executable.export public @matmul_tensor layout(#pipeline_layout)
     builtin.module {
