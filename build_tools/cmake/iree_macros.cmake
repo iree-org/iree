@@ -182,16 +182,21 @@ function(iree_get_shared_library_path OUTPUT_PATH_VAR LIBRARY_TARGET LIBRARY_NAM
     set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${LIBRARY_TARGET}>" PARENT_SCOPE)
   else()
     # The target won't be directly defined by this CMake invocation so check
-    # for an already built library at IREE_HOST_BINARY_ROOT. If we find it,
+    # for an already built library under IREE_HOST_BINARY_ROOT. If we find it,
     # add it as an imported target so it gets picked up on later invocations.
-    set(_LIBRARY_PATH "${IREE_HOST_BINARY_ROOT}/bin/${_FULL_LIBRARY_NAME}")
-    if(EXISTS ${_LIBRARY_PATH})
+    set(_LIBRARY_BIN_PATH "${IREE_HOST_BINARY_ROOT}/bin/${_FULL_LIBRARY_NAME}")
+    set(_LIBRARY_LIB_PATH "${IREE_HOST_BINARY_ROOT}/lib/${_FULL_LIBRARY_NAME}")
+    if(EXISTS ${_LIBRARY_BIN_PATH})
       add_library("${LIBRARY_TARGET}" SHARED IMPORTED GLOBAL)
-      set_property(TARGET "${LIBRARY_TARGET}" PROPERTY IMPORTED_LOCATION "${_LIBRARY_PATH}")
+      set_property(TARGET "${LIBRARY_TARGET}" PROPERTY IMPORTED_LOCATION "${_LIBRARY_BIN_PATH}")
+      set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${LIBRARY_TARGET}>" PARENT_SCOPE)
+    elseif(EXISTS ${_LIBRARY_LIB_PATH})
+      add_library("${LIBRARY_TARGET}" SHARED IMPORTED GLOBAL)
+      set_property(TARGET "${LIBRARY_TARGET}" PROPERTY IMPORTED_LOCATION "${_LIBRARY_LIB_PATH}")
       set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${LIBRARY_TARGET}>" PARENT_SCOPE)
     else()
-      message(FATAL_ERROR "Could not find '${LIBRARY_NAME}' at '${_LIBRARY_PATH}'. "
-              "Ensure that IREE_HOST_BINARY_ROOT points to installed binaries.")
+      message(FATAL_ERROR "Could not find '${LIBRARY_NAME}' under '${IREE_HOST_BINARY_ROOT}'. "
+              "Ensure that IREE_HOST_BINARY_ROOT points to install directory.")
     endif()
   endif()
 endfunction()
