@@ -1052,10 +1052,107 @@ static DiagnosedSilenceableFailure testMatchCallbackCallback(
   return DiagnosedSilenceableFailure::success();
 }
 
+/// Match callback for a reduction with optional leading and trailing
+/// elementwise operations. Matches *the first* occurrence of such a reduction
+/// within an op associated with the given handle.
+///
+/// Input handles:
+///
+///   - container op, must be associated with one operation.
+///
+/// Output handles:
+///
+///   - leading elementwise op, if any;
+///   - the "fill" op preceding the reduction;
+///   - reduction op;
+///   - trailing elementwise op, if any.
+static DiagnosedSilenceableFailure reductionCallback(
+    transform_dialect::MatchCallbackResult &res, Location loc,
+    const transform::TransformState &state, ValueRange handles) {
+  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+
+  transform_dialect::StructuredOpMatcher pattern, fill, leadingEltwise,
+      trailingEltwise;
+  makeGPUReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise);
+
+  // TODO: need a mechanism for this to go around the entire IR,
+  // potentially with list matches for each group.
+  Operation *root = state.getPayloadOps(handles[0])[0];
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    pattern.resetCapture();
+    if (!matchPattern(op, pattern)) return WalkResult::advance();
+
+    res.addPotentiallyEmptyPayloadGroup(leadingEltwise.getCaptured());
+    res.addPayloadGroup({fill.getCaptured()});
+    res.addPayloadGroup({pattern.getCaptured()});
+    res.addPotentiallyEmptyPayloadGroup(trailingEltwise.getCaptured());
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
+/// Match callback for a reduction after splitting with optional leading and
+/// trailing elementwise operations. Matches *the first* occurrence of such a
+/// reduction within an op associated with the given handle.
+///
+/// Input handles:
+///
+///   - container op, must be associated with one operation.
+///
+/// Output handles:
+///
+///   - leading elementwise op, if any;
+///   - the "fill" op preceding the original reduction;
+///   - the "fill" op preceding the split, more parallel reduction;
+///   - the split, more parallel reduction op;
+///   - reduction op;
+///   - trailing elementwise op, if any.
+static DiagnosedSilenceableFailure splitReductionCallback(
+    transform_dialect::MatchCallbackResult &res, Location loc,
+    const transform::TransformState &state, ValueRange handles) {
+  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+
+  transform_dialect::StructuredOpMatcher parallel_reduction, combiner_reduction,
+      parallel_fill, original_fill, leading, trailing;
+  makeGPUSplitReductionMatcher(parallel_reduction, combiner_reduction,
+                               parallel_fill, original_fill, leading, trailing);
+
+  // TODO: need a mechanism for this to go around the entire IR,
+  // potentially with list matches for each group.
+  Operation *root = state.getPayloadOps(handles[0])[0];
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    combiner_reduction.resetCapture();
+    if (!matchPattern(op, combiner_reduction)) return WalkResult::advance();
+
+    res.addPotentiallyEmptyPayloadGroup(leading.getCaptured());
+    res.addPayloadGroup({original_fill.getCaptured()});
+    res.addPayloadGroup({parallel_fill.getCaptured()});
+    res.addPayloadGroup({parallel_reduction.getCaptured()});
+    res.addPayloadGroup({combiner_reduction.getCaptured()});
+    res.addPotentiallyEmptyPayloadGroup(trailing.getCaptured());
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
 DiagnosedSilenceableFailure transform_dialect::RegisterMatchCallbacksOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
   auto &registry = state.addExtension<MatchCallbacksRegistry>();
   registry.registerCallback("_test_match_callback", testMatchCallbackCallback);
+  registry.registerCallback("reduction", reductionCallback);
+  registry.registerCallback("split_reduction", splitReductionCallback);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -1124,6 +1221,33 @@ void transform_dialect::MatchCallbackOp::getEffects(
   // TODO: it doesn't really modify the payload, we need a separate resource for
   // this mapping.
   transform::modifiesPayload(effects);
+}
+
+DiagnosedSilenceableFailure transform_dialect::TakeFirstOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  SmallVector<Operation *> concatenated;
+  bool found = false;
+  for (Value handle : getInputs()) {
+    ArrayRef<Operation *> payloads = state.getPayloadOps(handle);
+    if (payloads.empty()) continue;
+    if (!found) {
+      results.set(getFirst().cast<OpResult>(), payloads);
+      found = true;
+    } else {
+      llvm::append_range(concatenated, payloads);
+    }
+  }
+
+  if (!found) results.set(getFirst().cast<OpResult>(), {});
+  results.set(getRest().cast<OpResult>(), concatenated);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::TakeFirstOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getInputs(), effects);
+  transform::producesHandle(getFirst(), effects);
+  transform::producesHandle(getRest(), effects);
 }
 
 #define GET_OP_CLASSES

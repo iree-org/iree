@@ -383,4 +383,31 @@ def MatchCallbackOp :
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def TakeFirstOp :
+    Op<Transform_Dialect, "iree.take_first",
+       [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+        DeclareOpInterfaceMethods<TransformOpInterface>]> {
+  let description = [{
+    Given an arbitrary list of handles associated with potentially empty lists
+    of payload operations, produces two new handles:
+
+      - a handle pointing to the same payload operations as the first operand
+        handle with a non-empty list of payload operations;
+      - a handle pointing to the concatenated list of payload operations
+        associated with any other handle.
+
+    Note that this does not perform any deduplication.
+
+    This operation is useful to select a single target after some potentially
+    unsuccessful matches.
+  }];
+
+  let arguments = (ins Variadic<TransformTypeInterface>:$inputs);
+  let results = (outs TransformTypeInterface:$first,
+                      TransformTypeInterface:$rest);
+  let assemblyFormat =
+      "$inputs attr-dict `:` functional-type($inputs, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS

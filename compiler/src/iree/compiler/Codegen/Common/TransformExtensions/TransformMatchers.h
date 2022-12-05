@@ -13,10 +13,19 @@
 
 #include "llvm/ADT/StringMap.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Matchers.h"
 
 namespace mlir::iree_compiler::IREE::transform_dialect {
+
+//===---------------------------------------------------------------------===//
+// StructuredOpMatcher and predicates.
+//===---------------------------------------------------------------------===//
+
+class StructuredOpMatcher;
+StructuredOpMatcher m_StructuredOp();
 
 /// A tag indicating the shape being static or dynamic, for use with the
 /// structured op matcher.
@@ -74,8 +83,17 @@ struct OptionalMatch : public SingleValuePredicateParam<bool> {
 /// operation.
 struct SingleCombinerReduction {};
 
-class StructuredOpMatcher;
-StructuredOpMatcher m_StructuredOp();
+/// Indicates that it suffices for only a subset of an operand or result value
+/// to be used.
+struct SubsetOf {
+  explicit SubsetOf(StructuredOpMatcher &matcher) : matcher(matcher) {}
+  StructuredOpMatcher &matcher;
+};
+
+namespace detail {
+template <typename T>
+using has_reset_capture_t = decltype(std::declval<T>().resetCapture());
+}  // namespace detail
 
 /// Structured op matcher with additional predicates attachable through the
 /// fluent, a.k.a. chainable, API. Note that public API must *not* accept
@@ -87,6 +105,7 @@ StructuredOpMatcher m_StructuredOp();
 class StructuredOpMatcher {
   friend StructuredOpMatcher m_StructuredOp();
   using PredicateFn = std::function<bool(linalg::LinalgOp)>;
+  using CaptureResetFn = std::function<void()>;
 
   /// Matches a structured operation if the given predicate is satisfied.
   StructuredOpMatcher(PredicateFn &&firstPredicate) {
@@ -164,17 +183,29 @@ class StructuredOpMatcher {
       Operation *definingOp = linalgOp.getDpsInputOperand(transformedPosition)
                                   ->get()
                                   .getDefiningOp();
+      if (!definingOp) return optional.value;
       // We MUST run the matcher at this point, even if the match is optional,
       // to allow for capture.
       if (operandMatcher.match(definingOp)) return true;
       return optional.value;
     });
+    recordNestedMatcher(operandMatcher);
     return *this;
   }
 
   /// Adds a predicate checking that all input operands of the structured op
   /// have a permutation indexing map.
   StructuredOpMatcher &input(AllOperands tag, IsPermutation);
+
+  /// Adds a predicate that recursively applies another predicate to the
+  /// operation defining the `position`-th input operand, looking through any
+  /// "subsetting" operation such as "tensor.extract_slice".
+  StructuredOpMatcher &input(int64_t position, SubsetOf subset);
+
+  /// Adds a predicate that recursively applies another predicate to the
+  /// operation defining the `position`-th output operand, looking through any
+  /// "subsetting" operation such as "tensor.extract_slice".
+  StructuredOpMatcher &output(int64_t position, SubsetOf subset);
 
   /// Adds a predicate checking that the structured op has the given number of
   /// outputs.
@@ -226,6 +257,7 @@ class StructuredOpMatcher {
       if (operandMatcher.match(definingOp)) return true;
       return optional.value;
     });
+    recordNestedMatcher(operandMatcher);
     return *this;
   }
 
@@ -256,12 +288,43 @@ class StructuredOpMatcher {
       }
       return optional.value;
     });
+    recordNestedMatcher(resultUserMatcher);
     return *this;
   }
 
+  /// Adds a predicate that recursively applies to users of the `positions`-th
+  /// result, looking through any "subsetting" operation such as
+  /// "tensor.extract_slice". Succeeds if any user matches the predicate.
+  /// When the match is optional, the predicate check succeeds as long as the
+  /// `position` is in bounds, after running the given matcher.
+  StructuredOpMatcher &result(int64_t position, HasAnyUse tag, SubsetOf subset,
+                              OptionalMatch optional = OptionalMatch(false));
+
+  /// Resets the captured value to null. This should be called if the same
+  /// pattern needs to be applied more than once as it may keep captured values
+  /// for optional nested predicates from the previous application.
+  void resetCapture() {
+    captured = nullptr;
+    for (const CaptureResetFn &fn : captureResetFns) fn();
+  }
+
  private:
+  /// Informs the matcher that it has another, nested matcher. Practically,
+  /// records the captured value cleanup function so it runs when required.
+  template <typename T>
+  std::enable_if_t<llvm::is_detected<detail::has_reset_capture_t, T>::value>
+  recordNestedMatcher(T &nested) {
+    captureResetFns.push_back([&nested] { nested.resetCapture(); });
+  }
+  template <typename T>
+  std::enable_if_t<!llvm::is_detected<detail::has_reset_capture_t, T>::value>
+  recordNestedMatcher(T &nested) {}
+
   /// Additional predicates to be checked on the structured op.
   SmallVector<PredicateFn> predicates;
+
+  /// Callbacks to reset captures of nested matchers.
+  SmallVector<CaptureResetFn> captureResetFns;
 
   /// Matched value.
   linalg::LinalgOp captured = nullptr;
@@ -358,6 +421,39 @@ class MatchCallbacksRegistry : public transform::TransformState::Extension {
  private:
   llvm::StringMap<MatchCallbackFn> callbacks;
 };
+
+//===---------------------------------------------------------------------===//
+// Case-specific matcher builders.
+//===---------------------------------------------------------------------===//
+
+/// Creates a group of matchers for:
+///
+///     trailing(reduction(leading(), fill()))
+///
+/// where trailing and leading are elementwise operations whose presence is
+/// optional. Each matcher will capture the corresponding operation.
+void makeGPUReductionMatcher(StructuredOpMatcher &reduction,
+                             StructuredOpMatcher &fill,
+                             StructuredOpMatcher &leading,
+                             StructuredOpMatcher &trailing);
+
+/// Creates a group of matchers for:
+///
+///     trailing(
+///       combiner_reduction(
+///         parallel_reduction(leading(), parallel_fill()),
+///         original_fill())))
+///
+/// where trailing and leading are elementwise operations whose presence is
+/// optional, and with subsetting ops potentially present on the operand use-def
+/// chains.
+void makeGPUSplitReductionMatcher(StructuredOpMatcher &parallel_reduction,
+                                  StructuredOpMatcher &combiner_reduction,
+                                  StructuredOpMatcher &parallel_fill,
+                                  StructuredOpMatcher &original_fill,
+                                  StructuredOpMatcher &leading,
+                                  StructuredOpMatcher &trailing);
+
 }  // namespace mlir::iree_compiler::IREE::transform_dialect
 
 #endif  // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_TRANSFORMMATCHERS_H_
