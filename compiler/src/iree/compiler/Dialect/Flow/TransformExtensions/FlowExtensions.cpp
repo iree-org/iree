@@ -834,26 +834,20 @@ void transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
-static Flow::DispatchRegionOp makeEmptyDispatchRegion(RewriterBase &rewriter,
-                                                      Location loc) {
-  OpBuilder::InsertionGuard guard(rewriter);
-
-  // Create RegionOp.
-  auto regionOp = rewriter.create<Flow::DispatchRegionOp>(
-      loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange());
-  Block &body = regionOp.getBody().emplaceBlock();
-  rewriter.setInsertionPointToStart(&body);
-  rewriter.create<Flow::ReturnOp>(loc, ValueRange());
-
-  return regionOp;
-}
-
 DiagnosedSilenceableFailure
 transform_dialect::WrapInDispatchRegionOp::applyToOne(
     Operation *target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   IRRewriter rewriter(target->getContext());
-  auto regionOp = Flow::wrapOpInDispatchRegion(rewriter, target);
+  Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None;
+  if (getGenerateWorkload()) {
+    auto maybeBuilder = Flow::getWorkloadBuilder(rewriter, target);
+    if (failed(maybeBuilder))
+      return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    workloadBuilder = *maybeBuilder;
+  }
+  auto regionOp =
+      Flow::wrapOpInDispatchRegion(rewriter, target, workloadBuilder);
   if (failed(regionOp))
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
 

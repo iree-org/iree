@@ -778,8 +778,8 @@ static void buildDefaultWorkloadRegion(OpBuilder &builder, Location loc,
 
 /// Computes the workload and provides a workload region builder for the given
 /// root op.
-static FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
-                                                           Operation *rootOp) {
+FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
+                                                    Operation *rootOp) {
   Flow::WorkloadBuilder result;
 
   // Compute workload (before entering the dispatch region).
@@ -801,23 +801,22 @@ static FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
 
   return result;
 }
-
 /// Create Flow::DispatchGroupsOps based on a fusion heuristic.
 static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
     TensorDimTrackingRewriter &rewriter, FunctionOpInterface funcOp,
     DominanceInfo const &dominanceInfo, bool generateWorkloadRegion,
     bool aggressiveFusion) {
-  // Decide fusion groups (heuristic).
+  mlir::FunctionOpInterface funcOp = getOperation();
+
+  DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
+  TensorDimTrackingRewriter rewriter(funcOp);
+
+  // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
+  // attribute
   unsigned numRoots =
       decideFusableLinalgOps(funcOp, dominanceInfo, aggressiveFusion);
   SmallVector<Operation *> roots(numRoots, nullptr);
   DenseMap<unsigned, SmallVector<Operation *>> producers;
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n--- After deciding fusion groups ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
 
   // TODO: Incrementally add ops to an empty DispatchGroupOp instead of
   // annotating fusion group IDs via attributes.
@@ -833,7 +832,7 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
     }
   });
 
-  // Create a DispatchRegionOp for every fusion group.
+  // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<Flow::DispatchRegionOp> regionOps;
   DenseMap<Flow::DispatchRegionOp, Optional<Flow::WorkloadBuilder>>
@@ -843,22 +842,23 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
     Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None;
     if (generateWorkloadRegion) {
       auto maybeBuilder = getWorkloadBuilder(rewriter, /*rootOp=*/it.value());
-      if (failed(maybeBuilder)) return failure();
+      if (failed(maybeBuilder)) return signalPassFailure();
       workloadBuilder = *maybeBuilder;
     }
 
     // Simplify tensor::DimOps.
     SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-    if (failed(simplifyDimOps(rewriter, dimOps))) return failure();
+    if (failed(simplifyDimOps(rewriter, dimOps))) return signalPassFailure();
 
     // Create fusion group.
     Flow::DispatchRegionOp regionOp;
-    auto maybeRegionOp = Flow::wrapOpInDispatchRegion(rewriter, it.value());
-    if (failed(maybeRegionOp)) return failure();
+    auto maybeRegionOp =
+        Flow::wrapOpInDispatchRegion(rewriter, it.value(), workloadBuilder);
+    if (failed(maybeRegionOp)) return signalPassFailure();
     regionOp = *maybeRegionOp;
 
-    // Sort producers topologically. All producers must be in the same block as
-    // the root.
+    // Sort producers topologically. All producers must be in the same block
+    // as the root.
     bool sortResult = mlir::computeTopologicalSorting(producers[it.index()]);
     (void)sortResult;
     assert(sortResult && "could not compute topological sorting");
@@ -867,41 +867,12 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
     for (Operation *producer : llvm::reverse(producers[it.index()])) {
       auto newRegionOp =
           movePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp);
-      if (failed(newRegionOp)) return failure();
+      if (failed(newRegionOp)) return signalPassFailure();
       regionOp = *newRegionOp;
     }
-
-    workloadBuilders[regionOp] = workloadBuilder;
     regionOps.push_back(regionOp);
   }
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n--- After creating flow.dispatch.region ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
-  // Clone additional producers and rewrite to DispatchWorkgroupsOp.
-  SmallVector<Flow::DispatchWorkgroupsOp> result;
-  for (auto regionOp : regionOps) {
-    if (failed(cloneProducers(rewriter, regionOp))) return failure();
-    auto maybeWorkgroupOp =
-        Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
-            regionOp, rewriter, workloadBuilders[regionOp]);
-    if (failed(maybeWorkgroupOp)) return failure();
-
-    result.push_back(*maybeWorkgroupOp);
-  }
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n--- After creating flow.dispatch.workgroups ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
-  return result;
 }
-
 /// Wrap a single op in a DispatchWorkgroupsOp.
 static FailureOr<Flow::DispatchWorkgroupsOp> wrapInWorkgroupsOp(
     TensorDimTrackingRewriter &rewriter, Operation *op,
@@ -920,11 +891,11 @@ static FailureOr<Flow::DispatchWorkgroupsOp> wrapInWorkgroupsOp(
     return failure();
 
   // Wrap operation.
-  auto regionOp = Flow::wrapOpInDispatchRegion(rewriter, op);
+  auto regionOp = Flow::wrapOpInDispatchRegion(rewriter, op, workloadBuilder);
   if (failed(regionOp)) return failure();
   if (failed(cloneProducers(rewriter, *regionOp))) return failure();
   auto workgroupsOp = Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
-      *regionOp, rewriter, workloadBuilder);
+      *regionOp, rewriter);
   if (failed(workgroupsOp)) return failure();
   return *workgroupsOp;
 }
@@ -943,8 +914,30 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> wrapInWorkgroupsOp(
   return result;
 }
 
-/// Wrap all ops of the given types that are direct children of the given op in
-/// DispatchWorkgroupsOps.
+/// Create Flow::DispatchGroupsOps
+static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>>
+createDispatchWorkgroups(TensorDimTrackingRewriter &rewriter,
+                         FunctionOpInterface funcOp,
+                         DominanceInfo const &dominanceInfo,
+                         bool generateWorkloadRegion) {
+  SmallVector<Flow::DispatchRegionOp> regionOps;
+  funcOp.walk([&](Flow::DispatchRegionOp op) { regionOps.push_back(op); });
+
+  // Clone additional producers and rewrite to DispatchWorkgroupsOp.
+  SmallVector<Flow::DispatchWorkgroupsOp> result;
+  for (auto regionOp : regionOps) {
+    if (failed(cloneProducers(rewriter, regionOp))) return failure();
+    auto maybeWorkgroupOp =
+        Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(regionOp,
+                                                                rewriter);
+    if (failed(maybeWorkgroupOp)) return failure();
+    result.push_back(*maybeWorkgroupOp);
+  }
+  return result;
+}
+
+/// Wrap all ops of the given types that are direct children of the given op
+/// in DispatchWorkgroupsOps.
 template <typename... OpTys>
 static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> wrapInWorkgroupsOp(
     TensorDimTrackingRewriter &rewriter, Operation *op,
@@ -1027,45 +1020,60 @@ LogicalResult convertExtractSliceOps(
 
 namespace {
 /// Pass declaration.
-struct DispatchLinalgOnTensorsPass
-    : public DispatchLinalgOnTensorsBase<DispatchLinalgOnTensorsPass> {
+struct FormDispatchWorkgroupsPass
+    : public FormDispatchWorkgroupsBase<FormDispatchWorkgroupsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
                 scf::SCFDialect, tensor::TensorDialect>();
   }
-  DispatchLinalgOnTensorsPass(bool aggressiveFusion,
-                              bool generateWorkloadRegion) {
-    this->aggressiveFusion = aggressiveFusion;
+  FormDispatchWorkgroupsPass(bool generateWorkloadRegion) {
     this->generateWorkloadRegion = generateWorkloadRegion;
   }
-  DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass)
-      : DispatchLinalgOnTensorsPass(pass.aggressiveFusion,
-                                    pass.generateWorkloadRegion) {}
+  FormDispatchWorkgroupsPass(const FormDispatchWorkgroupsPass &pass)
+      : FormDispatchWorkgroupsPass(pass.generateWorkloadRegion) {}
   void runOnOperation() override;
-
- private:
-  Statistic numDispatches{this, "number of dispatches",
-                          "Number of Flow dispatches created"};
 };
 }  // namespace
 
-void DispatchLinalgOnTensorsPass::runOnOperation() {
+namespace {
+/// Pass declaration.
+struct FormDispatchRegionsPass
+    : public FormDispatchRegionsBase<FormDispatchRegionsPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry
+        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
+                scf::SCFDialect, tensor::TensorDialect>();
+  }
+  FormDispatchRegionsPass(bool aggressiveFusion, bool generateWorkloadRegion) {
+    this->aggressiveFusion = aggressiveFusion;
+    this->generateWorkloadRegion = generateWorkloadRegion;
+  }
+  FormDispatchRegionsPass(const FormDispatchRegionsPass &pass)
+      : FormDispatchRegionsPass(pass.aggressiveFusion,
+                                pass.generateWorkloadRegion) {}
+  void runOnOperation() override;
+};
+}  // namespace
+
+void FormDispatchWorkgroupsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
 
-  // Step 1: Create a DispatchWorkgroupsOp for every fusion group.
-  auto maybeWorkgroupsOps =
-      createFusionGroups(rewriter, funcOp, dominanceInfo,
-                         generateWorkloadRegion, aggressiveFusion);
-  if (failed(maybeWorkgroupsOps)) {
-    funcOp->emitOpError("failed to create fused dispatches");
-    return signalPassFailure();
-  }
+  // Step 1: Create a DispatchWorkgroupsOp for every DispatchRegionOp.
+  auto maybeWorkgroupsOps = createDispatchWorkgroups(
+      rewriter, funcOp, dominanceInfo, generateWorkloadRegion);
+  if (failed(maybeWorkgroupsOps)) return signalPassFailure();
   SmallVector<Flow::DispatchWorkgroupsOp> workgroupsOps = *maybeWorkgroupsOps;
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After forming of dispatch workgroups ---\n";
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
 
   // Step 2: Rewrite InsertSliceOps to FlowUpdateOps.
   if (failed(convertInsertSliceOps(rewriter, funcOp, workgroupsOps,
@@ -1119,11 +1127,24 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   }
 }
 
+/// Create dispatch.region Ops based on a fusion heuristic.
+void FormDispatchRegionsPass::runOnOperation() {
+  createFusionGroups(TensorDimTrackingRewriter & rewriter,
+                     FunctionOpInterface funcOp,
+                     const DominanceInfo &dominanceInfo,
+                     bool generateWorkloadRegion, bool aggressiveFusion);
+}
+
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDispatchLinalgOnTensorsPass(bool aggressiveFusion,
-                                  bool generateWorkloadRegion) {
-  return std::make_unique<DispatchLinalgOnTensorsPass>(aggressiveFusion,
-                                                       generateWorkloadRegion);
+createFormDispatchRegionsPass(bool aggressiveFusion,
+                              bool generateWorkloadRegion) {
+  return std::make_unique<FormDispatchRegionsPass>(aggressiveFusion,
+                                                   generateWorkloadRegion);
+}
+
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFormDispatchWorkgroupsPass(bool generateWorkloadRegion) {
+  return std::make_unique<FormDispatchWorkgroupsPass>(generateWorkloadRegion);
 }
 
 }  // namespace Flow

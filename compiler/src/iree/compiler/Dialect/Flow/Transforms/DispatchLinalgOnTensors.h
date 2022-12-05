@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_DISPATCHLINALGONTENSORS_H_
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_DISPATCHLINALGONTENSORS_H_
 
+#include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 namespace mlir {
 class Operation;
 
@@ -21,6 +22,8 @@ namespace Flow {
 /// into a dispatch region.
 bool isClonableIntoDispatchOp(Operation *op);
 
+FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
+                                                    Operation *rootOp);
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler
