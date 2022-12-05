@@ -1,6 +1,5 @@
 # Python
 .env
-.env.bat
 *.pyc
 **/.ipynb_checkpoints/
 .pytype/
