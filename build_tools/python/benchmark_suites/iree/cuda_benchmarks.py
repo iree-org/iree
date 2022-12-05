@@ -40,7 +40,7 @@ class Linux_CUDA_Benchmarks(object):
     ]
     sm80_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.CUDA_SM80,
-        platform=common_definitions.DevicePlatform.GENERIC_LINUX)
+        host_platform=common_definitions.HostPlatform.GENERIC_LINUX)
     run_module_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=gen_configs,
         module_execution_configs=[module_execution_configs.CUDA_CONFIG],

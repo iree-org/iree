@@ -56,15 +56,16 @@ class DeviceArchitecture(Enum):
 
 @dataclass(frozen=True)
 class PlatformInfo(object):
-  """Platform information of a device."""
+  """Platform information of a host."""
   os: str
+  architecture: str
 
 
-class DevicePlatform(Enum):
-  """Predefined device platform information."""
+class HostPlatform(Enum):
+  """Predefined host platform information."""
 
-  GENERIC_LINUX = PlatformInfo("linux")
-  GENERIC_ANDROID = PlatformInfo("android")
+  GENERIC_LINUX = PlatformInfo("linux", "x86_64")
+  GENERIC_ANDROID = PlatformInfo("android", "armv8.2-a")
 
 
 class ModelSourceType(Enum):
@@ -90,8 +91,15 @@ class DeviceSpec(object):
   id: str
   # Device vendor name. E.g., Pixel-6.
   vendor_name: str
+
+  # For CPU device type, this is usually where the benchmarks/tests run on. For
+  # other device types, this is where the tools run on. The tools will then
+  # deploy the benchmark/test workload on the target devices (e.g. GPU).
+  host_platform: HostPlatform
+
+  # Architecture of the target device.
   architecture: DeviceArchitecture
-  platform: DevicePlatform
+
   # Device-specific parameters. E.g., 2-big-cores, 4-little-cores.
   # This is for modeling the spec of a heterogeneous processor. Depending on
   # which cores you run, the device has a different spec. Benchmark machines use

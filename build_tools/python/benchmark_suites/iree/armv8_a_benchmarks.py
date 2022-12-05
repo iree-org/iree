@@ -90,10 +90,10 @@ class Android_ARMv8_A_Benchmarks(object):
 
     all_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
-        platform=common_definitions.DevicePlatform.GENERIC_ANDROID)
+        host_platform=common_definitions.HostPlatform.GENERIC_ANDROID)
     big_cores_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
-        platform=common_definitions.DevicePlatform.GENERIC_ANDROID,
+        host_platform=common_definitions.HostPlatform.GENERIC_ANDROID,
         device_parameters={"big-cores"})
     run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=default_gen_confings,
