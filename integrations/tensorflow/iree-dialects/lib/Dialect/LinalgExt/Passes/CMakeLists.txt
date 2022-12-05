@@ -1,10 +1,12 @@
 add_mlir_library(IREELinalgExtPasses
+  ConvertConv2DToWinograd.cpp
   ConvertToLoops.cpp
   FoldIntoPackAndUnpackOps.cpp
   MaterializeEncoding.cpp
   PadContractionToBlockSize.cpp
   Passes.cpp
   SplitReduction.cpp
+  TileAndDecomposeWinogradPass.cpp
   Tiling.cpp
 
   DEPENDS

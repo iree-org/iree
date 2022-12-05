@@ -8,6 +8,7 @@
 #define IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_CODEGENSTRATEGY_H_
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Pass/PassManager.h"
 
 #include <utility>
@@ -38,7 +39,7 @@ struct Transformation {
 
 /// Represent one application of LinalgStrategyTileAndFusePass.
 struct TileAndFuse : public Transformation {
-  TileAndFuse(StringRef name, linalg::LinalgTilingAndFusionOptions options,
+  TileAndFuse(StringRef name, scf::SCFTileAndFuseOptions options,
               LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr)
       : Transformation(std::move(f)), opName(name),
         options(std::move(options)) {}
@@ -51,12 +52,12 @@ struct TileAndFuse : public Transformation {
 
 private:
   std::string opName;
-  linalg::LinalgTilingAndFusionOptions options;
+  scf::SCFTileAndFuseOptions options;
 };
 
 /// Represent one application of LinalgStrategyTilePass.
 struct Tile : public Transformation {
-  Tile(StringRef name, linalg::LinalgTilingOptions options,
+  Tile(StringRef name, scf::SCFTilingOptions options,
        LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr)
       : Transformation(std::move(f)), opName(name),
         options(std::move(options)) {}
@@ -69,7 +70,7 @@ struct Tile : public Transformation {
 
 private:
   std::string opName;
-  linalg::LinalgTilingOptions options;
+  scf::SCFTilingOptions options;
 };
 
 /// Represent one application of LinalgStrategyPadPass.
@@ -171,8 +172,7 @@ struct CodegenStrategy {
   /// Append a pattern to tile the Op `opName` and fuse its producers with
   /// tiling and fusion `options`.
   CodegenStrategy &
-  tileAndFuse(StringRef opName,
-              const linalg::LinalgTilingAndFusionOptions &options,
+  tileAndFuse(StringRef opName, const scf::SCFTileAndFuseOptions &options,
               const LinalgExt::LinalgTransformationFilter::FilterFunction &f =
                   nullptr) {
     transformationSequence.emplace_back(
@@ -182,14 +182,14 @@ struct CodegenStrategy {
   /// Conditionally append a pattern to tile the Op `opName` and fuse its
   /// producers with tiling and fusion `options`.
   CodegenStrategy &tileAndFuseIf(
-      bool b, StringRef opName, linalg::LinalgTilingAndFusionOptions options,
+      bool b, StringRef opName, scf::SCFTileAndFuseOptions options,
       LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr) {
     return b ? tileAndFuse(opName, std::move(options), std::move(f)) : *this;
   }
   /// Append a pattern to add a level of tiling for Op `opName` with tiling
   /// `options`.
   CodegenStrategy &
-  tile(StringRef opName, const linalg::LinalgTilingOptions &options,
+  tile(StringRef opName, const scf::SCFTilingOptions &options,
        const LinalgExt::LinalgTransformationFilter::FilterFunction &f =
            nullptr) {
     transformationSequence.emplace_back(
@@ -199,7 +199,7 @@ struct CodegenStrategy {
   /// Conditionally append a pattern to add a level of tiling for
   /// `LinalgOpType` with tiling `options`.
   CodegenStrategy &
-  tileIf(bool b, StringRef opName, linalg::LinalgTilingOptions options,
+  tileIf(bool b, StringRef opName, scf::SCFTilingOptions options,
          LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr) {
     return b ? tile(opName, std::move(options), std::move(f)) : *this;
   }
