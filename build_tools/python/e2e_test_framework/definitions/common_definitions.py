@@ -89,12 +89,14 @@ class InputDataFormat(Enum):
 class DeviceSpec(object):
   """Benchmark device specification."""
   id: str
+
   # Device vendor name. E.g., Pixel-6.
   vendor_name: str
 
-  # For CPU device type, this is usually where the benchmarks/tests run on. For
-  # other device types, this is where the tools run on. The tools will then
-  # deploy the benchmark/test workload on the target devices (e.g. GPU).
+  # Host platform that runs the runtime. For CPU device type, this is usually
+  # same as where the benchmarks/tests run. For GPU device type, this is where
+  # the tools/runtimes run on. The tools/runtimes then deploy the workload on
+  # the target GPUs.
   host_platform: HostPlatform
 
   # Architecture of the target device.
