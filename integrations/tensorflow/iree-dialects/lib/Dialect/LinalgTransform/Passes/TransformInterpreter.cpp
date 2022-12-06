@@ -249,6 +249,15 @@ struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
       }
       return WalkResult::advance();
     });
+    // Remove potential empty module after cleanup.
+    getOperation()->walk([&](ModuleOp module) {
+      module->dump();
+      if (module.getBodyRegion().hasOneBlock() && module.getBody()->empty()) {
+        module->erase();
+        return WalkResult::skip();
+      }
+      return WalkResult::advance();
+    });
   }
 };
 } // namespace

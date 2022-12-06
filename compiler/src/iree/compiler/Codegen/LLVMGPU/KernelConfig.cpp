@@ -10,6 +10,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
+#include "iree/compiler/Codegen/Common/TransformDialectStrategies.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
@@ -463,58 +464,14 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 static LogicalResult setReductionTransformJitConfig(func::FuncOp entryPoint,
                                                     linalg::LinalgOp op) {
   if (!clGPUEnableTransformDialectJit) return failure();
-  // TODO: match the sequence the startegy supports.
   if (!isCudaTarget(entryPoint)) return failure();
-  if (!isa<linalg::GenericOp>(op)) return failure();
-  if (op.hasDynamicShape()) return failure();
-  SmallVector<unsigned> reductionDims;
-  op.getReductionDims(reductionDims);
-  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
-    return failure();
-  if (op.getRegionOutputArgs().size() != 1) return failure();
-
-  // Only support projected permutation, this could be extended to projected
-  // permutated with broadcast.
-  if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
-        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
-      }))
+  if (failed(matchAndSetGPUReductionTransformStrategy(entryPoint, op)))
     return failure();
 
-  // Only single combiner operations are supported for now.
-  SmallVector<Operation *, 4> combinerOps;
-  if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
-      combinerOps.size() != 1)
-    return failure();
-  Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
-  if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
-
-  const Type elementType = op.getDpsInitOperand(0)
-                               ->get()
-                               .getType()
-                               .cast<ShapedType>()
-                               .getElementType();
-  if (!elementType.isIntOrFloat()) return failure();
-  // Reduction distribution only supports 32-bit types now.
-  if (elementType.getIntOrFloatBitWidth() != 32) return failure();
-
-  // Hardcoded workagroup size, this could be deduced from the reduction dim.
-  std::array<int64_t, 3> workgroupSize = {32, 2, 1};
-  SmallVector<unsigned> partitionedLoops =
-      cast<PartitionableLoopsInterface>(op.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
-  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
-  // Tile all the parallel dimension to 1.
-  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
-  SmallVector<int64_t, 4> threadTileSizes = workgroupTileSizes;
-  threadTileSizes.push_back(1);
-  TileSizesListType tileSizes;
-  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
-  tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::
-          TransformDialectJitterCodegen,
-      workgroupSize);
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPoint->getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
+                                    TransformDialectJitterCodegen);
+  if (failed(setTranslationInfo(entryPoint, translationInfo))) return failure();
   return success();
 }
 
@@ -926,10 +883,12 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     // and distributed. The rest of the compilation must be structured to either
     // use `TileAndFuse` or they are independent configurations that are
     // determined based on the op.
-    IREE::Codegen::LoweringConfigAttr config = getLoweringConfig(rootOperation);
-    for (auto op : computeOps) {
-      if (op == rootOperation) continue;
-      setLoweringConfig(op, config);
+    if (IREE::Codegen::LoweringConfigAttr config =
+            getLoweringConfig(rootOperation)) {
+      for (auto op : computeOps) {
+        if (op == rootOperation) continue;
+        setLoweringConfig(op, config);
+      }
     }
   }
   return success();

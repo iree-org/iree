@@ -36,6 +36,7 @@ iree_lit_test_suite(
             "pad_dynamic_alloc.mlir",
             "materialize_encoding.mlir",
             "reduce_bank_conflicts.mlir",
+            "reductions.mlir",
             "remove_dead_allocs.mlir",
             "remove_trivial_loops.mlir",
             "swizzle_workgroup.mlir",
@@ -43,6 +44,7 @@ iree_lit_test_suite(
             "tile_and_distribute_to_workgroups.mlir",
             "tile_reduction.mlir",
             "transform_dialect_apply_pattern_op.mlir",
+            "transform_ops_invalid.mlir",
             "transpose_canonicalization.mlir",
             "type_propagation.mlir",
             "vectorize_tensor_pad.mlir",
@@ -50,8 +52,16 @@ iree_lit_test_suite(
             "workgroup_specialization.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            "reductions_codegen_spec.mlir",
+        ],
     ),
     cfg = "//compiler:lit.cfg.py",
+    # transform dialect spec files are MLIR files that specify a transformation,
+    # they need to be included as data.
+    data = [
+        "reductions_codegen_spec.mlir",
+    ],
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
