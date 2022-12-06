@@ -128,9 +128,7 @@ public:
 
     Operation *constOp = kernel.getDefiningOp();
     ShapedType type = constOp->getResult(0).getType().cast<ShapedType>();
-    Type elementType = type.getElementType();
-    assert(elementType.isa<FloatType>());
-    auto floatType = elementType.cast<FloatType>();
+    auto elemType = type.getElementType().cast<FloatType>();
     ArrayRef<int64_t> shape = type.getShape();
     DenseElementsAttr::iterator_range<APFloat> nonSplatValues =
         kernelAttr.getValues<APFloat>();
@@ -141,11 +139,11 @@ public:
     }
     SmallVector<int64_t> resultShape{inputTileSize * inputTileSize, shape[2],
                                      shape[3]};
-    auto resultType = RankedTensorType::get(resultShape, floatType);
+    auto resultType = RankedTensorType::get(resultShape, elemType);
     auto foldedKernelAttr =
         foldFilterTransform(shape, inputTileSize, kernelSize, resultType,
                             IREE::LinalgExt::Winograd::G_6x6_3x3, isSplat,
-                            splatValue, nonSplatValues, floatType);
+                            splatValue, nonSplatValues, elemType);
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, foldedKernelAttr);
     return success();
   }
