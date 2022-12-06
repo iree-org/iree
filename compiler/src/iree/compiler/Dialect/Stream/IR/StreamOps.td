@@ -1724,6 +1724,76 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
   let hasCanonicalizer = 1;
 }
 
+def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
+  AllTypesMatch<["target", "result"]>,
+  Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
+  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{performs a collective operation}];
+  let description = [{
+    TODO: document different usage. For now this should be considered a
+    prototype and that modeling of collective operations may change in the
+    future to better ensure in-place operations (where send/recv is a subset of
+    recv/send). We may have dedicated operations for the send and recv verbs as
+    they have sequencing implications - or we could add optional sequencing to
+    this base op.
+  }];
+
+  let arguments = (ins
+    Stream_CollectiveAttr:$op,
+    Stream_AnyStreamResource:$target,
+    Stream_Size:$target_size,
+    Stream_Offset:$target_offset,
+    Stream_Offset:$target_end,
+    Stream_Size:$target_length,
+    Stream_AnyStreamResource:$source,
+    Stream_Size:$source_size,
+    Stream_Offset:$source_offset,
+    Stream_Offset:$source_end,
+    Stream_Size:$source_length,
+    Stream_Size:$element_count,
+    Stream_Channel:$channel,
+    Optional<I32>:$param,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_AnyStreamResource:$result
+  );
+
+  let assemblyFormat = [{
+    `` $op `` `[` $element_count `]`
+    (`on` `(` $affinity^ `)`)?
+    `channel` `(` $channel `)`
+    custom<CollectiveParam>(ref($op), $param)
+    $source `[` $source_offset `to` $source_end `for` $source_length `]` `,`
+    $target `[` $target_offset `to` $target_end `for` $target_length `]` `:`
+    type($source) `` `{` $source_size `}` `->`
+    custom<ShapedTiedResult>(type($target), $target_size)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) {
+      return idx == 0 ? getTargetSize() : getSourceSize();
+    }
+    Value getResultSize(unsigned idx) { return getTargetSize(); }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
 def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
@@ -2341,6 +2411,58 @@ def Stream_CmdCopyOp : Stream_Op<"cmd.copy", [
   let hasCanonicalizer = 1;
 }
 
+def Stream_CmdCollectiveOp : Stream_Op<"cmd.collective", [
+  AttrSizedOperandSegments,
+  Stream_CmdPhaseOp,
+  Stream_StreamableOp,
+  Stream_SubviewEffectOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{dispatches a collective operation}];
+  let description = [{
+    Dispatches a collective operation specified against the device. If grouped
+    with other collectives in a `stream.cmd.concurrent` region the collective
+    operations may fuse and execute more efficiently.
+  }];
+
+  let arguments = (ins
+    Stream_CollectiveAttr:$op,
+    Stream_Channel:$channel,
+    Stream_Size:$element_count,
+    Optional<I32>:$param,
+    Variadic<Stream_AnyStreamResource>:$resources,
+    Variadic<Stream_Size>:$resource_sizes,
+    Variadic<Stream_Offset>:$resource_offsets,
+    Variadic<Stream_Size>:$resource_lengths,
+    Stream_ResourceAccessArrayAttr:$resource_accesses
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `` $op `` `[` $element_count `]`
+    `channel` `(` $channel `)`
+    (`param` `(` $param^ `:` type($param) `)`)? `{`
+    custom<DispatchResources>($resources, type($resources), $resource_sizes,
+                              $resource_offsets, $resource_lengths,
+                              $resource_accesses)
+    `\n` `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) {
+      return findValueSizeInList(
+          idx - getODSOperandIndexAndLength(4).first,
+          getResources(), getResourceSizes());
+    }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
 def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
@@ -2474,7 +2596,6 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   let hasCanonicalizer = 1;
 }
 
-// TODO(benvanik): stream.cmd.serial for serialized execution.
 def Stream_CmdSerialOp : Stream_Op<"cmd.serial", [
   ParentOneOf<[
     "IREE::Stream::CmdExecuteOp",
@@ -2875,6 +2996,112 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Channels
+//===----------------------------------------------------------------------===//
+
+def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  Stream_AffinityOp,
+]> {
+  let summary = [{returns a default collective communication channel}];
+  let description = [{
+    Returns a channel initialized using the runtime environment for the
+    particular affinity.
+  }];
+
+  let arguments = (ins
+    // TODO(benvanik): optional discriminator for groupings.
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  Stream_AffinityOp,
+]> {
+  let summary = [{creates a new channel for collective communication}];
+  let description = [{
+    Returns a new channel with the given rank associated with the specified
+    affinity. Collective operations using this channel must only be submitted on
+    compatible affinities.
+
+    The rank can be omitted to indicate a default inherited from the environment
+    or device configuration at runtime.
+  }];
+
+  let arguments = (ins
+    // TODO(benvanik): optional discriminator for groupings.
+    Optional<Index>:$rank,
+    Optional<Index>:$count,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`rank` `(` $rank^ `)`)?
+    (`count` `(` $count^ `)`)?
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the rank of the local participant in the group}];
+  let description = [{
+    Returns the rank the channel represents as a participant in a collective
+    group in `[0, count)`.
+  }];
+
+  let arguments = (ins
+    Stream_Channel:$channel
+  );
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{
+     $channel `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the total number of participants in the group}];
+  let description = [{
+    Returns the total participant count in the collective communicator group.
+  }];
+
+  let arguments = (ins
+    Stream_Channel:$channel
+  );
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{
+    $channel `:` type($result)
+    attr-dict-with-keyword
+  }];
 }
 
 //===----------------------------------------------------------------------===//
