@@ -258,8 +258,7 @@ py_binary(
         "requires-gpu-nvidia",
     ],
     target_backends_and_drivers = [
-        # TODO(#11281): Enable the test.
-        # ("cuda", "cuda"),
+        ("cuda", "cuda"),
         ("llvm-cpu", "local-task"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
