@@ -38,7 +38,7 @@ func.func @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: tensor<10
     %2 = linalg.matmul ins(%argB, %argC : tensor<5x10xf32>, tensor<10x11xf32>)
         outs(%1 : tensor<5x11xf32>) -> tensor<5x11xf32>
     flow.return %2 : tensor<5x11xf32>
-  }  
+  }
 
   //      CHECK: return %[[r0]], %[[r1]]
   return %r0, %r1 : tensor<?x?xf32>, tensor<5x11xf32>

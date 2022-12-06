@@ -24,7 +24,8 @@ iree_cc_library(
     Transforms
   HDRS
     "ConvertRegionToWorkgroups.h"
-    "DispatchLinalgOnTensors.h"
+    "FormDispatchRegions.h"
+    "FormDispatchWorkgroups.h"
     "Passes.h"
     "Passes.h.inc"
     "RegionOpUtils.h"
@@ -40,11 +41,12 @@ iree_cc_library(
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DetachElementwiseFromNamedOps.cpp"
-    "DispatchLinalgOnTensors.cpp"
     "DispatchWithTransformDialect.cpp"
     "DumpDispatchGraph.cpp"
     "ExpandTensorShapes.cpp"
     "ExportBenchmarkFuncs.cpp"
+    "FormDispatchRegions.cpp"
+    "FormDispatchWorkgroups.cpp"
     "FusionOfTensorOps.cpp"
     "InferNumericNarrowing.cpp"
     "InitializeEmptyTensors.cpp"
@@ -112,7 +114,8 @@ iree_cc_library(
 )
 
 set_property(SOURCE
-  DispatchLinalgOnTensors.cpp
+  FormDispatchRegions.cpp
+  FormDispatchWorkgroups.cpp
   PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

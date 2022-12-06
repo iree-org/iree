@@ -4,14 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/DispatchLinalgOnTensors.h"
-
-#include <deque>
+#include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
-#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Patterns.h"
-#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
@@ -26,33 +21,26 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Block.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Matchers.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
-#include "mlir/Transforms/RegionUtils.h"
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
-#define DEBUG_TYPE "iree-flow-dispatch-linalg-on-tensors"
+#define DEBUG_TYPE "iree-flow-form-dispatch-regions"
 
 // NOTE: These flags are added for experimental purposes only
 // for developer control. These should be treated as internal
@@ -70,50 +58,37 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
+namespace mlir {
+
 //===----------------------------------------------------------------------===//
-// Helpers for fusion group formation
+// Definition of TensorDimTrackingRewriter
 //===----------------------------------------------------------------------===//
 
-namespace {
-/// A rewriter that keeps track of all tensor::DimOps.
-class TensorDimTrackingRewriter : public IRRewriter {
- public:
-  /// Create a new rewriter: Scan the given op for tensor::DimOps.
-  TensorDimTrackingRewriter(Operation *op) : IRRewriter(op->getContext()) {
-    op->walk([&](tensor::DimOp dimOp) { dimOps.insert(dimOp.getOperation()); });
-  }
+TensorDimTrackingRewriter::TensorDimTrackingRewriter(Operation *op)
+    : IRRewriter(op->getContext()) {
+  op->walk([&](tensor::DimOp dimOp) { dimOps.insert(dimOp.getOperation()); });
+}
+SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
+  SmallVector<tensor::DimOp> result;
+  for (Operation *op : dimOps) result.push_back(cast<tensor::DimOp>(op));
+  return result;
+}
+void TensorDimTrackingRewriter::notifyOperationRemoved(Operation *op) {
+  IRRewriter::notifyOperationRemoved(op);
+  if (isa<tensor::DimOp>(op)) dimOps.erase(op);
+}
 
-  /// Return all tracked tensor::DimOps.
-  SmallVector<tensor::DimOp> getTensorDimOps() {
-    SmallVector<tensor::DimOp> result;
-    for (Operation *op : dimOps) result.push_back(cast<tensor::DimOp>(op));
-    return result;
-  }
+void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op) {
+  IRRewriter::notifyOperationInserted(op);
+  if (isa<tensor::DimOp>(op)) dimOps.insert(op);
+}
 
- protected:
-  void notifyOperationRemoved(Operation *op) override {
-    IRRewriter::notifyOperationRemoved(op);
-    if (isa<tensor::DimOp>(op)) dimOps.erase(op);
-  }
+namespace iree_compiler {
+namespace IREE {
+namespace Flow {
 
-  void notifyOperationInserted(Operation *op) override {
-    IRRewriter::notifyOperationInserted(op);
-    if (isa<tensor::DimOp>(op)) dimOps.insert(op);
-  }
-
- private:
-  SmallPtrSet<Operation *, 16> dimOps;
-};
-}  // namespace
-
-/// Simplfy the given tensor::DimOps as much as possible.
-/// * Static dimensions are replaced by constant.
-/// * Dynamic dim ops are pushed as much as possible to the top of the function,
-///   i.e., if the dim of a value is known to be equal to the dim of a value on
-///   the reverse SSA use-def chain, rewrite the value with a dim op of that
-///   value.
-static LogicalResult simplifyDimOps(RewriterBase &rewriter,
-                                    const SmallVector<tensor::DimOp> &dimOps) {
+LogicalResult simplifyDimOps(RewriterBase &rewriter,
+                             const SmallVector<tensor::DimOp> &dimOps) {
   for (tensor::DimOp dimOp : dimOps) {
     // Only DimOps with static indices are supported.
     Optional<int64_t> idx = dimOp.getConstantIndex();
@@ -144,11 +119,6 @@ static LogicalResult simplifyDimOps(RewriterBase &rewriter,
 
   return success();
 }
-
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
 
 //===----------------------------------------------------------------------===//
 // Root and fusion group attribute handling
@@ -291,65 +261,6 @@ static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
     return builder.create<AffineApplyOp>(rootOp->getLoc(), workload,
                                          ValueRange{offset, size, stride});
   }));
-}
-
-//===---------------------------------------------------------------------===//
-// Methods to legalize a dispatch region op, i.e. make it isolated from above.
-//===---------------------------------------------------------------------===//
-
-/// Checks if the `Value` has a use within the dispatch that is unfusable.
-static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
-  for (OpOperand &use : v.getUses()) {
-    Operation *user = use.getOwner();
-    Operation *ownerWorkgroupsOp =
-        user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>();
-    Operation *ownerRegionOp =
-        user->getParentOfType<IREE::Flow::DispatchRegionOp>();
-    Operation *owner = ownerWorkgroupsOp ? ownerWorkgroupsOp : ownerRegionOp;
-
-    // Ignore uses outside of dispatch workgroups op.
-    if (owner != dispatchOp) continue;
-
-    // Cannot fuse producer of `dest` with `tensor.insert_slice`.
-    if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
-      if (insertSliceUser.getDest() == v) return true;
-    }
-  }
-  return false;
-}
-
-/// Collect all ops that should be cloned into the given dispatch region op.
-static SmallVector<Operation *> getCloneableOps(
-    Flow::DispatchRegionOp regionOp) {
-  // Find values that are used inside of the dispatch region but defined outside
-  // of the dispatch region.
-  llvm::SetVector<Value> valuesDefinedAbove;
-  mlir::getUsedValuesDefinedAbove(regionOp.getBody(), valuesDefinedAbove);
-  if (valuesDefinedAbove.empty()) return {};
-
-  // Traverse the defining ops of these values (and the ops on their reverse
-  // SSA use-def chain).
-  SmallVector<Operation *> result;
-  llvm::SetVector<Value> visited;
-  SmallVector<Value, 4> worklist;
-  worklist.assign(valuesDefinedAbove.begin(), valuesDefinedAbove.end());
-  while (!worklist.empty()) {
-    Value outsideValue = worklist.pop_back_val();
-    // Skip values that were already visited.
-    if (visited.count(outsideValue)) continue;
-    visited.insert(outsideValue);
-
-    Operation *definingOp = outsideValue.getDefiningOp();
-    if (!definingOp || !(isClonableIntoDispatchOp(definingOp)) ||
-        hasUnfusableUseInDispatch(outsideValue, regionOp)) {
-      valuesDefinedAbove.insert(outsideValue);
-      continue;
-    }
-    result.push_back(definingOp);
-    worklist.append(definingOp->operand_begin(), definingOp->operand_end());
-  }
-
-  return result;
 }
 
 //===----------------------------------------------------------------------===//
@@ -746,22 +657,6 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
 // Dispatch region formation
 //===----------------------------------------------------------------------===//
 
-/// Clone producers into the dispatch region.
-static LogicalResult cloneProducers(RewriterBase &rewriter,
-                                    Flow::DispatchRegionOp regionOp) {
-  SmallVector<Operation *> cloneableOps = getCloneableOps(regionOp);
-  bool sortResult = mlir::computeTopologicalSorting(cloneableOps);
-  (void)sortResult;
-  assert(sortResult && "could not compute topological sorting");
-
-  for (Operation *producer : llvm::reverse(cloneableOps))
-    if (failed(
-            clonePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp)))
-      return failure();
-
-  return success();
-}
-
 static void buildSetEncodingWorkloadRegion(OpBuilder &builder, Location loc,
                                            ArrayRef<BlockArgument> args) {
   auto numWorkgroupsOp =
@@ -776,8 +671,6 @@ static void buildDefaultWorkloadRegion(OpBuilder &builder, Location loc,
   builder.create<Flow::ReturnOp>(loc, numWorkgroupsOp.getResults());
 }
 
-/// Computes the workload and provides a workload region builder for the given
-/// root op.
 FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
                                                     Operation *rootOp) {
   Flow::WorkloadBuilder result;
@@ -844,14 +737,16 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
     // Compute workload.
     Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None;
     if (generateWorkloadRegion) {
-      auto maybeBuilder = getWorkloadBuilder(rewriter, /*rootOp=*/it.value());
+      auto maybeBuilder = iree_compiler::IREE::Flow::getWorkloadBuilder(
+          rewriter, /*rootOp=*/it.value());
       if (failed(maybeBuilder)) return failure();
       workloadBuilder = *maybeBuilder;
     }
 
     // Simplify tensor::DimOps.
     SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-    if (failed(simplifyDimOps(rewriter, dimOps))) return failure();
+    if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps)))
+      return failure();
 
     // Create fusion group.
     Flow::DispatchRegionOp regionOp;
@@ -885,169 +780,6 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
   return success();
 }
 
-/// Wrap a single op in a DispatchWorkgroupsOp.
-static FailureOr<Flow::DispatchWorkgroupsOp> wrapInWorkgroupsOp(
-    TensorDimTrackingRewriter &rewriter, Operation *op,
-    bool generateWorkloadRegion) {
-  // Compute workload.
-  Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None;
-  if (generateWorkloadRegion) {
-    auto maybeBuilder = getWorkloadBuilder(rewriter, op);
-    if (failed(maybeBuilder)) return failure();
-    workloadBuilder = *maybeBuilder;
-  }
-
-  // Simplify tensor::DimOps.
-  SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-  if (failed(simplifyDimOps(rewriter, rewriter.getTensorDimOps())))
-    return failure();
-
-  // Wrap operation.
-  auto regionOp = Flow::wrapOpInDispatchRegion(rewriter, op, workloadBuilder);
-  if (failed(regionOp)) return failure();
-  if (failed(cloneProducers(rewriter, *regionOp))) return failure();
-  auto workgroupsOp = Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
-      *regionOp, rewriter);
-  if (failed(workgroupsOp)) return failure();
-  return *workgroupsOp;
-}
-
-/// Wrap all given ops in a DispatchWorkgroupsOp.
-static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> wrapInWorkgroupsOp(
-    TensorDimTrackingRewriter &rewriter, SmallVector<Operation *> rootOps,
-    bool generateWorkloadRegion) {
-  SmallVector<Flow::DispatchWorkgroupsOp> result;
-  for (Operation *rootOp : rootOps) {
-    auto workgroupsOp =
-        wrapInWorkgroupsOp(rewriter, rootOp, generateWorkloadRegion);
-    if (failed(workgroupsOp)) return failure();
-    result.push_back(*workgroupsOp);
-  }
-  return result;
-}
-
-/// Create Flow::DispatchGroupsOps
-static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>>
-createDispatchWorkgroups(TensorDimTrackingRewriter &rewriter,
-                         FunctionOpInterface funcOp,
-                         DominanceInfo const &dominanceInfo,
-                         bool generateWorkloadRegion) {
-  SmallVector<Flow::DispatchRegionOp> regionOps;
-  funcOp.walk([&](Flow::DispatchRegionOp op) { regionOps.push_back(op); });
-
-  // Clone additional producers and rewrite to DispatchWorkgroupsOp.
-  SmallVector<Flow::DispatchWorkgroupsOp> result;
-  for (auto regionOp : regionOps) {
-    if (failed(cloneProducers(rewriter, regionOp))) return failure();
-    auto maybeWorkgroupOp =
-        Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(regionOp,
-                                                                rewriter);
-    if (failed(maybeWorkgroupOp)) return failure();
-    result.push_back(*maybeWorkgroupOp);
-  }
-  return result;
-}
-
-/// Wrap all ops of the given types that are direct children of the given op
-/// in DispatchWorkgroupsOps.
-template <typename... OpTys>
-static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> wrapInWorkgroupsOp(
-    TensorDimTrackingRewriter &rewriter, Operation *op,
-    bool generateWorkloadRegion) {
-  // Find ops of type OpTys.
-  SmallVector<Operation *> rootOps;
-  for (Region &r : op->getRegions())
-    for (Block &b : r.getBlocks())
-      for (Operation &op : b)
-        if (isa<OpTys...>(&op)) rootOps.push_back(&op);
-
-  // Wrap ops in DispatchWorkgroupsOps.
-  return wrapInWorkgroupsOp(rewriter, rootOps, generateWorkloadRegion);
-}
-
-/// Return `true` if the given op is contained in DispatchWorkgroupsOp or in a
-/// DispatchRegionOp.
-static bool isInDispatchRegion(Operation *op) {
-  return op->getParentOfType<Flow::DispatchWorkgroupsOp>() ||
-         op->getParentOfType<Flow::DispatchRegionOp>();
-}
-
-/// Rewrite top-level InsertSliceOps to FlowUpdateOps or wrap them in a
-/// dispatch region.
-LogicalResult convertInsertSliceOps(
-    TensorDimTrackingRewriter &rewriter, mlir::FunctionOpInterface funcOp,
-    SmallVector<Flow::DispatchWorkgroupsOp> &workgroupsOps,
-    bool generateWorkloadRegion) {
-  // Find eligible InsertSliceOps.
-  SmallVector<tensor::InsertSliceOp> insertSliceOps;
-  funcOp.walk([&](tensor::InsertSliceOp op) {
-    if (!isInDispatchRegion(op)) insertSliceOps.push_back(op);
-  });
-
-  // Rewrite InsertSliceOps to FlowUpdateOps.
-  SmallVector<Operation *> remainingInsertSliceOps;
-  for (tensor::InsertSliceOp insertSliceOp : insertSliceOps)
-    if (failed(
-            Flow::convertInsertSliceOpToFlowUpdateOp(rewriter, insertSliceOp)))
-      remainingInsertSliceOps.push_back(insertSliceOp);
-
-  // Create a DispatchWorkgroupsOp for every remaining InsertSliceOp.
-  FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
-      wrapInWorkgroupsOp(rewriter, remainingInsertSliceOps,
-                         generateWorkloadRegion);
-  if (failed(newWorkgroupsOps)) return failure();
-  workgroupsOps.append(newWorkgroupsOps->begin(), newWorkgroupsOps->end());
-
-  return success();
-}
-
-/// Rewrite top-level ExtractSliceOps to FlowSliceOps or wrap them in a
-/// dispatch region.
-LogicalResult convertExtractSliceOps(
-    TensorDimTrackingRewriter &rewriter, mlir::FunctionOpInterface funcOp,
-    SmallVector<Flow::DispatchWorkgroupsOp> &workgroupsOps,
-    bool generateWorkloadRegion) {
-  // Find eligible ExtractSliceOps.
-  SmallVector<tensor::ExtractSliceOp> extractSliceOps;
-  funcOp.walk([&](tensor::ExtractSliceOp op) {
-    if (!isInDispatchRegion(op)) extractSliceOps.push_back(op);
-  });
-
-  // Rewrite ExtractSliceOps to FlowSliceOps.
-  SmallVector<Operation *> remainingExtractSliceOps;
-  for (tensor::ExtractSliceOp extractSliceOp : extractSliceOps)
-    if (failed(
-            Flow::convertExtractSliceOpToFlowSliceOp(rewriter, extractSliceOp)))
-      remainingExtractSliceOps.push_back(extractSliceOp);
-
-  // Create a DispatchWorkgroupsOp for every remaining ExtractSliceOp.
-  FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
-      wrapInWorkgroupsOp(rewriter, remainingExtractSliceOps,
-                         generateWorkloadRegion);
-  if (failed(newWorkgroupsOps)) return failure();
-  workgroupsOps.append(newWorkgroupsOps->begin(), newWorkgroupsOps->end());
-
-  return success();
-}
-
-namespace {
-/// Pass declaration.
-struct FormDispatchWorkgroupsPass
-    : public FormDispatchWorkgroupsBase<FormDispatchWorkgroupsPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                scf::SCFDialect, tensor::TensorDialect>();
-  }
-  FormDispatchWorkgroupsPass(bool generateWorkloadRegion) {
-    this->generateWorkloadRegion = generateWorkloadRegion;
-  }
-  FormDispatchWorkgroupsPass(const FormDispatchWorkgroupsPass &pass)
-      : FormDispatchWorkgroupsPass(pass.generateWorkloadRegion) {}
-  void runOnOperation() override;
-};
-}  // namespace
-
 namespace {
 /// Pass declaration.
 struct FormDispatchRegionsPass
@@ -1067,78 +799,6 @@ struct FormDispatchRegionsPass
   void runOnOperation() override;
 };
 }  // namespace
-
-void FormDispatchWorkgroupsPass::runOnOperation() {
-  mlir::FunctionOpInterface funcOp = getOperation();
-  MLIRContext *context = &getContext();
-
-  DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
-  TensorDimTrackingRewriter rewriter(funcOp);
-
-  // Step 1: Create a DispatchWorkgroupsOp for every DispatchRegionOp.
-  auto maybeWorkgroupsOps = createDispatchWorkgroups(
-      rewriter, funcOp, dominanceInfo, generateWorkloadRegion);
-  if (failed(maybeWorkgroupsOps)) return signalPassFailure();
-  SmallVector<Flow::DispatchWorkgroupsOp> workgroupsOps = *maybeWorkgroupsOps;
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n--- After forming of dispatch workgroups ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
-  // Step 2: Rewrite InsertSliceOps to FlowUpdateOps.
-  if (failed(convertInsertSliceOps(rewriter, funcOp, workgroupsOps,
-                                   generateWorkloadRegion))) {
-    funcOp->emitOpError(
-        "failed to create dispatch region for `tensor.insert_slice`");
-    return signalPassFailure();
-  }
-
-  // Step 3: Rewrite ExtractSliceOps to FlowUpdateOps.
-  if (failed(convertExtractSliceOps(rewriter, funcOp, workgroupsOps,
-                                    generateWorkloadRegion))) {
-    funcOp->emitOpError(
-        "failed to create dispatch region for `tensor.extract_slice`");
-    return signalPassFailure();
-  }
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n--- After other conversions ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
-  // A few extra canonicalizations/lowerings.
-  {
-    RewritePatternSet convertToFlowPatterns(context);
-    Flow::populateTensorToFlowConversionPatterns(context,
-                                                 convertToFlowPatterns);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(
-        convertToFlowPatterns);
-    IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(
-        convertToFlowPatterns, context);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(convertToFlowPatterns)))) {
-      funcOp->emitOpError("failed conversion to flow.tensor ops");
-      return signalPassFailure();
-    }
-
-    // Finally fold `tensor.insert_slice/extract_slice` operations with
-    // `flow.dispatch.tensor.load/store`.
-    RewritePatternSet foldExtractInsertSliceOps(context);
-    Flow::populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
-        foldExtractInsertSliceOps, context);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(foldExtractInsertSliceOps)))) {
-      funcOp->emitOpError(
-          "failed to insert/extract_slice with "
-          "flow.dispatch.tensor.load/store");
-      return signalPassFailure();
-    }
-  }
-}
-
 /// Create dispatch.region Ops based on a fusion heuristic.
 void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
@@ -1155,12 +815,6 @@ createFormDispatchRegionsPass(bool aggressiveFusion,
   return std::make_unique<FormDispatchRegionsPass>(aggressiveFusion,
                                                    generateWorkloadRegion);
 }
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFormDispatchWorkgroupsPass(bool generateWorkloadRegion) {
-  return std::make_unique<FormDispatchWorkgroupsPass>(generateWorkloadRegion);
-}
-
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

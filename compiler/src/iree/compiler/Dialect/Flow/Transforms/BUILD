@@ -42,7 +42,8 @@ iree_compiler_cc_library(
         "ConvertToFlow.cpp",
         "DeduplicateExecutables.cpp",
         "DetachElementwiseFromNamedOps.cpp",
-        "DispatchLinalgOnTensors.cpp",
+        "FormDispatchRegions.cpp",
+        "FormDispatchWorkgroups.cpp",
         "DispatchWithTransformDialect.cpp",
         "DumpDispatchGraph.cpp",
         "ExpandTensorShapes.cpp",
@@ -68,7 +69,8 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "ConvertRegionToWorkgroups.h",
-        "DispatchLinalgOnTensors.h",
+        "FormDispatchRegions.h",
+        "FormDispatchWorkgroups.h",
         "Passes.h",
         "Passes.h.inc",
         "RegionOpUtils.h",
@@ -128,7 +130,8 @@ iree_compiler_cc_library(
 iree_cmake_extra_content(
     content = """
 set_property(SOURCE
-  DispatchLinalgOnTensors.cpp
+  FormDispatchRegions.cpp
+  FormDispatchWorkgroups.cpp
   PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
 """,
     inline = True,

@@ -40,9 +40,10 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     abstraction for implementing fusion heuristics, i.e., the process of
     deciding which ops should form a dispatch region.
 
-    This op also has a second region: `workload_count`. This region calculates 
-    uses `workload` argument to calculate workload information. The region is 
-    lowered directly to `workload_count` region of `dispatch.workgroups`.
+    This op also has a second region: `workload_count`. The arguments to the 
+    region represent the workload for the dispatch, and returns the number of 
+    workgroups for the dispatch. The region is lowered directly to 
+    `workload_count` region of `dispatch.workgroups`.
   }];
 
   let arguments = (ins FLOW_ShapeDynamicDims:$result_dims, 

@@ -201,11 +201,11 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   rewriter.create<IREE::Flow::ReturnOp>(loc);
   rewriter.eraseOp(terminator);
 
-  // Clone DispatchRegion's workload_count region to DispatchWorkgroupOp's
+  // Move DispatchRegion's workload_count region to DispatchWorkgroupOp's
   if (!regionOp.getWorkgroupCount().empty()) {
-    BlockAndValueMapping bvm;
-    regionOp.getWorkgroupCount().cloneInto(&workgroupsOp.getWorkgroupCount(),
-                                           bvm);
+    rewriter.inlineRegionBefore(regionOp.getWorkgroupCount(),
+                                workgroupsOp.getWorkgroupCount(),
+                                workgroupsOp.getWorkgroupCount().begin());
   }
 
   rewriter.replaceOp(regionOp, workgroupsOp.getResults());
