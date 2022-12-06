@@ -163,6 +163,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     // VkShaderModuleCreateInfo.
     SmallVector<StringRef, 8> entryPointNames;
     SmallVector<uint32_t, 8> subgroupSizes;
+    bool hasAnySubgroupSizes = false;
     spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
       entryPointNames.push_back(exportOp.getFn());
       auto fn = spvModuleOp.lookupSymbol<spirv::FuncOp>(exportOp.getFn());
@@ -170,15 +171,19 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
           spirv::getEntryPointABIAttrName());
       if (abi && abi.getSubgroupSize()) {
         subgroupSizes.push_back(*abi.getSubgroupSize());
+        hasAnySubgroupSizes = true;
       } else {
         subgroupSizes.push_back(0);
       }
     });
     auto entryPointsRef = builder.createStringVec(entryPointNames);
-    auto subgroupSizesRef = builder.createInt32Vec(subgroupSizes);
+    flatbuffers_int32_vec_ref_t subgroupSizesRef =
+        hasAnySubgroupSizes ? builder.createInt32Vec(subgroupSizes) : 0;
 
     iree_SpirVExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_SpirVExecutableDef_subgroup_sizes_add(builder, subgroupSizesRef);
+    if (subgroupSizesRef) {
+      iree_SpirVExecutableDef_subgroup_sizes_add(builder, subgroupSizesRef);
+    }
     iree_SpirVExecutableDef_code_add(builder, spvCodeRef);
     iree_SpirVExecutableDef_end_as_root(builder);
 

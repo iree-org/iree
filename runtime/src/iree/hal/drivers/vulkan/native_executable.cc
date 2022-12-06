@@ -135,14 +135,16 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
     // If subgroup size is not 0, request the said subgroup size via
     // VK_EXT_subgroup_size_control (promoted to core since v1.3).
     stage_create_info->pNext = NULL;
-    if (uint32_t subgroup_size =
-            flatbuffers_uint32_vec_at(subgroup_sizes_vec, entry_ordinal)) {
-      subgroup_control_entries[entry_ordinal].sType =
-          VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO;
-      subgroup_control_entries[entry_ordinal].pNext = NULL;
-      subgroup_control_entries[entry_ordinal].requiredSubgroupSize =
-          subgroup_size;
-      stage_create_info->pNext = &subgroup_control_entries[entry_ordinal];
+    if (subgroup_sizes_vec) {
+      if (uint32_t subgroup_size =
+              flatbuffers_uint32_vec_at(subgroup_sizes_vec, entry_ordinal)) {
+        subgroup_control_entries[entry_ordinal].sType =
+            VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO;
+        subgroup_control_entries[entry_ordinal].pNext = NULL;
+        subgroup_control_entries[entry_ordinal].requiredSubgroupSize =
+            subgroup_size;
+        stage_create_info->pNext = &subgroup_control_entries[entry_ordinal];
+      }
     }
   }
 
@@ -226,6 +228,18 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
             flatbuffers_string_vec_at(entry_points_vec, i))) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "executable entry point %zu has no name", i);
+    }
+  }
+
+  flatbuffers_uint32_vec_t subgroup_sizes_vec =
+      iree_SpirVExecutableDef_subgroup_sizes_get(executable_def);
+  if (subgroup_sizes_vec) {
+    size_t subgroup_sizes_count = flatbuffers_vec_len(subgroup_sizes_vec);
+    if (subgroup_sizes_count != expected_entry_point_count) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "executable has %zu entry points but %zu subgroup sizes are defined",
+          expected_entry_point_count, subgroup_sizes_count);
     }
   }
 
