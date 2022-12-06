@@ -57,7 +57,6 @@ function(embedded_function_object _ARCH)
   add_custom_target(${_NAME} DEPENDS
     ${CMAKE_CURRENT_BINARY_DIR}/functions_${_ARCH}.o
   )
-  add_dependencies(iree-test-deps "${_NAME}")
   add_dependencies(iree-sample-deps "${_NAME}")
 endfunction()
 

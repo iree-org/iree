@@ -64,7 +64,6 @@ function(cuda_kernel_ptx _ARCH)
   add_custom_target(${_NAME} DEPENDS
     ${CMAKE_CURRENT_BINARY_DIR}/${_PTX_OBJ_NAME}.ptx
   )
-  add_dependencies(iree-test-deps "${_NAME}")
   add_dependencies(iree-sample-deps "${_NAME}")
 endfunction()
 

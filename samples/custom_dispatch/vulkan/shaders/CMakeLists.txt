@@ -42,7 +42,6 @@ add_custom_target(iree_samples_custom_dispatch_vulkan_shaders_spv DEPENDS
   ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.spv
   ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_inplace.spv
 )
-add_dependencies(iree-test-deps "${_SPV_TARGET}")
 add_dependencies(iree-sample-deps "${_SPV_TARGET}")
 
 iree_lit_test_suite(
