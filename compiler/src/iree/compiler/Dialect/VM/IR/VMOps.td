@@ -1513,7 +1513,7 @@ def VM_ListAllocOp :
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ListAlloc>,
-    VM_EncType<"result().getType().cast<IREE::VM::RefType>().getObjectType().cast<IREE::VM::ListType>().getElementType()">,
+    VM_EncType<"getResult().getType().cast<IREE::VM::RefType>().getObjectType().cast<IREE::VM::ListType>().getElementType()">,
     VM_EncOperand<"initial_capacity", 0>,
     VM_EncResult<"result">,
   ];
@@ -3584,8 +3584,8 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
   let encoding = [
     VM_EncOpcode<VM_OPC_CondBranch>,
     VM_EncOperand<"condition", 0>,
-    VM_EncBranch<"getTrueDest", "getTrueOperands", 0>,
-    VM_EncBranch<"getFalseDest", "getFalseOperands", 1>,
+    VM_EncBranch<"trueDest", "getTrueOperands", 0>,
+    VM_EncBranch<"falseDest", "getFalseOperands", 1>,
   ];
 
   let builders = [

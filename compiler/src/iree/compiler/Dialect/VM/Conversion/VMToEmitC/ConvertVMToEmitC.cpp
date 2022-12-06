@@ -4082,7 +4082,7 @@ class ListSetRefOpConversion
       return setOp.emitError() << "parent func op not found in cache.";
     }
     bool move =
-        vmAnalysis.value().get().isMove(setOp.value(), setOp.getOperation());
+        vmAnalysis.value().get().isMove(setOp.getValue(), setOp.getOperation());
 
     StringRef callee =
         move ? "iree_vm_list_set_ref_move" : "iree_vm_list_set_ref_retain";

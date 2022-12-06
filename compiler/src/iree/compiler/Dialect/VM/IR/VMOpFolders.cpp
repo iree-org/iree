@@ -2090,23 +2090,25 @@ struct RewritePseudoCmpNear : public OpRewritePattern<T> {
     //     * xor high bits of lhs and rhs
     auto zero = rewriter.createOrFold<ConstFOp>(loc, 0);
     auto lhsPositive =
-        rewriter.createOrFold<CmpGTEFOp>(loc, i32Type, op.lhs(), zero);
+        rewriter.createOrFold<CmpGTEFOp>(loc, i32Type, op.getLhs(), zero);
     auto rhsPositive =
-        rewriter.createOrFold<CmpGTEFOp>(loc, i32Type, op.rhs(), zero);
+        rewriter.createOrFold<CmpGTEFOp>(loc, i32Type, op.getRhs(), zero);
     auto signsNotEqual = rewriter.createOrFold<IREE::VM::CmpNEI32Op>(
         loc, i32Type, lhsPositive, rhsPositive);
 
     // If signs differ, perform a direct comparison of `lhs == rhs`.
     auto *directComparisonBlock = rewriter.createBlock(continuationBlock);
     auto exactEqual =
-        rewriter.createOrFold<CmpEQFOp>(loc, i32Type, op.lhs(), op.rhs());
+        rewriter.createOrFold<CmpEQFOp>(loc, i32Type, op.getLhs(), op.getRhs());
     rewriter.createOrFold<IREE::VM::BranchOp>(loc, continuationBlock,
                                               exactEqual);
 
     // ...else, perform a full ULP-based comparison.
     auto *ulpComparisonBlock = rewriter.createBlock(continuationBlock);
-    auto lhsInt = rewriter.createOrFold<BitcastFToIOp>(loc, i32Type, op.lhs());
-    auto rhsInt = rewriter.createOrFold<BitcastFToIOp>(loc, i32Type, op.rhs());
+    auto lhsInt =
+        rewriter.createOrFold<BitcastFToIOp>(loc, i32Type, op.getLhs());
+    auto rhsInt =
+        rewriter.createOrFold<BitcastFToIOp>(loc, i32Type, op.getRhs());
     auto signedUlpsDiff =
         rewriter.createOrFold<SubIOp>(loc, i32Type, lhsInt, rhsInt);
     auto absUlpsDiff =
@@ -2133,7 +2135,7 @@ struct RewritePseudoCmpNear : public OpRewritePattern<T> {
 
 template <typename T>
 static OpFoldResult foldCmpEQNearOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x ~ x = true
     return oneOfType(op.getType());
   }
