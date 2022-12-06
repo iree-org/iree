@@ -70,13 +70,13 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
       // involving operands/results have one parameter. It's a bit inflexible,
       // but it works for now and we can change when the extra flexibility is
       // really needed.
-      std::string check;
+      std::string param;
       if (params.size() == 1) {
-        check = "get" + llvm::convertToCamelFromSnakeCase(params.front(), true);
+        param = "get" + llvm::convertToCamelFromSnakeCase(params.front(), true);
       } else {
-        check = expr;
+        param = expr;
       }
-      os << formatv("failed({0})", formatv(expr.data(), check));
+      os << formatv("failed({0})", formatv(expr.data(), param));
     };
     interleave(encodingExprs, os, printOneCondition, " ||\n      ");
     os << ") {\n";
