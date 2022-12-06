@@ -282,3 +282,30 @@ if(IREE_BUILD_COMPILER)
     COMPONENT Tests
   )
 endif(IREE_BUILD_COMPILER)
+
+# Import the RuntimeImpl target when cross compiling.
+# TODO(scotttodd): Refactor to import_shared_library/import_executable funcs?
+set(_RUNTIME_IMPL_NAME "iree_compiler_API2_RuntimeImpl")
+set(_RUNTIME_IMPL_ALIAS "iree::compiler::API2::RuntimeImpl")
+if(TARGET "${_RUNTIME_IMPL_NAME}")
+  # Already defined, nothing to do.
+elseif(DEFINED IREE_HOST_BINARY_ROOT)
+  # Import.
+  set(_FULL_LIBRARY_NAME "${CMAKE_SHARED_LIBRARY_PREFIX}IREECompiler${CMAKE_SHARED_LIBRARY_SUFFIX}")
+  set(_LIBRARY_BIN_PATH "${IREE_HOST_BINARY_ROOT}/bin/${_FULL_LIBRARY_NAME}")
+  set(_LIBRARY_LIB_PATH "${IREE_HOST_BINARY_ROOT}/lib/${_FULL_LIBRARY_NAME}")
+  if(EXISTS ${_LIBRARY_BIN_PATH})
+    add_library("${_RUNTIME_IMPL_NAME}" SHARED IMPORTED GLOBAL)
+    set_property(TARGET "${_RUNTIME_IMPL_NAME}" PROPERTY IMPORTED_LOCATION "${_LIBRARY_BIN_PATH}")
+    add_library("${_RUNTIME_IMPL_ALIAS}" ALIAS "${_RUNTIME_IMPL_NAME}")
+  elseif(EXISTS ${_LIBRARY_LIB_PATH})
+    add_library("${_RUNTIME_IMPL_NAME}" SHARED IMPORTED GLOBAL)
+    set_property(TARGET "${_RUNTIME_IMPL_NAME}" PROPERTY IMPORTED_LOCATION "${_LIBRARY_LIB_PATH}")
+    add_library("${_RUNTIME_IMPL_ALIAS}" ALIAS "${_RUNTIME_IMPL_NAME}")
+  else()
+    message(FATAL_ERROR "Could not find '${_FULL_LIBRARY_NAME}' under '${IREE_HOST_BINARY_ROOT}'. "
+            "Ensure that IREE_HOST_BINARY_ROOT points to install directory.")
+  endif()
+else()
+  # Not defined and nowhere to import from.
+endif()

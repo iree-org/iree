@@ -61,9 +61,6 @@ function(iree_c_module)
   endif()
 
   iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
-  # Explicit dep on the shared library used by compiler tools. This is only
-  # needed on Windows. See https://github.com/iree-org/iree/issues/11331.
-  iree_get_shared_library_path(_COMPILER_SHARED_LIBRARY "iree::compiler::API2::SharedImpl" "IREECompiler")
 
   get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
 
@@ -91,10 +88,15 @@ function(iree_c_module)
   endif()
 
   add_custom_command(
-    OUTPUT ${_OUTPUT_FILES}
-    COMMAND ${_COMPILE_TOOL_EXECUTABLE} ${_ARGS}
+    OUTPUT
+      ${_OUTPUT_FILES}
+    COMMAND
+      ${_COMPILE_TOOL_EXECUTABLE} ${_ARGS}
     # Changes to either the compiler tool or the input source should rebuild.
-    DEPENDS ${_COMPILE_TOOL_EXECUTABLE} ${_COMPILER_SHARED_LIBRARY} ${_SRC_PATH}
+    DEPENDS
+      iree::compiler::API2::RuntimeImpl
+      ${_COMPILE_TOOL_EXECUTABLE}
+      ${_SRC_PATH}
   )
 
   iree_cc_library(

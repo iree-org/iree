@@ -111,19 +111,21 @@ install(
 
 # The bazel side uses a "Impl" library alias to generically represent
 # static or shared. Provide a corresponding one here.
-
+# Also add a "RuntimeImpl" library for tools to depend on.
 if(IREE_LINK_COMPILER_SHARED_LIBRARY)
-iree_cc_library(
-  NAME
-    Impl
-  DEPS
-    ::SharedImpl
-)
+  iree_cc_library(
+    NAME
+      Impl
+    DEPS
+      ::SharedImpl
+  )
+  add_library("iree::compiler::API2::RuntimeImpl" ALIAS "iree_compiler_API2_SharedImpl")
 else()
-iree_cc_library(
-  NAME
-    Impl
-  DEPS
-    ::StaticImpl
-)
+  iree_cc_library(
+    NAME
+      Impl
+    DEPS
+      ::StaticImpl
+  )
+  add_library("iree::compiler::API2::RuntimeImpl" ALIAS "iree_compiler_API2_StaticImpl")
 endif()  # IREE_LINK_COMPILER_SHARED_LIBRARY

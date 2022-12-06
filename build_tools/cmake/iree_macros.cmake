@@ -162,45 +162,6 @@ function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
   endif()
 endfunction()
 
-# iree_get_shared_library_path
-#
-# Gets the path to a shared library in a cross-compilation-aware way. Similar
-# to iree_get_executable_path.
-#
-# Paramters:
-# - OUTPUT_PATH_VAR: variable name for receiving the path to the built target.
-# - LIBRARY_TARGET: the target name that builds the library. Used when
-#     IREE_HOST_BINARY_ROOT is not set
-# - LIBRARY_NAME: the library name (without the 'lib' prefix or the executable
-#     suffix). Used when IREE_HOST_BINARY_ROOT is set.
-function(iree_get_shared_library_path OUTPUT_PATH_VAR LIBRARY_TARGET LIBRARY_NAME)
-  set(_FULL_LIBRARY_NAME "${CMAKE_SHARED_LIBRARY_PREFIX}${LIBRARY_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
-
-  if(NOT DEFINED IREE_HOST_BINARY_ROOT OR TARGET "${LIBRARY_TARGET}")
-    # We can either expect the target to be defined as part of this CMake
-    # invocation (if not cross compiling) or the target is defined already.
-    set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${LIBRARY_TARGET}>" PARENT_SCOPE)
-  else()
-    # The target won't be directly defined by this CMake invocation so check
-    # for an already built library under IREE_HOST_BINARY_ROOT. If we find it,
-    # add it as an imported target so it gets picked up on later invocations.
-    set(_LIBRARY_BIN_PATH "${IREE_HOST_BINARY_ROOT}/bin/${_FULL_LIBRARY_NAME}")
-    set(_LIBRARY_LIB_PATH "${IREE_HOST_BINARY_ROOT}/lib/${_FULL_LIBRARY_NAME}")
-    if(EXISTS ${_LIBRARY_BIN_PATH})
-      add_library("${LIBRARY_TARGET}" SHARED IMPORTED GLOBAL)
-      set_property(TARGET "${LIBRARY_TARGET}" PROPERTY IMPORTED_LOCATION "${_LIBRARY_BIN_PATH}")
-      set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${LIBRARY_TARGET}>" PARENT_SCOPE)
-    elseif(EXISTS ${_LIBRARY_LIB_PATH})
-      add_library("${LIBRARY_TARGET}" SHARED IMPORTED GLOBAL)
-      set_property(TARGET "${LIBRARY_TARGET}" PROPERTY IMPORTED_LOCATION "${_LIBRARY_LIB_PATH}")
-      set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${LIBRARY_TARGET}>" PARENT_SCOPE)
-    else()
-      message(FATAL_ERROR "Could not find '${LIBRARY_NAME}' under '${IREE_HOST_BINARY_ROOT}'. "
-              "Ensure that IREE_HOST_BINARY_ROOT points to install directory.")
-    endif()
-  endif()
-endfunction()
-
 #-------------------------------------------------------------------------------
 # select()-like Evaluation
 #-------------------------------------------------------------------------------

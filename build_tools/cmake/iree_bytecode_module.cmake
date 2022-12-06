@@ -63,9 +63,6 @@ function(iree_bytecode_module)
   endif()
 
   iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
-  # Explicit dep on the shared library used by compiler tools. This is only
-  # needed on Windows. See https://github.com/iree-org/iree/issues/11331.
-  iree_get_shared_library_path(_COMPILER_SHARED_LIBRARY "iree::compiler::API2::SharedImpl" "IREECompiler")
 
   if(DEFINED _RULE_MODULE_FILE_NAME)
     set(_MODULE_FILE_NAME "${_RULE_MODULE_FILE_NAME}")
@@ -133,8 +130,8 @@ function(iree_bytecode_module)
       ${_ARGS}
     # Changes to either the compiler tool or the input sources should rebuild.
     DEPENDS
+      iree::compiler::API2::RuntimeImpl
       ${_COMPILE_TOOL_EXECUTABLE}
-      ${_COMPILER_SHARED_LIBRARY}
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
       ${_RULE_DEPENDS}
