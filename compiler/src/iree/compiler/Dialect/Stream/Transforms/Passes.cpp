@@ -15,6 +15,12 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
+static llvm::cl::opt<bool> clFuseBinding(
+    "iree-stream-fuse-binding",
+    llvm::cl::desc(
+        "Fuse multiple bindings into a single binding when possible."),
+    llvm::cl::init(true));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -254,7 +260,7 @@ void buildStreamOptimizationPassPipeline(
   // Binding optimization
   //----------------------------------------------------------------------------
 
-  if (transformOptions.optimizeBindings) {
+  if (transformOptions.optimizeBindings && clFuseBinding) {
     // Fuse bindings together and add operands for their subview ranges.
     passManager.addPass(IREE::Stream::createFuseDispatchBindingsPass());
 
