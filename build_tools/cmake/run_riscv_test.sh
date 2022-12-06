@@ -13,8 +13,8 @@
 set -x
 set -e
 
-RISCV_PLATFORM="${RISCV_PLATFORM:-linux}"
-RISCV_ARCH="${RISCV_ARCH:-riscv_64}"
+RISCV_PLATFORM="${TARGET_PLATFORM:-linux}"
+RISCV_ARCH="${TARGET_ARCH:-riscv_64}"
 
 RISCV_PLATFORM_ARCH="${RISCV_PLATFORM}-${RISCV_ARCH}"
 # A QEMU Linux emulator must be available Within the system that matches the

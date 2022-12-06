@@ -15,9 +15,9 @@
 
 set -xeuo pipefail
 
-BUILD_DIR="${1:-${IREE_BUILD_RISCV_DIR:-build-riscv}}"
-RISCV_PLATFORM="${RISCV_PLATFORM:-linux}"
-RISCV_ARCH="${RISCV_ARCH:-riscv_64}"
+BUILD_DIR="${1:-${TARGET_BUILD_DIR:-build-riscv}}"
+RISCV_PLATFORM="${TARGET_PLATFORM:-linux}"
+RISCV_ARCH="${TARGET_ARCH:-riscv_64}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
 # Environment variable used by the emulator.

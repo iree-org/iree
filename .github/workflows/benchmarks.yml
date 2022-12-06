@@ -97,21 +97,18 @@ jobs:
     strategy:
       matrix:
         target:
-          - family: "linux"
-            platform: "linux"
+          - platform: "linux"
             arch: "x86_64"
             docker_image: "gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206"
             # Builds tools on the host and assumes the builder is Linux x86_64.
             build_script: "./build_tools/cmake/build_runtime.sh"
-          - family: "riscv"
-            platform: "linux"
+          - platform: "linux"
             arch: "riscv_64"
             docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
             build_script: "./build_tools/cmake/build_riscv.sh"
     outputs:
       benchmark-tools-gcs-artifacts: ${{ toJSON(steps.upload.outputs) }}
     env:
-      FAMILY: ${{ matrix.target.family }}
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
@@ -133,8 +130,8 @@ jobs:
         id: build
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "${FAMILY^^}_PLATFORM=${PLATFORM}" \
-            --env "${FAMILY^^}_ARCH=${ARCH}" \
+            --env "TARGET_PLATFORM=${PLATFORM}" \
+            --env "TARGET_ARCH=${ARCH}" \
             --env "BUILD_PRESET=benchmark" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build"
@@ -142,8 +139,8 @@ jobs:
         id: build-with-tracing
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "${FAMILY^^}_PLATFORM=${PLATFORM}" \
-            --env "${FAMILY^^}_ARCH=${ARCH}" \
+            --env "TARGET_PLATFORM=${PLATFORM}" \
+            --env "TARGET_ARCH=${ARCH}" \
             --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
