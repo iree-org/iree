@@ -62,14 +62,12 @@ static constexpr int64_t outputTileSize = 6;
 static DenseElementsAttr foldFilterTransform(
     ArrayRef<int64_t> shape, int64_t inputTileSize, int64_t kernelSize,
     Type outputType, const float *G, bool isSplat, float splatValue,
-    DenseElementsAttr::iterator_range<APFloat> &input, Type elementType) {
+    DenseElementsAttr::iterator_range<APFloat> &input, FloatType floatType) {
   const int &kh = shape[0];
   const int &kw = shape[1];
   const int &ic = shape[2];
   const int &oc = shape[3];
   const int64_t numElements = inputTileSize * inputTileSize * ic * oc;
-  FloatType floatType = elementType.cast<FloatType>();
-  bool losesInfo;
   SmallVector<APFloat> output(numElements, APFloat(0.0f));
   for (int d0 = 0; d0 < inputTileSize; d0++) {
     for (int d1 = 0; d1 < inputTileSize; d1++) {
@@ -90,6 +88,7 @@ static DenseElementsAttr foldFilterTransform(
           int odx = index(d0, d1, d2, d3, inputTileSize, inputTileSize, ic, oc);
           output[odx] = accum;
           if (floatType.isF16()) {
+            bool losesInfo;
             output[odx].convert(APFloat::IEEEhalf(),
                                 APFloat::rmNearestTiesToEven, &losesInfo);
           }
@@ -131,6 +130,7 @@ public:
     ShapedType type = constOp->getResult(0).getType().cast<ShapedType>();
     Type elementType = type.getElementType();
     assert(elementType.isa<FloatType>());
+    auto floatType = elementType.cast<FloatType>();
     ArrayRef<int64_t> shape = type.getShape();
     DenseElementsAttr::iterator_range<APFloat> nonSplatValues =
         kernelAttr.getValues<APFloat>();
@@ -141,11 +141,11 @@ public:
     }
     SmallVector<int64_t> resultShape{inputTileSize * inputTileSize, shape[2],
                                      shape[3]};
-    auto resultType = RankedTensorType::get(resultShape, elementType);
+    auto resultType = RankedTensorType::get(resultShape, floatType);
     auto foldedKernelAttr =
         foldFilterTransform(shape, inputTileSize, kernelSize, resultType,
                             IREE::LinalgExt::Winograd::G_6x6_3x3, isSplat,
-                            splatValue, nonSplatValues, elementType);
+                            splatValue, nonSplatValues, floatType);
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, foldedKernelAttr);
     return success();
   }
