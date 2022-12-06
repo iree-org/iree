@@ -316,11 +316,12 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
       }
     }
 
-    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
+    auto newOp = rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
         op, resultTypes, adaptor.getWorkload(), adaptor.getEntryPoint(),
         dispatchOperands, dispatchOperandSizes, dispatchOperandOffsets,
         dispatchOperandEnds, dispatchOperandLengths, resultSizes,
         adaptor.getTiedOperandsAttr(), getAffinityFor(op));
+    newOp->setDialectAttrs(op->getDialectAttrs());
     return success();
   }
 };

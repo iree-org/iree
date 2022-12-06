@@ -135,7 +135,7 @@ class WasmLinkerTool : public LinkerTool {
 };
 
 std::unique_ptr<LinkerTool> createWasmLinkerTool(
-    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
+    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
   return std::make_unique<WasmLinkerTool>(targetTriple, targetOptions);
 }
 

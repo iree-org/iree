@@ -117,7 +117,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
  public:
   explicit LLVMCPUTargetBackend(LLVMTargetOptions options)
       : options_(std::move(options)) {
-    initConfiguration();
+    initializeConfiguration(options_);
   }
 
   std::string name() const override { return "llvm-cpu"; }
@@ -149,12 +149,32 @@ class LLVMCPUTargetBackend final : public TargetBackend {
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
-  void buildTranslationPassPipeline(OpPassManager &passManager) override {
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                    OpPassManager &passManager) override {
     buildLLVMCPUCodegenPassPipeline(passManager);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {
     buildLLVMCPULinkingPassPipeline(passManager);
+  }
+
+  // Gets the LLVM target from |variantOp|.
+  // This will differ from the default options specified by command line flags
+  // whenever multi-targeting.
+  LLVMTarget getVariantTarget(IREE::HAL::ExecutableVariantOp variantOp) {
+    auto configAttr = variantOp.getTarget().getConfiguration();
+    auto tryAttrLookup = [&](StringRef name, StringRef fallback) {
+      if (!configAttr) return fallback.str();
+      auto value = configAttr.get(name).dyn_cast_or_null<StringAttr>();
+      if (!value) return fallback.str();
+      return value.str();
+    };
+    LLVMTarget target;
+    target.triple = tryAttrLookup("target_triple", options_.target.triple);
+    target.cpu = tryAttrLookup("cpu", options_.target.cpu);
+    target.cpuFeatures =
+        tryAttrLookup("cpu_features", options_.target.cpuFeatures);
+    return target;
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
@@ -177,10 +197,19 @@ class LLVMCPUTargetBackend final : public TargetBackend {
              << "cannot embed ELF and produce static library simultaneously";
     }
 
+    // Try to create the LLVM target machine interface for the variant target.
+    auto target = getVariantTarget(variantOp);
+    auto targetMachine = createTargetMachine(target, options_);
+    if (!targetMachine) {
+      return mlir::emitError(variantOp.getLoc())
+             << "failed to create target machine for target triple '"
+             << target.triple << "'";
+    }
+
     // Specialize the module to the target triple.
     // The executable will have been cloned into other ExecutableVariantOps for
     // other triples so it's fine to mutate in-place.
-    llvm::Triple targetTriple(options_.targetTriple);
+    const llvm::Triple &targetTriple = targetMachine->getTargetTriple();
     variantOp.getInnerModule()->setAttr(
         LLVM::LLVMDialect::getTargetTripleAttrName(),
         executableBuilder.getStringAttr(targetTriple.str()));
@@ -313,7 +342,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       if (!linkerTool) {
         return mlir::emitError(variantOp.getLoc())
                << "failed to find a target linker for the given target triple '"
-               << options_.targetTriple << "'";
+               << targetTriple.str() << "'";
       }
 
       // Configure the module with any code generation options required later by
@@ -326,12 +355,6 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     }
 
     // Specialize the module to our target machine.
-    auto targetMachine = createTargetMachine(options_);
-    if (!targetMachine) {
-      return mlir::emitError(variantOp.getLoc())
-             << "failed to create target machine for target triple '"
-             << options_.targetTriple << "'";
-    }
     llvmModule->setDataLayout(targetMachine->createDataLayout());
     llvmModule->setTargetTriple(targetMachine->getTargetTriple().str());
 
@@ -348,14 +371,14 @@ class LLVMCPUTargetBackend final : public TargetBackend {
             "libdevice", loadDeviceBitcode(targetMachine.get(), context)))) {
       return mlir::emitError(variantOp.getLoc())
              << "failed linking in builtin library for target triple '"
-             << options_.targetTriple << "'";
+             << targetTriple.str() << "'";
     }
     if (failed(linkBuiltinLibrary(
             variantOp.getLoc(), moduleLinker, linkerFlag, targetMachine.get(),
             "libmusl", loadMuslBitcode(targetMachine.get(), context)))) {
       return mlir::emitError(variantOp.getLoc())
              << "failed linking in builtin library for target triple '"
-             << options_.targetTriple << "'";
+             << targetTriple.str() << "'";
     }
 
     // Strip any compiler identifiers that may have snuck in. We let the linker
@@ -370,7 +393,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       return variantOp.emitError()
              << "failed to run LLVM-IR opt passes for IREE::HAL::ExecutableOp "
                 "targeting '"
-             << options_.targetTriple << "'";
+             << targetTriple.str() << "'";
     }
 
     // Fixup visibility from any symbols we may link in - we want to hide all
@@ -445,14 +468,40 @@ class LLVMCPUTargetBackend final : public TargetBackend {
         bitcodeFile.outputFile->keep();
       }
     }
+
+    // If custom object files were specified then add those to our artifact set.
+    // These will either be combined into the resulting static library or linked
+    // statically into the resulting dynamic library.
+    if (auto objectAttrs = variantOp.getObjects()) {
+      for (auto [index, attr] : llvm::enumerate(objectAttrs.value())) {
+        auto objectAttr = attr.cast<IREE::HAL::ExecutableObjectAttr>();
+        if (objectAttr.getPath()) {
+          auto absolutePath = objectAttr.getAbsolutePath();
+          if (failed(absolutePath)) {
+            llvm::errs()
+                << "ERROR: referenced object file not found on any path; use "
+                   "--iree-hal-executable-object-search-path= to add search "
+                   "paths: "
+                << objectAttr << "\n";
+            return failure();
+          }
+          objectFiles.push_back(Artifact::fromFile(*absolutePath));
+        } else if (auto dataAttr = objectAttr.getData()) {
+          objectFiles.push_back(Artifact::createTemporary(
+              objectFiles.front().path + "_object_" + std::to_string(index),
+              ".o"));
+        }
+      }
+    }
+
     if (options_.linkStatic) {
       return serializeStaticLibraryExecutable(options, variantOp,
                                               executableBuilder, libraryName,
                                               queryFunctionName, objectFiles);
     } else {
-      return serializeDynamicLibraryExecutable(options, variantOp,
-                                               executableBuilder, libraryName,
-                                               objectFiles, linkerTool.get());
+      return serializeDynamicLibraryExecutable(
+          options, variantOp, executableBuilder, libraryName, targetTriple,
+          objectFiles, linkerTool.get());
     }
   }
 
@@ -489,8 +538,8 @@ class LLVMCPUTargetBackend final : public TargetBackend {
   LogicalResult serializeDynamicLibraryExecutable(
       const SerializationOptions &options,
       IREE::HAL::ExecutableVariantOp variantOp, OpBuilder &executableBuilder,
-      const std::string &libraryName, const SmallVector<Artifact> &objectFiles,
-      LinkerTool *linkerTool) {
+      const std::string &libraryName, const llvm::Triple &targetTriple,
+      const SmallVector<Artifact> &objectFiles, LinkerTool *linkerTool) {
     // Link the generated object files into a dylib.
     auto linkArtifactsOr =
         linkerTool->linkDynamicLibrary(libraryName, objectFiles);
@@ -506,7 +555,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
           << "    " << linkArtifacts.libraryFile.path;
       linkArtifacts.keepAllFiles();
       for (auto &objectFile : objectFiles) {
-        objectFile.outputFile->keep();
+        objectFile.keep();
       }
     }
 
@@ -536,7 +585,6 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     } else {
       const char *mimeType = nullptr;
       const char *extension = "";
-      llvm::Triple targetTriple(options_.targetTriple);
       switch (targetTriple.getObjectFormat()) {
         case llvm::Triple::ObjectFormatType::COFF:
           mimeType = "application/x-msdownload";
@@ -612,7 +660,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       format += "static";
     } else {
       // Construct the [loader]-[format]-[arch] triple.
-      llvm::Triple targetTriple(options_.targetTriple);
+      llvm::Triple targetTriple(options_.target.triple);
       if (options_.linkEmbedded) {
         // Using the IREE embedded ELF format/loader.
         format += "embedded-elf-";
@@ -674,8 +722,12 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       config.emplace_back(StringAttr::get(context, name), value);
     };
 
-    // Set target triple.
-    addConfig("target_triple", StringAttr::get(context, options_.targetTriple));
+    // Set target attributes.
+    addConfig("target_triple",
+              StringAttr::get(context, options_.target.triple));
+    addConfig("cpu", StringAttr::get(context, options_.target.cpu));
+    addConfig("cpu_features",
+              StringAttr::get(context, options_.target.cpuFeatures));
 
     // Set data layout
     addConfig("data_layout", StringAttr::get(context, config_.dataLayoutStr));
@@ -685,17 +737,13 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     addConfig("native_vector_size",
               IntegerAttr::get(IndexType::get(context), config_.vectorSize));
 
-    // Set target CPU features.
-    addConfig("cpu_features",
-              StringAttr::get(context, options_.targetCPUFeatures));
-
     return IREE::HAL::ExecutableTargetAttr::get(
         context, StringAttr::get(context, "llvm-cpu"),
         StringAttr::get(context, format), DictionaryAttr::get(context, config));
   }
 
-  void initConfiguration() {
-    auto targetMachine = createTargetMachine(options_);
+  void initializeConfiguration(const LLVMTargetOptions &options) {
+    auto targetMachine = createTargetMachine(options.target, options);
 
     // Data layout
     llvm::DataLayout DL = targetMachine->createDataLayout();

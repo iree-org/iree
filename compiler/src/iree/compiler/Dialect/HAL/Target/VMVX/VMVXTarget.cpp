@@ -53,7 +53,8 @@ class VMVXTargetBackend final : public TargetBackend {
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
-  void buildTranslationPassPipeline(OpPassManager &passManager) override {
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                    OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
 
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -158,7 +159,8 @@ class VMVXInlineTargetBackend final : public TargetBackend {
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
-  void buildTranslationPassPipeline(OpPassManager &passManager) override {
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                    OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
   }
 

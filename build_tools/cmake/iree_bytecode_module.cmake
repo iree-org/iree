@@ -78,6 +78,10 @@ function(iree_bytecode_module)
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_MODULE_FILE_NAME}")
 
+  # Add the build directory to the compiler object file search path by default.
+  # Users can add their own additional directories as needed.
+  list(APPEND _ARGS "--iree-hal-executable-object-search-path=\"${IREE_BINARY_DIR}\"")
+
   # If an LLVM CPU backend is enabled, supply the linker tool.
   if(IREE_LLD_TARGET)
     iree_get_executable_path(_LINKER_TOOL_EXECUTABLE "lld")

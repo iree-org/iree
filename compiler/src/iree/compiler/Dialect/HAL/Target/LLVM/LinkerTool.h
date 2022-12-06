@@ -24,6 +24,10 @@ namespace IREE {
 namespace HAL {
 
 struct Artifact {
+  // Wraps an existing file on the file system.
+  // The file will not be deleted when the artifact is destroyed.
+  static Artifact fromFile(StringRef path);
+
   // Creates an output file path/container pair.
   // By default the file will be deleted when the link completes; callers must
   // use llvm::ToolOutputFile::keep() to prevent deletion upon success (or if
@@ -41,11 +45,14 @@ struct Artifact {
   std::string path;
   std::unique_ptr<llvm::ToolOutputFile> outputFile;
 
+  // Preserves the file contents on disk after the artifact has been destroyed.
+  void keep() const;
+
   // Reads the artifact file contents as bytes.
   Optional<std::vector<int8_t>> read() const;
 
   // Reads the artifact file and writes it into the given |stream|.
-  bool readInto(raw_ostream& targetStream) const;
+  bool readInto(raw_ostream &targetStream) const;
 
   // Closes the ostream of the file while preserving the temporary entry on
   // disk. Use this if files need to be modified by external tools that may
@@ -75,7 +82,7 @@ class LinkerTool {
   // Gets an instance of a linker tool for the given target options. This may
   // be a completely different toolchain than that of the host.
   static std::unique_ptr<LinkerTool> getForTarget(
-      llvm::Triple& targetTriple, LLVMTargetOptions& targetOptions);
+      const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 
   explicit LinkerTool(llvm::Triple targetTriple,
                       LLVMTargetOptions targetOptions)
@@ -91,7 +98,7 @@ class LinkerTool {
   // Configures a module prior to compilation with any additional
   // functions/exports it may need, such as shared object initializer functions.
   virtual LogicalResult configureModule(
-      llvm::Module* llvmModule, ArrayRef<llvm::Function*> exportedFuncs) {
+      llvm::Module *llvmModule, ArrayRef<llvm::Function *> exportedFuncs) {
     return success();
   }
 

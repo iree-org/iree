@@ -67,6 +67,9 @@ echo "=== Building default targets ==="
 echo "=== Building test deps ==="
 "${CMAKE_BIN?}" --build . --target iree-test-deps -- -k 0
 
+echo "=== Building sample deps ==="
+"${CMAKE_BIN?}" --build . --target iree-sample-deps -- -k 0
+
 echo "=== Generating list of tests ==="
 
 # TODO(scotttodd): Move this parsing and substitution into CMake?

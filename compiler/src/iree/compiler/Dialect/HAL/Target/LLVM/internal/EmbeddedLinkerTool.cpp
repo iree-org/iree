@@ -181,9 +181,11 @@ class EmbeddedLinkerTool : public LinkerTool {
       // command themselves.
       if (targetOptions.keepLinkerArtifacts) {
         for (auto &objectFile : objectFiles) {
-          llvm::errs() << "linker input preserved: "
-                       << objectFile.outputFile->getFilename();
-          objectFile.outputFile->keep();
+          if (objectFile.outputFile) {
+            llvm::errs() << "linker input preserved: "
+                         << objectFile.outputFile->getFilename();
+            objectFile.keep();
+          }
         }
       }
       return llvm::None;
@@ -193,7 +195,7 @@ class EmbeddedLinkerTool : public LinkerTool {
 };
 
 std::unique_ptr<LinkerTool> createEmbeddedLinkerTool(
-    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
+    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
   return std::make_unique<EmbeddedLinkerTool>(targetTriple, targetOptions);
 }
 

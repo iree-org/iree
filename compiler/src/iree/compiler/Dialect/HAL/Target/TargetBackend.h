@@ -166,7 +166,8 @@ class TargetBackend {
   //       module { spirv.module { ... } }
   //     }
   //   }
-  virtual void buildTranslationPassPipeline(OpPassManager &passManager) = 0;
+  virtual void buildTranslationPassPipeline(
+      IREE::HAL::ExecutableVariantOp variantOp, OpPassManager &passManager) = 0;
 
   // Inserts passes used to link `hal.executable.variant` ops together.
   // The pass manager will be nested on the parent module of `hal.executable`
