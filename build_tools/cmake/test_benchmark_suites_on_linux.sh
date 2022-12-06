@@ -10,29 +10,16 @@
 # Designed for CI, but can be run locally.
 set -xeuo pipefail
 
-ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
-cd "${ROOT_DIR}"
-
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-E2E_TEST_ARTIFACTS_DIR="$(realpath ${E2E_TEST_ARTIFACTS_DIR:-$ROOT_DIR/build-e2e-test-artifacts/e2e_test_artifacts})"
+BUILD_DIR="${BUILD_DIR:-build-benchmark-suites-test}"
+E2E_TEST_ARTIFACTS_DIR="$(realpath ${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts})"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
-BUILD_HOST_DIR="${BUILD_HOST_DIR:-build-benchmark-suites-test}"
 
-"$CMAKE_BIN" --version
-ninja --version
-
-# --------------------------------------------------------------------------- #
-if [[ -d "${BUILD_HOST_DIR}" ]]; then
-  echo "${BUILD_HOST_DIR} directory already exists. Will use cached results there."
-else
-  echo "${BUILD_HOST_DIR} directory does not already exist. Creating a new one."
-  mkdir -p "${BUILD_HOST_DIR}"
-fi
+source build_tools/cmake/setup_build.sh
 
 # Configure, build, test
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"
-  "-B" "${BUILD_HOST_DIR}"
+  "-B" "${BUILD_DIR}"
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
   "-DIREE_BUILD_COMPILER=OFF"
   "-DIREE_HOST_BINARY_ROOT=${IREE_HOST_BINARY_ROOT}"
@@ -45,7 +32,7 @@ echo "Configuring to build tests for benchmark suites"
 "${CMAKE_BIN}" "${CMAKE_ARGS[@]}"
 
 echo "Building tests artifacts"
-"${CMAKE_BIN}" --build "${BUILD_HOST_DIR}" \
+"${CMAKE_BIN}" --build "${BUILD_DIR}" \
   --target iree-run-module iree-run-module-test-deps -- -k 0
 
 ctest_args=(
@@ -60,5 +47,5 @@ declare -a label_args=(
 label_include_regex="($(IFS="|" ; echo "${label_args[*]}"))"
 
 echo "******** Running run-module CTest ********"
-ctest --test-dir ${BUILD_HOST_DIR} ${ctest_args[@]} \
+ctest --test-dir ${BUILD_DIR} ${ctest_args[@]} \
   --label-regex ${label_include_regex}
