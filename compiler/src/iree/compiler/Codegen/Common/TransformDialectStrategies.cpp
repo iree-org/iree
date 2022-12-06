@@ -528,8 +528,7 @@ static void createTransformRegion(func::FuncOp entryPoint,
   MLIRContext *ctx = entryPoint.getContext();
   Location loc = entryPoint.getLoc();
   OpBuilder b(ctx);
-  auto mod = entryPoint->getParentOfType<ModuleOp>();
-  b.setInsertionPointAfter(mod);
+  b.setInsertionPointAfter(entryPoint);
   auto topLevelTransformModule = b.create<ModuleOp>(loc);
   Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
   b.setInsertionPointToStart(&topLevelTransformRegion.front());
