@@ -104,7 +104,6 @@ cc_library(
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgPassIncGen",
         "@llvm-project//mlir:LinalgToLLVM",
-        "@llvm-project//mlir:LinalgToSPIRV",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MLProgramDialect",
         "@llvm-project//mlir:MathDialect",
