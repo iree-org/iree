@@ -25,6 +25,19 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_winograd_llvm-cpu_local-task
+  SRCS
+    "conv2d.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-flow-enable-conv-winograd-transform"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_vmvx_local-task
   SRCS
     "conv2d.mlir"
@@ -47,6 +60,19 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-input-type=none"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_winograd_vulkan-spirv_vulkan
+  SRCS
+    "conv2d.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-flow-enable-conv-winograd-transform"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
