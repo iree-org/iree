@@ -119,7 +119,7 @@ if(IREE_LINK_COMPILER_SHARED_LIBRARY)
     DEPS
       ::SharedImpl
   )
-  add_library("iree::compiler::API2::RuntimeImpl" ALIAS "iree_compiler_API2_SharedImpl")
+  add_library("iree_compiler_API2_RuntimeImpl" ALIAS "iree_compiler_API2_SharedImpl")
 else()
   iree_cc_library(
     NAME
@@ -127,5 +127,5 @@ else()
     DEPS
       ::StaticImpl
   )
-  add_library("iree::compiler::API2::RuntimeImpl" ALIAS "iree_compiler_API2_StaticImpl")
+  add_library("iree_compiler_API2_RuntimeImpl" ALIAS "iree_compiler_API2_StaticImpl")
 endif()  # IREE_LINK_COMPILER_SHARED_LIBRARY

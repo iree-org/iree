@@ -130,7 +130,7 @@ function(iree_bytecode_module)
       ${_ARGS}
     # Changes to either the compiler tool or the input sources should rebuild.
     DEPENDS
-      iree::compiler::API2::RuntimeImpl
+      iree_compiler_API2_RuntimeImpl
       ${_COMPILE_TOOL_EXECUTABLE}
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}

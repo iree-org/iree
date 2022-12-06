@@ -47,7 +47,7 @@ function(iree_microbenchmark_suite)
         ${_ARGS}
       # Changes to either the compiler tool or the input source should rebuild.
       DEPENDS
-        iree::compiler::API2::RuntimeImpl
+        iree_compiler_API2_RuntimeImpl
         "${_COMPILE_TOOL_EXECUTABLE}"
         "${_TRANSLATE_SRC}"
       VERBATIM
