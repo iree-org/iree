@@ -283,7 +283,7 @@ ArrayRef<Operation *> transform_dialect::MatchCallbackResult::getPayloadGroup(
 // Case-specific matcher builders.
 //===---------------------------------------------------------------------===//
 
-static constexpr unsigned cudaWarpSize = 32;
+static constexpr unsigned kCudaWarpSize = 32;
 
 void transform_dialect::makeGPUReductionMatcher(
     transform_dialect::StructuredOpMatcher &reduction,
@@ -300,7 +300,7 @@ void transform_dialect::makeGPUReductionMatcher(
   reduction = m_StructuredOp()
                   .dim(AllDims(), ShapeKind::Static)
                   .dim(-1, utils::IteratorType::reduction)
-                  .dim(-1, DivisibleBy(cudaWarpSize))
+                  .dim(-1, DivisibleBy(kCudaWarpSize))
                   // Can be extended to projected permutation with broadcast.
                   .input(AllOperands(), IsPermutation())
                   // TODO: we want to accept any input position here.
