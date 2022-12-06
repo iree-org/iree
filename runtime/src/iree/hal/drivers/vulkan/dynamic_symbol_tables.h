@@ -329,7 +329,7 @@ namespace vulkan {
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceExternalSemaphoreProperties)     \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceExternalSemaphorePropertiesKHR)  \
   INS_PFN(REQUIRED, vkGetPhysicalDeviceFeatures)                        \
-  INS_PFN(EXCLUDED, vkGetPhysicalDeviceFeatures2)                       \
+  INS_PFN(REQUIRED, vkGetPhysicalDeviceFeatures2)                       \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceFeatures2KHR)                    \
   INS_PFN(REQUIRED, vkGetPhysicalDeviceFormatProperties)                \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceFormatProperties2)               \
