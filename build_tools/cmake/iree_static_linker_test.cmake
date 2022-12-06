@@ -52,7 +52,7 @@ function(iree_static_linker_test)
     return()
   endif()
 
-  if(NOT (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_TOOLS_INSTALL) OR
+  if(NOT (IREE_TARGET_BACKEND_LLVM_CPU OR IREE_TOOLS_INSTALL) OR
      NOT IREE_HAL_DRIVER_LOCAL_SYNC)
     return()
   endif()
@@ -66,7 +66,7 @@ function(iree_static_linker_test)
   )
 
   if(_RULE_EMITC AND
-     NOT (IREE_OUTPUT_FORMAT_C OR DEFINED IREE_TOOLS_INSTALL))
+     NOT (IREE_OUTPUT_FORMAT_C OR IREE_TOOLS_INSTALL))
     return()
   endif()
 

@@ -95,7 +95,7 @@ iree_lit_test(
 )
 
 
-if(NOT (IREE_OUTPUT_FORMAT_C OR DEFINED IREE_TOOLS_INSTALL))
+if(NOT (IREE_OUTPUT_FORMAT_C OR IREE_TOOLS_INSTALL))
   return()
 endif()
 
