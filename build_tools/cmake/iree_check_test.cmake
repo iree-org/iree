@@ -90,13 +90,8 @@ function(iree_check_test)
   #
   # For now we enable check tests:
   #   On the host if IREE_BUILD_COMPILER is set
-  #   Always when cross compiling (assuming host tools exist)
-  #
-  # In the future, we should probably add some orthogonal options that give
-  # more control (such as using tools from a binary release in a runtime-only
-  # host build, or skipping check tests in an Android build).
-  # TODO(#4662): add flexible configurable options that cover more uses
-  if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
+  #   Always when IREE_HOST_BINARY_ROOT is set (such as when cross compiling)
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BINARY_ROOT)
     return()
   endif()
 
