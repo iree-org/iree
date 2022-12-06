@@ -74,6 +74,7 @@ using ::mlir::transform::FuseIntoContainingOp;
 using ::mlir::transform::MatchOp;
 using ::mlir::transform::MergeHandlesOp;
 using ::mlir::transform::PrintOp;
+using ::mlir::transform::SequenceOp;
 using ::mlir::transform::SplitHandlesOp;
 using ::mlir::transform::SplitReductionOp;
 using ::mlir::transform::TileToForeachThreadOp;
@@ -229,11 +230,21 @@ static Value mapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
 /// Post-bufferization vector distribution with rank-reduction.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
-                               int64_t warpSize = 32) {
+static Value distributeVectors(ImplicitLocOpBuilder &b, Value variantH,
+                               Value funcH, int64_t warpSize = 32) {
   funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
-  ifH = b.create<VectorToWarpExecuteOnLane0Op>(ifH, warpSize);
+  // Locally suppress failures for this op only because it doesn't cover the
+  // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.
+  auto sequence = b.create<SequenceOp>(
+      TypeRange(), transform::FailurePropagationMode::Suppress, variantH);
+  {
+    OpBuilder::InsertionGuard guard(b);
+    b.createBlock(&sequence.getBody(), sequence.getBody().begin(),
+                  pdl::OperationType::get(b.getContext()), b.getLoc());
+    ifH = b.create<VectorToWarpExecuteOnLane0Op>(ifH, warpSize);
+    b.create<transform::YieldOp>();
+  }
   b.create<VectorWarpDistributionOp>(funcH);
   return funcH;
 }
@@ -458,7 +469,7 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
   funcH = mapToBlockAndThreads(b, funcH, infos.workgroupSize);
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
-  distributeVectors(b, funcH);
+  distributeVectors(b, variantH, funcH);
 }
 
 static constexpr unsigned cudaWarpSize = 32;
@@ -527,7 +538,7 @@ static void createTransformRegion(func::FuncOp entryPoint,
   Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
   b.setInsertionPointToStart(&topLevelTransformRegion.front());
   auto sequence = b.create<::transform_ext::CanonicalizedSequenceOp>(
-      loc, transform::FailurePropagationMode::Suppress,
+      loc, transform::FailurePropagationMode::Propagate,
       [&](OpBuilder &b, Location loc, Value variantH) {
         ImplicitLocOpBuilder ib(loc, b);
         buildStrategy(ib, variantH);
