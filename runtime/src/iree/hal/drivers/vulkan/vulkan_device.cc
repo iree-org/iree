@@ -880,9 +880,23 @@ iree_status_t iree_hal_vulkan_device_create(
   dispatch_queue_info.pQueuePriorities = dispatch_queue_priorities.data();
 
   // Collect supported physical device features.
-  VkPhysicalDeviceFeatures physical_device_features;
-  instance_syms->vkGetPhysicalDeviceFeatures(physical_device,
-                                             &physical_device_features);
+  VkPhysicalDeviceFeatures2 supported_features = {};
+  supported_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+  // Collect supported storage features.
+  VkPhysicalDevice16BitStorageFeatures supported_storage_features = {};
+  supported_storage_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES;
+  supported_storage_features.pNext = supported_features.pNext;
+  supported_features.pNext = &supported_storage_features;
+
+  // Collect supported low precision features.
+  VkPhysicalDeviceShaderFloat16Int8Features supported_low_precision_features = {};
+  supported_low_precision_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
+  supported_low_precision_features.pNext = supported_features.pNext;
+  supported_features.pNext = &supported_low_precision_features;
+
+  instance_syms->vkGetPhysicalDeviceFeatures2(physical_device,
+                                             &supported_features);
 
   // Create device and its queues.
   VkDeviceCreateInfo device_create_info;
@@ -900,8 +914,27 @@ iree_status_t iree_hal_vulkan_device_create(
   memset(&features2, 0, sizeof(features2));
   features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   device_create_info.pNext = &features2;
-  if (physical_device_features.shaderInt64) {
+  if (supported_features.features.shaderInt64) {
     features2.features.shaderInt64 = VK_TRUE;
+  }
+
+  VkPhysicalDevice16BitStorageFeatures storage_features = {};
+  storage_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES;
+  if(supported_storage_features.storageBuffer16BitAccess) {
+    storage_features.pNext = features2.pNext;
+    features2.pNext = &storage_features;
+    storage_features.storageBuffer16BitAccess = VK_TRUE;
+  }
+
+  VkPhysicalDeviceShaderFloat16Int8Features low_precision_features;
+  low_precision_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
+  bool supportFloat16 = supported_low_precision_features.shaderFloat16;
+  bool supportInt8 = supported_low_precision_features.shaderInt8;
+  if(supportInt8 || supportFloat16) {
+    low_precision_features.pNext = features2.pNext;
+    features2.pNext = &low_precision_features;
+    low_precision_features.shaderFloat16 = supportFloat16 ? VK_TRUE : VK_FALSE;
+    low_precision_features.shaderInt8 = supportInt8 ? VK_TRUE : VK_FALSE;
   }
 
   VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
