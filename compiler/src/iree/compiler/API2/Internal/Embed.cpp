@@ -11,6 +11,7 @@
 
 #include <atomic>
 
+#include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Tools/init_dialects.h"
