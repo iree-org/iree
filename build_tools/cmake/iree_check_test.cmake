@@ -90,8 +90,8 @@ function(iree_check_test)
   #
   # For now we enable check tests:
   #   On the host if IREE_BUILD_COMPILER is set
-  #   Always when IREE_HOST_BINARY_ROOT is set (such as when cross compiling)
-  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BINARY_ROOT)
+  #   Always when IREE_TOOLS_INSTALL is set (such as when cross compiling)
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_TOOLS_INSTALL)
     return()
   endif()
 
@@ -228,7 +228,7 @@ function(iree_check_single_backend_test_suite)
   if(NOT DEFINED IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
     message(SEND_ERROR "Unknown backend '${_RULE_TARGET_BACKEND}'. Check IREE_TARGET_BACKEND_* options.")
   endif()
-  if(DEFINED IREE_HOST_BINARY_ROOT)
+  if(DEFINED IREE_TOOLS_INSTALL)
     # If we're not building the host tools from source under this configuration,
     # such as when cross compiling, then we can't easily check for which
     # compiler target backends are enabled. Just assume all are enabled and only

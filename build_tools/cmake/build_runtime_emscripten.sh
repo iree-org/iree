@@ -22,7 +22,7 @@ then
 fi
 
 BUILD_DIR="build-emscripten"
-IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
+IREE_TOOLS_INSTALL="$(realpath ${IREE_TOOLS_INSTALL})"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -31,7 +31,7 @@ cd "${BUILD_DIR}"
 
 # Configure using Emscripten's CMake wrapper, then build.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
-  -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}" \
+  -DIREE_TOOLS_INSTALL="${IREE_TOOLS_INSTALL}" \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \

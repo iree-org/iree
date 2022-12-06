@@ -8,7 +8,7 @@
 
 # Cross-compile the runtime using CMake targeting RISC-V
 #
-# The required IREE_HOST_BINARY_ROOT environment variable indicates the location
+# The required IREE_TOOLS_INSTALL environment variable indicates the location
 # of the precompiled IREE binaries. The BUILD_PRESET environment variable
 # indicates how the project should be configured: "test", "benchmark",
 # "benchmark-with-tracing", or "benchmark-suite-test". Defaults to "test".
@@ -24,7 +24,7 @@ set -xeuo pipefail
 BUILD_DIR="${1:-${IREE_BUILD_RISCV_DIR:-build-riscv}}"
 RISCV_ARCH="${RISCV_ARCH:-rv64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
-IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
+IREE_TOOLS_INSTALL="$(realpath ${IREE_TOOLS_INSTALL})"
 E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
@@ -37,7 +37,7 @@ args=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
   -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}"
-  -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}"
+  -DIREE_TOOLS_INSTALL="${IREE_TOOLS_INSTALL}"
   -DRISCV_CPU="${RISCV_ARCH}"
   -DRISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS}"
   -DIREE_BUILD_COMPILER=OFF

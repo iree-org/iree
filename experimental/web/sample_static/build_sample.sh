@@ -77,7 +77,7 @@ pushd ${BUILD_DIR}
 # Note: The sample creates a device directly, so no drivers are required.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DIREE_HOST_BINARY_ROOT=${INSTALL_ROOT} \
+  -DIREE_TOOLS_INSTALL=${INSTALL_ROOT} \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \

@@ -41,7 +41,7 @@ function(iree_c_module)
   endif()
 
   if(_RULE_STATIC_LIB_PATH AND
-     NOT (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT))
+     NOT (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_TOOLS_INSTALL))
     message(SEND_ERROR "Static library only supports llvm-cpu backend")
   endif()
 

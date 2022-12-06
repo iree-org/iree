@@ -190,11 +190,11 @@ function(iree_benchmark_suite)
   )
 
   # Try to check if the compiler supports the TARGET_BACKEND. If
-  # IREE_HOST_BINARY_ROOT is defined, we are using a compiler binary, in which
+  # IREE_TOOLS_INSTALL is defined, we are using a compiler binary, in which
   # case we can't check it's supported backend just by looking at this build
   # dir's cmake variables --- we would have to implement a configure-check
   # executing that compiler.
-  if (NOT DEFINED IREE_HOST_BINARY_ROOT)
+  if (NOT DEFINED IREE_TOOLS_INSTALL)
     string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
     string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
     if(NOT IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})

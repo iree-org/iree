@@ -726,7 +726,7 @@ jobs:
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_TOOLS_INSTALL=${HOST_BUILD_DIR}/install" \
             gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
@@ -812,7 +812,7 @@ jobs:
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
             --env "${PLATFORM^^}_ABI=${ABI}" \
             --env "BUILD_PRESET=test" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_TOOLS_INSTALL=${HOST_BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
             "./build_tools/cmake/build_${PLATFORM}.sh" \
             "${TARGET_BUILD_DIR}"
@@ -851,7 +851,7 @@ jobs:
       - name: "Building the runtime for the web using Emscripten"
         run: |
           build_tools/github_actions/docker_run.sh \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_TOOLS_INSTALL=${HOST_BUILD_DIR}/install" \
             gcr.io/iree-oss/emscripten@sha256:20847a0a9503852d9594f3c4e7e633b913b450240b097d378dcd42d22ac0948e \
             build_tools/cmake/build_runtime_emscripten.sh
 
@@ -915,7 +915,7 @@ jobs:
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
             --env "IREE_BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
             --env "BUILD_PRESET=benchmark-suite-test" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_TOOLS_INSTALL=${HOST_BUILD_DIR}/install" \
             --env "E2E_TEST_ARTIFACTS_DIR=${E2E_TEST_ARTIFACTS_DIR}" \
             "${DOCKER_IMAGE}" \
             bash -euo pipefail -c \

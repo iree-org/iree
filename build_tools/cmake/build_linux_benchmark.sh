@@ -82,7 +82,7 @@ fi
 cd build-linux-x86_64
 
 "${CMAKE_BIN}" -G Ninja .. \
-  -DIREE_HOST_BINARY_ROOT="${PWD}/../build-host/install" \
+  -DIREE_TOOLS_INSTALL="${PWD}/../build-host/install" \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=OFF

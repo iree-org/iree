@@ -12,7 +12,7 @@
 # will remove build_tools/cmake/build_benchmarks.sh once everything has been
 # migrated.
 #
-# The required IREE_HOST_BINARY_ROOT environment variable indicates the location
+# The required IREE_TOOLS_INSTALL environment variable indicates the location
 # of the precompiled IREE binaries.
 #
 # Designed for CI, but can be run locally. The desired build directory can be
@@ -25,7 +25,7 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_BUILD_E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts}}"
-IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
+IREE_TOOLS_INSTALL="$(realpath ${IREE_TOOLS_INSTALL})"
 IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/iree_tf_compiler}"
 
 source build_tools/cmake/setup_build.sh
@@ -33,7 +33,7 @@ source build_tools/cmake/setup_build.sh
 echo "Configuring to build e2e test artifacts"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
   -G Ninja \
-  -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}" \
+  -DIREE_TOOLS_INSTALL="${IREE_TOOLS_INSTALL}" \
   -DIREE_BUILD_EXPERIMENTAL_E2E_TEST_ARTIFACTS=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
