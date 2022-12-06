@@ -105,7 +105,7 @@ steps:
       - "trace-captures-moto-edge-x30-${BUILDKITE_BUILD_NUMBER}.tgz"
     timeout_in_minutes: "60"
 
-   - label: ":recycle: Collect compilation statistics"
+  - label: ":recycle: Collect compilation statistics"
     key: "collect-compilation-statistics"
     commands: |
       git clean -fdx
@@ -123,7 +123,7 @@ steps:
       - "queue=build"
     artifact_paths:
       - "compile-stats-results-${BUILDKITE_BUILD_NUMBER}.json"
-    timeout_in_minutes: "10"     
+    timeout_in_minutes: "10"
 
   - wait
 
