@@ -39,7 +39,7 @@ py_binary(
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_small" % lhs_rhs_type,
     compiler_flags = [
-        "--iree-flow-enable-data-tiling",
+        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -63,7 +63,7 @@ py_binary(
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_large" % lhs_rhs_type,
     compiler_flags = [
-        "--iree-flow-enable-data-tiling",
+        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -91,7 +91,7 @@ py_binary(
     name = "e2e_matmul_mmt4d_%s_intrinsics_%s" % (lhs_rhs_type, size),
     compiler_flags = [
         "--iree-codegen-mmt4d-use-intrinsics",
-        "--iree-flow-enable-data-tiling",
+        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
