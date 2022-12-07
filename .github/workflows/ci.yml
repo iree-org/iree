@@ -817,21 +817,21 @@ jobs:
             --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
             --env "IREE_TARGET_ARCH=${ARCH}" \
             --env "IREE_TARGET_ABI=${ABI}" \
+            --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
-            "${BUILD_SCRIPT}" \
-            "${TARGET_BUILD_DIR}"
+            "${BUILD_SCRIPT}"
       - name: "Test cross-compiling target"
         if: ${{ matrix.target.test_script }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
             --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
             --env "BUILD_PRESET=test" \
             "${DOCKER_IMAGE}" \
-            "${TEST_SCRIPT}" \
-            "${TARGET_BUILD_DIR}"
+            "${TEST_SCRIPT}"
 
   emscripten:
     needs: [setup, build_all]
@@ -922,13 +922,13 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
             --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
             --env "BUILD_PRESET=benchmark-suite-test" \
             --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
             --env "E2E_TEST_ARTIFACTS_DIR=${E2E_TEST_ARTIFACTS_DIR}" \
             "${DOCKER_IMAGE}" \
             bash -euo pipefail -c \
-              "${RUN_SCRIPTS}" \
-              "${TARGET_BUILD_DIR}"
+              "${RUN_SCRIPTS}"
 
   ##############################################################################
 
