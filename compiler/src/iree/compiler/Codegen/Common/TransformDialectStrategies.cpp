@@ -165,26 +165,13 @@ static Value tileAndFuseAndDistributeImpl(
 template <typename TilingTransformOp = TileToForeachThreadOp>
 static Value buildTileFuseDistWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<int64_t> tileSizes, ArrayAttr threadDimMapping,
+    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
     TileFuseDistOpt options = TileFuseDistOpt(),
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
   return tileAndFuseAndDistributeImpl<TilingTransformOp,
                                       transform::TileSizesSpec>(
-      b, rootH, opsHToFuse, getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)),
-      threadDimMapping, options, resultingFusedOpsHandles);
-}
-
-/// Call tileAndFuseAndDistributeImpl with a handle to multiple tilesSizes.
-template <typename TilingTransformOp = TileToForeachThreadOp>
-static Value buildTileFuseDistWithTileSizes(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    Value tileSizeHandle, ArrayAttr threadDimMapping,
-    TileFuseDistOpt options = TileFuseDistOpt(),
-    SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
-  return tileAndFuseAndDistributeImpl<TilingTransformOp,
-                                      transform::TileSizesSpec>(
-      b, rootH, opsHToFuse, ArrayRef<OpFoldResult>{tileSizeHandle},
-      threadDimMapping, options, resultingFusedOpsHandles);
+      b, rootH, opsHToFuse, tileSizes, threadDimMapping, options,
+      resultingFusedOpsHandles);
 }
 
 /// Call tileAndFuseAndDistributeImpl with ArrayRef<int64_t> numThreads.
@@ -308,11 +295,10 @@ static ReductionSplitResult buildExpansionBubbleUp(
 }
 
 /// Distribute to blocks using the current IREE lowering config.
-template <typename TileSizesType>
 static Value buildReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
     Value reductionH, Value optionalFusionRootH,
-    TileSizesType tileSizes0Generic, bool hasLeadingEltwise = false,
+    ArrayRef<OpFoldResult> tileSizes0Generic, bool hasLeadingEltwise = false,
     bool hasTrailingEltwise = false) {
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
@@ -391,12 +377,12 @@ static Value buildReductionStrategyThreadDistributionPart(
   buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/secondFusionRootH,
                    /*opsHToFuse=*/secondFusionGroupHs,
-                   /*tileSizes=*/tileSizes1Fill,
+                   /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr(tileSizes1Fill)),
                    /*threadDimMapping=*/b.getArrayAttr({z}));
   buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/firstFusionRootH,
                    /*opsHToFuse=*/firstFusionGroupHs,
-                   /*tileSizes=*/tileSizes1Generic,
+                   /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr(tileSizes1Generic)),
                    /*threadDimMapping=*/b.getArrayAttr({z,y}));
   // clang-format on
   return variantH;
@@ -442,8 +428,8 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
   // Step 1: Distribute to blocks using the current IREE lowering config.
   variantH = buildReductionStrategyBlockDistributionPart(
       b, variantH, originalFillH, reductionH, fusionRootH,
-      infos.workgroupTileSizes, infos.hasLeadingEltwise,
-      infos.hasTrailingEltwise);
+      getAsOpFoldResult(b.getI64ArrayAttr(infos.workgroupTileSizes)),
+      infos.hasLeadingEltwise, infos.hasTrailingEltwise);
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   variantH = buildReductionStrategyThreadDistributionPart(
@@ -562,7 +548,8 @@ static LogicalResult buildReductionCpuStrategy(
 
   // Step 1: Distribute to blocks using the current IREE lowering config.
   variantH = buildReductionStrategyBlockDistributionPart(
-      b, variantH, originalFillH, originalGenericH, Value(), info.tileSizes);
+      b, variantH, originalFillH, originalGenericH, Value(),
+      getAsOpFoldResult(b.getI64ArrayAttr(info.tileSizes)));
 
   // Step 2. Rank-reduce and buildVectorizeStrategy.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
