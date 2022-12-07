@@ -102,22 +102,6 @@ static void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {}) {
   for (auto h : handles) b.create<PrintOp>(h);
 }
 
-namespace {
-/// Options struct to control the behavior of TileFuseDist.
-struct TileFuseDistOpt {
-  /// Pass operations to control the bulk or iterative fusion behavior of the
-  /// fusion transform:
-  ///   - when true, pass the operations to fuse in bulk to the fusion
-  ///     transform which then performs an internal topological sort before
-  ///     fusing. This form does not allow interleaved canonicalizations and
-  ///     CSE to kick in.
-  ///   - when false, pass the operations one by one and fuse iteratively. This
-  ///     requires knowing the topological order of operations and allows
-  ///     interleaved canonicalizations and CSE to kick in.
-  bool batchFusion = true;
-};
-}  // namespace
-
 /// Performs the following transformations:
 ///   1. Tiles `rootH` to scf.foreach_thread to with `tileSizesOrNumThreads`
 ///      according to whether spec is a TileSizesSpec or a NumThreadsSpec.
@@ -126,16 +110,15 @@ struct TileFuseDistOpt {
 ///   3. Iterates over `opsHToFuse` in order and fuses into the containing op.
 /// Returns a handle to the resulting scf.foreach_thread.
 ///
-/// Fusion is controlled by the BatchOrIterativeFusion templatetype:
-///   1. In batch mode, a single fusion command is issued and a topological sort
-///      is automatically computed by the fusion. Since this applies a single
-///      fusion, no interleaved canonicalization/cse/enabling occur and the
-///      resulting fusion may not be as good.
-///   2. In iterative mode, the user is responsible for providing the fusion
-///      order but interleaved canonicalization/cse/enabling occur which may
-///      result in better fusion results.
-///      TODO: Transform dialect op to apply topological sort and avoid the
-///      manual intervention.
+/// Fusion operates in batch mode: a single fusion command is issued and a
+/// topological sort is automatically computed by the fusion.
+/// Since this applies a single fusion, no interleaved canonicalization / cse /
+/// enabling transformation occurs and the resulting fusion may not be as good.
+///
+/// In the future, an iterative mode in which the user is responsible for
+/// providing the fusion order and has interleaved canonicalization / cse /
+/// enabling transform will be introduced and may result in better fusions.
+///
 /// If `resultingFusedOpsHandles` is a non-null pointer, the fused operation are
 /// appended in order.
 // TODO: apply forwarding pattern.
@@ -143,21 +126,14 @@ template <typename TilingTransformOp, typename TileOrNumThreadSpec>
 static Value tileAndFuseAndDistributeImpl(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizesOrNumThreads, ArrayAttr threadDimMapping,
-    TileFuseDistOpt options, SmallVectorImpl<Value> *resultingFusedOpsHandles) {
+    SmallVectorImpl<Value> *resultingFusedOpsHandles) {
   auto tileToForeachOp = b.create<TilingTransformOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
   Value foreachThreadH = tileToForeachOp.getForeachThreadOp();
-  if (options.batchFusion) {
-    Value mergedOpsH =
-        b.create<MergeHandlesOp>(opsHToFuse, /*deduplicate=*/true);
-    b.create<FuseIntoContainingOp>(mergedOpsH, foreachThreadH);
-    assert(!resultingFusedOpsHandles && "Handle needs unpacking");
-  } else {
-    for (Value h : opsHToFuse) {
-      Value fusedH = b.create<FuseIntoContainingOp>(h, foreachThreadH);
-      if (resultingFusedOpsHandles) resultingFusedOpsHandles->push_back(fusedH);
-    }
-  }
+  // Batch fusion.
+  Value mergedOpsH = b.create<MergeHandlesOp>(opsHToFuse, /*deduplicate=*/true);
+  b.create<FuseIntoContainingOp>(mergedOpsH, foreachThreadH);
+  assert(!resultingFusedOpsHandles && "Handle needs unpacking");
   return foreachThreadH;
 }
 
@@ -166,7 +142,6 @@ template <typename TilingTransformOp = TileToForeachThreadOp>
 static Value buildTileFuseDistWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
-    TileFuseDistOpt options = TileFuseDistOpt(),
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
   return tileAndFuseAndDistributeImpl<TilingTransformOp,
                                       transform::TileSizesSpec>(
@@ -179,12 +154,11 @@ template <typename TilingTransformOp = TileToForeachThreadOp>
 static Value buildTileFuseDistWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<int64_t> numThreads, ArrayAttr threadDimMapping,
-    TileFuseDistOpt options = TileFuseDistOpt(),
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
   return tileAndFuseAndDistributeImpl<TilingTransformOp,
                                       transform::NumThreadsSpec>(
       b, rootH, opsHToFuse, getAsOpFoldResult(b.getI64ArrayAttr(numThreads)),
-      threadDimMapping, options, resultingFusedOpsHandles);
+      threadDimMapping, resultingFusedOpsHandles);
 }
 
 /// Call tileAndFuseAndDistributeImpl with a handle to multiple numThreads.
@@ -192,12 +166,11 @@ template <typename TilingTransformOp = TileToForeachThreadOp>
 static Value buildTileFuseDistWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     Value numThreads, ArrayAttr threadDimMapping,
-    TileFuseDistOpt options = TileFuseDistOpt(),
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
   return tileAndFuseAndDistributeImpl<TilingTransformOp,
                                       transform::NumThreadsSpec>(
       b, rootH, opsHToFuse, ArrayRef<OpFoldResult>{numThreads},
-      threadDimMapping, options, resultingFusedOpsHandles);
+      threadDimMapping, resultingFusedOpsHandles);
 }
 
 /// Apply patterns and vectorize (for now always applies rank-reduction).
