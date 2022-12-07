@@ -7,10 +7,15 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Build tests based on benchmark suites for IREE.
-# Designed for CI, but can be run locally.
+#
+# The desired build directory can be passed as the first argument. Otherwise, it
+# uses the environment variable IREE_TARGET_BUILD_DIR, defaulting to
+# "build-benchmark-suites-test". Designed for CI, but can be run manually. It
+# reuses the build directory if it already exists. Expects to be run from the
+# root of the IREE repository.
 set -xeuo pipefail
 
-BUILD_DIR="${BUILD_DIR:-build-benchmark-suites-test}"
+BUILD_DIR="${IREE_TARGET_BUILD_DIR:-build-benchmark-suites-test}"
 E2E_TEST_ARTIFACTS_DIR="$(realpath ${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts})"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 

@@ -791,7 +791,7 @@ jobs:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
       ABI: ${{ matrix.target.abi }}
-      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}
+      IREE_TARGET_BUILD_DIR: build-${{ matrix.target.platform }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
       BUILD_SCRIPT: ${{ matrix.target.build_script }}
       TEST_SCRIPT: ${{ matrix.target.test_script }}
@@ -814,24 +814,24 @@ jobs:
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=${DOCKER_IMAGE}" \
-            --env "TARGET_PLATFORM=${PLATFORM}" \
-            --env "TARGET_ARCH=${ARCH}" \
-            --env "TARGET_ABI=${ABI}" \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "IREE_TARGET_ABI=${ABI}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
             "${BUILD_SCRIPT}" \
-            "${TARGET_BUILD_DIR}"
+            "${IREE_TARGET_BUILD_DIR}"
       - name: "Test cross-compiling target"
         if: ${{ matrix.target.test_script }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "TARGET_PLATFORM=${PLATFORM}" \
-            --env "TARGET_ARCH=${ARCH}" \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
             --env "BUILD_PRESET=test" \
             "${DOCKER_IMAGE}" \
             "${TEST_SCRIPT}" \
-            "${TARGET_BUILD_DIR}"
+            "${IREE_TARGET_BUILD_DIR}"
 
   emscripten:
     needs: [setup, build_all]
@@ -919,9 +919,9 @@ jobs:
       - name: "Build iree-run-module and test benchmark suite modules"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "TARGET_PLATFORM=${PLATFORM}" \
-            --env "TARGET_ARCH=${ARCH}" \
-            --env "TARGET_BUILD_DIR=build-${PLATFORM}" \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "IREE_TARGET_BUILD_DIR=build-${PLATFORM}" \
             --env "BUILD_PRESET=benchmark-suite-test" \
             --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
             --env "E2E_TEST_ARTIFACTS_DIR=${E2E_TEST_ARTIFACTS_DIR}" \

@@ -14,15 +14,16 @@
 # "benchmark-with-tracing", or "benchmark-suite-test". Defaults to "test".
 #
 # The desired build directory can be passed as the first argument. Otherwise, it
-# uses the environment variable TARGET_BUILD_DIR, defaulting to "build-riscv".
-# Designed for CI, but can be run manually. It reuses the build directory if it
-# already exists. Expects to be run from the root of the IREE repository.
+# uses the environment variable IREE_TARGET_BUILD_DIR, defaulting to
+# "build-riscv". Designed for CI, but can be run manually. It reuses the build
+# directory if it already exists. Expects to be run from the root of the IREE
+# repository.
 
 set -xeuo pipefail
 
-BUILD_DIR="${1:-${TARGET_BUILD_DIR:-build-riscv}}"
-RISCV_PLATFORM="${TARGET_PLATFORM:-linux}"
-RISCV_ARCH="${TARGET_ARCH:-riscv_64}"
+BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-riscv}}"
+RISCV_PLATFORM="${IREE_TARGET_PLATFORM:-linux}"
+RISCV_ARCH="${IREE_TARGET_ARCH:-riscv_64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts}"

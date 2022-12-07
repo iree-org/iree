@@ -9,15 +9,15 @@
 # Test the cross-compiled RISCV 64-bit Linux targets.
 #
 # The desired build directory can be passed as the first argument. Otherwise, it
-# uses the environment variable TARGET_BUILD_DIR, defaulting to "build-riscv".
-# Designed for CI, but can be run manually. Expects to be run from the root of
-# the IREE repository.
+# uses the environment variable IREE_TARGET_BUILD_DIR, defaulting to
+# "build-riscv". Designed for CI, but can be run manually. Expects to be run
+# from the root of the IREE repository.
 
 set -xeuo pipefail
 
-BUILD_DIR="${1:-${TARGET_BUILD_DIR:-build-riscv}}"
-RISCV_PLATFORM="${TARGET_PLATFORM:-linux}"
-RISCV_ARCH="${TARGET_ARCH:-riscv_64}"
+BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-riscv}}"
+RISCV_PLATFORM="${IREE_TARGET_PLATFORM:-linux}"
+RISCV_ARCH="${IREE_TARGET_ARCH:-riscv_64}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
 # Environment variable used by the emulator.

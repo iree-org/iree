@@ -130,8 +130,8 @@ jobs:
         id: build
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "TARGET_PLATFORM=${PLATFORM}" \
-            --env "TARGET_ARCH=${ARCH}" \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
             --env "BUILD_PRESET=benchmark" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build"
@@ -139,8 +139,8 @@ jobs:
         id: build-with-tracing
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "TARGET_PLATFORM=${PLATFORM}" \
-            --env "TARGET_ARCH=${ARCH}" \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
             --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
