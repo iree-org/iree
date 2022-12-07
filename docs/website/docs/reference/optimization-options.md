@@ -14,7 +14,7 @@ These flags can be passed to the:
 
 ## High level program optimizations
 
-### Constant evaluation (`--iree-opt-const-eval` (off))
+### Constant evaluation (`--iree-opt-const-eval` (on))
 
 Performs compile-time evaluation of any global initializers which produce
 the initial values for global constants, storing the global directly in the
@@ -26,7 +26,7 @@ functions, not free-standing operations in the program which may produce
 constant-derived results. See `--iree-opt-const-expr-hoisting` for options to
 optimize these.
 
-### Constant expression hoisting (`--iree-opt-const-expr-hoisting` (off))
+### Constant expression hoisting (`--iree-opt-const-expr-hoisting` (on))
 
 Identifies all trees of constant expressions in the program and uses a
 heuristic to determine which would be profitable to hoist into global
