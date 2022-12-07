@@ -2,7 +2,7 @@
 #trait = { indexing_maps  = [affine_map<(d0, d1) -> (d0, d1)>],
            iterator_types = ["parallel", "parallel"] }
 
-#trait2 = { indexing_maps  = [affine_map<(d0, d1) -> (d0, d1)>, 
+#trait2 = { indexing_maps  = [affine_map<(d0, d1) -> (d0, d1)>,
                               affine_map<(d0, d1) -> (d0, d1)>],
            iterator_types = ["parallel", "parallel"] }
 
@@ -10,18 +10,18 @@ func.func @vecadd2d() -> (!type) {
   %cst0 = arith.constant 0.000000e+00 : f32
   %cst1 = arith.constant 2.000000e+00 : f32
   %0 = tensor.empty() : !type
-  %1 = tensor.empty() : !type  
+  %1 = tensor.empty() : !type
   %x = linalg.generic #trait outs(%0 : !type) {
-  ^bb0(%arg: f32):        
+  ^bb0(%arg: f32):
     linalg.yield %cst1 : f32
   } -> !type
   %y = linalg.generic #trait outs(%0 : !type) {
-  ^bb0(%arg: f32):        
+  ^bb0(%arg: f32):
     linalg.yield %cst0 : f32
   } -> !type
-  // Note: Two linalg.generics to fill the tensors will make IREE generate two 
+  // Note: Two linalg.generics to fill the tensors will make IREE generate two
   // separate kernels for the above and the below. It is important to validate
-  // the results. 
+  // the results.
   %2 = linalg.generic #trait2 ins(%x : !type) outs(%y : !type) {
   ^bb0(%arg3: f32, %arg4: f32):
     %3 = arith.addf %arg3, %arg4 : f32
@@ -50,14 +50,17 @@ func.func @vecadd2d() -> (!type) {
 // RUN: FileCheck %s --check-prefix=CHECK-PARTIAL-TILE
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
+// RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
+/// Constant JIT'ing must be disabled because the transform-dialect debug
+/// flags leak to the JIT session, which doesn't know what to do with them.
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/vecadd2d_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=vecadd2d --device=cuda |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
-//     CHECK:  hal.executable.export 
+//     CHECK:  hal.executable.export
 //     CHECK:  bb0(%[[DEV:.*]]: !hal.device, %[[A1:.*]]: index, %[[A2:.*]]: index):
 //     CHECK:  %[[Dim2:.*]] = arith.constant 1 : index
-//     CHECK:  %[[Dim3:.*]] = affine.apply #map()[%[[A1]]]                          
+//     CHECK:  %[[Dim3:.*]] = affine.apply #map()[%[[A1]]]
 //     CHECK:  %[[Dim1:.*]] = affine.apply #map1()[%[[A2]]]
 //     CHECK:  hal.return %[[Dim1]], %[[Dim2]], %[[Dim3]] : index, index, index
 

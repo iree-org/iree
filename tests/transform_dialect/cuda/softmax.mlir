@@ -13,6 +13,9 @@
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
+// RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
+/// Constant JIT'ing must be disabled because the transform-dialect debug
+/// flags leak to the JIT session, which doesn't know what to do with them.
 /// This must be used with the custom dispatch region formation
 /// because IREE's does not fuse the 6 ops softmax version even with
 /// --iree-flow-enable-aggressive-fusion.
