@@ -944,6 +944,66 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-f672a6b9-99fc-47ce-8b1b-8e5f44a541a1
 )
 
+iree_bytecode_module(
+  NAME
+    "iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-8da35f2b-a042-4b7d-9dcf-5ebbc1728765_demote_f32_to_16"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/MobileBertSquad_int8.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/8da35f2b-a042-4b7d-9dcf-5ebbc1728765_demote_f32_to_16/MobileBertSquad_int8.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
+    "--iree-flow-demote-f32-to-f16"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-8da35f2b-a042-4b7d-9dcf-5ebbc1728765_demote_f32_to_16
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-32a56c8d-cc6c-41b8-8620-1f8eda0b8223_demote_f32_to_16"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/MobileBertSquad_int8.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/32a56c8d-cc6c-41b8-8620-1f8eda0b8223_demote_f32_to_16/MobileBertSquad_int8.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-flow-demote-f32-to-f16"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-32a56c8d-cc6c-41b8-8620-1f8eda0b8223_demote_f32_to_16
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-6b601a8d-4824-42e0-bcc6-500c0c3fa346_demote_f32_to_16"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/MobileBertSquad_int8.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/6b601a8d-4824-42e0-bcc6-500c0c3fa346_demote_f32_to_16/MobileBertSquad_int8.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-hal-benchmark-dispatch-repeat-count=32"
+    "--iree-flow-demote-f32-to-f16"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-6b601a8d-4824-42e0-bcc6-500c0c3fa346_demote_f32_to_16
+)
+
 iree_import_tflite_model(
   TARGET_NAME
     "${PACKAGE_NAME}_iree-imported-model-73a0402e-271b-4aa8-a6a5-ac05839ca569"
