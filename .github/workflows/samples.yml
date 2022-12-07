@@ -1,0 +1,66 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# Workflow for running Examples of IREE usage against releases periodically.
+
+name: samples
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+  # DO NOT SUBMIT: Turn off presubmit build
+  pull_request:
+
+
+
+jobs:
+  colab:
+    runs-on: ubuntu-20.04-64core
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+      - name: "Testing Colab Notebooks"
+        run: |
+          ./build_tools/github_actions/docker_run.sh  \
+            gcr.io/iree-oss/samples@sha256:291d87d125b41e1539dbb96c7c4f734cc98fc158a36d18496cda360658f00bde \
+            ./samples/colab/test_notebooks.py
+
+  samples:
+    runs-on: ubuntu-20.04-64core
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+      - name: "Testing Colab Notebooks"
+        run: |
+          ./build_tools/github_actions/docker_run.sh  \
+            gcr.io/iree-oss/samples@sha256:291d87d125b41e1539dbb96c7c4f734cc98fc158a36d18496cda360658f00bde \
+            ./build_tools/testing/test_samples.sh
+
+  # FIXME: unify this with host build from ci.yml. This is complicated by
+  # incompatibility between storage options for GitHubmanaged and self-hosted
+  # runners.
+  wasm:
+    runs-on: ubuntu-20.04-64core
+    # TODO: remove dependence on magic matching build dir names
+    # env:
+    #   HOST_BUILD_DIR: build-host-install
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        with:
+          submodule: true
+      - name: "Building host tools"
+        run: |
+          ./build_tools/github_actions/docker_run.sh  \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206" \
+            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206\
+            ./build_tools/cmake/build_host_tools.sh
+      - name: "Testing Experimental Web Samples"
+        run: |
+          ./build_tools/github_actions/docker_run.sh  \
+            gcr.io/iree-oss/emscripten@sha256:20847a0a9503852d9594f3c4e7e633b913b450240b097d378dcd42d22ac0948e \
+            ./experimental/web/test_samples.sh
