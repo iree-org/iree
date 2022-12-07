@@ -765,6 +765,7 @@ jobs:
         target:
           - platform: android
             arch: arm_64
+            abi: arm64-v8a
             docker_image: "gcr.io/iree-oss/android@sha256:e5f45760ab2dc8a1d72dc6e9d90056719bedac5678ee90e6d9f9b958172b4834"
             build_script: "./build_tools/cmake/build_android.sh"
             # No test_script
@@ -815,7 +816,7 @@ jobs:
             --env "CCACHE_NAMESPACE=${DOCKER_IMAGE}" \
             --env "TARGET_PLATFORM=${PLATFORM}" \
             --env "TARGET_ARCH=${ARCH}" \
-            --env "BUILD_ABI=${ABI}" \
+            --env "TARGET_ABI=${ABI}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \

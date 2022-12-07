@@ -9,9 +9,9 @@
 # Test the cross-compiled RISCV 64-bit Linux targets.
 #
 # The desired build directory can be passed as the first argument. Otherwise, it
-# uses the environment variable IREE_RISCV_BUILD_DIR, defaulting to
-# "build-riscv". Designed for CI, but can be run manually. Expects to be run
-# from the root of the IREE repository.
+# uses the environment variable TARGET_BUILD_DIR, defaulting to "build-riscv".
+# Designed for CI, but can be run manually. Expects to be run from the root of
+# the IREE repository.
 
 set -xeuo pipefail
 
