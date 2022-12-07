@@ -51,7 +51,7 @@ if [[ "${RISCV_PLATFORM}" == "linux" ]]; then
   args+=(
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
   )
-elif [[ "${RISCV_PLATFORM_ARCH}" == "baremetal-riscv_32" ]]; then
+elif [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
   args+=(
     # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF

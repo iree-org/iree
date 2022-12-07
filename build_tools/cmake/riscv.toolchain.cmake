@@ -75,7 +75,7 @@ elseif(RISCV_CPU STREQUAL "linux-riscv_32")
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--riscv-v-vector-bits-min=512"
     CACHE INTERNAL "Default llvm codegen flags for testing purposes")
-elseif(RISCV_CPU STREQUAL "baremetal-riscv_32")
+elseif(RISCV_CPU STREQUAL "generic-riscv_32")
   set(CMAKE_SYSTEM_PROCESSOR riscv32)
   set(CMAKE_SYSTEM_NAME Generic)
   set(CMAKE_CROSSCOMPILING ON CACHE BOOL "")
