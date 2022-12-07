@@ -154,7 +154,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
   LogicalResult matchAndRewrite(
       IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
       PatternRewriter &rewriter) const override {
-    auto workloadValues = workgroupCountOp.operands();
+    auto workloadValues = workgroupCountOp.getOperands();
     SmallVector<OpFoldResult> tileSizes = llvm::to_vector(llvm::map_range(
         givenTileSizes,
         [&](int64_t v) -> OpFoldResult { return rewriter.getIndexAttr(v); }));

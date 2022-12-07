@@ -674,7 +674,7 @@ struct TensorTraceOpPattern
       IREE::Stream::TensorTraceOp traceOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewTraceOp>(
-        traceOp, traceOp.getKeyAttr(), adaptor.operands());
+        traceOp, traceOp.getKeyAttr(), adaptor.getOperands());
     return success();
   }
 };
