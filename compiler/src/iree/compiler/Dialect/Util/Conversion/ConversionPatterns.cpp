@@ -149,7 +149,7 @@ struct ConvertCallOp : public OpConversionPattern<mlir::func::CallOp> {
       return rewriter.notifyMatchFailure(op, "unable to convert result types");
     }
     rewriter.replaceOpWithNewOp<mlir::func::CallOp>(
-        op, resultTypes, op.getCallee(), adaptor.operands());
+        op, resultTypes, op.getCallee(), adaptor.getOperands());
     return success();
   }
 };
@@ -160,7 +160,7 @@ struct ConvertReturnOp : public OpConversionPattern<mlir::func::ReturnOp> {
       mlir::func::ReturnOp returnOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(returnOp,
-                                                      adaptor.operands());
+                                                      adaptor.getOperands());
     return success();
   }
 };

@@ -16,7 +16,6 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 def VM_Dialect : Dialect {
   let name = "vm";
   let cppNamespace = "::mlir::iree_compiler::IREE::VM";
-  let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 
   let summary = [{
     A dialect representing operations against an abstract virtual machine.

@@ -229,7 +229,7 @@ struct ConvertTensorTraceOp
       IREE::Flow::TensorTraceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> exportedTensors;
-    for (auto it : llvm::zip(op.operands(), adaptor.operands())) {
+    for (auto it : llvm::zip(op.getOperands(), adaptor.getOperands())) {
       auto tensorOperand = std::get<0>(it);
       auto resourceOperand = std::get<1>(it);
       auto source =
@@ -394,7 +394,7 @@ static bool insertBindingOp(BlockArgument arg,
 static void convertReturnOps(Region &region) {
   region.walk([](IREE::Flow::ReturnOp oldOp) {
     OpBuilder(oldOp).create<IREE::Stream::ReturnOp>(oldOp.getLoc(),
-                                                    oldOp.operands());
+                                                    oldOp.getOperands());
     oldOp.erase();
   });
 }
@@ -479,7 +479,8 @@ struct ConvertReturnOp : public OpConversionPattern<IREE::Flow::ReturnOp> {
   LogicalResult matchAndRewrite(
       IREE::Flow::ReturnOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::Stream::ReturnOp>(op, adaptor.operands());
+    rewriter.replaceOpWithNewOp<IREE::Stream::ReturnOp>(op,
+                                                        adaptor.getOperands());
     return success();
   }
 };

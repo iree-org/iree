@@ -461,7 +461,7 @@ static bool applyFuncChanges(FuncAnalysis &analysis, func::FuncOp funcOp) {
   // Erase dead results from all return sites.
   funcOp.walk([&](func::ReturnOp returnOp) {
     for (int i = deadResults.size() - 1; i >= 0; --i) {
-      if (deadResults.test(i)) returnOp.operandsMutable().erase(i);
+      if (deadResults.test(i)) returnOp.getOperandsMutable().erase(i);
     }
   });
 
