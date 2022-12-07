@@ -791,13 +791,13 @@ jobs:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
       ABI: ${{ matrix.target.abi }}
-      IREE_TARGET_BUILD_DIR: build-${{ matrix.target.platform }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
       BUILD_SCRIPT: ${{ matrix.target.build_script }}
       TEST_SCRIPT: ${{ matrix.target.test_script }}
       HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}
       IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
     steps:
       - name: "Checking out repository"
@@ -821,7 +821,7 @@ jobs:
             --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
             "${BUILD_SCRIPT}" \
-            "${IREE_TARGET_BUILD_DIR}"
+            "${TARGET_BUILD_DIR}"
       - name: "Test cross-compiling target"
         if: ${{ matrix.target.test_script }}
         run: |
@@ -831,7 +831,7 @@ jobs:
             --env "BUILD_PRESET=test" \
             "${DOCKER_IMAGE}" \
             "${TEST_SCRIPT}" \
-            "${IREE_TARGET_BUILD_DIR}"
+            "${TARGET_BUILD_DIR}"
 
   emscripten:
     needs: [setup, build_all]

@@ -9,12 +9,12 @@
 # Smoke test the cross-compiled RISCV-32 targets.
 #
 # The build directory containing tests can be passed as the first argument.
-# Otherwise, it uses the environment variable TARGET_BUILD_DIR, defaulting to
-# "build-riscv". Designed for CI, but can be run manually.
+# Otherwise, it uses the environment variable IREE_TARGET_BUILD_DIR, defaulting
+# to "build-riscv". Designed for CI, but can be run manually.
 
 set -xeuo pipefail
 
-BUILD_DIR="${1:-${TARGET_BUILD_DIR:-build-riscv}}"
+BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-riscv}}"
 
 # Run the embedded_library module loader and simple_embedding under QEMU.
 echo "Test elf_module_test_binary"
