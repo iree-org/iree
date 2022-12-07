@@ -30,6 +30,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
@@ -55,16 +56,30 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
 //===---------------------------------------------------------------------===//
 // ApplyPatternsOp
 //===---------------------------------------------------------------------===//
-void transform_dialect::ApplyPatternsOp::build(OpBuilder &builder,
-                                               OperationState &result,
-                                               Value target,
-                                               bool rankReducing) {
+void transform_dialect::ApplyPatternsOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    const ApplyPatternsOpPatterns &patterns) {
   MLIRContext *ctx = builder.getContext();
   result.addOperands(target);
-  if (rankReducing) {
-    result.addAttribute(ApplyPatternsOp::getRankReducingAttrName(result.name),
-                        builder.getUnitAttr());
-  }
+  auto unitAttr = builder.getUnitAttr();
+#define ADD_PATTERN(NAME, ATTR) \
+  if (patterns.NAME)            \
+    result.addAttribute(ApplyPatternsOp::ATTR(result.name), unitAttr);
+  ADD_PATTERN(additionalIreePatterns, getAdditionalIreePatternsAttrName)
+  ADD_PATTERN(bubbleCollapseExpand, getBubbleCollapseExpandAttrName)
+  ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
+  ADD_PATTERN(eraseUnnecessaryTensorOperands,
+              getEraseUnnecessaryTensorOperandsAttrName)
+  ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
+  ADD_PATTERN(promoteForeachThreadCaptureToShared,
+              getPromoteForeachThreadCaptureToSharedAttrName)
+  ADD_PATTERN(rankReducing, getRankReducingAttrName)
+  ADD_PATTERN(expandMemrefStridedMetadata,
+              getExpandMemrefStridedMetadataAttrName)
+  ADD_PATTERN(swapPaddingElideConditional,
+              getSwapPaddingElideConditionalAttrName)
+  ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
+#undef ADD_PATTERN
   result.addTypes({pdl::OperationType::get(ctx)});
 }
 
@@ -152,6 +167,15 @@ static void addForeachThreadCapturePromotionPatterns(
   patterns.add<PromoteCaptureToSharedOut>(patterns.getContext());
 }
 
+static void addReassociativeReshapePatterns(RewritePatternSet &patterns) {
+  tensor::populateReassociativeReshapeFoldingPatterns(patterns);
+}
+
+static void addEraseUnnecessaryTensorOperandsPatterns(
+    RewritePatternSet &patterns) {
+  linalg::populateEraseUnnecessaryInputsPatterns(patterns);
+}
+
 static void addRankReducingPatterns(RewritePatternSet &patterns) {
   populateReshapeToInterfaceTensorPatterns(patterns);
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
@@ -198,6 +222,9 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
+  if (getEraseUnnecessaryTensorOperands())
+    addEraseUnnecessaryTensorOperandsPatterns(patterns);
+  if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getPromoteForeachThreadCaptureToShared())
     addForeachThreadCapturePromotionPatterns(patterns);
   if (getRankReducing()) addRankReducingPatterns(patterns);
@@ -875,40 +902,32 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     memCpyFn = gpuComprehensiveBufferizeCopyFn;
   }
 
-  //   1. Eliminate tensor.empty, without the pass baggage.
-  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
-    if (failed(eliminateEmptyTensors(moduleOp.getOperation(),
-                                     getBufferizationOptions())))
-      return WalkResult::interrupt();
-    return WalkResult::advance();
-  });
-  if (res.wasInterrupted())
-    return DiagnosedSilenceableFailure::definiteFailure();
-
-  //   2. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
-  RewritePatternSet patterns(getContext());
-  patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
-  TrackingListener listener(state);
-  GreedyRewriteConfig config;
-  LogicalResult result = applyPatternsAndFoldGreedily(
-      state.getTopLevel(), std::move(patterns), config, &listener);
-  LogicalResult listenerResult = listener.checkErrorState();
-  if (failed(result)) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "greedy pattern application failed");
+  //   1. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
+  {
+    RewritePatternSet patterns(getContext());
+    patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
+    TrackingListener listener(state);
+    GreedyRewriteConfig config;
+    LogicalResult result = applyPatternsAndFoldGreedily(
+        state.getTopLevel(), std::move(patterns), config, &listener);
+    LogicalResult listenerResult = listener.checkErrorState();
+    if (failed(result)) {
+      return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                       "greedy pattern application failed");
+    }
+    if (failed(listenerResult))
+      return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                       "listener tracking failed");
   }
-  if (failed(listenerResult))
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "listener tracking failed");
 
-  //   3. Run one-shot-bufferize, without the pass baggage.
+  //   2. Run one-shot-bufferize, without the pass baggage.
   OneShotBufferizationOptions options = getBufferizationOptions();
   options.allocationFn = allocationFn;
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = getTestAnalysisOnly();
   options.printConflicts = getPrintConflicts();
-  res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
+  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
     if (failed(runIREEOneShotBufferize(moduleOp, options)))
       return WalkResult::interrupt();
     return WalkResult::advance();
@@ -916,7 +935,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   if (res.wasInterrupted())
     return DiagnosedSilenceableFailure::definiteFailure();
 
-  //   4. Post-bufferization passes are fine.
+  //   3. Post-bufferization passes are fine.
   PassManager pm(getContext());
   addIREEPostBufferizationPasses(pm);
   res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
@@ -934,6 +953,31 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
 
   results.set(getOperation()->getOpResult(0), payload.front());
   return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// IREEEliminateEmptyTensorsOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::IREEEliminateEmptyTensorsOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  ArrayRef<Operation *> payloads = state.getPayloadOps(getTarget());
+  for (Operation *payload : payloads) {
+    if (failed(eliminateEmptyTensors(payload, getBufferizationOptions()))) {
+      getOperation()->emitError() << "failed to eliminate tensor.empty ops";
+      return DiagnosedSilenceableFailure::definiteFailure();
+    }
+  }
+  results.set(getOperation()->getOpResult(0), payloads);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::IREEEliminateEmptyTensorsOp::build(
+    OpBuilder &builder, OperationState &result, Value target) {
+  result.addOperands(target);
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes(pdl::OperationType::get(ctx));
 }
 
 //===---------------------------------------------------------------------===//

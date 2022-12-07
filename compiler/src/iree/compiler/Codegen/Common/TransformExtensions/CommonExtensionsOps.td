@@ -38,6 +38,10 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       down across Linalg ops.
       - canonicalization: adds all the canonicalization patterns of all
       registered dialects and ops.
+      - erase_unnecessary_tensor_operands: add patterns that erase unnecessary
+      tensor operands.
+      - fold_reassociative_reshapes: adds patterns that fold insert_slice/
+      extract_slice ops with reassociative reshape ops.
       - promote_foreach_thread_capture_to_shared: adds patterns that rewrite
       uses of values captured by scf.foreach_thread with the matching
       shared_outs bbarg. This checks that the values captured are
@@ -75,6 +79,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$additional_iree_patterns,
                        UnitAttr:$bubble_collapse_expand,
                        UnitAttr:$canonicalization,
+                       UnitAttr:$erase_unnecessary_tensor_operands,
+                       UnitAttr:$fold_reassociative_reshapes,
                        UnitAttr:$promote_foreach_thread_capture_to_shared,
                        UnitAttr:$rank_reducing,
                        UnitAttr:$expand_memref_strided_metadata,
@@ -87,7 +93,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
   let builders = [
     // TODO: Some bitvector to scale better than n-bools.
-    OpBuilder<(ins "Value":$target, "bool":$rankReducing)>
+    OpBuilder<(ins "Value":$target,
+                   "const ApplyPatternsOpPatterns &":$patterns)>
   ];
 
   let extraClassDeclaration = [{
@@ -110,8 +117,8 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     using the following attributes:
       - target_gpu: if set, GPU allocations are emitted.
 
-    Return modes:
-    =============
+    #### Return modes
+
     This operation calls the upstream one-shot bufferization pass with extra
     registered patterns for IREE.
 
@@ -121,7 +128,7 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     If any of the pass on any of the ModuleOp fails, the transformation
     definitely fails. Otherwise the transformation succeeds.
 
-    No handles are consumed or produced.
+    This transform consumes the target handle and produces a result handle.
   }];
 
   let arguments = (
@@ -137,6 +144,35 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
 
   let builders = [
     OpBuilder<(ins "Value":$target, CArg<"bool", "false">:$targetGpu)>
+  ];
+}
+
+def IREEEliminateEmptyTensorsOp : Op<
+    Transform_Dialect, "iree.eliminate_empty_tensors",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+  let description = [{
+    This is a pre-processing pass for iree.bufferize. It tries to remove
+    tensor.empty ops by replacing them with a suitable destination tensors,
+    which can reduce the number of allocations when bufferizing.
+
+    This transform is not part of iree.bufferize because additional
+    canonicalization are sometimes possible after eliminate_empty_tensors but
+    before iree.bufferize.
+
+    #### Return modes
+
+    This transform consumes the target handle and produces a result handle.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$result);
+  let assemblyFormat = "attr-dict $target";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
   ];
 }
 

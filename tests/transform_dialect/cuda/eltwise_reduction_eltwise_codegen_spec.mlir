@@ -71,13 +71,14 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================
-  %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
-  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_2
+  %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
+  %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op_2
+  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3
   transform.iree.erase_hal_descriptor_type_from_memref %memref_func
 
   // Step 6. Post-bufferization mapping to blocks and threads.
   // ===========================================================================
-  %func_4 = transform.structured.match ops{["func.func"]} in %variant_op_2
+  %func_4 = transform.structured.match ops{["func.func"]} in %variant_op_3
   %func_5 = transform.iree.foreach_thread_to_workgroup %func_4
   %func_6 = transform.iree.map_nested_foreach_thread_to_gpu_threads %func_5
       { workgroup_size = [32, 2, 1] }
@@ -85,10 +86,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 7. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================
   %func_7 = transform.iree.apply_patterns %func_6 { rank_reducing }
-  %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_2
+  %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3
   // Don't complain about unsupported if (threadIdx.x == 0 && threadIdx.y == 0)
   // at this point.
-  transform.sequence %variant_op_2 : !pdl.operation failures(suppress) {
+  transform.sequence %variant_op_3 : !pdl.operation failures(suppress) {
   ^bb0(%arg0: !pdl.operation):
     transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
   }

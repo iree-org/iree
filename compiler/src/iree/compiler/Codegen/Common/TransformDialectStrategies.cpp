@@ -52,9 +52,11 @@ using namespace mlir;
 
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
+using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ConfigExtractPart;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
+using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
     IREEEraseHALDescriptorTypeFromMemRefOp;
 using iree_compiler::IREE::transform_dialect::
@@ -213,13 +215,20 @@ iree_compiler::TileAndFuseAndDistributeResult mlir::iree_compiler::
 // TODO: configure patterns.
 Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b,
                                           Value funcH) {
-  funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
+  ApplyPatternsOpPatterns patterns;
+  patterns.rankReducing = true;
+  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
   return b.create<VectorizeOp>(funcH);
 }
 
 /// Bufferize and drop HAL descriptor from memref ops.
 Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
                                           Value variantH, bool targetGpu) {
+  Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  ApplyPatternsOpPatterns patterns;
+  patterns.foldReassociativeReshapes = true;
+  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+  variantH = b.create<IREEEliminateEmptyTensorsOp>(variantH);
   variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
   Value memrefFunc =
       b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
@@ -244,7 +253,9 @@ static constexpr unsigned kCudaWarpSize = 32;
 Value mlir::iree_compiler::buildDistributeVectors(ImplicitLocOpBuilder &b,
                                                   Value variantH, Value funcH,
                                                   int64_t warpSize) {
-  funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
+  ApplyPatternsOpPatterns patterns;
+  patterns.rankReducing = true;
+  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
   // Locally suppress failures for this op only because it doesn't cover the
   // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.
@@ -300,9 +311,9 @@ static ReductionSplitResult createExpansionBubbleUp(
   }
 
   auto funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  auto applyPatterns = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/false);
-  applyPatterns->setAttr(applyPatterns.getBubbleCollapseExpandAttrName(),
-                         b.getUnitAttr());
+  ApplyPatternsOpPatterns patterns;
+  patterns.bubbleCollapseExpand = true;
+  b.create<ApplyPatternsOp>(funcH, patterns);
   std::tie(result.originalFillH, result.splitFillH) =
       matchAndUnpack<2>(b, variantH, linalg::FillOp::getOperationName());
   if (hasTrailingEltwise) {
