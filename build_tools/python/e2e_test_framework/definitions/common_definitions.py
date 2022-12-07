@@ -55,17 +55,17 @@ class DeviceArchitecture(Enum):
 
 
 @dataclass(frozen=True)
-class PlatformInfo(object):
-  """Platform information of a host."""
+class HostEnvironmentInfo(object):
+  """Environment information of a host."""
   platform: str
   architecture: str
 
 
-class RuntimePlatform(Enum):
-  """Predefined host platform information."""
+class HostEnvironment(Enum):
+  """Predefined host environment."""
 
-  LINUX_X86_64 = PlatformInfo("linux", "x86_64")
-  ANDROID_ARM_64 = PlatformInfo("android", "arm_64")
+  LINUX_X86_64 = HostEnvironmentInfo("linux", "x86_64")
+  ANDROID_ARM_64 = HostEnvironmentInfo("android", "arm_64")
 
 
 class ModelSourceType(Enum):
@@ -93,11 +93,11 @@ class DeviceSpec(object):
   # Device vendor name. E.g., Pixel-6.
   vendor_name: str
 
-  # Host platform where the IREE runtime is running. For CPU device type, this
-  # is usually the same as the device that workloads are dispatched to. With
-  # a separate device, such as a GPU, however, the runtime and dispatched
+  # Host environment where the IREE runtime is running. For CPU device type,
+  # this is usually the same as the device that workloads are dispatched to.
+  # With a separate device, such as a GPU, however, the runtime and dispatched
   # workloads will run on different platforms.
-  host_platform: HostPlatform
+  host_environment: HostEnvironment
 
   # Architecture of the target device.
   architecture: DeviceArchitecture
