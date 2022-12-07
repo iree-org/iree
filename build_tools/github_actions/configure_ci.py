@@ -15,10 +15,11 @@ import fnmatch
 import os
 import subprocess
 import sys
-from typing import Iterable, Mapping, MutableMapping
+from typing import Iterable, Mapping, MutableMapping, Optional
 
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
+BENCHMARK_FILTER_KEY = "benchmark"
 
 # Note that these are fnmatch patterns, which are not the same as gitignore
 # patterns because they don't treat '/' specially. The standard library doesn't
@@ -59,7 +60,8 @@ def set_output(d: Mapping[str, str]):
   print(f"Setting outputs: {d}")
   step_output_file = os.environ["GITHUB_OUTPUT"]
   with open(step_output_file, "a") as f:
-    f.writelines(f"{k}={v}" "\n" for k, v in d.items())
+    f.writelines(f"{k}={v}"
+                 "\n" for k, v in d.items())
 
 
 def get_trailers() -> Mapping[str, str]:
@@ -136,6 +138,16 @@ def get_ci_stage(event_name):
   return 'presubmit' if event_name == 'pull_request' else 'postsubmit'
 
 
+def get_benchmark_filter(trailers: Mapping[str, str]) -> str:
+  benchmark_filter = trailers.get(BENCHMARK_FILTER_KEY)
+  if benchmark_filter is None:
+    return ""
+  print(
+      f"Using benchmark filter '{benchmark_filter}' from PR description trailers"
+  )
+  return benchmark_filter
+
+
 def main():
   output: MutableMapping[str, str] = {}
   trailers = get_trailers()
@@ -152,6 +164,7 @@ def main():
   if ci_stage == "postsubmit":
     write_caches = "1"
   output["write-caches"] = write_caches
+  output["benchmark-filter"] = get_benchmark_filter(trailers)
 
   set_output(output)
 
