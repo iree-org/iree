@@ -93,10 +93,10 @@ class DeviceSpec(object):
   # Device vendor name. E.g., Pixel-6.
   vendor_name: str
 
-  # Host platform that runs the runtime. For CPU device type, this is usually
-  # same as where the benchmarks/tests run. For GPU device type, this is where
-  # the tools/runtimes run on. The tools/runtimes then deploy the workload on
-  # the target GPUs.
+  # Host platform where the IREE runtime is running. For CPU device type, this
+  # is usually the same as the device that workloads are dispatched to. With
+  # a separate device, such as a GPU, however, the runtime and dispatched
+  # workloads will run on different platforms.
   host_platform: HostPlatform
 
   # Architecture of the target device.
