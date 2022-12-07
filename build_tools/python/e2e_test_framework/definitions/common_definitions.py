@@ -57,15 +57,15 @@ class DeviceArchitecture(Enum):
 @dataclass(frozen=True)
 class PlatformInfo(object):
   """Platform information of a host."""
-  os: str
+  platform: str
   architecture: str
 
 
-class HostPlatform(Enum):
+class RuntimePlatform(Enum):
   """Predefined host platform information."""
 
-  GENERIC_LINUX = PlatformInfo("linux", "x86_64")
-  GENERIC_ANDROID = PlatformInfo("android", "armv8.2-a")
+  LINUX_X86_64 = PlatformInfo("linux", "x86_64")
+  ANDROID_ARM_64 = PlatformInfo("android", "arm_64")
 
 
 class ModelSourceType(Enum):
