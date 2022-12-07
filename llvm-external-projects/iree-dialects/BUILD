@@ -418,6 +418,7 @@ cc_library(
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TransformUtils",
