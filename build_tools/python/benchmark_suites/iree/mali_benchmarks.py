@@ -56,6 +56,7 @@ class Android_Mali_Benchmarks(object):
       tflite_models.MOBILENET_V3SMALL,
   ]
   FP16_MODELS = [tflite_models.MOBILEBERT_FP16]
+  QUANT_MODELS = [tflite_models.MOBILEBERT_INT8]
 
   def generate(
       self
@@ -64,15 +65,18 @@ class Android_Mali_Benchmarks(object):
     default_gen_configs = self._get_module_generation_configs(
         compile_config=self.DEFAULT_COMPILE_CONFIG,
         fp32_models=self.FP32_MODELS,
-        fp16_models=self.FP16_MODELS)
+        fp16_models=self.FP16_MODELS,
+        quant_models=self.QUANT_MODELS)
     fuse_padding_gen_configs = self._get_module_generation_configs(
         compile_config=self.FUSE_PADDING_COMPILE_CONFIG,
         fp32_models=self.FP32_MODELS,
-        fp16_models=self.FP16_MODELS)
+        fp16_models=self.FP16_MODELS,
+        quant_models=self.QUANT_MODELS)
     fuse_padding_repeated_kernel_gen_configs = self._get_module_generation_configs(
         compile_config=self.FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG,
         fp32_models=self.FP32_MODELS,
-        fp16_models=self.FP16_MODELS)
+        fp16_models=self.FP16_MODELS,
+        quant_models=self.QUANT_MODELS)
 
     mali_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.MALI_VALHALL,
@@ -96,7 +100,8 @@ class Android_Mali_Benchmarks(object):
   def _get_module_generation_configs(
       self, compile_config: iree_definitions.CompileConfig,
       fp32_models: Sequence[common_definitions.Model],
-      fp16_models: Sequence[common_definitions.Model]
+      fp16_models: Sequence[common_definitions.Model],
+      quant_models: Sequence[common_definitions.Model]
   ) -> List[iree_definitions.ModuleGenerationConfig]:
     demote_compile_config = iree_definitions.CompileConfig(
         id=compile_config.id + "_demote_f32_to_16",
@@ -114,4 +119,9 @@ class Android_Mali_Benchmarks(object):
             compile_config=demote_compile_config,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in fp16_models
+    ] + [
+        iree_definitions.ModuleGenerationConfig(
+            compile_config=demote_compile_config,
+            imported_model=iree_definitions.ImportedModel.from_model(model))
+        for model in quant_models
     ]
