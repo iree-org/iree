@@ -306,7 +306,16 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
   SmallVector<Type> resultTypes;
   SmallVector<OpAsmParser::UnresolvedOperand> allOperands;
   std::unique_ptr<Region> bodyRegion = std::make_unique<Region>();
+  std::unique_ptr<Region> workloadCountRegion = std::make_unique<Region>();
   if (parser.parseOptionalAttrDict(result.attributes)) return failure();
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> workloadOperands;
+  SMLoc workloadOperandsLoc;
+  (void)workloadOperandsLoc;
+  if (succeeded(parser.parseOptionalLSquare())) {
+    workloadOperandsLoc = parser.getCurrentLocation();
+    if (parser.parseOperandList(workloadOperands)) return failure();
+    if (parser.parseRSquare()) return failure();
+  }
   if (succeeded(parser.parseOptionalArrow())) {
     ParseResult typeListResult =
         parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, [&]() {
@@ -326,7 +335,24 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
   }
   if (parser.parseRegion(*bodyRegion)) return failure();
   ensureTerminator(*bodyRegion, parser.getBuilder(), result.location);
+
+  if (parseDispatchWorkgroupsCountRegion(parser, *workloadCountRegion)) {
+    return failure();
+  }
+
   result.addRegion(std::move(bodyRegion));
+  result.addRegion(std::move(workloadCountRegion));
+  result.addAttribute("operand_segment_sizes",
+                      parser.getBuilder().getDenseI32ArrayAttr(
+                          {static_cast<int32_t>(allOperands.size()),
+                           static_cast<int32_t>(workloadOperands.size())}));
+
+  if (parser.resolveOperands(workloadOperands,
+                             parser.getBuilder().getIndexType(),
+                             workloadOperandsLoc, result.operands)) {
+    return failure();
+  }
+
   result.addTypes(resultTypes);
   if (parser.resolveOperands(allOperands, parser.getBuilder().getIndexType(),
                              result.operands))
@@ -335,7 +361,12 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
 }
 
 void DispatchRegionOp::print(OpAsmPrinter &p) {
-  p.printOptionalAttrDict((*this)->getAttrs());
+  SmallVector<StringRef, 1> elidedAttrs;
+  elidedAttrs.push_back("operand_segment_sizes");
+  p.printOptionalAttrDictWithKeyword((*this)->getAttrs(), elidedAttrs);
+  if (!getWorkload().empty()) {
+    p << "[" << getWorkload() << "]";
+  }
   p << " -> (";
   unsigned resultDimCounter = 0;
   for (const auto &it : llvm::enumerate(getResult().getTypes())) {
@@ -362,6 +393,8 @@ void DispatchRegionOp::print(OpAsmPrinter &p) {
   }
   p.printRegion(getBody(), /*printEntryBlockArgs=*/true,
                 /*printBlockTerminators=*/printTerminator);
+
+  printDispatchWorkgroupsCountRegion(p, *this, getWorkgroupCount());
 }
 
 ValueRange DispatchRegionOp::getResultDynamicDims(unsigned idx) {
@@ -408,7 +441,7 @@ bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
 
   // Create new region and move over the body.
   auto newRegionOp = rewriter.create<Flow::DispatchRegionOp>(
-      regionOp.getLoc(), resultTypes, dynamicDims);
+      regionOp.getLoc(), resultTypes, dynamicDims, regionOp.getWorkload());
   newRegionOp.getBody().takeBody(regionOp.getBody());
 
   // Update terminator.

@@ -79,8 +79,7 @@ static Optional<Value> findFirstTiedValueOutsideOfRegionOp(
 /// explicitly and makes them available inside the region via block arguments.
 FailureOr<Flow::DispatchWorkgroupsOp>
 rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
-    Flow::DispatchRegionOp regionOp, RewriterBase &rewriter,
-    Optional<WorkloadBuilder> workloadBuilder) {
+    Flow::DispatchRegionOp regionOp, RewriterBase &rewriter) {
   // Only ops with a single block are supported.
   Region &region = regionOp.getBody();
   if (!region.hasOneBlock()) return failure();
@@ -137,11 +136,9 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       arguments.append(dims.begin(), dims.end());
     }
   }
-  ValueRange workload;
-  if (workloadBuilder.has_value()) workload = workloadBuilder->workload;
   auto workgroupsOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
-      loc, workload, regionOp.getResultTypes(), regionOp.getResultDims(),
-      arguments, argumentDims, tiedArguments);
+      loc, regionOp.getWorkload(), regionOp.getResultTypes(),
+      regionOp.getResultDims(), arguments, argumentDims, tiedArguments);
   workgroupsOp->setDialectAttrs(regionOp->getDialectAttrs());
   BlockAndValueMapping bvm;
   bvm.map(arguments, workgroupsOp.getInputBlockArguments());
@@ -204,15 +201,11 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   rewriter.create<IREE::Flow::ReturnOp>(loc);
   rewriter.eraseOp(terminator);
 
-  // Create workload region.
-  if (workloadBuilder.has_value()) {
-    Region &workgroupCountRegion = workgroupsOp.getWorkgroupCount();
-    Block *body = rewriter.createBlock(&workgroupCountRegion);
-    SmallVector<BlockArgument> workloadArgs;
-    for (Value v : workload)
-      workloadArgs.push_back(body->addArgument(v.getType(), loc));
-    rewriter.setInsertionPointToStart(body);
-    workloadBuilder->regionBuilder(rewriter, loc, workloadArgs);
+  // Move DispatchRegion's workload_count region to DispatchWorkgroupOp's
+  if (!regionOp.getWorkgroupCount().empty()) {
+    rewriter.inlineRegionBefore(regionOp.getWorkgroupCount(),
+                                workgroupsOp.getWorkgroupCount(),
+                                workgroupsOp.getWorkgroupCount().begin());
   }
 
   rewriter.replaceOp(regionOp, workgroupsOp.getResults());

@@ -26,6 +26,7 @@ class FLOW_PureOp<string mnemonic, list<Trait> traits = []> :
 
 def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     Util_ShapeAwareOp,
+    AttrSizedOperandSegments,
     SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">]> {
   let summary = [{a group of ops}];
   let description = [{
@@ -38,11 +39,21 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     isolated from above. `dispatch.region` ops are a more lightweight
     abstraction for implementing fusion heuristics, i.e., the process of
     deciding which ops should form a dispatch region.
+
+    This op also has a second region: `workload_count`. The arguments to the 
+    region represent the workload for the dispatch, and returns the number of 
+    workgroups for the dispatch. The region is lowered directly to 
+    `workload_count` region of `dispatch.workgroups`.
   }];
 
-  let arguments = (ins FLOW_ShapeDynamicDims:$result_dims);
+  let arguments = (ins FLOW_ShapeDynamicDims:$result_dims, 
+                       Variadic<FLOW_Dim>:$workload);
+  
   let results = (outs Variadic<AnyType>:$result);
-  let regions = (region AnyRegion:$body);
+
+  let regions = (region AnyRegion:$body,
+                        AnyRegion:$workgroup_count);
+                        
   let hasCanonicalizer = 1;
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;

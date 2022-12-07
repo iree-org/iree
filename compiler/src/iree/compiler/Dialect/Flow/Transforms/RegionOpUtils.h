@@ -6,6 +6,7 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_
 
+#include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Support/LogicalResult.h"
@@ -36,9 +37,10 @@ FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResult(
     RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result,
     const SmallVector<Value> &dynamicDims);
 
-/// Create an empty DispatchRegionOp.
-Flow::DispatchRegionOp makeEmptyDispatchRegion(OpBuilder &builder,
-                                               Location loc);
+/// Create an DispatchRegionOp with workload
+Flow::DispatchRegionOp makeDispatchRegionWithWorkload(
+    OpBuilder &builder, Location loc,
+    Optional<ValueRange> workload = llvm::None);
 
 /// Clone a `target` op that is preceding the given dispatch region op into the
 /// dispatch region.
@@ -78,8 +80,9 @@ FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
     RewriterBase &rewriter, Operation *target, Flow::DispatchRegionOp regionOp);
 
 /// Wrap the given op in a new dispatch region op.
-FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
-                                                         Operation *op);
+FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(
+    RewriterBase &rewriter, Operation *op,
+    Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None);
 
 }  // namespace Flow
 }  // namespace IREE
