@@ -52,6 +52,7 @@ iree_cc_library(
     MLIRPass
     MLIRSCFDialect
     MLIRTensorDialect
+    MLIRTensorTransforms
     MLIRTransformDialect
     MLIRTransforms
     iree::compiler::Codegen::Common::CommonPasses

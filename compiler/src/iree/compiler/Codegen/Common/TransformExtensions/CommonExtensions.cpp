@@ -30,6 +30,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
@@ -876,6 +877,24 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     memCpyFn = gpuComprehensiveBufferizeCopyFn;
   }
 
+  //   0. Run enabling transformations.
+  {
+    RewritePatternSet patterns(getContext());
+    tensor::populateReassociativeReshapeFoldingPatterns(patterns);
+    TrackingListener listener(state);
+    GreedyRewriteConfig config;
+    LogicalResult result = applyPatternsAndFoldGreedily(
+        state.getTopLevel(), std::move(patterns), config, &listener);
+    LogicalResult listenerResult = listener.checkErrorState();
+    if (failed(result)) {
+      return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                       "greedy pattern application failed");
+    }
+    if (failed(listenerResult))
+      return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                       "listener tracking failed");
+  }
+
   //   1. Eliminate tensor.empty, without the pass baggage.
   WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
     if (failed(eliminateEmptyTensors(moduleOp.getOperation(),
@@ -887,20 +906,22 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     return DiagnosedSilenceableFailure::definiteFailure();
 
   //   2. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
-  RewritePatternSet patterns(getContext());
-  patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
-  TrackingListener listener(state);
-  GreedyRewriteConfig config;
-  LogicalResult result = applyPatternsAndFoldGreedily(
-      state.getTopLevel(), std::move(patterns), config, &listener);
-  LogicalResult listenerResult = listener.checkErrorState();
-  if (failed(result)) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "greedy pattern application failed");
+  {
+    RewritePatternSet patterns(getContext());
+    patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
+    TrackingListener listener(state);
+    GreedyRewriteConfig config;
+    LogicalResult result = applyPatternsAndFoldGreedily(
+        state.getTopLevel(), std::move(patterns), config, &listener);
+    LogicalResult listenerResult = listener.checkErrorState();
+    if (failed(result)) {
+      return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                       "greedy pattern application failed");
+    }
+    if (failed(listenerResult))
+      return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                       "listener tracking failed");
   }
-  if (failed(listenerResult))
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "listener tracking failed");
 
   //   3. Run one-shot-bufferize, without the pass baggage.
   OneShotBufferizationOptions options = getBufferizationOptions();
