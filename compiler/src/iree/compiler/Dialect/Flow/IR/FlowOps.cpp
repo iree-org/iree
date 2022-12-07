@@ -336,8 +336,9 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
   if (parser.parseRegion(*bodyRegion)) return failure();
   ensureTerminator(*bodyRegion, parser.getBuilder(), result.location);
 
-  if (parseDispatchWorkgroupsCountRegion(parser, *workloadCountRegion))
+  if (parseDispatchWorkgroupsCountRegion(parser, *workloadCountRegion)) {
     return failure();
+  }
 
   result.addRegion(std::move(bodyRegion));
   result.addRegion(std::move(workloadCountRegion));
@@ -348,8 +349,9 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
 
   if (parser.resolveOperands(workloadOperands,
                              parser.getBuilder().getIndexType(),
-                             workloadOperandsLoc, result.operands))
+                             workloadOperandsLoc, result.operands)) {
     return failure();
+  }
 
   result.addTypes(resultTypes);
   if (parser.resolveOperands(allOperands, parser.getBuilder().getIndexType(),

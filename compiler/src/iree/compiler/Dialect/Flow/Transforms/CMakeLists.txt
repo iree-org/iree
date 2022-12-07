@@ -25,7 +25,6 @@ iree_cc_library(
   HDRS
     "ConvertRegionToWorkgroups.h"
     "FormDispatchRegions.h"
-    "FormDispatchWorkgroups.h"
     "Passes.h"
     "Passes.h.inc"
     "RegionOpUtils.h"

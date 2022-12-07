@@ -69,7 +69,7 @@ def DetachElementwiseFromNamedOps :
 }
 
 def FormDispatchRegions :
-    InterfacePass<"iree-flow-form-dispatch-regions-pass", "mlir::FunctionOpInterface"> {
+    InterfacePass<"iree-flow-form-dispatch-regions", "mlir::FunctionOpInterface"> {
   let summary = "Form Dispatch Region Ops from Linalg operations on tensors to form dispatch.regions";
   let constructor = "mlir::iree_compiler::IREE::Flow::createFormDispatchRegionsPass()";
   let options = [
@@ -81,7 +81,7 @@ def FormDispatchRegions :
 }
 
 def FormDispatchWorkgroups :
-    InterfacePass<"iree-flow-form-dispatch-workgroups-pass", "mlir::FunctionOpInterface"> {
+    InterfacePass<"iree-flow-form-dispatch-workgroups", "mlir::FunctionOpInterface"> {
   let summary = "Form Dispatch Workgroup Ops from Dispatch Region Ops that contain Linalg on tensor ops by tiling and distribution.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createFormDispatchWorkgroupsPass()";
   let options = [

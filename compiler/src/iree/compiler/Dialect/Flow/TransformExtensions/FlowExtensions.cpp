@@ -842,8 +842,9 @@ transform_dialect::WrapInDispatchRegionOp::applyToOne(
   Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None;
   if (getGenerateWorkload()) {
     auto maybeBuilder = Flow::getWorkloadBuilder(rewriter, target);
-    if (failed(maybeBuilder))
+    if (failed(maybeBuilder)) {
       return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    }
     workloadBuilder = *maybeBuilder;
   }
   auto regionOp =

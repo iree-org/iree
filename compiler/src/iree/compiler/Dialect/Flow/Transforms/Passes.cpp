@@ -294,6 +294,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
         return createFormDispatchRegionsPass(clEnableAggressiveFusion,
                                              clDispatchGenerateWorkloadRegion);
       })
+      // Form dispatch region into dispatch workgroups
       .addPass([&]() {
         return createFormDispatchWorkgroupsPass(
             clDispatchGenerateWorkloadRegion);

@@ -1,4 +1,4 @@
-// Copyright 2020 The IREE Authors
+// Copyright 2022 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -53,10 +53,6 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
 
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
-
-using namespace mlir;
-using namespace mlir::iree_compiler;
-using namespace mlir::iree_compiler::IREE;
 
 namespace mlir {
 
@@ -745,8 +741,9 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
 
     // Simplify tensor::DimOps.
     SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-    if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps)))
+    if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
       return failure();
+    }
 
     // Create fusion group.
     Flow::DispatchRegionOp regionOp;
@@ -799,6 +796,7 @@ struct FormDispatchRegionsPass
   void runOnOperation() override;
 };
 }  // namespace
+
 /// Create dispatch.region Ops based on a fusion heuristic.
 void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();

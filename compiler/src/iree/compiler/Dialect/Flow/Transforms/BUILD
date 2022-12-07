@@ -70,7 +70,6 @@ iree_compiler_cc_library(
     hdrs = [
         "ConvertRegionToWorkgroups.h",
         "FormDispatchRegions.h",
-        "FormDispatchWorkgroups.h",
         "Passes.h",
         "Passes.h.inc",
         "RegionOpUtils.h",

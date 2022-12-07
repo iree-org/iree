@@ -1,10 +1,8 @@
-// Copyright 2020 The IREE Authors
+// Copyright 2022 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
-#include "iree/compiler/Dialect/Flow/Transforms/FormDispatchWorkgroups.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Patterns.h"
@@ -35,10 +33,6 @@
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-flow-form-dispatch-workgroups"
-
-using namespace mlir;
-using namespace mlir::iree_compiler;
-using namespace mlir::iree_compiler::IREE;
 
 namespace mlir {
 namespace iree_compiler {
@@ -92,7 +86,7 @@ static SmallVector<Operation *> getCloneableOps(
     visited.insert(outsideValue);
 
     Operation *definingOp = outsideValue.getDefiningOp();
-    if (!definingOp || !(isClonableIntoDispatchOp(definingOp)) ||
+    if (!definingOp || !isClonableIntoDispatchOp(definingOp) ||
         hasUnfusableUseInDispatch(outsideValue, regionOp)) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
@@ -112,10 +106,12 @@ static LogicalResult cloneProducers(RewriterBase &rewriter,
   (void)sortResult;
   assert(sortResult && "could not compute topological sorting");
 
-  for (Operation *producer : llvm::reverse(cloneableOps))
+  for (Operation *producer : llvm::reverse(cloneableOps)) {
     if (failed(
-            clonePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp)))
+            clonePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp))) {
       return failure();
+    }
+  }
 
   return success();
 }
@@ -124,7 +120,8 @@ static LogicalResult cloneProducers(RewriterBase &rewriter,
 // Dispatch workgroups formation
 //===----------------------------------------------------------------------===//
 
-/// Create Flow::DispatchWorkgroupsOps
+/// Traverses DispatchRegionOp in the function and rewrites them as
+/// DispatchWorkgroupsOp
 static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>>
 createDispatchWorkgroups(mlir::TensorDimTrackingRewriter &rewriter,
                          FunctionOpInterface funcOp,
@@ -138,8 +135,7 @@ createDispatchWorkgroups(mlir::TensorDimTrackingRewriter &rewriter,
   for (auto regionOp : regionOps) {
     if (failed(cloneProducers(rewriter, regionOp))) return failure();
     auto maybeWorkgroupOp =
-        Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(regionOp,
-                                                                rewriter);
+        rewriteFlowDispatchRegionToFlowDispatchWorkgroups(regionOp, rewriter);
     if (failed(maybeWorkgroupOp)) return failure();
     result.push_back(*maybeWorkgroupOp);
   }
@@ -153,7 +149,8 @@ static bool isInDispatchRegion(Operation *op) {
          op->getParentOfType<Flow::DispatchRegionOp>();
 }
 
-/// Wrap a single op in a DispatchWorkgroupsOp.
+/// Wrap a single op in a DispatchWorkgroupsOp. When generateWorkloadRegion is
+/// true, `workload_count` region is generated for dispatch.region
 static FailureOr<Flow::DispatchWorkgroupsOp> wrapInWorkgroupsOp(
     mlir::TensorDimTrackingRewriter &rewriter, Operation *op,
     bool generateWorkloadRegion) {
@@ -227,10 +224,11 @@ LogicalResult convertInsertSliceOps(
 
   // Rewrite InsertSliceOps to FlowUpdateOps.
   SmallVector<Operation *> remainingInsertSliceOps;
-  for (tensor::InsertSliceOp insertSliceOp : insertSliceOps)
-    if (failed(
-            Flow::convertInsertSliceOpToFlowUpdateOp(rewriter, insertSliceOp)))
+  for (tensor::InsertSliceOp insertSliceOp : insertSliceOps) {
+    if (failed(convertInsertSliceOpToFlowUpdateOp(rewriter, insertSliceOp))) {
       remainingInsertSliceOps.push_back(insertSliceOp);
+    }
+  }
 
   // Create a DispatchWorkgroupsOp for every remaining InsertSliceOp.
   FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
@@ -256,10 +254,11 @@ LogicalResult convertExtractSliceOps(
 
   // Rewrite ExtractSliceOps to FlowSliceOps.
   SmallVector<Operation *> remainingExtractSliceOps;
-  for (tensor::ExtractSliceOp extractSliceOp : extractSliceOps)
-    if (failed(
-            Flow::convertExtractSliceOpToFlowSliceOp(rewriter, extractSliceOp)))
+  for (tensor::ExtractSliceOp extractSliceOp : extractSliceOps) {
+    if (failed(convertExtractSliceOpToFlowSliceOp(rewriter, extractSliceOp))) {
       remainingExtractSliceOps.push_back(extractSliceOp);
+    }
+  }
 
   // Create a DispatchWorkgroupsOp for every remaining ExtractSliceOp.
   FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
