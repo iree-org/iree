@@ -96,27 +96,15 @@ auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
   return std::tuple_cat(a);
 }
 
+//===----------------------------------------------------------------------===//
+// Low-level reusable builder APIs, these should follow MLIR-style builders.
+//===----------------------------------------------------------------------===//
+
 /// Prints `handles` in order. Prints the whole IR if `handles` is empty.
 static void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {}) {
   if (handles.empty()) b.create<PrintOp>();
   for (auto h : handles) b.create<PrintOp>(h);
 }
-
-namespace {
-/// Options struct to control the behavior of TileFuseDist.
-struct TileFuseDistOpt {
-  /// Pass operations to control the bulk or iterative fusion behavior of the
-  /// fusion transform:
-  ///   - when true, pass the operations to fuse in bulk to the fusion
-  ///     transform which then performs an internal topological sort before
-  ///     fusing. This form does not allow interleaved canonicalizations and
-  ///     CSE to kick in.
-  ///   - when false, pass the operations one by one and fuse iteratively. This
-  ///     requires knowing the topological order of operations and allows
-  ///     interleaved canonicalizations and CSE to kick in.
-  bool batchFusion = true;
-};
-}  // namespace
 
 /// Performs the following transformations:
 ///   1. Tiles `rootH` to scf.foreach_thread to with `tileSizesOrNumThreads`
@@ -126,91 +114,67 @@ struct TileFuseDistOpt {
 ///   3. Iterates over `opsHToFuse` in order and fuses into the containing op.
 /// Returns a handle to the resulting scf.foreach_thread.
 ///
-/// Fusion is controlled by the BatchOrIterativeFusion templatetype:
-///   1. In batch mode, a single fusion command is issued and a topological sort
-///      is automatically computed by the fusion. Since this applies a single
-///      fusion, no interleaved canonicalization/cse/enabling occur and the
-///      resulting fusion may not be as good.
-///   2. In iterative mode, the user is responsible for providing the fusion
-///      order but interleaved canonicalization/cse/enabling occur which may
-///      result in better fusion results.
-///      TODO: Transform dialect op to apply topological sort and avoid the
-///      manual intervention.
+/// Fusion operates in batch mode: a single fusion command is issued and a
+/// topological sort is automatically computed by the fusion.
+/// Since this applies a single fusion, no interleaved canonicalization / cse /
+/// enabling transformation occurs and the resulting fusion may not be as good.
+///
+/// In the future, an iterative mode in which the user is responsible for
+/// providing the fusion order and has interleaved canonicalization / cse /
+/// enabling transform will be introduced and may result in better fusions.
+///
 /// If `resultingFusedOpsHandles` is a non-null pointer, the fused operation are
 /// appended in order.
 // TODO: apply forwarding pattern.
 template <typename TilingTransformOp, typename TileOrNumThreadSpec>
-static Value tileAndFuseAndDistributeImpl(
+static Value buildTileAndFuseAndDistributeImpl(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizesOrNumThreads, ArrayAttr threadDimMapping,
-    TileFuseDistOpt options, SmallVectorImpl<Value> *resultingFusedOpsHandles) {
+    SmallVectorImpl<Value> *resultingFusedOpsHandles) {
   auto tileToForeachOp = b.create<TilingTransformOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
   Value foreachThreadH = tileToForeachOp.getForeachThreadOp();
-  if (options.batchFusion) {
-    Value mergedOpsH =
-        b.create<MergeHandlesOp>(opsHToFuse, /*deduplicate=*/true);
-    b.create<FuseIntoContainingOp>(mergedOpsH, foreachThreadH);
-    assert(!resultingFusedOpsHandles && "Handle needs unpacking");
-  } else {
-    for (Value h : opsHToFuse) {
-      Value fusedH = b.create<FuseIntoContainingOp>(h, foreachThreadH);
-      if (resultingFusedOpsHandles) resultingFusedOpsHandles->push_back(fusedH);
-    }
-  }
+  // Batch fusion.
+  Value mergedOpsH = b.create<MergeHandlesOp>(opsHToFuse, /*deduplicate=*/true);
+  b.create<FuseIntoContainingOp>(mergedOpsH, foreachThreadH);
+  assert(!resultingFusedOpsHandles && "Handle needs unpacking");
   return foreachThreadH;
 }
 
-/// Call tileAndFuseAndDistributeImpl with ArrayRef<int64_t> tilesSizes.
+/// Call buildTileAndFuseAndDistributeImpl with ArrayRef<int64_t> tilesSizes.
 template <typename TilingTransformOp = TileToForeachThreadOp>
 static Value buildTileFuseDistWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<int64_t> tileSizes, ArrayAttr threadDimMapping,
-    TileFuseDistOpt options = TileFuseDistOpt(),
+    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
-  return tileAndFuseAndDistributeImpl<TilingTransformOp,
-                                      transform::TileSizesSpec>(
-      b, rootH, opsHToFuse, getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)),
-      threadDimMapping, options, resultingFusedOpsHandles);
+  return buildTileAndFuseAndDistributeImpl<TilingTransformOp,
+                                           transform::TileSizesSpec>(
+      b, rootH, opsHToFuse, tileSizes, threadDimMapping,
+      resultingFusedOpsHandles);
 }
 
-/// Call tileAndFuseAndDistributeImpl with a handle to multiple tilesSizes.
-template <typename TilingTransformOp = TileToForeachThreadOp>
-static Value buildTileFuseDistWithTileSizes(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    Value tileSizeHandle, ArrayAttr threadDimMapping,
-    TileFuseDistOpt options = TileFuseDistOpt(),
-    SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
-  return tileAndFuseAndDistributeImpl<TilingTransformOp,
-                                      transform::TileSizesSpec>(
-      b, rootH, opsHToFuse, ArrayRef<OpFoldResult>{tileSizeHandle},
-      threadDimMapping, options, resultingFusedOpsHandles);
-}
-
-/// Call tileAndFuseAndDistributeImpl with ArrayRef<int64_t> numThreads.
+/// Call buildTileAndFuseAndDistributeImpl with ArrayRef<int64_t> numThreads.
 template <typename TilingTransformOp = TileToForeachThreadOp>
 static Value buildTileFuseDistWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<int64_t> numThreads, ArrayAttr threadDimMapping,
-    TileFuseDistOpt options = TileFuseDistOpt(),
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
-  return tileAndFuseAndDistributeImpl<TilingTransformOp,
-                                      transform::NumThreadsSpec>(
+  return buildTileAndFuseAndDistributeImpl<TilingTransformOp,
+                                           transform::NumThreadsSpec>(
       b, rootH, opsHToFuse, getAsOpFoldResult(b.getI64ArrayAttr(numThreads)),
-      threadDimMapping, options, resultingFusedOpsHandles);
+      threadDimMapping, resultingFusedOpsHandles);
 }
 
-/// Call tileAndFuseAndDistributeImpl with a handle to multiple numThreads.
+/// Call buildTileAndFuseAndDistributeImpl with a handle to multiple numThreads.
 template <typename TilingTransformOp = TileToForeachThreadOp>
 static Value buildTileFuseDistWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     Value numThreads, ArrayAttr threadDimMapping,
-    TileFuseDistOpt options = TileFuseDistOpt(),
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
-  return tileAndFuseAndDistributeImpl<TilingTransformOp,
-                                      transform::NumThreadsSpec>(
+  return buildTileAndFuseAndDistributeImpl<TilingTransformOp,
+                                           transform::NumThreadsSpec>(
       b, rootH, opsHToFuse, ArrayRef<OpFoldResult>{numThreads},
-      threadDimMapping, options, resultingFusedOpsHandles);
+      threadDimMapping, resultingFusedOpsHandles);
 }
 
 /// Apply patterns and vectorize (for now always applies rank-reduction).
@@ -225,8 +189,8 @@ static Value buildVectorizeStrategy(ImplicitLocOpBuilder &b, Value funcH) {
 /// Post-bufferization mapping to blocks and threads.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-static Value mapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
-                                  ArrayRef<int64_t> blockSize) {
+static Value buildMapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
+                                       ArrayRef<int64_t> blockSize) {
   funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
   return b.create<MapNestedForeachThreadToGpuThreadsOp>(funcH, blockSize);
 }
@@ -236,8 +200,9 @@ static constexpr unsigned kCudaWarpSize = 32;
 /// Post-bufferization vector distribution with rank-reduction.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-static Value distributeVectors(ImplicitLocOpBuilder &b, Value variantH,
-                               Value funcH, int64_t warpSize = kCudaWarpSize) {
+static Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
+                                    Value funcH,
+                                    int64_t warpSize = kCudaWarpSize) {
   funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
   // Locally suppress failures for this op only because it doesn't cover the
@@ -254,6 +219,11 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value variantH,
   b.create<VectorWarpDistributionOp>(funcH);
   return funcH;
 }
+
+//===----------------------------------------------------------------------===//
+// Higher-level problem-specific strategy creation APIs, these should favor
+// user-friendliness.
+//===----------------------------------------------------------------------===//
 
 /// Various handles produced by reduction splitting.
 struct ReductionSplitResult {
@@ -278,7 +248,8 @@ struct ReductionSplitResult {
 /// Builds transform IR requesting to bubble up the "expand_shape" operation
 /// produced as parent of reduction splitting if necessary for fusion of the
 /// leading elementwise operation.
-static ReductionSplitResult buildExpansionBubbleUp(
+// TODO: consider passing a problem-specific struct to control information.
+static ReductionSplitResult createExpansionBubbleUp(
     ImplicitLocOpBuilder &b, Value variantH,
     SplitReductionOp splitReductionTransformOp, bool hasLeadingEltwise,
     bool hasTrailingEltwise) {
@@ -308,11 +279,11 @@ static ReductionSplitResult buildExpansionBubbleUp(
 }
 
 /// Distribute to blocks using the current IREE lowering config.
-template <typename TileSizesType>
-static Value buildReductionStrategyBlockDistributionPart(
+// TODO: consider passing a problem-specific struct to control information.
+static Value createReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
     Value reductionH, Value optionalFusionRootH,
-    TileSizesType tileSizes0Generic, bool hasLeadingEltwise = false,
+    ArrayRef<OpFoldResult> tileSizes0Generic, bool hasLeadingEltwise = false,
     bool hasTrailingEltwise = false) {
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
@@ -321,8 +292,8 @@ static Value buildReductionStrategyBlockDistributionPart(
                                  /*splitFactor=*/2,
                                  /*insertSplitDimension=*/1);
   ReductionSplitResult rs =
-      buildExpansionBubbleUp(b, variantH, splitReductionTransformOp,
-                             hasLeadingEltwise, hasTrailingEltwise);
+      createExpansionBubbleUp(b, variantH, splitReductionTransformOp,
+                              hasLeadingEltwise, hasTrailingEltwise);
 
   // TODO: IREE needs own workgroup mapping attribute.
   // TODO: num of GPU block mapping attr is statically known here which is
@@ -364,7 +335,8 @@ static Value buildReductionStrategyBlockDistributionPart(
   return variantH;
 }
 
-static Value buildReductionStrategyThreadDistributionPart(
+// TODO: consider passing a problem-specific struct to control information.
+static Value createReductionStrategyThreadDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, ArrayRef<int64_t> tileSizes1Fill,
     ArrayRef<int64_t> tileSizes1Generic, bool hasLeadingEltwise,
     bool hasTrailingEltwise) {
@@ -391,12 +363,12 @@ static Value buildReductionStrategyThreadDistributionPart(
   buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/secondFusionRootH,
                    /*opsHToFuse=*/secondFusionGroupHs,
-                   /*tileSizes=*/tileSizes1Fill,
+                   /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr(tileSizes1Fill)),
                    /*threadDimMapping=*/b.getArrayAttr({z}));
   buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/firstFusionRootH,
                    /*opsHToFuse=*/firstFusionGroupHs,
-                   /*tileSizes=*/tileSizes1Generic,
+                   /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr(tileSizes1Generic)),
                    /*threadDimMapping=*/b.getArrayAttr({z,y}));
   // clang-format on
   return variantH;
@@ -416,9 +388,12 @@ struct GPUReductionStrategyInfos {
 /// reduction operation and the fusion root. The leading elementwise and the
 /// fusion root may be null. If the fusion root is null, the reduction operation
 /// should be used as fusion root instead.
-static std::tuple<Value, Value, Value> reductionBlockDistributionHandles(
-    ImplicitLocOpBuilder &b, Value variantH, bool hasLeadingEltwise,
-    bool hasTrailingEltwise) {
+// TODO: consider passing a problem-specific struct to control information.
+static std::tuple<Value, Value, Value>
+createMatchReductionBlockDistributionHandles(ImplicitLocOpBuilder &b,
+                                             Value variantH,
+                                             bool hasLeadingEltwise,
+                                             bool hasTrailingEltwise) {
   Value originalGenericH =
       b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
   auto op = b.create<SplitHandlesOp>(
@@ -431,22 +406,25 @@ static std::tuple<Value, Value, Value> reductionBlockDistributionHandles(
 
 // TODO: generalize and automate over and over.
 // TODO: significantly shrink this down.
-static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
-                                       const GPUReductionStrategyInfos &infos) {
+// TODO: consider passing a problem-specific struct to control information.
+static void createReductionCudaStrategy(
+    ImplicitLocOpBuilder &b, Value variantH,
+    const GPUReductionStrategyInfos &infos) {
   // Step 0. Match the ops.
   Value originalFillH =
       b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
-  auto [leadingH, reductionH, fusionRootH] = reductionBlockDistributionHandles(
-      b, variantH, infos.hasLeadingEltwise, infos.hasTrailingEltwise);
+  auto [leadingH, reductionH, fusionRootH] =
+      createMatchReductionBlockDistributionHandles(
+          b, variantH, infos.hasLeadingEltwise, infos.hasTrailingEltwise);
 
   // Step 1: Distribute to blocks using the current IREE lowering config.
-  variantH = buildReductionStrategyBlockDistributionPart(
+  variantH = createReductionStrategyBlockDistributionPart(
       b, variantH, originalFillH, reductionH, fusionRootH,
-      infos.workgroupTileSizes, infos.hasLeadingEltwise,
-      infos.hasTrailingEltwise);
+      getAsOpFoldResult(b.getI64ArrayAttr(infos.workgroupTileSizes)),
+      infos.hasLeadingEltwise, infos.hasTrailingEltwise);
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
-  variantH = buildReductionStrategyThreadDistributionPart(
+  variantH = createReductionStrategyThreadDistributionPart(
       b, variantH, infos.fillSecondTileSizes, infos.genericSecondTileSizes,
       infos.hasLeadingEltwise, infos.hasTrailingEltwise);
 
@@ -465,12 +443,13 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b, Value variantH,
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = mapToBlockAndThreads(b, funcH, infos.workgroupSize);
+  funcH = buildMapToBlockAndThreads(b, funcH, infos.workgroupSize);
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
-  distributeVectors(b, variantH, funcH);
+  buildDistributeVectors(b, variantH, funcH);
 }
 
+// TODO: consider passing a problem-specific struct to control information.
 static bool matchGPUReduction(linalg::LinalgOp op,
                               GPUReductionStrategyInfos &info) {
   // TODO: match the sequence the strategy supports.
@@ -548,7 +527,7 @@ static void createTransformRegion(func::FuncOp entryPoint,
 
 // TODO: generalize and automate over and over.
 // TODO: significantly shrink this down.
-static LogicalResult buildReductionCpuStrategy(
+static LogicalResult createReductionCpuStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const CPUReductionStrategyInfos &info) {
   // Step 0. Fetch transform information from the config and materialize it in
@@ -561,8 +540,9 @@ static LogicalResult buildReductionCpuStrategy(
       b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
 
   // Step 1: Distribute to blocks using the current IREE lowering config.
-  variantH = buildReductionStrategyBlockDistributionPart(
-      b, variantH, originalFillH, originalGenericH, Value(), info.tileSizes);
+  variantH = createReductionStrategyBlockDistributionPart(
+      b, variantH, originalFillH, originalGenericH, Value(),
+      getAsOpFoldResult(b.getI64ArrayAttr(info.tileSizes)));
 
   // Step 2. Rank-reduce and buildVectorizeStrategy.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
@@ -590,7 +570,7 @@ LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
   GPUReductionStrategyInfos infos;
   if (!matchGPUReduction(op, infos)) return failure();
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    return buildReductionCudaStrategy(b, variant, infos);
+    return createReductionCudaStrategy(b, variant, infos);
   };
   // 2. Add the strategy.
   createTransformRegion(entryPoint, strategyBuilder);
@@ -603,7 +583,7 @@ LogicalResult matchAndSetCPUReductionTransformStrategy(func::FuncOp entryPoint,
   CPUReductionStrategyInfos infos;
   if (!matchCPUReduction(op, infos)) return failure();
   auto startegyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    return buildReductionCpuStrategy(b, variant, infos);
+    return createReductionCpuStrategy(b, variant, infos);
   };
   // 2. Add the strategy.
   createTransformRegion(entryPoint, startegyBuilder);
