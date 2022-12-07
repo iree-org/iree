@@ -14,8 +14,7 @@ not.
 import fnmatch
 import os
 import subprocess
-import sys
-from typing import Iterable, Mapping, MutableMapping, Optional
+from typing import Iterable, Mapping, MutableMapping
 
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
@@ -51,6 +50,8 @@ SKIP_PATH_PATTERNS = [
 RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
+BENCHMARK_FILTER_OPTIONS = ["all", "linux-x86_64", "linux-cuda"]
+
 
 def skip_path(path: str) -> bool:
   return any(fnmatch.fnmatch(path, pattern) for pattern in SKIP_PATH_PATTERNS)
@@ -60,8 +61,7 @@ def set_output(d: Mapping[str, str]):
   print(f"Setting outputs: {d}")
   step_output_file = os.environ["GITHUB_OUTPUT"]
   with open(step_output_file, "a") as f:
-    f.writelines(f"{k}={v}"
-                 "\n" for k, v in d.items())
+    f.writelines(f"{k}={v}" "\n" for k, v in d.items())
 
 
 def get_trailers() -> Mapping[str, str]:
@@ -139,13 +139,21 @@ def get_ci_stage(event_name):
 
 
 def get_benchmark_filter(trailers: Mapping[str, str]) -> str:
-  benchmark_filter = trailers.get(BENCHMARK_FILTER_KEY)
-  if benchmark_filter is None:
+  trailer = trailers.get(BENCHMARK_FILTER_KEY)
+  if trailer is None:
     return ""
-  print(
-      f"Using benchmark filter '{benchmark_filter}' from PR description trailers"
-  )
-  return benchmark_filter
+  print(f"Using benchmark filter '{trailer}' from PR description trailers")
+
+  filter_options = [option.strip() for option in trailer.split(",")]
+  for filter_option in filter_options:
+    if filter_option not in BENCHMARK_FILTER_OPTIONS:
+      raise ValueError(f"Unknown benchmark filter option: '{filter_option}'.")
+
+  if "all" in filter_options:
+    filter_options = list(BENCHMARK_FILTER_OPTIONS)
+    filter_options.remove("all")
+
+  return ",".join(filter_options)
 
 
 def main():
