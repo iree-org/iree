@@ -797,7 +797,7 @@ jobs:
       HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}
+      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
       IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
     steps:
       - name: "Checking out repository"
@@ -894,6 +894,7 @@ jobs:
       HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
       E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
     steps:
@@ -921,13 +922,13 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
             --env "IREE_TARGET_ARCH=${ARCH}" \
-            --env "IREE_TARGET_BUILD_DIR=build-${PLATFORM}" \
             --env "BUILD_PRESET=benchmark-suite-test" \
             --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
             --env "E2E_TEST_ARTIFACTS_DIR=${E2E_TEST_ARTIFACTS_DIR}" \
             "${DOCKER_IMAGE}" \
             bash -euo pipefail -c \
-              "${RUN_SCRIPTS}"
+              "${RUN_SCRIPTS}" \
+              "${TARGET_BUILD_DIR}"
 
   ##############################################################################
 

@@ -15,7 +15,7 @@
 # root of the IREE repository.
 set -xeuo pipefail
 
-BUILD_DIR="${IREE_TARGET_BUILD_DIR:-build-benchmark-suites-test}"
+BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-benchmark-suites-test}}"
 E2E_TEST_ARTIFACTS_DIR="$(realpath ${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts})"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 
