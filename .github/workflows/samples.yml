@@ -10,12 +10,10 @@ name: samples
 
 on:
   schedule:
-    - cron: '0 13 * * *'
+    - cron: "0 13 * * *"
   workflow_dispatch:
   # DO NOT SUBMIT: Turn off presubmit build
   pull_request:
-
-
 
 jobs:
   colab:
