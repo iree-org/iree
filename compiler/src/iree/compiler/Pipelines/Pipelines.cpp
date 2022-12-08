@@ -168,8 +168,7 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
 
   buildIREEVMTransformPassPipeline(
       BindingOptions::FromFlags::get(), InputDialectOptions::FromFlags::get(),
-      highLevelOptimizations,
-      SchedulingOptions::FromFlags::get(),
+      highLevelOptimizations, SchedulingOptions::FromFlags::get(),
       IREE::HAL::TargetOptions::FromFlags::get(),
       IREE::VM::TargetOptions::FromFlags::get(), defaultHooks, passManager);
 }
