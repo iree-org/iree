@@ -202,7 +202,7 @@ jobs:
         id: upload-release-assets
         uses: dwenegar/upload-release-assets@5bc3024cf83521df8ebfadf00ad0c4614fd59148 # v1
         env:
-          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
         with:
           release_id: ${{ github.event.inputs.release_id }}
           # Only upload iree artifacts.
@@ -218,6 +218,6 @@ jobs:
         uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7 # v1
         with:
           workflow: Validate and Publish Release
-          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          token: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
           ref: "${{ env.tag_name }}"
           inputs: '{"release_id": "${{ github.event.inputs.release_id }}", "package_version": "${{ github.event.inputs.package_version }}", "build_run_id": "${{ github.run_id }}"}'
