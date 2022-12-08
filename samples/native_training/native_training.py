@@ -8,7 +8,6 @@ import argparse
 import os
 
 import functorch
-from functorch._src.compile_utils import strip_overloads
 import iree_torch
 import torch
 import torch_mlir
@@ -84,10 +83,6 @@ def main():
 
   train_args = (w, b, X_test, y_test)
   graph = functorch.make_fx(train)(*train_args)
-
-  # TODO: Remove once https://github.com/llvm/torch-mlir/issues/1495
-  # is resolved.
-  strip_overloads(graph)
 
   mlir = torch_mlir.compile(graph,
                             train_args,
