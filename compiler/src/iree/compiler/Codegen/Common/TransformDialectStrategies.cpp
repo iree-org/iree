@@ -10,8 +10,8 @@
 #include <type_traits>
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
-#include "iree/compiler/Codegen/Common/TransformExtensions/TransformMatchers.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -53,20 +53,14 @@ namespace iree_compiler {
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 // TODO: significantly better namespacing.
-using iree_compiler::IREE::transform_dialect::AllDims;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ConfigExtractPart;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::
     IREEEraseHALDescriptorTypeFromMemRefOp;
-using iree_compiler::IREE::transform_dialect::IsPermutation;
-using iree_compiler::IREE::transform_dialect::m_StructuredOp;
 using iree_compiler::IREE::transform_dialect::
     MapNestedForeachThreadToGpuThreadsOp;
-using iree_compiler::IREE::transform_dialect::NumEqualsTo;
-using iree_compiler::IREE::transform_dialect::ShapeKind;
-using iree_compiler::IREE::transform_dialect::StructuredOpMatcher;
 using iree_compiler::IREE::transform_dialect::
     TileToForeachThreadAndWorkgroupCountRegionOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
@@ -80,6 +74,12 @@ using transform::SplitHandlesOp;
 using transform::SplitReductionOp;
 using transform::TileToForeachThreadOp;
 using transform::VectorizeOp;
+using transform_ext::AllDims;
+using transform_ext::IsPermutation;
+using transform_ext::m_StructuredOp;
+using transform_ext::NumEqualsTo;
+using transform_ext::ShapeKind;
+using transform_ext::StructuredOpMatcher;
 
 /// Matches `args` within `targetH` and unpacks a number of handles `N`.
 /// Assumes there are exactly `N` matched ops (but could be relaxed).
