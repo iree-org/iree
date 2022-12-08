@@ -497,7 +497,7 @@ endif()
 # advice.
 #-------------------------------------------------------------------------------
 
-set(IREE_CUDA_LIBDEVICE_PATH "" CACHE STRING "Absolute path to an appropriate libdevice.*.bc (needed to build the IREE cuda compiler target)")
+set(IREE_CUDA_LIBDEVICE_PATH "" CACHE FILEPATH "Absolute path to an appropriate libdevice.*.bc (needed to build the IREE cuda compiler target)")
 
 # If any CUDA features are being built, try to locate a CUDA SDK. We will fall
 # back to this as needed for specific features.
@@ -512,7 +512,7 @@ if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
       # files.
       set(CUDAToolkit_ROOT "$ENV{IREE_CUDA_DEPS_DIR}")
       message(STATUS "CUDA SDK not found by CMake but using IREE_CUDA_DEPS = ${CUDAToolkit_ROOT}")
-    else()
+    elseif((NOT EXISTS "${IREE_CUDA_LIBDEVICE_PATH}") OR IREE_HAL_DRIVER_CUDA)
       # If we haven't found CUDA deps, download at least enough to build for CUDA.
       # This will define IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH & IREE_CUDA_DOWNLOAD_INCLUDE_PATH
       # vars with the target deps.
@@ -525,7 +525,7 @@ endif()
 # If an explicit libdevice file was not specified, and the compiler backend
 # is being built, probe for one.
 if(IREE_TARGET_BACKEND_CUDA)
-  if(IREE_CUDA_LIBDEVICE_PATH)
+  if(EXISTS "${IREE_CUDA_LIBDEVICE_PATH}")
     # Explicitly provided: do nothing.
   elseif(CUDAToolkit_FOUND AND CUDAToolkit_LIBRARY_ROOT)
     # Note that the variable CUDAToolkit_LIBRARY_ROOT keys off of the presence
