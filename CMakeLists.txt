@@ -850,14 +850,13 @@ endif()
 if(IREE_BUILD_PYTHON_BINDINGS)
   # Write out a .env file to make IDEs and developers happy.
   # Yes, we are writing this to the source dir. It is only for IDEs and if
-  # it gets clobbered, it is fine.
+  # it gets clobbered, it is fine (it is also ignored in .gitignore).
   set(_PYTHONPATH_ENV "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
-  file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env"
-    CONTENT "${_PYTHONPATH_ENV}"
-  )
-  file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env"
-    CONTENT "${_PYTHONPATH_ENV}"
-  )
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env" CONTENT "${_PYTHONPATH_ENV}")
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env" CONTENT "${_PYTHONPATH_ENV}")
+  # Similarly, write out .env.bat for Windows.
+  set(_PYTHONPATH_ENV_BAT "set PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env.bat" CONTENT "${_PYTHONPATH_ENV_BAT}")
 endif()
 
 if(IREE_BUILD_BINDINGS_TFLITE)

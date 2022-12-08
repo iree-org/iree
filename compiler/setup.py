@@ -234,6 +234,7 @@ def prepare_installation():
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
         get_env_cmake_option("IREE_TARGET_BACKEND_CUDA"),
+        # TODO(scotttodd): include IREE_TARGET_BACKEND_WEBGPU here (and in env)
         get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
     ]
 
@@ -383,9 +384,11 @@ setup(
     classifiers=[
         "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: Apache Software License",
+        "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     ext_modules=[
         CMakeExtension("iree.compiler._mlir_libs._mlir"),
