@@ -251,7 +251,6 @@ struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
     });
     // Remove potential empty module after cleanup.
     getOperation()->walk([&](ModuleOp module) {
-      module->dump();
       if (module.getBodyRegion().hasOneBlock() && module.getBody()->empty()) {
         module->erase();
         return WalkResult::skip();
