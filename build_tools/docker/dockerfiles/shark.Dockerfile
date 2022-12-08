@@ -6,7 +6,8 @@
 
 # An image for running SHARK tank: https://github.com/nod-ai/SHARK.
 
-FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73fb3
+# Ubuntu 22.04
+FROM ubuntu@sha256:4b1d0c4a2d2aaf63b37111f34eb9fa89fa1bf53dd6e4ca954d47caebca4005c2
 
 SHELL ["/bin/bash", "-e", "-u", "-o", "pipefail", "-c"]
 
@@ -29,22 +30,39 @@ WORKDIR /
 ######## Python ########
 WORKDIR /install-python
 
-RUN apt-get update \
-  && apt-get install -y software-properties-common \
-  && add-apt-repository -y ppa:deadsnakes/ppa \
-  && apt-get update \
-  && apt-get install -y \
-    python3.10 \
-    python3.10-dev \
-  && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 \
-  && apt-get install -y \
-    python3-pip \
-    python3-setuptools \
-    python3-distutils \
-    python3-venv \
-    python3.10-venv
+ARG PYTHON_VERSION=3.10
+
+COPY runtime/bindings/python/iree/runtime/build_requirements.txt build_tools/docker/context/install_python_deps.sh ./
+RUN ./install_python_deps.sh "${PYTHON_VERSION}" \
+  && rm -rf /install-python
+WORKDIR /
 
 ENV PYTHON_BIN /usr/bin/python3
+##############
+
+######## Cuda ########
+WORKDIR /install-cuda
+
+# We need CUDA Toolkit and CuDNN in order to run the Tensorflow XLA baselines.
+ARG NVIDIA_TOOLKIT_DEB="cuda-repo-ubuntu2204-11-7-local_11.7.0-515.43.04-1_amd64.deb"
+ARG NVIDIA_CUDNN_DEB="cudnn-local-repo-ubuntu2204-8.7.0.84_1.0-1_amd64.deb"
+
+RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_TOOLKIT_DEB}"
+RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_CUDNN_DEB}"
+
+# Install CUDA Toolkit. Instructions from https://developer.nvidia.com/cuda-downloads.
+RUN dpkg -i "${NVIDIA_TOOLKIT_DEB}" \
+  && cp /var/cuda-repo-ubuntu2204-11-7-local/cuda-46B62B5F-keyring.gpg /usr/share/keyrings/ \
+  && apt-get update \
+  && apt-get -y install cuda-toolkit-11.7
+
+# Install CuDNN. Instructions from https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html.
+RUN dpkg -i "${NVIDIA_CUDNN_DEB}" \
+  && cp /var/cudnn-local-repo-ubuntu2204-8.7.0.84/cudnn-local-BF23AD8A-keyring.gpg /usr/share/keyrings/ \
+  && apt-get update \
+  && apt-get -y install libcudnn8 \
+  && apt-get -y install libcudnn8-dev \
+  && rm -rf /install-cuda
 
 WORKDIR /
 ##############
@@ -63,13 +81,5 @@ RUN wget -q \
 WORKDIR /
 
 ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
-
 ENV PATH="${VULKAN_SDK}/bin:$PATH"
-
-# Symlink the Vulkan loader to a system library directory. This is needed to
-# allow Vulkan applications to find the Vulkan loader. It also avoids using
-# LD_LIBRARY_PATH, which is not supported well by Docker.
-RUN ln -s "${VULKAN_SDK}/lib/libvulkan.so" /usr/lib/x86_64-linux-gnu/ \
-  && ln -s "${VULKAN_SDK}/lib/libvulkan.so.1" /usr/lib/x86_64-linux-gnu/
-
 ############## \
