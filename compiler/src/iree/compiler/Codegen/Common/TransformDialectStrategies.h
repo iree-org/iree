@@ -40,6 +40,7 @@ static void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 /// If `resultingFusedOpsHandles` is a non-null pointer, the fused operation are
 /// appended in order.
 ///
+// TODO: if someone knows how to properly export templates go for it .. sigh.
 Value buildTileFuseDistToForeachThreadWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
@@ -62,7 +63,12 @@ Value buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
 /// Apply patterns and vectorize (for now always applies rank-reduction).
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-Value buildVectorizeStrategy(ImplicitLocOpBuilder &b, Value funcH);
+Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH);
+
+/// Bufferize and drop HAL decriptor from memref ops.
+/// Takes a handle variantOp and returns a handle to the same variant op.
+Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH,
+                     bool targetGpu = false);
 
 /// Post-bufferization mapping to blocks and threads.
 /// Takes a handle to a func.func and returns an updated handle to a

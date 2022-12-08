@@ -195,13 +195,10 @@ static void createReductionCudaStrategy(
   // Step 3. Rank-reduce and vectorize.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = iree_compiler::buildVectorizeStrategy(b, funcH);
+  funcH = iree_compiler::buildVectorize(b, funcH);
 
-  // Step 4. Bufferize and drop HAL decriptor from memref ops.
-  variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
-  Value memrefFunc =
-      b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  b.create<IREEEraseHALDescriptorTypeFromMemRefOp>(memrefFunc);
+  // Step 4. Bufferize and drop HAL descriptor from memref ops.
+  variantH = iree_compiler::buildBufferize(b, variantH, /*targetGpu=*/true);
 
   // Step 5. Post-bufferization mapping to blocks and threads.
   // Need to match again since bufferize invalidated all handles.

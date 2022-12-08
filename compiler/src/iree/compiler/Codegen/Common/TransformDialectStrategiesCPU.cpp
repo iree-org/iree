@@ -147,16 +147,13 @@ static LogicalResult createReductionCpuStrategy(
       b, variantH, originalFillH, originalGenericH, Value(),
       getAsOpFoldResult(b.getI64ArrayAttr(info.tileSizes)));
 
-  // Step 2. Rank-reduce and buildVectorizeStrategy.
+  // Step 2. Rank-reduce and buildVectorize.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = iree_compiler::buildVectorizeStrategy(b, funcH);
+  funcH = iree_compiler::buildVectorize(b, funcH);
 
-  // Step 3. Bufferize and drop HAL decriptor from memref ops.
-  variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
-  Value memrefFunc =
-      b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  b.create<IREEEraseHALDescriptorTypeFromMemRefOp>(memrefFunc);
+  // Step 3. Bufferize and drop HAL descriptor from memref ops.
+  variantH = iree_compiler::buildBufferize(b, variantH, /*targetGpu=*/true);
 
   // Step 4. Post-bufferization mapping to blocks only.
   // Need to match again since bufferize invalidated all handles.

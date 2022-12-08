@@ -207,10 +207,20 @@ Value mlir::iree_compiler::
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 // TODO: configure patterns.
-Value mlir::iree_compiler::buildVectorizeStrategy(ImplicitLocOpBuilder &b,
-                                                  Value funcH) {
+Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b,
+                                          Value funcH) {
   funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
   return b.create<VectorizeOp>(funcH);
+}
+
+/// Bufferize and drop HAL descriptor from memref ops.
+Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
+                                          Value variantH, bool targetGpu) {
+  variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
+  Value memrefFunc =
+      b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  b.create<IREEEraseHALDescriptorTypeFromMemRefOp>(memrefFunc);
+  return variantH;
 }
 
 /// Post-bufferization mapping to blocks and threads.
