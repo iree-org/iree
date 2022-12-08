@@ -49,6 +49,10 @@ class ReifyWinogradInputTransform final
 public:
   using OpRewritePattern::OpRewritePattern;
 
+  /// The input to this op is either (N, H, W, C) or (N, C, H, W)
+  /// but the output to this op is always (T, T, N, H', W', C).
+  /// Since the first two dimensions are used for the inner matrix
+  /// multiplication, we create the loop nest over (N, H', W', C).
   LogicalResult matchAndRewrite(WinogradInputTransformOp inputOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = inputOp.getLoc();
@@ -82,9 +86,13 @@ public:
     Value output = inputOp.output();
     auto outputType = output.getType().cast<ShapedType>();
     auto inputType = input.getType().cast<ShapedType>();
-    ArrayRef<int64_t> inputShape = inputType.getShape();
+    SmallVector<int64_t> inputShape(inputType.getShape());
+    const bool isNchw = inputOp.isNchw();
+    if (isNchw) {
+      permute<Permutation::NCHW_TO_NHWC>(inputShape);
+    }
     Type elementType = outputType.getElementType();
-    SmallVector<int64_t> imageDims = inputOp.imageDimensions();
+    SmallVector<int64_t> imageDims = inputOp.nhwcImageDimensions();
     const size_t numImageDims = imageDims.size();
     llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
                                                   imageDims.end());
@@ -141,17 +149,23 @@ public:
     rewriter.setInsertionPointToStart(loopNest.loops.back().getBody());
     auto tensorType = RankedTensorType::get(
         SmallVector<int64_t>(numImageDims, ShapedType::kDynamic), elementType);
+    if (isNchw) {
+      permute<Permutation::NHWC_TO_NCHW>(offsets);
+      permute<Permutation::NHWC_TO_NCHW>(sizes);
+    }
     Value dynamicSlice = rewriter.create<tensor::ExtractSliceOp>(
         loc, tensorType, input, offsets, sizes, strides);
 
     // Copy input slice into zeroed padded scratch space
     strides = SmallVector<OpFoldResult>(numImageDims, one);
     offsets = SmallVector<OpFoldResult>(numImageDims, zero);
-    sizes = SmallVector<OpFoldResult>{sizes[1], sizes[2]};
+    SmallVector<OpFoldResult> sliceSizes;
+    for (const int64_t dim : inputOp.imageDimensions())
+      sliceSizes.push_back(sizes[dim]);
     linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
         loc, ValueRange{zeroF32}, ValueRange{scratch});
     Value inputSlice = rewriter.create<tensor::InsertSliceOp>(
-        loc, dynamicSlice, fillOp.result(), offsets, sizes, strides);
+        loc, dynamicSlice, fillOp.result(), offsets, sliceSizes, strides);
 
     // Extract output slice
     strides = SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
@@ -205,6 +219,8 @@ class ReifyWinogradOutputTransform final
 public:
   using OpRewritePattern::OpRewritePattern;
 
+  /// The input to this op is always (T, T, N, H', W', C)
+  /// but the output is either (N, H, W, C) or (N, C, H, W).
   LogicalResult matchAndRewrite(WinogradOutputTransformOp outputOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = outputOp.getLoc();
@@ -239,7 +255,7 @@ public:
     auto outputType = output.getType().cast<ShapedType>();
     ArrayRef<int64_t> outputShape = outputType.getShape();
     Type elementType = outputType.getElementType();
-    SmallVector<int64_t> imageDims = outputOp.imageDimensions();
+    SmallVector<int64_t> imageDims = outputOp.nhwcImageDimensions();
     const size_t numImageDims = imageDims.size();
     llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
                                                   imageDims.end());
@@ -305,6 +321,10 @@ public:
     tensorType = RankedTensorType::get(
         SmallVector<int64_t>(numImageDims, outputTileSize), elementType);
     Value iterArg = loopNest.loops.back().getRegionIterArg(0);
+    if (outputOp.isNchw()) {
+      permute<Permutation::NHWC_TO_NCHW>(offsets);
+      permute<Permutation::NHWC_TO_NCHW>(sizes);
+    }
     Value outputSlice = rewriter.create<tensor::ExtractSliceOp>(
         loc, tensorType, iterArg, offsets, sizes, strides);
 

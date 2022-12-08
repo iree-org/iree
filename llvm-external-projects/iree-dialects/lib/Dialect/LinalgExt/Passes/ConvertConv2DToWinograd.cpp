@@ -8,6 +8,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/WinogradConstants.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -59,14 +60,16 @@ static constexpr int64_t outputTileSize = 6;
 /// are constants. So for large ic and oc, this function is
 /// time intensive.
 /// TODO: Codegen this as a kernel and run once at initialization
-static DenseElementsAttr foldFilterTransform(
-    ArrayRef<int64_t> shape, int64_t inputTileSize, int64_t kernelSize,
-    Type outputType, const float *G, bool isSplat, float splatValue,
-    DenseElementsAttr::iterator_range<APFloat> &input, FloatType floatType) {
-  const int &kh = shape[0];
-  const int &kw = shape[1];
-  const int &ic = shape[2];
-  const int &oc = shape[3];
+static DenseElementsAttr
+foldFilterTransform(ArrayRef<int64_t> shape, int64_t inputTileSize,
+                    int64_t kernelSize, Type outputType, const float *G,
+                    bool isSplat, float splatValue,
+                    DenseElementsAttr::iterator_range<APFloat> &input,
+                    FloatType floatType, bool isNchw) {
+  const int &kh = isNchw ? shape[2] : shape[0];
+  const int &kw = isNchw ? shape[3] : shape[1];
+  const int &ic = isNchw ? shape[1] : shape[2];
+  const int &oc = isNchw ? shape[0] : shape[3];
   const int64_t numElements = inputTileSize * inputTileSize * ic * oc;
   SmallVector<APFloat> output(numElements, APFloat(0.0f));
   for (int d0 = 0; d0 < inputTileSize; d0++) {
@@ -78,7 +81,11 @@ static DenseElementsAttr foldFilterTransform(
             for (int d5 = 0; d5 < kernelSize; d5++) {
               APFloat ival(splatValue);
               if (!isSplat) {
-                ival = input[index(d4, d5, d2, d3, kh, kw, ic, oc)];
+                if (!isNchw) {
+                  ival = input[index(d4, d5, d2, d3, kh, kw, ic, oc)];
+                } else {
+                  ival = input[index(d3, d2, d4, d5, oc, ic, kh, kw)];
+                }
               }
               int idx0 = index(d0, d4, inputTileSize, kernelSize);
               int idx1 = index(d1, d5, inputTileSize, kernelSize);
@@ -99,23 +106,36 @@ static DenseElementsAttr foldFilterTransform(
   return DenseElementsAttr::get(outputType, output);
 }
 
+static bool isValidConv2d(Operation *op, bool &isNchw) {
+  isNchw = isa<linalg::Conv2DNchwFchwOp>(op);
+  const bool isNhwc = isa<linalg::Conv2DNhwcHwcfOp>(op);
+  return (isNchw || isNhwc);
+}
+
 namespace {
 
-class FoldWinogradFilterTransform final
-    : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
+template <typename ConvOp>
+class FoldWinogradFilterTransform final : public OpRewritePattern<ConvOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using OpRewritePattern<ConvOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
+  LogicalResult matchAndRewrite(ConvOp convOp,
                                 PatternRewriter &rewriter) const override {
+
+    bool isNchw;
+    if (!isValidConv2d(convOp, isNchw))
+      return failure();
+
     // Check that kernel size = 3x3
     Value kernel = convOp.getInputs()[1];
     auto kernelType = kernel.getType().cast<ShapedType>();
     if (!kernelType)
       return failure();
     ArrayRef<int64_t> kernelShape = kernelType.getShape();
-    const int64_t kh = kernelShape[0];
-    const int64_t kw = kernelShape[1];
+    if (kernelShape.size() != 4)
+      return failure();
+    const int64_t kh = isNchw ? kernelShape[2] : kernelShape[0];
+    const int64_t kw = isNchw ? kernelShape[3] : kernelShape[1];
     if ((kh != 3) || (kw != 3))
       return failure();
     const int64_t kernelSize = kh;
@@ -139,11 +159,15 @@ public:
     }
     SmallVector<int64_t> resultShape{inputTileSize * inputTileSize, shape[2],
                                      shape[3]};
+    if (isNchw) {
+      resultShape[1] = shape[1];
+      resultShape[2] = shape[0];
+    }
     auto resultType = RankedTensorType::get(resultShape, elemType);
     auto foldedKernelAttr =
         foldFilterTransform(shape, inputTileSize, kernelSize, resultType,
                             IREE::LinalgExt::Winograd::G_6x6_3x3, isSplat,
-                            splatValue, nonSplatValues, elemType);
+                            splatValue, nonSplatValues, elemType, isNchw);
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, foldedKernelAttr);
     return success();
   }
@@ -199,8 +223,8 @@ namespace {
 ///
 /// y = conv2d(x, f)
 ///
-/// where x: (N, H, W, C)
-///       f: (H, W, C, F)
+/// where x: (N, H, W, C) | (N, C, H, W)
+///       f: (H, W, C, F) | (F, C, H, W)
 ///
 /// this pattern converts the convolution to the following
 /// sequence:
@@ -220,7 +244,7 @@ namespace {
 /// x_winograd_c: (i * i, N * H' * W', C)
 /// y_winograd:   (i * i, N * H' * W', F)
 /// y_winograd_e: (i, i, N, H', W', F)
-/// y_padded:     (N, r * H', r * W', F)
+/// y_padded:     (N, r * H', r * W', F) | (N, F, r * H', r * W')
 ///
 /// H': ceil((H - m + 1) / r)
 /// W': ceil((W - m + 1) / r)
@@ -239,13 +263,18 @@ namespace {
 ///
 /// https://github.com/nod-ai/MLIRWinogradTalk/blob/main/MLIRSummit2022.Nodai.Menon.pdf
 ///
-class ConvertConv2DNhwcHwcf final
-    : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
+template <typename ConvOp>
+class ConvertConvToWinograd final : public OpRewritePattern<ConvOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using OpRewritePattern<ConvOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
+  LogicalResult matchAndRewrite(ConvOp convOp,
                                 PatternRewriter &rewriter) const override {
+
+    bool isNchw;
+    if (!isValidConv2d(convOp, isNchw))
+      return failure();
+
     // Check that strides = 1
     if (!hasAllOneValues(convOp.getStrides()))
       return failure();
@@ -275,16 +304,20 @@ public:
     auto inputType = input.getType().cast<ShapedType>();
     if (!inputType)
       return failure();
-    ArrayRef<int64_t> inputShape = inputType.getShape();
+    SmallVector<int64_t> inputShape(inputType.getShape());
     if (llvm::any_of(inputShape, ShapedType::isDynamic))
       return failure();
     assert(inputShape.size() == 4);
+    if (isNchw) {
+      permute<IREE::LinalgExt::Permutation::NCHW_TO_NHWC>(inputShape);
+    }
 
-    SmallVector<int64_t, 2> imageDimensions = {1, 2};
-    const size_t numImageDims = imageDimensions.size();
+    const SmallVector<int64_t, 2> nhwcImageDimensions{1, 2};
+    const SmallVector<int64_t, 2> nchwImageDimensions{2, 3};
+    const size_t numImageDims = nhwcImageDimensions.size();
     SmallVector<int64_t> resultShape(6, inputTileSize);
-    llvm::SmallSetVector<int64_t, 2> imageDimensionsSet(imageDimensions.begin(),
-                                                        imageDimensions.end());
+    llvm::SmallSetVector<int64_t, 2> imageDimensionsSet(
+        nhwcImageDimensions.begin(), nhwcImageDimensions.end());
     int outputIndex;
     for (int i = 0; i < inputShape.size(); i++) {
       outputIndex = i + numImageDims;
@@ -297,6 +330,7 @@ public:
     }
     Value emptyTensor =
         rewriter.create<tensor::EmptyOp>(loc, resultShape, elementType);
+    auto &imageDimensions = isNchw ? nchwImageDimensions : nhwcImageDimensions;
     auto winogradInputOp =
         rewriter.create<IREE::LinalgExt::WinogradInputTransformOp>(
             loc, emptyTensor.getType(), ValueRange{input},
@@ -316,7 +350,10 @@ public:
     SmallVector<int64_t> bmmShape(collapsedShape.begin(), collapsedShape.end());
     Value output = convOp.getOutputs()[0];
     auto outputType = output.getType().cast<RankedTensorType>();
-    ArrayRef<int64_t> outputShape = outputType.getShape();
+    SmallVector<int64_t> outputShape(outputType.getShape());
+    if (isNchw) {
+      permute<IREE::LinalgExt::Permutation::NCHW_TO_NHWC>(outputShape);
+    }
     bmmShape[2] = outputShape[3];
     auto bmmOutputType = RankedTensorType::get(bmmShape, elementType);
     emptyTensor = rewriter.create<tensor::EmptyOp>(loc, bmmShape, elementType);
@@ -344,6 +381,9 @@ public:
         paddedResultShape[i] = resultShape[i + numImageDims] * outputTileSize;
       }
     }
+    if (isNchw) {
+      permute<IREE::LinalgExt::Permutation::NHWC_TO_NCHW>(paddedResultShape);
+    }
     emptyTensor =
         rewriter.create<tensor::EmptyOp>(loc, paddedResultShape, elementType);
     auto winogradOutputOp =
@@ -359,8 +399,8 @@ public:
     SmallVector<OpFoldResult> strides(outputShape.size(),
                                       rewriter.getIndexAttr(1));
     SmallVector<OpFoldResult> sizes;
-    for (int i = 0; i < outputShape.size(); i++)
-      sizes.push_back(rewriter.getIndexAttr(outputShape[i]));
+    for (const int64_t shape : outputType.getShape())
+      sizes.push_back(rewriter.getIndexAttr(shape));
     auto winogradOutput = rewriter.create<tensor::ExtractSliceOp>(
         loc, outputType, paddedOutput, offsets, sizes, strides);
 
@@ -379,8 +419,10 @@ struct ConvertConv2DToWinogradPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
-    patterns.insert<FoldWinogradFilterTransform, ConvertConv2DNhwcHwcf>(
-        context);
+    patterns.insert<FoldWinogradFilterTransform<linalg::Conv2DNchwFchwOp>,
+                    FoldWinogradFilterTransform<linalg::Conv2DNhwcHwcfOp>,
+                    ConvertConvToWinograd<linalg::Conv2DNhwcHwcfOp>,
+                    ConvertConvToWinograd<linalg::Conv2DNchwFchwOp>>(context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
