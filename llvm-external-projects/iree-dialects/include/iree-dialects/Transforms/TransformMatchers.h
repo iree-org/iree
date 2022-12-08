@@ -442,10 +442,10 @@ private:
 ///
 /// where trailing and leading are elementwise operations whose presence is
 /// optional. Each matcher will capture the corresponding operation.
-void makeGPUReductionMatcher(StructuredOpMatcher &reduction,
-                             StructuredOpMatcher &fill,
-                             StructuredOpMatcher &leading,
-                             StructuredOpMatcher &trailing);
+void makeReductionMatcher(StructuredOpMatcher &reduction,
+                          StructuredOpMatcher &fill,
+                          StructuredOpMatcher &leading,
+                          StructuredOpMatcher &trailing);
 
 /// Creates a group of matchers for:
 ///
@@ -457,12 +457,12 @@ void makeGPUReductionMatcher(StructuredOpMatcher &reduction,
 /// where trailing and leading are elementwise operations whose presence is
 /// optional, and with subsetting ops potentially present on the operand use-def
 /// chains.
-void makeGPUSplitReductionMatcher(StructuredOpMatcher &parallel_reduction,
-                                  StructuredOpMatcher &combiner_reduction,
-                                  StructuredOpMatcher &parallel_fill,
-                                  StructuredOpMatcher &original_fill,
-                                  StructuredOpMatcher &leading,
-                                  StructuredOpMatcher &trailing);
+void makeSplitReductionMatcher(StructuredOpMatcher &parallel_reduction,
+                               StructuredOpMatcher &combiner_reduction,
+                               StructuredOpMatcher &parallel_fill,
+                               StructuredOpMatcher &original_fill,
+                               StructuredOpMatcher &leading,
+                               StructuredOpMatcher &trailing);
 
 } // namespace transform_ext
 } // namespace mlir

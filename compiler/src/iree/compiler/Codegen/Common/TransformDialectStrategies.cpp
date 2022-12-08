@@ -454,7 +454,7 @@ static bool matchGPUReduction(linalg::LinalgOp op,
                               GPUReductionStrategyInfos &info) {
   // TODO: match the sequence the strategy supports.
   StructuredOpMatcher pattern, fill, leadingEltwise, trailingEltwise;
-  makeGPUReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise);
+  makeReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise);
   if (!matchPattern(op, pattern)) return false;
 
   info.hasLeadingEltwise = leadingEltwise.getCaptured() != nullptr;

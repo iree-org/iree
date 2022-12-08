@@ -288,7 +288,7 @@ transform_ext::MatchCallbackResult::getPayloadGroup(unsigned position) const {
 
 static constexpr unsigned kCudaWarpSize = 32;
 
-void transform_ext::makeGPUReductionMatcher(
+void transform_ext::makeReductionMatcher(
     transform_ext::StructuredOpMatcher &reduction,
     transform_ext::StructuredOpMatcher &fill,
     transform_ext::StructuredOpMatcher &leading,
@@ -317,7 +317,7 @@ void transform_ext::makeGPUReductionMatcher(
                   .result(0, HasAnyUse(), trailing, OptionalMatch());
 }
 
-void transform_ext::makeGPUSplitReductionMatcher(
+void transform_ext::makeSplitReductionMatcher(
     transform_ext::StructuredOpMatcher &parallel_reduction,
     transform_ext::StructuredOpMatcher &combiner_reduction,
     transform_ext::StructuredOpMatcher &parallel_fill,

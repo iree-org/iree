@@ -1233,7 +1233,7 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   transform_ext::StructuredOpMatcher pattern, fill, leadingEltwise,
       trailingEltwise;
-  makeGPUReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise);
+  makeReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise);
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
@@ -1282,8 +1282,8 @@ splitReductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   transform_ext::StructuredOpMatcher parallel_reduction, combiner_reduction,
       parallel_fill, original_fill, leading, trailing;
-  makeGPUSplitReductionMatcher(parallel_reduction, combiner_reduction,
-                               parallel_fill, original_fill, leading, trailing);
+  makeSplitReductionMatcher(parallel_reduction, combiner_reduction,
+                            parallel_fill, original_fill, leading, trailing);
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
