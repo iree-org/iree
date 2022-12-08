@@ -100,9 +100,13 @@ iree_compiler_cc_library(
     srcs = [
         "TransformDialectJitterPass.cpp",
         "TransformDialectStrategies.cpp",
+        "TransformDialectStrategiesCPU.cpp",
+        "TransformDialectStrategiesGPU.cpp",
     ],
     hdrs = [
         "TransformDialectStrategies.h",
+        "TransformDialectStrategiesCPU.h",
+        "TransformDialectStrategiesGPU.h",
     ],
     deps = [
         # Dialects

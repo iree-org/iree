@@ -39,32 +39,24 @@ static void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 ///
 /// If `resultingFusedOpsHandles` is a non-null pointer, the fused operation are
 /// appended in order.
-// TODO: apply forwarding pattern.
-template <typename TilingTransformOp, typename TileOrNumThreadSpec>
-static Value buildTileAndFuseAndDistributeImpl(
+///
+Value buildTileFuseDistToForeachThreadWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizesOrNumThreads, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles);
-
-/// Call buildTileAndFuseAndDistributeImpl with ArrayRef<int64_t> tilesSizes.
-template <typename TilingTransformOp>
-static Value buildTileFuseDistWithTileSizes(
+    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
+    SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);
+Value buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);
 
-/// Call buildTileAndFuseAndDistributeImpl with ArrayRef<int64_t> numThreads.
-template <typename TilingTransformOp>
-static Value buildTileFuseDistWithNumThreads(
+/// See buildTileFuseDistWithTileSizes.
+Value buildTileFuseDistToForeachThreadWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<int64_t> numThreads, ArrayAttr threadDimMapping,
+    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping,
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);
-
-/// Call buildTileAndFuseAndDistributeImpl with a handle to multiple numThreads.
-template <typename TilingTransformOp>
-static Value buildTileFuseDistWithNumThreads(
+Value buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    Value numThreads, ArrayAttr threadDimMapping,
+    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping,
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);
 
 /// Apply patterns and vectorize (for now always applies rank-reduction).
@@ -86,19 +78,23 @@ static constexpr unsigned kCudaWarpSize = 32;
 Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
                              Value funcH, int64_t warpSize = kCudaWarpSize);
 
-//===----------------------------------------------------------------------===//
-// Target-specific strategies .
-// TODO: Move the code below to a target-specific location.
-//===----------------------------------------------------------------------===//
+using StrategyBuilderFn = std::function<void(ImplicitLocOpBuilder &, Value)>;
 
-/// Return success if the IR matches what the GPU reduction strategy can handle.
-/// If it is success it will append the transform dialect after the entry point
-/// module.
-LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
-                                                       linalg::LinalgOp op);
+void createTransformRegion(func::FuncOp entryPoint,
+                           StrategyBuilderFn buildStrategy);
 
-LogicalResult matchAndSetCPUReductionTransformStrategy(func::FuncOp entryPoint,
-                                                       linalg::LinalgOp op);
+//===----------------------------------------------------------------------===//
+// Higher-level problem-specific strategy creation APIs, these should favor
+// user-friendliness.
+//===----------------------------------------------------------------------===//
+/// Distribute to blocks using the current IREE lowering config.
+// TODO: consider passing a problem-specific struct to control information.
+Value createReductionStrategyBlockDistributionPart(
+    ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
+    Value reductionH, Value optionalFusionRootH,
+    ArrayRef<OpFoldResult> tileSizes0Generic, bool hasLeadingEltwise = false,
+    bool hasTrailingEltwise = false);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
