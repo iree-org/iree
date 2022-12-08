@@ -26,6 +26,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgTransformOps
     MLIRLinalgTransforms
+    MLIRSCFTransformOps
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions

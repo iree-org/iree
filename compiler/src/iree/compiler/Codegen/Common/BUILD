@@ -92,6 +92,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
         "@llvm-project//mlir:LinalgTransformOps",
+        "@llvm-project//mlir:SCFTransformOps",
     ],
 )
 

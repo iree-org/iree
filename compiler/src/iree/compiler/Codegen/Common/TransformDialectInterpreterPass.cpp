@@ -34,6 +34,7 @@
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
@@ -103,6 +104,7 @@ class TransformDialectInterpreterPass
     iree_compiler::registerTransformDialectLLVMCPUExtension(registry);
     iree_compiler::registerTransformDialectLLVMGPUExtension(registry);
     linalg::registerTransformDialectExtension(registry);
+    scf::registerTransformDialectExtension(registry);
   }
 
   TransformDialectInterpreterPass(StringRef transformFileName = StringRef()) {

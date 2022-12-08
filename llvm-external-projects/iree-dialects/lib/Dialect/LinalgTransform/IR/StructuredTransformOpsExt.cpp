@@ -511,12 +511,71 @@ void ::transform_ext::CanonicalizedSequenceOp::build(
   bodyBuilder(builder, state.location, bodyBlock.getArgument(0));
 }
 
+/// A pattern that fixes up invalid affine.apply ops. This looking for IR such
+/// as:
+/// ```
+/// %0 = affine.apply affine_map<(d0) -> (d0)>(%v)[]
+/// %1 = affine.apply affine_map<[s0] -> (s0)>()[%0]
+/// ```
+/// The problem here is that an SSA value %0 is bound to a symbol, where %0 is
+/// an affine.apply op that contains a dim. Such IR is invalid and should not
+/// have been generated in the first place. Fixing this properly is a larger
+/// effort (in MLIR core) and this pattern is just a workaround to make loop
+/// peeling usable.
+struct FixupAffineApplyOp : public OpRewritePattern<AffineApplyOp> {
+  using OpRewritePattern<AffineApplyOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AffineApplyOp applyOp,
+                                PatternRewriter &rewriter) const override {
+    AffineMap map = applyOp.getAffineMap();
+    int64_t numDims = map.getNumDims();
+    int64_t numSyms = map.getNumSymbols();
+    bool changed = false;
+    for (int i = numDims; i < numDims + numSyms; ++i)
+      if (auto op = applyOp->getOperand(i).getDefiningOp<AffineApplyOp>())
+        changed |= replaceAllDimsWithSymbols(rewriter, op);
+    return success(changed);
+  }
+
+private:
+  bool replaceAllDimsWithSymbols(RewriterBase &rewriter,
+                                 AffineApplyOp applyOp) const {
+    bool changed = false;
+    for (int i = 0; i < applyOp->getNumOperands(); ++i)
+      if (auto op = applyOp->getOperand(i).getDefiningOp<AffineApplyOp>())
+        changed |= replaceAllDimsWithSymbols(rewriter, applyOp);
+
+    Builder builder(applyOp.getContext());
+    AffineMap map = applyOp.getAffineMap();
+    int64_t numDims = map.getNumDims();
+    int64_t numSyms = map.getNumSymbols();
+    if (numDims == 0)
+      return changed;
+    DenseMap<AffineExpr, AffineExpr> replacements;
+    for (int i = 0; i < numDims; ++i)
+      replacements[builder.getAffineDimExpr(i)] =
+          builder.getAffineSymbolExpr(numSyms + i);
+    AffineMap symbolizedMap = map.replace(replacements, /*numResultDims=*/0,
+                                          /*numSymbolDims=*/numDims + numSyms);
+    rewriter.updateRootInPlace(applyOp,
+                               [&]() { applyOp.setMap(symbolizedMap); });
+    return true;
+  }
+};
+
 /// Run enabling transformations (LICM and its variants, single-iteration loop
 /// removal, CSE) on the given function.
 static LogicalResult performEnablerTransformations(
     func::FuncOp func, RewriteListener &listener,
     LinalgEnablingOptions options = LinalgEnablingOptions()) {
   MLIRContext *ctx = func->getContext();
+
+  RewritePatternSet fixupPatterns(ctx);
+  fixupPatterns.add<FixupAffineApplyOp>(ctx);
+  if (failed(applyPatternsTrackAndFoldGreedily(func, listener,
+                                               std::move(fixupPatterns))))
+    return failure();
+
   RewritePatternSet patterns(ctx);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);

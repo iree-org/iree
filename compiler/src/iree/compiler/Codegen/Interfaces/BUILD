@@ -54,6 +54,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:SCFTransformOps",
     ],
 )
 

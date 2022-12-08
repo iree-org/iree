@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRPass
     MLIRRewrite
     MLIRSCFDialect
+    MLIRSCFTransformOps
     MLIRSCFTransforms
     MLIRSCFUtils
     MLIRSupport

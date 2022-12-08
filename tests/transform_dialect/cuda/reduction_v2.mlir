@@ -1,9 +1,11 @@
-!in_tensor_t = tensor<33x1024xf32>
-!out_tensor_t = tensor<33xf32>
+!in_tensor_t = tensor<64x40961xf32>
+!out_tensor_t = tensor<64xf32>
 
 func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
+  %c0 = arith.constant 0 : index
   %cst = arith.constant -0.000000e+00 : f32
 
+  %d0 = tensor.dim %arg, %c0: !in_tensor_t
   %0 = tensor.empty() : !out_tensor_t
   %1 = linalg.fill ins(%cst : f32) outs(%0 : !out_tensor_t) ->   !out_tensor_t
   %2 = linalg.generic {
