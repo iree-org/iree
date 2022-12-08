@@ -21,18 +21,18 @@ class DeviceCollectionTest(unittest.TestCase):
         id="android_x86",
         vendor_name="b",
         architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
-        host_environment=common_definitions.HostEnvironment.ANDROID_ARM_64)
+        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     little_cores_device_spec = common_definitions.DeviceSpec(
         id="android_little",
         vendor_name="c",
         architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
-        host_environment=common_definitions.HostEnvironment.ANDROID_ARM_64,
+        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         device_parameters=["little-cores"])
     big_cores_device_spec = common_definitions.DeviceSpec(
         id="android_big",
         vendor_name="d",
         architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
-        host_environment=common_definitions.HostEnvironment.ANDROID_ARM_64,
+        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         device_parameters=["big-cores"])
     devices = device_collections.DeviceCollection(device_specs=[
         linux_x86_device_spec, android_x86_device_spec,
@@ -44,18 +44,18 @@ class DeviceCollectionTest(unittest.TestCase):
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
     android_x86_devices = devices.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
-        host_environment=common_definitions.HostEnvironment.ANDROID_ARM_64)
+        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     little_cores_devices = devices.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
-        host_environment=common_definitions.HostEnvironment.ANDROID_ARM_64,
+        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         device_parameters={"little-cores"})
     big_cores_devices = devices.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
-        host_environment=common_definitions.HostEnvironment.ANDROID_ARM_64,
+        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         device_parameters={"big-cores"})
     all_arm_devices = devices.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
-        host_environment=common_definitions.HostEnvironment.ANDROID_ARM_64)
+        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     no_matched_device = devices.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
