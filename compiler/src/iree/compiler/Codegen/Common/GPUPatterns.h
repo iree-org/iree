@@ -16,6 +16,12 @@ namespace iree_compiler {
 void populateVectorTransferToGPUMMAPreparationPatterns(
     RewritePatternSet &patterns);
 
+/// Adds patterns to Merge transpose op into the transfer read op. Transposes
+/// are not supported on MMA types but MMA load can transpose the matrix when
+/// loading.
+void populateCombineVectorTransferReadBroadcastPatterns(
+    RewritePatternSet &patterns);
+
 /// Adds patterns for promoting Linalg contract op's operands to use GPU shared
 /// memory.
 void populateContractPromotionPatterns(RewritePatternSet &patterns,
