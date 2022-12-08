@@ -80,7 +80,7 @@ class Android_Mali_Benchmarks(object):
 
     mali_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.MALI_VALHALL,
-        platform=common_definitions.DevicePlatform.GENERIC_ANDROID)
+        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=default_gen_configs +
         fuse_padding_gen_configs,

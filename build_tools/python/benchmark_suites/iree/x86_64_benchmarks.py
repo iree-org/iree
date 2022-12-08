@@ -65,7 +65,7 @@ class Linux_x86_64_Benchmarks(object):
     ]
     cascadelake_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
-        platform=common_definitions.DevicePlatform.GENERIC_LINUX)
+        host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
     run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=gen_configs,
         module_execution_configs=default_execution_configs,

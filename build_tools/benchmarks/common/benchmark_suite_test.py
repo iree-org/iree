@@ -161,13 +161,13 @@ class BenchmarkSuiteTest(unittest.TestCase):
         id="dev_a",
         vendor_name="a",
         architecture=common_definitions.DeviceArchitecture.RV32_GENERIC,
-        platform=common_definitions.DevicePlatform.GENERIC_LINUX,
+        host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         device_parameters=[])
     device_spec_b = common_definitions.DeviceSpec(
         id="dev_b",
         vendor_name="b",
         architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
-        platform=common_definitions.DevicePlatform.GENERIC_LINUX,
+        host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         device_parameters=[])
     run_config_a = iree_definitions.E2EModelRunConfig(
         module_generation_config=iree_definitions.ModuleGenerationConfig(
