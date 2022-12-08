@@ -361,10 +361,6 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
 bool SPIRVTileAndPromotePass::isCooperativeMatrixFusable(
     linalg::GenericOp genericOp) const {
   if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) return false;
-  // Limit to outer dimension broadcasted cases for now.
-  for (AffineMap map : genericOp.getIndexingMapsArray()) {
-    if (!map.isMinorIdentity()) return false;
-  }
 
   for (Operation &op : genericOp.getBlock()->without_terminator()) {
     if (!isa<

@@ -718,7 +718,7 @@ hal.executable @matmul_f16_f512x4096x64 {
 
 // -----
 
-// Transposed+broadcasted elementwise ops need promote C.
+// Transposed+broadcasted elementwise ops does not need promoting C matrix.
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -798,13 +798,18 @@ hal.executable @matmul_f16_f512x4096x64 {
 
 // PROMOTEC-LABEL: func.func @matmul_f16_f512x4096x64()
 
+//  PROMOTEC-NOT: memref.alloc()
 //  PROMOTEC-DAG: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<64x32xf16, 3>
 //  PROMOTEC-DAG: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x128xf16, 3>
-//  PROMOTEC-DAG: %[[C_ALLOC:.+]] = memref.alloc() : memref<64x128xf16, 3>
+//  PROMOTEC-NOT: memref.alloc()
+
+//      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//      PROMOTEC: %[[SPAN3:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+//      PROMOTEC: %[[OUT_VIEW:.+]] = memref.subview %[[SPAN3]]
 
 //      PROMOTEC: linalg.fill
 // PROMOTEC-SAME:   __internal_linalg_transform__ = "workgroup_memory"
-// PROMOTEC-SAME:   outs(%[[C_ALLOC]]
+// PROMOTEC-SAME:   outs(%[[OUT_VIEW]]
 
 //      PROMOTEC: scf.for %{{.+}} = %c0 to %c64 step %c32 {
 //      PROMOTEC:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0] [%c64, %c32]
@@ -818,10 +823,13 @@ hal.executable @matmul_f16_f512x4096x64 {
 //      PROMOTEC:   linalg.matmul
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "workgroup_memory"
 // PROMOTEC-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
-// PROMOTEC-SAME:    outs(%[[C_ALLOC]]
+// PROMOTEC-SAME:    outs(%[[OUT_VIEW]]
 //      PROMOTEC: }
-//      PROMOTEC: gpu.barrier
+
+//  PROMOTEC-NOT: gpu.barrier
+//  PROMOTEC-NOT: memref.copy
+//      PROMOTEC: %[[BCAST_VIEW:.+]] = memref.subview %[[SPAN2]][%{{.+}}] [64] [1]
 //      PROMOTEC: linalg.generic
-//      PROMOTEC:    ins(%{{.+}}, %[[C_ALLOC]]
-// PROMOTEC-SAME:   __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      PROMOTEC: gpu.barrier
+// PROMOTEC-SAME:    ins(%[[BCAST_VIEW]]
+// PROMOTEC-SAME:    outs(%[[OUT_VIEW]]
+// PROMOTEC-SAME:   __internal_linalg_transform__ = "workgroup_memory"
