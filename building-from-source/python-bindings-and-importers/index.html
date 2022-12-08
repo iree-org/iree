@@ -1127,8 +1127,6 @@ Python bindings for the following packages:</p>
 <ul>
 <li>A relatively recent Python3 installation &gt;=3.7 (we aim to support
   <a href="https://endoflife.date/python">non-eol Python versions</a>).</li>
-<li>Installation of python dependencies as specified in
-  <a href="https://github.com/iree-org/iree/blob/main/runtime/bindings/python/iree/runtime/build_requirements.txt"><code>runtime/bindings/python/iree/runtime/build_requirements.txt</code></a>.</li>
 </ul>
 <p><strong>CMake Variables:</strong></p>
 <ul>
@@ -1176,7 +1174,14 @@ python -m pip install -r ./runtime/bindings/python/iree/runtime/build_requiremen
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="c"># Create a persistent virtual environment (first time only).</span>
+<div class="highlight"><pre><span></span><code><span class="c"># Make sure your &#39;python&#39; is what you expect.</span>
+<span class="c"># Also consider using the Python launcher &#39;py&#39; instead of &#39;python&#39;:</span>
+<span class="c"># https://docs.python.org/3/using/windows.html#python-launcher-for-windows</span>
+<span class="n">which</span> <span class="n">python</span>
+<span class="n">python</span> <span class="p">-</span><span class="n">-version</span>
+<span class="n">py</span> <span class="p">-</span><span class="n">-list-paths</span>
+
+<span class="c"># Create a persistent virtual environment (first time only).</span>
 <span class="n">python</span> <span class="n">-m</span> <span class="n">venv</span> <span class="p">.</span><span class="n">venv</span>
 
 <span class="c"># Activate the virtual environment (per shell).</span>
@@ -1208,8 +1213,7 @@ or running <code>deactivate</code>.</p>
     .
 cmake --build .
 
-<span class="c1"># Add ./bindings/python and compiler-api/python_package to PYTHONPATH and</span>
-<span class="c1"># use the API.</span>
+<span class="c1"># Add the bindings/python paths to PYTHONPATH and use the API.</span>
 <span class="nb">source</span> .env <span class="o">&amp;&amp;</span> <span class="nb">export</span> PYTHONPATH
 python -c <span class="s2">&quot;import iree.compiler&quot;</span>
 python -c <span class="s2">&quot;import iree.runtime&quot;</span>
@@ -1219,9 +1223,8 @@ python -c <span class="s2">&quot;import iree.runtime&quot;</span>
 <div class="highlight"><pre><span></span><code><span class="n">cmake</span> <span class="n">-GNinja</span> <span class="n">-DCMAKE_BUILD_TYPE</span><span class="p">=</span><span class="n">RelWithDebInfo</span> <span class="n">-DIREE_BUILD_PYTHON_BINDINGS</span><span class="p">=</span><span class="n">ON</span> <span class="p">.</span>
 <span class="n">cmake</span> <span class="p">-</span><span class="n">-build</span> <span class="p">.</span>
 
-<span class="c"># Add bindings\python and compiler-api\python_package to PYTHONPATH and use</span>
-<span class="c"># the API.</span>
-<span class="nb">set </span><span class="n">PYTHONPATH</span><span class="p">=</span><span class="s2">&quot;$pwd\compiler-api\python_package;$pwd\bindings\python;%PYTHONPATH%&quot;</span>
+<span class="c"># Add the bindings/python paths to PYTHONPATH and use the API.</span>
+<span class="p">.</span><span class="n">env</span><span class="p">.</span><span class="n">bat</span>
 <span class="n">python</span> <span class="n">-c</span> <span class="s2">&quot;import iree.compiler&quot;</span>
 <span class="n">python</span> <span class="n">-c</span> <span class="s2">&quot;import iree.runtime&quot;</span>
 </code></pre></div>
