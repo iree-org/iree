@@ -23,7 +23,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
         with:
-          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          token: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
           repository: iree-org/iree-llvm-fork
           ref: main
 
@@ -34,7 +34,7 @@ jobs:
       - name: Pushing changes
         uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6 # v0.6.0
         with:
-          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          github_token: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
           branch: main
           repository: iree-org/iree-llvm-fork
 
@@ -47,7 +47,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
         with:
-          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          token: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
           repository: iree-org/iree-mhlo-fork
           ref: master
 
@@ -58,7 +58,7 @@ jobs:
       - name: Pushing changes
         uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6 # v0.6.0
         with:
-          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          github_token: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
           branch: master
           repository: iree-org/iree-mhlo-fork
 
@@ -71,7 +71,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
         with:
-          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          token: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
           repository: iree-org/iree-tf-fork
           ref: master
 
@@ -82,6 +82,6 @@ jobs:
       - name: Pushing changes
         uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6 # v0.6.0
         with:
-          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          github_token: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
           branch: master
           repository: iree-org/iree-tf-fork
