@@ -5,44 +5,14 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Represents the directory structure of IREE artifacts."""
 
-from dataclasses import dataclass
-from typing import Sequence, OrderedDict
+from typing import Sequence
 import collections
 import pathlib
 
 from e2e_test_artifacts import model_artifacts
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
-IREE_ARTIFACTS_ROOT = pathlib.PurePath("iree")
-
-
-@dataclass(frozen=True)
-class ModuleDirectory(object):
-  """IREE module directory that accommodates the module and related files."""
-  module_path: pathlib.PurePath
-  compile_config: iree_definitions.CompileConfig
-
-
-@dataclass(frozen=True)
-class ImportedModelArtifact(object):
-  """IREE imported model artifact."""
-  imported_model: iree_definitions.ImportedModel
-  file_path: pathlib.PurePath
-
-
-@dataclass(frozen=True)
-class ModelDirectory(object):
-  """IREE model directory that accommodates the modules from the same model."""
-  imported_model_artifact: ImportedModelArtifact
-  # Map of module directories, keyed by the assoicated compile config id.
-  module_dir_map: OrderedDict[str, ModuleDirectory]
-
-
-@dataclass(frozen=True)
-class ArtifactsRoot(object):
-  # Map of IREE model directories, keyed by model id.
-  model_dir_map: OrderedDict[str, ModelDirectory]
-
+IREE_ARTIFACTS_SUB_ROOT = pathlib.PurePath("iree")
 
 def _get_imported_model_path(
     parent_path: pathlib.PurePath,
@@ -56,14 +26,29 @@ def _get_imported_model_path(
   return parent_path / f"{model.name}.mlir"
 
 
-def _get_model_dir_path(
+def _get_model_prefix(imported_model: iree_definitions.ImportedModel) -> str:
+  """Returns the path of an IREE model dir."""
+  model = imported_model.model
+  # IREE model prefix: <iree_artifact_prefix>_<model_id>_<model_name>
+  return f"{IREE_ARTIFACT_PREFIX}_{model.id}_{model.name}"
+
+
+def get_imported_model_path(
     imported_model: iree_definitions.ImportedModel,
     root_dir_path: pathlib.PurePath = pathlib.PurePath()
 ) -> pathlib.PurePath:
-  """Returns the path of an IREE model dir."""
-  model = imported_model.model
-  # IREE model dir: <parent_path>/<model_id>_<model_name>
-  return root_dir_path / IREE_ARTIFACTS_ROOT / f"{model.id}_{model.name}"
+  """Returns the path of an IREE imported MLIR model.
+  
+  Args:
+    imported_model: IREE model importing config.
+    root_dir_path: path of the root artifact directory, on which the returned
+      path will be based.
+  Returns:
+    Path of the imported model file.
+  """
+  model_prefix = _get_model_prefix(imported_model)
+  # Imported model path: <model_prefix>.mlir
+  return root_dir_path / f"{model_prefix}.mlir"
 
 
 def get_module_path(
@@ -79,11 +64,10 @@ def get_module_path(
   Returns:
     Path of the module file.
   """
-  model_dir_path = _get_model_dir_path(
-      root_dir_path=root_dir_path,
-      imported_model=module_generation_config.imported_model)
-  # Module path: <model_dir_path>/<compile_config_id>/<model_name>.vmfb
-  return model_dir_path / module_generation_config.compile_config.id / f"{module_generation_config.imported_model.model.name}.vmfb"
+  model_prefix = _get_model_prefix(module_generation_config.imported_model)
+  # Module path: <model_prefix>/<compile_config_id>.vmfb
+  return (root_dir_path /
+          f"{model_prefix}_{module_generation_config.compile_config.id}.vmfb")
 
 
 def _build_module_directory(
