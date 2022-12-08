@@ -32,7 +32,7 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-      - name: "Testing Colab Notebooks"
+      - name: "Testing Samples"
         run: |
           ./build_tools/github_actions/docker_run.sh  \
             gcr.io/iree-oss/samples@sha256:291d87d125b41e1539dbb96c7c4f734cc98fc158a36d18496cda360658f00bde \
