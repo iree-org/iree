@@ -46,9 +46,6 @@
 
 using namespace mlir;
 
-namespace mlir {
-namespace iree_compiler {
-
 #define DEBUG_TYPE "iree-transform-builder"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
@@ -101,7 +98,7 @@ auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
 //===----------------------------------------------------------------------===//
 
 /// Prints `handles` in order. Prints the whole IR if `handles` is empty.
-static void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {}) {
+void iree_compiler::buildPrint(ImplicitLocOpBuilder &b, ValueRange handles) {
   if (handles.empty()) b.create<PrintOp>();
   for (auto h : handles) b.create<PrintOp>(h);
 }
@@ -127,7 +124,7 @@ static void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {}) {
 /// appended in order.
 // TODO: apply forwarding pattern.
 template <typename TilingTransformOp, typename TileOrNumThreadSpec>
-static Value buildTileAndFuseAndDistributeImpl(
+Value iree_compiler::buildTileAndFuseAndDistributeImpl(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizesOrNumThreads, ArrayAttr threadDimMapping,
     SmallVectorImpl<Value> *resultingFusedOpsHandles) {
@@ -143,10 +140,10 @@ static Value buildTileAndFuseAndDistributeImpl(
 
 /// Call buildTileAndFuseAndDistributeImpl with ArrayRef<int64_t> tilesSizes.
 template <typename TilingTransformOp = TileToForeachThreadOp>
-static Value buildTileFuseDistWithTileSizes(
+Value iree_compiler::buildTileFuseDistWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
+    SmallVectorImpl<Value> *resultingFusedOpsHandles) {
   return buildTileAndFuseAndDistributeImpl<TilingTransformOp,
                                            transform::TileSizesSpec>(
       b, rootH, opsHToFuse, tileSizes, threadDimMapping,
@@ -155,10 +152,10 @@ static Value buildTileFuseDistWithTileSizes(
 
 /// Call buildTileAndFuseAndDistributeImpl with ArrayRef<int64_t> numThreads.
 template <typename TilingTransformOp = TileToForeachThreadOp>
-static Value buildTileFuseDistWithNumThreads(
+Value iree_compiler::buildTileFuseDistWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<int64_t> numThreads, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
+    SmallVectorImpl<Value> *resultingFusedOpsHandles) {
   return buildTileAndFuseAndDistributeImpl<TilingTransformOp,
                                            transform::NumThreadsSpec>(
       b, rootH, opsHToFuse, getAsOpFoldResult(b.getI64ArrayAttr(numThreads)),
@@ -167,10 +164,10 @@ static Value buildTileFuseDistWithNumThreads(
 
 /// Call buildTileAndFuseAndDistributeImpl with a handle to multiple numThreads.
 template <typename TilingTransformOp = TileToForeachThreadOp>
-static Value buildTileFuseDistWithNumThreads(
+Value iree_compiler::buildTileFuseDistWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     Value numThreads, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr) {
+    SmallVectorImpl<Value> *resultingFusedOpsHandles) {
   return buildTileAndFuseAndDistributeImpl<TilingTransformOp,
                                            transform::NumThreadsSpec>(
       b, rootH, opsHToFuse, ArrayRef<OpFoldResult>{numThreads},
@@ -181,7 +178,8 @@ static Value buildTileFuseDistWithNumThreads(
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 // TODO: configure patterns.
-static Value buildVectorizeStrategy(ImplicitLocOpBuilder &b, Value funcH) {
+Value iree_compiler::buildVectorizeStrategy(ImplicitLocOpBuilder &b,
+                                            Value funcH) {
   funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
   return b.create<VectorizeOp>(funcH);
 }
@@ -189,8 +187,9 @@ static Value buildVectorizeStrategy(ImplicitLocOpBuilder &b, Value funcH) {
 /// Post-bufferization mapping to blocks and threads.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-static Value buildMapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
-                                       ArrayRef<int64_t> blockSize) {
+Value iree_compiler::buildMapToBlockAndThreads(ImplicitLocOpBuilder &b,
+                                               Value funcH,
+                                               ArrayRef<int64_t> blockSize) {
   funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
   return b.create<MapNestedForeachThreadToGpuThreadsOp>(funcH, blockSize);
 }
@@ -200,9 +199,9 @@ static constexpr unsigned kCudaWarpSize = 32;
 /// Post-bufferization vector distribution with rank-reduction.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-static Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
-                                    Value funcH,
-                                    int64_t warpSize = kCudaWarpSize) {
+Value iree_compiler::buildDistributeVectors(ImplicitLocOpBuilder &b,
+                                            Value variantH, Value funcH,
+                                            int64_t warpSize) {
   funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
   // Locally suppress failures for this op only because it doesn't cover the
@@ -225,6 +224,7 @@ static Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
 // user-friendliness.
 //===----------------------------------------------------------------------===//
 
+namespace {
 /// Various handles produced by reduction splitting.
 struct ReductionSplitResult {
   /// Handle to the leading elementwise operation, may be null if no such
@@ -244,6 +244,7 @@ struct ReductionSplitResult {
   /// not re-matched.
   Value trailingEltwiseH;
 };
+}  // namespace
 
 /// Builds transform IR requesting to bubble up the "expand_shape" operation
 /// produced as parent of reduction splitting if necessary for fusion of the
@@ -322,11 +323,11 @@ static Value createReductionStrategyBlockDistributionPart(
   // formation happened using another transform dialect script and doesn't need
   // the workgroup count part.
   if (hasLeadingEltwise) {
-    buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(
+    iree_compiler::buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(
         b, optionalFusionRootH, opsHToFuse, tileSizes0Generic,
         b.getArrayAttr({x}));
   } else {
-    buildTileFuseDistWithTileSizes<
+    iree_compiler::buildTileFuseDistWithTileSizes<
         TileToForeachThreadAndWorkgroupCountRegionOp>(
         b, optionalFusionRootH, opsHToFuse, tileSizes0Generic,
         b.getArrayAttr({x}));
@@ -360,12 +361,12 @@ static Value createReductionStrategyThreadDistributionPart(
                                                 ::mlir::gpu::Threads::DimY);
 
   // clang-format off
-  buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(b,
+  iree_compiler::buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/secondFusionRootH,
                    /*opsHToFuse=*/secondFusionGroupHs,
                    /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr(tileSizes1Fill)),
                    /*threadDimMapping=*/b.getArrayAttr({z}));
-  buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(b,
+  iree_compiler::buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/firstFusionRootH,
                    /*opsHToFuse=*/firstFusionGroupHs,
                    /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr(tileSizes1Generic)),
@@ -431,7 +432,7 @@ static void createReductionCudaStrategy(
   // Step 3. Rank-reduce and vectorize.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildVectorizeStrategy(b, funcH);
+  funcH = iree_compiler::buildVectorizeStrategy(b, funcH);
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
@@ -443,10 +444,11 @@ static void createReductionCudaStrategy(
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildMapToBlockAndThreads(b, funcH, infos.workgroupSize);
+  funcH =
+      iree_compiler::buildMapToBlockAndThreads(b, funcH, infos.workgroupSize);
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
-  buildDistributeVectors(b, variantH, funcH);
+  iree_compiler::buildDistributeVectors(b, variantH, funcH);
 }
 
 // TODO: consider passing a problem-specific struct to control information.
@@ -463,8 +465,8 @@ static bool matchGPUReduction(linalg::LinalgOp op,
   // Hardcoded workagroup size, this could be deduced from the reduction dim.
   info.workgroupSize = {32, 2, 1};
   SmallVector<unsigned> partitionedLoops =
-      cast<PartitionableLoopsInterface>(op.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
+      cast<iree_compiler::PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(iree_compiler::kNumMaxParallelDims);
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   // Tile all the parallel dimension to 1.
   info.workgroupTileSizes.append(numLoops, 1);
@@ -492,8 +494,8 @@ static bool matchCPUReduction(linalg::LinalgOp op,
   // TODO: set the right config as expected by the strategy.
   infos.workgroupSize = 1;
   SmallVector<unsigned> partitionedLoops =
-      cast<PartitionableLoopsInterface>(op.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
+      cast<iree_compiler::PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(iree_compiler::kNumMaxParallelDims);
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   // Tile all the parallel dimension to 1.
   infos.tileSizes.append(numLoops, 1);
@@ -547,7 +549,7 @@ static LogicalResult createReductionCpuStrategy(
   // Step 2. Rank-reduce and buildVectorizeStrategy.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildVectorizeStrategy(b, funcH);
+  funcH = iree_compiler::buildVectorizeStrategy(b, funcH);
 
   // Step 3. Bufferize and drop HAL decriptor from memref ops.
   variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
@@ -564,8 +566,8 @@ static LogicalResult createReductionCpuStrategy(
   return success();
 }
 
-LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
-                                                       linalg::LinalgOp op) {
+LogicalResult iree_compiler::matchAndSetGPUReductionTransformStrategy(
+    func::FuncOp entryPoint, linalg::LinalgOp op) {
   // 1. Match
   GPUReductionStrategyInfos infos;
   if (!matchGPUReduction(op, infos)) return failure();
@@ -577,8 +579,8 @@ LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
   return success();
 }
 
-LogicalResult matchAndSetCPUReductionTransformStrategy(func::FuncOp entryPoint,
-                                                       linalg::LinalgOp op) {
+LogicalResult iree_compiler::matchAndSetCPUReductionTransformStrategy(
+    func::FuncOp entryPoint, linalg::LinalgOp op) {
   // 1. Match
   CPUReductionStrategyInfos infos;
   if (!matchCPUReduction(op, infos)) return failure();
@@ -589,6 +591,3 @@ LogicalResult matchAndSetCPUReductionTransformStrategy(func::FuncOp entryPoint,
   createTransformRegion(entryPoint, startegyBuilder);
   return success();
 }
-
-}  // namespace iree_compiler
-}  // namespace mlir
