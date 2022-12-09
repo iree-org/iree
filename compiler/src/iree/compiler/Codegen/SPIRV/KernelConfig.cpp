@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -398,10 +399,10 @@ static bool tileMatmulK(const int64_t dimK, const int64_t residualTilingFactor,
 }
 
 int64_t getTileBytes(int64_t mTileSize, int64_t nTileSize, int64_t kTileSize,
-                     int64_t elementBits) {
-  const int64_t count =
-      (mTileSize + nTileSize) *
-      (kTileSize + detail::bankConflictReductionPaddingBits / elementBits);
+                     int64_t elementBits, bool promoteC) {
+  int64_t paddingBits = detail::bankConflictReductionPaddingBits / elementBits;
+  int64_t count = (mTileSize + nTileSize) * (kTileSize + paddingBits);
+  if (promoteC) count += mTileSize * (nTileSize + paddingBits);
   return (elementBits / 8) * count;
 }
 
@@ -486,7 +487,8 @@ static bool adjustToPromote(ArrayRef<int64_t> dimMNKSize, int64_t &mTileSize,
     storeStage = 1;
   }
 
-  auto usedBytes = getTileBytes(mTileSize, nTileSize, kTileSize, elementBits);
+  auto usedBytes =
+      getTileBytes(mTileSize, nTileSize, kTileSize, elementBits, false);
 
   LLVM_DEBUG(llvm::dbgs() << "initial multibuffering bytes = "
                           << getMultiBufferMemoryUsage(usedBytes, pipelineDepth,
@@ -521,7 +523,7 @@ static bool adjustToPromote(ArrayRef<int64_t> dimMNKSize, int64_t &mTileSize,
 
   int64_t totalThreads = wgSize[0] * wgSize[1] * wgSize[2];
   LLVM_DEBUG(llvm::dbgs() << "revised total thread = " << totalThreads << "\n");
-  usedBytes = getTileBytes(mTileSize, nTileSize, kTileSize, elementBits);
+  usedBytes = getTileBytes(mTileSize, nTileSize, kTileSize, elementBits, false);
   LLVM_DEBUG(llvm::dbgs() << "revised tile bytes = " << usedBytes << "\n");
   return totalThreads > subgroupSize && usedBytes <= maxBytes;
 }
@@ -794,7 +796,8 @@ namespace detail {
 LogicalResult setCooperativeMatrixConfig(
     const spirv::TargetEnv &targetEnv, linalg::LinalgOp op,
     const unsigned numSubgroupsPerWorkgroup,
-    const unsigned numMNTilesPerSubgroup) {
+    const unsigned numMNTilesPerSubgroup, unsigned softwarePipelineDepth,
+    unsigned softwarePipelineStoreStage) {
   LLVM_DEBUG(llvm::dbgs() << "trying to matmul tensorcore config...\n");
   // This configuration is only for cooperative matrix.
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
@@ -887,9 +890,30 @@ LogicalResult setCooperativeMatrixConfig(
   tileSizes.push_back(reductionTileSizes);
   tileSizes.push_back(vectorSizes);
 
+  // Check if the C matrix will be promoted for computing shared memory usage.
+  auto matmulResult = op.getDpsInitOperand(0)->get();
+  bool promoteC =
+      !matmulResult.hasOneUse() ||
+      !isa<IREE::Flow::DispatchTensorStoreOp>(*matmulResult.getUsers().begin());
+
+  // Decrease pipeline depth until it fits in shared memory.
+  auto pipelineDepth = softwarePipelineDepth;
+  auto storeStage = softwarePipelineStoreStage;
+  const int maxBytes = limits.getMaxComputeSharedMemorySize();
+  auto usedBytes =
+      getTileBytes(workgroupTileSizes[mIndex], workgroupTileSizes[nIndex],
+                   reductionTileSizes[kIndex],
+                   getElementType(lhs).getIntOrFloatBitWidth(), promoteC);
+
+  while (pipelineDepth > 0 &&
+         getMultiBufferMemoryUsage(usedBytes, pipelineDepth, storeStage) >
+             maxBytes) {
+    pipelineDepth--;
+  }
+
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
-      workgroupSize, subgroupSize);
+      workgroupSize, subgroupSize, pipelineDepth, storeStage);
 }
 
 }  // namespace detail
