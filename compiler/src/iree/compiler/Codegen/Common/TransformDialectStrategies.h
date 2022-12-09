@@ -45,7 +45,7 @@ Value buildTileFuseDistToForeachThreadWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);
-Value buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
+Value buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);
@@ -55,7 +55,7 @@ Value buildTileFuseDistToForeachThreadWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping,
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);
-Value buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
+Value buildTileFuseDistToForeachThreadAndWorkgroupCountWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping,
     SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);

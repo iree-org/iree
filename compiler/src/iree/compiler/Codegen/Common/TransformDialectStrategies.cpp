@@ -161,7 +161,7 @@ Value mlir::iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
       resultingFusedOpsHandles);
 }
 Value mlir::iree_compiler::
-    buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
+    buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
         ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
         ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
         SmallVectorImpl<Value> *resultingFusedOpsHandles) {
@@ -186,21 +186,21 @@ static Value buildTileFuseDistWithNumThreads(
 }
 Value mlir::iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
+    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping,
     SmallVectorImpl<Value> *resultingFusedOpsHandles) {
-  return buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(
-      b, rootH, opsHToFuse, tileSizes, threadDimMapping,
+  return buildTileFuseDistWithNumThreads<TileToForeachThreadOp>(
+      b, rootH, opsHToFuse, numThreads, threadDimMapping,
       resultingFusedOpsHandles);
 }
 Value mlir::iree_compiler::
-    buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
+    buildTileFuseDistToForeachThreadAndWorkgroupCountWithNumThreads(
         ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-        ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
+        ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping,
         SmallVectorImpl<Value> *resultingFusedOpsHandles) {
-  return buildTileFuseDistWithTileSizes<
-      TileToForeachThreadAndWorkgroupCountRegionOp>(b, rootH, opsHToFuse,
-                                                    tileSizes, threadDimMapping,
-                                                    resultingFusedOpsHandles);
+  return buildTileFuseDistWithNumThreads<
+      TileToForeachThreadAndWorkgroupCountRegionOp>(
+      b, rootH, opsHToFuse, numThreads, threadDimMapping,
+      resultingFusedOpsHandles);
 }
 
 /// Apply patterns and vectorize (for now always applies rank-reduction).
@@ -361,7 +361,7 @@ Value mlir::iree_compiler::createReductionStrategyBlockDistributionPart(
         b.getArrayAttr({x}));
   } else {
     iree_compiler::
-        buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
+        buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
             b, optionalFusionRootH, opsHToFuse, tileSizes0Generic,
             b.getArrayAttr({x}));
   }
