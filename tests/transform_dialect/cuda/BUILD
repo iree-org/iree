@@ -29,6 +29,7 @@ iree_lit_test_suite(
         "reduction.mlir",
         "reduction_eltwise.mlir",
         "reduction_v2.mlir",
+        "reduction_v2_uneven.mlir",
         "softmax.mlir",
         "softmax_v2.mlir",
         # First few ops of softmax only, acts as a proxy example.

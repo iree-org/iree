@@ -37,9 +37,10 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[TIDY:.]] = gpu.thread_id  y
 //     CHECK-DAG:   %[[TIDZ:.]] = gpu.thread_id  z
 //         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]{{.*}}to memref<f32, {{.*}}, 3>
+//         CHECK:   %[[ADDED:.*]] = arith.addi %[[TIDZ]], %[[workgroup_id_x]]
 
 // Distributed reduction: everyone loads then 5 xor + addf expected
-//         CHECK:   vector.transfer_read %{{.*}}[%[[TIDZ]], %[[TIDY]], %[[TIDX]]]
+//         CHECK:   vector.transfer_read %{{.*}}[%[[ADDED]], %[[TIDY]], %[[TIDX]]]
 // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 //         CHECK:   %[[RES:.*]] = arith.addf %{{.*}}
 //         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
@@ -104,9 +105,10 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[TIDY:.]] = gpu.thread_id  y
 //     CHECK-DAG:   %[[TIDZ:.]] = gpu.thread_id  z
 //         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]{{.*}}to memref<f32, {{.*}}, 3>
+//         CHECK:   %[[ADDED:.*]] = arith.addi %[[TIDZ]], %[[workgroup_id_x]]
 
 // Distributed reduction: everyone loads then 5 xor + addf expected
-//         CHECK:   vector.transfer_read %{{.*}}[%[[TIDZ]], %[[TIDY]], %[[TIDX]]]
+//         CHECK:   vector.transfer_read %{{.*}}[%[[ADDED]], %[[TIDY]], %[[TIDX]]]
 // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 //         CHECK:   %[[RES:.*]] = arith.addf %{{.*}}
 //         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
@@ -171,9 +173,10 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[TIDZ:.]] = gpu.thread_id  z
 
 //         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]{{.*}}to memref<f32, {{.*}}, 3>
+//         CHECK:   %[[ADDED:.*]] = arith.addi %[[TIDZ]], %[[workgroup_id_x]]
 
 // Distributed reduction: everyone loads, does the elementwise then 5 xor + addf expected
-//         CHECK:   vector.transfer_read %{{.*}}[%[[TIDZ]], %[[TIDY]], %[[TIDX]]]
+//         CHECK:   vector.transfer_read %{{.*}}[%[[ADDED]], %[[TIDY]], %[[TIDX]]]
 //         CHECK:   arith.addf
 //         CHECK:   arith.addf
 // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
@@ -245,9 +248,10 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[TIDZ:.]] = gpu.thread_id  z
 
 //         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]{{.*}}to memref<f32, {{.*}}, 3>
+//         CHECK:   %[[ADDED:.*]] = arith.addi %[[TIDZ]], %[[workgroup_id_x]]
 
 // Distributed reduction: everyone loads, does the elementwise then 5 xor + addf expected
-//         CHECK:   vector.transfer_read %{{.*}}[%[[TIDZ]], %[[TIDY]], %[[TIDX]]]
+//         CHECK:   vector.transfer_read %{{.*}}[%[[ADDED]], %[[TIDY]], %[[TIDX]]]
 //         CHECK:   arith.addf
 //         CHECK:   arith.addf
 // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
