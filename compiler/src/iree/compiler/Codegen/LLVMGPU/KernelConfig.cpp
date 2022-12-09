@@ -10,7 +10,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
-#include "iree/compiler/Codegen/Common/TransformDialectStrategies.h"
+#include "iree/compiler/Codegen/Common/TransformDialectStrategiesGPU.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"

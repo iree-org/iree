@@ -145,8 +145,13 @@ cc_library(
     includes = ["include"],
     deps = [
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:Rewrite",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:Transforms",
     ],
 )

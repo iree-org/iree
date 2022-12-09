@@ -4,22 +4,21 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/TransformExtensions/TransformMatchers.h"
+#include "iree-dialects/Transforms/TransformMatchers.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
 using namespace mlir;
-using namespace mlir::iree_compiler;
-using namespace mlir::iree_compiler::IREE;
 
 //===---------------------------------------------------------------------===//
 // StructuredOpMatcher and friends.
 //===---------------------------------------------------------------------===//
 
-bool transform_dialect::StructuredOpMatcher::match(Operation *op) {
+bool transform_ext::StructuredOpMatcher::match(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) return false;
+  if (!linalgOp)
+    return false;
 
   if (!llvm::all_of(predicates, [linalgOp](const PredicateFn &fn) {
         return fn(linalgOp);
@@ -31,21 +30,22 @@ bool transform_dialect::StructuredOpMatcher::match(Operation *op) {
   return true;
 }
 
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::dim(int64_t dimension, ShapeKind kind) {
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::dim(int64_t dimension, ShapeKind kind) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
     int64_t transformedDimension =
         dimension >= 0 ? dimension : shape.size() + dimension;
-    if (transformedDimension >= shape.size()) return false;
+    if (transformedDimension >= shape.size())
+      return false;
     return ShapedType::isDynamic(shape[transformedDimension]) ^
            (kind == ShapeKind::Static);
   });
   return *this;
 }
 
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::dim(AllDims tag, ShapeKind kind) {
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::dim(AllDims tag, ShapeKind kind) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
     return llvm::all_of(shape, [=](int64_t dimension) {
@@ -55,14 +55,15 @@ transform_dialect::StructuredOpMatcher::dim(AllDims tag, ShapeKind kind) {
   return *this;
 }
 
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::dim(int64_t dimension,
-                                            utils::IteratorType kind) {
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::dim(int64_t dimension,
+                                        utils::IteratorType kind) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     unsigned rank = linalgOp.getNumLoops();
     int64_t transformedDimension =
         dimension >= 0 ? dimension : rank + dimension;
-    if (transformedDimension >= rank) return false;
+    if (transformedDimension >= rank)
+      return false;
 
     utils::IteratorType iteratorKind =
         linalgOp.getIteratorTypesArray()[transformedDimension];
@@ -70,9 +71,8 @@ transform_dialect::StructuredOpMatcher::dim(int64_t dimension,
   });
   return *this;
 }
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::dim(AllDims tag,
-                                            utils::IteratorType kind) {
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::dim(AllDims tag, utils::IteratorType kind) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     return llvm::all_of(
         linalgOp.getIteratorTypesArray(),
@@ -81,14 +81,15 @@ transform_dialect::StructuredOpMatcher::dim(AllDims tag,
   return *this;
 }
 
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::dim(int64_t dimension,
-                                            DivisibleBy divisibleBy) {
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::dim(int64_t dimension,
+                                        DivisibleBy divisibleBy) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     unsigned rank = linalgOp.getNumLoops();
     int64_t transformedDimension =
         dimension >= 0 ? dimension : rank + dimension;
-    if (transformedDimension >= rank) return false;
+    if (transformedDimension >= rank)
+      return false;
 
     int64_t size = linalgOp.getStaticLoopRanges()[transformedDimension];
     return !ShapedType::isDynamic(size) && (size % divisibleBy.value == 0);
@@ -96,8 +97,8 @@ transform_dialect::StructuredOpMatcher::dim(int64_t dimension,
   return *this;
 }
 
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::input(AllOperands tag, IsPermutation) {
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::input(AllOperands tag, IsPermutation) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
@@ -151,7 +152,8 @@ static Operation *traverseSubsetsForwardAnyUse(Value val) {
         auto it = llvm::find_if(range, [&](BlockArgument bbarg) {
           return loop.getTiedOpOperand(bbarg) != &use;
         });
-        if (it == range.end()) return user;
+        if (it == range.end())
+          return user;
         val = *it;
         continue;
       }
@@ -164,9 +166,8 @@ static Operation *traverseSubsetsForwardAnyUse(Value val) {
   } while (true);
 }
 
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::input(int64_t position,
-                                              SubsetOf subset) {
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::input(int64_t position, SubsetOf subset) {
   // Implementation note: SubsetOf must *not* be passed by-reference because
   // it is typically a temporary constructed within the argument of a function
   // call, but it will be used in the lambda that outlives the temporary. The
@@ -174,7 +175,8 @@ transform_dialect::StructuredOpMatcher::input(int64_t position,
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     int64_t transformedPosition =
         position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
-    if (transformedPosition >= linalgOp.getNumDpsInputs()) return false;
+    if (transformedPosition >= linalgOp.getNumDpsInputs())
+      return false;
 
     Operation *producer = traverseSubsetsBackwards(
         linalgOp.getDpsInputOperand(transformedPosition)->get());
@@ -184,8 +186,8 @@ transform_dialect::StructuredOpMatcher::input(int64_t position,
   return *this;
 }
 
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::output(AllOperands tag, IsPermutation) {
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::output(AllOperands tag, IsPermutation) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
       if (!linalgOp.getMatchingIndexingMap(operand).isPermutation())
@@ -196,13 +198,14 @@ transform_dialect::StructuredOpMatcher::output(AllOperands tag, IsPermutation) {
   return *this;
 }
 
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::output(int64_t position,
-                                               ElementTypeBitWidth width) {
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::output(int64_t position,
+                                           ElementTypeBitWidth width) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     int64_t updatedPosition =
         position >= 0 ? position : linalgOp.getNumDpsInits() + position;
-    if (updatedPosition >= linalgOp.getNumDpsInits()) return false;
+    if (updatedPosition >= linalgOp.getNumDpsInits())
+      return false;
     auto shapedType = linalgOp.getDpsInitOperand(updatedPosition)
                           ->get()
                           .getType()
@@ -213,13 +216,14 @@ transform_dialect::StructuredOpMatcher::output(int64_t position,
   return *this;
 }
 
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::output(int64_t position,
-                                               SingleCombinerReduction tag) {
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::output(int64_t position,
+                                           SingleCombinerReduction tag) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     int64_t updatedPosition =
         position >= 0 ? position : linalgOp.getNumDpsInits() + position;
-    if (updatedPosition >= linalgOp.getNumDpsInits()) return false;
+    if (updatedPosition >= linalgOp.getNumDpsInits())
+      return false;
     SmallVector<Operation *> combinerOps;
     return matchReduction(linalgOp.getRegionOutputArgs(), updatedPosition,
                           combinerOps) &&
@@ -228,9 +232,8 @@ transform_dialect::StructuredOpMatcher::output(int64_t position,
   return *this;
 }
 
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::output(int64_t position,
-                                               SubsetOf subset) {
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::output(int64_t position, SubsetOf subset) {
   // Implementation note: SubsetOf must *not* be passed by-reference because
   // it is typically a temporary constructed within the argument of a function
   // call, but it will be used in the lambda that outlives the temporary. The
@@ -238,7 +241,8 @@ transform_dialect::StructuredOpMatcher::output(int64_t position,
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     int64_t transformedPosition =
         position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
-    if (transformedPosition >= linalgOp.getNumDpsInputs()) return false;
+    if (transformedPosition >= linalgOp.getNumDpsInputs())
+      return false;
 
     Operation *producer = traverseSubsetsBackwards(
         linalgOp.getDpsInitOperand(transformedPosition)->get());
@@ -248,14 +252,13 @@ transform_dialect::StructuredOpMatcher::output(int64_t position,
   return *this;
 }
 
-transform_dialect::StructuredOpMatcher &
-transform_dialect::StructuredOpMatcher::result(int64_t position, HasAnyUse tag,
-                                               SubsetOf subset,
-                                               OptionalMatch optional) {
+transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::result(
+    int64_t position, HasAnyUse tag, SubsetOf subset, OptionalMatch optional) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     int64_t transformedPosition =
         position >= 0 ? position : linalgOp->getNumResults() + position;
-    if (transformedPosition >= linalgOp->getNumResults()) return false;
+    if (transformedPosition >= linalgOp->getNumResults())
+      return false;
 
     Operation *user =
         traverseSubsetsForwardAnyUse(linalgOp->getResult(transformedPosition));
@@ -268,8 +271,8 @@ transform_dialect::StructuredOpMatcher::result(int64_t position, HasAnyUse tag,
 // MatchCallbackResult.
 //===---------------------------------------------------------------------===//
 
-ArrayRef<Operation *> transform_dialect::MatchCallbackResult::getPayloadGroup(
-    unsigned position) const {
+ArrayRef<Operation *>
+transform_ext::MatchCallbackResult::getPayloadGroup(unsigned position) const {
   assert(position < payloadGroupLengths.size());
   int64_t start = 0;
   for (unsigned i = 0; i < position; ++i) {
@@ -285,11 +288,11 @@ ArrayRef<Operation *> transform_dialect::MatchCallbackResult::getPayloadGroup(
 
 static constexpr unsigned kCudaWarpSize = 32;
 
-void transform_dialect::makeGPUReductionMatcher(
-    transform_dialect::StructuredOpMatcher &reduction,
-    transform_dialect::StructuredOpMatcher &fill,
-    transform_dialect::StructuredOpMatcher &leading,
-    transform_dialect::StructuredOpMatcher &trailing) {
+void transform_ext::makeReductionMatcher(
+    transform_ext::StructuredOpMatcher &reduction,
+    transform_ext::StructuredOpMatcher &fill,
+    transform_ext::StructuredOpMatcher &leading,
+    transform_ext::StructuredOpMatcher &trailing) {
   fill = m_StructuredOp<linalg::FillOp>();
   trailing = m_StructuredOp<linalg::GenericOp>()
                  .input(AllOperands(), IsPermutation())
@@ -314,13 +317,13 @@ void transform_dialect::makeGPUReductionMatcher(
                   .result(0, HasAnyUse(), trailing, OptionalMatch());
 }
 
-void transform_dialect::makeGPUSplitReductionMatcher(
-    transform_dialect::StructuredOpMatcher &parallel_reduction,
-    transform_dialect::StructuredOpMatcher &combiner_reduction,
-    transform_dialect::StructuredOpMatcher &parallel_fill,
-    transform_dialect::StructuredOpMatcher &original_fill,
-    transform_dialect::StructuredOpMatcher &leading,
-    transform_dialect::StructuredOpMatcher &trailing) {
+void transform_ext::makeSplitReductionMatcher(
+    transform_ext::StructuredOpMatcher &parallel_reduction,
+    transform_ext::StructuredOpMatcher &combiner_reduction,
+    transform_ext::StructuredOpMatcher &parallel_fill,
+    transform_ext::StructuredOpMatcher &original_fill,
+    transform_ext::StructuredOpMatcher &leading,
+    transform_ext::StructuredOpMatcher &trailing) {
   original_fill = m_StructuredOp<linalg::FillOp>();
   parallel_fill = m_StructuredOp<linalg::FillOp>();
   trailing = m_StructuredOp<linalg::GenericOp>()

@@ -62,7 +62,7 @@ void ireeRegisterTransformExtensions(MlirContext context) {
   DialectRegistry registry;
   registry.addExtensions<
       mlir::iree_compiler::IREE::LinalgExt::LinalgExtTransformOpsExtension,
-      transform_ext::StructuredTransformOpsExtension>();
+      mlir::transform_ext::StructuredTransformOpsExtension>();
   ctx->appendDialectRegistry(registry);
 }
 
