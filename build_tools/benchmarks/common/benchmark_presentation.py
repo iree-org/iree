@@ -191,7 +191,7 @@ class TotalArtifactSizeToTable(MetricsToTableMapper[CompilationMetrics]):
 
   @staticmethod
   def get_table_title() -> str:
-    return "Total Dispatch Sizes"
+    return "Total Artifact Sizes"
 
 
 COMPILATION_METRICS_TO_TABLE_MAPPERS: List[
