@@ -94,6 +94,10 @@ def ConvertConv2DToWinograd :
     Pass<"iree-linalg-ext-convert-conv2d-to-winograd", ""> {
   let summary = "Convert linalg convolution ops to winograd based implementation";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createConvertConv2DToWinogradPass()";
+  let options = [
+    Option<"outputTileSize", "output-tile-size", "int",
+           /*default=*/"6", "Output tile size for Winograd transform">,
+  ];
 }
 
 

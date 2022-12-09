@@ -66,6 +66,11 @@ static llvm::cl::opt<bool> clEnableConvToWinograd(
     llvm::cl::desc("Enable converting convolution ops to winograd form."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<int> clWinogradOutputTileSize(
+    "iree-flow-winograd-output-tile-size",
+    llvm::cl::desc("Output tile size for winograd transform."),
+    llvm::cl::init(6));
+
 static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
     "iree-flow-enable-padding-linalg-ops",
     llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
@@ -193,8 +198,12 @@ void buildGlobalOptimizationPassPipeline(
 /// uses case.
 static void buildOptionalPreprocessingPassPipeline(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
-      .addPredicatedPass(clEnableConvToWinograd,
-                         IREE::LinalgExt::createConvertConv2DToWinogradPass)
+      .addPredicatedPass(
+          clEnableConvToWinograd,
+          [&]() {
+            return IREE::LinalgExt::createConvertConv2DToWinogradPass(
+                clWinogradOutputTileSize);
+          })
       .addPredicatedPass(clEnableConvToImg2Col,
                          IREE::Flow::createConvertConv2DToImg2ColPass)
       .addPredicatedPass(

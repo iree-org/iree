@@ -42,10 +42,6 @@ static bool hasAllOneValues(DenseIntElementsAttr attr) {
   return llvm::all_of(attr, [](APInt element) { return element.isOne(); });
 }
 
-// TODO: Make this a user-settable parameter once we have support
-// for more tile sizes
-static constexpr int64_t outputTileSize = 6;
-
 /// This function computes the Winograd filter transform when
 /// the filter is known to be a constant. Specifically, this
 /// function computes matmul(G, matmul(F, transpose(G))) where
@@ -105,6 +101,9 @@ class FoldWinogradFilterTransform final
     : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
+  FoldWinogradFilterTransform(MLIRContext *context, int size,
+                              PatternBenefit benefit = 1)
+      : OpRewritePattern(context, benefit), outputTileSize(size) {}
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
@@ -126,6 +125,18 @@ public:
       return failure();
     }
 
+    const float *G{nullptr};
+    switch (outputTileSize) {
+    case 4:
+      G = IREE::LinalgExt::Winograd::G_4x4_3x3;
+      break;
+    case 6:
+      G = IREE::LinalgExt::Winograd::G_6x6_3x3;
+      break;
+    default:
+      return failure();
+    }
+
     Operation *constOp = kernel.getDefiningOp();
     ShapedType type = constOp->getResult(0).getType().cast<ShapedType>();
     auto elemType = type.getElementType().cast<FloatType>();
@@ -141,12 +152,14 @@ public:
                                      shape[3]};
     auto resultType = RankedTensorType::get(resultShape, elemType);
     auto foldedKernelAttr =
-        foldFilterTransform(shape, inputTileSize, kernelSize, resultType,
-                            IREE::LinalgExt::Winograd::G_6x6_3x3, isSplat,
-                            splatValue, nonSplatValues, elemType);
+        foldFilterTransform(shape, inputTileSize, kernelSize, resultType, G,
+                            isSplat, splatValue, nonSplatValues, elemType);
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, foldedKernelAttr);
     return success();
   }
+
+private:
+  int outputTileSize;
 };
 
 } // namespace
@@ -243,6 +256,9 @@ class ConvertConv2DNhwcHwcf final
     : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
+  ConvertConv2DNhwcHwcf(MLIRContext *context, int size,
+                        PatternBenefit benefit = 1)
+      : OpRewritePattern(context, benefit), outputTileSize(size) {}
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
@@ -368,6 +384,9 @@ public:
     result.replaceAllUsesWith(winogradOutput);
     return success();
   }
+
+private:
+  int outputTileSize;
 };
 
 struct ConvertConv2DToWinogradPass
@@ -376,22 +395,31 @@ struct ConvertConv2DToWinogradPass
     registry
         .insert<linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect>();
   }
+  ConvertConv2DToWinogradPass(int outputTileSize) {
+    this->outputTileSize = outputTileSize;
+  }
+  ConvertConv2DToWinogradPass(const ConvertConv2DToWinogradPass &pass) {
+    this->outputTileSize = pass.outputTileSize;
+  }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
     patterns.insert<FoldWinogradFilterTransform, ConvertConv2DNhwcHwcf>(
-        context);
+        context, this->outputTileSize);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
     }
   }
+
+private:
+  int outputTileSize;
 };
 
 } // namespace
 
-std::unique_ptr<Pass> createConvertConv2DToWinogradPass() {
-  return std::make_unique<ConvertConv2DToWinogradPass>();
+std::unique_ptr<Pass> createConvertConv2DToWinogradPass(int outputTileSize) {
+  return std::make_unique<ConvertConv2DToWinogradPass>(outputTileSize);
 }
 
 } // namespace LinalgExt
