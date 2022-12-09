@@ -50,6 +50,9 @@ See details about `IREE_ENABLE_RUNTIME_TRACING` [here](/docs/developers/developi
 ```
 
 **Collect compilation statistics**
+
+See [here](/benchmarks/README.md#collect-compile-stats) for additional build
+steps to enable compilation statistics collection.
 ```sh
 ./collect_compilation_statistics.py \
   --output "compile-stats.json" \

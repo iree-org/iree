@@ -114,7 +114,7 @@ The benchmark results will be saved in `results.json`. You can use
 benchmark results and generate the report. More details can be found
 [here](/build_tools/benchmarks/README.md).
 
-### Check compilation statistics on benchmark suites locally
+### <a name="collect-compile-stats"></a> Check compilation statistics on benchmark suites locally
 
 Similar to [running benchmarks locally](#run-benchmark-locally), you need to
 first build the target `iree-benchmark-suites`. But in addition to
