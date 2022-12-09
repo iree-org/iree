@@ -58,6 +58,8 @@ typedef struct iree_hal_webgpu_staging_buffer_t {
 
   // Layout of an empty bind group, useful for padding within pipeline layouts.
   WGPUBindGroupLayout empty_bind_group_layout;
+  // Empty bind group.
+  WGPUBindGroup empty_bind_group;
 
   // Current write offset in the device buffer.
   uint32_t offset;

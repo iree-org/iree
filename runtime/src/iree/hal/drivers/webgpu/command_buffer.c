@@ -850,6 +850,15 @@ static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch(
     command_buffer->state.bind_groups[i].handle = handle;
   }
 
+  // Pad up to IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX with empty bind groups.
+  WGPUBindGroup empty_handle = command_buffer->staging_buffer->empty_bind_group;
+  for (iree_host_size_t i = binding_info->set_count;
+       i < IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX; ++i) {
+    wgpuComputePassEncoderSetBindGroup(compute_pass, (uint32_t)i, empty_handle,
+                                       0, NULL);
+    command_buffer->state.bind_groups[i].handle = empty_handle;
+  }
+
   *out_compute_pass = compute_pass;
   return iree_ok_status();
 }

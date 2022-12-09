@@ -105,6 +105,15 @@ iree_status_t iree_hal_webgpu_staging_buffer_initialize(
   };
   out_staging_buffer->empty_bind_group_layout =
       wgpuDeviceCreateBindGroupLayout(device, &empty_group_layout_descriptor);
+  const WGPUBindGroupDescriptor empty_descriptor = {
+      .nextInChain = NULL,
+      .label = WGPU_DEBUG_LABEL("_empty"),
+      .layout = out_staging_buffer->empty_bind_group_layout,
+      .entryCount = 0,
+      .entries = NULL,
+  };
+  out_staging_buffer->empty_bind_group =
+      wgpuDeviceCreateBindGroup(device, &empty_descriptor);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -115,6 +124,7 @@ void iree_hal_webgpu_staging_buffer_deinitialize(
   iree_wgpuBindGroupLayoutDrop(staging_buffer->empty_bind_group_layout);
   iree_wgpuBindGroupDrop(staging_buffer->bind_group);
   iree_wgpuBindGroupLayoutDrop(staging_buffer->bind_group_layout);
+  iree_wgpuBindGroupDrop(staging_buffer->empty_bind_group);
   iree_hal_buffer_release(staging_buffer->device_buffer);
 }
 
