@@ -119,7 +119,9 @@ benchmark results and generate the report. More details can be found
 Similar to [running benchmarks locally](#run-benchmark-locally), you need to
 first build the target `iree-benchmark-suites`. But in addition to
 `-DIREE_BUILD_BENCHMARKS=ON`, `-DIREE_ENABLE_COMPILATION_BENCHMARKS=ON` is also
-required. For example:
+required. **Note that using [Ninja](https://ninja-build.org/) to build the
+project is mandatory**, becuase the tools rely on `.ninja_log` to collect the
+compilation time. For example:
 
 ```sh
 cmake -GNinja -S ${IREE_SOURCE_DIR} -B ${IREE_BUILD_DIR}
