@@ -119,8 +119,6 @@ getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
   for (auto tileSize : mixedTileSizes) {
     if (tileSize.is<Value>()) {
       encodingInfo.innerTileSizes.push_back(ShapedType::kDynamic);
-      //return packOp.emitOpError(
-          //"unhandled distribution of pack op with dynamic inner tile size");
     } else {
       encodingInfo.innerTileSizes.push_back(
           tileSize.get<Attribute>().cast<IntegerAttr>().getInt());

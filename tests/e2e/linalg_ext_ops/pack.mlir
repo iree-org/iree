@@ -494,5 +494,3 @@ func.func @fully_dynamic_pack_pad_transpose_inner_and_outer_dims_large() {
   check.expect_eq(%cast_pack, %transpose) : tensor<16x4x16x32xi32>
   return
 }
-
-
