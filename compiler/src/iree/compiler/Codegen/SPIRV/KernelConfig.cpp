@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -890,15 +891,10 @@ LogicalResult setCooperativeMatrixConfig(
   tileSizes.push_back(vectorSizes);
 
   // Check if the C matrix will be promoted for computing shared memory usage.
-  bool promoteC = false;
-  SmallVector<Operation *> computeOps;
-  if (!failed(getComputeOps(op->getParentOfType<func::FuncOp>(), computeOps))) {
-    unsigned count = 0;
-    for (Operation *computeOp : computeOps) {
-      if (!isa<linalg::FillOp>(computeOp)) ++count;
-    }
-    promoteC = count > 1;
-  }
+  auto matmulResult = op.getDpsInitOperand(0)->get();
+  bool promoteC =
+      !matmulResult.hasOneUse() ||
+      !isa<IREE::Flow::DispatchTensorStoreOp>(*matmulResult.getUsers().begin());
 
   // Decrease pipeline depth until it fits in shared memory.
   auto pipelineDepth = softwarePipelineDepth;
@@ -908,13 +904,6 @@ LogicalResult setCooperativeMatrixConfig(
       getTileBytes(workgroupTileSizes[mIndex], workgroupTileSizes[nIndex],
                    reductionTileSizes[kIndex],
                    getElementType(lhs).getIntOrFloatBitWidth(), promoteC);
-
-  // TODO: Remove this check once either bufferization doesn't produce an extra
-  // buffer when fused with something like elementwise extf, or the shared
-  // memory calculation incorporates the fused op properly.
-  if (pipelineDepth != 0 && fusedOpMayUseExtraSharedMemory(op)) {
-    pipelineDepth = 0;
-  }
 
   while (pipelineDepth > 0 &&
          getMultiBufferMemoryUsage(usedBytes, pipelineDepth, storeStage) >

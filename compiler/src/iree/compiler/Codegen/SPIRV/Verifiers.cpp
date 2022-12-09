@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -330,15 +331,10 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   // Check if the C matrix will be promoted for computing shared memory usage.
-  bool promoteC = false;
-  SmallVector<Operation *> computeOps;
-  if (!failed(getComputeOps(op->getParentOfType<func::FuncOp>(), computeOps))) {
-    unsigned count = 0;
-    for (Operation *computeOp : computeOps) {
-      if (!isa<linalg::FillOp>(computeOp)) ++count;
-    }
-    promoteC = count > 1;
-  }
+  auto matmulResult = cast<linalg::LinalgOp>(op).getDpsInitOperand(0)->get();
+  bool promoteC =
+      !matmulResult.hasOneUse() ||
+      !isa<IREE::Flow::DispatchTensorStoreOp>(*matmulResult.getUsers().begin());
 
   // Verify shared memory usage of operands after tiling <= maxSharedMemory.
   unsigned tilingSharedMemSizeBytes = getTileBytes(
