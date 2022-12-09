@@ -5,8 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Generates CMake rules to build IREE artifacts."""
 
+import collections
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Sequence
 import pathlib
 
 from e2e_test_artifacts import iree_artifacts
@@ -188,30 +189,51 @@ class IreeRuleBuilder(object):
 
 def generate_rules(
     package_name: str, root_path: pathlib.PurePath,
-    artifacts_root: iree_artifacts.ArtifactsRoot,
+    module_generation_configs: Sequence[
+        iree_definitions.ModuleGenerationConfig],
     model_rule_map: Dict[str, model_rule_generator.ModelRule]) -> List[str]:
-  """Generates all rules to build IREE artifacts."""
+  """Generates all rules to build IREE artifacts.
+  
+  Args:
+    package_name: CMake package name for rules.
+    root_path: path of the root artifact directory.
+    module_generation_configs: List of IREE module generation configs
+    model_rule_map: Map of generated model rules keyed by model id. It must
+      cover all model referenced in module_generation_configs.
+  Returns:
+    List of cmake rules.
+  """
 
   rule_builder = IreeRuleBuilder(package_name=package_name)
 
+  all_imported_models = collections.OrderedDict(
+      (config.imported_model.model.id, config.imported_model)
+      for config in module_generation_configs)
+
   cmake_rules = []
-  for model_dir in artifacts_root.model_dir_map.values():
-    imported_model_artifact = model_dir.imported_model_artifact
-    imported_model = imported_model_artifact.imported_model
+  model_import_rule_map = {}
+  for model_id, imported_model in all_imported_models.items():
     model_rule = model_rule_map[imported_model.model.id]
 
+    imported_model_path = iree_artifacts.get_imported_model_path(
+        imported_model=imported_model, root_path=root_path)
     model_import_rule = rule_builder.build_model_import_rule(
         source_model_rule=model_rule,
         imported_model=imported_model,
-        output_file_path=root_path / imported_model_artifact.file_path)
+        output_file_path=imported_model_path)
+    model_import_rule_map[model_id] = model_import_rule
     cmake_rules.extend(model_import_rule.cmake_rules)
 
-    for module_dir in model_dir.module_dir_map.values():
-      module_compile_rule = rule_builder.build_module_compile_rule(
-          model_import_rule=model_import_rule,
-          imported_model=imported_model,
-          compile_config=module_dir.compile_config,
-          output_file_path=root_path / module_dir.module_path)
-      cmake_rules.extend(module_compile_rule.cmake_rules)
+  for gen_config in module_generation_configs:
+    model_import_rule = model_import_rule_map[
+        gen_config.imported_model.model.id]
+    module_dir_path = iree_artifacts.get_module_dir_path(
+        module_generation_config=gen_config, root_path=root_path)
+    module_compile_rule = rule_builder.build_module_compile_rule(
+        model_import_rule=model_import_rule,
+        imported_model=gen_config.imported_model,
+        compile_config=gen_config.compile_config,
+        output_file_path=module_dir_path / iree_artifacts.MODULE_FILENAME)
+    cmake_rules.extend(module_compile_rule.cmake_rules)
 
   return cmake_rules

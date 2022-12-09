@@ -6,7 +6,7 @@
 """Generates CMake rules to build common artifacts."""
 
 from dataclasses import dataclass
-from typing import List, OrderedDict, Sequence
+from typing import Iterable, List, OrderedDict
 import collections
 import pathlib
 import urllib.parse
@@ -24,8 +24,8 @@ class ModelRule(object):
 
 
 def generate_model_rule_map(
-    root_dir: pathlib.PurePath,
-    models: Sequence[common_definitions.Model]) -> OrderedDict[str, ModelRule]:
+    root_path: pathlib.PurePath,
+    models: Iterable[common_definitions.Model]) -> OrderedDict[str, ModelRule]:
   """Returns the model rules keyed by model id in an ordered map."""
 
   model_rules = collections.OrderedDict()
@@ -33,7 +33,7 @@ def generate_model_rule_map(
     # Model target: <package_name>-model-<model_id>
     target_name = f"model-{model.id}"
     model_path = str(
-        model_artifacts.get_model_path(model=model, root_dir=root_dir))
+        model_artifacts.get_model_path(model=model, root_path=root_path))
 
     model_url = urllib.parse.urlparse(model.source_url)
     if model_url.scheme == "https":
