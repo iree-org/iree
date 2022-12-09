@@ -736,13 +736,11 @@ jobs:
         env:
           E2E_TEST_ARTIFACTS_DIR: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
-          COMPRESSED_OUT_DIR: compressed-out
         run: |
-          zstd -T0 -r --output-dir-mirror "${COMPRESSED_OUT_DIR}" "${E2E_TEST_ARTIFACTS_DIR}/iree"
           # Not archiving the directory to allow fetching each file as needed
           # separately.
           gcloud alpha storage cp -r \
-            "${COMPRESSED_OUT_DIR}/${E2E_TEST_ARTIFACTS_DIR}/iree" \
+            "${E2E_TEST_ARTIFACTS_DIR}/iree" \
             "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/iree"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
 
