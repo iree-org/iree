@@ -49,6 +49,13 @@ See details about `IREE_ENABLE_RUNTIME_TRACING` [here](/docs/developers/developi
   --output=results.json $IREE_BUILD_DIR
 ```
 
+**Collect compilation statistics**
+```sh
+./collect_compilation_statistics.py \
+  --output "compile-stats.json" \
+  "${IREE_BUILD_DIR}"
+```
+
 ## Generating Benchmark Report
 
 The tools here are mainly designed for benchmark automation pipelines.
@@ -62,4 +69,13 @@ the report. For example:
 
 ```sh
 ./diff_local_benchmarks.py --base before.json --target after.json > report.md
+```
+
+An example that compares compilation statistics:
+
+```sh
+./diff_local_benchmarks.py \
+  --base-compile-stats "compile-stats-before.json" \
+  --target-compile-stats "compile-stats-after.json" \
+  > report.md
 ```
