@@ -72,6 +72,12 @@ void propagateSharedMemoryCopy(func::FuncOp funcOp);
 /// Inserts barriers before and after shared memory copy.
 void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp);
 
+//===----------------------------------------------------------------------===//
+// GPU workgroup memory
+//===----------------------------------------------------------------------===//
+
+const char *getWarpReductionFusedOpTileSizeAttrName();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

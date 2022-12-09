@@ -189,6 +189,7 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   pm.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 
   // Turn multi-dimension memref into one-dimension. This is needed for SPIR-V
   // because we don't use upstream memref descriptors.

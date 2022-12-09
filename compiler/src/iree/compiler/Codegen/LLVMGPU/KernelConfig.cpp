@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -571,6 +572,15 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   tileSizes.emplace_back(std::move(reductionTileSizes));  // reduction level
+  for (Operation *userOp : op->getUsers()) {
+    if (auto fusedOp = dyn_cast<linalg::LinalgOp>(userOp)) {
+      // Set lowering configuration to drive tiling for fused ops too---the
+      // pipeline expects it.
+      fusedOp->setAttr(
+          getWarpReductionFusedOpTileSizeAttrName(),
+          DenseI64ArrayAttr::get(fusedOp.getContext(), tileSizes.back()));
+    }
+  }
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
