@@ -118,14 +118,15 @@ getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
   encodingInfo.innerTileSizes.reserve(mixedTileSizes.size());
   for (auto tileSize : mixedTileSizes) {
     if (tileSize.is<Value>()) {
-      return packOp.emitOpError(
-          "unhandled distribution of pack op with dynamic inner tile size");
+      encodingInfo.innerTileSizes.push_back(ShapedType::kDynamic);
+    } else {
+      encodingInfo.innerTileSizes.push_back(
+          tileSize.get<Attribute>().cast<IntegerAttr>().getInt());
     }
-    encodingInfo.innerTileSizes.push_back(
-        tileSize.get<Attribute>().cast<IntegerAttr>().getInt());
   }
   encodingInfo.innerDimsPos = llvm::to_vector(packOp.getInnerDimsPos());
   encodingInfo.outerDimsPerm = llvm::to_vector(packOp.getOuterDimsPerm());
+  encodingInfo.srcRank = packOp.getInputRank();
   return encodingInfo;
 }
 
@@ -268,6 +269,7 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
             getAsOpFoldResults(materializeEncodingInfo.innerTileSizes),
             materializeEncodingInfo.innerDimsPos,
             materializeEncodingInfo.outerDimsPerm);
+    resultShape.resize(materializeEncodingInfo.srcRank);
 
     rewriter
         .replaceOpWithNewOp<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(
