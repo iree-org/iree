@@ -48,7 +48,8 @@ fi
 PYTHON=python3.10 VENV_DIR=shark.venv BENCHMARK=1 IMPORTER=1 ./setup_venv.sh
 source shark.venv/bin/activate
 export SHARK_VERSION=`pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g"`
-pytest "${args[@]}" tank/test_models.py || true
+# The flag --enable_conv_transform is currently only supported in SHARK-runtime.
+pytest "${args[@]}" --enable_conv_transform=True tank/test_models.py || true
 
 echo "######################################################"
 echo "Benchmarks for SHARK-Runtime Complete"
