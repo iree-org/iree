@@ -5,9 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Generates CMake rules to build IREE artifacts."""
 
-import collections
 from dataclasses import dataclass
 from typing import Dict, List, Sequence
+import collections
 import pathlib
 
 from e2e_test_artifacts import iree_artifacts
@@ -19,14 +19,14 @@ import cmake_builder.rules
 @dataclass(frozen=True)
 class IreeModelImportRule(object):
   target_name: str
-  output_file_path: str
+  output_file_path: pathlib.PurePath
   cmake_rules: List[str]
 
 
 @dataclass(frozen=True)
 class IreeModuleCompileRule(object):
   target_name: str
-  output_module_path: str
+  output_module_path: pathlib.PurePath
   cmake_rules: List[str]
 
 
@@ -45,12 +45,12 @@ class IreeRuleBuilder(object):
 
     model = imported_model.model
     if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
-      if pathlib.PurePath(source_model_rule.file_path) != output_file_path:
-        raise ValueError("Separate path for Linalg model isn't supported ('" +
-                         source_model_rule.file_path + "' != '" +
-                         str(output_file_path) + "')")
+      if source_model_rule.file_path != output_file_path:
+        raise ValueError(
+            f"Separate path for Linalg model isn't supported "
+            f"('{source_model_rule.file_path }' != '{output_file_path}')")
       return IreeModelImportRule(target_name=source_model_rule.target_name,
-                                 output_file_path=str(output_file_path),
+                                 output_file_path=output_file_path,
                                  cmake_rules=[])
 
     # Import target name: iree-imported-model-<model_id>
@@ -60,14 +60,14 @@ class IreeRuleBuilder(object):
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tflite_model(
               target_path=self._build_target_path(target_name),
-              source=source_model_rule.file_path,
+              source=str(source_model_rule.file_path),
               output_mlir_file=str(output_file_path))
       ]
     elif model.source_type == common_definitions.ModelSourceType.EXPORTED_TF:
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tf_model(
               target_path=self._build_target_path(target_name),
-              source=source_model_rule.file_path,
+              source=str(source_model_rule.file_path),
               entry_function=model.entry_function,
               output_mlir_file=str(output_file_path))
       ]
@@ -82,7 +82,7 @@ class IreeRuleBuilder(object):
             deps=[self._build_target_path(target_name)]))
 
     return IreeModelImportRule(target_name=target_name,
-                               output_file_path=str(output_file_path),
+                               output_file_path=output_file_path,
                                cmake_rules=cmake_rules)
 
   def build_module_compile_rule(
@@ -102,7 +102,7 @@ class IreeRuleBuilder(object):
     cmake_rules = [
         cmake_builder.rules.build_iree_bytecode_module(
             target_name=target_name,
-            src=model_import_rule.output_file_path,
+            src=str(model_import_rule.output_file_path),
             module_name=str(output_file_path),
             flags=compile_flags),
         cmake_builder.rules.build_add_dependencies(
@@ -113,7 +113,7 @@ class IreeRuleBuilder(object):
     # TODO(#10155): Dump the compile flags from iree_bytecode_module into a flagfile.
 
     return IreeModuleCompileRule(target_name=target_name,
-                                 output_module_path=str(output_file_path),
+                                 output_module_path=output_file_path,
                                  cmake_rules=cmake_rules)
 
   def _generate_compile_flags(self,
@@ -213,7 +213,9 @@ def generate_rules(
   cmake_rules = []
   model_import_rule_map = {}
   for model_id, imported_model in all_imported_models.items():
-    model_rule = model_rule_map[imported_model.model.id]
+    model_rule = model_rule_map.get(imported_model.model.id)
+    if model_rule is None:
+      raise ValueError(f"Model rule not found for {imported_model.model.id}.")
 
     imported_model_path = iree_artifacts.get_imported_model_path(
         imported_model=imported_model, root_path=root_path)

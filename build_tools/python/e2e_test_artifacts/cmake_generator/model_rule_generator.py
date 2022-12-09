@@ -19,7 +19,7 @@ import cmake_builder.rules
 @dataclass
 class ModelRule(object):
   target_name: str
-  file_path: str
+  file_path: pathlib.PurePath
   cmake_rules: List[str]
 
 
@@ -32,8 +32,8 @@ def generate_model_rule_map(
   for model in models:
     # Model target: <package_name>-model-<model_id>
     target_name = f"model-{model.id}"
-    model_path = str(
-        model_artifacts.get_model_path(model=model, root_path=root_path))
+    model_path = model_artifacts.get_model_path(model=model,
+                                                root_path=root_path)
 
     model_url = urllib.parse.urlparse(model.source_url)
     if model_url.scheme == "https":
@@ -41,7 +41,7 @@ def generate_model_rule_map(
           cmake_builder.rules.build_iree_fetch_artifact(
               target_name=target_name,
               source_url=model.source_url,
-              output=model_path,
+              output=str(model_path),
               unpack=True)
       ]
     else:
