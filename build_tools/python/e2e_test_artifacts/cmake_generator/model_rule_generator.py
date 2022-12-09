@@ -6,12 +6,13 @@
 """Generates CMake rules to build common artifacts."""
 
 from dataclasses import dataclass
-from typing import List, OrderedDict
+from typing import List, OrderedDict, Sequence
 import collections
 import pathlib
 import urllib.parse
 
 from e2e_test_artifacts import model_artifacts
+from e2e_test_framework.definitions import common_definitions
 import cmake_builder.rules
 
 
@@ -23,16 +24,16 @@ class ModelRule(object):
 
 
 def generate_model_rule_map(
-    root_path: pathlib.PurePath, artifacts_root: model_artifacts.ArtifactsRoot
-) -> OrderedDict[str, ModelRule]:
-  """Returns the model rules in an ordered map."""
+    root_dir: pathlib.PurePath,
+    models: Sequence[common_definitions.Model]) -> OrderedDict[str, ModelRule]:
+  """Returns the model rules keyed by model id in an ordered map."""
 
   model_rules = collections.OrderedDict()
-  for model_artifact in artifacts_root.model_artifact_map.values():
-    model = model_artifact.model
+  for model in models:
     # Model target: <package_name>-model-<model_id>
     target_name = f"model-{model.id}"
-    model_path = str(root_path / model_artifact.file_path)
+    model_path = str(
+        model_artifacts.get_model_path(model=model, root_dir=root_dir))
 
     model_url = urllib.parse.urlparse(model.source_url)
     if model_url.scheme == "https":

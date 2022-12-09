@@ -12,18 +12,8 @@ import pathlib
 from e2e_test_artifacts import model_artifacts
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
-IREE_ARTIFACTS_SUB_ROOT = pathlib.PurePath("iree")
-
-def _get_imported_model_path(
-    parent_path: pathlib.PurePath,
-    imported_model: iree_definitions.ImportedModel,
-    model_artifact: model_artifacts.ModelArtifact) -> pathlib.PurePath:
-  model = imported_model.model
-  if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
-    # Uses the MLIR model directly.
-    return model_artifact.file_path
-  # Imported model path: <parent_path>/<model_name>.mlir
-  return parent_path / f"{model.name}.mlir"
+IREE_ARTIFACT_PREFIX = "iree"
+MODULE_FILENAME = "module.vmfb"
 
 
 def _get_model_prefix(imported_model: iree_definitions.ImportedModel) -> str:
@@ -35,54 +25,49 @@ def _get_model_prefix(imported_model: iree_definitions.ImportedModel) -> str:
 
 def get_imported_model_path(
     imported_model: iree_definitions.ImportedModel,
-    root_dir_path: pathlib.PurePath = pathlib.PurePath()
+    root_dir: pathlib.PurePath = pathlib.PurePath()
 ) -> pathlib.PurePath:
-  """Returns the path of an IREE imported MLIR model.
+  """Returns the path of an IREE imported MLIR model. If the source model is
+  in MLIR format, returns the path of source model.
   
   Args:
     imported_model: IREE model importing config.
-    root_dir_path: path of the root artifact directory, on which the returned
-      path will be based.
+    root_dir: path of the root artifact directory, on which the returned path
+      will base.
   Returns:
     Path of the imported model file.
   """
+  model = imported_model.model
+  if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
+    # Uses the MLIR model directly.
+    return model_artifacts.get_model_path(model=model, root_dir=root_dir)
+
   model_prefix = _get_model_prefix(imported_model)
-  # Imported model path: <model_prefix>.mlir
-  return root_dir_path / f"{model_prefix}.mlir"
+  # Imported model path: <root_dir>/<model_prefix>.mlir
+  return root_dir / f"{model_prefix}.mlir"
 
 
-def get_module_path(
+def get_module_dir_path(
     module_generation_config: iree_definitions.ModuleGenerationConfig,
-    root_dir_path: pathlib.PurePath = pathlib.PurePath()
+    root_dir: pathlib.PurePath = pathlib.PurePath()
 ) -> pathlib.PurePath:
-  """Returns the path of an IREE compiled module.
+  """Returns the path of an IREE module directory, which contains the compiled
+  module and related flag files.
   
   Args:
     module_generation_config: IREE module generation config.
-    root_dir_path: path of the root artifact directory, on which the returned
-      path will be based.
+    root_dir: path of the root artifact directory, on which the returned path
+      will base.
   Returns:
-    Path of the module file.
+    Path of the module directory.
   """
   model_prefix = _get_model_prefix(module_generation_config.imported_model)
-  # Module path: <model_prefix>/<compile_config_id>.vmfb
-  return (root_dir_path /
-          f"{model_prefix}_{module_generation_config.compile_config.id}.vmfb")
-
-
-def _build_module_directory(
-    root_dir_path: pathlib.PurePath,
-    module_generation_config: iree_definitions.ModuleGenerationConfig
-) -> ModuleDirectory:
-  compile_config = module_generation_config.compile_config
-  module_path = get_module_path(
-      root_dir_path=root_dir_path,
-      module_generation_config=module_generation_config)
-  return ModuleDirectory(module_path=module_path, compile_config=compile_config)
+  # Module path: <root_dir>/<model_prefix>_<compile_config_id>
+  return root_dir / f"{model_prefix}_{module_generation_config.compile_config.id}"
 
 
 def generate_artifacts_root(
-    root_dir_path: pathlib.PurePath,
+    root_dir: pathlib.PurePath,
     model_artifacts_root: model_artifacts.ArtifactsRoot,
     module_generation_configs: Sequence[iree_definitions.ModuleGenerationConfig]
 ) -> ArtifactsRoot:
@@ -99,14 +84,14 @@ def generate_artifacts_root(
 
   model_dir_map = collections.OrderedDict()
   for imported_model in all_imported_models.values():
-    model_dir_path = _get_model_dir_path(root_dir_path=root_dir_path,
+    model_dir_path = _get_model_dir_path(root_dir=root_dir,
                                          imported_model=imported_model)
     model = imported_model.model
 
     module_dir_map = collections.OrderedDict()
     for config in grouped_generation_configs[model.id]:
       module_dir_map[config.compile_config.id] = _build_module_directory(
-          root_dir_path=root_dir_path, module_generation_config=config)
+          root_dir=root_dir, module_generation_config=config)
 
     model_artifact = model_artifacts_root.model_artifact_map.get(model.id)
     if model_artifact is None:
