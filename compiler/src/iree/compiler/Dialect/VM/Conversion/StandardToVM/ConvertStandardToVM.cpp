@@ -772,6 +772,7 @@ class IndexCastOpConversion : public OpConversionPattern<OpTy> {
   LogicalResult matchAndRewrite(
       OpTy srcOp, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
+    // TODO(jpienaar): Audit and fix if needed.
     auto srcType = adaptor.getIn().getType();
     auto dstType =
         this->getTypeConverter()->convertType(srcOp.getResult().getType());
@@ -890,39 +891,31 @@ class TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
   }
 };
 
-class SIToFPOpConversion : public OpConversionPattern<arith::SIToFPOp> {
-  using OpConversionPattern::OpConversionPattern;
+template <typename OpTy, typename ExtOpTy, typename CastOpTy>
+class IntToFPOpConversion : public OpConversionPattern<OpTy> {
+  using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      arith::SIToFPOp srcOp, OpAdaptor adaptor,
+      OpTy srcOp, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto srcType = adaptor.getOperands()[0].getType();
-    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
-    if (srcType.isSignlessInteger(32) || srcType.isSignedInteger(32)) {
-      if (dstType.isF32()) {
-        rewriter.replaceOpWithNewOp<IREE::VM::CastSI32F32Op>(
-            srcOp, dstType, adaptor.getOperands()[0]);
-        return success();
+    auto srcType = srcOp.getIn().getType();
+    auto dstType =
+        this->getTypeConverter()->convertType(srcOp.getResult().getType());
+    if (!dstType.isF32() ||
+        !(srcType.isSignedInteger() || srcType.isSignlessInteger())) {
+      return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+    }
+    Value input = srcOp.getIn();
+    if (!(srcType.isSignlessInteger(32) || srcType.isSignedInteger(32))) {
+      if (srcType.getIntOrFloatBitWidth() < 32) {
+        input = rewriter.create<ExtOpTy>(
+            srcOp.getLoc(), IntegerType::get(this->getContext(), 32), input);
+      } else {
+        return rewriter.notifyMatchFailure(srcOp, "unsupported type");
       }
     }
-    return rewriter.notifyMatchFailure(srcOp, "unsupported type");
-  }
-};
 
-class UIToFPOpConversion : public OpConversionPattern<arith::UIToFPOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      arith::UIToFPOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto srcType = adaptor.getOperands()[0].getType();
-    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
-    if (srcType.isSignlessInteger(32) || srcType.isUnsignedInteger(32)) {
-      if (dstType.isF32()) {
-        rewriter.replaceOpWithNewOp<IREE::VM::CastUI32F32Op>(
-            srcOp, dstType, adaptor.getOperands()[0]);
-        return success();
-      }
-    }
-    return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+    rewriter.replaceOpWithNewOp<CastOpTy>(srcOp, dstType, input);
+    return success();
   }
 };
 
@@ -931,7 +924,7 @@ class FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
   LogicalResult matchAndRewrite(
       arith::FPToSIOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto srcType = adaptor.getOperands()[0].getType();
+    auto srcType = srcOp.getIn().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isF32()) {
       if (dstType.isSignlessInteger(32) || dstType.isSignedInteger(32)) {
@@ -949,7 +942,7 @@ class FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
   LogicalResult matchAndRewrite(
       arith::FPToUIOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto srcType = adaptor.getOperands()[0].getType();
+    auto srcType = srcOp.getIn().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isF32()) {
       if (srcType.isUnsignedInteger(32)) {
@@ -967,7 +960,8 @@ class BitcastOpConversion : public OpConversionPattern<arith::BitcastOp> {
   LogicalResult matchAndRewrite(
       arith::BitcastOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto srcType = adaptor.getOperands()[0].getType();
+    // TODO(jpienaar): Audit and fix if needed.
+    auto srcType = srcOp.getIn().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isF32() && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BitcastF32I32Op>(
@@ -1140,9 +1134,12 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                                                 context);
 
   // Floating-point conversion ops.
-  patterns.insert<SIToFPOpConversion, UIToFPOpConversion, FPToSIOpConversion,
-                  FPToUIOpConversion, BitcastOpConversion>(typeConverter,
-                                                           context);
+  patterns.insert<IntToFPOpConversion<arith::SIToFPOp, arith::ExtSIOp,
+                                      IREE::VM::CastSI32F32Op>,
+                  IntToFPOpConversion<arith::UIToFPOp, arith::ExtUIOp,
+                                      IREE::VM::CastUI32F32Op>,
+                  FPToSIOpConversion, FPToUIOpConversion, BitcastOpConversion>(
+      typeConverter, context);
 
   // Shift ops.
   patterns

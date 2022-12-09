@@ -43,6 +43,7 @@ iree_lit_test_suite(
             "libm_linking.mlir",
             "scalar.mlir",
             "trace_dispatch_tensors.mlir",
+            "trunci.mlir",
             "unused_args.mlir",
         ],
         include =
