@@ -41,7 +41,7 @@ class Android_ARMv8_A_Benchmarks(object):
       tags=["experimental-flags", "mmt4d"],
       compile_targets=[ARMV8_A_CPU_TARGET],
       extra_flags=[
-          "--iree-flow-mmt4d-target-options=arch=aarch64",
+          "--iree-flow-enable-data-tiling",
           "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
           "--iree-llvmcpu-enable-pad-consumer-fusion"
       ])
@@ -50,6 +50,8 @@ class Android_ARMv8_A_Benchmarks(object):
       tags=["experimental-flags", "mmt4d", "dotprod"],
       compile_targets=[ARMV8_A_CPU_TARGET],
       extra_flags=[
+          # TODO(#11434): Switch to use data tiling flag after fixing the long
+          # compilation time issue.
           "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod",
           "--iree-llvm-target-cpu-features=+dotprod",
           "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
@@ -90,10 +92,10 @@ class Android_ARMv8_A_Benchmarks(object):
 
     all_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
-        platform=common_definitions.DevicePlatform.GENERIC_ANDROID)
+        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     big_cores_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
-        platform=common_definitions.DevicePlatform.GENERIC_ANDROID,
+        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         device_parameters={"big-cores"})
     run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=default_gen_confings,

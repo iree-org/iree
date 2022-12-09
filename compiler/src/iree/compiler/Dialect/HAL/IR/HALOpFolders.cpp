@@ -654,7 +654,7 @@ static void filterReturnOperands(ExecutableConstantBlockOp blockOp,
     for (auto [i, operand] : llvm::enumerate(returnOp.getOperands())) {
       if (preservedIndices.test(i)) operands.push_back(operand);
     }
-    returnOp.operandsMutable().assign(operands);
+    returnOp.getOperandsMutable().assign(operands);
   }
 }
 

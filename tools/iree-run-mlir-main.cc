@@ -41,6 +41,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
+#include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
@@ -215,6 +216,23 @@ Status GetTargetBackends(std::vector<std::string>* out_target_backends) {
   return OkStatus();
 }
 
+void BuildDefaultIREEVMTransformPassPipeline(mlir::OpPassManager& passManager) {
+  static mlir::iree_compiler::IREEVMPipelineHooks defaultHooks = {
+      // buildConstEvalPassPipelineCallback =
+      [](mlir::OpPassManager& pm) {
+        pm.addPass(mlir::iree_compiler::ConstEval::createJitGlobalsPass());
+      }};
+
+  buildIREEVMTransformPassPipeline(
+      mlir::iree_compiler::BindingOptions::FromFlags::get(),
+      mlir::iree_compiler::InputDialectOptions::FromFlags::get(),
+      mlir::iree_compiler::HighLevelOptimizationOptions::FromFlags::get(),
+      mlir::iree_compiler::SchedulingOptions::FromFlags::get(),
+      mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::get(),
+      mlir::iree_compiler::IREE::VM::TargetOptions::FromFlags::get(),
+      defaultHooks, passManager);
+}
+
 // Prepares a module for evaluation by running MLIR import and IREE translation.
 // Returns the serialized flatbuffer data.
 Status PrepareModule(std::string target_backend,
@@ -242,7 +260,7 @@ Status PrepareModule(std::string target_backend,
   pass_manager.enableVerifier(verify_passes_flag);
   mlir::applyPassManagerCLOptions(pass_manager);
   mlir::applyDefaultTimingPassManagerCLOptions(pass_manager);
-  mlir::iree_compiler::buildDefaultIREEVMTransformPassPipeline(pass_manager);
+  BuildDefaultIREEVMTransformPassPipeline(pass_manager);
   if (failed(pass_manager.run(mlir_module.get()))) {
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "conversion from source -> vm failed");

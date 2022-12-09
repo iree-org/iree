@@ -72,10 +72,15 @@ iree_cc_library(
     TransformDialectJitterPass
   HDRS
     "TransformDialectStrategies.h"
+    "TransformDialectStrategiesCPU.h"
+    "TransformDialectStrategiesGPU.h"
   SRCS
     "TransformDialectJitterPass.cpp"
     "TransformDialectStrategies.cpp"
+    "TransformDialectStrategiesCPU.cpp"
+    "TransformDialectStrategiesGPU.cpp"
   DEPS
+    IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgExtTransformOps
     IREELinalgTransformDialect

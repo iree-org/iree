@@ -93,13 +93,17 @@ def WrapInDispatchRegionOp : Op<
     Wrap the `target` op in a new `dispatch.region` op. All uses of target op
     are replaces with the results of the newly generated `dispach.region` op.
 
+    The argument `generateWorkload` can be set to generate workload information
+    from the given `target` op.
+
     #### Return modes
 
     This transform reads the `target` handle and produces the `transformed`
     handle (i.e., the `dispatch.region` op).
   }];
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins PDL_Operation:$target, 
+                       DefaultValuedAttr<BoolAttr, "true">:$generateWorkload);
   let results = (outs PDL_Operation:$transformed);
 
   let assemblyFormat = "$target attr-dict";

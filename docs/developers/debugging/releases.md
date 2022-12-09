@@ -107,7 +107,7 @@ And change the branch from 'main' to the branch you are developing on
 - name: Pushing changes
   uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6  # v0.6.0
   with:
-    github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+    github_token: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
     branch: main
     tags: true
 ```

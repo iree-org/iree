@@ -280,6 +280,8 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
 
   // PackOp has other operands besides ins and outs.
   if (auto packOp = dyn_cast<IREE::LinalgExt::PackOp>(op.getOperation())) {
+    newOperands.append(packOp.getInnerTiles().begin(),
+                       packOp.getInnerTiles().end());
     if (auto pad = packOp.getPaddingValue()) newOperands.push_back(pad);
   }
 

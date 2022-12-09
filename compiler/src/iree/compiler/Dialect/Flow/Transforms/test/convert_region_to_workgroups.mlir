@@ -20,7 +20,6 @@ func.func @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: tensor<10
   %r0 = flow.dispatch.region -> (tensor<?x?xf32>{%dimA0, %dimA1}) {
     flow.return %argA : tensor<?x?xf32>
   }
-
   //      CHECK: %[[r1:.*]] = flow.dispatch.workgroups(%[[argB]], %[[argC]]) : (tensor<5x10xf32>, tensor<10x11xf32>) -> tensor<5x11xf32>
   // CHECK-SAME:   stream.affinity = #hal.affinity.queue<[0]>
   // CHECK-NEXT: (%[[arg3:.*]]: !flow.dispatch.tensor<readonly:tensor<5x10xf32>>, %[[arg4:.*]]: !flow.dispatch.tensor<readonly:tensor<10x11xf32>>, %[[arg5:.*]]: !flow.dispatch.tensor<writeonly:tensor<5x11xf32>>)

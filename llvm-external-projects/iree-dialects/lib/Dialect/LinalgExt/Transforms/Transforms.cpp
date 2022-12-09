@@ -9,7 +9,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -18,10 +17,10 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -45,7 +44,7 @@ FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
     const Optional<linalg::LinalgLoopDistributionOptions> &tileDistribution) {
   assert(tileSizes.size() == tileInterchange.size() &&
          "expect the number of tile sizes and interchange dims to match");
-  assert(linalg::isPermutation(tileInterchange) &&
+  assert(isPermutationVector(tileInterchange) &&
          "expect tile interchange is a permutation");
 
   // Create an empty tile loop nest.
@@ -569,6 +568,7 @@ struct LinalgStrategyEnablePass
     RewritePatternSet patterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
     scf::populateSCFForLoopCanonicalizationPatterns(patterns);
+    tensor::populateFoldTensorEmptyPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns))))
       return signalPassFailure();
 
@@ -817,6 +817,11 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
       return rewriter.notifyMatchFailure(
           packOp, "require the outer dimension of the result are all 1s");
     }
+    if (llvm::any_of(packOp.getMixedTiles(),
+                     [](OpFoldResult tile) { return tile.is<Value>(); })) {
+      return rewriter.notifyMatchFailure(
+          packOp, "require inner tile sizes being static");
+    }
 
     Value input = getInputOrPaddedInput(rewriter, packOp);
 
@@ -954,9 +959,17 @@ struct LinalgExtVectorizationPass
       SimpleRewriter rewriter(ctx);
       auto packOptions = scf::SCFTileAndFuseOptions().setTilingOptions(
           scf::SCFTilingOptions().setTileSizeComputationFunction(
-              [](OpBuilder &builder, Operation *op) {
+              [](OpBuilder &builder, Operation *op) -> SmallVector<Value> {
                 Location loc = op->getLoc();
-                int inputRank = cast<PackOp>(op).getInputRank();
+                auto packOp = cast<PackOp>(op);
+
+                // Do nothing if any of inner tile sizes is dynamic.
+                if (llvm::any_of(packOp.getMixedTiles(), [](OpFoldResult tile) {
+                      return tile.is<Value>();
+                    }))
+                  return {};
+
+                int inputRank = packOp.getInputRank();
                 SmallVector<Value> tileSizes(
                     inputRank, builder.create<arith::ConstantIndexOp>(loc, 1));
                 return tileSizes;

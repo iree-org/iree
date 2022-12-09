@@ -418,8 +418,8 @@ static void expandCallOp(mlir::func::CallOp op,
 
   // Build the new call op with expanded operands and results.
   OpBuilder builder(op);
-  auto operands =
-      expandOperands(op.getLoc(), op.operands(), resourceTimepointMap, builder);
+  auto operands = expandOperands(op.getLoc(), op.getOperands(),
+                                 resourceTimepointMap, builder);
   auto resultTypes = expandTypes(op.getResultTypes());
   auto newOp = builder.create<mlir::func::CallOp>(op.getLoc(), op.getCallee(),
                                                   resultTypes, operands);
@@ -464,8 +464,8 @@ static void expandReturnOp(mlir::func::ReturnOp op,
   if (!usesResources(op)) return;
   if (isPublicOrExternal(op->getParentOfType<mlir::func::FuncOp>())) return;
   OpBuilder builder(op);
-  auto operands =
-      expandOperands(op.getLoc(), op.operands(), resourceTimepointMap, builder);
+  auto operands = expandOperands(op.getLoc(), op.getOperands(),
+                                 resourceTimepointMap, builder);
   builder.create<mlir::func::ReturnOp>(op.getLoc(), operands);
   op.erase();
 }

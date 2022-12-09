@@ -489,7 +489,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
-void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm);
+void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
+                                                    unsigned pipelineDepth,
+                                                    unsigned storeStage);
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing to
 /// workgroups, promoting to use workgroup memory, and then tiling and
@@ -534,10 +536,14 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndDistributePass();
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
     bool promoteCMatrix = false, bool skipThreadLevel = false);
 
-/// Pass to tile Linalg ops with buffer semantics to subgroups and vectorize
-/// to vector ops suitable for lowering to SPIR-V cooperative ops.
+/// Pass to tile Linalg ops with buffer semantics suitable for lowering to
+/// SPIR-V cooperative ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVTileAndVectorizeToCooperativeOpsPass();
+createSPIRVTileToCooperativeOpsPass();
+
+/// Pass to do vectorization suitable for lowering to SPIR-V cooperative ops.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVVectorizeToCooperativeOpsPass();
 
 /// Converts vector ops to gpu subgroup MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>

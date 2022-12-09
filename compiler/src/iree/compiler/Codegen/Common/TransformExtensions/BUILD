@@ -57,12 +57,10 @@ iree_compiler_cc_library(
     srcs = [
         "CommonExtensions.cpp",
         "CommonExtensionsOps.cpp.inc",
-        "TransformMatchers.cpp",
     ],
     hdrs = [
         "CommonExtensions.h",
         "CommonExtensionsOps.h.inc",
-        "TransformMatchers.h",
     ],
     deps = [
         ":CommonExtensionsOpGen",

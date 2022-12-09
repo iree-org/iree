@@ -29,5 +29,6 @@ add_mlir_library(IREELinalgExtTransforms
   MLIRLinalgTransforms
   MLIRPass
   MLIRSCFDialect
+  MLIRTensorTransforms
   MLIRTransforms
 )

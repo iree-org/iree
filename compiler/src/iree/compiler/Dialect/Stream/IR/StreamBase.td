@@ -23,7 +23,6 @@ include "mlir/IR/SubElementInterfaces.td"
 def Stream_Dialect : Dialect {
   let name = "stream";
   let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
-  let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 
   let summary = [{
     A dialect designed to model execution partitioning and scheduling.

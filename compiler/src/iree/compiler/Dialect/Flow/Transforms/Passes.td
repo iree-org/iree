@@ -68,13 +68,23 @@ def DetachElementwiseFromNamedOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createDetachElementwiseFromNamedOpsPass()";
 }
 
-def DispatchLinalgOnTensors :
-    InterfacePass<"iree-flow-dispatch-linalg-on-tensors-pass", "mlir::FunctionOpInterface"> {
-  let summary = "Dispatch Linalg operations on tensors by using tile and distribute";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsPass()";
+def FormDispatchRegions :
+    InterfacePass<"iree-flow-form-dispatch-regions", "mlir::FunctionOpInterface"> {
+  let summary = "Form Dispatch Region Ops from Linalg operations on tensors to form dispatch.regions";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFormDispatchRegionsPass()";
   let options = [
     Option<"aggressiveFusion", "aggressive-fusion", "bool",
            /*default=*/"false", "Fuse with aggressive heuristics">,
+    Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
+           /*default=*/"true", "Generate workload regions of WorkgroupOps">,
+  ];
+}
+
+def FormDispatchWorkgroups :
+    InterfacePass<"iree-flow-form-dispatch-workgroups", "mlir::FunctionOpInterface"> {
+  let summary = "Form Dispatch Workgroup Ops from Dispatch Region Ops that contain Linalg on tensor ops by tiling and distribution.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFormDispatchWorkgroupsPass()";
+  let options = [
     Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
            /*default=*/"true", "Generate workload regions of WorkgroupOps">,
   ];

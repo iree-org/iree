@@ -243,6 +243,7 @@ if(IREE_BUILD_COMPILER)
       iree::base
       iree::base::internal::flags
       iree::base::tracing
+      iree::compiler::ConstEval
       iree::compiler::Dialect::HAL::Target
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets

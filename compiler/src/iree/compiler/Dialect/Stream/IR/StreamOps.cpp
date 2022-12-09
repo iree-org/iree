@@ -2623,7 +2623,7 @@ LogicalResult BindingSubspanOp::verify() {
 
 MutableOperandRange ReturnOp::getMutableSuccessorOperands(
     Optional<unsigned> index) {
-  return operandsMutable();
+  return getOperandsMutable();
 }
 
 //===----------------------------------------------------------------------===//
