@@ -59,11 +59,11 @@ struct InputDialectOptions {
 // Options controlling high level optimizations.
 struct HighLevelOptimizationOptions {
   // Enables const-expr hoisting into globals.
-  bool constExprHoisting = true;
+  bool constExprHoisting = false;
 
   // Enables recursive evaluation of immutable globals using the compiler
   // and runtime.
-  bool constEval = true;
+  bool constEval = false;
 
   // Optimizations to reduce numeric precision where it is safe to do so.
   bool numericPrecisionReduction = false;
