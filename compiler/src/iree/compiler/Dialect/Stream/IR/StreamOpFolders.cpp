@@ -2251,7 +2251,7 @@ LogicalResult TimepointExportOp::fold(ArrayRef<Attribute> operands,
   if (auto importOp = dyn_cast_or_null<TimepointImportOp>(
           getAwaitTimepoint().getDefiningOp())) {
     if (llvm::equal(importOp.getOperandTypes(), getResultTypes())) {
-      llvm::append_range(results, importOp.operands());
+      llvm::append_range(results, importOp.getOperands());
       return success();
     }
   }

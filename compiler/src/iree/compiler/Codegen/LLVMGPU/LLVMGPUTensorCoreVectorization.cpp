@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Common/GPUPatterns.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -69,40 +70,6 @@ static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
   }
   return order;
 }
-
-// Merge transpose op into the transfer read op. Transpose are not supported on
-// MMA types but MMA load can transpose the matrix when loading.
-struct CombineTransferReadOpBroadcast final
-    : public OpRewritePattern<vector::BroadcastOp> {
-  using OpRewritePattern<vector::BroadcastOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::BroadcastOp op,
-                                PatternRewriter &rewriter) const override {
-    auto transferReadOp =
-        op.getSource().getDefiningOp<vector::TransferReadOp>();
-    if (!transferReadOp || transferReadOp.getMask() ||
-        transferReadOp.hasOutOfBoundsDim()) {
-      return failure();
-    }
-    int64_t rankDiff =
-        op.getVectorType().getRank() - transferReadOp.getVectorType().getRank();
-    SmallVector<AffineExpr> exprs(rankDiff, rewriter.getAffineConstantExpr(0));
-    ArrayRef<AffineExpr> originalExpr =
-        transferReadOp.getPermutationMap().getResults();
-    exprs.append(originalExpr.begin(), originalExpr.end());
-    AffineMap newMap =
-        AffineMap::get(transferReadOp.getPermutationMap().getNumDims(),
-                       transferReadOp.getPermutationMap().getNumSymbols(),
-                       exprs, op.getContext());
-    ArrayAttr inBounds = rewriter.getBoolArrayAttr(
-        SmallVector<bool>(op.getVectorType().getRank(), true));
-    rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-        op, op.getType(), transferReadOp.getSource(),
-        transferReadOp.getIndices(), newMap, transferReadOp.getPadding(),
-        transferReadOp.getMask(), inBounds);
-    return success();
-  }
-};
 
 static Optional<SmallVector<int64_t>> getGPUTCNativeVectorSize(Operation *op) {
   // Currently hardcode the size of wmma operation. When more cases are
@@ -178,8 +145,8 @@ struct LLVMGPUTensorCoreVectorizationPass
       RewritePatternSet canonicalizationPatterns(context);
       vector::ContractionOp::getCanonicalizationPatterns(
           canonicalizationPatterns, context);
-      canonicalizationPatterns.insert<CombineTransferReadOpBroadcast>(
-          funcOp.getContext());
+      populateCombineVectorTransferReadBroadcastPatterns(
+          canonicalizationPatterns);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(canonicalizationPatterns)))) {
         return signalPassFailure();

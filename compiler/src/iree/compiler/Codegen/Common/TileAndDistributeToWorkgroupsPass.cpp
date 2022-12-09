@@ -34,6 +34,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -117,14 +118,15 @@ getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
   encodingInfo.innerTileSizes.reserve(mixedTileSizes.size());
   for (auto tileSize : mixedTileSizes) {
     if (tileSize.is<Value>()) {
-      return packOp.emitOpError(
-          "unhandled distribution of pack op with dynamic inner tile size");
+      encodingInfo.innerTileSizes.push_back(ShapedType::kDynamic);
+    } else {
+      encodingInfo.innerTileSizes.push_back(
+          tileSize.get<Attribute>().cast<IntegerAttr>().getInt());
     }
-    encodingInfo.innerTileSizes.push_back(
-        tileSize.get<Attribute>().cast<IntegerAttr>().getInt());
   }
   encodingInfo.innerDimsPos = llvm::to_vector(packOp.getInnerDimsPos());
   encodingInfo.outerDimsPerm = llvm::to_vector(packOp.getOuterDimsPerm());
+  encodingInfo.srcRank = packOp.getInputRank();
   return encodingInfo;
 }
 
@@ -154,7 +156,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
   LogicalResult matchAndRewrite(
       IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
       PatternRewriter &rewriter) const override {
-    auto workloadValues = workgroupCountOp.operands();
+    auto workloadValues = workgroupCountOp.getOperands();
     SmallVector<OpFoldResult> tileSizes = llvm::to_vector(llvm::map_range(
         givenTileSizes,
         [&](int64_t v) -> OpFoldResult { return rewriter.getIndexAttr(v); }));
@@ -267,6 +269,7 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
             getAsOpFoldResults(materializeEncodingInfo.innerTileSizes),
             materializeEncodingInfo.innerDimsPos,
             materializeEncodingInfo.outerDimsPerm);
+    resultShape.resize(materializeEncodingInfo.srcRank);
 
     rewriter
         .replaceOpWithNewOp<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(
@@ -413,6 +416,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       // casting ops into tiled operations.
       RewritePatternSet patterns(context);
       linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+      tensor::populateFoldTensorEmptyPatterns(patterns);
       populateFoldAffineMinInDistributedLoopsPatterns(patterns);
       context->getOrLoadDialect<IREE::LinalgExt::IREELinalgExtDialect>()
           ->getCanonicalizationPatterns(patterns);

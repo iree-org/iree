@@ -140,14 +140,24 @@ createStripSignednessPass();
 std::unique_ptr<Pass> createVerifyInputLegalityPass();
 
 //===----------------------------------------------------------------------===//
+// Dispatches (flow.dispatch.region)
+//===----------------------------------------------------------------------===//
+
+// Pass to form dispatch.region ops from Linalg on tensor ops. A dispatch region
+// is created for each tiled loop nest.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFormDispatchRegionsPass(bool aggressiveFusion = false,
+                              bool generateWorkloadRegion = true);
+
+//===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)
 //===----------------------------------------------------------------------===//
 
-// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
-// A dispatch region is created for each tiled loop nest.
+// Pass to perform dispatch of dispatch.region ops that contain Linalg on tensor
+// ops by tiling and distribution. A dispatch region is created for each tiled
+// loop nest.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDispatchLinalgOnTensorsPass(bool aggressiveFusion = false,
-                                  bool generateWorkloadRegion = true);
+createFormDispatchWorkgroupsPass(bool generateWorkloadRegion = true);
 
 // Pass to perform dispatch of Linalg on tensor ops by using the transform
 // dialect. Dispatch regions are created as specified by the transform module

@@ -289,10 +289,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                clDispatchTransformFileName);
                          })
       // Only want use the transform dialect for some dispatch regions and let
-      // the DispatchLinalgOnTensorsPass handle the rest.
+      // the FormDispatchRegions handle the rest.
       .addPass([&]() {
-        return createDispatchLinalgOnTensorsPass(
-            clEnableAggressiveFusion, clDispatchGenerateWorkloadRegion);
+        return createFormDispatchRegionsPass(clEnableAggressiveFusion,
+                                             clDispatchGenerateWorkloadRegion);
+      })
+      // Form dispatch region into dispatch workgroups
+      .addPass([&]() {
+        return createFormDispatchWorkgroupsPass(
+            clDispatchGenerateWorkloadRegion);
       })
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)

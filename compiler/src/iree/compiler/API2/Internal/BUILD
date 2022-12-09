@@ -19,6 +19,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
         "//compiler/src/iree/compiler/Dialect/VM/Target/C",
         "//compiler/src/iree/compiler/Pipelines",

@@ -16,7 +16,6 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 def HAL_Dialect : Dialect {
   let name = "hal";
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
-  let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 
   let summary = [{
     A dialect representing operations against the IREE HAL.

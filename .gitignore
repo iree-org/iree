@@ -1,10 +1,10 @@
 # Python
+.env
 *.pyc
 **/.ipynb_checkpoints/
 .pytype/
 
 # Visual Studio files
-.env
 .vs/
 .vscode/
 *.sdf

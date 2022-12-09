@@ -16,14 +16,14 @@ hal.executable private @push_constant {
       // CHECK-LABEL: spirv.module
       // CHECK: spirv.GlobalVariable @__push_constant_var__ : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
       // CHECK: spirv.func @push_constant()
-      func.func @push_constant() {
+      func.func @push_constant() -> index {
         // CHECK-DAG: %[[INDEX_0:.+]] = spirv.Constant 0 : i32
         // CHECK-DAG: %[[INDEX_1:.+]] = spirv.Constant 2 : i32
         // CHECK: %[[ADDR:.+]] = spirv.mlir.addressof @__push_constant_var__ : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
         // CHECK: %[[AC:.+]] = spirv.AccessChain %[[ADDR]][%[[INDEX_0]], %[[INDEX_1]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
         // CHECK: spirv.Load "PushConstant" %[[AC]] : i32
         %0 = hal.interface.constant.load[2] : index
-        return
+        return %0 : index
       }
     }
   }
@@ -53,7 +53,7 @@ hal.executable private @resource_bindings_in_same_func {
       // CHECK: spirv.GlobalVariable @[[ARG1_1:.+]] bind(1, 3) {aliased} : !spirv.ptr<!spirv.struct<(!spirv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
       // CHECK: spirv.GlobalVariable @[[RET0:.+]] bind(3, 4) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
       // CHECK: spirv.func @resource_bindings_in_same_entry_func()
-      func.func @resource_bindings_in_same_entry_func() {
+      func.func @resource_bindings_in_same_entry_func() -> f32 {
         %c0 = arith.constant 0 : index
 
         // Same type
@@ -79,7 +79,13 @@ hal.executable private @resource_bindings_in_same_func {
 
         %9 = memref.load %4[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
 
-        return
+        %10 = arith.addf %5, %6 : f32
+        %11 = arith.addf %7, %9 : f32
+        %12 = arith.addf %10, %11 : f32
+        %13 = vector.extractelement %8[%c0 : index] : vector<4xf32>
+        %14 = arith.addf %12, %13 : f32
+
+        return %14 : f32
       }
     }
   }
@@ -112,7 +118,7 @@ hal.executable private @resource_bindings_in_multi_entry_func {
       // CHECK: spirv.GlobalVariable @[[FUNC2_RET:.+]] bind(3, 4) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
 
       // CHECK: spirv.func @resource_bindings_in_entry_func1()
-      func.func @resource_bindings_in_entry_func1() {
+      func.func @resource_bindings_in_entry_func1() -> f32 {
         // CHECK: spirv.mlir.addressof @[[FUNC1_ARG]]
         // CHECK: spirv.mlir.addressof @[[FUNC1_RET]]
         %c0 = arith.constant 0 : index
@@ -122,11 +128,14 @@ hal.executable private @resource_bindings_in_multi_entry_func {
         %2 = memref.load %0[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
         %3 = memref.load %1[%c0] : memref<4xvector<4xf32>, #spirv.storage_class<StorageBuffer>>
 
-        return
+        %4 = vector.extractelement %3[%c0 : index] : vector<4xf32>
+        %5 = arith.addf %2, %4 : f32
+
+        return %5 : f32
       }
 
       // CHECK: spirv.func @resource_bindings_in_entry_func2()
-      func.func @resource_bindings_in_entry_func2() {
+      func.func @resource_bindings_in_entry_func2() -> f32 {
         // CHECK: spirv.mlir.addressof @[[FUNC2_ARG]]
         // CHECK: spirv.mlir.addressof @[[FUNC2_RET]]
         %c0 = arith.constant 0 : index
@@ -136,7 +145,9 @@ hal.executable private @resource_bindings_in_multi_entry_func {
         %2 = memref.load %0[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
         %3 = memref.load %1[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
 
-        return
+        %4 = arith.addf %2, %3 : f32
+
+        return %4 : f32
       }
     }
   }
@@ -158,7 +169,7 @@ hal.executable private @interface_binding {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
-      func.func @interface_binding() {
+      func.func @interface_binding() -> f32 {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8x5xf32, #spirv.storage_class<StorageBuffer>>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<5xf32, #spirv.storage_class<StorageBuffer>>
@@ -168,7 +179,10 @@ hal.executable private @interface_binding {
         %4 = memref.load %1[%c0] : memref<5xf32, #spirv.storage_class<StorageBuffer>>
         %5 = memref.load %2[%c0, %c0] : memref<8x5xf32, #spirv.storage_class<StorageBuffer>>
 
-        return
+        %6 = arith.addf %3, %4 : f32
+        %8 = arith.addf %6, %5 : f32
+
+        return %8 : f32
       }
     }
   }
@@ -201,10 +215,11 @@ hal.executable private @interface_wg_id {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
-      func.func @interface_wg_id() {
+      func.func @interface_wg_id() -> index {
         %0 = hal.interface.workgroup.id[0] : index
         %1 = hal.interface.workgroup.id[1] : index
-        return
+        %2 = arith.addi %0, %1 : index
+        return %2 : index
       }
     }
   }
@@ -236,10 +251,11 @@ hal.executable private @interface_wg_count {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
-      func.func @interface_wg_count() {
+      func.func @interface_wg_count() -> index {
         %0 = hal.interface.workgroup.count[0] : index
         %1 = hal.interface.workgroup.count[1] : index
-        return
+        %2 = arith.addi %0, %1 : index
+        return %2 : index
       }
     }
   }

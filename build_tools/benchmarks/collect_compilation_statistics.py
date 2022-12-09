@@ -42,7 +42,7 @@ DISPATCH_COMPONENT_PATTERNS = [
     r".+_embedded_elf_.+\.so",
     r".+_vulkan_spirv_fb\.fb",
     r".+_cuda_nvptx_fb\.fb",
-    r".+_vmvx_bytecode_fb\.bin",
+    r".+_vmvx_bytecode_fb\.fb",
 ]
 
 

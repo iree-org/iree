@@ -17,7 +17,6 @@ include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 def VMVX_Dialect : Dialect {
   let name = "vmvx";
   let cppNamespace = "::mlir::iree_compiler::IREE::VMVX";
-  let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 
   let summary = [{
     Vector extensions to the IREE VM.

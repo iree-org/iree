@@ -16,7 +16,6 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 def HALLoader_Dialect : Dialect {
   let name = "hal_loader";
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL::Loader";
-  let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 
   let summary = [{
     IREE HAL inline executable loader runtime module dialect.

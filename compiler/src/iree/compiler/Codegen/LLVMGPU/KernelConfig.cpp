@@ -10,6 +10,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
+#include "iree/compiler/Codegen/Common/TransformDialectStrategiesGPU.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
@@ -50,6 +51,14 @@ llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes(
 }  // namespace mlir
 
 namespace {
+
+/// Structure to represent target features.
+struct TargetInfo {
+  // TODO: add finer grain control for other tensorcore types.
+  bool hasTF32TensorCore = false;
+  bool hasWarpShuffle = false;
+};
+
 struct TileWorkgroupSizePair {
   // How many scalar elements each workgroup should handle along each dimension.
   std::array<int64_t, 3> tileSize;
@@ -94,13 +103,13 @@ static void getTensorCoreConfig(
   }
 }
 
-static std::string getTargetArch(func::FuncOp entryPoint) {
+static StringRef getTargetArch(func::FuncOp entryPoint) {
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
     IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
     if (auto config = targetAttr.getConfiguration()) {
       if (auto attr = config.getAs<StringAttr>("target_arch")) {
-        return attr.getValue().str();
+        return attr.getValue();
       }
     }
   }
@@ -118,11 +127,34 @@ bool isCudaTarget(func::FuncOp entryPoint) {
   return false;
 }
 
-static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
+static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
+  TargetInfo info;
+  // TODO: fill out target info for other vendors.
+  if (!isCudaTarget(entryPoint)) return info;
+  // All the cuda target are assumed to have warp support.
+  info.hasWarpShuffle = true;
+  StringRef targetName = getTargetArch(entryPoint);
+  // If no target name is set assume all the features are off.
+  if (targetName == "") return info;
+  if (!StringRef(targetName).starts_with("sm_")) {
+    entryPoint.emitError("unknown target name ") << targetName;
+    return info;
+  }
+  APInt version;
+  if (targetName.substr(3).getAsInteger(10, version)) {
+    entryPoint.emitError("unknown target version ") << targetName;
+    return info;
+  }
+  int64_t smVersion = version.getZExtValue();
+  if (smVersion >= 80) info.hasTF32TensorCore = true;
+  return info;
+}
+
+static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
+                               const TargetInfo &targetInfo) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose
   // are supported upstream.
-  // TODO(thomasraoux): Enable batchMatmul and generic contraction.
-  if (getTargetArch(entryPoint) != "sm_80") return false;
+  if (!targetInfo.hasTF32TensorCore) return false;
   if (!(isa<linalg::MatmulOp>(op) || isa<linalg::BatchMatmulOp>(op))) {
     assert(linalg::isaContractionOpInterface(op));
     // If this is not a named op matmul check some properties to make sure that
@@ -145,7 +177,8 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
 }
 
 static LogicalResult setContractConfig(func::FuncOp entryPoint,
-                                       linalg::LinalgOp op) {
+                                       linalg::LinalgOp op,
+                                       const TargetInfo &targetInfo) {
   auto setMatmulConfig =
       [&entryPoint, &op](int64_t tileX, int64_t tileY, int64_t tileK,
                          llvm::ArrayRef<int64_t> workgroupSize,
@@ -214,7 +247,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
                       sizeK != ShapedType::kDynamic;
   if (isStaticSize) {
     /// Try tensorcore config first.
-    if (supportsTensorCore(entryPoint, op)) {
+    if (supportsTensorCore(entryPoint, op, targetInfo)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
 
       getTensorCoreConfig(TCtileSizeConfig, op.getDpsInputOperand(0)
@@ -460,68 +493,26 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 }
 
 /// Set configuration for reduction transform dialect based strategy.
-static LogicalResult setReductionTransformJitConfig(func::FuncOp entryPoint,
-                                                    linalg::LinalgOp op) {
+static LogicalResult setReductionTransformJitConfig(
+    func::FuncOp entryPoint, linalg::LinalgOp op,
+    const TargetInfo &targetInfo) {
   if (!clGPUEnableTransformDialectJit) return failure();
-  // TODO: match the sequence the startegy supports.
-  if (!isCudaTarget(entryPoint)) return failure();
-  if (!isa<linalg::GenericOp>(op)) return failure();
-  if (op.hasDynamicShape()) return failure();
-  SmallVector<unsigned> reductionDims;
-  op.getReductionDims(reductionDims);
-  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
-    return failure();
-  if (op.getRegionOutputArgs().size() != 1) return failure();
-
-  // Only support projected permutation, this could be extended to projected
-  // permutated with broadcast.
-  if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
-        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
-      }))
+  if (!targetInfo.hasWarpShuffle) return failure();
+  if (failed(matchAndSetGPUReductionTransformStrategy(entryPoint, op)))
     return failure();
 
-  // Only single combiner operations are supported for now.
-  SmallVector<Operation *, 4> combinerOps;
-  if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
-      combinerOps.size() != 1)
-    return failure();
-  Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
-  if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
-
-  const Type elementType = op.getDpsInitOperand(0)
-                               ->get()
-                               .getType()
-                               .cast<ShapedType>()
-                               .getElementType();
-  if (!elementType.isIntOrFloat()) return failure();
-  // Reduction distribution only supports 32-bit types now.
-  if (elementType.getIntOrFloatBitWidth() != 32) return failure();
-
-  // Hardcoded workagroup size, this could be deduced from the reduction dim.
-  std::array<int64_t, 3> workgroupSize = {32, 2, 1};
-  SmallVector<unsigned> partitionedLoops =
-      cast<PartitionableLoopsInterface>(op.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
-  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
-  // Tile all the parallel dimension to 1.
-  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
-  SmallVector<int64_t, 4> threadTileSizes = workgroupTileSizes;
-  threadTileSizes.push_back(1);
-  TileSizesListType tileSizes;
-  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
-  tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::
-          TransformDialectJitterCodegen,
-      workgroupSize);
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPoint->getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
+                                    TransformDialectJitterCodegen);
+  if (failed(setTranslationInfo(entryPoint, translationInfo))) return failure();
   return success();
 }
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
-                                            linalg::LinalgOp op) {
-  if (!isCudaTarget(entryPoint)) return failure();
+                                            linalg::LinalgOp op,
+                                            const TargetInfo &targetInfo) {
+  if (!targetInfo.hasWarpShuffle) return failure();
   if (!isa<linalg::GenericOp>(op)) return failure();
   // TODO(thomasraoux): Enable dynamic shape.
   if (op.hasDynamicShape()) return failure();
@@ -821,6 +812,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     setLoweringConfig(computeOp, config);
     return success();
   }
+  TargetInfo targetInfo = getTargetInfo(entryPointFn);
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(computeOp)) {
     // If the op already has a lowering config coming from the IR use this and
@@ -830,12 +822,13 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (linalg::isaContractionOpInterface(linalgOp) &&
         linalgOp.getNumParallelLoops() >= 2) {
-      return setContractConfig(entryPointFn, linalgOp);
+      return setContractConfig(entryPointFn, linalgOp, targetInfo);
     }
-    if (succeeded(setReductionTransformJitConfig(entryPointFn, linalgOp))) {
+    if (succeeded(setReductionTransformJitConfig(entryPointFn, linalgOp,
+                                                 targetInfo))) {
       return success();
     }
-    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp))) {
+    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp, targetInfo))) {
       return success();
     }
     if (succeeded(setConvolutionConfig(linalgOp, 32, 16))) {
@@ -926,10 +919,12 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     // and distributed. The rest of the compilation must be structured to either
     // use `TileAndFuse` or they are independent configurations that are
     // determined based on the op.
-    IREE::Codegen::LoweringConfigAttr config = getLoweringConfig(rootOperation);
-    for (auto op : computeOps) {
-      if (op == rootOperation) continue;
-      setLoweringConfig(op, config);
+    if (IREE::Codegen::LoweringConfigAttr config =
+            getLoweringConfig(rootOperation)) {
+      for (auto op : computeOps) {
+        if (op == rootOperation) continue;
+        setLoweringConfig(op, config);
+      }
     }
   }
   return success();

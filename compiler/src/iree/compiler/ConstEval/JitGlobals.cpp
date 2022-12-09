@@ -138,6 +138,12 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     options->targetOptions.f32Extension = true;
     options->targetOptions.f64Extension = false;  // not yet implemented
 
+    // Disable constant evaluation for our Jit compilation pipeline.
+    // It would make no sense to recursively do constant evaluation, and since
+    // we omit the necessary hooks, it is unsupported anyway.
+    options->highLevelOptimizationOptions.constExprHoisting = false;
+    options->highLevelOptimizationOptions.constEval = false;
+
     buildIREEVMTransformPassPipeline(
         options->bindingOptions, options->inputOptions,
         options->highLevelOptimizationOptions, options->schedulingOptions,

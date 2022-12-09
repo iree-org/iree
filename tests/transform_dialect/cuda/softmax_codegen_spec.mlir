@@ -66,14 +66,15 @@ transform.structured.canonicalized_sequence failures(propagate) {
     : !pdl.operation
   transform.structured.tile_to_foreach_thread_op %parallel_linalg_ops num_threads [1, 4, 32]
       ( mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>] )
+
   // Step 3. Rank-reduce and vectorize.
   // ==================================
   %funcx_2 = transform.structured.match ops{["func.func"]} in %variant_op
   %funcx_3 = transform.iree.apply_patterns %funcx_2 { rank_reducing }
   transform.structured.vectorize %funcx_3
 
-  // Step 4. Bufferize.
-  // ==================
+  // Step 4. Bufferize and drop HAL decriptor from memref ops.
+  // =========================================================
   %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_2
   transform.iree.erase_hal_descriptor_type_from_memref %memref_func

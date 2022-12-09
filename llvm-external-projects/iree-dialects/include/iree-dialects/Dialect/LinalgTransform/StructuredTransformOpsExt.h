@@ -73,6 +73,7 @@ private:
 #define GET_OP_CLASSES
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h.inc"
 
+namespace mlir {
 namespace transform_ext {
 class StructuredTransformOpsExtension
     : public mlir::transform::TransformDialectExtension<
@@ -81,5 +82,6 @@ public:
   StructuredTransformOpsExtension();
 };
 } // namespace transform_ext
+} // namespace mlir
 
 #endif // IREE_DIALECTS_DIALECT_LINALG_TRANSFORM_STRUCTUREDTRANSFORMOPSEXT_H

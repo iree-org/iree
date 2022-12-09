@@ -19,52 +19,66 @@ class ArchitectureType(Enum):
 
 
 @dataclass(frozen=True)
-class ArchitectureInfo(object):
+class _ArchitectureInfo(object):
   """Architecture information."""
   type: ArchitectureType
   architecture: str
   microarchitecture: str
 
 
-class DeviceArchitecture(Enum):
+class DeviceArchitecture(_ArchitectureInfo, Enum):
   """Predefined architecture/microarchitecture."""
 
   # VMVX virtual machine
-  VMVX_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "vmvx", "generic")
+  VMVX_GENERIC = (ArchitectureType.CPU, "vmvx", "generic")
 
   # x86_64 CPUs
-  X86_64_CASCADELAKE = ArchitectureInfo(ArchitectureType.CPU, "x86_64",
-                                        "cascadelake")
+  X86_64_CASCADELAKE = (ArchitectureType.CPU, "x86_64", "cascadelake")
 
   # ARM CPUs
-  ARMV8_2_A_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "armv8.2-a",
-                                       "generic")
-  ARMV9_A_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "armv9-a", "generic")
+  ARMV8_2_A_GENERIC = (ArchitectureType.CPU, "armv8.2-a", "generic")
+  ARMV9_A_GENERIC = (ArchitectureType.CPU, "armv9-a", "generic")
 
   # RISC-V CPUs
-  RV64_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "rv64", "generic")
-  RV32_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "rv32", "generic")
+  RV64_GENERIC = (ArchitectureType.CPU, "rv64", "generic")
+  RV32_GENERIC = (ArchitectureType.CPU, "rv32", "generic")
 
   # Mobile GPUs
-  MALI_VALHALL = ArchitectureInfo(ArchitectureType.GPU, "mali", "valhall")
-  ADRENO_GENERIC = ArchitectureInfo(ArchitectureType.GPU, "adreno", "generic")
+  MALI_VALHALL = (ArchitectureType.GPU, "mali", "valhall")
+  ADRENO_GENERIC = (ArchitectureType.GPU, "adreno", "generic")
 
   # CUDA GPUs
-  CUDA_SM70 = ArchitectureInfo(ArchitectureType.GPU, "cuda", "sm_70")
-  CUDA_SM80 = ArchitectureInfo(ArchitectureType.GPU, "cuda", "sm_80")
+  CUDA_SM70 = (ArchitectureType.GPU, "cuda", "sm_70")
+  CUDA_SM80 = (ArchitectureType.GPU, "cuda", "sm_80")
 
 
 @dataclass(frozen=True)
-class PlatformInfo(object):
-  """Platform information of a device."""
-  os: str
+class _HostEnvironmentInfo(object):
+  """Environment information of a host.
+
+  The definitions and terms here matches the macros in
+  `runtime/src/iree/base/target_platform.h`.
+
+  Note that this is the environment where the runtime "runs". For example:
+  ```
+  {
+    "platform": "linux",
+    "architecture": "x86_64"
+  }
+  ```
+  means the runtime will run on a Linux x86_64 host. The runtime might dispatch
+  the workloads on GPU or it can be a VM to run workloads compiled in another
+  ISA, but those are irrelevant to the information here.
+  """
+  platform: str
+  architecture: str
 
 
-class DevicePlatform(Enum):
-  """Predefined device platform information."""
+class HostEnvironment(_HostEnvironmentInfo, Enum):
+  """Predefined host environment."""
 
-  GENERIC_LINUX = PlatformInfo("linux")
-  GENERIC_ANDROID = PlatformInfo("android")
+  LINUX_X86_64 = ("linux", "x86_64")
+  ANDROID_ARMV8_2_A = ("android", "armv8.2-a")
 
 
 class ModelSourceType(Enum):
@@ -88,10 +102,19 @@ class InputDataFormat(Enum):
 class DeviceSpec(object):
   """Benchmark device specification."""
   id: str
+
   # Device vendor name. E.g., Pixel-6.
   vendor_name: str
+
+  # Host environment where the IREE runtime is running. For CPU device type,
+  # this is usually the same as the device that workloads are dispatched to.
+  # With a separate device, such as a GPU, however, the runtime and dispatched
+  # workloads will run on different platforms.
+  host_environment: HostEnvironment
+
+  # Architecture of the target device.
   architecture: DeviceArchitecture
-  platform: DevicePlatform
+
   # Device-specific parameters. E.g., 2-big-cores, 4-little-cores.
   # This is for modeling the spec of a heterogeneous processor. Depending on
   # which cores you run, the device has a different spec. Benchmark machines use

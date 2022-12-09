@@ -132,7 +132,7 @@ class IreeRuleBuilder(object):
 
   def _generate_compile_target_flags(
       self, target: iree_definitions.CompileTarget) -> List[str]:
-    arch_info: common_definitions.ArchitectureInfo = target.target_architecture.value
+    arch_info = target.target_architecture
     if arch_info.architecture == "x86_64":
       flags = [
           f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",

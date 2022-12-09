@@ -405,7 +405,7 @@ static void addMemoryEffectsForGlobal(
   auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, global);
   assert(symbolOp);
   auto globalOp = dyn_cast<T>(symbolOp);
-  if (globalOp.is_mutable()) {
+  if (globalOp.getIsMutable()) {
     effects.emplace_back(MemoryEffects::Read::get());
   }
 }

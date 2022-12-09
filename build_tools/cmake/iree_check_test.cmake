@@ -82,21 +82,10 @@ function(iree_check_test)
 
   # Check tests require (by way of iree_bytecode_module) some tools.
   #
-  # On the host, we can either build the tools directly, if IREE_BUILD_COMPILER
-  # is enabled, or reuse the tools from an existing build (or binary release).
-  #
-  # In some configurations (e.g. when cross compiling for Android), we can't
-  # always build the tools and may depend on them from a host build.
-  #
-  # For now we enable check tests:
-  #   On the host if IREE_BUILD_COMPILER is set
-  #   Always when cross compiling (assuming host tools exist)
-  #
-  # In the future, we should probably add some orthogonal options that give
-  # more control (such as using tools from a binary release in a runtime-only
-  # host build, or skipping check tests in an Android build).
-  # TODO(#4662): add flexible configurable options that cover more uses
-  if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
+  # These can either be built from source, if IREE_BUILD_COMPILER is set, or
+  # be located under IREE_HOST_BINARY_ROOT. The latter is required if
+  # cross-compiling.
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BINARY_ROOT)
     return()
   endif()
 

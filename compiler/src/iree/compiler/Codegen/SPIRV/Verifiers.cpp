@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -144,7 +145,8 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   // Verify shared memory usage of operands after tiling <= maxSharedMemory.
   unsigned tilingSharedMemSizeBytes = getTileBytes(
       workgroupTileSizes[0], workgroupTileSizes[1], reductionTileSizes[2],
-      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth());
+      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth(),
+      false);
   unsigned totalSharedMemSizeBytes = getMultiBufferMemoryUsage(
       tilingSharedMemSizeBytes, pipelineDepth,
       translationInfo.getSoftwarePipelineStoreStage());
@@ -328,10 +330,16 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
         "subgroup_tile_m)");
   }
 
+  // Check if the C matrix will be promoted for computing shared memory usage.
+  auto matmulResult = cast<linalg::LinalgOp>(op).getDpsInitOperand(0)->get();
+  bool promoteC =
+      !matmulResult.hasOneUse() ||
+      !isa<IREE::Flow::DispatchTensorStoreOp>(*matmulResult.getUsers().begin());
+
   // Verify shared memory usage of operands after tiling <= maxSharedMemory.
-  unsigned tilingSharedMemSizeBytes =
-      getTileBytes(workgroupTileSizes[0], workgroupTileSizes[1],
-                   reductionTileSizes[2], lhsType.getIntOrFloatBitWidth());
+  unsigned tilingSharedMemSizeBytes = getTileBytes(
+      workgroupTileSizes[0], workgroupTileSizes[1], reductionTileSizes[2],
+      lhsType.getIntOrFloatBitWidth(), promoteC);
   unsigned totalSharedMemSizeBytes = getMultiBufferMemoryUsage(
       tilingSharedMemSizeBytes, translationInfo.getSoftwarePipelineDepth(),
       translationInfo.getSoftwarePipelineStoreStage());

@@ -42,11 +42,12 @@ iree_compiler_cc_library(
         "ConvertToFlow.cpp",
         "DeduplicateExecutables.cpp",
         "DetachElementwiseFromNamedOps.cpp",
-        "DispatchLinalgOnTensors.cpp",
         "DispatchWithTransformDialect.cpp",
         "DumpDispatchGraph.cpp",
         "ExpandTensorShapes.cpp",
         "ExportBenchmarkFuncs.cpp",
+        "FormDispatchRegions.cpp",
+        "FormDispatchWorkgroups.cpp",
         "FusionOfTensorOps.cpp",
         "InferNumericNarrowing.cpp",
         "InitializeEmptyTensors.cpp",
@@ -68,7 +69,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "ConvertRegionToWorkgroups.h",
-        "DispatchLinalgOnTensors.h",
+        "FormDispatchRegions.h",
         "Passes.h",
         "Passes.h.inc",
         "RegionOpUtils.h",
@@ -113,6 +114,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TosaDialect",
@@ -128,7 +130,8 @@ iree_compiler_cc_library(
 iree_cmake_extra_content(
     content = """
 set_property(SOURCE
-  DispatchLinalgOnTensors.cpp
+  FormDispatchRegions.cpp
+  FormDispatchWorkgroups.cpp
   PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
 """,
     inline = True,

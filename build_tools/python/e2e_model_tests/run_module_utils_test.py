@@ -62,7 +62,7 @@ class RunModuleTuilsTest(unittest.TestCase):
         id="abc",
         vendor_name="vendor",
         architecture=common_definitions.DeviceArchitecture.VMVX_GENERIC,
-        platform=common_definitions.DevicePlatform.GENERIC_LINUX,
+        host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         device_parameters=[device_parameters.OCTA_CORES])
 
     flags = run_module_utils.build_linux_wrapper_cmds_for_device_spec(

@@ -12,6 +12,7 @@
 #include "iree-dialects/Transforms/Listener.h"
 #include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
+#include "iree-dialects/Transforms/TransformMatchers.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
@@ -317,7 +318,7 @@ static LogicalResult isDimDynamic(PatternRewriter &rewriter,
 // StructuredTransformOpsExtension
 //===----------------------------------------------------------------------===//
 
-transform_ext::StructuredTransformOpsExtension::
+mlir::transform_ext::StructuredTransformOpsExtension::
     StructuredTransformOpsExtension() {
   registerTransformOps<
 #define GET_OP_LIST
@@ -1114,4 +1115,245 @@ transform_ext::LowerVectorsOp::apply(mlir::transform::TransformResults &results,
 
   // TODO: make composable...
   return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// MatchCallbackOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_ext::MatchCallbackOp::apply(
+    mlir::transform::TransformResults &results,
+    mlir::transform::TransformState &state) {
+  auto setEmptyResults = [&results, this] {
+    for (OpResult value : getResults()) {
+      results.set(value, {});
+    }
+  };
+  auto errorOut = [this, &setEmptyResults] {
+    setEmptyResults();
+    return emitSilenceableError();
+  };
+
+  auto *registry = state.getExtension<transform_ext::MatchCallbacksRegistry>();
+  if (!registry)
+    return errorOut() << "match registry not available";
+
+  const transform_ext::MatchCallbacksRegistry::MatchCallbackFn *callback =
+      registry->get(getCallbackName());
+  if (!callback) {
+    return errorOut() << "callback '" << getCallbackName()
+                      << "' not found in the registry";
+  }
+
+  MatchCallbackResult result;
+  DiagnosedSilenceableFailure status =
+      (*callback)(result, getLoc(), state, getInputs());
+  if (!status.succeeded()) {
+    setEmptyResults();
+    if (status.isDefiniteFailure())
+      return status;
+    if (getFailurePropagationMode() ==
+        mlir::transform::FailurePropagationMode::Propagate) {
+      return emitSilenceableError() << "failed to match";
+    } else {
+      return DiagnosedSilenceableFailure::success();
+    }
+  }
+  if (getNumResults() != result.getNumPayloadGroups()) {
+    return errorOut()
+           << "callback produced a different number of handles than expected ( "
+           << result.getNumPayloadGroups() << " vs " << getNumResults() << " )";
+  }
+
+  for (OpResult value : getResults()) {
+    results.set(value, result.getPayloadGroup(value.getResultNumber()));
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_ext::MatchCallbackOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  mlir::transform::onlyReadsHandle(getInputs(), effects);
+  mlir::transform::producesHandle(getOutputs(), effects);
+  // TODO: it doesn't really modify the payload, we need a separate resource for
+  // this mapping.
+  mlir::transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// RegisterMatchCallbacksOp
+//===---------------------------------------------------------------------===//
+
+/// Match callback for "_test_match_callback" hook. Matches any payload
+/// operations associated with operand handles unless they have the
+/// "test.iree_transform_do_not_match" attribute, in which case produces a
+/// silenceable failure.
+static DiagnosedSilenceableFailure
+testMatchCallbackCallback(transform_ext::MatchCallbackResult &res, Location loc,
+                          const mlir::transform::TransformState &state,
+                          ValueRange handles) {
+  bool hadFailures = false;
+  for (Value handle : handles) {
+    if (llvm::any_of(state.getPayloadOps(handle), [](Operation *op) {
+          return op->hasAttr("test.iree_transform_do_not_match");
+        })) {
+      res.addPayloadGroup(ArrayRef<Operation *>());
+      hadFailures = true;
+    } else {
+      res.addPayloadGroup(state.getPayloadOps(handle));
+    }
+  }
+  if (hadFailures)
+    return emitSilenceableFailure(loc) << "failed to match";
+  return DiagnosedSilenceableFailure::success();
+}
+
+/// Match callback for a reduction with optional leading and trailing
+/// elementwise operations. Matches *the first* occurrence of such a reduction
+/// within an op associated with the given handle.
+///
+/// Input handles:
+///
+///   - container op, must be associated with one operation.
+///
+/// Output handles:
+///
+///   - leading elementwise op, if any;
+///   - the "fill" op preceding the reduction;
+///   - reduction op;
+///   - trailing elementwise op, if any.
+static DiagnosedSilenceableFailure
+reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
+                  const mlir::transform::TransformState &state,
+                  ValueRange handles) {
+  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+
+  transform_ext::StructuredOpMatcher pattern, fill, leadingEltwise,
+      trailingEltwise;
+  makeReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise);
+
+  // TODO: need a mechanism for this to go around the entire IR,
+  // potentially with list matches for each group.
+  Operation *root = state.getPayloadOps(handles[0])[0];
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    pattern.resetCapture();
+    if (!matchPattern(op, pattern))
+      return WalkResult::advance();
+
+    res.addPotentiallyEmptyPayloadGroup(leadingEltwise.getCaptured());
+    res.addPayloadGroup({fill.getCaptured()});
+    res.addPayloadGroup({pattern.getCaptured()});
+    res.addPotentiallyEmptyPayloadGroup(trailingEltwise.getCaptured());
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
+/// Match callback for a reduction after splitting with optional leading and
+/// trailing elementwise operations. Matches *the first* occurrence of such a
+/// reduction within an op associated with the given handle.
+///
+/// Input handles:
+///
+///   - container op, must be associated with one operation.
+///
+/// Output handles:
+///
+///   - leading elementwise op, if any;
+///   - the "fill" op preceding the original reduction;
+///   - the "fill" op preceding the split, more parallel reduction;
+///   - the split, more parallel reduction op;
+///   - reduction op;
+///   - trailing elementwise op, if any.
+static DiagnosedSilenceableFailure
+splitReductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
+                       const mlir::transform::TransformState &state,
+                       ValueRange handles) {
+  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+
+  transform_ext::StructuredOpMatcher parallel_reduction, combiner_reduction,
+      parallel_fill, original_fill, leading, trailing;
+  makeSplitReductionMatcher(parallel_reduction, combiner_reduction,
+                            parallel_fill, original_fill, leading, trailing);
+
+  // TODO: need a mechanism for this to go around the entire IR,
+  // potentially with list matches for each group.
+  Operation *root = state.getPayloadOps(handles[0])[0];
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    combiner_reduction.resetCapture();
+    if (!matchPattern(op, combiner_reduction))
+      return WalkResult::advance();
+
+    res.addPotentiallyEmptyPayloadGroup(leading.getCaptured());
+    res.addPayloadGroup({original_fill.getCaptured()});
+    res.addPayloadGroup({parallel_fill.getCaptured()});
+    res.addPayloadGroup({parallel_reduction.getCaptured()});
+    res.addPayloadGroup({combiner_reduction.getCaptured()});
+    res.addPotentiallyEmptyPayloadGroup(trailing.getCaptured());
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
+DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
+    mlir::transform::TransformResults &results,
+    mlir::transform::TransformState &state) {
+  auto &registry = state.addExtension<transform_ext::MatchCallbacksRegistry>();
+  registry.registerCallback("_test_match_callback", testMatchCallbackCallback);
+  registry.registerCallback("reduction", reductionCallback);
+  registry.registerCallback("split_reduction", splitReductionCallback);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_ext::RegisterMatchCallbacksOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // TODO: it doesn't really modify the payload, we need a separate resource for
+  // this mapping.
+  mlir::transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// TakeFirstOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_ext::TakeFirstOp::apply(mlir::transform::TransformResults &results,
+                                  mlir::transform::TransformState &state) {
+  SmallVector<Operation *> concatenated;
+  bool found = false;
+  for (Value handle : getInputs()) {
+    ArrayRef<Operation *> payloads = state.getPayloadOps(handle);
+    if (payloads.empty())
+      continue;
+    if (!found) {
+      results.set(getFirst().cast<OpResult>(), payloads);
+      found = true;
+    } else {
+      llvm::append_range(concatenated, payloads);
+    }
+  }
+
+  if (!found)
+    results.set(getFirst().cast<OpResult>(), {});
+  results.set(getRest().cast<OpResult>(), concatenated);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_ext::TakeFirstOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  mlir::transform::onlyReadsHandle(getInputs(), effects);
+  mlir::transform::producesHandle(getFirst(), effects);
+  mlir::transform::producesHandle(getRest(), effects);
 }

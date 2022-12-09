@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-vectorize-to-cooperative-ops, canonicalize, cse)))))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-to-cooperative-ops, iree-spirv-vectorize-to-cooperative-ops, canonicalize, cse)))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [16, 16], [0, 0, 32], [16, 16, 16]]>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>

@@ -105,6 +105,13 @@ You can find a full end-to-end example of defining a basic regression model,
 training with it, and running inference on it
 [here](https://github.com/iree-org/iree-torch/blob/main/examples/regression.py).
 
+## Native / On-device Training
+
+A small (~100-250KB), self-contained binary can be built for deploying to
+resource-constrained environments. An example illustrating this can be found in
+[this example](https://github.com/iree-org/iree-torch/tree/main/examples/native_training).
+This binary runs a model without a Python interpreter.
+
 ## Samples
 
 | Colab notebooks |  |
@@ -114,3 +121,4 @@ Inference on BERT | [![Open in Colab](https://colab.research.google.com/assets/c
 | Example scripts |
 | -- |
 | [Basic Inference and Training Example](https://github.com/iree-org/iree-torch/blob/main/examples/regression.py) |
+| [Native On-device Training Example](https://github.com/iree-org/iree-torch/tree/main/examples/native_training) |

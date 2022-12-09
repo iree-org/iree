@@ -1,6 +1,6 @@
 // RUN: iree-opt %s
 
-transform.structured.canonicalized_sequence failures(suppress) {
+transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
 
@@ -41,7 +41,7 @@ transform.structured.canonicalized_sequence failures(suppress) {
   %func_2 = transform.iree.apply_patterns %func { rank_reducing }
   %func_3 = transform.structured.vectorize %func_2
 
-  // Step 5. Bufferize.
+  // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================
   %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_2
@@ -58,6 +58,11 @@ transform.structured.canonicalized_sequence failures(suppress) {
   // ===========================================================================
   %func_7 = transform.iree.apply_patterns %func_6 { rank_reducing }
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_2
-  %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
+  // Don't complain about unsupported if (threadIdx.x == 0 && threadIdx.y == 0)
+  // at this point.
+  transform.sequence %variant_op_2 : !pdl.operation failures(suppress) {
+  ^bb0(%arg0: !pdl.operation):
+    transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
+  }
   transform.iree.vector.warp_distribute %func_7
 }

@@ -92,6 +92,7 @@ struct MaterializeEncodingInfo {
   SmallVector<int64_t> innerDimsPos;
   SmallVector<int64_t> innerTileSizes;
   SmallVector<int64_t> outerDimsPerm;
+  unsigned srcRank = 0;
 };
 using MaterializeEncodingFn =
     std::function<FailureOr<MaterializeEncodingInfo>(RankedTensorType)>;

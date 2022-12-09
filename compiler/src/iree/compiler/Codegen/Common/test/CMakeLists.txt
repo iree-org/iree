@@ -32,6 +32,7 @@ iree_lit_test_suite(
     "materialize_encoding.mlir"
     "pad_dynamic_alloc.mlir"
     "reduce_bank_conflicts.mlir"
+    "reductions.mlir"
     "remove_dead_allocs.mlir"
     "remove_trivial_loops.mlir"
     "swizzle_workgroup.mlir"
@@ -39,6 +40,7 @@ iree_lit_test_suite(
     "tile_and_distribute_to_workgroups.mlir"
     "tile_reduction.mlir"
     "transform_dialect_apply_pattern_op.mlir"
+    "transform_ops_invalid.mlir"
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"
     "vectorize_tensor_pad.mlir"
@@ -47,6 +49,8 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-opt
+  DATA
+    reductions_codegen_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

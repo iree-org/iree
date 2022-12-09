@@ -99,21 +99,32 @@ iree_compiler_cc_library(
     name = "TransformDialectJitterPass",
     srcs = [
         "TransformDialectJitterPass.cpp",
+        "TransformDialectStrategies.cpp",
+        "TransformDialectStrategiesCPU.cpp",
+        "TransformDialectStrategiesGPU.cpp",
+    ],
+    hdrs = [
+        "TransformDialectStrategies.h",
+        "TransformDialectStrategiesCPU.h",
+        "TransformDialectStrategiesGPU.h",
     ],
     deps = [
         # Dialects
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:AsyncDialect",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:LinalgDialect",
@@ -258,6 +269,7 @@ iree_compiler_cc_library(
     hdrs = [
         "GPUPatterns.h",
         "LinalgOpInfo.h",
+        "TransformDialectStrategies.h",
         "UserConfig.h",
     ],
     deps = [
