@@ -29,6 +29,7 @@ iree_lit_test_suite(
         "reduction.mlir",
         "reduction_eltwise.mlir",
         "reduction_v2.mlir",
+        "reduction_v3.mlir",
         "softmax.mlir",
         "softmax_v2.mlir",
         # First few ops of softmax only, acts as a proxy example.
@@ -42,6 +43,7 @@ iree_lit_test_suite(
         "reduction_codegen_spec.mlir",
         "reduction_eltwise_codegen_spec.mlir",
         "reduction_v2_codegen_spec.mlir",
+        "reduction_v3_codegen_spec.mlir",
         "softmax_codegen_spec.mlir",
         "softmax_v2_codegen_spec.mlir",
         #

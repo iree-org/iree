@@ -1,6 +1,6 @@
 // RUN: iree-opt %s
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.structured.canonicalized_sequence failures(suppress) {
 ^bb1(%variant_op: !pdl.operation):
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
   %reduction = transform.structured.match ops{["linalg.generic"]} in %variant_op
@@ -13,45 +13,45 @@ transform.structured.canonicalized_sequence failures(propagate) {
   transform.structured.fuse_into_containing_op %fill into %foreach_thread_grid
 
   // Step 2. Split the reduction to get meatier parallelism.
+  // This also parallelizes to threads
   // ===========================================================================
   %foreach_thread, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
-    transform.structured.tile_reduction_using_scf %grid_reduction { tile_sizes = [0, 128] }
-  %_1:2 =
-    transform.structured.tile_to_foreach_thread_op %block_more_parallel_op_2 num_threads [0, 32] 
-    ( mapping = [#gpu.thread<x>] )
-
-  // Step 3. Second level of tiling parallelizes to threads.
-  // ===========================================================================
-  // 1st op is [parallel, parallel], map it to threadIdx.x by 4.
-  %_2:2 =
-    transform.structured.tile_to_foreach_thread_op %block_more_parallel_fill_op_2 tile_sizes [0, 4] 
-    ( mapping = [#gpu.thread<x>] )
-  // 2nd op is [parallel, reduction] of 1x128, map the 1-dim to threadIdx.y to
-  // trigger mapping of the reduction to threadIdx.x via predication via `if (x==0)`.
-  %_3:2 =
-    transform.structured.tile_to_foreach_thread_op %block_combiner_op_2 tile_sizes [1] 
+     transform.structured.tile_reduction_using_foreach_thread %grid_reduction 
+       { num_threads = [0, 1024], tile_sizes = [0, 1], mapping = [#gpu.thread<x>] }
+  // Fuse the fill and pointwise to privatize them. 
+  transform.structured.fuse_into_containing_op %block_more_parallel_fill_op_2
+    into %foreach_thread
+  // block_combiner_op_2 op is [parallel, reduction] of 1x384 that cannot fuse.
+  // map the 1-dim to threadIdx.y to trigger mapping of the reduction to 
+  // threadIdx.x via predication via `if (x==0)`.
+  transform.structured.tile_to_foreach_thread_op %block_combiner_op_2 tile_sizes [1] 
     ( mapping = [#gpu.thread<y>] )
 
-  // Step 4. Rank-reduce and vectorize.
+  // Step 3. Rank-reduce and vectorize.
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op
-  %func_2 = transform.iree.apply_patterns %func { rank_reducing }
-  %func_3 = transform.structured.vectorize %func_2
+  // TODO: masked vectorization on block_more_parallel_op_2 if we want 
+  // vector<4> to work as intended.
+  // TODO: there is a conflicting pattern here that introduces a tensor.empty
+  // to collapse/expand shape + scf.for. 
+  // This is investigated in parallel.
+  // %func_2 = transform.iree.apply_patterns %func { rank_reducing }
+  %func_3 = transform.structured.vectorize %func
 
-  // Step 5. Bufferize and drop HAL decriptor from memref ops.
+  // Step 4. Bufferize and drop HAL descriptor from memref ops.
   // ===========================================================================
   %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_2
   transform.iree.erase_hal_descriptor_type_from_memref %memref_func
 
-  // Step 6. Post-bufferization mapping to blocks and threads.
+  // Step 5. Post-bufferization mapping to blocks and threads.
   // ===========================================================================
   %func_4 = transform.structured.match ops{["func.func"]} in %variant_op_2
   %func_5 = transform.iree.foreach_thread_to_workgroup %func_4
   %func_6 = transform.iree.map_nested_foreach_thread_to_gpu_threads %func_5
-      { workgroup_size = [32, 1, 1] }
+      { workgroup_size = [1024, 1, 1] }
 
-  // Step 7. Post-bufferization vector distribution with rank-reduction.
+  // Step 6. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================
   %func_7 = transform.iree.apply_patterns %func_6 { rank_reducing }
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_2
