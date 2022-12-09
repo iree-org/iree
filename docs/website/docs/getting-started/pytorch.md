@@ -110,7 +110,7 @@ training with it, and running inference on it
 A small (~100-250KB), self-contained binary can be built for deploying to
 resource-constrained environments. An example illustrating this can be found in
 [this example](https://github.com/iree-org/iree-torch/tree/main/examples/native_training).
-This binary runs a model without a Python interperter.
+This binary runs a model without a Python interpreter.
 
 ## Samples
 
