@@ -28,6 +28,9 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN: FileCheck %s --check-prefix=CHECK
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
+// RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
+/// Constant JIT'ing must be disabled because the transform-dialect debug
+/// flags leak to the JIT session, which doesn't know what to do with them.
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
