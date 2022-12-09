@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -691,12 +692,157 @@ FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
   return result;
 }
 
+/// Finds contiguous loop ranges from the given linalg.generic.
+static SmallVector<ReassociationIndices> getContiguousLoops(
+    linalg::GenericOp genericOp, ArrayRef<unsigned> loopDims) {
+  SmallVector<ReassociationIndices> contiguousLoops;
+  if (loopDims.size() < 2) return contiguousLoops;
+
+  AffineMap firstMap = genericOp.getIndexingMapsArray().front();
+  // Checks all AffineExpr are the same.
+  auto areSameDimExprForAllAffineMaps = [&](unsigned dim) {
+    if (firstMap.getNumResults() <= dim) return false;
+    return llvm::all_of(genericOp.getIndexingMapsArray(), [=](AffineMap map) {
+      if (map.getNumResults() <= dim) return false;
+      return map.getResult(dim) == firstMap.getResult(dim);
+    });
+  };
+
+  // Finds that d2-d3 and d6-d7 are contiguous for the case (d1, d0, d2, d3, d5,
+  // d4, d6, d7).
+  ReassociationIndices range;
+  for (auto [idx, dim] : llvm::enumerate(loopDims)) {
+    if (!range.empty()) {
+      if (!areSameDimExprForAllAffineMaps(dim) || (range.back() + 1 != dim)) {
+        if (range.size() > 1)
+          contiguousLoops.push_back({range.begin(), range.end()});
+        range.clear();
+      }
+    }
+    if (areSameDimExprForAllAffineMaps(dim)) range.push_back(dim);
+  }
+  if (range.size() > 1) contiguousLoops.push_back(range);
+
+  // Convert dimensions to positions
+  for (auto &loop : contiguousLoops)
+    for (auto &idx : loop) idx = firstMap.getDimPosition(idx);
+  return contiguousLoops;
+}
+
+/// Finds all collapsible loop ranges of type "parallel" without
+/// mixing them with "reduction" types.
+static SmallVector<ReassociationIndices> getCollapsibleLoops(
+    linalg::GenericOp genericOp) {
+  SmallVector<unsigned int> pDims;
+  genericOp.getParallelDims(pDims);
+
+  SmallVector<ReassociationIndices> pLoops =
+      getContiguousLoops(genericOp, pDims);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "Collapsing parallel loops: ";
+    for (auto indices : pLoops) {
+      llvm::dbgs() << "[";
+      for (auto idx : indices) llvm::dbgs() << idx << ",";
+      llvm::dbgs() << "]\t";
+    }
+    llvm::dbgs() << "\n";
+  });
+
+  return pLoops;
+}
+
+/// Collapse possible dimension of the given linalg.generic and return the new
+/// one
+static FailureOr<linalg::GenericOp> collapseLinalgGeneric(
+    TensorDimTrackingRewriter &rewriter, linalg::GenericOp genericOp) {
+  SmallVector<ReassociationIndices> collapseIndices =
+      getCollapsibleLoops(genericOp);
+
+  rewriter.setInsertionPoint(genericOp);
+  FailureOr<SmallVector<Value>> replacements =
+      mlir::linalg::collapseGenericOpIterationDims(genericOp, collapseIndices,
+                                                   rewriter);
+  if (failed(replacements) || replacements->empty()) {
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "failed to collapse dimensions");
+  }
+
+  // Find and return collapsed linalg.generic
+  if (auto expandshapeOp =
+          replacements->front().getDefiningOp<tensor::ExpandShapeOp>()) {
+    if (auto newGenericOp =
+            expandshapeOp.getOperand().getDefiningOp<linalg::GenericOp>()) {
+      rewriter.replaceOp(genericOp, *replacements);
+      return newGenericOp;
+    }
+  }
+
+  return failure();
+}
+
+static constexpr unsigned kNumMaxParallelDims = 3;
+
+/// Returns true if the given op is collapsable.
+static bool isEligibleForCollapse(Operation *op,
+                                  ArrayRef<Operation *> producers) {
+  if (!producers.empty()) return false;
+
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  if (!genericOp) return false;
+
+  // TODO There is no mechanism to convey collapsed indexes from
+  // `tensor.collapse_shape` to `tensor.expand_shape`. Once we have this support
+  // in MLIR, we can enable dynamic tensor shapes.
+  for (Value output : genericOp.getOutputs()) {
+    if (auto tensorType = dyn_cast<RankedTensorType>(output.getType())) {
+      if (tensorType.getNumDynamicDims() > 0) {
+        return false;
+      }
+    }
+  }
+
+  // TODO Currently we can only collapse when result of all the AffineMaps are
+  // dimensions. Possible to collapse cases like affine_map<d0, d1+d2> with
+  // affine_map<d0, d1+d2>, however, this is not supported in collapsing
+  // mechanism in MLIR. Once we have this support, we can remove this if
+  // statement.
+  if (llvm::any_of(genericOp.getIndexingMapsArray(), [](AffineMap map) {
+        return !map.isProjectedPermutation();
+      })) {
+    return false;
+  }
+
+  // We can parallelize up to 3D loops, so we collapse 3D+ loops.
+  if (kNumMaxParallelDims >= genericOp.getNumLoops()) return false;
+
+  if (getCollapsibleLoops(genericOp).empty()) {
+    return false;
+  }
+  return true;
+}
+
+/// Traverses all the ops in `roots`; collapse the ops if they are eligible ops.
+static LogicalResult collapseDimensions(
+    TensorDimTrackingRewriter &rewriter, SmallVectorImpl<Operation *> &roots,
+    DenseMap<unsigned, SmallVector<Operation *>> &producers) {
+  for (auto [index, op] : llvm::enumerate(roots)) {
+    if (!isEligibleForCollapse(op, producers[index])) continue;
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      auto maybeLinalgGeneric = collapseLinalgGeneric(rewriter, genericOp);
+      if (failed(maybeLinalgGeneric)) return failure();
+      roots[index] = *maybeLinalgGeneric;
+    }
+  }
+  return success();
+}
+
 /// Create Flow::DispatchGroupsOps based on a fusion heuristic.
 static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
                                         FunctionOpInterface funcOp,
                                         DominanceInfo const &dominanceInfo,
                                         bool generateWorkloadRegion,
-                                        bool aggressiveFusion) {
+                                        bool aggressiveFusion, bool collapse) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
   // attribute
   unsigned numRoots =
@@ -723,6 +869,16 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
       removeFusionGroupsAttribute(op);
     }
   });
+
+  if (collapse) {
+    if (failed(collapseDimensions(rewriter, roots, producers)))
+      return failure();
+    LLVM_DEBUG({
+      llvm::dbgs() << "\n--- After Collapsing dimension ---\n";
+      funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+  }
 
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
@@ -786,13 +942,15 @@ struct FormDispatchRegionsPass
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
                 scf::SCFDialect, tensor::TensorDialect>();
   }
-  FormDispatchRegionsPass(bool aggressiveFusion, bool generateWorkloadRegion) {
+  FormDispatchRegionsPass(bool aggressiveFusion, bool generateWorkloadRegion,
+                          bool collapse) {
     this->aggressiveFusion = aggressiveFusion;
     this->generateWorkloadRegion = generateWorkloadRegion;
+    this->collapse = collapse;
   }
   FormDispatchRegionsPass(const FormDispatchRegionsPass &pass)
       : FormDispatchRegionsPass(pass.aggressiveFusion,
-                                pass.generateWorkloadRegion) {}
+                                pass.generateWorkloadRegion, pass.collapse) {}
   void runOnOperation() override;
 };
 }  // namespace
@@ -803,15 +961,16 @@ void FormDispatchRegionsPass::runOnOperation() {
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo,
-                                generateWorkloadRegion, aggressiveFusion)))
+                                generateWorkloadRegion, aggressiveFusion,
+                                collapse)))
     return signalPassFailure();
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFormDispatchRegionsPass(bool aggressiveFusion,
-                              bool generateWorkloadRegion) {
-  return std::make_unique<FormDispatchRegionsPass>(aggressiveFusion,
-                                                   generateWorkloadRegion);
+                              bool generateWorkloadRegion, bool collapse) {
+  return std::make_unique<FormDispatchRegionsPass>(
+      aggressiveFusion, generateWorkloadRegion, collapse);
 }
 }  // namespace Flow
 }  // namespace IREE
