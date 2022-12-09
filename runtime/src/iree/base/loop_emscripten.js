@@ -10,8 +10,10 @@
 //   * https://emscripten.org/docs/porting/connecting_cpp_and_javascript/Interacting-with-code.html
 //   * https://github.com/evanw/emscripten-library-generator
 //   * https://github.com/emscripten-core/emscripten/tree/main/src
+//   * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
+//   * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/race
 
-const IreeLibraryLoopEmscripten = {
+const LibraryIreeLoopEmscripten = {
   $iree_loop_emscripten_support__postset: 'iree_loop_emscripten_support();',
   $iree_loop_emscripten_support: function() {
     const IREE_STATUS_OK = 0;
@@ -49,9 +51,61 @@ const IreeLibraryLoopEmscripten = {
       }
     }
 
+    class LoopCommandWaitOne extends LoopCommand {
+      constructor(
+          scope, operationId, callback, user_data, timeout_ms, wait_promise,
+          loop) {
+        super();
+
+        this.callback = callback;
+        this.user_data = user_data;
+        this.loop = loop;
+        this.abortFn = undefined;
+
+        // We're given a primary Promise to wait on, but we'll race it against
+        // two other Promises:
+        //   * timeoutPromise: rejected after a timeout
+        //   * abortPromise : rejected if abort() is called
+        // This way, whichever Promise settles first will decide the eventual
+        // state and either issue the callback with IREE_STATUS_OK or
+        // IREE_STATUS_ABORTED.
+        const abortPromise = new Promise((_, reject) => {
+          this.abortFn = reject;
+        });
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject();
+          }, timeout_ms);
+        });
+
+        Promise.race([wait_promise, abortPromise, timeoutPromise])
+            .then(() => {
+              Module['dynCall'](
+                  'iiii', this.callback, this.user_data, this.loop,
+                  IREE_STATUS_OK);
+              // TODO(scotttodd): handle the returned status (sticky failure
+              //     state?) at least free the status so it doesn't leak
+              delete scope.pendingOperations[operationId];
+            })
+            .catch(() => {
+              Module['dynCall'](
+                  'iiii', this.callback, this.user_data, this.loop,
+                  IREE_STATUS_ABORTED);
+            })
+            .finally(() => {
+              delete scope.pendingOperations[operationId];
+            });
+      }
+
+      abort() {
+        this.abortFn();
+      }
+    }
+
     class LoopEmscriptenScope {
       constructor() {
-        this.nextOperationId = 0;
+        // Note: start at 1, leaving 0 as a sentinel for uninitialized.
+        this.nextOperationId = 1;
 
         // Dictionary of operationIds -> LoopCommands.
         this.pendingOperations = {};
@@ -72,11 +126,21 @@ const IreeLibraryLoopEmscripten = {
             new LoopCommandCall(this, operationId, callback, user_data, loop);
         return IREE_STATUS_OK;
       }
+
+      command_wait_one(callback, user_data, timeout_ms, wait_promise, loop) {
+        // TODO(scotttodd): assert not destroyed to avoid reentrant queueing?
+        const operationId = this.nextOperationId++;
+        this.pendingOperations[operationId] = new LoopCommandWaitOne(
+            this, operationId, callback, user_data, timeout_ms, wait_promise,
+            loop);
+        return IREE_STATUS_OK;
+      }
     }
 
     class LoopEmscripten {
       constructor() {
-        this.nextScopeHandle = 0;
+        // Note: start at 1, leaving 0 as a sentinel for uninitialized.
+        this.nextScopeHandle = 1;
 
         // Dictionary of scopeHandles -> LoopEmscriptenScopes.
         this.scopes = {};
@@ -102,6 +166,18 @@ const IreeLibraryLoopEmscripten = {
         const scope = this.scopes[scope_handle];
         return scope.command_call(callback, user_data, loop);
       }
+
+      iree_loop_command_wait_one(
+          scope_handle, callback, user_data, timeout_ms,
+          wait_primitive_promise_handle, loop) {
+        if (!(scope_handle in this.scopes)) return IREE_STATUS_OUT_OF_RANGE;
+
+        const scope = this.scopes[scope_handle];
+        const wait_promise =
+            IreeWaitHandlePromise.getPromise(wait_primitive_promise_handle);
+        return scope.command_wait_one(
+            callback, user_data, timeout_ms, wait_promise, loop);
+      }
     }
 
     const instance = new LoopEmscripten();
@@ -109,8 +185,10 @@ const IreeLibraryLoopEmscripten = {
         instance.iree_loop_allocate_scope.bind(instance);
     _iree_loop_free_scope = instance.iree_loop_free_scope.bind(instance);
     _iree_loop_command_call = instance.iree_loop_command_call.bind(instance);
+    _iree_loop_command_wait_one =
+        instance.iree_loop_command_wait_one.bind(instance);
   },
-  $iree_loop_emscripten_support__deps: ['$dynCall'],
+  $iree_loop_emscripten_support__deps: ['$dynCall', '$IreeWaitHandlePromise'],
 
   iree_loop_allocate_scope: function() {},
   iree_loop_allocate_scope__deps: ['$iree_loop_emscripten_support'],
@@ -118,6 +196,8 @@ const IreeLibraryLoopEmscripten = {
   iree_loop_free_scope__deps: ['$iree_loop_emscripten_support'],
   iree_loop_command_call: function() {},
   iree_loop_command_call__deps: ['$iree_loop_emscripten_support'],
+  iree_loop_command_wait_one: function() {},
+  iree_loop_command_wait_one__deps: ['$iree_loop_emscripten_support'],
 }
 
-mergeInto(LibraryManager.library, IreeLibraryLoopEmscripten);
+mergeInto(LibraryManager.library, LibraryIreeLoopEmscripten);

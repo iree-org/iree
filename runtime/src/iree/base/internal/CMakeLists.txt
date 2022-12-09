@@ -344,6 +344,7 @@ iree_cc_library(
     "wait_handle_poll.c"
     "wait_handle_posix.c"
     "wait_handle_posix.h"
+    "wait_handle_promise.c"
     "wait_handle_win32.c"
   DEPS
     ::synchronization
@@ -423,3 +424,12 @@ iree_cc_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(EMSCRIPTEN)
+  iree_link_js_library(
+    TARGET
+      ::wait_handle
+    SRCS
+      "wait_handle_promise.js"
+  )
+endif()

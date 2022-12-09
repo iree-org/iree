@@ -321,6 +321,7 @@ iree_runtime_cc_library(
         "wait_handle_poll.c",
         "wait_handle_posix.c",
         "wait_handle_posix.h",
+        "wait_handle_promise.c",
         "wait_handle_win32.c",
     ],
     hdrs = ["wait_handle.h"],
