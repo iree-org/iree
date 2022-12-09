@@ -2366,7 +2366,6 @@ func.func @unpack() {
 
 // -----
 
-
 func.func @unpack_fully_dynamic() {
   %c0 = arith.constant 0 : index
   %inner_d0 = util.unfoldable_constant 2 : index
