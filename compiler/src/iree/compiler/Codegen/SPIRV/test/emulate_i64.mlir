@@ -41,7 +41,7 @@ hal.executable private @buffer_types {
 //       CHECK:   [[REF_I64_0:%.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   [[REF_I64_1:%.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   [[VI64:%.+]]      = memref.load [[REF_I64_0]][{{%.+}}] : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
-//       CHECK:   {{%.+}}           = arith.addui_carry {{%.+}}, {{%.+}} : i32, i1
+//       CHECK:   {{%.+}}           = arith.addui_extended {{%.+}}, {{%.+}} : i32, i1
 //       CHECK:   memref.store {{%.+}}, [[REF_I64_1]][{{%.+}}] : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   return
 
@@ -96,7 +96,7 @@ hal.executable private @emulate_1d_vector {
 //       CHECK:   [[LOAD:%.+]]     = memref.load {{%.+}}[{{%.+}}] : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   {{%.+}}          = arith.muli {{%.+}}, {{%.+}} : vector<4xi32>
 //       CHECK:   {{%.+}}          = arith.addi {{%.+}}, {{%.+}} : vector<4xi32>
-//       CHECK:   {{%.+}}, {{%.+}} = arith.addui_carry {{%.+}}, {{%.+}} : vector<4xi32>, vector<4xi1>
+//       CHECK:   {{%.+}}, {{%.+}} = arith.addui_extended {{%.+}}, {{%.+}} : vector<4xi32>, vector<4xi1>
 //       CHECK:   memref.store {{%.+}}, {{%.+}}[{{%.+}}] : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   return
 

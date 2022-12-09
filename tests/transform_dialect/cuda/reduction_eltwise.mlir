@@ -53,7 +53,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //     CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
   //     CHECK-DAG: %[[F0:.*]] = arith.constant dense<0.000000e+00> : vector<f32>
   //     CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 128 : i64} : memref<1x2xf32, 3>
+  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x2xf32, 3>
   //     CHECK-DAG: %[[TIDX:.]] = gpu.thread_id  x
   //     CHECK-DAG: %[[TIDY:.]] = gpu.thread_id  y
   //     CHECK-DAG: %[[TIDZ:.]] = gpu.thread_id  z
