@@ -739,9 +739,9 @@ jobs:
         run: |
           # Not archiving the directory to allow fetching each file as needed
           # separately.
-          gcloud alpha storage cp -r \
-            "${E2E_TEST_ARTIFACTS_DIR}/iree" \
-            "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/iree"
+          find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 -name "iree_*" | \
+            gcloud alpha storage cp --read-paths-from-stdin -r \
+              "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
 
   ############################## Crosscompilation ##############################
