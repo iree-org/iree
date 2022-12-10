@@ -33,7 +33,8 @@ const LibraryLoopEmscripten = {
         this.loop = loop;
 
         this.timeoutId = setTimeout(() => {
-          getWasmTableEntry(callback)(user_data, loop, IREE_STATUS_OK);
+          Module['dynCall'](
+              'iiii', this.callback, this.user_data, this.loop, IREE_STATUS_OK);
           // TODO(scotttodd): handle the returned status (sticky failure state?)
           delete scope.pendingOperations[operationId];
         }, 0);
@@ -41,8 +42,9 @@ const LibraryLoopEmscripten = {
 
       abort() {
         clearTimeout(this.timeoutId);
-        getWasmTableEntry(this.callback)(
-            this.user_data, this.loop, IREE_STATUS_ABORTED);
+        Module['dynCall'](
+            'iiii', this.callback, this.user_data, this.loop,
+            IREE_STATUS_ABORTED);
       }
     }
 
