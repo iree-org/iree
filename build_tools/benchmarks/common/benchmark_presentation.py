@@ -164,7 +164,7 @@ class TotalDispatchSizeToTable(MetricsToTableMapper[CompilationMetrics]):
 
 
 class TotalArtifactSizeToTable(MetricsToTableMapper[CompilationMetrics]):
-  """Helper to map CompilationMetrics to total dispatch size column."""
+  """Helper to map CompilationMetrics to total artifact size column."""
 
   def update_base_value(self, compile_metrics: CompilationMetrics,
                         base_value: Any) -> CompilationMetrics:
