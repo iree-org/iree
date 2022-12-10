@@ -3,7 +3,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Represents the directory structure of common artifacts."""
+"""Helpers that generates paths for model artifacts."""
 
 import pathlib
 import urllib.parse
@@ -15,8 +15,10 @@ MODEL_ARTIFACT_PREFIX = "model"
 ARCHIVE_FILE_EXTENSIONS = [".tar", ".gz"]
 
 
-def get_model_path(model: common_definitions.Model,
-                   root_path: pathlib.PurePath = pathlib.PurePath()):
+def get_model_path(
+    model: common_definitions.Model,
+    root_path: pathlib.PurePath = pathlib.PurePath()
+) -> pathlib.PurePath:
   """Returns the path of an model artifact file or directory.
   
   Args:
