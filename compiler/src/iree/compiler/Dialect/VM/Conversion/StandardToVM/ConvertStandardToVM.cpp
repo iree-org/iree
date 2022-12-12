@@ -965,7 +965,8 @@ class BitcastOpConversion : public OpConversionPattern<arith::BitcastOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = srcOp.getResult().getType();
-    auto resultType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    auto resultType =
+        getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isF32() && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BitcastF32I32Op>(
           srcOp, resultType, adaptor.getOperands()[0]);
