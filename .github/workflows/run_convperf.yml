@@ -17,6 +17,7 @@ on:
   schedule:
     - cron: '0 16 * * *'
   workflow_dispatch:
+  pull_request:
 
 env:
   GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
@@ -79,7 +80,7 @@ jobs:
         run: |
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/convperf@sha256:9c6a6cf89d4f667246382bcce96f8542f626872d9014184b3a8118750af8f878 \
+            gcr.io/iree-oss/convperf@sha256:7f6b958020c7077bb1d39ace1304c61209eb3d53131bfcecebf9250dcf7d91fc \
           ./build_tools/benchmarks/convperf/build_and_run_convperf.sh "${BUILD_DIR}" "${RESULTS_DIR}" "${IREE_SHA}"
       - name: "Uploading results"
         run: |

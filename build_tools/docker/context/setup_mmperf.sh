@@ -38,17 +38,19 @@ source mmperf.venv/bin/activate
 pip install -r requirements.txt
 pip install -r ./external/llvm-project/mlir/python/requirements.txt
 
-popd # mmperf
-
-# Since the root user clones the mmperf repo, we update permissions so that a
-# runner can access this repo.
+# Since the root user clones the convperf repo, we update permissions so that a
+# runner can access this repo, but we don't want to set the executable bit for
+# non-executables because git tracks this, so we then restore any git-tracked
+# changes.
 chmod -R 777 .
-
-# Make sure there are no local changes to the IREE submodule since the workflow
-# updates this at each run.
-pushd mmperf/external/iree
 git restore .
 git submodule foreach --recursive git restore .
-popd # mmperf/external/iree
 
+# Set all repos as a safe directory. Git will not run commands on this repo as a
+# non-root user unless it is marked safe.
+for i in $(find ${REPO_DIR} -name '.git' | xargs dirname); do
+  git config --system --add safe.directory $i
+done
+
+popd # mmperf
 popd # ${REPO_DIR}

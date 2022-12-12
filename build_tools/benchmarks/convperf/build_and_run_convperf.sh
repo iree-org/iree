@@ -30,13 +30,6 @@ export REPO_DIR=${4:-"${CONVPERF_REPO_DIR}"}
 pushd ${REPO_DIR}
 source convperf.venv/bin/activate
 
-# Set all repos as a safe directory. Since this repo was created in the
-# Dockerfile under `root`, git will not run commands on this repo as a
-# non-root user unless it is marked safe.
-for i in $(find "${REPO_DIR}" -name '.git' | xargs dirname); do
-  git config --global --add safe.directory $i
-done
-
 # Update IREE.
 pushd external/iree
 git fetch https://github.com/iree-org/iree "${IREE_COMMIT}"
