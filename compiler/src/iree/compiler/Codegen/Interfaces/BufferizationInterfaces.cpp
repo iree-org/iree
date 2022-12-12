@@ -278,11 +278,9 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
   SmallVector<Value> newOperands = newInputBuffers;
   newOperands.append(newOutputBuffers.begin(), newOutputBuffers.end());
 
-  // PackOp has other operands besides ins and outs.
-  if (auto packOp = dyn_cast<IREE::LinalgExt::PackOp>(op.getOperation())) {
-    newOperands.append(packOp.getInnerTiles().begin(),
-                       packOp.getInnerTiles().end());
-    if (auto pad = packOp.getPaddingValue()) newOperands.push_back(pad);
+  // Append other operands besides ins and outs.
+  for (auto nonDPSOperands : op.getNonInputOrOutputOperands()) {
+    newOperands.push_back(nonDPSOperands->get());
   }
 
   // Set insertion point now that potential alloc/dealloc are introduced.
