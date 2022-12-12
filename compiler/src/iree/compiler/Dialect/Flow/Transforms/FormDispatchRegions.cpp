@@ -691,6 +691,16 @@ FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
 
   return result;
 }
+/// Returns the position of given dimension.
+/// For dim=2, map=affine_map<(d0, d1, d2) -> (d0, d2), it returns 1
+static Optional<unsigned> getResultPosition(AffineMap &map, unsigned dim) {
+  unsigned pos = 0;
+  for (AffineExpr result : map.getResults()) {
+    if (result.cast<AffineDimExpr>().getPosition() == dim) return pos;
+    pos++;
+  }
+  return llvm::None;
+}
 
 /// Finds contiguous loop ranges from the given linalg.generic.
 static SmallVector<ReassociationIndices> getContiguousLoops(
@@ -698,13 +708,12 @@ static SmallVector<ReassociationIndices> getContiguousLoops(
   SmallVector<ReassociationIndices> contiguousLoops;
   if (loopDims.size() < 2) return contiguousLoops;
 
-  AffineMap firstMap = genericOp.getIndexingMapsArray().front();
-  // Checks all AffineExpr are the same.
-  auto areSameDimExprForAllAffineMaps = [&](unsigned dim) {
-    if (firstMap.getNumResults() <= dim) return false;
-    return llvm::all_of(genericOp.getIndexingMapsArray(), [=](AffineMap map) {
-      if (map.getNumResults() <= dim) return false;
-      return map.getResult(dim) == firstMap.getResult(dim);
+  auto areDimensionsContiguous = [&](unsigned preDim, unsigned nextDim) {
+    return llvm::all_of(genericOp.getIndexingMapsArray(), [&](AffineMap map) {
+      Optional<unsigned> prePos = getResultPosition(map, preDim);
+      Optional<unsigned> nextPos = getResultPosition(map, nextDim);
+      return prePos.has_value() && nextPos.has_value() &&
+             (prePos.value() + 1) == nextPos;
     });
   };
 
@@ -713,19 +722,17 @@ static SmallVector<ReassociationIndices> getContiguousLoops(
   ReassociationIndices range;
   for (auto [idx, dim] : llvm::enumerate(loopDims)) {
     if (!range.empty()) {
-      if (!areSameDimExprForAllAffineMaps(dim) || (range.back() + 1 != dim)) {
+      if (!areDimensionsContiguous(range.back(), dim) ||
+          (range.back() + 1 != dim)) {
         if (range.size() > 1)
           contiguousLoops.push_back({range.begin(), range.end()});
         range.clear();
       }
     }
-    if (areSameDimExprForAllAffineMaps(dim)) range.push_back(dim);
+    range.push_back(dim);
   }
   if (range.size() > 1) contiguousLoops.push_back(range);
 
-  // Convert dimensions to positions
-  for (auto &loop : contiguousLoops)
-    for (auto &idx : loop) idx = firstMap.getDimPosition(idx);
   return contiguousLoops;
 }
 
@@ -759,6 +766,8 @@ static FailureOr<linalg::GenericOp> collapseLinalgGeneric(
   SmallVector<ReassociationIndices> collapseIndices =
       getCollapsibleLoops(genericOp);
 
+  if (collapseIndices.empty()) return genericOp;
+
   rewriter.setInsertionPoint(genericOp);
   FailureOr<SmallVector<Value>> replacements =
       mlir::linalg::collapseGenericOpIterationDims(genericOp, collapseIndices,
@@ -781,8 +790,6 @@ static FailureOr<linalg::GenericOp> collapseLinalgGeneric(
   return failure();
 }
 
-static constexpr unsigned kNumMaxParallelDims = 3;
-
 /// Returns true if the given op is collapsable.
 static bool isEligibleForCollapse(Operation *op,
                                   ArrayRef<Operation *> producers) {
@@ -791,34 +798,22 @@ static bool isEligibleForCollapse(Operation *op,
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
   if (!genericOp) return false;
 
-  // TODO There is no mechanism to convey collapsed indexes from
+  // TODO(guray) There is no mechanism to convey collapsed indexes from
   // `tensor.collapse_shape` to `tensor.expand_shape`. Once we have this support
   // in MLIR, we can enable dynamic tensor shapes.
-  for (Value output : genericOp.getOutputs()) {
-    if (auto tensorType = dyn_cast<RankedTensorType>(output.getType())) {
-      if (tensorType.getNumDynamicDims() > 0) {
-        return false;
-      }
-    }
-  }
+  if (genericOp.hasDynamicShape()) return false;
 
-  // TODO Currently we can only collapse when result of all the AffineMaps are
-  // dimensions. Possible to collapse cases like affine_map<d0, d1+d2> with
-  // affine_map<d0, d1+d2>, however, this is not supported in collapsing
-  // mechanism in MLIR. Once we have this support, we can remove this if
-  // statement.
+  // TODO(guray) Currently we can only collapse when result of all the
+  // AffineMaps are dimensions. Possible to collapse cases like affine_map<d0,
+  // d1+d2> with affine_map<d0, d1+d2>, however, this is not supported in
+  // collapsing mechanism in MLIR. Once we have this support, we can remove this
+  // if statement.
   if (llvm::any_of(genericOp.getIndexingMapsArray(), [](AffineMap map) {
         return !map.isProjectedPermutation();
       })) {
     return false;
   }
 
-  // We can parallelize up to 3D loops, so we collapse 3D+ loops.
-  if (kNumMaxParallelDims >= genericOp.getNumLoops()) return false;
-
-  if (getCollapsibleLoops(genericOp).empty()) {
-    return false;
-  }
   return true;
 }
 
