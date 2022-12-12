@@ -32,7 +32,7 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 
 HOST_BUILD_DIR="${IREE_HOST_BUILD_DIR:-${ROOT_DIR}/build-host}"
 BUILD_DIR="${IREE_EMPSCRIPTEN_BUILD_DIR:-build-emscripten}"
-INSTALL_ROOT="${1:-${HOST_BUILD_DIR}/install}"
+INSTALL_ROOT="$(realpath ${1:-${HOST_BUILD_DIR}/install})"
 SOURCE_DIR=${ROOT_DIR}/experimental/web/sample_dynamic
 BINARY_DIR=${BUILD_DIR}/experimental/web/sample_dynamic
 
