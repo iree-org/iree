@@ -92,3 +92,95 @@ hal.executable @warp_reduction_dispatch {
 //         CHECK:    scf.if %[[TID0]] {
 //         CHECK:      vector.transfer_write %[[R13]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32, #hal.descriptor_type<storage_buffer>>
 //         CHECK:    }
+
+// -----
+
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
+    [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, Unknown:Unknown,
+    #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32>>}>
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
+
+hal.executable @warp_reduction_dispatch {
+  hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+    hal.executable.export public @warp_reduction_dispatch ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @warp_reduction_dispatch() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f16
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<10x9216x9216xf16>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<10x9216x9216xf16>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [10, 9216, 9216], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<10x9216x9216xf16>> -> tensor<10x9216x9216xf16>
+        %3 = tensor.empty() : tensor<10x9216x9216xf16>
+        %4 = tensor.empty() : tensor<10x9216xf16>
+        %5 = linalg.fill ins(%cst : f16) outs(%4 : tensor<10x9216xf16>) -> tensor<10x9216xf16>
+        %6 = linalg.generic {
+            indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+            iterator_types = ["parallel", "parallel", "reduction"]}
+        ins(%2 : tensor<10x9216x9216xf16>) outs(%5 : tensor<10x9216xf16>) {
+        ^bb0(%in: f16, %out: f16):
+          %8 = arith.addf %in, %out : f16
+          linalg.yield %8 : f16
+        } -> tensor<10x9216xf16>
+        %7 = linalg.generic {
+            indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+            iterator_types = ["parallel", "parallel", "parallel"]}
+        ins(%2, %6 : tensor<10x9216x9216xf16>, tensor<10x9216xf16>) outs(%3 : tensor<10x9216x9216xf16>) {
+        ^bb0(%in: f16, %in_0: f16, %out: f16):
+          %8 = arith.divf %in, %in_0 : f16
+          linalg.yield %8 : f16
+        } -> tensor<10x9216x9216xf16>
+        flow.dispatch.tensor.store %7, %1, offsets = [0, 0, 0], sizes = [10, 9216, 9216], strides = [1, 1, 1] : tensor<10x9216x9216xf16> -> !flow.dispatch.tensor<writeonly:tensor<10x9216x9216xf16>>
+        return
+      }
+    }
+  }
+}
+
+// Check fused elementwise ops
+
+//         CHECK:  #[[$MAP:.+]] = affine_map<(d0)[s0] -> (d0 + s0 * 8)>
+
+//   CHECK-LABEL:  func.func @warp_reduction_dispatch
+
+//     CHECK-DAG:    %[[I0:.+]] = arith.constant 0 : i32
+//     CHECK-DAG:    %[[I1:.+]] = arith.constant 1 : i32
+//     CHECK-DAG:    %[[I2:.+]] = arith.constant 2 : i32
+//     CHECK-DAG:    %[[I32:.+]] = arith.constant 32 : i32
+
+//     CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+//     CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
+//     CHECK-DAG:    %[[C9216:.+]] = arith.constant 9216 : index
+
+//     CHECK-DAG:    %[[F0:.+]] = arith.constant 0.000000e+00 : f16
+
+//     CHECK-DAG:    %[[WGIDX:.+]] = hal.interface.workgroup.id[0] : index
+//     CHECK-DAG:    %[[WGIDY:.+]] = hal.interface.workgroup.id[1] : index
+//     CHECK-DAG:    %[[TIDX:.+]] = gpu.thread_id  x
+
+//     CHECK-DAG:    %[[SPAN0:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//     CHECK-DAG:    %[[SPAN1:.+]] = hal.interface.binding.subspan set(0) binding(1)
+
+//         CHECK:    gpu.barrier
+//         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle  xor %{{.+}}, %[[I1]], %[[I32]] : i32
+//         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle  xor %{{.+}}, %[[I2]], %[[I32]] : i32
+//         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle  idx %{{.+}}, %[[I0]], %[[I32]] : i32
+//         CHECK:    %[[ADD:.+]] = vector.reduction <add>, %{{.+}} : vector<2xf16> into f16
+//         CHECK:    %[[ADD1:.+]] = arith.addf %[[ADD]], %[[F0]] : f16
+//         CHECK:    %[[SPLAT:.+]] = vector.splat %[[ADD1]] : vector<4xf16>
+//         CHECK:    scf.for %[[IV:.+]] = %[[C0]] to %[[C9216]] step %[[C1024]] {
+//         CHECK:      %[[OFFSET:.+]] = affine.apply #[[$MAP]](%[[IV]])[%[[TIDX]]]
+//         CHECK:      %[[READ:.+]] = vector.transfer_read %[[SPAN0]][%[[WGIDY]], %[[WGIDX]], %[[OFFSET]]], %[[F0]] {in_bounds = [true]} : memref<10x9216x9216xf16{{.*}}>, vector<8xf16>
+//         CHECK:      %[[SLICE0:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [0], sizes = [4], strides = [1]}
+//         CHECK:      %[[DIV0:.+]] = arith.divf %[[SLICE0]], %[[SPLAT]] : vector<4xf16>
+//         CHECK:      %[[SLICE1:.+]] = vector.insert_strided_slice %[[DIV0]], %cst {offsets = [0], strides = [1]}
+//         CHECK:      %[[SLICE2:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [4], sizes = [4], strides = [1]}
+//         CHECK:      %[[DIV1:.+]] = arith.divf %[[SLICE2]], %[[SPLAT]] : vector<4xf16>
+//         CHECK:      %[[SLICE3:.+]] = vector.insert_strided_slice %[[DIV1]], %[[SLICE1]] {offsets = [4], strides = [1]}
+//         CHECK:      vector.transfer_write %[[SLICE3]], %[[SPAN1]][%[[WGIDY]], %[[WGIDX]], %56] {in_bounds = [true]} : vector<8xf16>, memref<10x9216x9216xf16{{.*}}>
+//         CHECK:    }
