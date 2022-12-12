@@ -21,7 +21,7 @@ steps:
         --normal_benchmark_tool_dir=build-linux/tools/ \
         -o "benchmark-results-gcp-cpu-$${BUILDKITE_BUILD_NUMBER}.json" \
         --verbose \
-        build-linux
+        build-targets/linux-x86_64
     agents:
       - "gcp:machine-type=c2-standard-16"
       - "queue=benchmark-x86_64"
