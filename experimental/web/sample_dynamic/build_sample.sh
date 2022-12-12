@@ -78,23 +78,22 @@ compile_sample "collatz"        "${ROOT_DIR}/tests/e2e/models/collatz.mlir"
 
 echo "=== Building web artifacts using Emscripten ==="
 
-pushd "${BUILD_DIR}"
-
 # Configure using Emscripten's CMake wrapper, then build.
 # Note: The sample creates a device directly, so no drivers are required.
-emcmake "${CMAKE_BIN}" -G Ninja .. \
+emcmake "${CMAKE_BIN}" \
+  -B "${BUILD_DIR}" \
+  -G Ninja \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_HOST_BINARY_ROOT="${INSTALL_ROOT}" \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_BUILD_TESTS=OFF
+  -DIREE_BUILD_TESTS=OFF \
+  .
 
-"${CMAKE_BIN}" --build . --target \
+"${CMAKE_BIN}" --build "${BUILD_DIR}" --target \
   iree_experimental_web_sample_dynamic_sync
-
-popd
 
 echo "=== Copying static files (.html, .js) to the build directory ==="
 
