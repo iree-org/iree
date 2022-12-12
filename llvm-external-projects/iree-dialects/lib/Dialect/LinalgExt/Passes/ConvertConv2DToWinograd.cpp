@@ -86,6 +86,11 @@ foldFilterTransform(ArrayRef<int64_t> shape, int64_t inputTileSize,
                 } else {
                   ival = input[index(d3, d2, d4, d5, oc, ic, kh, kw)];
                 }
+                if (floatType.isF16()) {
+                  bool losesInfo;
+                  ival.convert(APFloat::IEEEsingle(),
+                                      APFloat::rmNearestTiesToEven, &losesInfo);
+                }
               }
               int idx0 = index(d0, d4, inputTileSize, kernelSize);
               int idx1 = index(d1, d5, inputTileSize, kernelSize);
@@ -140,6 +145,14 @@ public:
 
     bool isNchw;
     if (!isValidConv2d(convOp, isNchw))
+      return failure();
+
+    // Check that strides = 1
+    if (!hasAllOneValues(convOp.getStrides()))
+      return failure();
+
+    // Check that dilations = 1
+    if (!hasAllOneValues(convOp.getDilations()))
       return failure();
 
     // Check that kernel size = 3x3
