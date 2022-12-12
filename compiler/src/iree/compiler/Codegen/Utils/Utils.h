@@ -65,6 +65,7 @@ bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Returns true if `targetAttr` has `feature` in its CPU features.
 bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature);
