@@ -161,7 +161,7 @@ createTileAndDecomposeWinogradTransformPass();
 // Creates a pass to convert linalg convolution ops into a sequence of
 // linalg_ext.winograd.* ops and linalg.batch_matmul ops using the winograd
 // tranformation.
-std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
+std::unique_ptr<Pass> createConvertConv2DToWinogradPass(bool forceWinograd = false);
 
 // Creates a pass to convert the softmax op into a sequence of
 // linalg generic ops.
