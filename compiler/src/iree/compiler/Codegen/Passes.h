@@ -9,6 +9,7 @@
 
 #include <memory>
 
+#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
@@ -196,6 +197,9 @@ createFuseTensorPadWithConsumerPass();
 /// OffsetSizeAndStrideOpInterface. For example, pad(extract_slice).
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConcretizePadResultShapePass();
+
+IREE::LinalgExt::MaterializeEncodingValueFn getMaterializeEncodingValueFn(
+    IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Materialize the encoding of operations. The layout to use for the encoded
 /// operations are backend specific.

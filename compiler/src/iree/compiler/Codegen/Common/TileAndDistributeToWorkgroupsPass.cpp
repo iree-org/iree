@@ -247,9 +247,12 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
   LowerDispatchWorkgroupCountFromSetEncodingOp(
       MLIRContext *context,
       IREE::LinalgExt::MaterializeEncodingInfo encodingInfo,
-      PatternBenefit benefit = 1)
+      IREE::LinalgExt::MaterializeEncodingValueFn materializeEncodingValueFn,
+      RankedTensorType inputType, PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
-        materializeEncodingInfo(std::move(encodingInfo)) {}
+        materializeEncodingInfo(std::move(encodingInfo)),
+        materializeEncodingValueFn(materializeEncodingValueFn),
+        inputType(inputType) {}
 
   LogicalResult matchAndRewrite(
       IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp workgroupCountOp,
@@ -257,15 +260,14 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
     ValueRange workload = workgroupCountOp.getOperands();
     // The workload represents the unpacked shape. Get the workload of the
     // packed shape.
-    auto getAsOpFoldResults = [&](ArrayRef<int64_t> intVals) {
-      return llvm::to_vector(llvm::map_range(
-          intVals,
-          [&](int64_t i) -> OpFoldResult { return rewriter.getIndexAttr(i); }));
-    };
+    Location loc = workgroupCountOp.getLoc();
+    auto innerTileSizes =
+        getInnerTileSizesOfr(rewriter, loc, inputType, materializeEncodingInfo,
+                             materializeEncodingValueFn);
+    if (failed(innerTileSizes)) return failure();
     SmallVector<OpFoldResult> resultShape =
         IREE::LinalgExt::PackOp::getResultShape(
-            rewriter, workgroupCountOp.getLoc(), getAsOpFoldResult(workload),
-            getAsOpFoldResults(materializeEncodingInfo.innerTileSizes),
+            rewriter, loc, getAsOpFoldResult(workload), *innerTileSizes,
             materializeEncodingInfo.innerDimsPos,
             materializeEncodingInfo.outerDimsPerm);
     resultShape.resize(materializeEncodingInfo.srcRank);
@@ -273,13 +275,14 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
     rewriter
         .replaceOpWithNewOp<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(
             workgroupCountOp,
-            getValueOrCreateConstantIndexOp(rewriter, workgroupCountOp.getLoc(),
-                                            resultShape));
+            getValueOrCreateConstantIndexOp(rewriter, loc, resultShape));
     return success();
   }
 
  private:
   IREE::LinalgExt::MaterializeEncodingInfo materializeEncodingInfo;
+  IREE::LinalgExt::MaterializeEncodingValueFn materializeEncodingValueFn;
+  RankedTensorType inputType;
 };
 
 //===---------------------------------------------------------------------===//
@@ -345,8 +348,13 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         if (failed(encodingInfo)) {
           return signalPassFailure();
         }
+        auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(packRootOp);
+        auto materializeEncodingValueFn =
+            getMaterializeEncodingValueFn(targetAttr);
+        auto tensorType = packRootOp.getInputType().cast<RankedTensorType>();
         patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
-            context, encodingInfo.value());
+            context, encodingInfo.value(), materializeEncodingValueFn,
+            tensorType);
       }
       if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
         exportOp.emitOpError("failed to lower number of workgroups");
