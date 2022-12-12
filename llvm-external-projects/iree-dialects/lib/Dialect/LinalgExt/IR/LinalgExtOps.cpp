@@ -2332,6 +2332,10 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
     tiledOperands.push_back(empty.getResult());
   }
 
+  for (auto tile : getInnerTiles()) {
+    tiledOperands.push_back(tile);
+  }
+
   SmallVector<Type, 4> tiledResultTypes;
   tiledResultTypes.push_back(tiledOperands[1].getType());
 
