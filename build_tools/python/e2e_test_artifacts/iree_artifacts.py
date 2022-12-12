@@ -69,7 +69,7 @@ def get_module_dir_path(
 def get_dependent_model_map(
     module_generation_configs: Iterable[iree_definitions.ModuleGenerationConfig]
 ) -> OrderedDict[str, common_definitions.Model]:
-  """Returns an ordered map of the dependent models, keyed by model id."""
+  """Returns an ordered map of the dependent models keyed by model id."""
   return collections.OrderedDict(
       (config.imported_model.model.id, config.imported_model.model)
       for config in module_generation_configs)

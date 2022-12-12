@@ -22,7 +22,7 @@ def get_model_path(
   """Returns the path of an model artifact file or directory.
   
   Args:
-    model: the model.
+    model: source model.
     root_path: path of the root artifact directory, on which the returned path
       will base.
   Returns:

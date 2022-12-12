@@ -197,8 +197,8 @@ def generate_rules(
   Args:
     package_name: CMake package name for rules.
     root_path: path of the root artifact directory.
-    module_generation_configs: List of IREE module generation configs
-    model_rule_map: Map of generated model rules keyed by model id. It must
+    module_generation_configs: list of IREE module generation configs.
+    model_rule_map: map of generated model rules keyed by model id, it must
       cover all model referenced in module_generation_configs.
   Returns:
     List of cmake rules.
