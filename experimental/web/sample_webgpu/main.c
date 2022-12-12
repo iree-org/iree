@@ -355,21 +355,21 @@ static void buffer_map_sync_callback(WGPUBufferMapAsyncStatus map_status,
   }
 
   // Copy the original buffer_view, backed by the mapped heap buffer instead.
-  iree_hal_buffer_view_t* buffer_view = NULL;
+  iree_hal_buffer_view_t* heap_buffer_view = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_create_like(
         heap_buffer, userdata->source_buffer_view, iree_allocator_system(),
-        &buffer_view);
+        &heap_buffer_view);
   }
 
   if (iree_status_is_ok(status)) {
     fprintf(stdout, "Call output:\n");
-    status = iree_hal_buffer_view_fprint(stdout, buffer_view,
+    status = iree_hal_buffer_view_fprint(stdout, heap_buffer_view,
                                          /*max_element_count=*/4096,
                                          iree_allocator_system());
     fprintf(stdout, "\n");
   }
-  iree_hal_buffer_view_release(buffer_view);
+  iree_hal_buffer_view_release(heap_buffer_view);
   iree_hal_buffer_release(heap_buffer);
 
   if (!iree_status_is_ok(status)) {
