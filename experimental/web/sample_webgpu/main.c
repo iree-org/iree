@@ -282,7 +282,7 @@ static iree_status_t parse_inputs_into_call(
 }
 
 typedef struct iree_buffer_map_userdata_t {
-  iree_hal_buffer_view_t* buffer_view;
+  iree_hal_buffer_view_t* source_buffer_view;
   iree_hal_buffer_t* readback_buffer;
 } iree_buffer_map_userdata_t;
 
@@ -313,8 +313,8 @@ static void buffer_map_sync_callback(WGPUBufferMapAsyncStatus map_status,
   }
 
   if (map_status != WGPUBufferMapAsyncStatus_Success) {
+    iree_hal_buffer_view_release(userdata->source_buffer_view);
     iree_hal_buffer_release(userdata->readback_buffer);
-    iree_hal_buffer_view_release(userdata->buffer_view);
     iree_allocator_free(iree_allocator_system(), userdata);
     return;
   }
@@ -324,9 +324,9 @@ static void buffer_map_sync_callback(WGPUBufferMapAsyncStatus map_status,
   // TODO(scotttodd): bubble result(s) up to the caller (async + callback API)
 
   iree_device_size_t data_offset = iree_hal_buffer_byte_offset(
-      iree_hal_buffer_view_buffer(userdata->buffer_view));
+      iree_hal_buffer_view_buffer(userdata->source_buffer_view));
   iree_device_size_t data_length =
-      iree_hal_buffer_view_byte_length(userdata->buffer_view);
+      iree_hal_buffer_view_byte_length(userdata->source_buffer_view);
   WGPUBuffer buffer_handle =
       iree_hal_webgpu_buffer_handle(userdata->readback_buffer);
 
@@ -357,9 +357,9 @@ static void buffer_map_sync_callback(WGPUBufferMapAsyncStatus map_status,
   // Copy the original buffer_view, backed by the mapped heap buffer instead.
   iree_hal_buffer_view_t* buffer_view = NULL;
   if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_buffer_view_create_like(heap_buffer, userdata->buffer_view,
-                                         iree_allocator_system(), &buffer_view);
+    status = iree_hal_buffer_view_create_like(
+        heap_buffer, userdata->source_buffer_view, iree_allocator_system(),
+        &buffer_view);
   }
 
   if (iree_status_is_ok(status)) {
@@ -378,8 +378,8 @@ static void buffer_map_sync_callback(WGPUBufferMapAsyncStatus map_status,
     iree_status_free(status);
   }
 
+  iree_hal_buffer_view_release(userdata->source_buffer_view);
   iree_hal_buffer_release(userdata->readback_buffer);
-  iree_hal_buffer_view_release(userdata->buffer_view);
   iree_allocator_free(iree_allocator_system(), userdata);
 }
 
@@ -481,13 +481,13 @@ static iree_status_t print_buffer_view(iree_hal_device_t* device,
     status = iree_allocator_malloc(iree_allocator_system(),
                                    sizeof(iree_buffer_map_userdata_t),
                                    (void**)&userdata);
-    userdata->buffer_view = buffer_view;
+    iree_hal_buffer_view_retain(buffer_view);  // Released in the callback.
+    userdata->source_buffer_view = buffer_view;
     userdata->readback_buffer = readback_buffer;
   }
 
   if (iree_status_is_ok(status)) {
-    WGPUBuffer buffer_handle = iree_hal_webgpu_buffer_handle(readback_buffer);
-    wgpuBufferMapAsync(buffer_handle, WGPUMapMode_Read, /*offset=*/0,
+    wgpuBufferMapAsync(readback_buffer_handle, WGPUMapMode_Read, /*offset=*/0,
                        /*size=*/data_length, buffer_map_sync_callback,
                        /*userdata=*/userdata);
   }
@@ -546,8 +546,6 @@ static iree_status_t print_outputs_from_call(
       if (iree_hal_buffer_view_isa(variant.ref)) {
         iree_hal_buffer_view_t* buffer_view =
             iree_hal_buffer_view_deref(variant.ref);
-        iree_hal_buffer_view_retain(buffer_view);  // Release in async callback.
-
         // TODO(scotttodd): join async outputs together and return to caller
         iree_hal_device_t* device = iree_runtime_session_device(call->session);
         IREE_RETURN_IF_ERROR(print_buffer_view(device, buffer_view));

@@ -165,6 +165,9 @@ typedef struct iree_hal_webgpu_command_buffer_t {
       iree_hal_webgpu_bind_group_binding_t
           bindings[IREE_HAL_WEBGPU_MAX_DESCRIPTOR_SET_BINDING_COUNT];
     } bind_groups[IREE_HAL_WEBGPU_MAX_DESCRIPTOR_SET_COUNT];
+
+    // Bitfield tracking which bind groups are set to an empty group.
+    uint64_t bind_groups_empty;
   } state;
 } iree_hal_webgpu_command_buffer_t;
 
@@ -257,6 +260,8 @@ static void iree_hal_webgpu_command_buffer_reset(
         wgpuCommandEncoderFinish(command_buffer->state.encoder, &descriptor));
     command_buffer->state.encoder = NULL;
   }
+
+  command_buffer->state.bind_groups_empty = 0;
 
   iree_hal_webgpu_staging_buffer_reset(command_buffer->staging_buffer);
   iree_hal_webgpu_command_segment_list_reset(&command_buffer->segments);
@@ -396,6 +401,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_acquire_compute_pass(
        i < IREE_ARRAYSIZE(command_buffer->state.bind_groups); ++i) {
     command_buffer->state.bind_groups[i].handle = NULL;
   }
+  command_buffer->state.bind_groups_empty = 0;
 
   return iree_ok_status();
 }
@@ -816,11 +822,13 @@ static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch(
       command_buffer, &compute_pass));
   wgpuComputePassEncoderSetPipeline(compute_pass, entry_point->pipeline);
 
-  // Bind the push constant emulation bind group at the staging buffer relative
-  // offset for this dispatch.
-  wgpuComputePassEncoderSetBindGroup(
-      compute_pass, IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX,
-      command_buffer->staging_buffer->bind_group, 1, &params_offset);
+  if (push_constant_count > 0) {
+    // Bind the push constant emulation bind group at the staging buffer
+    // relative offset for this dispatch.
+    wgpuComputePassEncoderSetBindGroup(
+        compute_pass, IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX,
+        command_buffer->staging_buffer->bind_group, 1, &params_offset);
+  }
 
   // Set all bindings.
   const iree_hal_webgpu_set_binding_info_t* binding_info =
@@ -848,15 +856,23 @@ static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch(
     wgpuComputePassEncoderSetBindGroup(compute_pass, (uint32_t)i, handle, 0,
                                        NULL);
     command_buffer->state.bind_groups[i].handle = handle;
+    command_buffer->state.bind_groups_empty &= ~(1ull << i);
   }
 
-  // Pad up to IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX with empty bind groups.
-  WGPUBindGroup empty_handle = command_buffer->staging_buffer->empty_bind_group;
-  for (iree_host_size_t i = binding_info->set_count;
-       i < IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX; ++i) {
-    wgpuComputePassEncoderSetBindGroup(compute_pass, (uint32_t)i, empty_handle,
-                                       0, NULL);
-    command_buffer->state.bind_groups[i].handle = empty_handle;
+  if (push_constant_count > 0) {
+    // Pad up to IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX with empty bind groups.
+    WGPUBindGroup empty_handle =
+        command_buffer->staging_buffer->empty_bind_group;
+    for (iree_host_size_t i = binding_info->set_count;
+         i < IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX; ++i) {
+      // Skip if an empty group is already set at this index.
+      if ((command_buffer->state.bind_groups_empty >> i) & 1ull) continue;
+
+      wgpuComputePassEncoderSetBindGroup(compute_pass, (uint32_t)i,
+                                         empty_handle, 0, NULL);
+      command_buffer->state.bind_groups[i].handle = empty_handle;
+      command_buffer->state.bind_groups_empty |= 1ull << i;
+    }
   }
 
   *out_compute_pass = compute_pass;
