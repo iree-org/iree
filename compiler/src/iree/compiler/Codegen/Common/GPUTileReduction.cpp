@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -55,10 +54,7 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
 static LogicalResult tileFusedOps(linalg::GenericOp op) {
   SimpleRewriter rewriter(op.getContext());
   rewriter.setInsertionPoint(op);
-  auto tileSizesAttr = op->getAttrOfType<DenseI64ArrayAttr>(
-      getWarpReductionFusedOpTileSizeAttrName());
-  if (!tileSizesAttr) return success();
-  ArrayRef<int64_t> tileSizes = tileSizesAttr.asArrayRef();
+  SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
   if (tileSizes.empty()) return success();
   linalg::LinalgTilingOptions tileOption;
   tileOption.setTileSizes(tileSizes);

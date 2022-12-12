@@ -1056,20 +1056,22 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   tileSizes.emplace_back(std::move(reductionTileSizes));  // reduction level
-
-  for (Operation *userOp : op->getUsers()) {
-    if (auto fusedOp = dyn_cast<linalg::LinalgOp>(userOp)) {
-      // Set lowering configuration to drive tiling for fused ops too---the
-      // pipeline expects it.
-      fusedOp->setAttr(
-          getWarpReductionFusedOpTileSizeAttrName(),
-          DenseI64ArrayAttr::get(fusedOp.getContext(), tileSizes.back()));
-    }
+  if (failed(setOpConfigAndEntryPointFnTranslation(
+          op->getParentOfType<func::FuncOp>(), op, tileSizes,
+          CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize))) {
+    return failure();
   }
 
-  return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<func::FuncOp>(), op, tileSizes,
-      CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize);
+  // Set lowering configuration to drive tiling for fused ops too---the pipeline
+  // expects it.
+  tileSizes[0] = {};  // We only need the reduction level tile sizes.
+  for (Operation *userOp : op->getUsers()) {
+    if (auto fusedOp = dyn_cast<linalg::LinalgOp>(userOp)) {
+      setLoweringConfig(fusedOp, IREE::Codegen::LoweringConfigAttr::get(
+                                     fusedOp.getContext(), tileSizes));
+    }
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1439,11 +1441,10 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       // Check if the op configuration was set.
       if (!getLoweringConfig(computeOp)) continue;
 
-      if (rootOperation) {
-        return computeOp->emitOpError(
-            "unhandled multiple roots in dispatch region");
-      }
       rootOperation = computeOp;
+      // Break after finding the first one--following ops may still use the same
+      // attribute for other purposes.
+      break;
     }
 
     if (!rootOperation) {

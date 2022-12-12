@@ -253,9 +253,5 @@ void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp) {
   });
 }
 
-const char *getWarpReductionFusedOpTileSizeAttrName() {
-  return "iree.warp_reduction.fused_op_tile_size";
-}
-
 }  // namespace iree_compiler
 }  // namespace mlir
