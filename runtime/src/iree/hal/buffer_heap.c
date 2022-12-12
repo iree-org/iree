@@ -185,6 +185,7 @@ iree_status_t iree_hal_heap_buffer_wrap(
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+#if !defined(IREE_PLATFORM_EMSCRIPTEN)  // WebGPU buffer data isn't aligned?
   if (!iree_host_size_has_alignment((uintptr_t)data.data,
                                     IREE_HAL_HEAP_BUFFER_ALIGNMENT)) {
     IREE_TRACE_ZONE_END(z0);
@@ -193,6 +194,7 @@ iree_status_t iree_hal_heap_buffer_wrap(
         "imported heap buffer data must be aligned to %d; got %p",
         (int)IREE_HAL_HEAP_BUFFER_ALIGNMENT, data.data);
   }
+#endif  // !defined(IREE_PLATFORM_EMSCRIPTEN)
 
   iree_allocator_t host_allocator =
       iree_hal_allocator_host_allocator(allocator);
