@@ -887,6 +887,14 @@ LogicalResult setCooperativeMatrixConfig(
   tileSizes.push_back(reductionTileSizes);
   tileSizes.push_back(vectorSizes);
 
+  // Don't do multibuffering if the inner reduction loop is folded out.
+  auto pipelineDepth = softwarePipelineDepth;
+  auto storeStage = softwarePipelineStoreStage;
+  if (coopMatSize->kTileCount <= 1) {
+    pipelineDepth = 0;
+    storeStage = 0;
+  }
+
   // Check if the C matrix will be promoted for computing shared memory usage.
   auto matmulResult = op.getDpsInitOperand(0)->get();
   bool promoteC =
@@ -894,8 +902,6 @@ LogicalResult setCooperativeMatrixConfig(
       !isa<IREE::Flow::DispatchTensorStoreOp>(*matmulResult.getUsers().begin());
 
   // Decrease pipeline depth until it fits in shared memory.
-  auto pipelineDepth = softwarePipelineDepth;
-  auto storeStage = softwarePipelineStoreStage;
   const int maxBytes = limits.getMaxComputeSharedMemorySize();
   auto usedBytes =
       getTileBytes(workgroupTileSizes[mIndex], workgroupTileSizes[nIndex],

@@ -290,7 +290,7 @@ hal.executable public @batch_matmul_16x1024x1024x80 {
 }
 
 //  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64], [1, 32, 32], [0, 0, 0, 16], [1, 16, 16, 16]{{\]}}>
-//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize pipeline_depth = 1 store_stage = 0>
+//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize store_stage = 0>
 //CHECK-LABEL: hal.executable.export public @batch_matmul_16x1024x1024x80
 // CHECK-SAME:   subgroup_size = 32 : index
 // CHECK-SAME:   translation_info = #[[$TRANSLATION]]

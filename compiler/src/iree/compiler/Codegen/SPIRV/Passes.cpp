@@ -294,6 +294,10 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
   // Tile and distribute to GPU subgroups.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVTileToCooperativeOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
 
   // Multi-buffer depending on pipeline depth and distribute to shared memory.
   if (pipelineDepth > 0)
@@ -328,6 +332,9 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
   // cooperative ops in the next step.
   nestedModulePM.addPass(memref::createFoldMemRefAliasOpsPass());
 
+  nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVVectorToGPUSubgroupMMAOpsPass());
   nestedModulePM.addPass(createCanonicalizerPass());
