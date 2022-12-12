@@ -66,3 +66,8 @@ systemctl enable github-actions-runner-deregister
 
 echo "Starting the runner service."
 systemctl start github-actions-runner-start
+
+# The health check server confirms that we've at least made it this far and
+# therefore registering the runner has succeeded.
+echo "Starting health check server"
+/runner-root/config/health_server/health_server.py
