@@ -41,13 +41,13 @@ jobs:
             ./build_tools/testing/test_samples.sh
 
   # FIXME: unify this with host build from ci.yml. This is complicated by
-  # incompatibility between storage options for GitHubmanaged and self-hosted
+  # incompatibility between storage options for GitHub-managed and self-hosted
   # runners.
-  wasm:
+  web:
     runs-on: ubuntu-20.04-64core
     # TODO: remove dependence on magic matching build dir names
-    # env:
-    #   HOST_BUILD_DIR: build-host-install
+    env:
+      HOST_BUILD_DIR: build-host-install
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
@@ -58,9 +58,13 @@ jobs:
           ./build_tools/github_actions/docker_run.sh  \
             --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206" \
             gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206\
-            ./build_tools/cmake/build_host_tools.sh
+            ./build_tools/cmake/build_host_tools.sh "${HOST_BUILD_DIR}"
       - name: "Testing Experimental Web Samples"
+        env:
+          IREE_EMPSCRIPITEN_BUILD_DIR: build-empscripten
         run: |
           ./build_tools/github_actions/docker_run.sh  \
+            --env "IREE_HOST_BUILD_DIR=${HOST_BUILD_DIR}" \
+            --env "IREE_EMPSCRIPITEN_BUILD_DIR=${IREE_EMPSCRIPITEN_BUILD_DIR}" \
             gcr.io/iree-oss/emscripten@sha256:20847a0a9503852d9594f3c4e7e633b913b450240b097d378dcd42d22ac0948e \
             ./experimental/web/test_samples.sh

@@ -17,7 +17,6 @@ set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_HOST_BUILD_DIR:-build-host}}"
 INSTALL_DIR="${INSTALL_DIR:-${BUILD_DIR}/install}"
-CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-OFF}"
 
 source build_tools/cmake/setup_build.sh

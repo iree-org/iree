@@ -14,8 +14,29 @@
 #
 # Usage:
 #   build_sample.sh (optional install path) && serve_sample.sh
+#
+# The desired host install directory can be passed as the first argument.
+# Otherwise, it looks for an install directory under path set in the environment
+# variable IREE_HOST_BUILD_DIR (default build-host). The build directory for the
+# empscripten build is taken from the environment variable
+# IREE_EMPSCRIPITEN_BUILD_DIR, defaulting to "build-empscripten". Designed for
+# CI, but can be run manually. It reuses the build directory if it already
+# exists.
+#
+# NOTE: This is different from most of build scripts we use for CI because it is
+# intended to also be runnable by humans with minimal configuration.
 
-set -e
+set -euo pipefail
+
+ROOT_DIR=$(git rev-parse --show-toplevel)
+
+HOST_BUILD_DIR="${IREE_HOST_BUILD_DIR:-${ROOT_DIR}/build-host}"
+BUILD_DIR="${IREE_EMPSCRIPITEN_BUILD_DIR:-build-emscripten}"
+INSTALL_ROOT="${1:-${HOST_BUILD_DIR}/install}"
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+SOURCE_DIR=${ROOT_DIR}/experimental/web/sample_dynamic
+BINARY_DIR=${BUILD_DIR}/experimental/web/sample_dynamic
+
 
 ###############################################################################
 # Setup and checking for dependencies                                         #
@@ -27,38 +48,35 @@ then
   exit 1
 fi
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-ROOT_DIR=$(git rev-parse --show-toplevel)
-SOURCE_DIR=${ROOT_DIR}/experimental/web/sample_dynamic
+if [[ -d "${BUILD_DIR}" ]]; then
+  echo "'${BUILD_DIR}' directory already exists. Will use cached results there."
+else
+  echo "'${BUILD_DIR}' directory does not already exist. Creating a new one."
+  mkdir -p "${BUILD_DIR}"
+fi
 
-BUILD_DIR=${ROOT_DIR?}/build-emscripten
-mkdir -p ${BUILD_DIR}
-
-BINARY_DIR=${BUILD_DIR}/experimental/web/sample_dynamic
 mkdir -p ${BINARY_DIR}
-
-INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
 
 ###############################################################################
 # Compile from .mlir input to portable .vmfb file using host tools            #
 ###############################################################################
 
-COMPILE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
+COMPILE_TOOL="${INSTALL_ROOT}/bin/iree-compile"
 
 compile_sample() {
   echo "  Compiling '$1' sample..."
-  ${COMPILE_TOOL?} $2 \
+  "${COMPILE_TOOL}" "$2" \
     --iree-input-type=mhlo \
     --iree-hal-target-backends=llvm-cpu \
     --iree-llvm-target-triple=wasm32-unknown-emscripten \
     --iree-llvm-target-cpu-features=+atomics,+bulk-memory,+simd128 \
-    --o ${BINARY_DIR}/$1.vmfb
+    --o "${BINARY_DIR}/$1.vmfb"
 }
 
 echo "=== Compiling sample MLIR files to VM FlatBuffer outputs (.vmfb) ==="
-compile_sample "simple_abs"     "${ROOT_DIR?}/samples/models/simple_abs.mlir"
-compile_sample "fullyconnected" "${ROOT_DIR?}/tests/e2e/models/fullyconnected.mlir"
-compile_sample "collatz"        "${ROOT_DIR?}/tests/e2e/models/collatz.mlir"
+compile_sample "simple_abs"     "${ROOT_DIR}/samples/models/simple_abs.mlir"
+compile_sample "fullyconnected" "${ROOT_DIR}/tests/e2e/models/fullyconnected.mlir"
+compile_sample "collatz"        "${ROOT_DIR}/tests/e2e/models/collatz.mlir"
 
 ###############################################################################
 # Build the web artifacts using Emscripten                                    #
@@ -66,28 +84,28 @@ compile_sample "collatz"        "${ROOT_DIR?}/tests/e2e/models/collatz.mlir"
 
 echo "=== Building web artifacts using Emscripten ==="
 
-pushd ${BUILD_DIR}
+pushd "${BUILD_DIR}"
 
 # Configure using Emscripten's CMake wrapper, then build.
 # Note: The sample creates a device directly, so no drivers are required.
-emcmake "${CMAKE_BIN?}" -G Ninja .. \
+emcmake "${CMAKE_BIN}" -G Ninja .. \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DIREE_HOST_BINARY_ROOT=${INSTALL_ROOT} \
+  -DIREE_HOST_BINARY_ROOT="${INSTALL_ROOT}" \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF
 
-"${CMAKE_BIN?}" --build . --target \
+"${CMAKE_BIN}" --build . --target \
   iree_experimental_web_sample_dynamic_sync
 
 popd
 
 echo "=== Copying static files (.html, .js) to the build directory ==="
 
-cp ${SOURCE_DIR?}/index.html ${BINARY_DIR}
-cp ${SOURCE_DIR?}/benchmarks.html ${BINARY_DIR}
-cp ${ROOT_DIR?}/docs/website/overrides/ghost.svg ${BINARY_DIR}
-cp ${SOURCE_DIR?}/iree_api.js ${BINARY_DIR}
-cp ${SOURCE_DIR?}/iree_worker.js ${BINARY_DIR}
+cp "${SOURCE_DIR}/index.html" "${BINARY_DIR}"
+cp "${SOURCE_DIR}/benchmarks.html" "${BINARY_DIR}"
+cp "${ROOT_DIR}/docs/website/overrides/ghost.svg" "${BINARY_DIR}"
+cp "${SOURCE_DIR}/iree_api.js" "${BINARY_DIR}"
+cp "${SOURCE_DIR}/iree_worker.js" "${BINARY_DIR}"
