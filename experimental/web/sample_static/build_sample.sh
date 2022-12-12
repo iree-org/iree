@@ -83,11 +83,11 @@ echo "=== Embedding bytecode module (.vmfb) into C source files (.h, .c) ==="
 
 echo "=== Building web artifacts using Emscripten ==="
 
-pushd "${BUILD_DIR}"
-
 # Configure using Emscripten's CMake wrapper, then build.
 # Note: The sample creates a device directly, so no drivers are required.
-emcmake "${CMAKE_BIN}" -G Ninja .. \
+emcmake "${CMAKE_BIN}" \
+  -G Ninja \
+  -B "${BUILD_DIR}" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_HOST_BINARY_ROOT="${INSTALL_ROOT}" \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
@@ -95,13 +95,12 @@ emcmake "${CMAKE_BIN}" -G Ninja .. \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
   -DIREE_HAL_DRIVER_LOCAL_TASK=ON \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_BUILD_TESTS=OFF
+  -DIREE_BUILD_TESTS=OFF \
+  .
 
-"${CMAKE_BIN}" --build . --target \
+"${CMAKE_BIN}" --build "${BUILD_DIR}" --target \
     iree_experimental_web_sample_static_sync \
     iree_experimental_web_sample_static_multithreaded
-
-popd
 
 echo "=== Copying static files to the build directory ==="
 
