@@ -18,8 +18,8 @@
 # The desired host install directory can be passed as the first argument.
 # Otherwise, it looks for an install directory under path set in the environment
 # variable IREE_HOST_BUILD_DIR (default build-host). The build directory for the
-# empscripten build is taken from the environment variable
-# IREE_EMPSCRIPITEN_BUILD_DIR, defaulting to "build-empscripten". Designed for
+# emscripten build is taken from the environment variable
+# IREE_EMPSCRIPTEN_BUILD_DIR, defaulting to "build-emscripten". Designed for
 # CI, but can be run manually. It reuses the build directory if it already
 # exists.
 #
@@ -31,9 +31,8 @@ set -euo pipefail
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
 HOST_BUILD_DIR="${IREE_HOST_BUILD_DIR:-${ROOT_DIR}/build-host}"
-BUILD_DIR="${IREE_EMPSCRIPITEN_BUILD_DIR:-build-emscripten}"
+BUILD_DIR="${IREE_EMPSCRIPTEN_BUILD_DIR:-build-emscripten}"
 INSTALL_ROOT="${1:-${HOST_BUILD_DIR}/install}"
-CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 SOURCE_DIR="${ROOT_DIR}/experimental/web/sample_static"
 BINARY_DIR="${BUILD_DIR}/experimental/web/sample_static/"
 
@@ -48,12 +47,7 @@ then
   exit 1
 fi
 
-if [[ -d "${BUILD_DIR}" ]]; then
-  echo "'${BUILD_DIR}' directory already exists. Will use cached results there."
-else
-  echo "'${BUILD_DIR}' directory does not already exist. Creating a new one."
-  mkdir -p "${BUILD_DIR}"
-fi
+source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
 
 mkdir -p "${BINARY_DIR}"
 
