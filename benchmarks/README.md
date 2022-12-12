@@ -83,7 +83,7 @@ These steps help reproduce the failures in TFLite models.
    to compile and run the benchmarks can be found in
    [this CMakeLists.txt file](./TFLite/CMakeLists.txt).
 
-### Running benchmark suites locally
+### <a name="run-benchmark-locally"></a> Running benchmark suites locally
 
 First you need to have [`iree-import-tflite`](https://iree-org.github.io/iree/getting-started/tflite/),
 [`iree-import-tf`](https://iree-org.github.io/iree/getting-started/tensorflow/),
@@ -114,7 +114,45 @@ The benchmark results will be saved in `results.json`. You can use
 benchmark results and generate the report. More details can be found
 [here](/build_tools/benchmarks/README.md).
 
-#### Importing the models only
+### <a name="collect-compile-stats"></a> Check compilation statistics on benchmark suites locally
+
+Similar to [running benchmarks locally](#run-benchmark-locally), you need to
+first build the target `iree-benchmark-suites`. But in addition to
+`-DIREE_BUILD_BENCHMARKS=ON`, `-DIREE_ENABLE_COMPILATION_BENCHMARKS=ON` is also
+required. **Note that using [Ninja](https://ninja-build.org/) to build the
+project is mandatory**, becuase the tools rely on `.ninja_log` to collect the
+compilation time. For example:
+
+```sh
+cmake -GNinja -S ${IREE_SOURCE_DIR} -B ${IREE_BUILD_DIR}
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+   -DCMAKE_C_COMPILER=clang \
+   -DCMAKE_CXX_COMPILER=clang++ \
+   -DIREE_ENABLE_LLD=ON \
+   -DIREE_TARGET_BACKEND_CUDA=ON \
+   -DIREE_BUILD_BENCHMARKS=ON \
+   -DIREE_ENABLE_COMPILATION_BENCHMARKS=ON
+```
+
+Then run the command below to collect the statistics:
+
+```sh
+build_tools/benchmarks/collect_compilation_statistics.py \
+  --output "compile-stats.json" \
+  "${IREE_BUILD_DIR}"
+```
+
+Then `build_tools/benchmarks/diff_local_benchmarks.py` can also compare the
+compilation statistics. More details can be found
+[here](/build_tools/benchmarks/README.md). For example:
+
+```sh
+build_tools/benchmarks/diff_local_benchmarks.py \
+  --base-compile-stats "compile-stats-before.json" \
+  --target-compile-stats "compile-stats-after.json"
+```
+
+### Importing the models only
 
 If you want to run custom benchmarks or do other work with the imported models,
 without compiling the full benchmarks suites. You can run the following command
