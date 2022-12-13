@@ -179,6 +179,14 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
 static LogicalResult setContractConfig(func::FuncOp entryPoint,
                                        linalg::LinalgOp op,
                                        const TargetInfo &targetInfo) {
+  if (!linalg::isaContractionOpInterface(op) || op.getNumParallelLoops() < 2)
+    return failure();
+  // Don't consider operations that don't have a broadcast, those should go
+  // through reductions.
+  if (llvm::any_of(op.getIndexingMapsArray(),
+                   [](AffineMap m) { return m.isPermutation(); }))
+    return failure();
+
   auto setMatmulConfig =
       [&entryPoint, &op](int64_t tileX, int64_t tileY, int64_t tileK,
                          llvm::ArrayRef<int64_t> workgroupSize,
@@ -820,9 +828,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     return setUserConfig(entryPointFn, computeOp, compilationInfo);
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
-    if (linalg::isaContractionOpInterface(linalgOp) &&
-        linalgOp.getNumParallelLoops() >= 2) {
-      return setContractConfig(entryPointFn, linalgOp, targetInfo);
+    if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
+      return success();
     }
     if (succeeded(setReductionTransformJitConfig(entryPointFn, linalgOp,
                                                  targetInfo))) {
