@@ -33,6 +33,21 @@ struct ConvertTensorInsertSlicePattern
   }
 };
 
+/// Convert tensor.insert ops into flow.tensor.store ops where possible.
+struct ConvertTensorInsertPattern : public OpRewritePattern<tensor::InsertOp> {
+  using OpRewritePattern<tensor::InsertOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::InsertOp insertOp,
+                                PatternRewriter &rewriter) const override {
+    if (insertOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorStoreOp>(
+        insertOp, insertOp.getScalar(), insertOp.getDest(),
+        insertOp.getIndices());
+    return success();
+  }
+};
+
 /// Convert tensor.extract_slice ops into flow.tensor.slice ops where possible.
 struct ConvertTensorExtractSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
@@ -209,12 +224,12 @@ struct ConvertLinalgFillPattern final
 
 void populateTensorToFlowConversionPatterns(MLIRContext *context,
                                             RewritePatternSet &patterns) {
-  patterns
-      .insert<ConvertLinalgFillPattern, ConvertTensorCastPattern,
-              ConvertTensorExtractPattern, ConvertTensorExtractSlicePattern,
-              ConvertTensorInsertSlicePattern, ConvertTensorFromElementsPattern,
-              ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
-              ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
+  patterns.insert<ConvertLinalgFillPattern, ConvertTensorCastPattern,
+                  ConvertTensorExtractPattern, ConvertTensorExtractSlicePattern,
+                  ConvertTensorInsertSlicePattern, ConvertTensorInsertPattern,
+                  ConvertTensorFromElementsPattern,
+                  ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
+                  ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
 }
 
 }  // namespace Flow
