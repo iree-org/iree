@@ -67,6 +67,10 @@ public:
     const int64_t inputTileSize = inputOp.getInputTileSize();
     const int64_t outputTileSize = inputOp.getOutputTileSize();
     switch (outputTileSize) {
+    case 4:
+      B = IREE::LinalgExt::Winograd::B_4x4_3x3;
+      BT = IREE::LinalgExt::Winograd::BT_4x4_3x3;
+      break;
     case 6:
       B = IREE::LinalgExt::Winograd::B_6x6_3x3;
       BT = IREE::LinalgExt::Winograd::BT_6x6_3x3;
@@ -235,6 +239,10 @@ public:
     const int64_t inputTileSize = outputOp.getInputTileSize();
     const int64_t outputTileSize = outputOp.getOutputTileSize();
     switch (outputTileSize) {
+    case 4:
+      A = IREE::LinalgExt::Winograd::A_4x4_3x3;
+      AT = IREE::LinalgExt::Winograd::AT_4x4_3x3;
+      break;
     case 6:
       A = IREE::LinalgExt::Winograd::A_6x6_3x3;
       AT = IREE::LinalgExt::Winograd::AT_6x6_3x3;
