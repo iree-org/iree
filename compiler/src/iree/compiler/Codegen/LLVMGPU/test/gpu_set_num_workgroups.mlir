@@ -494,3 +494,52 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore
 //      CHECK: hal.executable.export public @matmul_config_sm86
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @contract_reduction {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}> {
+  hal.executable.export public @contract_reduction layout(#pipeline_layout)
+  builtin.module {
+    func.func @contract_reduction() {
+      %c0 = arith.constant 0 : index
+      %c40064 = arith.constant 40064 : index
+      %c34752 = arith.constant 34752 : index
+      %cst = arith.constant 0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<3x7xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c40064) alignment(64) : !flow.dispatch.tensor<readonly:tensor<3x64x4x8xf32>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c34752) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<3x64xf32>>
+      %3 = tensor.empty() : tensor<3x64xf32>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 4], sizes = [3, 64, 4, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x64x4x8xf32>> -> tensor<3x64x4xf32>
+      %5 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 32]]>} ins(%cst : f32) outs(%3 : tensor<3x64xf32>) -> tensor<3x64xf32>
+      %6 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<3x7xf32>> -> tensor<f32>
+      %7 = linalg.generic {indexing_maps = [
+        affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+        affine_map<(d0, d1, d2) -> ()>,
+        affine_map<(d0, d1, d2) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel", "reduction"]}
+        ins(%4, %6 : tensor<3x64x4xf32>, tensor<f32>) outs(%5 : tensor<3x64xf32>)  {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %8 = arith.subf %in, %in_0 : f32
+        %9 = arith.maxf %8, %cst : f32
+        %10 = arith.mulf %9, %9 : f32
+        %11 = arith.addf %out, %10 : f32
+        linalg.yield %11 : f32
+      } -> tensor<3x64xf32>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [3, 64], strides = [1, 1] : tensor<3x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<3x64xf32>>
+      return
+    }
+  }
+}
+}
+
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize
+//      CHECK: hal.executable.export public @contract_reduction
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
