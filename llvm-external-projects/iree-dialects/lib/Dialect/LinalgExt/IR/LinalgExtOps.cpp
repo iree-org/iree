@@ -1747,6 +1747,32 @@ SmallVector<int64_t> PackOp::getStaticTiles() {
   return ::getStaticTiles(*this);
 }
 
+// Helper for PackOp::{getResultShape,getPackedType}. Returns the shape of the
+// packed type. Having a shared helper helps implement these two methods in a
+// way that ensures that they agree on which dimensions are dynamic.
+static SmallVector<int64_t> getPackOpResultTypeShape(
+    ArrayRef<int64_t> sourceShape, ArrayRef<int64_t> innerTileSizes,
+    ArrayRef<int64_t> innerDimsPos, ArrayRef<int64_t> outerDimsPerm) {
+  SmallVector<int64_t> resultShape = llvm::to_vector(sourceShape);
+  for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
+    if (ShapedType::isDynamic(resultShape[tiledDim.value()]))
+      continue;
+    if (ShapedType::isDynamic(innerTileSizes[tiledDim.index()])) {
+      resultShape[tiledDim.value()] = ShapedType::kDynamic;
+      continue;
+    }
+    resultShape[tiledDim.value()] = ceilDiv(resultShape[tiledDim.value()],
+                                            innerTileSizes[tiledDim.index()]);
+  }
+
+  // Swap tile loops if outer_dims_perm is available.
+  resultShape = interchange<int64_t>(resultShape, outerDimsPerm, /*offset=*/0);
+
+  // Append the inner tile dimensions.
+  resultShape.append(innerTileSizes.begin(), innerTileSizes.end());
+  return resultShape;
+}
+
 SmallVector<OpFoldResult> PackOp::getResultShape(
     OpBuilder &builder, Location loc, ArrayRef<OpFoldResult> sourceDims,
     ArrayRef<OpFoldResult> innerTileSizes, ArrayRef<int64_t> innerDimsPos,
@@ -1766,6 +1792,23 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
         interchange<OpFoldResult>(resultDims, outerDimsPerm, /*offset=*/0);
   }
   resultDims.append(innerTileSizes.begin(), innerTileSizes.end());
+
+  SmallVector<int64_t> resultTypeShape =
+      getPackOpResultTypeShape(asShapeWithAnyValueAsDynamic(sourceDims),
+                               asShapeWithAnyValueAsDynamic(innerTileSizes),
+                               innerDimsPos, outerDimsPerm);
+
+  // Fix-up `resultDims` to ensure that they are Value's if and only if the
+  // result type shape says it's a dynamic dim. This is needed as callers may
+  // use dispatchIndexOpFoldResults on the result, and rely on exact number of
+  // dynamic dims returned by that.
+  for (unsigned i = 0; i < resultDims.size(); ++i) {
+    if (!ShapedType::isDynamic(resultTypeShape[i]))
+      continue;
+    resultDims[i] =
+        getValueOrCreateConstantIndexOp(builder, loc, resultDims[i]);
+  }
+
   return resultDims;
 }
 
@@ -1777,29 +1820,16 @@ ShapedType PackOp::getPackedType(ShapedType sourceType,
                                  ArrayRef<int64_t> innerTileSizes,
                                  ArrayRef<int64_t> innerDimsPos,
                                  ArrayRef<int64_t> outerDimsPerm) {
-  SmallVector<int64_t> resultShape = llvm::to_vector(sourceType.getShape());
-  for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
-    if (ShapedType::isDynamic(resultShape[tiledDim.value()]))
-      continue;
-    if (ShapedType::isDynamic(innerTileSizes[tiledDim.index()])) {
-      resultShape[tiledDim.value()] = ShapedType::kDynamic;
-      continue;
-    }
-    resultShape[tiledDim.value()] = ceilDiv(resultShape[tiledDim.value()],
-                                            innerTileSizes[tiledDim.index()]);
-  }
+  SmallVector<int64_t> resultTypeShape = getPackOpResultTypeShape(
+      sourceType.getShape(), innerTileSizes, innerDimsPos, outerDimsPerm);
 
-  // Swap tile loops if outer_dims_perm is available.
-  resultShape = interchange<int64_t>(resultShape, outerDimsPerm, /*offset=*/0);
-
-  // Append the inner tile dimensions.
-  resultShape.append(innerTileSizes.begin(), innerTileSizes.end());
   return TypeSwitch<ShapedType, ShapedType>(sourceType)
       .Case<RankedTensorType>([&](auto shapedType) {
-        return RankedTensorType::get(resultShape, shapedType.getElementType());
+        return RankedTensorType::get(resultTypeShape,
+                                     shapedType.getElementType());
       })
       .Case<MemRefType>([&](auto shapedType) {
-        return MemRefType::get(resultShape, shapedType.getElementType());
+        return MemRefType::get(resultTypeShape, shapedType.getElementType());
       })
       .Default([&](Type t) {
         assert(false && "unexpected type");

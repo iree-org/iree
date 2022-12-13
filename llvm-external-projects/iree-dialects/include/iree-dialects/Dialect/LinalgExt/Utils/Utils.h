@@ -59,6 +59,10 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
 Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
                                 Location loc, PatternRewriter &rewriter);
 
+// Converts OpFoldResults to int64_t shape entries, unconditionally mapping all
+// Value's to kDynamic, even if they are arith.constant values.
+SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs);
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler
