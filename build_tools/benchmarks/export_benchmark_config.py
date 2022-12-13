@@ -82,10 +82,10 @@ def main(args: argparse.Namespace):
       )
     host_environment = host_environments.pop()
 
-    module_dir_paths = sort_and_dedup_paths([
-        iree_artifacts.get_module_dir_path(config.module_generation_config)
+    module_dir_paths = sorted(set(
+        str(iree_artifacts.get_module_dir_path(config.module_generation_config))
         for config in run_configs
-    ])
+    ))
 
     output_map[device_name] = {
         "host_environment": dataclasses.asdict(host_environment),
