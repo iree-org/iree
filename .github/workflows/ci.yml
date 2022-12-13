@@ -737,12 +737,12 @@ jobs:
           E2E_TEST_ARTIFACTS_DIR: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
         run: |
+          # Uploads all IREE artifacts and MLIR files (including the imported
+          # MLIR files and MLIR source models).
           # Not archiving the directory to allow fetching each file as needed
           # separately.
-          # TODO(#11076): The command below doesn't include the MLIR files from
-          # `model_` when the model importing is not required. Need a proper
-          # tool to list all dependent files.
-          find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 -name "iree_*" | \
+          find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 \
+            -name "iree_*" -o -name "model_*.mlir" | \
             gcloud alpha storage cp --read-paths-from-stdin -r \
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
