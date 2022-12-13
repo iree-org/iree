@@ -294,17 +294,7 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   if (foreachThreadOp.getNumThreads().size() > 3)
     return foreachThreadOp->emitError(
         "scf.foreach_thread with rank > 3 does not lower to workgroup");
-  if (llvm::any_of(foreachThreadOp.getNumThreads(), [](Value v) {
-        return !v.getDefiningOp<arith::ConstantIndexOp>();
-      })) {
-    return foreachThreadOp->emitError(
-        "unsupported dynamic workgroup_count atm --- need to slice out "
-        "workgroup_count computation into ExecutableExport::workgroup_count. "
-        "This region may require arbitrary computations and cannot magically "
-        "match what the `stream.cmd.dispatch` has already imposed on us at a "
-        "distance. For now we must specify the number of values properly "
-        "when applying the topLevel tile_to_foreach_thread_op");
-  }
+
   if (!foreachThreadOp.getMapping().has_value())
     return foreachThreadOp->emitError("mapping must be present");
   SmallVector<Attribute> blockMapping =
@@ -335,9 +325,6 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   };
   SmallVector<Value> gridDimValues = scf::ForeachThreadOp::getValuesSortedByKey(
       blockMapping, numBlocks, comparator);
-  SmallVector<int64_t> gridDims;
-  for (Value v : gridDimValues)
-    gridDims.push_back(v.getDefiningOp<arith::ConstantIndexOp>().value());
 
   // Step 3. Outline the compute workload region and set up the workload
   // operands, if this has not been done already.
@@ -352,6 +339,18 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   // the flow level and explicitly match the ops we want to fuse.
   // Once fusion is customizable enough in perpetuity, we can retire this.
   if (exportOp.getWorkgroupCount().empty()) {
+    if (llvm::any_of(foreachThreadOp.getNumThreads(), [](Value v) {
+          return !v.getDefiningOp<arith::ConstantIndexOp>();
+        })) {
+      return foreachThreadOp->emitError(
+          "unsupported dynamic workgroup_count atm --- need to slice out "
+          "workgroup_count computation into ExecutableExport::workgroup_count."
+          "\nThis region may require arbitrary computations and cannot "
+          "magically match what the `stream.cmd.dispatch` has already imposed "
+          "on us at a distance."
+          "\nFor now we must specify the number of values properly when "
+          "applying the topLevel tile_to_foreach_thread_op");
+    }
     if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
                                                      exportOp))) {
       return foreachThreadOp->emitOpError(
