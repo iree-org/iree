@@ -945,7 +945,6 @@ class FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = srcOp.getResult().getType();
-    dstType.dump();
     auto resultType = getTypeConverter()->convertType(dstType);
     if (srcType.isF32()) {
       if (dstType.isSignlessInteger(32) || dstType.isUnsignedInteger(32)) {
