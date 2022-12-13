@@ -3,36 +3,37 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Generates CMake rules to build common artifacts."""
+"""Generates CMake rules to fetch model artifacts."""
 
 from dataclasses import dataclass
-from typing import List, OrderedDict
+from typing import Iterable, List, OrderedDict
 import collections
 import pathlib
 import urllib.parse
 
 from e2e_test_artifacts import model_artifacts
+from e2e_test_framework.definitions import common_definitions
 import cmake_builder.rules
 
 
 @dataclass
 class ModelRule(object):
   target_name: str
-  file_path: str
+  file_path: pathlib.PurePath
   cmake_rules: List[str]
 
 
 def generate_model_rule_map(
-    root_path: pathlib.PurePath, artifacts_root: model_artifacts.ArtifactsRoot
-) -> OrderedDict[str, ModelRule]:
-  """Returns the model rules in an ordered map."""
+    root_path: pathlib.PurePath,
+    models: Iterable[common_definitions.Model]) -> OrderedDict[str, ModelRule]:
+  """Returns the model rules keyed by model id in an ordered map."""
 
   model_rules = collections.OrderedDict()
-  for model_artifact in artifacts_root.model_artifact_map.values():
-    model = model_artifact.model
+  for model in models:
     # Model target: <package_name>-model-<model_id>
     target_name = f"model-{model.id}"
-    model_path = str(root_path / model_artifact.file_path)
+    model_path = model_artifacts.get_model_path(model=model,
+                                                root_path=root_path)
 
     model_url = urllib.parse.urlparse(model.source_url)
     if model_url.scheme == "https":
@@ -40,7 +41,7 @@ def generate_model_rule_map(
           cmake_builder.rules.build_iree_fetch_artifact(
               target_name=target_name,
               source_url=model.source_url,
-              output=model_path,
+              output=str(model_path),
               unpack=True)
       ]
     else:

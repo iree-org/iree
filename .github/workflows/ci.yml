@@ -739,9 +739,12 @@ jobs:
         run: |
           # Not archiving the directory to allow fetching each file as needed
           # separately.
-          gcloud alpha storage cp -r \
-            "${E2E_TEST_ARTIFACTS_DIR}/iree" \
-            "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/iree"
+          # TODO(#11076): The command below doesn't include the MLIR files from
+          # `model_` when the model importing is not required. Need a proper
+          # tool to list all dependent files.
+          find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 -name "iree_*" | \
+            gcloud alpha storage cp --read-paths-from-stdin -r \
+              "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
 
   ############################## Crosscompilation ##############################

@@ -282,9 +282,9 @@ function(iree_benchmark_suite_module_test)
     message(SEND_ERROR "No compile config for ${_PLATFORM}. Skip ${_RULE_MODEL}.")
     return()
   endif()
-  # Drop the UUID prefix ".{8}-.{4}-.{4}-.{4}-.{12}_", 37 characters in total.
-  string(SUBSTRING "${_RULE_MODEL}" 37 -1 _MODEL_NAME)
-  set(_SRC "${IREE_E2E_TEST_ARTIFACTS_DIR}/iree/${_RULE_MODEL}/${_IREE_MODULE_COMPILE_CONFIG_ID}/${_MODEL_NAME}.vmfb")
+  # TODO(#11136): We shouldn't composite the module path here by better
+  # integrating with e2e test framework.
+  set(_SRC "${IREE_E2E_TEST_ARTIFACTS_DIR}/iree_${_RULE_MODEL}_${_IREE_MODULE_COMPILE_CONFIG_ID}/module.vmfb")
 
   iree_run_module_test(
     NAME
