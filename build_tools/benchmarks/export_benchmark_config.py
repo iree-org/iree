@@ -23,22 +23,14 @@ import pathlib
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
-from typing import List
 import argparse
 import collections
 import dataclasses
-import itertools
 import json
 
 from benchmark_suites.iree import benchmark_collections
 from e2e_test_framework import serialization
 from e2e_test_artifacts import iree_artifacts
-
-
-def sort_and_dedup_paths(
-    values: List[pathlib.PurePath]) -> List[pathlib.PurePath]:
-  values.sort()
-  return list(value for value, _ in itertools.groupby(values))
 
 
 def parse_arguments():
@@ -54,7 +46,6 @@ def parse_arguments():
       help=("Target device name, can be specified multiple times. "
             "Not specified means including all devices."))
   parser.add_argument("--output",
-                      required=True,
                       type=pathlib.Path,
                       help="Path to write the JSON output.")
 
@@ -82,18 +73,22 @@ def main(args: argparse.Namespace):
       )
     host_environment = host_environments.pop()
 
-    module_dir_paths = sorted(set(
-        str(iree_artifacts.get_module_dir_path(config.module_generation_config))
-        for config in run_configs
-    ))
+    all_module_dir_paths = (str(
+        iree_artifacts.get_module_dir_path(config.module_generation_config))
+                            for config in run_configs)
+    module_dir_paths = sorted(set(all_module_dir_paths))
 
     output_map[device_name] = {
         "host_environment": dataclasses.asdict(host_environment),
-        "module_dir_paths": [str(path) for path in module_dir_paths],
+        "module_dir_paths": module_dir_paths,
         "run_configs": serialization.serialize_and_pack(run_configs),
     }
 
-  args.output.write_text(json.dumps(output_map))
+  json_data = json.dumps(output_map, indent=2)
+  if args.output is None:
+    print(json_data)
+  else:
+    args.output.write_text(json_data)
 
 
 if __name__ == "__main__":
