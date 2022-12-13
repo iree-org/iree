@@ -80,6 +80,18 @@ Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
                RankedTensorType::get(shape, rewriter.getF32Type()), vector));
 }
 
+SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs) {
+  SmallVector<int64_t> result;
+  for (auto o : ofrs) {
+    // Have to do this first, as getConstantIntValue special-cases constants.
+    if (o.dyn_cast<Value>())
+      result.push_back(ShapedType::kDynamic);
+    else
+      result.push_back(getConstantIntValue(o).value_or(ShapedType::kDynamic));
+  }
+  return result;
+}
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

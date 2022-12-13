@@ -1773,21 +1773,6 @@ static SmallVector<int64_t> getPackOpResultTypeShape(
   return resultShape;
 }
 
-// Converts OpFoldResults to int64_t shape entries, unconditionally mapping all
-// Value's to kDynamic, even if they are arith.constant values.
-static SmallVector<int64_t>
-asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs) {
-  SmallVector<int64_t> result;
-  for (auto o : ofrs) {
-    // Have to do this first, as getConstantIntValue special-cases constants.
-    if (o.dyn_cast<Value>())
-      result.push_back(ShapedType::kDynamic);
-    else
-      result.push_back(getConstantIntValue(o).value_or(ShapedType::kDynamic));
-  }
-  return result;
-}
-
 SmallVector<OpFoldResult> PackOp::getResultShape(
     OpBuilder &builder, Location loc, ArrayRef<OpFoldResult> sourceDims,
     ArrayRef<OpFoldResult> innerTileSizes, ArrayRef<int64_t> innerDimsPos,
