@@ -41,7 +41,17 @@ def build_common_argument_parser():
       "build_dir",
       metavar="<build-dir>",
       type=check_dir_path,
+      default=None,
+      nargs='?',
       help="Path to the build directory containing benchmark suites")
+  parser.add_argument(
+      "--e2e_test_artifacts_dir",
+      metavar="<e2e-test-artifacts-dir>",
+      type=check_dir_path,
+      default=None,
+      help=(
+          "Path to the IREE e2e test artifacts directory. This will override "
+          "<build-dir> and eventually replace it. Must use with --run_config"))
   parser.add_argument(
       "--normal_benchmark_tool_dir",
       "--normal-benchmark-tool-dir",
