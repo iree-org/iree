@@ -41,6 +41,9 @@ def VM_Dialect : Dialect {
     avoids the need for more verbose manual reference counting logic (that may
     be difficult or impossible to manage given the coroutine-like nature of the
     VM). Lowering targets can insert the reference counting as needed.
+
+    The types in the VM dialect correspond to the storage rather than value
+    type, with the interpretation of the type encoded on the op.
   }];
 }
 
