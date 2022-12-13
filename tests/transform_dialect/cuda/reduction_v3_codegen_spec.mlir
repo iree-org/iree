@@ -1,6 +1,6 @@
 // RUN: iree-opt %s
 
-transform.structured.canonicalized_sequence failures(suppress) {
+transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
   %reduction = transform.structured.match ops{["linalg.generic"]} in %variant_op
@@ -13,7 +13,7 @@ transform.structured.canonicalized_sequence failures(suppress) {
   transform.structured.fuse_into_containing_op %fill into %foreach_thread_grid
 
   // Step 2. Split the reduction to get meatier parallelism.
-  // This also parallelizes to threads
+  // This also parallelizes to threads.
   // ===========================================================================
   %foreach_thread, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
      transform.structured.tile_reduction_using_foreach_thread %grid_reduction 
@@ -24,7 +24,7 @@ transform.structured.canonicalized_sequence failures(suppress) {
   // block_combiner_op_2 op is [parallel, reduction] of 1x384 that cannot fuse.
   // map the 1-dim to threadIdx.y to trigger mapping of the reduction to 
   // threadIdx.x via predication via `if (x==0)`.
-  transform.structured.tile_to_foreach_thread_op %block_combiner_op_2 tile_sizes [1] 
+  transform.structured.tile_to_foreach_thread_op %block_combiner_op_2 num_threads [1] 
     ( mapping = [#gpu.thread<y>] )
 
   // Step 3. Rank-reduce and vectorize.
