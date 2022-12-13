@@ -849,6 +849,18 @@ jobs:
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
 
+  benchmarks:
+    needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
+    if: needs.setup.outputs.should-run == 'true'
+    uses: ./.github/workflows/benchmarks.yml
+    with:
+      # env.GCS_DIR is also duplicated in this workflow. See the note there on
+      # why this is.
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+      e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################

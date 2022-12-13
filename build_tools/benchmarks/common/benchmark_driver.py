@@ -96,17 +96,28 @@ class BenchmarkDriver(object):
       self.config.trace_capture_config.capture_tmp_dir.mkdir(parents=True,
                                                              exist_ok=True)
 
-    cpu_target_arch = self.device_info.get_iree_cpu_arch_name()
-    gpu_target_arch = self.device_info.get_iree_gpu_arch_name()
-    drivers, loaders = self.__get_available_drivers_and_loaders()
+    if self.config.run_config is None:
+      cpu_target_arch = self.device_info.get_iree_cpu_arch_name()
+      gpu_target_arch = self.device_info.get_iree_gpu_arch_name()
+      cpu_target_arch_filter = f"^{cpu_target_arch}$"
+      gpu_target_arch_filter = f"^{gpu_target_arch}$"
+      drivers, loaders = self.__get_available_drivers_and_loaders()
+    else:
+      # If the run config is provided, don't do smart filtering and completely
+      # follow the run config.
+      # TODO: TODO
+      drivers = None
+      loaders = None
+      cpu_target_arch_filter = None
+      gpu_target_arch_filter = None
 
     for category, _ in self.benchmark_suite.list_categories():
       benchmark_cases = self.benchmark_suite.filter_benchmarks_for_category(
           category=category,
           available_drivers=drivers,
           available_loaders=loaders,
-          cpu_target_arch_filter=f"^{cpu_target_arch}$",
-          gpu_target_arch_filter=f"^{gpu_target_arch}$",
+          cpu_target_arch_filter=cpu_target_arch_filter,
+          gpu_target_arch_filter=gpu_target_arch_filter,
           driver_filter=self.config.driver_filter,
           mode_filter=self.config.mode_filter,
           model_name_filter=self.config.model_name_filter)
