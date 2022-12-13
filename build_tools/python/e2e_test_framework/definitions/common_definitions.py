@@ -103,8 +103,8 @@ class DeviceSpec(object):
   """Benchmark device specification."""
   id: str
 
-  # Device vendor name. E.g., Pixel-6.
-  vendor_name: str
+  # Device name. E.g., Pixel-6.
+  device_name: str
 
   # Host environment where the IREE runtime is running. For CPU device type,
   # this is usually the same as the device that workloads are dispatched to.

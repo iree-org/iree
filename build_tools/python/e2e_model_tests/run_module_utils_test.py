@@ -60,7 +60,7 @@ class RunModuleTuilsTest(unittest.TestCase):
   def test_build_linux_wrapper_cmds_for_device_spec(self):
     device_spec = common_definitions.DeviceSpec(
         id="abc",
-        vendor_name="vendor",
+        device_name="test-device",
         architecture=common_definitions.DeviceArchitecture.VMVX_GENERIC,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         device_parameters=[device_parameters.OCTA_CORES])

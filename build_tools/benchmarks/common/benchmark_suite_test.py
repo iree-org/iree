@@ -159,13 +159,13 @@ class BenchmarkSuiteTest(unittest.TestCase):
         driver=iree_definitions.RuntimeDriver.LOCAL_TASK)
     device_spec_a = common_definitions.DeviceSpec(
         id="dev_a",
-        vendor_name="a",
+        device_name="a",
         architecture=common_definitions.DeviceArchitecture.RV32_GENERIC,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         device_parameters=[])
     device_spec_b = common_definitions.DeviceSpec(
         id="dev_b",
-        vendor_name="b",
+        device_name="b",
         architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         device_parameters=[])
