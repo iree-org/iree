@@ -779,7 +779,8 @@ jobs:
           BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools.tar
         run: |
           tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
-            "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module
+            "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module \
+            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt
           echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading the benchmark tools archive"
         id: upload

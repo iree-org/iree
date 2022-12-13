@@ -10,11 +10,10 @@ from dataclasses import dataclass
 from typing import Optional
 import pathlib
 
-from e2e_test_framework.definitions import iree_definitions
-
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 BENCHMARK_RESULTS_REL_PATH = "benchmark-results"
 CAPTURES_REL_PATH = "captures"
+E2E_TEST_ARTIFACTS_REL_PATH = "e2e_test_artifacts"
 
 
 @dataclass
@@ -73,8 +72,6 @@ class BenchmarkConfig:
   keep_going: bool = False
   benchmark_min_time: float = 0
 
-  run_config: Optional[iree_definitions.E2EModelRunConfig] = None
-
   @staticmethod
   def build_from_args(args: Namespace, git_commit_hash: str):
     """Build config from command arguments.
@@ -132,5 +129,4 @@ class BenchmarkConfig:
                            model_name_filter=args.model_name_regex,
                            mode_filter=args.mode_regex,
                            keep_going=args.keep_going,
-                           benchmark_min_time=args.benchmark_min_time,
-                           run_config=args.run_config)
+                           benchmark_min_time=args.benchmark_min_time)
