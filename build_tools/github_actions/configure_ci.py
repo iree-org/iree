@@ -147,7 +147,8 @@ def get_benchmark_filter(trailers: Mapping[str, str]) -> str:
   filter_options = [option.strip() for option in trailer.split(",")]
   for filter_option in filter_options:
     if filter_option not in BENCHMARK_FILTER_OPTIONS:
-      raise ValueError(f"Unknown benchmark filter option: '{filter_option}'.")
+      raise ValueError(f"Unknown benchmark filter option: '{filter_option}'.\n"
+                       f"Available options: '{BENCHMARK_FILTER_OPTIONS}'.")
 
   if "all" in filter_options:
     filter_options = list(BENCHMARK_FILTER_OPTIONS)
