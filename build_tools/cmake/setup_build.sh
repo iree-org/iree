@@ -11,7 +11,7 @@
 set -euo pipefail
 
 # Check these exist and print the versions for later debugging.
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 "${CMAKE_BIN}" --version
 ninja --version
 python3 --version
