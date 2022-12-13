@@ -1233,7 +1233,8 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   transform_ext::StructuredOpMatcher pattern, fill, leadingEltwise,
       trailingEltwise;
-  makeReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise);
+  int64_t ignore;
+  makeReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise, ignore);
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.

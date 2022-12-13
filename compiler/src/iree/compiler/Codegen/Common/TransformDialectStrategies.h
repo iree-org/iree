@@ -20,13 +20,26 @@ namespace iree_compiler {
 /// Prints `handles` in order. Prints the whole IR if `handles` is empty.
 static void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 
+/// Result of the combined transform performing tiling, fusion and distribution
+/// to parallel constructs.
+struct TileAndFuseAndDistributeResult {
+  /// Outer `scf.foreach_thread` loop containing the tiled and fused operations.
+  Value foreachThreadH;
+  /// Handles to fused operations other than the final consumer operation. May
+  /// be empty if fusion was not performed iteratively.
+  // TODO: support returning handles from `fuse_into_containing_op` and remove
+  // the restriction above.
+  SmallVector<Value> resultingFusedOpsHandles;
+  /// Handle to the tiled final consumer operation.
+  Value tiledOpH;
+};
+
 /// Performs the following transformations:
 ///   1. Tiles `rootH` to scf.foreach_thread to with `tileSizesOrNumThreads`
 ///      according to whether spec is a TileSizesSpec or a NumThreadsSpec.
 ///   2. Maps the resulting scf.foreach_thread to threads according to
 ///      `threadDimMapping`.
 ///   3. Iterates over `opsHToFuse` in order and fuses into the containing op.
-/// Returns a handle to the resulting scf.foreach_thread.
 ///
 /// Fusion operates in batch mode: a single fusion command is issued and a
 /// topological sort is automatically computed by the fusion.
@@ -37,28 +50,23 @@ static void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 /// providing the fusion order and has interleaved canonicalization / cse /
 /// enabling transform will be introduced and may result in better fusions.
 ///
-/// If `resultingFusedOpsHandles` is a non-null pointer, the fused operation are
-/// appended in order.
-///
 // TODO: if someone knows how to properly export templates go for it .. sigh.
-Value buildTileFuseDistToForeachThreadWithTileSizes(
+TileAndFuseAndDistributeResult buildTileFuseDistToForeachThreadWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);
-Value buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
+    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping);
+TileAndFuseAndDistributeResult
+buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);
+    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping);
 
 /// See buildTileFuseDistWithTileSizes.
-Value buildTileFuseDistToForeachThreadWithNumThreads(
+TileAndFuseAndDistributeResult buildTileFuseDistToForeachThreadWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);
-Value buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
+    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
+TileAndFuseAndDistributeResult
+buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles = nullptr);
+    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
 
 /// Apply patterns and vectorize (for now always applies rank-reduction).
 /// Takes a handle to a func.func and returns an updated handle to a
