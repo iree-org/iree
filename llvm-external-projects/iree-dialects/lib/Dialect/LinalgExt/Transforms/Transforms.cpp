@@ -569,6 +569,10 @@ struct LinalgStrategyEnablePass
         linalg::getLinalgTilingCanonicalizationPatterns(context);
     scf::populateSCFForLoopCanonicalizationPatterns(patterns);
     tensor::populateFoldTensorEmptyPatterns(patterns);
+    // Pull in tensor dialect canonicalization patterns to fold tensor.cast
+    // into producers when possible.
+    context->getLoadedDialect<tensor::TensorDialect>()
+        ->getCanonicalizationPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns))))
       return signalPassFailure();
 
