@@ -82,6 +82,62 @@ const float A_6x6_3x3[] = {
 
 // clang-format on
 
+//===----------------------------------------------------------------------===//
+// Output tile size = 4, Kernel size = 3
+//===----------------------------------------------------------------------===//
+// These constants were obtained from this paper:
+//
+// Lavin, A. et al (2016) Fast Algorithms for Convolution Neural Networks.
+// https://openaccess.thecvf.com/content_cvpr_2016/papers/Lavin_Fast_Algorithms_for_CVPR_2016_paper.pdf
+//
+
+// clang-format off
+
+const float BT_4x4_3x3[] = {
+  4,  0, -5,  0, 1, 0,
+  0, -4, -4,  1, 1, 0,
+  0,  4, -4, -1, 1, 0,
+  0, -2, -1,  2, 1, 0,
+  0,  2, -1, -2, 1, 0,
+  0,  4,  0, -5, 0, 1
+};
+
+const float B_4x4_3x3[] = {
+  4,  0,  0,  0,  0,  0,
+  0, -4,  4, -2,  2,  4,
+ -5, -4, -4, -1, -1,  0,
+  0,  1, -1,  2, -2, -5,
+  1,  1,  1,  1,  1,  0,
+  0,  0,  0,  0,  0,  1
+};
+
+const float G_4x4_3x3[] = {
+   1./4.,       0,       0,
+  -1./6.,  -1./6.,  -1./6.,
+  -1./6.,   1./6.,  -1./6.,
+  1./24.,  1./12.,   1./6.,
+  1./24., -1./12.,   1./6.,
+       0,       0,       1
+};
+
+const float AT_4x4_3x3[] = {
+  1, 1,  1, 1,  1, 0,
+  0, 1, -1, 2, -2, 0,
+  0, 1,  1, 4,  4, 0,
+  0, 1, -1, 8, -8, 1
+};
+
+const float A_4x4_3x3[] = {
+  1,  0, 0,  0,
+  1,  1, 1,  1,
+  1, -1, 1, -1,
+  1,  2, 4,  8,
+  1, -2, 4, -8,
+  0,  0, 0,  1
+};
+
+// clang-format on
+
 } // namespace Winograd
 } // namespace LinalgExt
 } // namespace IREE
