@@ -1,4 +1,4 @@
-// RUN: iree-opt --allow-unregistered-dialect --iree-convert-to-llvm --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-convert-to-llvm --split-input-file %s | FileCheck %s
 
 // CHECK-DAG: llvm.mlir.global internal @__constant_ordinal_foo() {{.+}}hal.executable.constant.key = "foo"{{.+}} : i32
 // CHECK-LABEL: llvm.func @constant_values
