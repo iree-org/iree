@@ -22,7 +22,9 @@ func.func @collapse1() -> !type {
   return %6: !type
 
 }
+
 //      CHECK: #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+//      CHECK-LABEL: func.func @collapse1
 //      CHECK: %[[IN:.+]] = tensor.collapse_shape %[[INPUT:.+]] {{\[}}[0, 1, 2, 3, 4, 5]] : tensor<2x4x8x16x32x64xf32> into tensor<2097152xf32>
 //      CHECK: %[[OUT:.+]] = tensor.collapse_shape %[[OUTPUT:.+]] {{\[}}[0, 1, 2, 3, 4, 5]] : tensor<2x4x8x16x32x64xf32> into tensor<2097152xf32>
 //      CHECK: %[[RES:.+]] = flow.dispatch.region
@@ -55,8 +57,10 @@ func.func @collapse2() -> !type {
   return %6: !type
 
 }
+
 //      CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d2, d4)>
 //      CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+//      CHECK-LABEL: func.func @collapse2
 //      CHECK: %[[IN:.+]] = tensor.collapse_shape %[[INPUT:.+]] {{\[}}[0, 1], [2], [3], [4], [5, 6]] : tensor<2x4x8x32x32x64x128xf32> into tensor<8x8x32x32x8192xf32>
 //      CHECK: %[[OUT:.+]] = tensor.collapse_shape %[[OUTPUT:.+]] {{\[}}[0, 1], [2], [3], [4], [5, 6]] : tensor<2x4x8x32x32x64x128xf32> into tensor<8x8x32x32x8192xf32>
 //      CHECK: %[[RES:.+]] = flow.dispatch.region
@@ -90,6 +94,7 @@ func.func @collapse3() -> !type {
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+//      CHECK-LABEL: func.func @collapse3
 //      CHECK: %[[IN:.+]] = tensor.collapse_shape %[[INPUT:.+]] {{\[}}[0, 1], [2], [3, 4, 5, 6, 7]] : tensor<2x4x8x16x32x64x128x256xf32> into tensor<8x8x1073741824xf32>
 //      CHECK: %[[OUT:.+]] = tensor.collapse_shape %[[OUTPUT:.+]] {{\[}}[0, 1], [2], [3, 4, 5, 6, 7]] : tensor<2x4x8x16x32x64x128x256xf32> into tensor<8x8x1073741824xf32>
 //      CHECK: %[[RES:.+]] = flow.dispatch.region
@@ -121,8 +126,10 @@ func.func @collapse4() -> !type {
   return %result: !type
 
 }
+
 //      CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>
 //      CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>
+//      CHECK-LABEL: func.func @collapse4
 //      CHECK: %[[IN:.+]] = tensor.collapse_shape %[[INPUT:.+]] {{\[}}[0, 1], [2], [3], [4], [5], [6, 7]] : tensor<2x4x8x16x64x64x128x256xf32> into tensor<8x8x16x64x64x32768xf32>
 //      CHECK: %[[OUT:.+]] = tensor.collapse_shape %[[OUTPUT:.+]] {{\[}}[0, 1], [2], [3], [4], [5], [6, 7]] : tensor<2x4x8x16x64x64x128x256xf32> into tensor<8x8x16x64x64x32768xf32>
 //      CHECK: %[[RES:.+]] = flow.dispatch.region
@@ -163,6 +170,7 @@ func.func @collapse5() -> !type {
 //      CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>
 //      CHECK: #[[MAP1:.+]] =  affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d2, d4, d5)>
 //      CHECK: #[[MAP2:.+]] =  affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d2, d1, d4, d5)>
+//      CHECK-LABEL: func.func @collapse5
 //      CHECK: %[[IN:.+]] = tensor.collapse_shape %[[INPUT:.+]] {{\[}}[0, 1], [2], [3], [4], [5], [6, 7]] : tensor<2x4x32x32x32x64x128x256xf32> into tensor<8x32x32x32x64x32768xf32>
 //      CHECK: %[[IN1:.+]] = tensor.collapse_shape %[[INPUT1:.+]] {{\[}}[0, 1], [2], [3], [4], [5], [6, 7]] : tensor<2x4x32x32x32x64x128x256xf32> into tensor<8x32x32x32x64x32768xf32>
 //      CHECK: %[[IN2:.+]] = tensor.collapse_shape %[[INPUT2:.+]] {{\[}}[0, 1], [2], [3], [4], [5], [6, 7]] : tensor<2x4x32x32x32x64x128x256xf32> into tensor<8x32x32x32x64x32768xf32>
@@ -199,6 +207,7 @@ func.func @collapse6() -> !type {
 
 //      CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>
 //      CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>
+//      CHECK-LABEL: func.func @collapse6
 //      CHECK: %[[IN:.+]] = tensor.collapse_shape %[[INPUT:.+]] {{\[}}[0], [1], [2, 3], [4], [5], [6, 7]] : tensor<32x2x4x8x16x16x64x128xf32> into tensor<32x2x32x16x16x8192xf32>
 //      CHECK: %[[OUT:.+]] = tensor.collapse_shape %[[OUTPUT:.+]] {{\[}}[0], [1], [2, 3], [4], [5], [6, 7]] : tensor<32x2x4x8x16x16x64x128xf32> into tensor<32x2x32x16x16x8192xf32>
 //      CHECK: %[[RES:.+]] = flow.dispatch.region
@@ -232,6 +241,7 @@ func.func @collapse7() -> !type_out {
 
 // CHECK: #[[MAP:.+]] =  affine_map<(d0, d1) -> (d1)>
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d1, d0)>
+// CHECK-LABEL: func.func @collapse7
 // CHECK: %[[IN:.+]] = tensor.collapse_shape %[[INPUT:.+]] {{\[}}[0, 1, 2]] : tensor<2x4x8xf32> into tensor<64xf32>
 // CHECK: %[[OUT:.+]] = tensor.collapse_shape %[[OUTPUT:.+]] {{\[}}[0, 1, 2], [3]] : tensor<2x4x8x16xf32> into tensor<64x16xf32>
 // CHECK: %[[RES:.+]] = flow.dispatch.region
@@ -249,7 +259,7 @@ func.func @collapse8() -> !type_out {
   %input = tensor.empty() : !type_in
   %output = tensor.empty() : !type_out
   %6 = linalg.generic { indexing_maps = [ 
-            affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d0, d1,  d5)>, 
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d0, d1, d5)>, 
             affine_map<(d0, d1, d2, d3, d4, d5) -> (d2, d3, d0, d1, d4, d5)>],
             iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
          }
@@ -260,8 +270,10 @@ func.func @collapse8() -> !type_out {
     } -> !type_out
   return %6: !type_out
 }
+
 // CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d2, d0, d4)>
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d0, d3, d4)>
+// CHECK-LABEL: func.func @collapse8
 // CHECK: %[[IN:.+]] = tensor.collapse_shape %[[INPUT:.+]] {{\[}}[0], [1, 2], [3]] : tensor<16x4x32x2xf32> into tensor<16x128x2xf32>
 // CHECK: %[[OUT:.+]] = tensor.collapse_shape %[[OUTPUT:.+]] {{\[}}[0], [1], [2, 3], [4], [5]] : tensor<8x16x4x32x8x2xf32> into tensor<8x16x128x8x2xf32>
 // CHECK: %[[RES:.+]] = flow.dispatch.region
@@ -290,7 +302,7 @@ func.func @dont_collapse() -> !type_out {
     } -> !type_out
   return %6: !type_out
 }
-
+// CHECK-LABEL: func.func @dont_collapse
 // CHECK: linalg.generic {indexing_maps = [#[[MAP:.+]], #[[MAP2:.+]]], iterator_types = ["parallel", "parallel", "parallel"]}
 
 // -----
@@ -306,7 +318,7 @@ func.func @collapse9() -> !type_out {
   %input = util.global.load.indirect %input_ptr : !util.ptr<!type_in> -> !type_in
   %output = tensor.empty() : !type_out
   
-  // Can collapse (d0, d1) and (d3, d4, d5, d6, d7)
+  // Can collapse (d0, d1) and (d6, d7)
   %result = linalg.generic { indexing_maps = [ 
           affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>, 
           affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d3, d5, d4, d6, d7)>],
@@ -322,5 +334,53 @@ func.func @collapse9() -> !type_out {
 
 // CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d4, d3, d5)>
+// CHECK-LABEL: func.func @collapse9
 // CHECK: %[[RES:.+]] = flow.dispatch.region
 // CHECK: linalg.generic {indexing_maps = [#[[MAP]], #[[MAP2]]], iterator_types = ["parallel", "reduction", "parallel", "parallel", "parallel", "parallel"]}
+
+
+// -----
+
+!type_in = tensor<10x20x30xf32>
+!type_out = tensor<10x10x20x30x50xf32>
+
+func.func @collapse9() -> !type_out {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %input = tensor.empty() : !type_in
+  %output = tensor.empty() : !type_out
+  
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d0)>, 
+                     affine_map<(d0, d1, d2, d3, d4) -> (d3, d1, d2, d0, d4)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+  ins(%input : !type_in) outs(%output : !type_out) {
+  ^bb0(%arg1: f32, %arg2: f32):
+    linalg.yield %arg1 : f32
+  }  -> !type_out
+
+  return %result: !type_out
+}
+
+// -----
+
+!type_in = tensor<10x10x30xf32>
+!type_out = tensor<20x10x10x30x20xf32>
+
+func.func @collapse10() -> !type_out {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %input = tensor.empty() : !type_in
+  %output = tensor.empty() : !type_out
+
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d0)>, 
+                     affine_map<(d0, d1, d2, d3, d4) -> (d2, d1, d3, d0, d4)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+  ins(%input : !type_in) outs(%output : !type_out) {
+  ^bb0(%arg1: f32, %arg2: f32):
+    linalg.yield %arg1 : f32
+  }  -> !type_out
+
+  return %result: !type_out
+}

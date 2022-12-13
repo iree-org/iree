@@ -694,10 +694,10 @@ FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
 /// Returns the position of given dimension.
 /// For dim=2, map=affine_map<(d0, d1, d2) -> (d0, d2), it returns 1
 static Optional<unsigned> getResultPosition(AffineMap &map, unsigned dim) {
-  unsigned pos = 0;
-  for (AffineExpr result : map.getResults()) {
-    if (result.cast<AffineDimExpr>().getPosition() == dim) return pos;
-    pos++;
+  for (auto result : llvm::enumerate(map.getResults())) {
+    if (result.value().cast<AffineDimExpr>().getPosition() == dim) {
+      return result.index();
+    }
   }
   return llvm::None;
 }
@@ -778,16 +778,14 @@ static FailureOr<linalg::GenericOp> collapseLinalgGeneric(
   }
 
   // Find and return collapsed linalg.generic
-  if (auto expandshapeOp =
-          replacements->front().getDefiningOp<tensor::ExpandShapeOp>()) {
-    if (auto newGenericOp =
-            expandshapeOp.getOperand().getDefiningOp<linalg::GenericOp>()) {
-      rewriter.replaceOp(genericOp, *replacements);
-      return newGenericOp;
-    }
-  }
-
-  return failure();
+  auto expandshapeOp =
+      replacements->front().getDefiningOp<tensor::ExpandShapeOp>();
+  if (!expandshapeOp) return failure();
+  auto newGenericOp =
+      expandshapeOp.getOperand().getDefiningOp<linalg::GenericOp>();
+  if (!newGenericOp) return failure();
+  rewriter.replaceOp(genericOp, *replacements);
+  return newGenericOp;
 }
 
 /// Returns true if the given op is collapsable.
@@ -798,9 +796,9 @@ static bool isEligibleForCollapse(Operation *op,
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
   if (!genericOp) return false;
 
-  // TODO(guray) There is no mechanism to convey collapsed indexes from
-  // `tensor.collapse_shape` to `tensor.expand_shape`. Once we have this support
-  // in MLIR, we can enable dynamic tensor shapes.
+  // TODO(guray) There is no mechanism to tell the collapsed indexes to
+  // `tensor.expand_shape`. Once we have this support in MLIR, we can enable
+  // dynamic tensor shapes.
   if (genericOp.hasDynamicShape()) return false;
 
   // TODO(guray) Currently we can only collapse when result of all the
