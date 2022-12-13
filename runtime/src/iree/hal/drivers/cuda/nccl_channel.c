@@ -118,7 +118,7 @@ static void iree_hal_cuda_nccl_channel_destroy(
   IREE_TRACE_ZONE_APPEND_VALUE(z0, channel->rank);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, channel->count);
 
-  // TODO(#9580): tear down nccl - blocking if needed.
+  // TODO(#9580): support async tear down
   // We could be smarter about starting finalization of all channels async and
   // then waiting for them to complete but we aren't currently optimizing for
   // lifetime performance. To do that we'd probably want to track each open
@@ -132,22 +132,9 @@ static void iree_hal_cuda_nccl_channel_destroy(
   //  syms->ncclCommDestroy(channel->comm)
   NCCL_IGNORE_ERROR(channel->context_wrapper->syms,
                     ncclCommFinalize(channel->comm));
-  ncclResult_t async_error;
-  for (;;) {
-    NCCL_IGNORE_ERROR(channel->context_wrapper->syms,
-                      ncclCommGetAsyncError(channel->comm, &async_error));
-    if (async_error == ncclInProgress) {
-      // wait for a second
-      const iree_time_t sec_in_ns = 1000000000;
-      iree_wait_until(sec_in_ns);
-    } else {
-      break;
-    }
-  }
   NCCL_IGNORE_ERROR(channel->context_wrapper->syms,
                     ncclCommDestroy(channel->comm));
   iree_allocator_free(host_allocator, channel);
-
   IREE_TRACE_ZONE_END(z0);
 }
 
