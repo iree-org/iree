@@ -19,7 +19,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
      transform.structured.tile_reduction_using_foreach_thread %grid_reduction 
         by num_threads = [0, 1024], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
 
-  // Fuse the fill and pointwise to privatize them. 
+  // Fuse the fill and pointwise to privatize them.
   transform.structured.fuse_into_containing_op %block_more_parallel_fill_op_2
     into %foreach_thread
 
