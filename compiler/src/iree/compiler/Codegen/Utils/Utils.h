@@ -53,6 +53,11 @@ Optional<StringAttr> getConfigStringAttr(
 Optional<IntegerAttr> getConfigIntegerAttr(
     IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr);
 
+/// Returns the BoolAttr with the name `integerAttr` in the `targetAttr`, if
+/// found.
+Optional<BoolAttr> getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                     StringRef integerAttr);
+
 /// Returns the LLVM Target triple associated with the `targetAttr`, if set.
 Optional<llvm::Triple> getTargetTriple(
     IREE::HAL::ExecutableTargetAttr targetAttr);
