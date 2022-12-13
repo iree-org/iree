@@ -14,8 +14,6 @@ on:
     # with this on weekends.
     - cron: "5 4 * * 1-5"
   workflow_dispatch:
-  # DO NOT SUBMIT: Turn off presubmit build
-  pull_request:
 
 jobs:
   colab:
