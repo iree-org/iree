@@ -98,6 +98,21 @@ transform_ext::StructuredOpMatcher::dim(int64_t dimension,
 }
 
 transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::dim(int64_t dimension, CaptureDim capture) {
+  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+    unsigned rank = linalgOp.getNumLoops();
+    int64_t transformedDimension =
+        dimension >= 0 ? dimension : rank + dimension;
+    if (transformedDimension >= rank)
+      return false;
+
+    capture.value = linalgOp.getStaticLoopRanges()[transformedDimension];
+    return true;
+  });
+  return *this;
+}
+
+transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::input(AllOperands tag, IsPermutation) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     // all_of with a lambda requires const-casting dance, so using a loop.
@@ -292,7 +307,8 @@ void transform_ext::makeReductionMatcher(
     transform_ext::StructuredOpMatcher &reduction,
     transform_ext::StructuredOpMatcher &fill,
     transform_ext::StructuredOpMatcher &leading,
-    transform_ext::StructuredOpMatcher &trailing) {
+    transform_ext::StructuredOpMatcher &trailing,
+    int64_t &reductionDimensionSize) {
   fill = m_StructuredOp<linalg::FillOp>();
   trailing = m_StructuredOp<linalg::GenericOp>()
                  .input(AllOperands(), IsPermutation())
@@ -304,6 +320,7 @@ void transform_ext::makeReductionMatcher(
                   .dim(AllDims(), ShapeKind::Static)
                   .dim(-1, utils::IteratorType::reduction)
                   .dim(-1, DivisibleBy(kCudaWarpSize))
+                  .dim(-1, CaptureDim(reductionDimensionSize))
                   // Can be extended to projected permutation with broadcast.
                   .input(AllOperands(), IsPermutation())
                   // TODO: we want to accept any input position here.
