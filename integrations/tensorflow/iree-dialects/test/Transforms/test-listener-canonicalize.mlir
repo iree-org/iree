@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s --allow-unregistered-dialect --test-listener-canonicalize --split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s --test-listener-canonicalize --split-input-file | FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Everything below copied from mlir/test/Dialect/Standard/canonicalize.mlir
