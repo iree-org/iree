@@ -528,6 +528,47 @@ jobs:
           pytest tank/test_models.py -k "vulkan and ($MODEL_LIST)" $SHARK_SKIP_TESTS
           pytest tank/test_models.py -k "cuda and ($MODEL_LIST)" $SHARK_SKIP_TESTS
 
+  # TODO(#11263): Drop this job once the IREE_BUILD_BENCHMARKS is removed.
+  test_build_benchmark_suites:
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
+      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+      BUILD_BENCHMARKS_DIR: build-benchmarks
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Downloading TF binaries archive"
+        run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+      - name: "Extracting TF binaries archive"
+        run: tar -xf "${TF_BINARIES_ARCHIVE}"
+      - name: "Building benchmarks"
+        id: build
+        run: |
+          build_tools/github_actions/docker_run.sh \
+            --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "IREE_BUILD_BENCHMARKS_DIR=${BUILD_BENCHMARKS_DIR}" \
+            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
+            build_tools/cmake/build_benchmarks.sh
+
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
@@ -671,21 +712,82 @@ jobs:
             ./build_tools/cmake/build_tracing.sh \
             "${BUILD_DIR}"
 
-  benchmarks:
+  ############################### Configurations ###############################
+  # Jobs that build and run IREE e2e tests/benchmarks                          #
+  ##############################################################################
+
+  build_benchmark_tools:
     needs: [setup, build_all, build_tf_integrations]
     if: needs.setup.outputs.should-run == 'true'
-    uses: ./.github/workflows/benchmarks.yml
-    with:
-      # env.GCS_DIR is also duplicated in this workflow. See the note there on
-      # why this is.
-      runner-group: ${{ needs.setup.outputs.runner-group }}
-      runner-env: ${{ needs.setup.outputs.runner-env }}
-      build-dir: ${{ needs.build_all.outputs.build-dir }}
-      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      tf-binaries-dir: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
-      tf-binaries-archive: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      tf-binaries-gcs-artifact: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    strategy:
+      matrix:
+        target:
+          - platform: "linux"
+            arch: "x86_64"
+            docker_image: "gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206"
+            # Builds tools on the host and assumes the builder is Linux x86_64.
+            build_script: "./build_tools/cmake/build_runtime.sh"
+          - platform: "linux"
+            arch: "riscv_64"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
+            build_script: "./build_tools/cmake/build_riscv.sh"
+    env:
+      PLATFORM: ${{ matrix.target.platform }}
+      ARCH: ${{ matrix.target.arch }}
+      DOCKER_IMAGE: ${{ matrix.target.docker_image }}
+      BUILD_SCRIPT: ${{ matrix.target.build_script }}
+      BUILD_TOOLS_DIR: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools-dir
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting host binaries"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Compiling the benchmark tools"
+        id: build
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "BUILD_PRESET=benchmark" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build"
+      - name: "Compiling the benchmark tools with tracing"
+        id: build-with-tracing
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "BUILD_PRESET=benchmark-with-tracing" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
+      - name: "Creating the benchmark tools archive"
+        id: archive
+        env:
+          BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools.tar
+        run: |
+          tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
+            "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module
+          echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading the benchmark tools archive"
+        id: upload
+        env:
+          BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}
+          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.benchmark-tools-archive }}
+        run: |
+          gcloud alpha storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT}"
 
   build_e2e_test_artifacts:
     needs: [setup, build_all, build_tf_integrations]
@@ -960,6 +1062,7 @@ jobs:
       - test_tf_integrations_gpu
 
       # Model Coverage
+      - test_build_benchmark_suites
       - test_shark_model_suite
 
       # Configurations
@@ -974,10 +1077,8 @@ jobs:
       - emscripten
 
       # Artifacts for e2e testing and benchmarking
+      - build_benchmark_tools
       - build_e2e_test_artifacts
-
-      # Benchmark pipeline
-      - benchmarks
 
       # Test modules from benchmark pipeline
       - test_benchmark_suites
