@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -169,6 +170,10 @@ void populateConcretizePadResultShapePatterns(MLIRContext *context,
   // Tiling can generate dim ops taking them as operands.
   IREE::Flow::DispatchTensorLoadOp::getCanonicalizationPatterns(patterns,
                                                                 context);
+  // Pull in tensor dialect canonicalization patterns to fold tensor.cast
+  // into producers when possible.
+  context->getLoadedDialect<tensor::TensorDialect>()
+      ->getCanonicalizationPatterns(patterns);
   patterns.add<ConcretizePadResultShape>(context);
 }
 

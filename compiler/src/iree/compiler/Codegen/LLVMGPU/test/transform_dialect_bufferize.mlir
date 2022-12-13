@@ -14,7 +14,7 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       %cst = arith.constant 0.000000e+00 : f32
       %5 = linalg.fill ins(%cst : f32) outs(%50 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
 
-      //      CHECK: memref.alloc() {alignment = 128 : i64} : memref<250x1020xf32, 3>
+      //      CHECK: memref.alloc() {alignment = 64 : i64} : memref<250x1020xf32, 3>
       // CHECK-NEXT: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32, 3>)
       // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32>, memref<500x1020xf32>) outs(%{{.*}} : memref<250x1020xf32, 3>)
       // CHECK-NEXT: bufferization.to_tensor %{{.*}} : memref<250x1020xf32, 3>
