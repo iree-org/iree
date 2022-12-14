@@ -58,7 +58,6 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -286,23 +285,6 @@ struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
   }
 };
 
-/// Removes memref.cast that converts static and dynamic shapes.
-struct RemoveStaticDynamicCast final : public OpRewritePattern<memref::CastOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(memref::CastOp castOp,
-                                PatternRewriter &rewriter) const override {
-    auto srcType = castOp.getSource().getType().cast<MemRefType>();
-    auto dstType = castOp.getType().cast<MemRefType>();
-    if (srcType.getRank() == 1 && dstType.getRank() == 1 &&
-        srcType.hasStaticShape() != dstType.hasStaticShape()) {
-      rewriter.replaceOp(castOp, castOp.getSource());
-      return success();
-    }
-    return failure();
-  }
-};
-
 /// Removes unrealized_conversion_cast ops introduced during progressive
 /// lowering when possible.
 struct RemoveIdentityConversionCast final
@@ -386,16 +368,6 @@ void ConvertToSPIRVPass::runOnOperation() {
     funcOp->setAttr(
         spirv::getEntryPointABIAttrName(),
         spirv::getEntryPointABIAttr(context, workgroupSize32, subgroupSize32));
-  }
-
-  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
-    RewritePatternSet shapePatterns(context);
-    shapePatterns.insert<RemoveStaticDynamicCast>(context);
-    if (failed(
-            applyPatternsAndFoldGreedily(funcOp, std::move(shapePatterns)))) {
-      funcOp.emitOpError() << "failed running shape patterns";
-      return signalPassFailure();
-    }
   }
 
   spirv::TargetEnvAttr targetAttr = getSPIRVTargetEnvAttr(moduleOp);
