@@ -23,28 +23,53 @@ import pathlib
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
+from typing import Callable, Dict, List
 import argparse
 import collections
 import dataclasses
 import json
 
 from benchmark_suites.iree import benchmark_collections
+from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework import serialization
 from e2e_test_artifacts import iree_artifacts
+
+DeviceSpecMatcher = Callable[[common_definitions.DeviceSpec], bool]
+BENCHMARK_PRESET_DEVICE_SPEC_MATCHERS: Dict[str, DeviceSpecMatcher] = {
+    "x86_64":
+        lambda device_spec: device_spec.architecture.architecture == "x86_64",
+    "cuda":
+        lambda device_spec: device_spec.architecture.architecture == "cuda",
+    "android-cpu":
+        lambda device_spec:
+        (device_spec.architecture.type == common_definitions.ArchitectureType.
+         CPU and device_spec.host_environment.platform == "android"),
+    "android-gpu":
+        lambda device_spec:
+        (device_spec.architecture.type == common_definitions.ArchitectureType.
+         GPU and device_spec.host_environment.platform == "android"),
+}
 
 
 def parse_arguments():
   """Parses command-line options."""
 
+  def parse_and_strip_list_argument(arg) -> List[str]:
+    return [part.strip() for part in arg.split(",")]
+
   parser = argparse.ArgumentParser(
-      description="Exports JSON config for benchmarking.")
+      description="Exports JSON config for benchmarking. Filters can be "
+      "specified jointly to select a subset of benchmarks.")
   parser.add_argument(
-      "--target_device_name",
-      type=str,
-      action="append",
-      dest="target_device_names",
-      help=("Target device name, can be specified multiple times. "
-            "Not specified means including all devices."))
+      "--target_device_names",
+      type=parse_and_strip_list_argument,
+      help=("Target device names, separated by comma, not specified means "
+            "including all devices."))
+  parser.add_argument(
+      "--benchmark_presets",
+      type=parse_and_strip_list_argument,
+      help=("Presets that select a bundle of benchmarks, separated by comma, "
+            "multiple presets will be union."))
   parser.add_argument("--output",
                       type=pathlib.Path,
                       help="Path to write the JSON output.")
@@ -57,11 +82,26 @@ def main(args: argparse.Namespace):
 
   target_device_names = (set(args.target_device_names)
                          if args.target_device_names is not None else None)
+  device_spec_matchers = None
+  if args.benchmark_presets is not None:
+    device_spec_matchers = []
+    for preset in args.benchmark_presets:
+      matcher = BENCHMARK_PRESET_DEVICE_SPEC_MATCHERS.get(preset)
+      if matcher is None:
+        raise ValueError(f"Unrecognized benchmark preset: '{preset}'.")
+      device_spec_matchers.append(matcher)
+
   grouped_run_config_map = collections.defaultdict(list)
   for run_config in all_run_configs:
     device_name = run_config.target_device_spec.device_name
-    if target_device_names is None or device_name in target_device_names:
-      grouped_run_config_map[device_name].append(run_config)
+    if (target_device_names is not None and
+        device_name not in target_device_names):
+      continue
+    if (device_spec_matchers is not None and
+        all(not matcher(run_config.target_device_spec)
+            for matcher in device_spec_matchers)):
+      continue
+    grouped_run_config_map[device_name].append(run_config)
 
   output_map = {}
   for device_name, run_configs in grouped_run_config_map.items():
