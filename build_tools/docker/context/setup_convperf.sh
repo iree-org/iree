@@ -23,8 +23,6 @@ export REPO_SHA="$2"
 
 pushd "${REPO_DIR}"
 
-mkdir convperf
-pushd convperf
 git init
 git fetch --depth 1 https://github.com/nod-ai/convperf.git "${REPO_SHA}"
 git checkout "${REPO_SHA}"
@@ -37,8 +35,6 @@ git checkout "${REPO_SHA}"
 python3 -m venv convperf.venv
 source convperf.venv/bin/activate
 pip install -r requirements.txt
-
-popd # convperf
 
 # Since the root user clones the convperf repo, we update permissions so that a
 # runner can access this repo, but we don't want to set the executable bit for

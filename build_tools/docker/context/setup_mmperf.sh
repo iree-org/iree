@@ -25,8 +25,6 @@ export REPO_SHA=$2
 
 pushd ${REPO_DIR}
 
-mkdir mmperf
-pushd mmperf
 git init
 git fetch --depth 1 https://github.com/mmperf/mmperf.git "${REPO_SHA}"
 git checkout ${REPO_SHA}
@@ -38,17 +36,15 @@ source mmperf.venv/bin/activate
 pip install -r requirements.txt
 pip install -r ./external/llvm-project/mlir/python/requirements.txt
 
-popd # mmperf
-
 # Since the root user clones the mmperf repo, we update permissions so that a
 # runner can access this repo.
 chmod -R 777 .
 
 # Make sure there are no local changes to the IREE submodule since the workflow
 # updates this at each run.
-pushd mmperf/external/iree
+pushd external/iree
 git restore .
 git submodule foreach --recursive git restore .
-popd # mmperf/external/iree
+popd # external/iree
 
 popd # ${REPO_DIR}

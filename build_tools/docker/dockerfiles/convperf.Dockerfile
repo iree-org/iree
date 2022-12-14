@@ -9,7 +9,7 @@
 # `convperf` benchmarks convolution workloads on IREE and other backends such
 # as libxsmm. IREE is included as a submodule.
 
-FROM gcr.io/iree-oss/perf@sha256:d9ba4befb943c11671747a76bee8f9afd286d88254e9f5c9da905b00bd2a8404
+FROM gcr.io/iree-oss/perf@sha256:b47078bd32d300c6d45c47a43357f839710f69baa8d04ca6d5d0c9ed9b005603
 
 ######## OpenMP ########
 RUN apt-get update \
@@ -25,5 +25,5 @@ ARG CONVPERF_SHA="ca181bf9f1b959477acf8043eb5b5579fc47a37f"
 RUN mkdir -p "/usr/local/src/convperf" \
     && /usr/local/bin/setup_convperf.sh "/usr/local/src/convperf" "${CONVPERF_SHA}"
 
-ENV CONVPERF_REPO_DIR="/usr/local/src/convperf/convperf"
+ENV CONVPERF_REPO_DIR="/usr/local/src/convperf"
 ############## \

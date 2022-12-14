@@ -13,7 +13,7 @@
 # mmperf repo. Later versions of Clang, LLVM, Python and Ubuntu are needed
 # to satisfy the dependency requirements of the backends.
 
-FROM gcr.io/iree-oss/perf@sha256:d9ba4befb943c11671747a76bee8f9afd286d88254e9f5c9da905b00bd2a8404
+FROM gcr.io/iree-oss/perf@sha256:b47078bd32d300c6d45c47a43357f839710f69baa8d04ca6d5d0c9ed9b005603
 
 ######## CUDA ########
 RUN apt-get update \
@@ -67,5 +67,5 @@ ARG MMPERF_SHA="ae523a31449a58ef39592c6b8cf9c042e0a55a1f"
 RUN mkdir -p "/usr/local/src/mmperf" \
     && /usr/local/bin/setup_mmperf.sh "/usr/local/src/mmperf" "${MMPERF_SHA}"
 
-ENV MMPERF_REPO_DIR="/usr/local/src/mmperf/mmperf"
+ENV MMPERF_REPO_DIR="/usr/local/src/mmperf"
 ############## \
