@@ -932,7 +932,7 @@ class FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
       // required will be handled via interpretation by consumer.
       if (resultType.isSignlessInteger(32) || resultType.isSignedInteger(32)) {
         rewriter.replaceOpWithNewOp<IREE::VM::CastF32SI32Op>(
-            srcOp, resultType, adaptor.getOperands()[0]);
+            srcOp, resultType, adaptor.getIn());
         return success();
       }
     }
