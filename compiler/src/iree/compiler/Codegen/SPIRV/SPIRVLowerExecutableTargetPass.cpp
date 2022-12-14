@@ -86,8 +86,8 @@ static LogicalResult verifyEntryPoint(
   }
 
   std::array<int64_t, 3> workgroupSizes;
-  for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
-    workgroupSizes[it.index()] = it.value().cast<IntegerAttr>().getInt();
+  for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
+    workgroupSizes[index] = attr.cast<IntegerAttr>().getInt();
   }
 
   switch (translationInfo.getDispatchLoweringPassPipeline()) {

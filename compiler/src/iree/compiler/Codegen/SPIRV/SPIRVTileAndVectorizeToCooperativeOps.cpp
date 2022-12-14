@@ -232,19 +232,19 @@ class CombineContractTranspose final
     std::array<Value, 3> sources = {op.getLhs(), op.getRhs(), op.getAcc()};
     SmallVector<AffineMap> newMaps;
     SmallVector<Value> newSources;
-    for (auto source : llvm::enumerate(sources)) {
-      auto map = op.getIndexingMapsArray()[source.index()];
-      auto tranposeOp = source.value().getDefiningOp<vector::TransposeOp>();
+    for (auto [srcIdx, source] : llvm::enumerate(sources)) {
+      auto map = op.getIndexingMapsArray()[srcIdx];
+      auto tranposeOp = source.getDefiningOp<vector::TransposeOp>();
       if (!tranposeOp) {
-        newSources.push_back(source.value());
+        newSources.push_back(source);
         newMaps.push_back(map);
         continue;
       }
       SmallVector<int64_t, 3> perm;
       tranposeOp.getTransp(perm);
       SmallVector<AffineExpr> exprs(perm.size());
-      for (auto remap : llvm::enumerate(perm)) {
-        exprs[remap.value()] = map.getResult(remap.index());
+      for (auto [remapIdx, remap] : llvm::enumerate(perm)) {
+        exprs[remap] = map.getResult(remapIdx);
       }
       newMaps.push_back(
           AffineMap::get(map.getNumDims(), map.getNumSymbols(), exprs, ctx));

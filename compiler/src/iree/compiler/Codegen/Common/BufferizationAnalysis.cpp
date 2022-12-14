@@ -202,12 +202,12 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
   if (!dpsOp) return {};
   SmallVector<Value> tiedOperands(linalgOp.getOperation()->getNumResults());
   auto outputOperands = dpsOp.getDpsInitOperands();
-  for (auto outTensor : llvm::enumerate(outputOperands)) {
+  for (auto [index, outTensor] : llvm::enumerate(outputOperands)) {
     // If the `outs` tensor has a single use (this op) and is not from a
     // read-only buffer, the `outs` tensor can be tied to the result.
-    if (outTensor.value()->get().hasOneUse() &&
-        !isFromReadOnlyTensor(outTensor.value()->get(), plan)) {
-      tiedOperands[outTensor.index()] = outTensor.value()->get();
+    if (outTensor->get().hasOneUse() &&
+        !isFromReadOnlyTensor(outTensor->get(), plan)) {
+      tiedOperands[index] = outTensor->get();
     }
   }
   return tiedOperands;
@@ -224,13 +224,12 @@ static LogicalResult analyseLinalgOps(OpType linalgOp,
   auto results = linalgOp->getResults();
   auto tiedOperands = getTiedOperandsForLinalgOps(linalgOp, plan);
   if (tiedOperands.empty()) return failure();
-  for (auto it : llvm::enumerate(llvm::zip(results, tiedOperands))) {
-    Value resultTensor = std::get<0>(it.value());
-    Value tiedOperand = std::get<1>(it.value());
+  for (auto [index, resultTensor, tiedOperand] : llvm::zip_equal(
+           llvm::seq<int64_t>(0, results.size()), results, tiedOperands)) {
     if (tiedOperand) {
       plan.unionSets(resultTensor, tiedOperand);
     }
-    plan.insert(dpsOp.getDpsInitOperand(it.index())->get());
+    plan.insert(dpsOp.getDpsInitOperand(index)->get());
     plan.insert(resultTensor);
   }
   return success();
@@ -296,13 +295,13 @@ static LogicalResult analyseDestructiveUpdateOp(Operation *op, Value source,
 
 static LogicalResult analyseScfIfOp(scf::IfOp ifOp, BufferizationPlan &plan) {
   if (!ifOp.getNumResults()) return success();
-  for (auto it : llvm::zip(ifOp.getResults(), ifOp.thenYield().getOperands(),
-                           ifOp.elseYield().getOperands())) {
-    Value result = std::get<0>(it);
+  for (auto [result, thenOperand, elseOperand] :
+       llvm::zip_equal(ifOp.getResults(), ifOp.thenYield().getOperands(),
+                       ifOp.elseYield().getOperands())) {
     if (!result.getType().isa<RankedTensorType>()) continue;
     // All results and yields of the if-then-else are tied together.
-    plan.unionSets(result, std::get<1>(it));
-    plan.unionSets(result, std::get<2>(it));
+    plan.unionSets(result, thenOperand);
+    plan.unionSets(result, elseOperand);
   }
   return success();
 }
@@ -446,26 +445,23 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
 ///    not using a buffer from the dispatch ABI.
 static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
                                         BufferizationPlan &plan) {
-  for (auto result : enumerate(linalgOp.getDpsInitOperands())) {
-    if (linalgOp.payloadUsesValueFromOperand(result.value())) {
+  for (auto [index, result] : enumerate(linalgOp.getDpsInitOperands())) {
+    if (linalgOp.payloadUsesValueFromOperand(result)) {
       continue;
     }
     for (OpOperand *input : linalgOp.getDpsInputOperands()) {
       auto tensorType = input->get().getType().dyn_cast<RankedTensorType>();
       if (!tensorType) continue;
       Type inputElementType = tensorType.getElementType();
-      Type resultElementType = result.value()
-                                   ->get()
-                                   .getType()
-                                   .cast<RankedTensorType>()
-                                   .getElementType();
+      Type resultElementType =
+          result->get().getType().cast<RankedTensorType>().getElementType();
       if (input->get().hasOneUse() && (inputElementType == resultElementType) &&
           linalgOp.getMatchingIndexingMap(input) ==
-              linalgOp.getMatchingIndexingMap(result.value()) &&
+              linalgOp.getMatchingIndexingMap(result) &&
           !getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(
               input->get(), plan) &&
           !isFromReadOnlyTensor(input->get(), plan)) {
-        plan.unionSets(linalgOp->getResult(result.index()), input->get());
+        plan.unionSets(linalgOp->getResult(index), input->get());
         break;
       }
     }

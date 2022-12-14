@@ -186,32 +186,32 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   auto interfaceOp = dyn_cast_or_null<TilingInterface>(op);
   if (interfaceOp) {
     llvm::SmallDenseSet<unsigned> pLoopsSet;
-    for (auto iteratorType :
+    for (auto [index, iteratorType] :
          llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
-      if (iteratorType.value() == utils::IteratorType::parallel) {
-        pLoopsSet.insert(iteratorType.index());
+      if (iteratorType == utils::IteratorType::parallel) {
+        pLoopsSet.insert(index);
       }
     }
 
     SmallVector<int64_t> secondLevelTileSizes = loweringConfig.getTileSizeVals(
         static_cast<unsigned>(StrategyTilingLevel::ParallelTiles));
-    for (auto en : llvm::enumerate(secondLevelTileSizes)) {
-      if (en.value() != 0 && !pLoopsSet.contains(en.index())) {
+    for (auto [index, tileSize] : llvm::enumerate(secondLevelTileSizes)) {
+      if (tileSize != 0 && !pLoopsSet.contains(index)) {
         return op->emitOpError(
                    "expected only parallel dims to be set in the "
                    "second tiling sizes, got ")
-               << en.index() << "-th tile size set";
+               << index << "-th tile size set";
       }
     }
 
     SmallVector<int64_t> thirdLevelTileSizes = loweringConfig.getTileSizeVals(
         static_cast<unsigned>(StrategyTilingLevel::ReductionTiles));
-    for (auto en : llvm::enumerate(thirdLevelTileSizes)) {
-      if (en.value() != 0 && pLoopsSet.contains(en.index())) {
+    for (auto [index, tileSize] : llvm::enumerate(thirdLevelTileSizes)) {
+      if (tileSize != 0 && pLoopsSet.contains(index)) {
         return op->emitOpError(
                    "expected only reduction dims to be set in the third "
                    "tiling sizes, got ")
-               << en.index() << "-th tile size set";
+               << index << "-th tile size set";
       }
     }
   }
@@ -253,9 +253,7 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
   for (auto sizes : loweringConfig.getTileSizeVals()) {
-    for (auto en : llvm::enumerate(sizes)) {
-      int i = en.index();
-      int size = en.value();
+    for (auto [i, size] : llvm::enumerate(sizes)) {
       if (size == 1) shape[i] = 1;
       if (shape[i] == -1 || size == 0) continue;
       if (shape[i] % size != 0) {
