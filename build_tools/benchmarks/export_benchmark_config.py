@@ -98,7 +98,7 @@ def main(args: argparse.Namespace):
         device_name not in target_device_names):
       continue
     if (device_spec_matchers is not None and
-        all(not matcher(run_config.target_device_spec)
+        not any(matcher(run_config.target_device_spec)
             for matcher in device_spec_matchers)):
       continue
     grouped_run_config_map[device_name].append(run_config)
