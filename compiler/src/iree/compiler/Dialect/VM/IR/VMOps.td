@@ -95,7 +95,7 @@ def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
   let assemblyFormat = "attr-dict";
 }
 
-// TODO(b/142336293): DCE functions when unused and not exports.
+// TODO(benvanik): DCE vm.func when unused and not exported.
 // TODO(benvanik): attributes for function analysis: pure, etc (for imports).
 def VM_FuncOp : VM_Op<"func", [
     IsolatedFromAbove,
@@ -3667,7 +3667,6 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
       CallOpInterface,
     ])> {
   let extraClassDeclaration = [{
-    // TODO(b/133879130): make tablegen support variadic operand accessors.
     /// Get the argument operands to the called function.
     operand_range getArgOperands() {
       return {arg_operand_begin(), arg_operand_end()};

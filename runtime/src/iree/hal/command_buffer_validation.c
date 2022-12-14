@@ -328,7 +328,7 @@ iree_status_t iree_hal_command_buffer_copy_buffer_validation(
 
   // At least source or destination must be device-visible to enable
   // host->device, device->host, and device->device.
-  // TODO(b/117338171): host->host copies.
+  // TODO(benvanik): host->host copies.
   if (!iree_any_bit_set(iree_hal_buffer_memory_type(source_buffer),
                         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE) &&
       !iree_any_bit_set(iree_hal_buffer_memory_type(target_buffer),

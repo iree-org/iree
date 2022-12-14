@@ -252,7 +252,7 @@ class CheckModuleState final {
       if (!contents_eq) {
         os << " Contents does not match.";
       }
-      // TODO(b/146898896): Propagate original variable names.
+      // TODO(gcmn): Propagate original variable names.
       os << "\n"
             "  lhs:\n"
             "    ";
@@ -265,7 +265,7 @@ class CheckModuleState final {
       IREE_ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
       os << rhs_str;
 
-      // TODO(b/146898896): Use ADD_FAILURE_AT to propagate source location.
+      // TODO(gcmn): Use ADD_FAILURE_AT to propagate source location.
       ADD_FAILURE() << os.str();
     }
 
@@ -334,7 +334,7 @@ class CheckModuleState final {
       if (!contents_could_be_almost_eq) {
         os << " Contents does not match.";
       }
-      // TODO(b/146898896): Propagate original variable names.
+      // TODO(gcmn): Propagate original variable names.
       os << "\n"
             "  lhs:\n"
             "    ";
@@ -347,7 +347,7 @@ class CheckModuleState final {
       IREE_ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
       os << rhs_str;
 
-      // TODO(b/146898896): Use ADD_FAILURE_AT to propagate source location.
+      // TODO(gcmn): Use ADD_FAILURE_AT to propagate source location.
       ADD_FAILURE() << os.str();
     }
 
