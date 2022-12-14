@@ -165,8 +165,7 @@ static void createReductionStrategyThreadDistribution(
   // Split the reduction into a parallel and combiner part, then tile the
   // parallel part and map it to a full warp so it works on vectors.
   auto tileReduction = b.create<transform::TileReductionUsingScfOp>(
-      pdlOperation, pdlOperation, pdlOperation, pdlOperation, gridReductionH,
-      b.getI64ArrayAttr({0, firstReductionSize}));
+      gridReductionH, ArrayRef<int64_t>({0, firstReductionSize}));
   Value blockParallelFillH = tileReduction.getFillOp();
   Value blockParallelOpH = tileReduction.getSplitLinalgOp();
   Value blockCombinerOpH = tileReduction.getCombiningLinalgOp();

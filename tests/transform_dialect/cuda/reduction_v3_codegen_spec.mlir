@@ -17,10 +17,12 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // ===========================================================================
   %foreach_thread, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
      transform.structured.tile_reduction_using_foreach_thread %grid_reduction 
-       { num_threads = [0, 1024], tile_sizes = [0, 1], mapping = [#gpu.thread<x>] }
+        by num_threads = [0, 1024], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
+
   // Fuse the fill and pointwise to privatize them. 
   transform.structured.fuse_into_containing_op %block_more_parallel_fill_op_2
     into %foreach_thread
+
   // block_combiner_op_2 op is [parallel, reduction] of 1x384 that cannot fuse.
   // map the 1-dim to threadIdx.y to trigger mapping of the reduction to 
   // threadIdx.x via predication via `if (x==0)`.
