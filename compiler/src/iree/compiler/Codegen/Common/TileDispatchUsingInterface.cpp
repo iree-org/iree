@@ -20,6 +20,7 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/TilingInterface.h"
@@ -38,9 +39,10 @@ static bool isZero(Value val) {
 
 /// Helper method to adjust the interchange vector to match the iteration
 /// domain.
-static SmallVector<unsigned> fillInterchangeVector(
+static SmallVector<int64_t> fillInterchangeVector(
     ArrayRef<unsigned> interchangeVector, size_t iterationDomainSize) {
-  SmallVector<unsigned> filledVector = llvm::to_vector(interchangeVector);
+  SmallVector<int64_t> filledVector;
+  for (auto v : interchangeVector) filledVector.push_back(v);
   if (filledVector.size() < iterationDomainSize) {
     auto range = llvm::seq<unsigned>(filledVector.size(), iterationDomainSize);
     filledVector.append(range.begin(), range.end());
@@ -48,33 +50,6 @@ static SmallVector<unsigned> fillInterchangeVector(
   if (filledVector.size() > iterationDomainSize)
     filledVector.resize(iterationDomainSize);
   return filledVector;
-}
-
-/// Helper method to apply permutation to a vector
-template <typename T>
-static SmallVector<T> applyPermutationToVector(const SmallVector<T> &vector,
-                                               ArrayRef<unsigned> interchange) {
-  assert(interchange.size() == vector.size());
-  return llvm::to_vector(
-      llvm::map_range(interchange, [&](unsigned val) { return vector[val]; }));
-}
-/// Helper method to apply to invert a permutation.
-static SmallVector<unsigned> invertPermutationVector(
-    ArrayRef<unsigned> interchange) {
-  SmallVector<unsigned> inversion(interchange.size());
-  for (auto pos : llvm::enumerate(interchange)) {
-    inversion[pos.value()] = pos.index();
-  }
-  return inversion;
-}
-/// Method to check if an interchange vector is a permutation.
-static bool isPermutation(ArrayRef<unsigned> interchange) {
-  llvm::SmallDenseSet<unsigned, 4> seenVals;
-  for (auto val : interchange) {
-    if (seenVals.count(val)) return false;
-    seenVals.insert(val);
-  }
-  return seenVals.size() == interchange.size();
 }
 
 /// Given the `lb` and `step` of a loop, return the lower bound and step to use
@@ -384,23 +359,21 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
     SmallVector<OpFoldResult> offsets, sizes;
     // If there is an interchange specified, permute the iteration domain and
     // the tile sizes.
-    SmallVector<unsigned> interchangeVector;
+    SmallVector<int64_t> interchangeVector;
     if (!options.interchangeVector.empty()) {
       interchangeVector = fillInterchangeVector(options.interchangeVector,
                                                 iterationDomain.size());
     }
     if (!interchangeVector.empty()) {
-      if (!isPermutation(interchangeVector)) {
+      if (!isPermutationVector(interchangeVector)) {
         return rewriter.notifyMatchFailure(
             op,
             "invalid intechange vector, not a permutation of the entire "
             "iteration space");
       }
 
-      iterationDomain =
-          applyPermutationToVector(iterationDomain, interchangeVector);
-      tileSizeVector =
-          applyPermutationToVector(tileSizeVector, interchangeVector);
+      applyPermutationToVector(iterationDomain, interchangeVector);
+      applyPermutationToVector(tileSizeVector, interchangeVector);
     }
 
     // If there is distribution specified, adjust the loop ranges. Note that
@@ -443,8 +416,8 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
 
     if (!interchangeVector.empty()) {
       auto inversePermutation = invertPermutationVector(interchangeVector);
-      offsets = applyPermutationToVector(offsets, inversePermutation);
-      sizes = applyPermutationToVector(sizes, inversePermutation);
+      applyPermutationToVector(offsets, inversePermutation);
+      applyPermutationToVector(sizes, inversePermutation);
     }
 
     LLVM_DEBUG({
