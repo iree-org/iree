@@ -691,64 +691,55 @@ FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
 
   return result;
 }
-/// Returns the position of given dimension.
-/// For dim=2, map=affine_map<(d0, d1, d2) -> (d0, d2), it returns 1
-static Optional<unsigned> getResultPosition(AffineMap &map, unsigned dim) {
-  for (auto result : llvm::enumerate(map.getResults())) {
-    if (result.value().cast<AffineDimExpr>().getPosition() == dim) {
-      return result.index();
-    }
-  }
-  return llvm::None;
-}
 
-/// Finds contiguous loop ranges from the given linalg.generic.
-static SmallVector<ReassociationIndices> getContiguousLoops(
-    linalg::GenericOp genericOp, ArrayRef<unsigned> loopDims) {
+/// Searches the same sequence in all the affine maps and collapses these
+/// dimensions. It only applies these to "parallel" loops without mixing them
+/// with "reduction" types.
+static SmallVector<ReassociationIndices> getCollapsibleLoops(
+    linalg::GenericOp genericOp) {
   SmallVector<ReassociationIndices> contiguousLoops;
-  if (loopDims.size() < 2) return contiguousLoops;
 
-  auto areDimensionsContiguous = [&](unsigned preDim, unsigned nextDim) {
-    return llvm::all_of(genericOp.getIndexingMapsArray(), [&](AffineMap map) {
-      Optional<unsigned> prePos = getResultPosition(map, preDim);
-      Optional<unsigned> nextPos = getResultPosition(map, nextDim);
-      return prePos.has_value() && nextPos.has_value() &&
-             (prePos.value() + 1) == nextPos;
-    });
+  SmallVector<unsigned> pDims;
+  genericOp.getParallelDims(pDims);
+  if (pDims.size() < 2) return contiguousLoops;
+
+  llvm::SmallDenseSet<unsigned> pLoops(pDims.begin(), pDims.end());
+
+  auto hasAllMapsSameSequence = [&](AffineExpr preExpr, AffineExpr nextExpr) {
+    for (AffineMap map : genericOp.getIndexingMapsArray()) {
+      bool foundSeq = false;
+      for (auto [index, resultExpr] : llvm::enumerate(map.getResults())) {
+        if (resultExpr == nextExpr) {
+          foundSeq = (index > 0 && preExpr == map.getResult(index - 1));
+          break;
+        }
+      }
+      if (!foundSeq) return false;
+    }
+    return true;
   };
 
-  // Finds that d2-d3 and d6-d7 are contiguous for the case (d1, d0, d2, d3, d5,
-  // d4, d6, d7).
   ReassociationIndices range;
-  for (auto [idx, dim] : llvm::enumerate(loopDims)) {
+  AffineExpr preExpr;
+  for (auto nextExpr : genericOp.getIndexingMapsArray().front().getResults()) {
+    unsigned pos = nextExpr.cast<AffineDimExpr>().getPosition();
     if (!range.empty()) {
-      if (!areDimensionsContiguous(range.back(), dim) ||
-          (range.back() + 1 != dim)) {
+      if (!hasAllMapsSameSequence(preExpr, nextExpr) || !pLoops.count(pos)) {
         if (range.size() > 1)
           contiguousLoops.push_back({range.begin(), range.end()});
         range.clear();
       }
     }
-    range.push_back(dim);
+    preExpr = nextExpr;
+    if (pLoops.count(pos)) range.push_back(pos);
   }
   if (range.size() > 1) contiguousLoops.push_back(range);
 
-  return contiguousLoops;
-}
-
-/// Finds all collapsible loop ranges of type "parallel" without
-/// mixing them with "reduction" types.
-static SmallVector<ReassociationIndices> getCollapsibleLoops(
-    linalg::GenericOp genericOp) {
-  SmallVector<unsigned int> pDims;
-  genericOp.getParallelDims(pDims);
-
-  SmallVector<ReassociationIndices> pLoops =
-      getContiguousLoops(genericOp, pDims);
-
+  // Couldn't find anything to collapse
+  if (contiguousLoops.empty()) return contiguousLoops;
   LLVM_DEBUG({
     llvm::dbgs() << "Collapsing parallel loops: ";
-    for (auto indices : pLoops) {
+    for (auto indices : contiguousLoops) {
       llvm::dbgs() << "[";
       for (auto idx : indices) llvm::dbgs() << idx << ",";
       llvm::dbgs() << "]\t";
@@ -756,11 +747,11 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(
     llvm::dbgs() << "\n";
   });
 
-  return pLoops;
+  return contiguousLoops;
 }
 
-/// Collapse possible dimension of the given linalg.generic and return the new
-/// one
+/// Collapse possible dimension of the given linalg.generic and return the
+/// new one
 static FailureOr<linalg::GenericOp> collapseLinalgGeneric(
     TensorDimTrackingRewriter &rewriter, linalg::GenericOp genericOp) {
   SmallVector<ReassociationIndices> collapseIndices =
@@ -781,9 +772,11 @@ static FailureOr<linalg::GenericOp> collapseLinalgGeneric(
   auto expandshapeOp =
       replacements->front().getDefiningOp<tensor::ExpandShapeOp>();
   if (!expandshapeOp) return failure();
+
   auto newGenericOp =
       expandshapeOp.getOperand().getDefiningOp<linalg::GenericOp>();
   if (!newGenericOp) return failure();
+
   rewriter.replaceOp(genericOp, *replacements);
   return newGenericOp;
 }
@@ -802,10 +795,10 @@ static bool isEligibleForCollapse(Operation *op,
   if (genericOp.hasDynamicShape()) return false;
 
   // TODO(guray) Currently we can only collapse when result of all the
-  // AffineMaps are dimensions. Possible to collapse cases like affine_map<d0,
-  // d1+d2> with affine_map<d0, d1+d2>, however, this is not supported in
-  // collapsing mechanism in MLIR. Once we have this support, we can remove this
-  // if statement.
+  // AffineMaps are dimensions. Possible to collapse cases like
+  // affine_map<d0, d1+d2> with affine_map<d0, d1+d2>, however, this is not
+  // supported in collapsing mechanism in MLIR. Once we have this support,
+  // we can remove this if statement.
   if (llvm::any_of(genericOp.getIndexingMapsArray(), [](AffineMap map) {
         return !map.isProjectedPermutation();
       })) {
@@ -815,12 +808,14 @@ static bool isEligibleForCollapse(Operation *op,
   return true;
 }
 
-/// Traverses all the ops in `roots`; collapse the ops if they are eligible ops.
+/// Traverses all the ops in `roots`; collapse the ops if they are eligible
+/// ops.
 static LogicalResult collapseDimensions(
     TensorDimTrackingRewriter &rewriter, SmallVectorImpl<Operation *> &roots,
     DenseMap<unsigned, SmallVector<Operation *>> &producers) {
   for (auto [index, op] : llvm::enumerate(roots)) {
     if (!isEligibleForCollapse(op, producers[index])) continue;
+
     if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       auto maybeLinalgGeneric = collapseLinalgGeneric(rewriter, genericOp);
       if (failed(maybeLinalgGeneric)) return failure();
@@ -863,6 +858,7 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
     }
   });
 
+  // TODO(guray): This can be extracted to a pass.
   if (collapse) {
     if (failed(collapseDimensions(rewriter, roots, producers)))
       return failure();

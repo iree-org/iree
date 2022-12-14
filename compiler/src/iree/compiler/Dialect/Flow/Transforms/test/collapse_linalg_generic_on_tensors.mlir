@@ -258,6 +258,7 @@ func.func @collapse8() -> !type_out {
   %c0 = arith.constant 0 : index
   %input = tensor.empty() : !type_in
   %output = tensor.empty() : !type_out
+  // Can collapse (d3, d0, d1)
   %6 = linalg.generic { indexing_maps = [ 
             affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d0, d1, d5)>, 
             affine_map<(d0, d1, d2, d3, d4, d5) -> (d2, d3, d0, d1, d4, d5)>],
@@ -271,15 +272,15 @@ func.func @collapse8() -> !type_out {
   return %6: !type_out
 }
 
-// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d2, d0, d4)>
-// CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d0, d3, d4)>
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
+// CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK-LABEL: func.func @collapse8
-// CHECK: %[[IN:.+]] = tensor.collapse_shape %[[INPUT:.+]] {{\[}}[0], [1, 2], [3]] : tensor<16x4x32x2xf32> into tensor<16x128x2xf32>
-// CHECK: %[[OUT:.+]] = tensor.collapse_shape %[[OUTPUT:.+]] {{\[}}[0], [1], [2, 3], [4], [5]] : tensor<8x16x4x32x8x2xf32> into tensor<8x16x128x8x2xf32>
+// CHECK: %[[IN:.+]] = tensor.collapse_shape %[[INPUT:.+]] {{\[}}[0, 1, 2], [3]] : tensor<16x4x32x2xf32> into tensor<2048x2xf32>
+// CHECK: %[[OUT:.+]] = tensor.collapse_shape %[[OUTPUT:.+]] {{\[}}[0], [1, 2, 3], [4], [5]] : tensor<8x16x4x32x8x2xf32> into tensor<8x2048x8x2xf32>
 // CHECK: %[[RES:.+]] = flow.dispatch.region
-// CHECK: linalg.generic {indexing_maps = [#[[MAP]], #[[MAP2]]], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
-// CHECK: ins(%[[IN]] : tensor<16x128x2xf32>) outs(%[[OUT]] : tensor<8x16x128x8x2xf32>)
-// CHECK:  tensor.expand_shape %[[RES]] {{\[}}[0], [1], [2, 3], [4], [5]] : tensor<8x16x128x8x2xf32> into tensor<8x16x4x32x8x2xf32>
+// CHECK: linalg.generic {indexing_maps = [#[[MAP]], #[[MAP2]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+// CHECK: ins(%[[IN]] : tensor<2048x2xf32>) outs(%[[OUT]] : tensor<8x2048x8x2xf32
+// CHECK:  tensor.expand_shape %[[RES]] {{\[}}[0], [1, 2, 3], [4], [5]] : tensor<8x2048x8x2xf32> into tensor<8x16x4x32x8x2xf32>
 
 // -----
 
@@ -341,29 +342,6 @@ func.func @collapse9() -> !type_out {
 
 // -----
 
-!type_in = tensor<10x20x30xf32>
-!type_out = tensor<10x10x20x30x50xf32>
-
-func.func @collapse9() -> !type_out {
-  %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %input = tensor.empty() : !type_in
-  %output = tensor.empty() : !type_out
-  
-  %result = linalg.generic {
-    indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d0)>, 
-                     affine_map<(d0, d1, d2, d3, d4) -> (d3, d1, d2, d0, d4)>],
-    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
-  ins(%input : !type_in) outs(%output : !type_out) {
-  ^bb0(%arg1: f32, %arg2: f32):
-    linalg.yield %arg1 : f32
-  }  -> !type_out
-
-  return %result: !type_out
-}
-
-// -----
-
 !type_in = tensor<10x10x30xf32>
 !type_out = tensor<20x10x10x30x20xf32>
 
@@ -373,6 +351,7 @@ func.func @collapse10() -> !type_out {
   %input = tensor.empty() : !type_in
   %output = tensor.empty() : !type_out
 
+  // Can collapse (d1, d3, d0)
   %result = linalg.generic {
     indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d0)>, 
                      affine_map<(d0, d1, d2, d3, d4) -> (d2, d1, d3, d0, d4)>],
@@ -384,3 +363,11 @@ func.func @collapse10() -> !type_out {
 
   return %result: !type_out
 }
+
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0)>
+// CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d1, d0, d2)>
+// CHECK-LABEL: func.func @collapse10
+// CHECK: %[[RES:.+]] = flow.dispatch.region
+// CHECK: linalg.generic {indexing_maps = [#[[MAP]], #[[MAP2]]], iterator_types = ["parallel", "parallel", "parallel"]}
+
