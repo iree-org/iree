@@ -926,11 +926,13 @@ class FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = srcOp.getResult().getType();
+    auto resultType = getTypeConverter()->convertType(dstType);
     if (srcType.isF32()) {
-      if (dstType.isSignlessInteger(32) || dstType.isSignedInteger(32)) {
-        auto resultType = getTypeConverter()->convertType(dstType);
-        rewriter.replaceOpWithNewOp<IREE::VM::CastF32SI32Op>(
-            srcOp, resultType, adaptor.getOperands()[0]);
+      // This uses the resultType rather than dstType as any truncation
+      // required will be handled via interpretation by consumer.
+      if (resultType.isSignlessInteger(32) || resultType.isSignedInteger(32)) {
+        rewriter.replaceOpWithNewOp<IREE::VM::CastF32SI32Op>(srcOp, resultType,
+                                                             adaptor.getIn());
         return success();
       }
     }
@@ -948,8 +950,8 @@ class FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
     auto resultType = getTypeConverter()->convertType(dstType);
     if (srcType.isF32()) {
       if (dstType.isSignlessInteger(32) || dstType.isUnsignedInteger(32)) {
-        rewriter.replaceOpWithNewOp<IREE::VM::CastF32UI32Op>(
-            srcOp, resultType, adaptor.getOperands()[0]);
+        rewriter.replaceOpWithNewOp<IREE::VM::CastF32UI32Op>(srcOp, resultType,
+                                                             adaptor.getIn());
         return success();
       }
     }
