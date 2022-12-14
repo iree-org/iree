@@ -35,7 +35,7 @@ env:
   GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
 
 jobs:
-  export_benchmarks:
+  export_benchmark_config:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ inputs.runner-group }}
@@ -76,10 +76,10 @@ jobs:
           echo "benchmark-config-gcs-artifact=${BENCHMARK_CONFIG_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
   run_benchmarks:
-    needs: [export_benchmarks]
+    needs: [export_benchmark_config]
     strategy:
       matrix:
-        benchmark: ${{ fromJSON(needs.export_benchmarks.outputs.benchmark-matrix) }}
+        benchmark: ${{ fromJSON(needs.export_benchmark_config.outputs.benchmark-matrix) }}
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ inputs.runner-group }}
@@ -89,34 +89,46 @@ jobs:
       benchmark-results-gcs-artifact-dir: ${{ steps.upload.outputs.benchmark-results-gcs-artifact-dir }}
     env:
       DEVICE_NAME: ${{ matrix.benchmark.device_name }}
-      BENCHMARK_CONFIG: ${{ needs.export_benchmarks.outputs.benchmark-config }}
-      BENCHMARK_CONFIG_GCS_ARTIFACT: ${{ needs.export_benchmarks.outputs.benchmark-config-gcs-artifact }}
+      PLATFORM_ARCH: ${{ matrix.benchmark.host_environment.platform }}-${{ matrix.benchmark.host_environment.architecture }}
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ inputs.e2e-test-artifacts-gcs-artifact-dir }}
       E2E_TEST_ARTIFACTS_DIR: ${{ inputs.e2e-test-artifacts-dir }}
-      BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.benchmark.platform }}-${{ matrix.benchmark.architecture }}-benchmark-tools.tar
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading benchmark tools"
+        id: download-tools
         env:
-          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ env.BENCHMARK_TOOLS_ARCHIVE }}
+          # See `build_benchmark_tools` step in ci.yml for the name format of
+          # benchmark tools artifacts.
+          BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM_ARCH }}-benchmark-tools.tar
+          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ env.PLATFORM_ARCH }}-benchmark-tools.tar
         run: |
           gcloud alpha storage cp "${BENCHMARK_TOOLS_GCS_ARTIFACT}" "${BENCHMARK_TOOLS_ARCHIVE}"
+          echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
       - name: "Downloading benchmark assets"
+        id: download-assets
+        env:
+          BENCHMARK_CONFIG: ${{ needs.export_benchmark_config.outputs.benchmark-config }}
+          BENCHMARK_CONFIG_GCS_ARTIFACT: ${{ needs.export_benchmark_config.outputs.benchmark-config-gcs-artifact }}
         run: |
           gcloud alpha storage cp "${BENCHMARK_CONFIG_GCS_ARTIFACT}" "${BENCHMARK_CONFIG}"
+          mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
           jq -r \
             --arg DEVICE_NAME "${DEVICE_NAME}" \
-            --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR \
+            --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
             '.[$DEVICE_NAME] | .module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
             "${BENCHMARK_CONFIG}" | \
             gcloud alpha storage cp -r --read-paths-from-stdin "${E2E_TEST_ARTIFACTS_DIR}"
+          echo "benchmark-config=${BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"
       - name: "Unpacking benchmark tools"
         id: unpack-tools
         env:
-          BENCHMARK_TOOLS_DIR: benchmark-tools-dir
+          BENCHMARK_TOOLS_ARCHIVE: ${{ steps.download-tools.outputs.benchmark-tools-archive }}
+          # See `build_benchmark_tools` step in ci.yml for the name format of
+          # benchmark tools directory.
+          BENCHMARK_TOOLS_DIR: ${{ env.PLATFORM_ARCH }}-benchmark-tools-dir
         run: |
           tar -xf ${BENCHMARK_TOOLS_ARCHIVE}
           echo "normal-benchmark-tools-dir=${BENCHMARK_TOOLS_DIR}/build/tools" >> "${GITHUB_OUTPUT}"
@@ -124,18 +136,19 @@ jobs:
       - name: "Running benchmarks"
         id: run
         env:
-          NORMAL_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.normal-benchmark-tools-dir }}
-          TRACED_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.traced-benchmark-tools-dir }}
-          RUN_CONFIGS: run-configs.json
-          BENCHMARK_RESULTS: ${{ matrix.benchmark.device_name }}-benchmark-results.json
+          BENCHMARK_CONFIG: ${{ steps.download-assets.outputs.benchmark-config }}
+          IREE_NORMAL_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.normal-benchmark-tools-dir }}
+          IREE_TRACED_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.traced-benchmark-tools-dir }}
+          IREE_DEVICE_NAME: ${{ env.DEVICE_NAME }}
+          IREE_E2E_TEST_ARTIFACTS_DIR: ${{ env.E2E_TEST_ARTIFACTS_DIR }}
+          IREE_RUN_CONFIG: run-config.json
+          IREE_BENCHMARK_RESULTS: ${{ matrix.benchmark.device_name }}-benchmark-results.json
         run: |
-          jq --arg DEVICE_NAME "${DEVICE_NAME}" \
-            '.[$DEVICE_NAME] | .run_configs' > "${RUN_CONFIGS}"
-          ./build_tools/github_actions/run_benchmarks.sh \
-            "${E2E_TEST_ARTIFACTS_DIR}" \
-            "${RUN_CONFIGS}" \
-            "${BENCHMARK_RESULTS}"
-          echo "benchmark-results=${BENCHMARK_RESULTS}" >> "${GITHUB_OUTPUT}"
+          jq --arg DEVICE_NAME "${IREE_DEVICE_NAME}" \
+            '.[$DEVICE_NAME] | .run_configs' \
+            "${BENCHMARK_CONFIG}" > "${IREE_RUN_CONFIG}"
+          ./build_tools/github_actions/run_benchmarks.sh
+          echo "benchmark-results=${IREE_BENCHMARK_RESULTS}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading reuslts"
         id: upload
         env:
@@ -145,4 +158,3 @@ jobs:
           gcloud alpha storage cp \
             "${BENCHMARK_RESULTS}" \
             "${BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/${BENCHMARK_RESULTS}"
-          echo "benchmark-results-gcs-artifact-dir=${BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
