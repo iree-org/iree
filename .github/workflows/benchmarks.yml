@@ -25,6 +25,9 @@ on:
       e2e-test-artifacts-gcs-artifact-dir:
         required: true
         type: string
+      benchmark-presets:
+        required: true
+        type: string
 
 env:
   # This duplicates the variable from ci.yml. The variable needs to be in env
@@ -55,10 +58,11 @@ jobs:
         id: export
         env:
           BENCHMARK_CONFIG: "benchmark-config.json"
+          BENCHMARK_PRESETS: ${{ inputs.benchmark-presets }}
         run: |
           ./build_tools/benchmarks/export_benchmark_config.py \
-            --output "${BENCHMARK_CONFIG}" \
-            --target_device_name="a2-highgpu-1g"
+            --benchmark_presets="${BENCHMARK_PRESETS}" \
+            --output="${BENCHMARK_CONFIG}"
           echo "benchmark-config=${BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"
           echo benchmark-matrix=$(jq \
               'to_entries | map({"device_name": .key, "host_environment": .value.host_environment})' \
