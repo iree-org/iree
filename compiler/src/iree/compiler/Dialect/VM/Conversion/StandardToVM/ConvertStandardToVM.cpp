@@ -950,8 +950,8 @@ class FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
     auto resultType = getTypeConverter()->convertType(dstType);
     if (srcType.isF32()) {
       if (dstType.isSignlessInteger(32) || dstType.isUnsignedInteger(32)) {
-        rewriter.replaceOpWithNewOp<IREE::VM::CastF32UI32Op>(
-            srcOp, resultType, adaptor.getOperands()[0]);
+        rewriter.replaceOpWithNewOp<IREE::VM::CastF32UI32Op>(srcOp, resultType,
+                                                             adaptor.getIn());
         return success();
       }
     }
