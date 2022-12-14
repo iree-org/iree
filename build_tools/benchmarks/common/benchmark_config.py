@@ -110,7 +110,8 @@ class BenchmarkConfig:
 
     if args.e2e_test_artifacts_dir is not None:
       if args.run_config is None:
-        raise ValueError("--e2e_test_artifacts_dir must use with --run_config.")
+        raise ValueError(
+            "--e2e_test_artifacts_dir only supports using with --run_config.")
 
       root_benchmark_dir = args.e2e_test_artifacts_dir
     else:
