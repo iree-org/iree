@@ -15,7 +15,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 2. Split the reduction to get meatier parallelism.
   // ===========================================================================
   %foreach_thread, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
-    transform.structured.tile_reduction_using_scf %grid_reduction { tile_sizes = [0, 128] }
+    transform.structured.tile_reduction_using_scf %grid_reduction by tile_sizes = [0, 128]
   %_1:2 =
     transform.structured.tile_to_foreach_thread_op %block_more_parallel_op_2 num_threads [0, 32] 
     ( mapping = [#gpu.thread<x>] )

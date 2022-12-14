@@ -35,7 +35,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   transform.iree.tile_to_foreach_thread_and_workgroup_count_region {{.*}} tile_sizes [1](mapping = [#gpu.block<x>])
 // CHECK-COUNT-3:   transform.structured.fuse_into_containing_op
 //         CHECK:   transform.iree.take_first
-//         CHECK:   transform.structured.tile_reduction_using_scf %{{.*}} {tile_sizes = [0, 64]}
+//         CHECK:   transform.structured.tile_reduction_using_scf %{{.*}} by tile_sizes = [0, 64]
 //         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}} num_threads [0, 32]
 //    CHECK-SAME:      (mapping = [#gpu.thread<x>])
 //         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}} tile_sizes [0, 2](mapping = [#gpu.thread<x>])
@@ -95,7 +95,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 //   CHECK-LABEL: func.func @group_reduction_128
 //         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
-//         CHECK:   transform.structured.tile_reduction_using_scf %{{.*}} {tile_sizes = [0, 128]}
+//         CHECK:   transform.structured.tile_reduction_using_scf %{{.*}} by tile_sizes = [0, 128]
 //         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}} num_threads [0, 32]
 //    CHECK-SAME:      (mapping = [#gpu.thread<x>])
 //         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}} tile_sizes [0, 4](mapping = [#gpu.thread<x>])
@@ -136,7 +136,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 //   CHECK-LABEL: func.func @group_reduction_32
 //         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
-//         CHECK:   transform.structured.tile_reduction_using_scf %{{.*}} {tile_sizes = [0, 32]}
+//         CHECK:   transform.structured.tile_reduction_using_scf %{{.*}} by tile_sizes = [0, 32]
 //         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}} num_threads [0, 32]
 //    CHECK-SAME:      (mapping = [#gpu.thread<x>])
 //         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}} tile_sizes [0, 1](mapping = [#gpu.thread<x>])
