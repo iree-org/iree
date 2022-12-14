@@ -10,7 +10,7 @@
   ]>
 ]>
 
-hal.executable public @matmul_256x1024x128_div_exp {
+hal.executable public @matmul_256x1024x128_div_add {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.5,
@@ -33,13 +33,13 @@ hal.executable public @matmul_256x1024x128_div_exp {
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
        >}> {
-    hal.executable.export public @matmul_256x1024x128_div_exp layout(#pipeline_layout) {
+    hal.executable.export public @matmul_256x1024x128_div_add layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module  {
-      func.func @matmul_256x1024x128_div_exp() {
+      func.func @matmul_256x1024x128_div_add() {
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
         %c256 = arith.constant 256 : index
@@ -64,8 +64,7 @@ hal.executable public @matmul_256x1024x128_div_exp {
           outs(%17 : tensor<256x1024xf16>) {
         ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):
           %28 = arith.divf %arg2, %arg3 : f16
-          // spirv.GL.Exp is not permitted to use cooperative matrix types per the spec.
-          %29 = math.exp %28 : f16
+          %29 = arith.addf %28, %arg4 : f16
           linalg.yield %29 : f16
         } -> tensor<256x1024xf16>
         flow.dispatch.tensor.store %27, %4, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : tensor<256x1024xf16> -> !flow.dispatch.tensor<writeonly:tensor<256x1024xf16>>
@@ -90,7 +89,7 @@ hal.executable public @matmul_256x1024x128_div_exp {
 //         CHECK:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
 //         CHECK:   spirv.GlobalVariable @[[C_MEM:.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
 
-//         CHECK:   spirv.func @matmul_256x1024x128_div_exp
+//         CHECK:   spirv.func @matmul_256x1024x128_div_add
 
 //     CHECK-DAG:     %[[COL_MAJOR:.+]] = spirv.Constant [[COL_MAJOR]]
 //     CHECK-DAG:     %[[C5:.+]] = spirv.Constant 5 : i32
@@ -189,19 +188,19 @@ hal.executable public @matmul_256x1024x128_div_exp {
 //         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
 //         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
 //         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
 //         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 // -----
@@ -276,6 +275,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 
 //         CHECK:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
 //         CHECK:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
+//         CHECK:   spirv.GlobalVariable @[[C_MEM:.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<576 x vector<4xf32>>)>, Workgroup>
 
 //         CHECK:   spirv.func @batch_matmul_16x128x256x512_div
 
@@ -321,14 +321,32 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 // CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.coopmatrix<16x16xf16, Subgroup>
 // CHECK-COUNT-8:     %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C32]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, StorageBuffer> as !spirv.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-4:     %{{.+}} = spirv.FDiv %{{.+}}, %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-4:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C32]], %[[COL_MAJOR]]
+//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
+//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %{{.+}}, %[[C9]], %[[COL_MAJOR]]
+//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
+//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %{{.+}}, %[[C9]], %[[COL_MAJOR]]
+//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
+//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %{{.+}}, %[[C9]], %[[COL_MAJOR]]
+//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
+//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %{{.+}}, %[[C9]], %[[COL_MAJOR]]
+
+//         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
+//         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 
 // -----
-
-// Small matmul that each subgroup only handles one tile
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -401,7 +419,7 @@ hal.executable public @matmul_32x32x32_div {
 // CHECK-COUNT-4: spirv.NV.CooperativeMatrixLoad
 // CHECK-COUNT-2: spirv.NV.CooperativeMatrixMulAdd
 //         CHECK: spirv.NV.CooperativeMatrixLoad
-//         CHECK: spirv.FDiv %{{.+}}, %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup>
+//         CHECK: spirv.FDiv
 //         CHECK: spirv.NV.CooperativeMatrixStore
 
 // -----
@@ -529,7 +547,7 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
   ]>
 ]>
 
-hal.executable public @matmul_256x1024x128_div_exp {
+hal.executable public @matmul_256x1024x128_div_add {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
@@ -546,13 +564,13 @@ hal.executable public @matmul_256x1024x128_div_exp {
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
        >}> {
-    hal.executable.export public @matmul_256x1024x128_div_exp layout(#pipeline_layout) {
+    hal.executable.export public @matmul_256x1024x128_div_add layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module  {
-      func.func @matmul_256x1024x128_div_exp() {
+      func.func @matmul_256x1024x128_div_add() {
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
         %c256 = arith.constant 256 : index
@@ -577,8 +595,7 @@ hal.executable public @matmul_256x1024x128_div_exp {
           outs(%17 : tensor<256x1024xf16>) {
         ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):
           %28 = arith.divf %arg2, %arg3 : f16
-          // spirv.GL.Exp is not permitted to use cooperative matrix types per the spec.
-          %29 = math.exp %28 : f16
+          %29 = arith.addf %28, %arg4 : f16
           linalg.yield %29 : f16
         } -> tensor<256x1024xf16>
         flow.dispatch.tensor.store %27, %4, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : tensor<256x1024xf16> -> !flow.dispatch.tensor<writeonly:tensor<256x1024xf16>>
@@ -594,7 +611,7 @@ hal.executable public @matmul_256x1024x128_div_exp {
 //     CHECK-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
 //     CHECK-DAG:   spirv.GlobalVariable @[[C_MEM:.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
 
-//         CHECK:   spirv.func @matmul_256x1024x128_div_exp
+//         CHECK:   spirv.func @matmul_256x1024x128_div_add
 
 //     CHECK-DAG:     %[[COL_MAJOR:.+]] = spirv.Constant [[COL_MAJOR]]
 //     CHECK-DAG:     %[[C5:.+]] = spirv.Constant 5 : i32
@@ -639,13 +656,13 @@ hal.executable public @matmul_256x1024x128_div_exp {
 
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 // -----
@@ -714,6 +731,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 
 //     CHECK-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
 //     CHECK-DAG:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<640 x vector<4xf32>>)>, Workgroup>
+//     CHECK-DAG:   spirv.GlobalVariable @[[C_MEM:.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<1088 x vector<4xf32>>)>, Workgroup>
 
 //         CHECK:   spirv.func @batch_matmul_16x128x256x512_div
 
@@ -754,9 +772,12 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 // CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.coopmatrix<16x16xf16, Subgroup>
 // CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C17]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.coopmatrix<16x16xf16, Subgroup>
 
-// CHECK-COUNT-8:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C32]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, StorageBuffer> as !spirv.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-8:     %{{.+}} = spirv.FDiv %{{.+}}, %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-8:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C32]], %[[COL_MAJOR]]
+// CHECK-COUNT-8:     %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
+// CHECK-COUNT-8:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C17]], %[[COL_MAJOR]]
+
+//         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+// CHECK-COUNT-8:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
+//         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 // -----
 
@@ -857,90 +878,3 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 //CHECK-COUNT-16:     %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
 // CHECK-COUNT-8:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C64]], %[[COL_MAJOR]]
-
-// -----
-
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
-]>
-
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[1, 64, 64], [1, 16, 64], [0, 0, 0, 16], [1, 16, 16, 16]]>,
-    translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [32, 4, 1], subgroup_size = 32>
-
-hal.executable public @batch_matmul_f16_16x4096x4096x64_truncf_mulf {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-    spirv.target_env = #spirv.target_env<
-      #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
-      #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
-            a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
-        ],
-        max_compute_shared_memory_size = 65536,
-        max_compute_workgroup_invocations = 1024,
-        max_compute_workgroup_size = [1024, 1024, 1024],
-        subgroup_size = 64>
-       >}> {
-    hal.executable.export public @batch_matmul_f16_16x4096x4096x64_truncf_mulf layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
-      hal.return %x, %y, %z : index, index, index
-    }
-    builtin.module  {
-      func.func @batch_matmul_f16_16x4096x4096x64_truncf_mulf() {
-        %cst = arith.constant 0.158113882 : f32
-        %cst_0 = arith.constant 0.000000e+00 : f16
-        %c0 = arith.constant 0 : index
-        %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<16x4096x64xf16>>
-        %7 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<16x64x4096xf16>>
-        %8 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<16x4096x4096xf16>>
-        %9 = flow.dispatch.tensor.load %6, offsets = [0, 0, 0], sizes = [16, 4096, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<16x4096x64xf16>> -> tensor<16x4096x64xf16>
-        %10 = flow.dispatch.tensor.load %7, offsets = [0, 0, 0], sizes = [16, 64, 4096], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<16x64x4096xf16>> -> tensor<16x64x4096xf16>
-        %11 = tensor.empty() : tensor<16x4096x4096xf16>
-        %12 = linalg.fill ins(%cst_0 : f16) outs(%11 : tensor<16x4096x4096xf16>) -> tensor<16x4096x4096xf16>
-        %13 = linalg.batch_matmul {compilation_info = #compilation}
-          ins(%9, %10 : tensor<16x4096x64xf16>, tensor<16x64x4096xf16>)
-          outs(%12 : tensor<16x4096x4096xf16>) -> tensor<16x4096x4096xf16>
-        %14 = linalg.generic {
-              indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-              iterator_types = ["parallel", "parallel", "parallel"]}
-          ins(%13 : tensor<16x4096x4096xf16>) outs(%11 : tensor<16x4096x4096xf16>) {
-        ^bb0(%in: f16, %out: f16):
-          %15 = arith.truncf %cst : f32 to f16
-          %16 = arith.mulf %in, %15 : f16
-          linalg.yield %16 : f16
-        } -> tensor<16x4096x4096xf16>
-        flow.dispatch.tensor.store %14, %8, offsets = [0, 0, 0], sizes = [16, 4096, 4096], strides = [1, 1, 1] : tensor<16x4096x4096xf16> -> !flow.dispatch.tensor<writeonly:tensor<16x4096x4096xf16>>
-        return
-      }
-    }
-  }
-}
-
-//   CHECK-LABEL: spirv.module Logical GLSL450
-
-//     CHECK-NOT:   spirv.GlobalVariable {{.+}} Workgroup
-// CHECK-COUNT-2:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<{{.+}}>)>, Workgroup>
-//     CHECK-NOT:   spirv.GlobalVariable {{.+}} Workgroup
-
-//         CHECK:   spirv.func @batch_matmul_f16_16x4096x4096x64_truncf_mulf
-
-//     CHECK-DAG:     %[[COL_MAJOR:.+]] = spirv.Constant [[COL_MAJOR]]
-//     CHECK-DAG:     %[[C512:.+]] = spirv.Constant 512 : i32
-//     CHECK-DAG:     %[[SCALAR:.+]] = spirv.Constant 0.158113882 : f32
-
-
-// CHECK-COUNT-4:     %{{.+}} = spirv.Load "Function" %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[CONVERT:.+]] = spirv.FConvert %[[SCALAR]] : f32 to f16
-// CHECK-COUNT-4:     %{{.+}} = spirv.MatrixTimesScalar %{{.+}}, %[[CONVERT]] : !spirv.coopmatrix<16x16xf16, Subgroup>, f16
-
-// CHECK-COUNT-4:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C512]], %[[COL_MAJOR]]

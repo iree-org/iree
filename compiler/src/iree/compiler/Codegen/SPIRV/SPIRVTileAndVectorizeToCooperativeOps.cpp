@@ -15,7 +15,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Common/GPUPatterns.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -27,7 +26,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
-#include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -174,12 +172,6 @@ std::optional<SmallVector<int64_t>> getCooperativeOpVectorShape(
   // Unroll vector.contract ops according to native cooperative matrix size.
   if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
     return llvm::to_vector(nativeShape);
-  }
-
-  // Unroll elementwise ops according to native cooperative matrix size.
-  if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
-    if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>())
-      return llvm::to_vector(nativeShape.drop_back());  // Drop K dim size
   }
 
   // Unrolling vector.contract generates vector.{insert|extract}_strided_slice
@@ -444,10 +436,6 @@ class SPIRVVectorizeToCooperativeOpsPass final
       RewritePatternSet canonicalizationPatterns(context);
       vector::ContractionOp::getCanonicalizationPatterns(
           canonicalizationPatterns, context);
-      populateCombineVectorTransferReadBroadcastPatterns(
-          canonicalizationPatterns);
-      populatePrepareVectorToMMAPatterns(canonicalizationPatterns,
-                                         /*useNvGPU=*/false);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(canonicalizationPatterns)))) {
         return signalPassFailure();
@@ -497,6 +485,22 @@ class SPIRVVectorizeToCooperativeOpsPass final
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After hoisting vector transfers ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    {
+      RewritePatternSet canonicalizationPatterns(context);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(
+          canonicalizationPatterns);
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After canonicalizing vectors ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
