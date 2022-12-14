@@ -212,6 +212,7 @@ VULKAN_SRCS = enforce_glob(
         "max_pool.mlir",
         "maximum.mlir",
         "minimum.mlir",
+        "mul.mlir",
         "negate.mlir",
         "pad.mlir",
         "reciprocal.mlir",
@@ -227,10 +228,6 @@ VULKAN_SRCS = enforce_glob(
         "while.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [
-        # TODO(#11081): Enable the test after fixing it.
-        "mul.mlir",
-    ],
 )
 
 iree_check_single_backend_test_suite(
