@@ -142,7 +142,7 @@ Optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
   auto vmAnalysis = lookupAnalysis(funcOp);
   if (failed(vmAnalysis)) {
     funcOp.emitError() << "parent func op not found in cache.";
-    return None;
+    return std::nullopt;
   }
 
   int32_t ordinal = vmAnalysis.value().get().getRefRegisterOrdinal(ref);

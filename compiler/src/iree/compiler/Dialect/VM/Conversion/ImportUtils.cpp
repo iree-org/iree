@@ -147,7 +147,7 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     for (auto elementAttr : arrayAttr) {
       auto flattenedValues =
           rewriteAttrToOperands(loc, elementAttr, inputType, rewriter);
-      if (!flattenedValues) return llvm::None;
+      if (!flattenedValues) return std::nullopt;
       allValues.append(flattenedValues->begin(), flattenedValues->end());
     }
     return allValues;
@@ -181,7 +181,7 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
             }
             allValues.append(flattenedValues->begin(), flattenedValues->end());
           });
-      if (failed(walkStatus)) return llvm::None;
+      if (failed(walkStatus)) return std::nullopt;
     } else {
       // Custom dialect type maps into zero or more input types (ala arrays).
       LogicalResult walkStatus = conversionInterface->walkAttributeStorage(
@@ -195,14 +195,14 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
             }
             allValues.append(flattenedValues->begin(), flattenedValues->end());
           });
-      if (failed(walkStatus)) return llvm::None;
+      if (failed(walkStatus)) return std::nullopt;
     }
-    if (anyFailed) return llvm::None;
+    if (anyFailed) return std::nullopt;
     return allValues;
   }
 
   emitError(loc) << "unsupported attribute encoding: " << attrValue;
-  return llvm::None;
+  return std::nullopt;
 }
 
 }  // namespace detail

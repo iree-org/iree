@@ -113,7 +113,9 @@ def VM_FuncOp : VM_Op<"func", [
   let arguments = (ins
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<VM_Ordinal>:$ordinal,
-    OptionalAttr<UnitAttr>:$noinline
+    OptionalAttr<UnitAttr>:$noinline,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs    
   );
 
   let regions = (region AnyRegion:$body);
@@ -204,10 +206,14 @@ def VM_ImportOp : VM_Op<"import", [
     they were resolved can be queried with `vm.import.resolved`.
   }];
 
-  let arguments = (ins
-    OptionalAttr<VM_Ordinal>:$ordinal,
-    OptionalAttr<UnitAttr>:$is_optional,
-    OptionalAttr<I32Attr>:$minimum_version
+  let arguments = (ins SymbolNameAttr:$sym_name,
+                       TypeAttrOf<FunctionType>:$function_type,
+                       OptionalAttr<DictArrayAttr>:$arg_attrs,
+                       OptionalAttr<DictArrayAttr>:$res_attrs,
+                       OptionalAttr<StrAttr>:$sym_visibility,
+                       OptionalAttr<VM_Ordinal>:$ordinal,
+                       OptionalAttr<UnitAttr>:$is_optional,
+                       OptionalAttr<I32Attr>:$minimum_version
   );
 
   // Required because FunctionOpInterface and CallableOpInterface disagree with
@@ -222,13 +228,6 @@ def VM_ImportOp : VM_Op<"import", [
   ];
 
   let extraClassDeclaration = [{
-    /// Returns the type of this function.
-    FunctionType getFunctionType() {
-      return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
-          .getValue()
-          .cast<FunctionType>();
-    }
-
     /// Returns true if the import must be invoked via vm.call.variadic.
     bool isVariadic() {
       for (int i = 0; i < getArgumentTypes().size(); ++i) {
@@ -280,7 +279,9 @@ def VM_InitializerOp : VM_Op<"initializer", [
   }];
 
   let arguments = (ins
-    TypeAttrOf<FunctionType>:$function_type
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs    
   );
 
   let regions = (region AnyRegion:$body);
@@ -367,7 +368,7 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     ),
     [{
-      build($_builder, $_state, name, isMutable, type, llvm::None, attrs);
+      build($_builder, $_state, name, isMutable, type, std::nullopt, attrs);
     }]>,
   ];
 }
@@ -3821,7 +3822,7 @@ def VM_ReturnOp : VM_Op<"return", [
   let builders = [
     OpBuilder<(ins),
     [{
-      build($_builder, $_state, llvm::None);
+      build($_builder, $_state, std::nullopt);
     }]>,
   ];
 }

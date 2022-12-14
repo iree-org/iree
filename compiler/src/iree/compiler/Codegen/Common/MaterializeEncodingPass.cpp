@@ -95,7 +95,7 @@ namespace {
 static Optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
   auto encodingAttr = tensorType.getEncoding()
                           .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
-  if (!encodingAttr) return llvm::None;
+  if (!encodingAttr) return std::nullopt;
   return encodingAttr.getEncoding().getValue();
 }
 
@@ -124,7 +124,7 @@ static Optional<MatmulType> getMatmulType(TensorEncoding encoding) {
     case TensorEncoding::MATMUL_I8I8I32_RESULT:
       return MatmulType::I8I8I32;
     default:
-      return llvm::None;
+      return std::nullopt;
   }
 }
 
@@ -144,7 +144,7 @@ static Optional<MatmulOperandRole> getMatmulOperandRole(
     case TensorEncoding::MATMUL_I8I8I32_RESULT:
       return MatmulOperandRole::RESULT;
     default:
-      return llvm::None;
+      return std::nullopt;
   }
 }
 

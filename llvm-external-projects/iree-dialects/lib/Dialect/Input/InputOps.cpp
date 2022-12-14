@@ -115,7 +115,7 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      bool isMutable, Type type,
                      ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type, llvm::None, attrs);
+  build(builder, result, name, isMutable, type, std::nullopt, attrs);
 }
 
 // Returns true if the given |accessType| is compatible with the |globalType|.

@@ -38,7 +38,7 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Returns the legal element type to use instead of the passed in element type.
-/// If the type is already legal, returns llvm::None.
+/// If the type is already legal, returns std::nullopt.
 static Optional<Type> getLegalizedElementType(Type elementType) {
   if (auto intType = elementType.dyn_cast<IntegerType>()) {
     unsigned bitWidth = intType.getWidth();
@@ -67,17 +67,18 @@ static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
   return nullptr;
 }
 
-/// Legalizes the given type. If the type is already legal, returns llvm::None.
+/// Legalizes the given type. If the type is already legal, returns
+/// std::nullopt.
 static Optional<Type> getLegalizedType(Type t) {
   if (auto shapedType = t.dyn_cast<RankedTensorType>()) {
     Type elementType = shapedType.getElementType();
     Optional<Type> legalizedElementType = getLegalizedElementType(elementType);
-    if (!legalizedElementType) return llvm::None;
+    if (!legalizedElementType) return std::nullopt;
     return RankedTensorType::get(shapedType.getShape(),
                                  legalizedElementType.value(),
                                  shapedType.getEncoding());
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 namespace {

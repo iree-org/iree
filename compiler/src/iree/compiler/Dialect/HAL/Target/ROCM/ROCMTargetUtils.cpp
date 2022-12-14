@@ -188,7 +188,7 @@ std::string createHsaco(const std::string isa, StringRef name) {
   // Executing LLD
   std::string errorMessage;
   int lldResult = llvm::sys::ExecuteAndWait(
-      lldProgram, llvm::ArrayRef<llvm::StringRef>(lldArgs), llvm::None, {}, 5,
+      lldProgram, llvm::ArrayRef<llvm::StringRef>(lldArgs), std::nullopt, {}, 5,
       0, &errorMessage);
   if (lldResult) {
     llvm::WithColor::error(llvm::errs(), name)

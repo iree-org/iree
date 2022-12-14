@@ -41,7 +41,7 @@ static Type convertIntegerToSignless(IntegerType intType) {
 }
 
 static Optional<Type> convertRank0TensorToScalar(RankedTensorType tensorType) {
-  if (tensorType.getRank() != 0) return llvm::None;
+  if (tensorType.getRank() != 0) return std::nullopt;
   Type elementType = tensorType.getElementType();
   if (auto intType = elementType.dyn_cast<IntegerType>()) {
     elementType = convertIntegerToSignless(intType);
@@ -60,7 +60,7 @@ static Optional<Value> materializeCast(OpBuilder &builder, Type toType,
   assert(inputs.size() == 1 && "too many inputs to type conversion");
   Value fromValue = inputs[0];
   auto fromType = fromValue.getType().dyn_cast<RankedTensorType>();
-  if (!fromType) return llvm::None;
+  if (!fromType) return std::nullopt;
 
   if (auto intFromType = fromType.getElementType().dyn_cast<IntegerType>()) {
     Type castType = getElementTypeOrSelf(toType);

@@ -78,7 +78,7 @@ Optional<SmallVector<Value>> rewriteToCall(
     if (auto attrValue = op->getAttr(inputName)) {
       auto flattenedAttrs = detail::rewriteAttrToOperands(
           op.getLoc(), attrValue, inputType, rewriter);
-      if (!flattenedAttrs) return None;
+      if (!flattenedAttrs) return std::nullopt;
       state.addOperands(*flattenedAttrs);
       if (importOp.isFuncArgumentVariadic(input.index())) {
         segmentSizes.push_back(flattenedAttrs->size() /
@@ -98,7 +98,7 @@ Optional<SmallVector<Value>> rewriteToCall(
         // This only supports a single level of unpacking.
         if (inputTupleType.size() != newOperands.size()) {
           assert(false && "arity mismatch between tuple and variadic");
-          return None;
+          return std::nullopt;
         }
         for (auto it : llvm::zip(newOperands, inputTupleType.getTypes())) {
           state.addOperands(
@@ -140,7 +140,7 @@ Optional<SmallVector<Value>> rewriteToCall(
     auto result = std::get<0>(resultToType);
     auto targetType = std::get<1>(resultToType);
     targetType = typeConverter.convertType(targetType);
-    if (!targetType) return None;
+    if (!targetType) return std::nullopt;
     results.push_back(castFromImportType(result, targetType, rewriter));
   }
   return results;

@@ -63,7 +63,7 @@ class CombineInitializersPass
               inlinerInterface, &initializerOp.getBody(),
               builder.getInsertionBlock(), builder.getInsertionPoint(),
               /*inlinedOperands=*/ValueRange{},
-              /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/llvm::None,
+              /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/std::nullopt,
               /*shouldCloneInlinedRegion=*/false))) {
         initializerOp.emitOpError()
             << "failed to inline into combined initializer";

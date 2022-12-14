@@ -251,7 +251,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     return mlir::emitDefiniteFailure(target, "listener tracking failed");
 
   results.assign({target});
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -479,7 +479,7 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
   }
 
   results.assign({target});
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -724,7 +724,7 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
 
   transformResults.set(getForeachThreadOp().cast<OpResult>(), tileOps);
   transformResults.set(getTiledOp().cast<OpResult>(), tiledOps);
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//

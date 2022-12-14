@@ -61,11 +61,11 @@ static Optional<Value> findFirstTiedValueOutsideOfRegionOp(
     auto tiedOpInterface = value.getDefiningOp<IREE::Util::TiedOpInterface>();
     if (!tiedOpInterface)
       // Reached an op that does not implement the interface.
-      return llvm::None;
+      return std::nullopt;
     value = tiedOpInterface.getTiedResultOperand(value);
     if (!value)
       // Nothing is tied here.
-      return llvm::None;
+      return std::nullopt;
   }
 
   return value;

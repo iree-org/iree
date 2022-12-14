@@ -129,7 +129,7 @@ class WasmLinkerTool : public LinkerTool {
     }
 
     auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine))) return llvm::None;
+    if (failed(runLinkCommand(commandLine))) return std::nullopt;
     return artifacts;
   }
 };

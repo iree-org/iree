@@ -154,7 +154,7 @@ int main(int argc, char **argv) {
       fileInputStream->open(inputPath, std::ios::in | std::ios::binary);
       if (!fileInputStream->is_open()) {
         llvm::errs() << "Unable to open input file " << inputPath << "\n";
-        return llvm::None;
+        return std::nullopt;
       }
       inputStream = fileInputStream.get();
     }

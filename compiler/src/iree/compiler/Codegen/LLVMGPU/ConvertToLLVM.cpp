@@ -252,7 +252,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
     SmallVector<NamedAttribute, 4> funcAttrs;
     for (auto attr : funcOp->getAttrs()) {
       if (attr.getName() == SymbolTable::getSymbolAttrName() ||
-          attr.getName() == mlir::function_interface_impl::getTypeAttrName()) {
+          attr.getName() == funcOp.getFunctionTypeAttrName()) {
         continue;
       }
       funcAttrs.push_back(attr);

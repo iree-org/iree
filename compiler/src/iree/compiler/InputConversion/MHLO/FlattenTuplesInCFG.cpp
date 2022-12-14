@@ -239,7 +239,7 @@ bool convertFunction(func::FuncOp oldFunction, func::FuncOp newFunction) {
   BlockAndValueMapping mapping;
 
   for (auto attr : oldFunction->getAttrs()) {
-    if (attr.getName() != oldFunction.getTypeAttrName()) {
+    if (attr.getName() != oldFunction.getFunctionTypeAttrName()) {
       newFunction->setAttr(attr.getName(), attr.getValue());
     }
   }
