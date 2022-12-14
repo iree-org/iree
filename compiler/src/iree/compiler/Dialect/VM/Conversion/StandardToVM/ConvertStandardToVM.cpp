@@ -931,8 +931,8 @@ class FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
       // This uses the resultType rather than dstType as any truncation
       // required will be handled via interpretation by consumer.
       if (resultType.isSignlessInteger(32) || resultType.isSignedInteger(32)) {
-        rewriter.replaceOpWithNewOp<IREE::VM::CastF32SI32Op>(
-            srcOp, resultType, adaptor.getIn());
+        rewriter.replaceOpWithNewOp<IREE::VM::CastF32SI32Op>(srcOp, resultType,
+                                                             adaptor.getIn());
         return success();
       }
     }
