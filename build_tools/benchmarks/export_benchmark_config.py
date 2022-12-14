@@ -30,24 +30,35 @@ import dataclasses
 import json
 
 from benchmark_suites.iree import benchmark_collections
-from e2e_test_framework.definitions import common_definitions
+from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework import serialization
 from e2e_test_artifacts import iree_artifacts
 
-DeviceSpecMatcher = Callable[[common_definitions.DeviceSpec], bool]
-BENCHMARK_PRESET_DEVICE_SPEC_MATCHERS: Dict[str, DeviceSpecMatcher] = {
+
+def get_device_spec(
+    config: iree_definitions.E2EModelRunConfig
+) -> common_definitions.DeviceSpec:
+  return config.target_device_spec
+
+
+PresetMatcher = Callable[[iree_definitions.E2EModelRunConfig], bool]
+BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
     "x86_64":
-        lambda device_spec: device_spec.architecture.architecture == "x86_64",
+        lambda config: get_device_spec(config).architecture.architecture ==
+        "x86_64",
     "cuda":
-        lambda device_spec: device_spec.architecture.architecture == "cuda",
+        lambda config: get_device_spec(config).architecture.architecture ==
+        "cuda",
     "android-cpu":
-        lambda device_spec:
-        (device_spec.architecture.type == common_definitions.ArchitectureType.
-         CPU and device_spec.host_environment.platform == "android"),
+        lambda config:
+        (get_device_spec(config).architecture.type == common_definitions.
+         ArchitectureType.CPU and get_device_spec(
+             config).host_environment.platform == "android"),
     "android-gpu":
-        lambda device_spec:
-        (device_spec.architecture.type == common_definitions.ArchitectureType.
-         GPU and device_spec.host_environment.platform == "android"),
+        lambda config:
+        (get_device_spec(config).architecture.type == common_definitions.
+         ArchitectureType.GPU and get_device_spec(
+             config).host_environment.platform == "android"),
 }
 
 
@@ -56,6 +67,16 @@ def parse_arguments():
 
   def parse_and_strip_list_argument(arg) -> List[str]:
     return [part.strip() for part in arg.split(",")]
+
+  def parse_benchmark_presets(arg) -> List[PresetMatcher]:
+    matchers = []
+    for preset in parse_and_strip_list_argument(arg):
+      matcher = BENCHMARK_PRESET_MATCHERS.get(preset)
+      if matcher is None:
+        raise argparse.ArgumentTypeError(
+            f"Unrecognized benchmark preset: '{preset}'.")
+      matchers.append(matcher)
+    return matchers
 
   parser = argparse.ArgumentParser(
       description="Exports JSON config for benchmarking. Filters can be "
@@ -67,9 +88,10 @@ def parse_arguments():
             "including all devices."))
   parser.add_argument(
       "--benchmark_presets",
-      type=parse_and_strip_list_argument,
+      type=parse_benchmark_presets,
       help=("Presets that select a bundle of benchmarks, separated by comma, "
-            "multiple presets will be union."))
+            "multiple presets will be union. Available options: "
+            f"{','.join(BENCHMARK_PRESET_MATCHERS.keys())}"))
   parser.add_argument("--output",
                       type=pathlib.Path,
                       help="Path to write the JSON output.")
@@ -82,14 +104,7 @@ def main(args: argparse.Namespace):
 
   target_device_names = (set(args.target_device_names)
                          if args.target_device_names is not None else None)
-  device_spec_matchers = None
-  if args.benchmark_presets is not None:
-    device_spec_matchers = []
-    for preset in args.benchmark_presets:
-      matcher = BENCHMARK_PRESET_DEVICE_SPEC_MATCHERS.get(preset)
-      if matcher is None:
-        raise ValueError(f"Unrecognized benchmark preset: '{preset}'.")
-      device_spec_matchers.append(matcher)
+  preset_matchers = args.benchmark_presets
 
   grouped_run_config_map = collections.defaultdict(list)
   for run_config in all_run_configs:
@@ -97,9 +112,8 @@ def main(args: argparse.Namespace):
     if (target_device_names is not None and
         device_name not in target_device_names):
       continue
-    if (device_spec_matchers is not None and
-        not any(matcher(run_config.target_device_spec)
-            for matcher in device_spec_matchers)):
+    if (preset_matchers is not None and
+        not any(matcher(run_config) for matcher in preset_matchers)):
       continue
     grouped_run_config_map[device_name].append(run_config)
 
