@@ -92,7 +92,7 @@ public:
       permute<Permutation::NCHW_TO_NHWC>(inputShape);
     }
     Type elementType = outputType.getElementType();
-    SmallVector<int64_t> imageDims = inputOp.nhwcImageDimensions();
+    const std::array<int64_t, 2> imageDims = inputOp.nhwcImageDimensions();
     const size_t numImageDims = imageDims.size();
     llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
                                                   imageDims.end());
@@ -255,7 +255,7 @@ public:
     auto outputType = output.getType().cast<ShapedType>();
     ArrayRef<int64_t> outputShape = outputType.getShape();
     Type elementType = outputType.getElementType();
-    SmallVector<int64_t> imageDims = outputOp.nhwcImageDimensions();
+    const std::array<int64_t, 2> imageDims = outputOp.nhwcImageDimensions();
     const size_t numImageDims = imageDims.size();
     llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
                                                   imageDims.end());

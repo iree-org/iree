@@ -960,17 +960,21 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     SmallVector<int64_t> imageDimensions() {
       return llvm::to_vector(getImageDimensions());
     }
-    SmallVector<int64_t> nhwcImageDimensions() {
-      return SmallVector<int64_t>{1, 2};
+    std::array<int64_t, 2> nhwcImageDimensions() {
+      return {1, 2};
     }
-    SmallVector<int64_t> nchwImageDimensions() {
-      return SmallVector<int64_t>{2, 3};
+    std::array<int64_t, 2> nchwImageDimensions() {
+      return {2, 3};
     }
     bool isNhwc() {
-      return imageDimensions() == nhwcImageDimensions();
+      std::array<int64_t, 2> nhwcImageDims = nhwcImageDimensions();
+      SmallVector<int64_t> imageDims = imageDimensions();
+      return imageDims == ArrayRef<int64_t>(nhwcImageDims);
     }
     bool isNchw() {
-      return imageDimensions() == nchwImageDimensions();
+      std::array<int64_t, 2> nchwImageDims = nchwImageDimensions();
+      SmallVector<int64_t> imageDims = imageDimensions();
+      return imageDims == ArrayRef<int64_t>(nchwImageDims);
     }
     int channelDim() {
       return isNhwc() ? 3 : 1;
@@ -1057,17 +1061,21 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     SmallVector<int64_t> imageDimensions() {
       return llvm::to_vector(getImageDimensions());
     }
-    SmallVector<int64_t> nhwcImageDimensions() {
-      return SmallVector<int64_t>{1, 2};
+    std::array<int64_t, 2> nhwcImageDimensions() {
+      return {1, 2};
     }
-    SmallVector<int64_t> nchwImageDimensions() {
-      return SmallVector<int64_t>{2, 3};
+    std::array<int64_t, 2> nchwImageDimensions() {
+      return {2, 3};
     }
     bool isNhwc() {
-      return imageDimensions() == nhwcImageDimensions();
+      std::array<int64_t, 2> nhwcImageDims = nhwcImageDimensions();
+      SmallVector<int64_t> imageDims = imageDimensions();
+      return imageDims == ArrayRef<int64_t>(nhwcImageDims);
     }
     bool isNchw() {
-      return imageDimensions() == nchwImageDimensions();
+      std::array<int64_t, 2> nchwImageDims = nchwImageDimensions();
+      SmallVector<int64_t> imageDims = imageDimensions();
+      return imageDims == ArrayRef<int64_t>(nchwImageDims);
     }
     int channelDim() {
       return isNhwc() ? 3 : 1;

@@ -106,10 +106,26 @@ foldFilterTransform(ArrayRef<int64_t> shape, int64_t inputTileSize,
   return DenseElementsAttr::get(outputType, output);
 }
 
+template <typename T>
+static bool hasValidStridesAndDilations(Operation *op) {
+  auto convOp = dyn_cast<T>(op);
+  // Check that strides = 1
+  if (!hasAllOneValues(convOp.getStrides()))
+    return false;
+
+  // Check that dilations = 1
+  if (!hasAllOneValues(convOp.getDilations()))
+    return false;
+  return true;
+}
+
 static bool isValidConv2d(Operation *op, bool &isNchw) {
   isNchw = isa<linalg::Conv2DNchwFchwOp>(op);
   const bool isNhwc = isa<linalg::Conv2DNhwcHwcfOp>(op);
-  return (isNchw || isNhwc);
+  if (!(isNchw || isNhwc))
+    return false;
+  return (isNchw ? hasValidStridesAndDilations<linalg::Conv2DNchwFchwOp>(op)
+                 : hasValidStridesAndDilations<linalg::Conv2DNhwcHwcfOp>(op));
 }
 
 namespace {
@@ -275,14 +291,6 @@ public:
     if (!isValidConv2d(convOp, isNchw))
       return failure();
 
-    // Check that strides = 1
-    if (!hasAllOneValues(convOp.getStrides()))
-      return failure();
-
-    // Check that dilations = 1
-    if (!hasAllOneValues(convOp.getDilations()))
-      return failure();
-
     // Check that kernel has been constant folded (by validating rank = 3)
     Value kernel = convOp.getInputs()[1];
     auto kernelType = kernel.getType().cast<ShapedType>();
@@ -312,8 +320,8 @@ public:
       permute<IREE::LinalgExt::Permutation::NCHW_TO_NHWC>(inputShape);
     }
 
-    const SmallVector<int64_t, 2> nhwcImageDimensions{1, 2};
-    const SmallVector<int64_t, 2> nchwImageDimensions{2, 3};
+    const std::array<int64_t, 2> nhwcImageDimensions{1, 2};
+    const std::array<int64_t, 2> nchwImageDimensions{2, 3};
     const size_t numImageDims = nhwcImageDimensions.size();
     SmallVector<int64_t> resultShape(6, inputTileSize);
     llvm::SmallSetVector<int64_t, 2> imageDimensionsSet(
