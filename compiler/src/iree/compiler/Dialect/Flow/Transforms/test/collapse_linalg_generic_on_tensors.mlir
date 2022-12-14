@@ -364,10 +364,38 @@ func.func @collapse10() -> !type_out {
   return %result: !type_out
 }
 
-
 // CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0)>
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d1, d0, d2)>
 // CHECK-LABEL: func.func @collapse10
 // CHECK: %[[RES:.+]] = flow.dispatch.region
 // CHECK: linalg.generic {indexing_maps = [#[[MAP]], #[[MAP2]]], iterator_types = ["parallel", "parallel", "parallel"]}
+
+// -----
+
+!type_in =  tensor<10x20xf32>
+!type_out =  tensor<10x20xf32>
+
+func.func @collapse11() -> !type_out {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %input = tensor.empty() : !type_in
+  %output = tensor.empty() : !type_out
+
+  // Can collapse (d1, d0)
+  %result = linalg.generic { 
+    indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1, d0)>],
+    iterator_types = ["parallel", "parallel"] }     
+  ins(%input : !type_in) outs(%output : !type_out) {
+  ^bb0(%arg1: f32, %arg2: f32):
+    linalg.yield %arg1 : f32
+  }  -> !type_out
+
+  return %result: !type_out
+}
+
+
+// CHECK: #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+// CHECK-LABEL: func.func @collapse11
+// CHECK: %[[RES:.+]] = flow.dispatch.region
+// CHECK: linalg.generic {indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = ["parallel"]}
 
