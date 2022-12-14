@@ -75,9 +75,12 @@ using transform::VectorizeOp;
 using transform_ext::AllDims;
 using transform_ext::IsPermutation;
 using transform_ext::m_StructuredOp;
+using transform_ext::MatchCallbackOp;
 using transform_ext::NumEqualsTo;
+using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::ShapeKind;
 using transform_ext::StructuredOpMatcher;
+using transform_ext::TakeFirstOp;
 
 /// Matches `args` within `targetH` and unpacks a number of handles `N`.
 /// Assumes there are exactly `N` matched ops (but could be relaxed).
@@ -99,105 +102,131 @@ auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
 // user-friendliness.
 //===----------------------------------------------------------------------===//
 
-// TODO: consider passing a problem-specific struct to control information.
-static Value createReductionStrategyThreadDistributionPart(
-    ImplicitLocOpBuilder &b, Value variantH, ArrayRef<int64_t> tileSizes1Fill,
-    ArrayRef<int64_t> tileSizes1Generic, bool hasLeadingEltwise,
-    bool hasTrailingEltwise) {
-  // TODO: Relying on ordering is brittle, harden this.
-  Value matchedH = b.create<MatchOp>(
-      variantH, ArrayRef<StringRef>{linalg::GenericOp::getOperationName(),
-                                    linalg::FillOp::getOperationName()});
-  auto split = b.create<SplitHandlesOp>(
-      matchedH,
-      /*numResultHandles=*/4 + hasLeadingEltwise + hasTrailingEltwise);
-  Value firstFusionRootH = split.getResults()[1 + hasLeadingEltwise];
-  SmallVector<Value> firstFusionGroupHs =
-      split.getResults().take_front(1 + hasLeadingEltwise);
-  Value secondFusionRootH = split.getResults().back();
-  SmallVector<Value> secondFusionGroupHs =
-      split.getResults().drop_front(2 + hasLeadingEltwise).drop_back();
-
-  auto z = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
-                                                ::mlir::gpu::Threads::DimZ);
-  auto y = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
-                                                ::mlir::gpu::Threads::DimY);
-
-  // clang-format off
-  iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(b,
-                   /*rootH=*/secondFusionRootH,
-                   /*opsHToFuse=*/secondFusionGroupHs,
-                   /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr(tileSizes1Fill)),
-                   /*threadDimMapping=*/b.getArrayAttr({z}));
-  iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(b,
-                   /*rootH=*/firstFusionRootH,
-                   /*opsHToFuse=*/firstFusionGroupHs,
-                   /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr(tileSizes1Generic)),
-                   /*threadDimMapping=*/b.getArrayAttr({z,y}));
-  // clang-format on
-  return variantH;
-}
-
 /// Structure to hold the parameters related to GPU reduction strategy.
 struct GPUReductionStrategyInfos {
   std::array<int64_t, 3> workgroupSize;
   SmallVector<int64_t> workgroupTileSizes;
   SmallVector<int64_t> fillSecondTileSizes;
   SmallVector<int64_t> genericSecondTileSizes;
-  bool hasLeadingEltwise;
-  bool hasTrailingEltwise;
+  int64_t reductionDimensionSize;
 };
 
-/// Returns a triple of handles: the leading elementwise operation, the
-/// reduction operation and the fusion root. The leading elementwise and the
-/// fusion root may be null. If the fusion root is null, the reduction operation
-/// should be used as fusion root instead.
-// TODO: consider passing a problem-specific struct to control information.
-static std::tuple<Value, Value, Value>
-createMatchReductionBlockDistributionHandles(ImplicitLocOpBuilder &b,
-                                             Value variantH,
-                                             bool hasLeadingEltwise,
-                                             bool hasTrailingEltwise) {
-  Value originalGenericH =
-      b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
-  auto op = b.create<SplitHandlesOp>(
-      originalGenericH,
-      /*numResultHandles=*/1 + hasLeadingEltwise + hasTrailingEltwise);
-  return std::make_tuple(hasLeadingEltwise ? op.getResults().front() : Value(),
-                         op.getResults().drop_front(hasLeadingEltwise).front(),
-                         hasTrailingEltwise ? op.getResults().back() : Value());
+static std::pair<Value, Value> createReductionStrategyBlockDistribution(
+    ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
+    Value maybeTrailingH) {
+  auto pdlOperation = pdl::OperationType::get(b.getContext());
+  auto fusionTargetSelector = b.create<TakeFirstOp>(
+      pdlOperation, pdlOperation, ArrayRef<Value>{maybeTrailingH, reductionH});
+  Value fusionTargetH = fusionTargetSelector.getFirst();
+  Value fusionGroupH = fusionTargetSelector.getRest();
+  auto blockX = mlir::gpu::GPUBlockMappingAttr::get(b.getContext(),
+                                                    mlir::gpu::Blocks::DimX);
+  iree_compiler::TileAndFuseAndDistributeResult tileResult = iree_compiler::
+      buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
+          b, fusionTargetH, fusionGroupH,
+          getAsOpFoldResult(b.getI64ArrayAttr({1})), b.getArrayAttr(blockX));
+  Value foreachThreadH =
+      b.create<FuseIntoContainingOp>(fillH, tileResult.foreachThreadH);
+  foreachThreadH =
+      b.create<FuseIntoContainingOp>(maybeLeadingH, foreachThreadH);
+  auto gridReductionSelector = b.create<TakeFirstOp>(
+      pdlOperation, pdlOperation,
+      ArrayRef<Value>(
+          {tileResult.resultingFusedOpsHandles.front(), tileResult.tiledOpH}));
+
+  return std::make_pair(gridReductionSelector.getFirst(),
+                        gridReductionSelector.getRest());
 }
 
-// TODO: generalize and automate over and over.
-// TODO: significantly shrink this down.
-// TODO: consider passing a problem-specific struct to control information.
+static void createReductionStrategyThreadDistribution(
+    ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledTrailingH,
+    int64_t reductionDimensionSize) {
+  // Select tile sizes. Perfectly tile by:
+  //   - 128 to obtain 32 threads working on vector<4xf32> when possible;
+  //   - 64 to obtain 32 threads working on vector<2xf32> when possible;
+  //   - 32 otherwise.
+  // TODO: refine sizes based on the bitwidth of the elemental type.
+  int64_t firstReductionSize = iree_compiler::kCudaWarpSize;
+  int64_t vectorTileSize = 1;
+  if (reductionDimensionSize % (4 * iree_compiler::kCudaWarpSize) == 0) {
+    firstReductionSize = 4 * iree_compiler::kCudaWarpSize;
+    vectorTileSize = 4;
+  } else if (reductionDimensionSize % (2 * iree_compiler::kCudaWarpSize) == 0) {
+    firstReductionSize = 2 * iree_compiler::kCudaWarpSize;
+    vectorTileSize = 2;
+  }
+
+  auto pdlOperation = pdl::OperationType::get(b.getContext());
+  auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
+                                                      mlir::gpu::Threads::DimX);
+  auto threadY = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
+                                                      mlir::gpu::Threads::DimY);
+
+  // Split the reduction into a parallel and combiner part, then tile the
+  // parallel part and map it to a full warp so it works on vectors.
+  auto tileReduction = b.create<transform::TileReductionUsingScfOp>(
+      pdlOperation, pdlOperation, pdlOperation, pdlOperation, gridReductionH,
+      b.getI64ArrayAttr({0, firstReductionSize}));
+  Value blockParallelFillH = tileReduction.getFillOp();
+  Value blockParallelOpH = tileReduction.getSplitLinalgOp();
+  Value blockCombinerOpH = tileReduction.getCombiningLinalgOp();
+  iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
+      b, blockParallelOpH, {},
+      getAsOpFoldResult(b.getI64ArrayAttr({0, iree_compiler::kCudaWarpSize})),
+      b.getArrayAttr(threadX));
+
+  // Tile the fill so it maps to vectors.
+  // TODO: fuse once the support is available
+  // (https://reviews.llvm.org/D139844).
+  iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
+      b, blockParallelFillH, {},
+      getAsOpFoldResult(b.getI64ArrayAttr({0, vectorTileSize})),
+      b.getArrayAttr(threadX));
+
+  // Map the combiner reduction to one thread along y so it can be mapped
+  // further via predication. Fuse it into the trailing elementwise if present.
+  auto selector = b.create<TakeFirstOp>(
+      pdlOperation, pdlOperation,
+      ArrayRef<Value>({maybeTiledTrailingH, blockCombinerOpH}));
+  Value fusionRootH = selector.getFirst();
+  Value fusionGroupH = selector.getRest();
+  iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
+      b, fusionRootH, fusionGroupH, getAsOpFoldResult(b.getI64ArrayAttr({1})),
+      b.getArrayAttr(threadY));
+}
+
+/// Builds the transform IR tiling reductions for CUDA targets. Supports
+/// reductions in the last dimension with static shape divisible by 32 (CUDA
+/// warp size), with optional leading and trailing elementwise operations.
 static void createReductionCudaStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const GPUReductionStrategyInfos &infos) {
-  // Step 0. Match the ops.
-  Value originalFillH =
-      b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
-  auto [leadingH, reductionH, fusionRootH] =
-      createMatchReductionBlockDistributionHandles(
-          b, variantH, infos.hasLeadingEltwise, infos.hasTrailingEltwise);
+  // Step 1. Call the matcher. Note that this is the same matcher as used to
+  // trigger this compilation path, so it must always apply.
+  b.create<RegisterMatchCallbacksOp>();
+  SmallVector<Type> matchedTypes(4, pdl::OperationType::get(b.getContext()));
+  auto match = b.create<MatchCallbackOp>(
+      matchedTypes, "reduction", transform::FailurePropagationMode::Propagate,
+      variantH);
+  Value maybeLeadingH = match.getResult(0);
+  Value fillH = match.getResult(1);
+  Value reductionH = match.getResult(2);
+  Value maybeTrailingH = match.getResult(3);
 
-  // Step 1: Distribute to blocks using the current IREE lowering config.
-  variantH = iree_compiler::createReductionStrategyBlockDistributionPart(
-      b, variantH, originalFillH, reductionH, fusionRootH,
-      getAsOpFoldResult(b.getI64ArrayAttr(infos.workgroupTileSizes)),
-      infos.hasLeadingEltwise, infos.hasTrailingEltwise);
+  // Step 2. Use tiling to introduce a single-iteration loop mapped to a single
+  // block/workgroup. Keep everything fused.
+  auto [gridReductionH, maybeTiledTrailingH] =
+      createReductionStrategyBlockDistribution(b, maybeLeadingH, fillH,
+                                               reductionH, maybeTrailingH);
 
-  // Step 2. Second level of tiling + fusion parallelizes to threads.
-  variantH = createReductionStrategyThreadDistributionPart(
-      b, variantH, infos.fillSecondTileSizes, infos.genericSecondTileSizes,
-      infos.hasLeadingEltwise, infos.hasTrailingEltwise);
+  // Step 3. Split the reduction and tile the pieces to ensure vector
+  // load/stores and mapping to a single warp with shuffles.
+  createReductionStrategyThreadDistribution(
+      b, gridReductionH, maybeTiledTrailingH, infos.reductionDimensionSize);
 
-  // Step 3. Rank-reduce and vectorize.
-  // TODO: assumes a single func::FuncOp to transform, may need hardening.
+  // Step 4. Bufferize and drop HAL decriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = iree_compiler::buildVectorize(b, funcH);
-
-  // Step 4. Bufferize and drop HAL descriptor from memref ops.
   variantH = iree_compiler::buildBufferize(b, variantH, /*targetGpu=*/true);
 
   // Step 5. Post-bufferization mapping to blocks and threads.
@@ -216,14 +245,12 @@ static bool matchGPUReduction(linalg::LinalgOp op,
                               GPUReductionStrategyInfos &info) {
   // TODO: match the sequence the strategy supports.
   StructuredOpMatcher pattern, fill, leadingEltwise, trailingEltwise;
-  makeReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise);
+  makeReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise,
+                       info.reductionDimensionSize);
   if (!matchPattern(op, pattern)) return false;
 
-  info.hasLeadingEltwise = leadingEltwise.getCaptured() != nullptr;
-  info.hasTrailingEltwise = trailingEltwise.getCaptured() != nullptr;
-
-  // Hardcoded workagroup size, this could be deduced from the reduction dim.
-  info.workgroupSize = {32, 2, 1};
+  // Hardcoded workgroup size, this could be deduced from the reduction dim.
+  info.workgroupSize = {32, 1, 1};
   SmallVector<unsigned> partitionedLoops =
       cast<iree_compiler::PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(iree_compiler::kNumMaxParallelDims);
