@@ -11,9 +11,6 @@
 
 set -xeEuo pipefail
 
-# If the startup script fails, shut down the VM.
-trap '/usr/sbin/shutdown -P now' ERR
-
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 source "${SCRIPT_DIR}/functions.sh"
 
