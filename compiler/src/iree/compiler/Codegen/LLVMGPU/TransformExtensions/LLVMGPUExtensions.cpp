@@ -7,6 +7,7 @@
 #include "LLVMGPUExtensions.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -59,14 +60,28 @@ DiagnosedSilenceableFailure
 transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
     func::FuncOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
-  if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    state.getTopLevel()->emitOpError(
-        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel to "
-        "attach the workgroup size information to a nested ExecutableExportOp");
-    return emitDefaultDefiniteFailure(target);
+  assert(target && "no target");
+  assert(state.getTopLevel() && "no top-level");
+  auto maybeExecutableVariant = getExecutableVariantOp(target);
+  if (failed(maybeExecutableVariant) ||
+      !state.getTopLevel()->isAncestor(*maybeExecutableVariant)) {
+    results.assign(1, target);
+    // Assign an empty handle and return success to allow propagating
+    // through functions that do not have an ExecutableVariantOp or an
+    // ExportOp (e.g. stream-related functions).
+    return DiagnosedSilenceableFailure::success();
   }
+  auto maybeExportOp = getEntryPoint(target);
+  if (failed(maybeExportOp)) {
+    // Return a silenceable failure and set the expected 1 result to nullptr.
+    results.assign(1, target);
+    // Assign an empty handle and return success to allow propagating through
+    // functions that do not have an ExecutableVariantOp or an ExportOp (e.g.
+    // stream-related functions).
+    return DiagnosedSilenceableFailure::success();
+  }
+  HAL::ExecutableExportOp exportOp = *maybeExportOp;
 
-  IREE::HAL::ExecutableExportOp exportOp;
   state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
     if (op.getSymName() == target.getName()) exportOp = op;
   });
@@ -251,42 +266,29 @@ static FailureOr<VectorDistributionResult> rewriteScfIfAsWarpExecuteOnLane0(
   return VectorDistributionResult{warpOp};
 }
 
-// TODO: Refactor in a generic util that can be reused.
-static HAL::ExecutableExportOp getExecutableExportOpForFunc(
-    HAL::ExecutableVariantOp halExecutableVariantOp, func::FuncOp funcOp) {
-  if (!halExecutableVariantOp || !funcOp) return {};
-  HAL::ExecutableExportOp exportOp;
-  halExecutableVariantOp->walk([&](HAL::ExecutableExportOp op) {
-    if (op.getSymName() != funcOp.getName()) return WalkResult::advance();
-    exportOp = op;
-    return WalkResult::interrupt();
-  });
-  return exportOp;
-}
-
 DiagnosedSilenceableFailure
 transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
     scf::IfOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
-  if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    return emitDefaultSilenceableFailure(state.getTopLevel())
-           << "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel "
-              "so that IR is properly isolated. This is required so we can "
-              "safely inspect the HAL::ExecutableExportOp under multi-threaded "
-              "pass assumptions.";
-  }
-
-  auto halExecutableVariantOp =
-      target->getParentOfType<HAL::ExecutableVariantOp>();
   auto funcOp = target->getParentOfType<func::FuncOp>();
-  HAL::ExecutableExportOp exportOp =
-      getExecutableExportOpForFunc(halExecutableVariantOp, funcOp);
-  if (!halExecutableVariantOp || !funcOp || !exportOp) {
+  auto maybeExecutableVariant = getExecutableVariantOp(funcOp);
+  if (failed(maybeExecutableVariant) ||
+      !state.getTopLevel()->isAncestor(*maybeExecutableVariant)) {
+    results.assign(1, nullptr);
+    return mlir::emitSilenceableFailure(
+        target,
+        "no nested IREE::HAL::ExecutableVariantOp found: we need one to access "
+        "config without risking thread unsafe access in multi-threaded pass "
+        "execution mode");
+  }
+  auto maybeExportOp = getEntryPoint(funcOp);
+  if (failed(maybeExportOp)) {
     // Return a silenceable failure and set the expected 1 result to nullptr.
     results.assign(1, nullptr);
     return emitDefaultSilenceableFailure(target)
            << "export op is missing --- the transform is not applied";
   }
+  HAL::ExecutableExportOp exportOp = *maybeExportOp;
 
   Optional<ArrayAttr> maybeAttr = exportOp.getWorkgroupSize();
   // TODO: Pervasive 3 constant in IREE.

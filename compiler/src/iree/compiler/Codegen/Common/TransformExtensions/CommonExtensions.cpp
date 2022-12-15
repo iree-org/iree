@@ -438,23 +438,26 @@ DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
     func::FuncOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
-  if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    return mlir::emitDefiniteFailure(
-        state.getTopLevel(),
-        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel "
-        "to attach the workgroup size information to a nested "
-        "ExecutableExportOp");
+  assert(target && "no target");
+  assert(state.getTopLevel() && "no top-level");
+  auto maybeExecutableVariant = getExecutableVariantOp(target);
+  if (failed(maybeExecutableVariant) ||
+      !state.getTopLevel()->isAncestor(*maybeExecutableVariant)) {
+    results.assign(1, target);
+    // Assign an empty handle and return success to allow propagating through
+    // functions that do not have an ExecutableVariantOp or an ExportOp (e.g.
+    // stream-related functions).
+    return DiagnosedSilenceableFailure::success();
   }
-
-  IREE::HAL::ExecutableExportOp exportOp;
-  state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
-    if (op.getSymName() == target.getName()) exportOp = op;
-  });
-  if (!exportOp) {
-    results.assign(1, nullptr);
-    return mlir::emitSilenceableFailure(
-        target, "no IREE::HAL::ExecutableExportOp found");
+  auto maybeExportOp = getEntryPoint(target);
+  if (failed(maybeExportOp)) {
+    results.assign(1, target);
+    // Assign an empty handle and return success to allow propagating through
+    // functions that do not have an ExecutableVariantOp or an ExportOp (e.g.
+    // stream-related functions).
+    return DiagnosedSilenceableFailure::success();
   }
+  HAL::ExecutableExportOp exportOp = *maybeExportOp;
 
   scf::ForeachThreadOp topLevelForeachThreadOp;
   auto walkResult = target->walk([&](scf::ForeachThreadOp foreachThreadOp) {
@@ -1065,19 +1068,22 @@ transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
-  if (targetOps.size() != 1 || !isa<func::FuncOp>(targetOps.front())) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "expects a func::FuncOp as the target op");
-  }
-  auto funcOp = cast<func::FuncOp>(targetOps.front());
+  SmallVector<Operation *> results;
+  for (Operation *op : targetOps) {
+    auto funcOp = dyn_cast<func::FuncOp>(op);
+    if (!funcOp) {
+      return mlir::emitDefiniteFailure(
+          funcOp, "expects a func::FuncOp as the target op");
+    }
 
-  if (failed(eraseHALDescriptorTypeFromMemRef(funcOp))) {
-    return mlir::emitDefiniteFailure(
-        state.getTopLevel(),
-        "failed to erase #hal.descriptor_type as MemRef memory space");
+    if (failed(eraseHALDescriptorTypeFromMemRef(funcOp))) {
+      return mlir::emitDefiniteFailure(
+          funcOp,
+          "failed to erase #hal.descriptor_type as MemRef memory space");
+    }
+    results.push_back(op);
   }
-
-  transformResults.set(getOperation()->getOpResult(0), targetOps.front());
+  transformResults.set(getOperation()->getOpResult(0), results);
   return DiagnosedSilenceableFailure::success();
 }
 
