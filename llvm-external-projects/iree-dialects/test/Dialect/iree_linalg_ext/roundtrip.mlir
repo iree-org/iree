@@ -998,3 +998,39 @@ func.func @winograd_output_transform(%arg0: tensor<8x8x?x?x?x?xf32>, %arg1: tens
 // CHECK:      }
 
 // -----
+
+func.func @winograd_input_transform_nchw(%arg0: tensor<1x1280x10x10xf32>) -> tensor<8x8x1x2x2x1280xf32> {
+  %0 = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
+  %1 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([2, 3])
+    ins(%arg0 : tensor<1x1280x10x10xf32>) outs(%0 : tensor<8x8x1x2x2x1280xf32>) -> tensor<8x8x1x2x2x1280xf32>
+  return %1 : tensor<8x8x1x2x2x1280xf32>
+}
+// CHECK:      func.func @winograd_input_transform_nchw(%[[ARG0]]: tensor<1x1280x10x10xf32>) ->
+// CHECK-SAME:   tensor<8x8x1x2x2x1280xf32> {
+// CHECK:        %[[D0]] = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
+// CHECK:        %[[D1]] = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3)
+// CHECK-SAME:     image_dimensions([2, 3]) ins(%[[ARG0]] : tensor<1x1280x10x10xf32>) outs(%[[D0]] :
+// CHECK-SAME:     tensor<8x8x1x2x2x1280xf32>) -> tensor<8x8x1x2x2x1280xf32>
+// CHECK:        return %[[D1]] : tensor<8x8x1x2x2x1280xf32>
+// CHECK:      }
+// CHECK:    }
+
+// -----
+
+func.func @winograd_output_transform_nchw(%arg0: tensor<8x8x1x2x2x1280xf32>) -> tensor<1x1280x12x12xf32> {
+  %0 = tensor.empty() : tensor<1x1280x12x12xf32>
+  %1 = iree_linalg_ext.winograd.output_transform output_tile_size(6) kernel_size(3) image_dimensions([2, 3])
+    ins(%arg0 : tensor<8x8x1x2x2x1280xf32>) outs(%0 : tensor<1x1280x12x12xf32>) -> tensor<1x1280x12x12xf32>
+  return %1 : tensor<1x1280x12x12xf32>
+}
+// CHECK:      func.func @winograd_output_transform_nchw(%[[ARG0]]: tensor<8x8x1x2x2x1280xf32>) ->
+// CHECK-SAME:   tensor<1x1280x12x12xf32> {
+// CHECK:        %[[D0]] = tensor.empty() : tensor<1x1280x12x12xf32>
+// CHECK:        %[[D1]] = iree_linalg_ext.winograd.output_transform output_tile_size(6) kernel_size(3)
+// CHECK-SAME:     image_dimensions([2, 3]) ins(%[[ARG0]] : tensor<8x8x1x2x2x1280xf32>) outs(%[[D0]] :
+// CHECK-SAME:     tensor<1x1280x12x12xf32>) -> tensor<1x1280x12x12xf32>
+// CHECK:        return %[[D1]] : tensor<1x1280x12x12xf32>
+// CHECK:      }
+// CHECK:    }
+
+// -----

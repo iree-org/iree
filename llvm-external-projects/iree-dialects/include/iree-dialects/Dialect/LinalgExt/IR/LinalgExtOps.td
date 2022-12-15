@@ -904,8 +904,8 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     The input tile is assumed to be square with each side of size m + r - 1,
     where the convolutional kernel is m x m and the output tile size is r x r.
     B is a constant 2-d square matrix of the same shape as the input tile I.
-    The input to the operator is an image of shape (N, H, W, C) and the
-    output is an operator of shape (m + r - 1, m + r - 1, N, H', W', C)
+    The input to the operator is an image of shape (N, H, W, C) or (N, C, H, W)
+    and the output is an operator of shape (m + r - 1, m + r - 1, N, H', W', C)
     where H' = ceil((H - m + 1)/r) and W' = ceil((W - m + 1)/r). The result
     of this operator is first collapsed and then fed to a batch matmul op.
   }];
@@ -960,6 +960,25 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     SmallVector<int64_t> imageDimensions() {
       return llvm::to_vector(getImageDimensions());
     }
+    std::array<int64_t, 2> nhwcImageDimensions() {
+      return {1, 2};
+    }
+    std::array<int64_t, 2> nchwImageDimensions() {
+      return {2, 3};
+    }
+    bool isNhwc() {
+      std::array<int64_t, 2> nhwcImageDims = nhwcImageDimensions();
+      SmallVector<int64_t> imageDims = imageDimensions();
+      return imageDims == ArrayRef<int64_t>(nhwcImageDims);
+    }
+    bool isNchw() {
+      std::array<int64_t, 2> nchwImageDims = nchwImageDimensions();
+      SmallVector<int64_t> imageDims = imageDimensions();
+      return imageDims == ArrayRef<int64_t>(nchwImageDims);
+    }
+    int channelDim() {
+      return isNhwc() ? 3 : 1;
+    }
     int64_t getIterationDomainRank() {
       SmallVector<int64_t> imageDims = imageDimensions();
       return getInputOperandRank() - imageDims.size();
@@ -996,9 +1015,9 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     and the output tile size is r x r. A is a constant 2-d matrix of
     shape (m + r - 1) x r. The input to the operator is a tensor of
     shape (m + r - 1, m + r - 1, N, H', W', C) and the output is a
-    tensor of shape (N, H, W, C) where H = r H' and W = r W'. This operator
-    is followed by a tensor.extract_slice which extracts only the non-padded
-    part of the output.
+    tensor of shape (N, H, W, C) or (N, C, H, W) where H = r H' and W = r W'.
+    This operator is followed by a tensor.extract_slice which extracts
+    only the non-padded part of the output.
   }];
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
@@ -1041,6 +1060,25 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     }
     SmallVector<int64_t> imageDimensions() {
       return llvm::to_vector(getImageDimensions());
+    }
+    std::array<int64_t, 2> nhwcImageDimensions() {
+      return {1, 2};
+    }
+    std::array<int64_t, 2> nchwImageDimensions() {
+      return {2, 3};
+    }
+    bool isNhwc() {
+      std::array<int64_t, 2> nhwcImageDims = nhwcImageDimensions();
+      SmallVector<int64_t> imageDims = imageDimensions();
+      return imageDims == ArrayRef<int64_t>(nhwcImageDims);
+    }
+    bool isNchw() {
+      std::array<int64_t, 2> nchwImageDims = nchwImageDimensions();
+      SmallVector<int64_t> imageDims = imageDimensions();
+      return imageDims == ArrayRef<int64_t>(nchwImageDims);
+    }
+    int channelDim() {
+      return isNhwc() ? 3 : 1;
     }
     int64_t getInputOperandRank() {
       return getInputOperandType().getRank();

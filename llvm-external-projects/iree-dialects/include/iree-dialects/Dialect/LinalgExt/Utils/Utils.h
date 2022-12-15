@@ -63,6 +63,34 @@ Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
 // Value's to kDynamic, even if they are arith.constant values.
 SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs);
 
+enum class Permutation {
+  NCHW_TO_NHWC,
+  NHWC_TO_NCHW,
+  TTNHWC_TO_TTNCHW,
+  TTNCHW_TO_TTNHWC,
+};
+
+// Permutes the elements of a SmallVector depending on the permutation specified
+template <Permutation P, typename T>
+static void permute(SmallVectorImpl<T> &vector) {
+  switch (P) {
+  case Permutation::NCHW_TO_NHWC:
+    std::rotate(vector.begin() + 1, vector.begin() + 2, vector.end());
+    break;
+  case Permutation::NHWC_TO_NCHW:
+    std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 1);
+    break;
+  case Permutation::TTNCHW_TO_TTNHWC:
+    std::rotate(vector.begin() + 3, vector.begin() + 4, vector.end());
+    break;
+  case Permutation::TTNHWC_TO_TTNCHW:
+    std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 3);
+    break;
+  default:
+    break;
+  }
+}
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

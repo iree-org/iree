@@ -1422,3 +1422,86 @@ func.func @winograd_output_transform_memref(%arg0: memref<8x8x1x2x2x32xf32>, %ar
 // CHECK:      }
 
 // -----
+
+func.func @winograd_input_transform_nchw(%arg0: tensor<1x1280x10x10xf32>) -> tensor<8x8x1x2x2x1280xf32> {
+  %0 = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
+  %1 = iree_linalg_ext.winograd.input_transform {__internal_linalg_transform__ = "tiling_winograd_input_nhwc"}
+    output_tile_size(6) kernel_size(3) image_dimensions([2, 3])
+    ins(%arg0 : tensor<1x1280x10x10xf32>) outs(%0 : tensor<8x8x1x2x2x1280xf32>) -> tensor<8x8x1x2x2x1280xf32>
+  return %1 : tensor<8x8x1x2x2x1280xf32>
+}
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (1, -d0 + s1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
+// CHECK:      func.func @winograd_input_transform_nchw(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x1280x10x10xf32>) ->
+// CHECK-SAME:   tensor<8x8x1x2x2x1280xf32> {
+// CHECK:        %[[C0:.+]] = arith.constant 0 : index
+// CHECK:        %[[C1:.+]] = arith.constant 1 : index
+// CHECK:        %[[C1280:.+]] = arith.constant 1280 : index
+// CHECK:        %[[C32:.+]] = arith.constant 32 : index
+// CHECK:        %[[D0:.+]] = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
+// CHECK:        %[[D1:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1]] step %[[C1]]
+// CHECK-SAME:     iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<8x8x1x2x2x1280xf32>) {
+// CHECK-DAG:        %[[D2:.+]] = affine.min #[[MAP]](%[[ARG1]])[%[[C1]], %[[C1]]]
+// CHECK:          %[[D3:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1280]] step %[[C32]]
+// CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<8x8x1x2x2x1280xf32>) {
+// CHECK-DAG:          %[[D4:.+]] = affine.min #[[MAP1]](%[[ARG3]])[%[[C32]], %[[C1280]]]
+// CHECK:            %[[EXTRACTED_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG1]], %[[ARG3]], 0, 0] [%[[D2]],
+// CHECK-SAME:         %[[D4]], 10, 10] [1, 1, 1, 1] : tensor<1x1280x10x10xf32> to tensor<?x?x10x10xf32>
+// CHECK:            %[[EXTRACTED_SLICE_0:.+]] = tensor.extract_slice %[[D0]][0, 0, %[[ARG1]], 0, 0, %[[ARG3]]] [8, 8,
+// CHECK-SAME:         %[[D2]], 2, 2, %[[D4]]] [1, 1, 1, 1, 1, 1] : tensor<8x8x1x2x2x1280xf32> to
+// CHECK-SAME:         tensor<8x8x?x2x2x?xf32>
+// CHECK:            %[[D5:.+]] = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3)
+// CHECK-SAME:         image_dimensions([2, 3]) ins(%[[EXTRACTED_SLICE]] : tensor<?x?x10x10xf32>)
+// CHECK-SAME:         outs(%[[EXTRACTED_SLICE]]_0 : tensor<8x8x?x2x2x?xf32>) -> tensor<8x8x?x2x2x?xf32>
+// CHECK:            %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D5]] into %[[ARG4]][0, 0, %[[ARG1]], 0, 0,
+// CHECK-SAME:         %[[ARG3]]] [8, 8, %[[D2]], 2, 2, %[[D4]]] [1, 1, 1, 1, 1, 1] : tensor<8x8x?x2x2x?xf32> into
+// CHECK-SAME:         tensor<8x8x1x2x2x1280xf32>
+// CHECK:            scf.yield %[[INSERTED_SLICE]] : tensor<8x8x1x2x2x1280xf32>
+// CHECK:          }
+// CHECK:          scf.yield %[[D3]] : tensor<8x8x1x2x2x1280xf32>
+// CHECK:        }
+// CHECK:        return %[[D1]] : tensor<8x8x1x2x2x1280xf32>
+// CHECK:      }
+// CHECK:    }
+
+// -----
+
+func.func @winograd_output_transform_nchw(%arg0: tensor<8x8x1x2x2x32xf32>) -> tensor<1x32x12x12xf32> {
+  %0 = tensor.empty() : tensor<1x32x12x12xf32>
+  %1 = iree_linalg_ext.winograd.output_transform {__internal_linalg_transform__ = "tiling_winograd_input_nhwc"}
+        output_tile_size(6) kernel_size(3) image_dimensions([2, 3])
+        ins(%arg0 : tensor<8x8x1x2x2x32xf32>) outs(%0 : tensor<1x32x12x12xf32>) -> tensor<1x32x12x12xf32>
+  return %1 : tensor<1x32x12x12xf32>
+}
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (1, -d0 + s1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
+// CHECK:      func.func @winograd_output_transform_nchw(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<8x8x1x2x2x32xf32>) ->
+// CHECK-SAME:   tensor<1x32x12x12xf32> {
+// CHECK:        %[[C0:.+]] = arith.constant 0 : index
+// CHECK:        %[[C1:.+]] = arith.constant 1 : index
+// CHECK:        %[[C32:.+]] = arith.constant 32 : index
+// CHECK:        %[[D0:.+]] = tensor.empty() : tensor<1x32x12x12xf32>
+// CHECK:        %[[D1:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1]] step %[[C1]]
+// CHECK-SAME:     iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<1x32x12x12xf32>) {
+// CHECK-DAG:        %[[D2:.+]] = affine.min #[[MAP]](%[[ARG1]])[%[[C1]], %[[C1]]]
+// CHECK:          %[[D3:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C32]] step %[[C32]]
+// CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<1x32x12x12xf32>) {
+// CHECK-DAG:          %[[D4:.+]] = affine.min #[[MAP1]](%[[ARG3]])[%[[C32]], %[[C32]]]
+// CHECK:            %[[EXTRACTED_SLICE:.+]] = tensor.extract_slice %[[ARG0]][0, 0, %[[ARG1]], 0, 0, %[[ARG3]]] [8, 8,
+// CHECK-SAME:         %[[D2]], 2, 2, %[[D4]]] [1, 1, 1, 1, 1, 1] : tensor<8x8x1x2x2x32xf32> to tensor<8x8x?x2x2x?xf32>
+// CHECK:            %[[EXTRACTED_SLICE_0:.+]] = tensor.extract_slice %[[D0]][%[[ARG1]], %[[ARG3]], 0, 0] [%[[D2]],
+// CHECK-SAME:         %[[D4]], 12, 12] [1, 1, 1, 1] : tensor<1x32x12x12xf32> to tensor<?x?x12x12xf32>
+// CHECK:            %[[D5:.+]] = iree_linalg_ext.winograd.output_transform output_tile_size(6) kernel_size(3)
+// CHECK-SAME:         image_dimensions([2, 3]) ins(%[[EXTRACTED_SLICE]] : tensor<8x8x?x2x2x?xf32>)
+// CHECK-SAME:         outs(%[[EXTRACTED_SLICE]]_0 : tensor<?x?x12x12xf32>) -> tensor<?x?x12x12xf32>
+// CHECK:            %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D5]] into %[[ARG4]][%[[ARG1]], %[[ARG3]], 0, 0]
+// CHECK-SAME:         [%[[D2]], %[[D4]], 12, 12] [1, 1, 1, 1] : tensor<?x?x12x12xf32> into tensor<1x32x12x12xf32>
+// CHECK:            scf.yield %[[INSERTED_SLICE]] : tensor<1x32x12x12xf32>
+// CHECK:          }
+// CHECK:          scf.yield %[[D3]] : tensor<1x32x12x12xf32>
+// CHECK:        }
+// CHECK:        return %[[D1]] : tensor<1x32x12x12xf32>
+// CHECK:      }
+// CHECK:    }
+
+// -----
