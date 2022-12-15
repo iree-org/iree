@@ -243,10 +243,27 @@ static void createReductionCudaStrategy(
 static bool matchGPUReduction(linalg::LinalgOp op,
                               GPUReductionStrategyInfos &info) {
   // TODO: match the sequence the strategy supports.
-  StructuredOpMatcher pattern, fill, leadingEltwise, trailingEltwise;
-  makeReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise,
+  StructuredOpMatcher reduction, fill, leading, trailing;
+  makeReductionMatcher(reduction, fill, leading, trailing,
                        info.reductionDimensionSize);
-  if (!matchPattern(op, pattern)) return false;
+  if (!matchPattern(op, reduction)) return false;
+
+  //
+  // !!We must match exactly all payload ops when the dispatch is pre-formed!!
+  //
+  int64_t mustMatchNumPayloadOps =
+      transform_ext::getNumPayloadOpsThatWeMustMatch(
+          op->getParentOfType<func::FuncOp>());
+  int64_t numMatchedOps = 2;  // Mandatory operations.
+  if (leading.getCaptured()) ++numMatchedOps;
+  if (trailing.getCaptured()) ++numMatchedOps;
+  if (numMatchedOps != mustMatchNumPayloadOps) {
+    LLVM_DEBUG({
+      DBGS() << "Failed to match " << mustMatchNumPayloadOps
+             << " payload ops, matched " << numMatchedOps << " instead\n";
+    });
+    return false;
+  }
 
   // Hardcoded workgroup size, this could be deduced from the reduction dim.
   info.workgroupSize = {32, 1, 1};

@@ -39,6 +39,7 @@
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
@@ -46,6 +47,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -59,8 +61,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
-#include <mlir/Dialect/Transform/IR/TransformDialect.h>
-#include <mlir/IR/MLIRContext.h>
 
 #define DEBUG_TYPE "transform-ops-ext"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
@@ -1208,6 +1208,33 @@ testMatchCallbackCallback(transform_ext::MatchCallbackResult &res, Location loc,
   return DiagnosedSilenceableFailure::success();
 }
 
+//===---------------------------------------------------------------------===//
+// IMPORTANT WARNING FOR ALL MATCH CALLBACK OPS !!!
+//===---------------------------------------------------------------------===//
+// We need to temporarily encode additional constraints in C++ that we
+// cannot yet express in the Matchers.
+//
+// These extra constraints are necessary because of the layering IREE
+// imposes on us: the dispatch regions are already pre-formed and we must
+// match **exactly** (best effort..) to avoid leaving dangling payload IR
+// in the dispatch that is not transformed (and leads to catastrophic
+// performance bugs or even miscompiles).
+// A future more robust system will let us form our own dispatches and we
+// won't need to be as strict on matching **exactly**.
+//
+// It is important that these additional C++ constraints can all be
+// expressed as separable matchers (and in the future as contraint IR).
+//
+// In the following, we make the assumption that TilingInterface ops are
+// exactly the payload ops that we must not miss.
+// This is best effort and if anything else must not be missed, it should also
+// be added here.
+int64_t transform_ext::getNumPayloadOpsThatWeMustMatch(Operation *root) {
+  int64_t mustMatchNumPayloadOps = 0;
+  root->walk([&](TilingInterface op) { mustMatchNumPayloadOps++; });
+  return mustMatchNumPayloadOps;
+}
+
 /// Match callback for a reduction with optional leading and trailing
 /// elementwise operations. Matches *the first* occurrence of such a reduction
 /// within an op associated with the given handle.
@@ -1231,23 +1258,57 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
            << "expected one handle to one operation";
   }
 
-  transform_ext::StructuredOpMatcher pattern, fill, leadingEltwise,
-      trailingEltwise;
+  transform_ext::StructuredOpMatcher pattern, fill, leading, trailing;
   int64_t ignore;
-  makeReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise, ignore);
+  makeReductionMatcher(pattern, fill, leading, trailing, ignore);
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
   Operation *root = state.getPayloadOps(handles[0])[0];
+
+  //
+  // !!We must match exactly all payload ops when the dispatch is pre-formed!!
+  //
+  int64_t mustMatchNumPayloadOps =
+      transform_ext::getNumPayloadOpsThatWeMustMatch(root);
+
   WalkResult walkResult = root->walk([&](Operation *op) {
     pattern.resetCapture();
     if (!matchPattern(op, pattern))
       return WalkResult::advance();
 
-    res.addPotentiallyEmptyPayloadGroup(leadingEltwise.getCaptured());
+    // TODO: notify properly.
+    LLVM_DEBUG({
+      DBGS() << "leading:\n";
+      if (leading.getCaptured())
+        DBGS() << leading.getCaptured() << "\n";
+      DBGS() << "fill: " << fill.getCaptured() << "\n";
+      DBGS() << "pattern: " << fill.getCaptured() << "\n";
+      DBGS() << "trailing:\n";
+      if (trailing.getCaptured())
+        DBGS() << trailing.getCaptured() << "\n";
+    });
+
+    //
+    // !!We must match exactly all payload ops when the dispatch is pre-formed!!
+    //
+    int64_t numMatchedOps = 2; // Mandatory operations.
+    if (leading.getCaptured())
+      ++numMatchedOps;
+    if (trailing.getCaptured())
+      ++numMatchedOps;
+    if (numMatchedOps != mustMatchNumPayloadOps) {
+      LLVM_DEBUG({
+        DBGS() << "Failed to match " << mustMatchNumPayloadOps
+               << " payload ops, matched " << numMatchedOps << " instead\n";
+      });
+      return WalkResult::advance();
+    }
+
+    res.addPotentiallyEmptyPayloadGroup(leading.getCaptured());
     res.addPayloadGroup({fill.getCaptured()});
     res.addPayloadGroup({pattern.getCaptured()});
-    res.addPotentiallyEmptyPayloadGroup(trailingEltwise.getCaptured());
+    res.addPotentiallyEmptyPayloadGroup(trailing.getCaptured());
     return WalkResult::interrupt();
   });
 
@@ -1289,10 +1350,49 @@ splitReductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
   Operation *root = state.getPayloadOps(handles[0])[0];
+
+  //
+  // !!We must match exactly all payload ops when the dispatch is pre-formed!!
+  //
+  int64_t mustMatchNumPayloadOps =
+      transform_ext::getNumPayloadOpsThatWeMustMatch(root);
+
   WalkResult walkResult = root->walk([&](Operation *op) {
     combiner_reduction.resetCapture();
     if (!matchPattern(op, combiner_reduction))
       return WalkResult::advance();
+
+    // TODO: notify properly.
+    LLVM_DEBUG({
+      DBGS() << "leading:\n";
+      if (leading.getCaptured())
+        DBGS() << leading.getCaptured() << "\n";
+      DBGS() << "original_fill: " << original_fill.getCaptured() << "\n";
+      DBGS() << "parallel_fill: " << parallel_fill.getCaptured() << "\n";
+      DBGS() << "parallel_reduction: " << parallel_reduction.getCaptured()
+             << "\n";
+      DBGS() << "combiner_reduction: " << combiner_reduction.getCaptured()
+             << "\n";
+      DBGS() << "trailing:\n";
+      if (trailing.getCaptured())
+        DBGS() << trailing.getCaptured() << "\n";
+    });
+
+    //
+    // !!We must match exactly all payload ops when the dispatch is pre-formed!!
+    //
+    int64_t numMatchedOps = 4; // Mandatory operations.
+    if (leading.getCaptured())
+      ++numMatchedOps;
+    if (trailing.getCaptured())
+      ++numMatchedOps;
+    if (numMatchedOps != mustMatchNumPayloadOps) {
+      LLVM_DEBUG({
+        DBGS() << "Failed to match " << mustMatchNumPayloadOps
+               << " payload ops, matched " << numMatchedOps << " instead\n";
+      });
+      return WalkResult::advance();
+    }
 
     res.addPotentiallyEmptyPayloadGroup(leading.getCaptured());
     res.addPayloadGroup({original_fill.getCaptured()});
