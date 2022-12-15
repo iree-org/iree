@@ -242,10 +242,12 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
       CUdeviceptr sendbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       NCCL_RETURN_IF_ERROR(
           syms,
@@ -258,10 +260,12 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
       CUdeviceptr sendbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       ncclRedOp_t redop;
       IREE_RETURN_IF_ERROR(get_nccl_red_type(entry->op.reduction, &redop));
@@ -276,10 +280,12 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
       CUdeviceptr sendbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       NCCL_RETURN_IF_ERROR(syms,
                            ncclBroadcast((const void*)sendbuff, (void*)recvbuff,
@@ -292,10 +298,12 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
       CUdeviceptr sendbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       ncclRedOp_t redop;
       IREE_RETURN_IF_ERROR(get_nccl_red_type(entry->op.reduction, &redop));
@@ -310,10 +318,12 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
       CUdeviceptr sendbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       CUdeviceptr recvbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       ncclRedOp_t redop;
       IREE_RETURN_IF_ERROR(get_nccl_red_type(entry->op.reduction, &redop));
@@ -329,6 +339,7 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
       CUdeviceptr sendbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       NCCL_RETURN_IF_ERROR(syms,
                            ncclSend((const void*)sendbuff, entry->element_count,
@@ -340,6 +351,7 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
       CUdeviceptr recvbuff =
           iree_hal_cuda_buffer_device_pointer(
               iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       NCCL_RETURN_IF_ERROR(syms,
                            ncclRecv((void*)recvbuff, entry->element_count,
