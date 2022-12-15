@@ -30,9 +30,10 @@ import json
 from typing import Callable, Dict, List
 
 from benchmark_suites.iree import benchmark_collections
-from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework import serialization
 from e2e_test_artifacts import iree_artifacts
+from e2e_test_framework import serialization
+from e2e_test_framework.definitions import common_definitions, iree_definitions
+from e2e_test_framework.definitions import iree_definitions
 
 PresetMatcher = Callable[[iree_definitions.E2EModelRunConfig], bool]
 BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
@@ -55,44 +56,7 @@ BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
 }
 
 
-def parse_arguments():
-  """Parses command-line options."""
-
-  def parse_and_strip_list_argument(arg) -> List[str]:
-    return [part.strip() for part in arg.split(",")]
-
-  def parse_benchmark_presets(arg) -> List[PresetMatcher]:
-    matchers = []
-    for preset in parse_and_strip_list_argument(arg):
-      matcher = BENCHMARK_PRESET_MATCHERS.get(preset)
-      if matcher is None:
-        raise argparse.ArgumentTypeError(
-            f"Unrecognized benchmark preset: '{preset}'.")
-      matchers.append(matcher)
-    return matchers
-
-  parser = argparse.ArgumentParser(
-      description="Exports JSON config for benchmarking. Filters can be "
-      "specified jointly to select a subset of benchmarks.")
-  parser.add_argument(
-      "--target_device_names",
-      type=parse_and_strip_list_argument,
-      help=("Target device names, separated by comma, not specified means "
-            "including all devices."))
-  parser.add_argument(
-      "--benchmark_presets",
-      type=parse_benchmark_presets,
-      help=("Presets that select a bundle of benchmarks, separated by comma, "
-            "multiple presets will be union. Available options: "
-            f"{','.join(BENCHMARK_PRESET_MATCHERS.keys())}"))
-  parser.add_argument("--output",
-                      type=pathlib.Path,
-                      help="Path to write the JSON output.")
-
-  return parser.parse_args()
-
-
-def main(args: argparse.Namespace):
+def benchmark_handler(args: argparse.Namespace):
   _, all_run_configs = benchmark_collections.generate_benchmarks()
 
   target_device_names = (set(args.target_device_names)
@@ -131,7 +95,67 @@ def main(args: argparse.Namespace):
         "run_configs": serialization.serialize_and_pack(run_configs),
     }
 
-  json_data = json.dumps(output_map, indent=2)
+  return output_map
+
+
+def compile_stats_handler(_args: argparse.Namespace):
+  all_gen_configs, _ = benchmark_collections.generate_benchmarks()
+  compile_stats_gen_configs = [
+      config for config in all_gen_configs
+      if benchmark_collections.COMPILE_STATS_TAG in config.compile_config.tags
+  ]
+
+  return serialization.serialize_and_pack(compile_stats_gen_configs)
+
+
+def parse_arguments():
+  """Parses command-line options."""
+
+  def parse_and_strip_list_argument(arg) -> List[str]:
+    return [part.strip() for part in arg.split(",")]
+
+  def parse_benchmark_presets(arg) -> List[PresetMatcher]:
+    matchers = []
+    for preset in parse_and_strip_list_argument(arg):
+      matcher = BENCHMARK_PRESET_MATCHERS.get(preset)
+      if matcher is None:
+        raise argparse.ArgumentTypeError(
+            f"Unrecognized benchmark preset: '{preset}'.")
+      matchers.append(matcher)
+    return matchers
+
+  parser = argparse.ArgumentParser(
+      description="Exports JSON config for benchmarking.")
+  parser.add_argument("--output",
+                      type=pathlib.Path,
+                      help="path to write the JSON output.")
+  subparser = parser.add_subparsers(required=True, title="config type")
+
+  benchmark_parser = subparser.add_parser(
+      "benchmark", help="exports config to run benchmarks.")
+  benchmark_parser.set_defaults(handler=benchmark_handler)
+  benchmark_parser.add_argument(
+      "--target_device_names",
+      type=parse_and_strip_list_argument,
+      help=("target device names, separated by comma, not specified means "
+            "including all devices."))
+  benchmark_parser.add_argument(
+      "--benchmark_presets",
+      type=parse_benchmark_presets,
+      help=("presets that select a bundle of benchmarks, separated by comma, "
+            "multiple presets will be union. Available options: "
+            f"{','.join(BENCHMARK_PRESET_MATCHERS.keys())}"))
+
+  compile_stats_parser = subparser.add_parser(
+      "compile-stats", help="exports config to collect compilation statistics")
+  compile_stats_parser.set_defaults(handler=compile_stats_handler)
+
+  return parser.parse_args()
+
+
+def main(args: argparse.Namespace):
+  output_obj = args.handler(args)
+  json_data = json.dumps(output_obj, indent=2)
   if args.output is None:
     print(json_data)
   else:
