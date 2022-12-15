@@ -781,6 +781,20 @@ static FailureOr<linalg::GenericOp> collapseLinalgGeneric(
   return newGenericOp;
 }
 
+/// Finds whether genericOp contains an external tensor in ExtractOp that is not
+/// input/output.
+static bool hasExternalTensor(linalg::GenericOp genericOp) {
+  Optional<bool> hasExternal = llvm::None;
+  genericOp->walk([&](mlir::tensor::ExtractOp extractOp) {
+    auto usedTensor = extractOp.getTensor();
+    hasExternal = (llvm::all_of(genericOp.getInputs(),
+                                [&](Value val) { return val != usedTensor; }) &&
+                   llvm::all_of(genericOp.getOutputs(),
+                                [&](Value val) { return val != usedTensor; }));
+  });
+  return hasExternal.value_or(false);
+}
+
 /// Returns true if the given op is collapsable.
 static bool isEligibleForCollapse(Operation *op,
                                   ArrayRef<Operation *> producers) {
@@ -802,6 +816,13 @@ static bool isEligibleForCollapse(Operation *op,
   if (llvm::any_of(genericOp.getIndexingMapsArray(), [](AffineMap map) {
         return !map.isProjectedPermutation();
       })) {
+    return false;
+  }
+
+  // We only linearize tensors that are input/output, not the external tensors.
+  // After collapse loop structure is changed so data access. We cannot
+  // guarantee that collapsing is profitable in this case.
+  if (hasExternalTensor(genericOp)) {
     return false;
   }
 
