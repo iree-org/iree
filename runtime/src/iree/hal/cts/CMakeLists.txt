@@ -9,6 +9,7 @@ set(IREE_ALL_CTS_TESTS
   "buffer_mapping"
   "command_buffer"
   "command_buffer_dispatch"
+  "command_buffer_push_constants"
   "descriptor_set_layout"
   "driver"
   "event"
@@ -24,6 +25,7 @@ set(IREE_ALL_CTS_TESTS
 # connected to a functional compiler target, these tests can be skipped.
 set(IREE_EXECUTABLE_CTS_TESTS
   "command_buffer_dispatch"
+  "command_buffer_push_constants"
   "executable_cache"
   PARENT_SCOPE
 )
@@ -31,6 +33,7 @@ set(IREE_EXECUTABLE_CTS_TESTS
 # List of testdata/{name}.mlir source files.
 set(IREE_ALL_CTS_EXECUTABLE_SOURCES
   "command_buffer_dispatch_test"
+  "command_buffer_push_constants_test"
   "executable_cache_test"
   PARENT_SCOPE
 )
@@ -89,6 +92,18 @@ iree_cc_library(
     command_buffer_dispatch_test_library
   HDRS
     "command_buffer_dispatch_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+)
+
+iree_cc_library(
+  NAME
+    command_buffer_push_constants_test_library
+  HDRS
+    "command_buffer_push_constants_test.h"
   DEPS
     ::cts_test_base
     iree::base
