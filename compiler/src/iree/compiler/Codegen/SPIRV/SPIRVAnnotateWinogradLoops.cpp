@@ -30,9 +30,9 @@ class SPIRVAnnotateWinogradLoopsPass final
     MLIRContext *context = &getContext();
     OpBuilder builder(context);
     const char *attrName = getSPIRVDistributeAttrName();
-    for (auto forOp : llvm::enumerate(forOps)) {
-      if (forOp.index() > kNumGPUDims) break;
-      forOp.value()->setAttr(attrName, builder.getIndexAttr(forOp.index()));
+    for (auto [index, forOp] : llvm::enumerate(forOps)) {
+      if (index > kNumGPUDims) break;
+      forOp->setAttr(attrName, builder.getIndexAttr(index));
     }
   }
 };

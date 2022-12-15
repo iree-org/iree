@@ -132,10 +132,12 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
   };
 
   unsigned procDim = 0;
-  for (auto loopRange : llvm::enumerate(loopRanges)) {
-    auto index = loopRange.index();
-    Value lb = loopRange.value().offset;
-    Value ub = loopRange.value().size;
+  for (auto [idx, loopRange] : llvm::enumerate(loopRanges)) {
+    // Capturing structured bindings in lambdas is a c++20 feature, so we have
+    // to declare a local variable for it.
+    int index = idx;
+    Value lb = loopRange.offset;
+    Value ub = loopRange.size;
     Value step = tileSizeVals[index];
 
     // No loops if tile size is zero. Set offset and size to the loop
@@ -225,19 +227,18 @@ static LogicalResult replaceAllStoresWithTiledVersion(
     RewriterBase &rewriter, TilingInterface untiledOp,
     ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
     Operation *tiledOp) {
-  for (auto result : llvm::enumerate(untiledOp->getResults())) {
+  for (auto [index, result] : llvm::enumerate(untiledOp->getResults())) {
     SmallVector<OpFoldResult> resultOffsets, resultSizes;
-    if (failed(untiledOp.getResultTilePosition(rewriter, result.index(),
-                                               offsets, sizes, resultOffsets,
-                                               resultSizes))) {
+    if (failed(untiledOp.getResultTilePosition(rewriter, index, offsets, sizes,
+                                               resultOffsets, resultSizes))) {
       return rewriter.notifyMatchFailure(
           untiledOp, "failed to rewrite destructive update");
     }
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(tiledOp->getBlock()->getTerminator());
     if (failed(replaceStoreWithTiledVersion(
-            rewriter, result.value().cast<OpResult>(),
-            tiledOp->getResult(result.index()).cast<OpResult>(), resultOffsets,
+            rewriter, result.cast<OpResult>(),
+            tiledOp->getResult(index).cast<OpResult>(), resultOffsets,
             resultSizes))) {
       return failure();
     }
@@ -342,9 +343,9 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
 
   TilingResult tilingResult;
   tilingResult.tiledLoops.resize(numLoops, false);
-  for (auto tileSize : llvm::enumerate(tileSizeVector)) {
-    if (!isZero(tileSize.value())) {
-      tilingResult.tiledLoops.set(tileSize.index());
+  for (auto [index, tileSize] : llvm::enumerate(tileSizeVector)) {
+    if (!isZero(tileSize)) {
+      tilingResult.tiledLoops.set(index);
     }
   }
 
@@ -388,12 +389,11 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
       // The parallel loops that are tiled are partitionable loops.
       SmallVector<Range> parallelLoopRanges;
       SmallVector<unsigned> partitionedLoopIds;
-      for (auto iteratorType : llvm::enumerate(iteratorTypes)) {
-        if (iteratorType.value() == utils::IteratorType::parallel &&
-            !isZero(tileSizeVector[iteratorType.index()])) {
-          parallelLoopRanges.push_back(
-              iterationDomainOfr[iteratorType.index()]);
-          partitionedLoopIds.push_back(iteratorType.index());
+      for (auto [index, iteratorType] : llvm::enumerate(iteratorTypes)) {
+        if (iteratorType == utils::IteratorType::parallel &&
+            !isZero(tileSizeVector[index])) {
+          parallelLoopRanges.push_back(iterationDomainOfr[index]);
+          partitionedLoopIds.push_back(index);
         }
       }
 
@@ -401,9 +401,8 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
       procInfo =
           options.distribution->procInfo(rewriter, loc, parallelLoopRanges);
 
-      for (auto it : llvm::enumerate(partitionedLoopIds)) {
-        distributionMethods[it.value()] =
-            procInfo[it.index()].distributionMethod;
+      for (auto [index, loopIdx] : llvm::enumerate(partitionedLoopIds)) {
+        distributionMethods[loopIdx] = procInfo[index].distributionMethod;
       }
     }
 
@@ -614,14 +613,14 @@ TileAndFuseDispatchUsingSCFForOp::returningMatchAndRewrite(
     SmallVector<OpFoldResult> producerOffset, producerSizes;
     SmallVector<Range> producerIterationDomain =
         fusableProducer.getIterationDomain(rewriter);
-    for (auto range : llvm::enumerate(producerIterationDomain)) {
-      if (range.index() < tilingResult->tiledLoops.size() &&
-          tilingResult->tiledLoops.test(range.index())) {
-        producerOffset.push_back(tilingResult->tileOffsets[range.index()]);
-        producerSizes.push_back(tilingResult->tileSizes[range.index()]);
+    for (auto [index, range] : llvm::enumerate(producerIterationDomain)) {
+      if (index < tilingResult->tiledLoops.size() &&
+          tilingResult->tiledLoops.test(index)) {
+        producerOffset.push_back(tilingResult->tileOffsets[index]);
+        producerSizes.push_back(tilingResult->tileSizes[index]);
       } else {
-        producerOffset.push_back(range.value().offset);
-        producerSizes.push_back(range.value().size);
+        producerOffset.push_back(range.offset);
+        producerSizes.push_back(range.size);
       }
     }
 
@@ -728,9 +727,9 @@ struct SwapExtractSliceWithInitTensor
       SmallVector<OpFoldResult> rankReducedMixedSizes;
       rankReducedMixedSizes.reserve(sliceOp.getType().getRank());
       auto droppedDims = sliceOp.getDroppedDims();
-      for (auto size : llvm::enumerate(mixedSizes)) {
-        if (droppedDims.test(size.index())) continue;
-        rankReducedMixedSizes.push_back(size.value());
+      for (auto [index, size] : llvm::enumerate(mixedSizes)) {
+        if (droppedDims.test(index)) continue;
+        rankReducedMixedSizes.push_back(size);
       }
       std::swap(mixedSizes, rankReducedMixedSizes);
     }

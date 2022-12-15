@@ -939,9 +939,9 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
 
   // Tiling along partitioned loops with size 1.
-  for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
-    if (iteratorType.value() == utils::IteratorType::parallel) {
-      workgroupTileSize[iteratorType.index()] = 1;
+  for (auto [index, iteratorType] : llvm::enumerate(loopIteratorTypes)) {
+    if (iteratorType == utils::IteratorType::parallel) {
+      workgroupTileSize[index] = 1;
     }
   }
   auto rank = op.getOperandRank();
@@ -1286,12 +1286,11 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     // vector later. Similarly, also try to tile other untiled parallel
     // dimensions by 4 to avoid instruction bloat.
     SmallVector<int64_t> loopTileSizes(linalgOp.getNumLoops(), 0);
-    for (const auto &it : llvm::enumerate(linalgOp.getIteratorTypesArray())) {
-      auto i = it.index();
+    for (const auto &[i, iter] :
+         llvm::enumerate(linalgOp.getIteratorTypesArray())) {
       if (loopBounds[i] % 4 != 0) continue;
-      if (linalg::isReductionIterator(it.value()) ||
-          workgroupTileSizes[i] == 0) {
-        loopTileSizes[it.index()] = 4;
+      if (linalg::isReductionIterator(iter) || workgroupTileSizes[i] == 0) {
+        loopTileSizes[i] = 4;
       }
     }
     if (llvm::any_of(loopTileSizes, [](int64_t s) { return s != 0; })) {

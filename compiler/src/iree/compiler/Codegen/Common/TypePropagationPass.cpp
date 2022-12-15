@@ -158,14 +158,14 @@ struct GenericOpTypePropagation
     SmallVector<Type> resultTypes;
 
     // 1. Check if any of the operands needs to be legalized.
-    for (auto operand : llvm::enumerate(genericOp->getOpOperands())) {
-      Type operandType = operand.value().get().getType();
+    for (auto [index, operand] : llvm::enumerate(genericOp->getOpOperands())) {
+      Type operandType = operand.get().getType();
       Type legalizedType = this->getTypeConverter()->convertType(operandType);
       if (operandType != legalizedType) {
-        modifiedOperandIndex.insert(operand.index());
+        modifiedOperandIndex.insert(index);
       }
       // If the operand is an `outs` tensor, its type needs to be changed.
-      if (genericOp.isDpsInit(&operand.value())) {
+      if (genericOp.isDpsInit(&operand)) {
         resultTypes.push_back(legalizedType);
       }
     }
@@ -194,18 +194,18 @@ struct GenericOpTypePropagation
     // type.
     TypeConverter::SignatureConversion signatureConverter(
         modifiedOpRegion.getNumArguments());
-    for (auto arg : llvm::enumerate(modifiedOpRegion.getArguments())) {
-      Type argType = arg.value().getType();
-      if (!modifiedOperandIndex.count(arg.index())) {
-        signatureConverter.addInputs(arg.index(), argType);
+    for (auto [index, arg] : llvm::enumerate(modifiedOpRegion.getArguments())) {
+      Type argType = arg.getType();
+      if (!modifiedOperandIndex.count(index)) {
+        signatureConverter.addInputs(index, argType);
         continue;
       }
       Optional<Type> legalizedArgType = getLegalizedElementType(argType);
       if (!legalizedArgType) {
         return genericOp.emitOpError("failed to get legalized type for arg ")
-               << arg.index();
+               << index;
       }
-      signatureConverter.addInputs(arg.index(), legalizedArgType.value());
+      signatureConverter.addInputs(index, legalizedArgType.value());
     }
     rewriter.applySignatureConversion(&modifiedOpRegion, signatureConverter);
 
@@ -354,17 +354,17 @@ struct LegalizeResultElementType : public ConversionPattern {
 
     // Move all the regions from the old op to the new op and legalize its
     // signature.
-    for (auto &region : llvm::enumerate(op->getRegions())) {
-      Region &newOpRegion = newOp->getRegion(region.index());
-      rewriter.inlineRegionBefore(region.value(), newOpRegion,
-                                  newOpRegion.begin());
+    for (auto &[index, region] : llvm::enumerate(op->getRegions())) {
+      Region &newOpRegion = newOp->getRegion(index);
+      rewriter.inlineRegionBefore(region, newOpRegion, newOpRegion.begin());
       TypeConverter::SignatureConversion signatureConverter(
           newOpRegion.getNumArguments());
       bool doSignatureConversion = false;
-      for (auto arg : llvm::enumerate(newOpRegion.getArguments())) {
-        Type argType = arg.value().getType();
+      for (auto &[argIndex, arg] :
+           llvm::enumerate(newOpRegion.getArguments())) {
+        Type argType = arg.getType();
         Type legalizedType = this->typeConverter->convertType(argType);
-        signatureConverter.addInputs(arg.index(), legalizedType);
+        signatureConverter.addInputs(argIndex, legalizedType);
         doSignatureConversion |= argType != legalizedType;
       }
       if (doSignatureConversion) {

@@ -681,14 +681,14 @@ LogicalResult ProcessFunctionArgument::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
   TypeConverter::SignatureConversion signatureConverter(
       funcOp.getFunctionType().getNumInputs());
-  for (const auto &arg : llvm::enumerate(funcOp.getArguments())) {
-    if (memrefUsageAnalysis.shouldVectorizeMemRef(arg.value())) {
-      if (auto memrefType = getVectorizedMemRefType(rewriter, arg.value())) {
-        signatureConverter.addInputs(arg.index(), *memrefType);
+  for (const auto &[index, arg] : llvm::enumerate(funcOp.getArguments())) {
+    if (memrefUsageAnalysis.shouldVectorizeMemRef(arg)) {
+      if (auto memrefType = getVectorizedMemRefType(rewriter, arg)) {
+        signatureConverter.addInputs(index, *memrefType);
         continue;
       }
     }
-    signatureConverter.addInputs(arg.index(), arg.value().getType());
+    signatureConverter.addInputs(index, arg.getType());
   }
   // Creates a new function with the update signature.
   rewriter.applySignatureConversion(&funcOp.getFunctionBody(),

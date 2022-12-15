@@ -96,23 +96,23 @@ struct CanonicalizeForOpInductionVarShape final
     auto terminator = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
     auto returnValues = llvm::to_vector<8>(terminator.getOperands());
     auto initArgs = llvm::to_vector<8>(forOp.getIterOperands());
-    for (auto it : llvm::enumerate(forOp.getRegionIterArgs())) {
-      if (!it.value().hasOneUse()) continue;
-      Operation* op = it.value().use_begin()->getOwner();
+    for (auto [index, iterArg] : llvm::enumerate(forOp.getRegionIterArgs())) {
+      if (!iterArg.hasOneUse()) continue;
+      Operation* op = iterArg.use_begin()->getOwner();
       if (!isa<vector::ShapeCastOp, vector::ExtractOp,
                UnrealizedConversionCastOp>(op)) {
         continue;
       }
-      Operation* returnValDef = returnValues[it.index()].getDefiningOp();
+      Operation* returnValDef = returnValues[index].getDefiningOp();
       Value newReturn = FoldCarryDep(forOp, op, returnValDef);
       if (!newReturn) continue;
-      iteratorFolded.push_back(it.index());
+      iteratorFolded.push_back(index);
       resultOps.push_back(returnValDef);
-      returnValues[it.index()] = newReturn;
+      returnValues[index] = newReturn;
 
       BlockAndValueMapping mapping;
-      mapping.map(it.value(), initArgs[it.index()]);
-      initArgs[it.index()] = rewriter.clone(*op, mapping)->getResult(0);
+      mapping.map(iterArg, initArgs[index]);
+      initArgs[index] = rewriter.clone(*op, mapping)->getResult(0);
     }
     if (iteratorFolded.empty()) return failure();
     auto newLoop = rewriter.create<scf::ForOp>(
@@ -123,14 +123,14 @@ struct CanonicalizeForOpInductionVarShape final
     // Replace the operation by the new one.
     SmallVector<Value, 8> repResults(newLoop.getResults().begin(),
                                      newLoop.getResults().end());
-    for (auto en : llvm::enumerate(iteratorFolded)) {
+    for (auto [index, iter] : llvm::enumerate(iteratorFolded)) {
       BlockAndValueMapping mapping;
-      mapping.map(returnValues[en.value()], newLoop.getResult(en.value()));
-      repResults[en.index()] =
-          rewriter.clone(*resultOps[en.index()], mapping)->getResult(0);
+      mapping.map(returnValues[iter], newLoop.getResult(iter));
+      repResults[index] =
+          rewriter.clone(*resultOps[index], mapping)->getResult(0);
       Operation* oldOp =
-          newLoop.getRegionIterArgs()[en.index()].use_begin()->getOwner();
-      SmallVector<Value, 1> arg(1, newLoop.getRegionIterArgs()[en.index()]);
+          newLoop.getRegionIterArgs()[index].use_begin()->getOwner();
+      SmallVector<Value, 1> arg(1, newLoop.getRegionIterArgs()[index]);
       oldOp->replaceAllUsesWith(arg);
     }
     rewriter.replaceOp(forOp, repResults);
@@ -154,8 +154,8 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
     VectorType v4f32Type = VectorType::get({4}, rewriter.getF32Type());
 
     SmallVector<unsigned, 8> ivIndices;
-    for (auto it : llvm::enumerate(forOp.getRegionIterArgs())) {
-      if (it.value().getType() == v8f16Type) ivIndices.push_back(it.index());
+    for (auto [index, iterArg] : llvm::enumerate(forOp.getRegionIterArgs())) {
+      if (iterArg.getType() == v8f16Type) ivIndices.push_back(index);
     }
     if (ivIndices.empty()) return failure();
 

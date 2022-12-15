@@ -46,9 +46,9 @@ static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
   // Pick an unrolling order that will allow tensorcore operation to reuse LHS
   // register. This is needed to get good performance on sm_80 target.
   // First make reduction the outer dimensions.
-  for (auto iter : llvm::enumerate(contract.getIteratorTypes())) {
-    if (vector::isReductionIterator(iter.value())) {
-      order.push_back(iter.index());
+  for (auto [index, iter] : llvm::enumerate(contract.getIteratorTypes())) {
+    if (vector::isReductionIterator(iter)) {
+      order.push_back(index);
     }
   }
 
@@ -57,15 +57,15 @@ static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
     dims.insert(expr.cast<AffineDimExpr>().getPosition());
   }
   // Then parallel dimensions that are part of Lhs as we want to re-use Lhs.
-  for (auto iter : llvm::enumerate(contract.getIteratorTypes())) {
-    if (vector::isParallelIterator(iter.value()) && dims.count(iter.index())) {
-      order.push_back(iter.index());
+  for (auto [index, iter] : llvm::enumerate(contract.getIteratorTypes())) {
+    if (vector::isParallelIterator(iter) && dims.count(index)) {
+      order.push_back(index);
     }
   }
   // Then the remaining parallel loops.
-  for (auto iter : llvm::enumerate(contract.getIteratorTypes())) {
-    if (vector::isParallelIterator(iter.value()) && !dims.count(iter.index())) {
-      order.push_back(iter.index());
+  for (auto [index, iter] : llvm::enumerate(contract.getIteratorTypes())) {
+    if (vector::isParallelIterator(iter) && !dims.count(index)) {
+      order.push_back(index);
     }
   }
   return order;

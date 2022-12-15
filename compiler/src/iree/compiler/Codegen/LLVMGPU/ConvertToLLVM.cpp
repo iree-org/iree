@@ -48,9 +48,8 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   // Replace the addressOfOps with correctly offseted pointers to dynamic
   // shared memory.
   llvm::SmallDenseMap<LLVM::GlobalOp, uint32_t> globalMemoryOffsetMap;
-  for (auto addressOfOpsIt : llvm::enumerate(addressOfOps)) {
+  for (auto addressOfOp : addressOfOps) {
     uint32_t offset = 0;
-    auto addressOfOp = addressOfOpsIt.value();
     auto globalOp = addressOfOp.getGlobal(symbolTableCollection);
     if (globalMemoryOffsetMap.count(globalOp)) {
       offset = globalMemoryOffsetMap[globalOp];
@@ -202,8 +201,8 @@ static llvm::SmallDenseMap<SetBinding, size_t> getKernelArgMapping(
               return lhs.first.ult(rhs.first);
             });
   llvm::SmallDenseMap<SetBinding, size_t> mapBindingArgIndex;
-  for (auto binding : llvm::enumerate(sparseBindings)) {
-    mapBindingArgIndex[binding.value()] = binding.index();
+  for (auto [index, binding] : llvm::enumerate(sparseBindings)) {
+    mapBindingArgIndex[binding] = index;
   }
   return mapBindingArgIndex;
 }
