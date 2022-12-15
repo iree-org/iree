@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
+#include <optional>
+
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -277,7 +279,7 @@ Optional<std::string> buildFunctionName(IREE::VM::ModuleOp &moduleOp,
                                         IREE::VM::ImportOp &importOp) {
   auto callingConvention = makeImportCallingConventionString(importOp);
   if (!callingConvention.has_value()) {
-    return None;
+    return std::nullopt;
   }
   return moduleOp.getName().str() + "_call_" + callingConvention.value() +
          "_import_shim";
@@ -288,7 +290,7 @@ Optional<std::string> buildVariadicFunctionName(
     DenseIntElementsAttr segmentSizes) {
   auto callingConvention = makeImportCallingConventionString(importOp);
   if (!callingConvention.has_value()) {
-    return None;
+    return std::nullopt;
   }
   std::string result(moduleOp.getName());
   result += "_call_";
@@ -335,7 +337,7 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
       /*value=*/emitc::OpaqueAttr::get(ctx, ""));
 
   if (failed(clearStruct(rewriter, elementTypeOp.getResult()))) {
-    return None;
+    return std::nullopt;
   }
 
   auto ptr = valueTypeMap.find((elementType));
@@ -351,7 +353,7 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
                                        /*value=*/ptr->second.second);
   } else {
     if (!elementType.isa<IREE::VM::RefType>()) {
-      return None;
+      return std::nullopt;
     }
     Type objType = elementType.cast<IREE::VM::RefType>().getObjectType();
 
@@ -1350,8 +1352,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
  private:
   struct GeneratedStruct {
-    Optional<Value> value = None;
-    Optional<std::string> name = None;
+    Optional<Value> value = std::nullopt;
+    Optional<std::string> name = std::nullopt;
     SmallVector<Value> callArguments;
   };
 
@@ -3769,7 +3771,9 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
               return std::make_pair(StringRef("IREE_VM_VALUE_TYPE_I64"),
                                     StringRef("iree_vm_value_get_i64"));
             })
-            .Default([](Operation *) { return std::make_pair(None, None); });
+            .Default([](Operation *) {
+              return std::make_pair(std::nullopt, std::nullopt);
+            });
 
     if (!valueTypeEnum.has_value() || !valueExtractor.has_value()) {
       return getOp.emitOpError() << "element type not handled";
@@ -3997,7 +4001,7 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
                 [&](auto op) { return StringRef("iree_vm_value_make_i32"); })
             .template Case<IREE::VM::ListSetI64Op>(
                 [&](auto op) { return StringRef("iree_vm_value_make_i64"); })
-            .Default([](Operation *) { return None; });
+            .Default([](Operation *) { return std::nullopt; });
 
     if (!valueConstructor.has_value()) {
       return setOp.emitOpError() << " not handled";

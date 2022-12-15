@@ -350,7 +350,7 @@ def ConfigExtractPart :
 
   let builders = [
     OpBuilder<(ins "Value":$target, "StringRef":$attrName,
-               CArg<"Optional<int64_t>", "llvm::None">:$level)>
+               CArg<"Optional<int64_t>", "std::nullopt">:$level)>
   ];
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(

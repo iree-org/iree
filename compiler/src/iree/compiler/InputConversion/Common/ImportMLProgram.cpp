@@ -76,7 +76,7 @@ class MLProgramGlobalOpPattern
     auto srcOpTypedAttr =
         srcOpAttr.has_value()
             ? Optional<TypedAttr>(srcOpAttr.value().cast<TypedAttr>())
-            : llvm::None;
+            : std::nullopt;
     auto globalOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(
         srcOp, srcOp.getName(), srcOp.getIsMutable(), newType, srcOpTypedAttr);
     globalOp.setVisibility(srcOp.getVisibility());

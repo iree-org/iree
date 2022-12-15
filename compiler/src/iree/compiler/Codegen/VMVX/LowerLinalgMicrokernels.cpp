@@ -578,7 +578,7 @@ struct LinalgBinaryGenericConversion
                                       op.getMatchingIndexingMap(result)),
             selection);
       } else {
-        return None;
+        return std::nullopt;
       }
     };
 
@@ -592,87 +592,87 @@ struct LinalgBinaryGenericConversion
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "add");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::AddIOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "add");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::AndIOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "and");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::DivFOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "div");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::DivSIOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "divs");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::DivUIOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "divu");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::MulFOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "mul");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::MulIOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "mul");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::OrIOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "or");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::ShLIOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "shl");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::ShRSIOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "shrs");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::XOrIOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "xor");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::SubFOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "sub");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::SubIOp op) -> Optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "sub");
               }
-              return None;
+              return std::nullopt;
             })
-            .Default([](Operation *) { return None; });
+            .Default([](Operation *) { return std::nullopt; });
 
     // Determine op type to lower to.
     if (!emitter) {
@@ -744,51 +744,51 @@ struct LinalgUnaryGenericConversion
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "abs");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](math::CeilOp op) -> Optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "ceil");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](math::CountLeadingZerosOp op) -> Optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "ctlz");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](math::ExpOp op) -> Optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "exp");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](math::FloorOp op) -> Optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "floor");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](math::LogOp op) -> Optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "log");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](arith::NegFOp op) -> Optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "neg");
               }
-              return None;
+              return std::nullopt;
             })
             .Case([&](math::RsqrtOp op) -> Optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "rsqrt");
               }
-              return None;
+              return std::nullopt;
             })
-            .Default([](Operation *) { return None; });
+            .Default([](Operation *) { return std::nullopt; });
 
     // Determine op type to lower to.
     if (!emitter) {

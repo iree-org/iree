@@ -327,7 +327,7 @@ llvm::Optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
                                      ValueRange inputs, Location loc) {
   assert(inputs.size() == 1);
   if (inputs.front().getType().isa<ShapedType>()) {
-    return llvm::None;
+    return std::nullopt;
   }
   return builder
       .create<tensor::FromElementsOp>(

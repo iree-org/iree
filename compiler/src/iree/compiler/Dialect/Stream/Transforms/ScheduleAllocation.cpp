@@ -855,7 +855,7 @@ static llvm::Optional<TransientAllocation> allocateLocalTransients(
   }
   if (transientValues.empty()) {
     // No transients required.
-    return llvm::None;
+    return std::nullopt;
   }
 
   // Insert the stream.resource.pack op to compute the slices and total size of
@@ -929,7 +929,7 @@ static Optional<ConstantAllocation> extractConstants(
   // Gather all constant ops from the region, if any.
   auto constantOps =
       llvm::to_vector<4>(executeOp.getOps<IREE::Stream::AsyncConstantOp>());
-  if (constantOps.empty()) return llvm::None;
+  if (constantOps.empty()) return std::nullopt;
 
   // Allocate a new constant upload op and insert a subview for each constant.
   SmallVector<Location> locs;

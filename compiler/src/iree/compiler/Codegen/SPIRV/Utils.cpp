@@ -51,11 +51,11 @@ llvm::Optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp) {
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
   auto exportOp = exportOps.lookup(funcOp.getName());
-  if (!exportOp) return llvm::None;
+  if (!exportOp) return std::nullopt;
   if (auto size = exportOp.getSubgroupSize()) return size->getSExtValue();
 
   spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(funcOp);
-  if (!target) return llvm::None;
+  if (!target) return std::nullopt;
   return target.getResourceLimits().getSubgroupSize();
 }
 

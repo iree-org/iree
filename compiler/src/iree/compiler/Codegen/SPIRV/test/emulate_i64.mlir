@@ -94,8 +94,7 @@ hal.executable private @emulate_1d_vector {
 //
 // CHECK-LABEL: func.func @emulate_1d_vector
 //       CHECK:   [[LOAD:%.+]]     = memref.load {{%.+}}[{{%.+}}] : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
-//       CHECK:   {{%.+}}          = arith.muli {{%.+}}, {{%.+}} : vector<4xi32>
-//       CHECK:   {{%.+}}          = arith.addi {{%.+}}, {{%.+}} : vector<4xi32>
+//       CHECK:   {{%.+}}, {{%.+}} = arith.mului_extended {{%.+}}, {{%.+}} : vector<4xi32>
 //       CHECK:   {{%.+}}, {{%.+}} = arith.addui_extended {{%.+}}, {{%.+}} : vector<4xi32>, vector<4xi1>
 //       CHECK:   memref.store {{%.+}}, {{%.+}}[{{%.+}}] : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   return

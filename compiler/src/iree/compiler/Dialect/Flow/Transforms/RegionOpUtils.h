@@ -40,7 +40,7 @@ FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResult(
 /// Create an DispatchRegionOp with workload
 Flow::DispatchRegionOp makeDispatchRegionWithWorkload(
     OpBuilder &builder, Location loc,
-    Optional<ValueRange> workload = llvm::None);
+    Optional<ValueRange> workload = std::nullopt);
 
 /// Clone a `target` op that is preceding the given dispatch region op into the
 /// dispatch region.
@@ -82,7 +82,7 @@ FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
 /// Wrap the given op in a new dispatch region op.
 FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(
     RewriterBase &rewriter, Operation *op,
-    Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None);
+    Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt);
 
 }  // namespace Flow
 }  // namespace IREE

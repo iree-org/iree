@@ -597,7 +597,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     OpBuilder<(ins "Value":$source, "Value":$output,
       "ArrayRef<int64_t>":$innerDimsPos,
       "ArrayRef<OpFoldResult>":$innerTiles,
-      CArg<"Optional<Value>", "llvm::None">:$paddingValue,
+      CArg<"Optional<Value>", "std::nullopt">:$paddingValue,
       CArg<"ArrayRef<int64_t>", "{}">:$outerDimsPerm)>
   ];
 

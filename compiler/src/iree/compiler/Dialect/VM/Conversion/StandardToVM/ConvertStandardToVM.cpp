@@ -153,7 +153,7 @@ class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
     // vm.export ops.
     newFuncOp.setPrivate();
 
-    rewriter.replaceOp(srcOp, llvm::None);
+    rewriter.replaceOp(srcOp, std::nullopt);
     return success();
   }
 };
@@ -227,7 +227,7 @@ class ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
     // Retain function attributes in the allowlist.
     copyImportAttrs(srcOp, importOp);
 
-    rewriter.replaceOp(srcOp, llvm::None);
+    rewriter.replaceOp(srcOp, std::nullopt);
     return success();
   }
 };

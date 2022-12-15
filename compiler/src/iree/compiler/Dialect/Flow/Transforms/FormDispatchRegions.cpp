@@ -393,7 +393,7 @@ static bool hasCompatibleOuterParallelLoops(
 static Optional<OpOperand *> getFusableUse(Operation *op,
                                            DominanceInfo const &dominanceInfo,
                                            bool fuseMultiUse) {
-  if (!fuseMultiUse && !op->hasOneUse()) return llvm::None;
+  if (!fuseMultiUse && !op->hasOneUse()) return std::nullopt;
 
   for (auto &use : op->getUses()) {
     Operation *user = use.getOwner();
@@ -403,7 +403,7 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
       return &use;
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Returns true if the operands are fusable under the aggressive fusion
@@ -731,7 +731,7 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
       workloadBuilders;
   for (const auto &it : llvm::enumerate(roots)) {
     // Compute workload.
-    Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None;
+    Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
     if (generateWorkloadRegion) {
       auto maybeBuilder = iree_compiler::IREE::Flow::getWorkloadBuilder(
           rewriter, /*rootOp=*/it.value());

@@ -39,7 +39,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   IREE::LinalgExt::LinalgTransformationFilter f(
       {StringAttr::get(ctx, getWorkgroupKTiledMarker()),
        StringAttr::get(ctx, getVectorizeMarker())},
-      llvm::None);
+      std::nullopt);
   f.setMatchByDefault();
   // When vectorizing if some ops didn't get tiled we may end up with large
   // vectors being created that will later explode code size. If we have any

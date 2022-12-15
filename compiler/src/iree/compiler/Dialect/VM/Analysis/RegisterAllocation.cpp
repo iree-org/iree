@@ -107,7 +107,7 @@ struct RegisterUsage {
       }
       unsigned int ordinalEnd = ordinalStart + (byteWidth / 4) - 1;
       if (ordinalEnd >= Register::kInt32RegisterCount) {
-        return llvm::None;
+        return std::nullopt;
       }
       bool rangeAvailable = true;
       for (unsigned int ordinal = ordinalStart + 1; ordinal <= ordinalEnd;
@@ -119,7 +119,7 @@ struct RegisterUsage {
       }
       ordinalStart = intRegisters.find_next_unset(ordinalEnd);
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
   Optional<Register> allocateRegister(Type type) {
@@ -127,7 +127,7 @@ struct RegisterUsage {
       size_t byteWidth = IREE::Util::getRoundedElementByteWidth(type);
       auto ordinalStartOr = findFirstUnsetIntOrdinalSpan(byteWidth);
       if (!ordinalStartOr.has_value()) {
-        return llvm::None;
+        return std::nullopt;
       }
       int ordinalStart = ordinalStartOr.value();
       unsigned int ordinalEnd = ordinalStart + (byteWidth / 4) - 1;
@@ -138,7 +138,7 @@ struct RegisterUsage {
     } else {
       int ordinal = refRegisters.find_first_unset();
       if (ordinal >= Register::kRefRegisterCount || ordinal == -1) {
-        return llvm::None;
+        return std::nullopt;
       }
       refRegisters.set(ordinal);
       maxRefRegisterOrdinal = std::max(ordinal, maxRefRegisterOrdinal);

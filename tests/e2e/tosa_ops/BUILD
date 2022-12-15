@@ -46,6 +46,7 @@ LLVM_SRCS = enforce_glob(
         "maximum.mlir",
         "minimum.mlir",
         "mul.mlir",
+        "mul_shift.mlir",
         "negate.mlir",
         "pad.mlir",
         "reciprocal.mlir",
@@ -99,6 +100,7 @@ VMVX_SRCS = enforce_glob(
         "maximum.mlir",
         "minimum.mlir",
         "mul.mlir",
+        "mul_shift.mlir",
         "negate.mlir",
         "pad.mlir",
         "reciprocal.mlir",
@@ -156,6 +158,7 @@ VMVX_MICROKERNELS_SRCS = enforce_glob(
         "maximum.mlir",
         "minimum.mlir",
         "mul.mlir",
+        "mul_shift.mlir",
         "negate.mlir",
         "pad.mlir",
         "reciprocal.mlir",
@@ -228,6 +231,7 @@ VULKAN_SRCS = enforce_glob(
         "while.mlir",
     ],
     include = ["*.mlir"],
+    exclude = ["mul_shift.mlir"],  # TODO(#11571)
 )
 
 iree_check_single_backend_test_suite(

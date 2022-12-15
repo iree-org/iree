@@ -6,6 +6,7 @@
 
 #include "iree_tf_compiler/TFL/PassDetail.h"
 #include "iree_tf_compiler/TFL/Passes.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 
@@ -31,7 +32,6 @@ static bool isTFLAttr(NamedAttribute &namedAttr) {
 class StripModuleMetadataPass
     : public StripModuleMetadataBase<StripModuleMetadataPass> {
  public:
-
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
@@ -46,7 +46,6 @@ class StripModuleMetadataPass
 class StripFunctionMetadataPass
     : public StripFunctionMetadataBase<StripFunctionMetadataPass> {
  public:
-
   void runOnOperation() override {
     auto funcOp = getOperation();
     auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
@@ -58,7 +57,7 @@ class StripFunctionMetadataPass
 
     for (int i = 0; i < funcOp.getNumArguments(); ++i) {
       auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
-          funcOp.getArgAttrs(i),
+          mlir::function_interface_impl::getArgAttrs(funcOp, i),
           [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
       for (auto namedAttr : stripAttrs) {
         funcOp.removeArgAttr(i, namedAttr.getName());
@@ -67,7 +66,7 @@ class StripFunctionMetadataPass
 
     for (int i = 0; i < funcOp.getNumResults(); ++i) {
       auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
-          funcOp.getResultAttrs(i),
+          mlir::function_interface_impl::getResultAttrs(funcOp, i),
           [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
       for (auto namedAttr : stripAttrs) {
         funcOp.removeResultAttr(i, namedAttr.getName());

@@ -15,6 +15,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
@@ -569,7 +570,8 @@ struct MergeExecutableConstantBlocks
     auto fusedLoc = rewriter.getFusedLoc(blockLocs);
     auto newBlockOp = rewriter.create<ExecutableConstantBlockOp>(
         fusedLoc, rewriter.getFunctionType(inputTypes, resultTypes),
-        rewriter.getArrayAttr(resultKeys));
+        rewriter.getArrayAttr(resultKeys), /*arg_attrs=*/ArrayAttr(),
+        /*res_attrs=*/ArrayAttr());
 
     // Create the entry block that captures the optional device argument and
     // the exit block that returns the final flattened set of keys.
@@ -770,7 +772,7 @@ struct ElideEmptyFenceJoin : public OpRewritePattern<FenceJoinOp> {
 };
 
 // Produces a deduplicated and null-elided operand list.
-// Returns None if nothing changed.
+// Returns std::nullopt if nothing changed.
 static Optional<std::vector<Value>> deduplicateFenceOperands(
     ValueRange operands) {
   SetVector<Value> newOperands;
@@ -783,7 +785,7 @@ static Optional<std::vector<Value>> deduplicateFenceOperands(
     newOperands.insert(operand);
   }
 
-  if (newOperands.size() == operands.size()) return None;
+  if (newOperands.size() == operands.size()) return std::nullopt;
   return newOperands.takeVector();
 }
 
@@ -831,7 +833,7 @@ struct DeduplicateFenceAwaitFences : public OpRewritePattern<FenceAwaitOp> {
   LogicalResult matchAndRewrite(FenceAwaitOp op,
                                 PatternRewriter &rewriter) const override {
     auto newOperands = deduplicateFenceOperands(op.getFences());
-    if (newOperands == None) return failure();
+    if (newOperands == std::nullopt) return failure();
     rewriter.replaceOpWithNewOp<FenceAwaitOp>(op, op.getStatus().getType(),
                                               op.getTimeoutMillis(),
                                               newOperands.value());

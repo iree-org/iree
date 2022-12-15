@@ -376,7 +376,7 @@ static Optional<ZIPFileRef> appendZIPFileToStream(
   uint32_t crc32 = 0;
   null_crc32_ostream crcStream(crc32);
   if (failed(write(crcStream))) {
-    return None;
+    return std::nullopt;
   }
 
   // Write the ZIP header and padding up to the start of the file.
@@ -386,7 +386,7 @@ static Optional<ZIPFileRef> appendZIPFileToStream(
   // Stream out the file contents to the output stream.
   uint64_t start = os.tell();
   if (failed(write(os))) {
-    return None;
+    return std::nullopt;
   }
   fileRef.totalLength = os.tell() - start;
   assert(fileRef.totalLength == fileLength && "declared length mismatch");
@@ -431,7 +431,7 @@ static Optional<ZIPFileRef> appendZIPFileToFD(
   {
     crc32_ostream crcStream(os, fileRef.crc32);
     if (failed(write(crcStream))) {
-      return None;
+      return std::nullopt;
     }
     crcStream.flush();
   }

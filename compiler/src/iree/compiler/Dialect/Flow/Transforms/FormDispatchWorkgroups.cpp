@@ -155,7 +155,7 @@ static FailureOr<Flow::DispatchWorkgroupsOp> wrapInWorkgroupsOp(
     mlir::TensorDimTrackingRewriter &rewriter, Operation *op,
     bool generateWorkloadRegion) {
   // Compute workload.
-  Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None;
+  Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
   if (generateWorkloadRegion) {
     auto maybeBuilder =
         iree_compiler::IREE::Flow::getWorkloadBuilder(rewriter, op);

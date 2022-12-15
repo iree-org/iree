@@ -298,16 +298,16 @@ llvm::Optional<unsigned> detail::getTiedResultOperandIndex(
     Operation *op, unsigned resultIndex) {
   auto storageAttr =
       op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
-  if (!storageAttr) return llvm::None;
+  if (!storageAttr) return std::nullopt;
   auto valueAttrs = storageAttr.getValue();
-  if (valueAttrs.empty()) return llvm::None;
+  if (valueAttrs.empty()) return std::nullopt;
   auto tiedOp = cast<TiedOpInterface>(op);
   auto indexAndLength = tiedOp.getTiedResultsIndexAndLength();
-  if (resultIndex < indexAndLength.first) return None;
+  if (resultIndex < indexAndLength.first) return std::nullopt;
   resultIndex -= indexAndLength.first;
-  if (resultIndex >= indexAndLength.second) return None;
+  if (resultIndex >= indexAndLength.second) return std::nullopt;
   int64_t value = valueAttrs[resultIndex].cast<IntegerAttr>().getInt();
-  if (value == TiedOpInterface::kUntiedIndex) return llvm::None;
+  if (value == TiedOpInterface::kUntiedIndex) return std::nullopt;
   unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
   return tiedOperandsOffset + static_cast<unsigned>(value);
 }
@@ -562,7 +562,7 @@ Optional<ValueRange> findDynamicDims(Value shapedValue) {
       if (tiedValue) worklist.push_back(tiedValue);
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
@@ -588,7 +588,7 @@ Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
     }
   }
 
-  return None;
+  return std::nullopt;
 }
 
 ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
