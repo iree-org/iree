@@ -1319,15 +1319,12 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   constexpr int64_t kMinimumWorkload = 4096;
   auto shape = genericOp.getStaticLoopRanges();
   int64_t numWorkload = 1;
-  for (auto [index, size] : llvm::enumerate(shape)) {
+  for (const auto &[index, size] : llvm::enumerate(shape)) {
     if (size == ShapedType::kDynamic) {
       numWorkload = ShapedType::kDynamic;
       break;
     }
-    if (flowTileSizes[index]) {
-      size = flowTileSizes[index];
-    }
-    numWorkload *= size;
+    numWorkload *= flowTileSizes[index] ? flowTileSizes[index] : size;
   }
   for (unsigned currDim = 0;
        numWorkload < kMinimumWorkload && currDim < numLoops;) {
