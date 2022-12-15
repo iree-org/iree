@@ -155,7 +155,7 @@ static void addForeachThreadCapturePromotionPatterns(
 static void addRankReducingPatterns(RewritePatternSet &patterns) {
   populateReshapeToInterfaceTensorPatterns(patterns);
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  linalg::populateFoldUnitExtentDimsPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
 }
 
 static void addSwappingPatterns(RewritePatternSet &patterns,
@@ -183,7 +183,7 @@ static void addAllRegisteredCanonicalizationPatterns(
 static void addConverToDPSPatterns(RewritePatternSet &patterns) {
   populateReshapeToInterfaceTensorPatterns(patterns);
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  linalg::populateFoldUnitExtentDimsPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
 }
 
 DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
