@@ -30,6 +30,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
@@ -55,16 +56,30 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
 //===---------------------------------------------------------------------===//
 // ApplyPatternsOp
 //===---------------------------------------------------------------------===//
-void transform_dialect::ApplyPatternsOp::build(OpBuilder &builder,
-                                               OperationState &result,
-                                               Value target,
-                                               bool rankReducing) {
+void transform_dialect::ApplyPatternsOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    const ApplyPatternsOpPatterns &patterns) {
   MLIRContext *ctx = builder.getContext();
   result.addOperands(target);
-  if (rankReducing) {
-    result.addAttribute(ApplyPatternsOp::getRankReducingAttrName(result.name),
-                        builder.getUnitAttr());
-  }
+  auto unitAttr = builder.getUnitAttr();
+#define ADD_PATTERN(NAME, ATTR) \
+  if (patterns.NAME)            \
+    result.addAttribute(ApplyPatternsOp::ATTR(result.name), unitAttr);
+  ADD_PATTERN(additionalIreePatterns, getAdditionalIreePatternsAttrName)
+  ADD_PATTERN(bubbleCollapseExpand, getBubbleCollapseExpandAttrName)
+  ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
+  ADD_PATTERN(eraseUnnecessaryTensorOperands,
+              getEraseUnnecessaryTensorOperandsAttrName)
+  ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
+  ADD_PATTERN(promoteForeachThreadCaptureToShared,
+              getPromoteForeachThreadCaptureToSharedAttrName)
+  ADD_PATTERN(rankReducing, getRankReducingAttrName)
+  ADD_PATTERN(expandMemrefStridedMetadata,
+              getExpandMemrefStridedMetadataAttrName)
+  ADD_PATTERN(swapPaddingElideConditional,
+              getSwapPaddingElideConditionalAttrName)
+  ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
+#undef ADD_PATTERN
   result.addTypes({pdl::OperationType::get(ctx)});
 }
 
@@ -152,10 +167,19 @@ static void addForeachThreadCapturePromotionPatterns(
   patterns.add<PromoteCaptureToSharedOut>(patterns.getContext());
 }
 
+static void addReassociativeReshapePatterns(RewritePatternSet &patterns) {
+  tensor::populateReassociativeReshapeFoldingPatterns(patterns);
+}
+
+static void addEraseUnnecessaryTensorOperandsPatterns(
+    RewritePatternSet &patterns) {
+  linalg::populateEraseUnnecessaryInputsPatterns(patterns);
+}
+
 static void addRankReducingPatterns(RewritePatternSet &patterns) {
   populateReshapeToInterfaceTensorPatterns(patterns);
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  linalg::populateFoldUnitExtentDimsPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
 }
 
 static void addSwappingPatterns(RewritePatternSet &patterns,
@@ -183,7 +207,7 @@ static void addAllRegisteredCanonicalizationPatterns(
 static void addConverToDPSPatterns(RewritePatternSet &patterns) {
   populateReshapeToInterfaceTensorPatterns(patterns);
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  linalg::populateFoldUnitExtentDimsPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
 }
 
 DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
@@ -198,6 +222,9 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
+  if (getEraseUnnecessaryTensorOperands())
+    addEraseUnnecessaryTensorOperandsPatterns(patterns);
+  if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getPromoteForeachThreadCaptureToShared())
     addForeachThreadCapturePromotionPatterns(patterns);
   if (getRankReducing()) addRankReducingPatterns(patterns);
@@ -224,7 +251,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     return mlir::emitDefiniteFailure(target, "listener tracking failed");
 
   results.assign({target});
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -294,17 +321,7 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   if (foreachThreadOp.getNumThreads().size() > 3)
     return foreachThreadOp->emitError(
         "scf.foreach_thread with rank > 3 does not lower to workgroup");
-  if (llvm::any_of(foreachThreadOp.getNumThreads(), [](Value v) {
-        return !v.getDefiningOp<arith::ConstantIndexOp>();
-      })) {
-    return foreachThreadOp->emitError(
-        "unsupported dynamic workgroup_count atm --- need to slice out "
-        "workgroup_count computation into ExecutableExport::workgroup_count. "
-        "This region may require arbitrary computations and cannot magically "
-        "match what the `stream.cmd.dispatch` has already imposed on us at a "
-        "distance. For now we must specify the number of values properly "
-        "when applying the topLevel tile_to_foreach_thread_op");
-  }
+
   if (!foreachThreadOp.getMapping().has_value())
     return foreachThreadOp->emitError("mapping must be present");
   SmallVector<Attribute> blockMapping =
@@ -335,9 +352,6 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   };
   SmallVector<Value> gridDimValues = scf::ForeachThreadOp::getValuesSortedByKey(
       blockMapping, numBlocks, comparator);
-  SmallVector<int64_t> gridDims;
-  for (Value v : gridDimValues)
-    gridDims.push_back(v.getDefiningOp<arith::ConstantIndexOp>().value());
 
   // Step 3. Outline the compute workload region and set up the workload
   // operands, if this has not been done already.
@@ -352,6 +366,18 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   // the flow level and explicitly match the ops we want to fuse.
   // Once fusion is customizable enough in perpetuity, we can retire this.
   if (exportOp.getWorkgroupCount().empty()) {
+    if (llvm::any_of(foreachThreadOp.getNumThreads(), [](Value v) {
+          return !v.getDefiningOp<arith::ConstantIndexOp>();
+        })) {
+      return foreachThreadOp->emitError(
+          "unsupported dynamic workgroup_count atm --- need to slice out "
+          "workgroup_count computation into ExecutableExport::workgroup_count."
+          "\nThis region may require arbitrary computations and cannot "
+          "magically match what the `stream.cmd.dispatch` has already imposed "
+          "on us at a distance."
+          "\nFor now we must specify the number of values properly when "
+          "applying the topLevel tile_to_foreach_thread_op");
+    }
     if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
                                                      exportOp))) {
       return foreachThreadOp->emitOpError(
@@ -453,7 +479,7 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
   }
 
   results.assign({target});
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -698,7 +724,7 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
 
   transformResults.set(getForeachThreadOp().cast<OpResult>(), tileOps);
   transformResults.set(getTiledOp().cast<OpResult>(), tiledOps);
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -876,40 +902,32 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     memCpyFn = gpuComprehensiveBufferizeCopyFn;
   }
 
-  //   1. Eliminate tensor.empty, without the pass baggage.
-  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
-    if (failed(eliminateEmptyTensors(moduleOp.getOperation(),
-                                     getBufferizationOptions())))
-      return WalkResult::interrupt();
-    return WalkResult::advance();
-  });
-  if (res.wasInterrupted())
-    return DiagnosedSilenceableFailure::definiteFailure();
-
-  //   2. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
-  RewritePatternSet patterns(getContext());
-  patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
-  TrackingListener listener(state);
-  GreedyRewriteConfig config;
-  LogicalResult result = applyPatternsAndFoldGreedily(
-      state.getTopLevel(), std::move(patterns), config, &listener);
-  LogicalResult listenerResult = listener.checkErrorState();
-  if (failed(result)) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "greedy pattern application failed");
+  //   1. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
+  {
+    RewritePatternSet patterns(getContext());
+    patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
+    TrackingListener listener(state);
+    GreedyRewriteConfig config;
+    LogicalResult result = applyPatternsAndFoldGreedily(
+        state.getTopLevel(), std::move(patterns), config, &listener);
+    LogicalResult listenerResult = listener.checkErrorState();
+    if (failed(result)) {
+      return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                       "greedy pattern application failed");
+    }
+    if (failed(listenerResult))
+      return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                       "listener tracking failed");
   }
-  if (failed(listenerResult))
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "listener tracking failed");
 
-  //   3. Run one-shot-bufferize, without the pass baggage.
+  //   2. Run one-shot-bufferize, without the pass baggage.
   OneShotBufferizationOptions options = getBufferizationOptions();
   options.allocationFn = allocationFn;
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = getTestAnalysisOnly();
   options.printConflicts = getPrintConflicts();
-  res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
+  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
     if (failed(runIREEOneShotBufferize(moduleOp, options)))
       return WalkResult::interrupt();
     return WalkResult::advance();
@@ -917,7 +935,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   if (res.wasInterrupted())
     return DiagnosedSilenceableFailure::definiteFailure();
 
-  //   4. Post-bufferization passes are fine.
+  //   3. Post-bufferization passes are fine.
   PassManager pm(getContext());
   addIREEPostBufferizationPasses(pm);
   res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
@@ -935,6 +953,31 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
 
   results.set(getOperation()->getOpResult(0), payload.front());
   return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// IREEEliminateEmptyTensorsOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::IREEEliminateEmptyTensorsOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  ArrayRef<Operation *> payloads = state.getPayloadOps(getTarget());
+  for (Operation *payload : payloads) {
+    if (failed(eliminateEmptyTensors(payload, getBufferizationOptions()))) {
+      getOperation()->emitError() << "failed to eliminate tensor.empty ops";
+      return DiagnosedSilenceableFailure::definiteFailure();
+    }
+  }
+  results.set(getOperation()->getOpResult(0), payloads);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::IREEEliminateEmptyTensorsOp::build(
+    OpBuilder &builder, OperationState &result, Value target) {
+  result.addOperands(target);
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes(pdl::OperationType::get(ctx));
 }
 
 //===---------------------------------------------------------------------===//

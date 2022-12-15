@@ -11,7 +11,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
                      affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]}
     ins(%arg : !in_tensor_t) outs(%1 : !out_tensor_t) {
-      ^bb0(%arg3: f32, %arg4: f32):
+      ^bb0(%arg3: f32, %arg4: f32): 
         %3 = arith.addf %arg3, %arg4 : f32
         linalg.yield %3 : f32
       } -> !out_tensor_t
@@ -31,6 +31,12 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_v2_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="33x1024xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
+
+// RUN: iree-compile %s --iree-hal-target-backends=cuda \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit | \
+// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="33x1024xf32=1" |\
+// RUN: FileCheck %s --check-prefix=EXEC
+
 
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   //     CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index

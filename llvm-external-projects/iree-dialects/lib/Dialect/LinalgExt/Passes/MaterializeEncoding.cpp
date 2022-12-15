@@ -29,7 +29,7 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 static Optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
   auto encodingAttr = tensorType.getEncoding().dyn_cast_or_null<EncodingAttr>();
   if (!encodingAttr)
-    return llvm::None;
+    return std::nullopt;
   return encodingAttr.getEncoding().getValue();
 }
 
@@ -117,11 +117,11 @@ chooseEncodingInfo(RankedTensorType tensorType) {
 static Optional<Value> getPaddingValue(Value &source) {
   auto padOp = source.getDefiningOp<tensor::PadOp>();
   if (!padOp || padOp.getNofold() || !padOp.hasZeroLowPad())
-    return llvm::None;
+    return std::nullopt;
 
   Value constantPaddingValue = padOp.getConstantPaddingValue();
   if (!constantPaddingValue)
-    return llvm::None;
+    return std::nullopt;
 
   source = padOp.getSource();
   return constantPaddingValue;

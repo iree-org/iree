@@ -214,7 +214,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
             std::move(workgroupTileSizes));  // Workgroup level.
         return setOpConfigAndEntryPointFnTranslation(
             entryPoint, op, tileSizes, pipeline, workgroupSize,
-            /*subgroupSize=*/llvm::None, softwarePipelineDepth);
+            /*subgroupSize=*/std::nullopt, softwarePipelineDepth);
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =
@@ -394,7 +394,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
-  auto partitionedLoops = interfaceOp.getPartitionableLoops(llvm::None);
+  auto partitionedLoops = interfaceOp.getPartitionableLoops(std::nullopt);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
@@ -493,12 +493,12 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
       auto expr = dim.dyn_cast<AffineDimExpr>();
       if (expr && expr.getPosition() == d) {
         auto type = op->getOperand(mapIdx).getType().cast<ShapedType>();
-        if (type.isDynamicDim(dimIdx)) return llvm::None;
+        if (type.isDynamicDim(dimIdx)) return std::nullopt;
         return type.getDimSize(dimIdx);
       }
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Set configuration for reduction transform dialect based strategy.

@@ -108,12 +108,15 @@ class BenchmarkConfig:
           capture_tarball=args.capture_tarball.resolve(),
           capture_tmp_dir=per_commit_tmp_dir / CAPTURES_REL_PATH)
 
-    build_dir = args.build_dir.resolve()
-    if args.run_config is None:
-      # TODO(#11076): Remove legacy path.
-      root_benchmark_dir = build_dir / BENCHMARK_SUITE_REL_PATH
+    if args.e2e_test_artifacts_dir is not None:
+      root_benchmark_dir = args.e2e_test_artifacts_dir
     else:
-      root_benchmark_dir = build_dir / E2E_TEST_ARTIFACTS_REL_PATH
+      # TODO(#11076): Remove legacy path.
+      build_dir = args.build_dir.resolve()
+      if args.run_config is not None:
+        root_benchmark_dir = build_dir / E2E_TEST_ARTIFACTS_REL_PATH
+      else:
+        root_benchmark_dir = build_dir / BENCHMARK_SUITE_REL_PATH
 
     return BenchmarkConfig(root_benchmark_dir=root_benchmark_dir,
                            benchmark_results_dir=per_commit_tmp_dir /

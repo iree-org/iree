@@ -63,7 +63,7 @@ transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
     state.getTopLevel()->emitOpError(
         "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel to "
         "attach the workgroup size information to a nested ExecutableExportOp");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
   }
 
   IREE::HAL::ExecutableExportOp exportOp;
@@ -72,7 +72,7 @@ transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
   });
   if (!exportOp) {
     state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
   }
 
   SmallVector<int64_t> workgroupSize =
@@ -321,7 +321,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
               "transform is not applied";
   }
   results.assign({vectorDistributionResult->warpOp});
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -565,7 +565,7 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
     target->emitOpError(
         "applies only to isolated-from-above targets because it needs to apply "
         "patterns greedily");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
   }
 
   // TODO: Hook up into the ApplyPatternOp in CommonExtensions.cpp to
@@ -580,7 +580,7 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   populatePropagateVectorDistribution(target, patterns, /*benefit=*/1);
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {
     target->emitOpError("warp distribution patterns failed to apply");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
   }
 
   RewritePatternSet endPatterns(ctx);
@@ -591,10 +591,10 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   if (failed(applyPatternsAndFoldGreedily(target, std::move(endPatterns)))) {
     target->emitOpError(
         "warp execute on lane 0 to scf patterns failed to apply");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
   }
 
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::VectorWarpDistributionOp::getEffects(

@@ -393,7 +393,9 @@ def Util_InitializerOp : Util_Op<"initializer", [
   }];
 
   let arguments = (ins
-    TypeAttrOf<FunctionType>:$function_type
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs    
   );
 
   let regions = (region AnyRegion:$body);

@@ -115,7 +115,7 @@ Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
     nativeSize.back() = getComputeVectorSize(vectorType.getShape().back());
     return nativeSize;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Add patterns to vectorize any supported Linalg ops.

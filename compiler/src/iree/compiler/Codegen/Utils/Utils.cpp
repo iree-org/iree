@@ -74,38 +74,38 @@ llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
 
 Optional<StringAttr> getConfigStringAttr(
     IREE::HAL::ExecutableTargetAttr targetAttr, StringRef stringAttr) {
-  if (!targetAttr) return llvm::None;
+  if (!targetAttr) return std::nullopt;
   auto config = targetAttr.getConfiguration();
-  if (!config) return llvm::None;
+  if (!config) return std::nullopt;
   auto attr = config.getAs<StringAttr>(stringAttr);
-  if (!attr) return llvm::None;
+  if (!attr) return std::nullopt;
   return attr;
 }
 
 Optional<IntegerAttr> getConfigIntegerAttr(
     IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr) {
-  if (!targetAttr) return llvm::None;
+  if (!targetAttr) return std::nullopt;
   auto config = targetAttr.getConfiguration();
-  if (!config) return llvm::None;
+  if (!config) return std::nullopt;
   auto attr = config.getAs<IntegerAttr>(integerAttr);
-  if (!attr) return llvm::None;
+  if (!attr) return std::nullopt;
   return attr;
 }
 
 Optional<BoolAttr> getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
                                      StringRef integerAttr) {
-  if (!targetAttr) return llvm::None;
+  if (!targetAttr) return std::nullopt;
   auto config = targetAttr.getConfiguration();
-  if (!config) return llvm::None;
+  if (!config) return std::nullopt;
   auto attr = config.getAs<BoolAttr>(integerAttr);
-  if (!attr) return llvm::None;
+  if (!attr) return std::nullopt;
   return attr;
 }
 
 Optional<llvm::Triple> getTargetTriple(
     IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto triple = getConfigStringAttr(targetAttr, "target_triple");
-  if (!triple) return llvm::None;
+  if (!triple) return std::nullopt;
   return llvm::Triple(triple.value().str());
 }
 
@@ -113,7 +113,7 @@ Optional<llvm::Triple> getTargetTriple(
 /// operation, if set.
 Optional<StringRef> getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
-  if (!cpuFeatures) return llvm::None;
+  if (!cpuFeatures) return std::nullopt;
   return cpuFeatures->getValue();
 }
 
@@ -254,11 +254,11 @@ static Optional<unsigned> getDimension(Operation *op) {
   if (auto tOp = dyn_cast<T>(op)) {
     return tOp.getDimIndex();
   }
-  return llvm::None;
+  return std::nullopt;
 }
 template <typename T1, typename T2, typename... T3>
 static Optional<unsigned> getDimension(Operation *op) {
-  if (!op) return llvm::None;
+  if (!op) return std::nullopt;
   if (auto dimension = getDimension<T1>(op)) {
     return dimension;
   }
@@ -267,18 +267,18 @@ static Optional<unsigned> getDimension(Operation *op) {
 
 /// Checks that all `vals` are defined by some processor id/count/size ops using
 /// the same `dimension`. If any element of `vals` is not defined by one of
-/// these ops, or the dimensions dont match, returns llvm::None; oterhwise,
+/// these ops, or the dimensions dont match, returns std::nullopt; oterhwise,
 /// returns the dimension.  If `refDimension` is passed checks if the dimension
 /// matches the given value.
 template <typename... T>
 static Optional<unsigned> checkDimensions(
-    ArrayRef<Value> vals, Optional<unsigned> refDimension = llvm::None) {
+    ArrayRef<Value> vals, Optional<unsigned> refDimension = std::nullopt) {
   for (auto v : vals) {
     auto currDimension = getDimension<T...>(v.getDefiningOp());
-    if (!currDimension) return llvm::None;
+    if (!currDimension) return std::nullopt;
     if (refDimension) {
       if (refDimension.value() != currDimension.value()) {
-        return llvm::None;
+        return std::nullopt;
       }
     } else {
       refDimension = currDimension.value();
@@ -495,7 +495,7 @@ static Optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
   if (auto op = value.getDefiningOp<OpTy>()) {
     return op.getDimension().getZExtValue();
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Checks if the `forOp` is a tiled + distributed op. Looks for the op of this
@@ -535,7 +535,7 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
       countDim = ifx.getDimIndex();
     }
 
-    if (!idDim || !countDim) return llvm::None;
+    if (!idDim || !countDim) return std::nullopt;
 
     Builder b(forOp.getContext());
     loopInfo.untiledLowerBound = b.getIndexAttr(0);
@@ -550,13 +550,13 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
   StepExprVisitor stepVisitor(stepApplyOp, loopInfo);
 
   if (failed(lbVisitor.visit(lbApplyOp.getAffineMap().getResults()[0]))) {
-    return llvm::None;
+    return std::nullopt;
   }
   if (failed(stepVisitor.visit(stepApplyOp.getAffineMap().getResults()[0]))) {
-    return llvm::None;
+    return std::nullopt;
   }
   if (!loopInfo.untiledLowerBound || !loopInfo.untiledStep) {
-    return llvm::None;
+    return std::nullopt;
   }
   return loopInfo;
 }

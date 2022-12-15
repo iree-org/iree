@@ -11,13 +11,13 @@ from e2e_test_framework.device_specs import device_parameters
 
 GCP_C2_STANDARD_16 = common_definitions.DeviceSpec(
     id=unique_ids.DEVICE_SPEC_GCP_C2_STANDARD_16,
-    vendor_name="GCP-c2-standard-16",
+    device_name="c2-standard-16",
     host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
     architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
     device_parameters=[device_parameters.OCTA_CORES])
 
 GCP_A2_HIGHGPU_1G = common_definitions.DeviceSpec(
     id=unique_ids.DEVICE_SPEC_GCP_A2_HIGHGPU_1G,
-    vendor_name="GCP-a2-highgpu-1g",
+    device_name="a2-highgpu-1g",
     host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
     architecture=common_definitions.DeviceArchitecture.CUDA_SM80)

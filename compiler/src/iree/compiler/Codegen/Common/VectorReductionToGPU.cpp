@@ -273,7 +273,7 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
     SmallVector<Value> indices = {warpId};
     builder.create<scf::IfOp>(loc, lane0, [&](OpBuilder &b, Location l) {
       b.create<memref::StoreOp>(l, laneVal, alloc, indices);
-      b.create<scf::YieldOp>(l, llvm::None);
+      b.create<scf::YieldOp>(l, std::nullopt);
     });
     builder.create<gpu::BarrierOp>(loc);
     // Further reduce the outputs from each warps with a single warp reduce.

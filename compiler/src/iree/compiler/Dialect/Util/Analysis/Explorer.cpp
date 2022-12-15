@@ -33,14 +33,14 @@ static llvm::Optional<unsigned> mapSuccessorOperand(BranchOpInterface branchOp,
   // I don't know if there's a better way to do this - the interface doesn't
   // help.
   auto operandRange = branchOp.getSuccessorOperands(successorIdx);
-  if (operandRange.empty()) return llvm::None;
+  if (operandRange.empty()) return std::nullopt;
   unsigned beginIdx =
       operandRange.getForwardedOperands().getBeginOperandIndex();
   if (operandIdx >= beginIdx && operandIdx < beginIdx + operandRange.size()) {
     // Covered.
     return {operandIdx - beginIdx};
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 Explorer::Explorer(Operation *rootOp, TraversalAction defaultAction)
@@ -459,7 +459,7 @@ TraversalResult Explorer::walkReturnOperands(Operation *parentOp,
   return walkReturnOps(parentOp, [&](Operation *returnOp) {
     if (auto terminatorOp =
             dyn_cast<RegionBranchTerminatorOpInterface>(returnOp)) {
-      return fn(terminatorOp.getSuccessorOperands(llvm::None));
+      return fn(terminatorOp.getSuccessorOperands(std::nullopt));
     } else {
       return fn(returnOp->getOperands());
     }
@@ -477,7 +477,7 @@ TraversalResult Explorer::walkIncomingBranchOperands(
     auto *parentOp = targetBlock->getParentOp();
     if (auto regionOp = dyn_cast<RegionBranchOpInterface>(parentOp)) {
       SmallVector<RegionSuccessor, 2> entrySuccessors;
-      regionOp.getSuccessorRegions(/*index=*/llvm::None, entrySuccessors);
+      regionOp.getSuccessorRegions(/*index=*/std::nullopt, entrySuccessors);
       for (auto &entrySuccessor : entrySuccessors) {
         if (fn(regionOp->getBlock(),
                regionOp.getSuccessorEntryOperands(
@@ -797,7 +797,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
   auto traverseRegionOp = [&](RegionBranchOpInterface regionOp,
                               unsigned operandIdx) {
     SmallVector<RegionSuccessor, 2> entrySuccessors;
-    regionOp.getSuccessorRegions(/*index=*/llvm::None, entrySuccessors);
+    regionOp.getSuccessorRegions(/*index=*/std::nullopt, entrySuccessors);
     for (auto &entrySuccessor : entrySuccessors) {
       auto successorInputs = entrySuccessor.getSuccessorInputs();
       if (operandIdx >= successorInputs.size()) {
@@ -821,7 +821,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
   // Move within/out-of a region.
   auto traverseRegionBranchOp = [&](RegionBranchTerminatorOpInterface branchOp,
                                     unsigned operandIdx) {
-    auto successorOperands = branchOp.getSuccessorOperands(llvm::None);
+    auto successorOperands = branchOp.getSuccessorOperands(std::nullopt);
     unsigned beginIdx = successorOperands.getBeginOperandIndex();
     if (operandIdx < beginIdx ||
         operandIdx >= beginIdx + successorOperands.size()) {
@@ -831,7 +831,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
                  << operandIdx << "\n");
       return TraversalResult::COMPLETE;
     }
-    auto result = branchOp.getSuccessorOperands(llvm::None)[operandIdx];
+    auto result = branchOp.getSuccessorOperands(std::nullopt)[operandIdx];
     LLVM_DEBUG({
       llvm::dbgs() << "   + queuing region result ";
       result.printAsOperand(llvm::dbgs(), asmState);

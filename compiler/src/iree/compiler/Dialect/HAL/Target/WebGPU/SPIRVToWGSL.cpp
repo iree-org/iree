@@ -30,26 +30,26 @@ llvm::Optional<std::string> compileSPIRVToWGSL(
       std::make_unique<tint::Program>(tint::reader::spirv::Parse(binaryVector));
   if (!program) {
     llvm::errs() << "Tint failed to parse SPIR-V program\n";
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (program->Diagnostics().contains_errors()) {
     llvm::errs() << "Tint reported " << program->Diagnostics().error_count()
                  << " error(s) for a SPIR-V program, see diagnostics:\n";
     diagFormatter.format(program->Diagnostics(), diagPrinter.get());
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (!program->IsValid()) {
     llvm::errs() << "Tint parsed an invalid SPIR-V program\n";
-    return llvm::None;
+    return std::nullopt;
   }
 
   tint::writer::wgsl::Options genOptions;
   auto result = tint::writer::wgsl::Generate(program.get(), genOptions);
   if (!result.success) {
     llvm::errs() << "Tint failed to generate WGSL: " << result.error << "\n";
-    return llvm::None;
+    return std::nullopt;
   }
 
   return result.wgsl;

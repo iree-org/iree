@@ -52,9 +52,11 @@ using namespace mlir;
 
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
+using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ConfigExtractPart;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
+using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
     IREEEraseHALDescriptorTypeFromMemRefOp;
 using iree_compiler::IREE::transform_dialect::
@@ -126,81 +128,85 @@ void mlir::iree_compiler::buildPrint(ImplicitLocOpBuilder &b,
 /// appended in order.
 // TODO: apply forwarding pattern.
 template <typename TilingTransformOp, typename TileOrNumThreadSpec>
-static Value buildTileAndFuseAndDistributeImpl(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizesOrNumThreads, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles) {
+static iree_compiler::TileAndFuseAndDistributeResult
+buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b, Value rootH,
+                                  ValueRange opsHToFuse,
+                                  ArrayRef<OpFoldResult> tileSizesOrNumThreads,
+                                  ArrayAttr threadDimMapping) {
+  iree_compiler::TileAndFuseAndDistributeResult result;
   auto tileToForeachOp = b.create<TilingTransformOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
-  Value foreachThreadH = tileToForeachOp.getForeachThreadOp();
-  // Batch fusion.
-  Value mergedOpsH = b.create<MergeHandlesOp>(opsHToFuse, /*deduplicate=*/true);
-  b.create<FuseIntoContainingOp>(mergedOpsH, foreachThreadH);
-  assert(!resultingFusedOpsHandles && "Handle needs unpacking");
-  return foreachThreadH;
+  result.foreachThreadH = tileToForeachOp.getForeachThreadOp();
+  result.tiledOpH = tileToForeachOp.getTiledOp();
+
+  // Batch fusion if requested.
+  if (opsHToFuse.size() > 1) {
+    Value mergedOpsH =
+        b.create<MergeHandlesOp>(opsHToFuse, /*deduplicate=*/true);
+    b.create<FuseIntoContainingOp>(mergedOpsH, result.foreachThreadH);
+  } else if (opsHToFuse.size() == 1) {
+    Value fusedH = b.create<FuseIntoContainingOp>(opsHToFuse.front(),
+                                                  result.foreachThreadH);
+    result.resultingFusedOpsHandles.push_back(fusedH);
+  }
+  return result;
 }
 
 // TODO: if someone knows how to properly export templates go for it ..
 // sigh.
 template <typename TilingTransformOp>
-static Value buildTileFuseDistWithTileSizes(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles) {
+static iree_compiler::TileAndFuseAndDistributeResult
+buildTileFuseDistWithTileSizes(ImplicitLocOpBuilder &b, Value rootH,
+                               ValueRange opsHToFuse,
+                               ArrayRef<OpFoldResult> tileSizes,
+                               ArrayAttr threadDimMapping) {
   return buildTileAndFuseAndDistributeImpl<TilingTransformOp,
                                            transform::TileSizesSpec>(
-      b, rootH, opsHToFuse, tileSizes, threadDimMapping,
-      resultingFusedOpsHandles);
+      b, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
-Value mlir::iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
+iree_compiler::TileAndFuseAndDistributeResult
+mlir::iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles) {
+    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
   return buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(
-      b, rootH, opsHToFuse, tileSizes, threadDimMapping,
-      resultingFusedOpsHandles);
+      b, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
-Value mlir::iree_compiler::
+iree_compiler::TileAndFuseAndDistributeResult mlir::iree_compiler::
     buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
         ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-        ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
-        SmallVectorImpl<Value> *resultingFusedOpsHandles) {
+        ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
   return buildTileFuseDistWithTileSizes<
-      TileToForeachThreadAndWorkgroupCountRegionOp>(b, rootH, opsHToFuse,
-                                                    tileSizes, threadDimMapping,
-                                                    resultingFusedOpsHandles);
+      TileToForeachThreadAndWorkgroupCountRegionOp>(
+      b, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
 
 /// Call buildTileAndFuseAndDistributeImpl with ArrayRef<int64_t> numThreads.
 // TODO: if someone knows how to properly export templates go for it ..
 // sigh.
 template <typename TilingTransformOp>
-static Value buildTileFuseDistWithNumThreads(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles) {
+static iree_compiler::TileAndFuseAndDistributeResult
+buildTileFuseDistWithNumThreads(ImplicitLocOpBuilder &b, Value rootH,
+                                ValueRange opsHToFuse,
+                                ArrayRef<OpFoldResult> numThreads,
+                                ArrayAttr threadDimMapping) {
   return buildTileAndFuseAndDistributeImpl<TilingTransformOp,
                                            transform::NumThreadsSpec>(
-      b, rootH, opsHToFuse, numThreads, threadDimMapping,
-      resultingFusedOpsHandles);
+      b, rootH, opsHToFuse, numThreads, threadDimMapping);
 }
-Value mlir::iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
+iree_compiler::TileAndFuseAndDistributeResult
+mlir::iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
-    SmallVectorImpl<Value> *resultingFusedOpsHandles) {
-  return buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(
-      b, rootH, opsHToFuse, tileSizes, threadDimMapping,
-      resultingFusedOpsHandles);
+    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
+  return buildTileFuseDistWithNumThreads<TileToForeachThreadOp>(
+      b, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
-Value mlir::iree_compiler::
+iree_compiler::TileAndFuseAndDistributeResult mlir::iree_compiler::
     buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
         ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-        ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping,
-        SmallVectorImpl<Value> *resultingFusedOpsHandles) {
-  return buildTileFuseDistWithTileSizes<
-      TileToForeachThreadAndWorkgroupCountRegionOp>(b, rootH, opsHToFuse,
-                                                    tileSizes, threadDimMapping,
-                                                    resultingFusedOpsHandles);
+        ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
+  return buildTileFuseDistWithNumThreads<
+      TileToForeachThreadAndWorkgroupCountRegionOp>(
+      b, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
 
 /// Apply patterns and vectorize (for now always applies rank-reduction).
@@ -209,13 +215,20 @@ Value mlir::iree_compiler::
 // TODO: configure patterns.
 Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b,
                                           Value funcH) {
-  funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
+  ApplyPatternsOpPatterns patterns;
+  patterns.rankReducing = true;
+  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
   return b.create<VectorizeOp>(funcH);
 }
 
 /// Bufferize and drop HAL descriptor from memref ops.
 Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
                                           Value variantH, bool targetGpu) {
+  Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  ApplyPatternsOpPatterns patterns;
+  patterns.foldReassociativeReshapes = true;
+  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+  variantH = b.create<IREEEliminateEmptyTensorsOp>(variantH);
   variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
   Value memrefFunc =
       b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
@@ -240,7 +253,9 @@ static constexpr unsigned kCudaWarpSize = 32;
 Value mlir::iree_compiler::buildDistributeVectors(ImplicitLocOpBuilder &b,
                                                   Value variantH, Value funcH,
                                                   int64_t warpSize) {
-  funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
+  ApplyPatternsOpPatterns patterns;
+  patterns.rankReducing = true;
+  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
   // Locally suppress failures for this op only because it doesn't cover the
   // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.
@@ -296,9 +311,9 @@ static ReductionSplitResult createExpansionBubbleUp(
   }
 
   auto funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  auto applyPatterns = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/false);
-  applyPatterns->setAttr(applyPatterns.getBubbleCollapseExpandAttrName(),
-                         b.getUnitAttr());
+  ApplyPatternsOpPatterns patterns;
+  patterns.bubbleCollapseExpand = true;
+  b.create<ApplyPatternsOp>(funcH, patterns);
   std::tie(result.originalFillH, result.splitFillH) =
       matchAndUnpack<2>(b, variantH, linalg::FillOp::getOperationName());
   if (hasTrailingEltwise) {

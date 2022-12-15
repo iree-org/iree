@@ -77,7 +77,7 @@ module @my_module {
 module @t006_fptosi_fp32_i8 {
 module @my_module {
   func.func @my_fn(%arg0 : f32) -> (i8) {
-// expected-error@+1 {{failed to legalize}}
+    // CHECK: vm.cast.f32.si32 %[[ARG0]] : f32 -> i32
     %1 = arith.fptosi %arg0 : f32 to i8
     return %1 : i8
   }

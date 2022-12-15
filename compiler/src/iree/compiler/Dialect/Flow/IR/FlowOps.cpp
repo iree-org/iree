@@ -135,13 +135,13 @@ static Optional<BlockArgument> getBindingArgument(Value v) {
             blockArg.getOwner()->getParentOp())) {
       return blockArg;
     }
-    return llvm::None;
+    return std::nullopt;
   }
   Operation *definingOp = v.getDefiningOp();
   if (auto loadOp = dyn_cast<IREE::Flow::DispatchTensorLoadOp>(definingOp)) {
     return getBindingArgument(loadOp.getSource());
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Returns `true` if the slice (described by the `offset`, `sizes` and

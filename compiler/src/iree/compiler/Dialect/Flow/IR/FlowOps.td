@@ -613,7 +613,7 @@ def FLOW_ReturnOp : FLOW_Op<"return", [Pure, ReturnLike, Terminator]> {
   let builders = [
     OpBuilder<(ins),
     [{
-      build($_builder, $_state, llvm::None);
+      build($_builder, $_state, std::nullopt);
     }]>,
   ];
 }

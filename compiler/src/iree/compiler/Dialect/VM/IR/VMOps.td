@@ -95,7 +95,7 @@ def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
   let assemblyFormat = "attr-dict";
 }
 
-// TODO(b/142336293): DCE functions when unused and not exports.
+// TODO(benvanik): DCE vm.func when unused and not exported.
 // TODO(benvanik): attributes for function analysis: pure, etc (for imports).
 def VM_FuncOp : VM_Op<"func", [
     IsolatedFromAbove,
@@ -113,7 +113,9 @@ def VM_FuncOp : VM_Op<"func", [
   let arguments = (ins
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<VM_Ordinal>:$ordinal,
-    OptionalAttr<UnitAttr>:$noinline
+    OptionalAttr<UnitAttr>:$noinline,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs    
   );
 
   let regions = (region AnyRegion:$body);
@@ -204,10 +206,14 @@ def VM_ImportOp : VM_Op<"import", [
     they were resolved can be queried with `vm.import.resolved`.
   }];
 
-  let arguments = (ins
-    OptionalAttr<VM_Ordinal>:$ordinal,
-    OptionalAttr<UnitAttr>:$is_optional,
-    OptionalAttr<I32Attr>:$minimum_version
+  let arguments = (ins SymbolNameAttr:$sym_name,
+                       TypeAttrOf<FunctionType>:$function_type,
+                       OptionalAttr<DictArrayAttr>:$arg_attrs,
+                       OptionalAttr<DictArrayAttr>:$res_attrs,
+                       OptionalAttr<StrAttr>:$sym_visibility,
+                       OptionalAttr<VM_Ordinal>:$ordinal,
+                       OptionalAttr<UnitAttr>:$is_optional,
+                       OptionalAttr<I32Attr>:$minimum_version
   );
 
   // Required because FunctionOpInterface and CallableOpInterface disagree with
@@ -222,13 +228,6 @@ def VM_ImportOp : VM_Op<"import", [
   ];
 
   let extraClassDeclaration = [{
-    /// Returns the type of this function.
-    FunctionType getFunctionType() {
-      return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
-          .getValue()
-          .cast<FunctionType>();
-    }
-
     /// Returns true if the import must be invoked via vm.call.variadic.
     bool isVariadic() {
       for (int i = 0; i < getArgumentTypes().size(); ++i) {
@@ -280,7 +279,9 @@ def VM_InitializerOp : VM_Op<"initializer", [
   }];
 
   let arguments = (ins
-    TypeAttrOf<FunctionType>:$function_type
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs    
   );
 
   let regions = (region AnyRegion:$body);
@@ -367,7 +368,7 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     ),
     [{
-      build($_builder, $_state, name, isMutable, type, llvm::None, attrs);
+      build($_builder, $_state, name, isMutable, type, std::nullopt, attrs);
     }]>,
   ];
 }
@@ -3667,7 +3668,6 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
       CallOpInterface,
     ])> {
   let extraClassDeclaration = [{
-    // TODO(b/133879130): make tablegen support variadic operand accessors.
     /// Get the argument operands to the called function.
     operand_range getArgOperands() {
       return {arg_operand_begin(), arg_operand_end()};
@@ -3822,7 +3822,7 @@ def VM_ReturnOp : VM_Op<"return", [
   let builders = [
     OpBuilder<(ins),
     [{
-      build($_builder, $_state, llvm::None);
+      build($_builder, $_state, std::nullopt);
     }]>,
   ];
 }

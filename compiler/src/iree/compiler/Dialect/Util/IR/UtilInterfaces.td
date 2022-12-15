@@ -232,7 +232,7 @@ def Util_GlobalOpInterface : OpInterface<"GlobalOpInterface"> {
         if (value) {
           $_op.setIsMutableAttr(UnitAttr::get($_op.getContext()));
         } else {
-          $_op.removeIs_mutableAttr();
+          $_op.removeIsMutableAttr();
         }
       }]
     >,
@@ -263,7 +263,7 @@ def Util_GlobalOpInterface : OpInterface<"GlobalOpInterface"> {
           // Not fantastic but the typed attr may not accept Attribute.
           $_op->setAttr("initial_value", (value));
         } else {
-          $_op.removeInitial_valueAttr();
+          $_op.removeInitialValueAttr();
         }
       }]
     >,

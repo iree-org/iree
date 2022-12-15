@@ -7,6 +7,9 @@
 #ifndef IREE_HAL_DRIVERS_CUDA_DYNAMIC_SYMBOLS_H_
 #define IREE_HAL_DRIVERS_CUDA_DYNAMIC_SYMBOLS_H_
 
+#if IREE_HAL_DRIVER_CUDA_NCCL
+#include <nccl.h>
+#endif
 #include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/hal/drivers/cuda/cuda_headers.h"
@@ -15,17 +18,29 @@
 extern "C" {
 #endif  // __cplusplus
 
-// DynamicSymbols allow loading dynamically a subset of CUDA driver API. It
-// loads all the function declared in `dynamic_symbol_tables.def` and fail if
-// any of the symbol is not available. The functions signatures are matching
-// the declarations in `cuda.h`.
+// DynamicSymbols allow loading dynamically a subset of CUDA driver and NCCL
+// API. It loads all the function declared in `dynamic_symbol_tables.h` and fail
+// if any of the symbol is not available. The functions signatures are matching
+// the declarations in `cuda.h` and `nccl.h`.
 typedef struct iree_hal_cuda_dynamic_symbols_t {
-  iree_dynamic_library_t* loader_library;
+  iree_dynamic_library_t* cuda_library;
+  iree_dynamic_library_t* nccl_library;
 
 #define CU_PFN_DECL(cudaSymbolName, ...) \
   CUresult (*cudaSymbolName)(__VA_ARGS__);
+#if IREE_HAL_DRIVER_CUDA_NCCL
+#define NCCL_PFN_DECL(ncclSymbolName, ...) \
+  ncclResult_t (*ncclSymbolName)(__VA_ARGS__);
+#define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...) \
+  const char* (*ncclSymbolName)(__VA_ARGS__);
+#else
+#define NCCL_PFN_DECL(ncclSymbolName, ...)
+#define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
+#endif
 #include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: export
 #undef CU_PFN_DECL
+#undef NCCL_PFN_DECL
+#undef NCCL_PFN_DECL_STR_RETURN
 } iree_hal_cuda_dynamic_symbols_t;
 
 // Initializes |out_syms| in-place with dynamically loaded CUDA symbols.

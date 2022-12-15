@@ -99,12 +99,15 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
          function_interface_impl::VariadicFlag,
          std::string &) { return builder.getFunctionType(argTypes, results); };
   return function_interface_impl::parseFunctionOp(
-      parser, result, /*allowVariadic=*/false, buildFuncType);
+      parser, result, /*allowVariadic=*/false,
+      getFunctionTypeAttrName(result.name), buildFuncType,
+      getArgAttrsAttrName(result.name), getResAttrsAttrName(result.name));
 }
 
 void FuncOp::print(OpAsmPrinter &p) {
-  Operation *op = getOperation();
-  function_interface_impl::printFunctionOp(p, op, /*isVariadic=*/false);
+  function_interface_impl::printFunctionOp(
+      p, *this, /*isVariadic=*/false, getFunctionTypeAttrName(),
+      getArgAttrsAttrName(), getResAttrsAttrName());
 }
 
 void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
@@ -121,8 +124,10 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
   assert(type.getNumInputs() == argAttrs.size() &&
          "expected as many argument attribute lists as arguments");
-  function_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
-                                                /*resultAttrs=*/llvm::None);
+  function_interface_impl::addArgAndResultAttrs(
+      builder, result, argAttrs,
+      /*resultAttrs=*/std::nullopt, getArgAttrsAttrName(result.name),
+      getResAttrsAttrName(result.name));
 }
 
 Block *FuncOp::addEntryBlock() {
@@ -135,10 +140,9 @@ Block *FuncOp::addEntryBlock() {
 }
 
 LogicalResult FuncOp::verifyType() {
-  auto type =
-      getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName()).getValue();
+  auto type = getFunctionTypeAttr().getValue();
   if (!type.isa<FunctionType>())
-    return emitOpError("requires '" + getTypeAttrName() +
+    return emitOpError("requires '" + getFunctionTypeAttrName().getValue() +
                        "' attribute of function type");
   return success();
 }
@@ -272,15 +276,17 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
     return parser.emitError(parser.getCurrentLocation())
            << "invalid result type list";
   }
-  function_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
-                                                /*resultAttrs=*/llvm::None);
+  function_interface_impl::addArgAndResultAttrs(
+      builder, result, argAttrs,
+      /*resultAttrs=*/std::nullopt, getArgAttrsAttrName(result.name),
+      getResAttrsAttrName(result.name));
   if (failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
     return failure();
   }
 
   auto functionType =
       FunctionType::get(result.getContext(), argTypes, resultTypes);
-  result.addAttribute(mlir::function_interface_impl::getTypeAttrName(),
+  result.addAttribute(getFunctionTypeAttrName(result.name),
                       TypeAttr::get(functionType));
 
   result.addRegion();
@@ -316,11 +322,13 @@ void ImportOp::print(OpAsmPrinter &p) {
     p << " -> (" << getFunctionType().getResults() << ")";
   }
   mlir::function_interface_impl::printFunctionAttributes(
-      p, op, getArgumentTypes().size(), getResultTypes().size(),
-      /*elided=*/
+      p, op,
       {
+          getFunctionTypeAttrName(),
+          getArgAttrsAttrName(),
+          getResAttrsAttrName(),
           "is_variadic",
-          "is_optional",
+          getIsOptionalAttrName(),
       });
 }
 
@@ -334,18 +342,19 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   if (!argAttrs.empty()) {
     assert(type.getNumInputs() == argAttrs.size() &&
            "expected as many argument attribute lists as arguments");
-    function_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
-                                                  /*resultAttrs=*/llvm::None);
+    function_interface_impl::addArgAndResultAttrs(
+        builder, result, argAttrs,
+        /*resultAttrs=*/std::nullopt, getArgAttrsAttrName(result.name),
+        getResAttrsAttrName(result.name));
   }
 
   result.addRegion();
 }
 
 LogicalResult ImportOp::verifyType() {
-  auto type =
-      getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName()).getValue();
+  auto type = getFunctionTypeAttr().getValue();
   if (!type.isa<FunctionType>())
-    return emitOpError("requires '" + getTypeAttrName() +
+    return emitOpError("requires '" + getFunctionTypeAttrName().getValue() +
                        "' attribute of function type");
   return success();
 }

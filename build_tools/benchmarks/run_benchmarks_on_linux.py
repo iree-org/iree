@@ -24,12 +24,12 @@ from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_definition import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash, get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start
-from common.common_arguments import build_common_argument_parser
 from common.linux_device_utils import get_linux_device_info
 from e2e_test_framework.definitions import iree_definitions
 from e2e_test_framework import serialization
 from e2e_test_artifacts import iree_artifacts
 from e2e_model_tests import run_module_utils
+import common.common_arguments
 
 
 class LinuxBenchmarkDriver(BenchmarkDriver):
@@ -203,7 +203,7 @@ def main(args):
 
 
 def parse_argument():
-  arg_parser = build_common_argument_parser()
+  arg_parser = common.common_arguments.Parser()
   arg_parser.add_argument("--device_model",
                           default="Unknown",
                           help="Device model")

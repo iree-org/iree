@@ -186,15 +186,15 @@ Optional<SmallVector<int64_t>> getCooperativeOpVectorShape(
     VectorType sliceType;
     for (Operation *users : op->getUsers()) {
       auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-      if (!extract) return llvm::None;
+      if (!extract) return std::nullopt;
       auto vecType = extract.getResult().getType().cast<VectorType>();
-      if (sliceType && sliceType != vecType) return llvm::None;
+      if (sliceType && sliceType != vecType) return std::nullopt;
       sliceType = vecType;
     }
     return llvm::to_vector<>(sliceType.getShape());
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.

@@ -118,7 +118,7 @@ using AttributeMap = llvm::StringMap<std::string>;
 /// cluster, an invisible "anchor" node is created.
 struct Node {
  public:
-  Node(int id = 0, Optional<int> clusterId = llvm::None)
+  Node(int id = 0, Optional<int> clusterId = std::nullopt)
       : id(id), clusterId(clusterId) {}
 
   int id;

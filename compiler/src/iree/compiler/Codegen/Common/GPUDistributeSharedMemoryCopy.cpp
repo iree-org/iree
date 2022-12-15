@@ -256,7 +256,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
                     {StringAttr::get(patterns.getContext(),
                                      getCopyToWorkgroupMemoryMarker()),
                      StringAttr::get(patterns.getContext(), kCopyDistributed)},
-                    llvm::None));
+                    std::nullopt));
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.

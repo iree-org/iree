@@ -18,16 +18,10 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Creates a new NCCL communicator channel.
-typedef struct ncclComm* ncclComm_t;
-
 iree_status_t iree_hal_cuda_nccl_channel_create(
     iree_hal_cuda_context_wrapper_t* context_wrapper,
     const iree_hal_cuda_nccl_id_t* id, int rank, int count,
     iree_hal_channel_t** out_channel);
-
-// Returns the NCCL communicator for the given |channel|, if available.
-ncclComm_t iree_hal_cuda_nccl_channel_comm(iree_hal_channel_t* channel);
 
 // Performs a non-blocking submission of |batch| to |stream|.
 // The backing storage of |batch| is dropped immediately but all resources

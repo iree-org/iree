@@ -140,7 +140,8 @@ static IREE::HAL::CommandCategoryBitfield deriveCommandCategories(
   auto bits = IREE::HAL::CommandCategoryBitfield::None;
   for (auto &block : region) {
     for (auto &op : block) {
-      if (isa<IREE::Stream::CmdDispatchOp>(op)) {
+      if (isa<IREE::Stream::CmdDispatchOp>(op) ||
+          isa<IREE::Stream::CmdCollectiveOp>(op)) {
         bits = bits | IREE::HAL::CommandCategoryBitfield::Dispatch;
       } else {
         bits = bits | IREE::HAL::CommandCategoryBitfield::Transfer;
@@ -748,7 +749,7 @@ static IREE::HAL::CollectiveAttr convertCollectiveAttr(
     IREE::Stream::CollectiveAttr sourceAttr) {
   auto convertReductionOp = [](Optional<IREE::Stream::CollectiveReductionOp> op)
       -> Optional<IREE::HAL::CollectiveReductionOp> {
-    if (!op.has_value()) return llvm::None;
+    if (!op.has_value()) return std::nullopt;
     return static_cast<IREE::HAL::CollectiveReductionOp>(op.value());
   };
   return IREE::HAL::CollectiveAttr::get(
@@ -1268,7 +1269,7 @@ struct GlobalTimepointConversionPattern
     auto initialValue = op.getInitialValue();
     if (!initialValue.has_value()) return failure();
     if (!initialValue->isa<IREE::Stream::TimepointAttr>()) return failure();
-    rewriter.updateRootInPlace(op, [&]() { op.removeInitial_valueAttr(); });
+    rewriter.updateRootInPlace(op, [&]() { op.removeInitialValueAttr(); });
     return success();
   }
 };

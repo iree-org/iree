@@ -131,9 +131,9 @@ LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
   FailureOr<Operation *> result =
       pattern.returningMatchAndRewrite(target, rewriter);
   if (failed(result))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
   results.assign({*result});
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 DiagnosedSilenceableFailure
@@ -145,9 +145,9 @@ LinalgExt::RewriteForeachThreadToScfForOp::applyToOne(
   FailureOr<Operation *> result =
       pattern.returningMatchAndRewrite(target, rewriter);
   if (failed(result))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultDefiniteFailure(target);
   results.assign({*result});
-  return DiagnosedSilenceableFailure(success());
+  return DiagnosedSilenceableFailure::success();
 }
 
 #define GET_OP_CLASSES
