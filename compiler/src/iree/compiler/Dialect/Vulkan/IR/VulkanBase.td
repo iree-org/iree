@@ -49,26 +49,23 @@ class VK_IsKnownIntEnumCaseFor<string name> :
 
 // Wrapper over base I32BitEnumAttr to set common fields.
 class VK_BitEnumAttr<string name, string description,
-                      list<I32BitEnumAttrCase> cases> :
+                     list<I32BitEnumAttrCase> cases> :
     I32BitEnumAttr<name, description, cases> {
   let predicate = And<[I32Attr.predicate, VK_IsKnownBitEnumCaseFor<name>]>;
   let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
 }
 
-// Wrapper over base I32EnumAttr to set common fields.
-class VK_I32EnumAttr<string name, string description,
-                      list<I32EnumAttrCase> cases> :
+class VK_I32Enum<string name, string description, list<I32EnumAttrCase> cases> :
     I32EnumAttr<name, description, cases> {
   let predicate = And<[I32Attr.predicate, VK_IsKnownIntEnumCaseFor<name>]>;
   let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
 }
 
-// Wrapper over base I32EnumAttr to set common fields for mimicing StrEnumAttr.
-class VK_EnumAttr<string name, string description,
-                  list<I32EnumAttrCase> cases> :
-    EnumAttr<VK_Dialect, I32EnumAttr<name, description, cases>, name> {
-  let predicate = And<[StrAttr.predicate, VK_IsKnownIntEnumCaseFor<name>]>;
+class VK_I32EnumAttr<string name, string description, string mnemonic,
+                     list<I32EnumAttrCase> cases> :
+    EnumAttr<VK_Dialect, I32EnumAttr<name, description, cases>, mnemonic> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
+  let assemblyFormat = "`<` $value `>`";
 }
 
 //===----------------------------------------------------------------------===//
@@ -80,7 +77,7 @@ def VK_V_1_1 : I32EnumAttrCase<"V_1_1", 1, "v1.1">;
 def VK_V_1_2 : I32EnumAttrCase<"V_1_2", 2, "v1.2">;
 def VK_V_1_3 : I32EnumAttrCase<"V_1_3", 3, "v1.3">;
 
-def VK_VersionAttr : VK_I32EnumAttr<"Version", "valid Vulkan version", [
+def VK_VersionAttr : VK_I32Enum<"Version", "valid Vulkan version", [
     VK_V_1_0, VK_V_1_1, VK_V_1_2, VK_V_1_3
 ]>;
 
@@ -94,7 +91,7 @@ def VK_EXT_subgroup_size_control : I32EnumAttrCase<"VK_EXT_subgroup_size_control
 def VK_NV_cooperative_matrix : I32EnumAttrCase<"VK_NV_cooperative_matrix", 7>;
 
 def VK_ExtensionAttr :
-    VK_EnumAttr<"Extension", "supported Vulkan extension", [
+    VK_I32EnumAttr<"Extension", "supported Vulkan extension", "extension", [
       VK_KHR_16bit_storage, VK_KHR_8bit_storage, VK_KHR_shader_float16_int8,
       VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class,
       VK_KHR_variable_pointers, VK_EXT_subgroup_size_control,
@@ -122,7 +119,7 @@ def VK_TTA_Ampere    : I32EnumAttrCase<"NV_Ampere", 401, "ampere">;
 // Qualcomm Adreno GPU
 def VK_TTA_Adreno    : I32EnumAttrCase<"QC_Adreno", 500, "adreno">;
 
-def VK_TargetArchAttr : VK_I32EnumAttr<
+def VK_TargetArchAttr : VK_I32Enum<
   "TargetTripleArch", "recognized target architecture", [
     VK_TTA_Unknown, VK_TTA_CPU, VK_TTA_RDNAv1, VK_TTA_RDNAv2,
     VK_TTA_RDNAv3, VK_TTA_M1, VK_TTA_Valhall, VK_TTA_Turing, VK_TTA_Ampere,
@@ -139,7 +136,7 @@ def VK_TTP_SwiftShader : I32EnumAttrCase<"SwiftShader", 200, "swiftshader">;
 // Translation layers
 def VK_TTP_MoltenVK    : I32EnumAttrCase<"MoltenVK", 300, "moltenvk">;
 
-def VK_TargetProductAttr : VK_I32EnumAttr<
+def VK_TargetProductAttr : VK_I32Enum<
   "TargetTripleProduct", "recognized target product", [
     VK_TTP_Unknown, VK_TTP_Adreno650, VK_TTP_Adreno660, VK_TTP_SwiftShader,
     VK_TTP_MoltenVK,
@@ -155,7 +152,7 @@ def VK_TTOS_Android30 : I32EnumAttrCase<"Android30", 5, "android30">;
 // API Level 31 => Android 12
 def VK_TTOS_Android31 : I32EnumAttrCase<"Android31", 6, "android31">;
 
-def VK_TargetOSAttr : VK_I32EnumAttr<
+def VK_TargetOSAttr : VK_I32Enum<
   "TargetTripleOS", "recognized target operating system", [
     VK_TTOS_Unknown, VK_TTOS_Linux, VK_TTOS_iOS, VK_TTOS_macOS,
     VK_TTOS_Windows, VK_TTOS_Android30, VK_TTOS_Android31,
@@ -187,7 +184,7 @@ def VK_SNV_Subgroup    : I32EnumAttrCase<"Subgroup", 3>;
 def VK_SNV_QueueFamily : I32EnumAttrCase<"QueueFamily", 5>;
 
 def VK_ScopeNV_Attr :
-  VK_I32EnumAttr<"ScopeNV", "valid VkScopeNV", [
+  VK_I32EnumAttr<"ScopeNV", "valid VkScopeNV", "scope", [
     VK_SNV_Device, VK_SNV_Workgroup, VK_SNV_Subgroup,
     VK_SNV_QueueFamily
   ]>;
