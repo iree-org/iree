@@ -57,7 +57,7 @@ static constexpr int64_t outputTileSize = 6;
 /// are constants. So for large ic and oc, this function is
 /// time intensive.
 /// TODO: Codegen this as a kernel and run once at initialization
-static DenseElementsAttr
+static Optional<DenseElementsAttr>
 foldFilterTransform(ArrayRef<int64_t> shape, int64_t inputTileSize,
                     int64_t kernelSize, ShapedType outputType, const float *G,
                     bool isSplat, float splatValue,
@@ -68,29 +68,47 @@ foldFilterTransform(ArrayRef<int64_t> shape, int64_t inputTileSize,
   const int &ic = isNchw ? shape[1] : shape[2];
   const int &oc = isNchw ? shape[0] : shape[3];
   const int64_t numElements = inputTileSize * inputTileSize * ic * oc;
+  float *alloc{nullptr};
+  int idx;
+  if (!isSplat) {
+    alloc = reinterpret_cast<float *>(
+        std::malloc(kh * kw * ic * oc * sizeof(float)));
+    if (!alloc)
+      return std::nullopt;
+    for (int d2 = 0; d2 < ic; d2++) {
+      for (int d3 = 0; d3 < oc; d3++) {
+        for (int d4 = 0; d4 < kernelSize; d4++) {
+          for (int d5 = 0; d5 < kernelSize; d5++) {
+            idx = isNchw ? index(d3, d2, d4, d5, oc, ic, kh, kw)
+                         : index(d4, d5, d2, d3, kh, kw, ic, oc);
+            alloc[idx] = input[idx].convertToFloat();
+          }
+        }
+      }
+    }
+  }
+  int idx0, idx1, odx;
   SmallVector<APFloat> output(numElements, APFloat(0.0f));
   for (int d0 = 0; d0 < inputTileSize; d0++) {
     for (int d1 = 0; d1 < inputTileSize; d1++) {
       for (int d2 = 0; d2 < ic; d2++) {
         for (int d3 = 0; d3 < oc; d3++) {
-          APFloat accum(0.0f);
+          float accum{0.0f};
           for (int d4 = 0; d4 < kernelSize; d4++) {
             for (int d5 = 0; d5 < kernelSize; d5++) {
-              APFloat ival(splatValue);
+              float ival{splatValue};
               if (!isSplat) {
-                if (!isNchw) {
-                  ival = input[index(d4, d5, d2, d3, kh, kw, ic, oc)];
-                } else {
-                  ival = input[index(d3, d2, d4, d5, oc, ic, kh, kw)];
-                }
+                idx = isNchw ? index(d3, d2, d4, d5, oc, ic, kh, kw)
+                             : index(d4, d5, d2, d3, kh, kw, ic, oc);
+                ival = alloc[idx];
               }
-              int idx0 = index(d0, d4, inputTileSize, kernelSize);
-              int idx1 = index(d1, d5, inputTileSize, kernelSize);
-              accum = accum + APFloat(G[idx0]) * ival * APFloat(G[idx1]);
+              idx0 = index(d0, d4, inputTileSize, kernelSize);
+              idx1 = index(d1, d5, inputTileSize, kernelSize);
+              accum = accum + G[idx0] * ival * G[idx1];
             }
           }
-          int odx = index(d0, d1, d2, d3, inputTileSize, inputTileSize, ic, oc);
-          output[odx] = accum;
+          odx = index(d0, d1, d2, d3, inputTileSize, inputTileSize, ic, oc);
+          output[odx] = APFloat(accum);
           if (floatType.isF16()) {
             bool losesInfo;
             output[odx].convert(APFloat::IEEEhalf(),
@@ -100,6 +118,8 @@ foldFilterTransform(ArrayRef<int64_t> shape, int64_t inputTileSize,
       }
     }
   }
+  if (alloc)
+    std::free(alloc);
   return DenseElementsAttr::get(outputType, output);
 }
 
@@ -188,7 +208,9 @@ public:
         foldFilterTransform(shape, inputTileSize, kernelSize, resultType,
                             IREE::LinalgExt::Winograd::G_6x6_3x3, isSplat,
                             splatValue, nonSplatValues, elemType, isNchw);
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, foldedKernelAttr);
+    if (!foldedKernelAttr)
+      return failure();
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, *foldedKernelAttr);
     return success();
   }
 };
