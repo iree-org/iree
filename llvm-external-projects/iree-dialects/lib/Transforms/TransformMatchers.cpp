@@ -317,9 +317,10 @@ void transform_ext::makeReductionMatcher(
                  .output(NumEqualsTo(1));
   leading = trailing;
   reduction = m_StructuredOp()
-                  .dim(AllDims(), ShapeKind::Static)
+                  // The CUDA strategy now supports arbitray mixes of static and
+                  // dynamic sizes and adapts accordingly.
+                  // Consider separating control for other targets if needed.
                   .dim(-1, utils::IteratorType::reduction)
-                  .dim(-1, DivisibleBy(kCudaWarpSize))
                   .dim(-1, CaptureDim(reductionDimensionSize))
                   // Can be extended to projected permutation with broadcast.
                   .input(AllOperands(), IsPermutation())

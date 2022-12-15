@@ -34,6 +34,11 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="123x4567xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
+// RUN: iree-compile %s --iree-hal-target-backends=cuda \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit | \
+// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="123x4567xf32=1" |\
+// RUN: FileCheck %s --check-prefix=EXEC
+
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   //     CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
   //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x1024xf32, 3>

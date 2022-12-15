@@ -85,6 +85,7 @@ Value buildMapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
                                 ArrayRef<int64_t> blockSize);
 
 static constexpr unsigned kCudaWarpSize = 32;
+static constexpr unsigned kCudaMaxNumThreads = 1024;
 
 /// Post-bufferization vector distribution with rank-reduction.
 /// Takes a handle to a func.func and returns an updated handle to a

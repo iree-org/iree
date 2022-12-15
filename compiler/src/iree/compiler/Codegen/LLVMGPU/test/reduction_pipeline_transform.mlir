@@ -31,22 +31,25 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //   CHECK-LABEL: func.func @group_reduction
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, 3>
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x32xf32, 3>
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
-//         CHECK:   %[[IDX:.*]] = affine.apply{{.*}}%[[TIDX]]
-//         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][0, %[[IDX]]]{{.*}}to memref<2xf32, strided<[1], offset: ?>, 3>
-//         CHECK:   gpu.barrier
 
-// Local per-thread scf.for-based reduction, after the single-iteration scf.for was canonicalized.
-//         CHECK:   vector.transfer_read
-//         CHECK:   vector.transfer_read
-//         CHECK:   arith.addf %{{.*}} : vector<2xf32>
-//         CHECK:   vector.transfer_write
-//         CHECK:   gpu.barrier
+// Fusion occurred, no barrier before the loop
+//     CHECK-NOT: gpu.barrier
+//     CHECK:   vector.transfer_read {{.*}} vector<f32>
+// Local per-thread scf.for-based reduction.
+//         CHECK: scf.for
+//         CHECK:   vector.transfer_read {{.*}} vector<2xf32>
+//         CHECK:   vector.reduction <add>{{.*}} : vector<2xf32> into f32
+//         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
+// No barrier within the loop
+//     CHECK-NOT:   gpu.barrier
+//         CHECK:   scf.yield {{.*}} : vector<f32>
 
 // Distributed reduction: everyone loads then 5 xor + addf expected.
 //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
-//         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %[[IDX]]]
+//         CHECK: vector.transfer_read %{{.*}}[]
+//         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %[[TIDX]]]
 // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
 //         CHECK:   %[[RES:.*]] = arith.addf %{{.*}}
@@ -95,29 +98,31 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //   CHECK-LABEL: func.func @group_reduction_elementwise
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, 3>
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x32xf32, 3>
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
-//         CHECK:   %[[IDX:.*]] = affine.apply{{.*}}%[[TIDX]]
-//         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][0, %[[IDX]]]{{.*}}to memref<2xf32, strided<[1], offset: ?>, 3>
-//         CHECK:   gpu.barrier
 
-// Local per-thread scf.for-based reduction, after the single-iteration scf.for was canonicalized.
-//         CHECK:   vector.transfer_read
-//         CHECK:   vector.transfer_read
-//         CHECK:   arith.addf %{{.*}} : vector<2xf32>
-//         CHECK:   vector.transfer_write
-//         CHECK:   gpu.barrier
+// Fusion occurred, no barrier before the loop
+//     CHECK-NOT: gpu.barrier
+//     CHECK:   vector.transfer_read {{.*}} vector<f32>
+// Local per-thread scf.for-based reduction.
+//         CHECK: scf.for
+//         CHECK:   vector.transfer_read {{.*}} vector<2xf32>
+//         CHECK:   vector.reduction <add>{{.*}} : vector<2xf32> into f32
+//         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
+// No barrier within the loop
+//     CHECK-NOT:   gpu.barrier
+//         CHECK:   scf.yield {{.*}} : vector<f32>
 
 // Distributed reduction: everyone loads then 5 xor + addf expected.
 //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
-//         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %[[IDX]]]
+//         CHECK: vector.transfer_read %{{.*}}[]
+//         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %[[TIDX]]]
 // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
 //         CHECK:   %[[PARTIAL:.*]] = arith.addf %{{.*}}
-//         CHECK:   %[[PARTIAL_VEC:.*]] = vector.broadcast %[[PARTIAL]] : f32 to vector<f32>
-//         CHECK:   %[[ELEM:.*]] = vector.extractelement %[[PARTIAL_VEC]][]
-//         CHECK:   %[[RES:.*]] = math.sqrt %[[ELEM]]
-//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
+//         CHECK:   vector.broadcast %[[PARTIAL]] : f32 to vector<f32>
+//         CHECK:   math.sqrt 
+//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %{{.*}}: f32 to vector<f32>
 //         CHECK:   %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
 //         CHECK:   scf.if %[[CONDXIS0]]
 //         CHECK:     vector.transfer_write %[[RES_VEC]]
@@ -159,26 +164,28 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //   CHECK-LABEL: func.func @group_elementwise_reduction
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, 3>
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x32xf32, 3>
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
-//         CHECK:   %[[IDX:.*]] = affine.apply{{.*}}%[[TIDX]]
-//         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][0, %[[IDX]]]{{.*}}to memref<2xf32, strided<[1], offset: ?>, 3>
-//         CHECK:   gpu.barrier
 
-// Local per-thread scf.for-based reduction, after the single-iteration scf.for was canonicalized.
-//         CHECK:   vector.transfer_read
-//         CHECK:   vector.transfer_read
-//         CHECK:   %[[PARTIAL_1:.*]] = arith.addf %[[ARG:.*]], %[[ARG]]
-//         CHECK:   %[[PARTIAL_2:.*]] = arith.addf %[[PARTIAL_1]], %[[PARTIAL_1]]
-//         CHECK:   arith.addf %[[PARTIAL_2]], %{{.*}} : vector<2xf32>
-//         CHECK:   vector.transfer_write
-//         CHECK:   gpu.barrier
+// Fusion occurred, no barrier before the loop
+//     CHECK-NOT: gpu.barrier
+//     CHECK:   vector.transfer_read {{.*}} vector<f32>
+// Local per-thread scf.for-based reduction.
+//         CHECK: scf.for
+//         CHECK:   vector.transfer_read {{.*}} vector<2xf32>
+//         CHECK:   arith.addf{{.*}} : vector<2xf32>
+//         CHECK:   arith.addf{{.*}} : vector<2xf32>
+//         CHECK:   vector.reduction <add>{{.*}} : vector<2xf32> into f32
+//         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
+// No barrier within the loop
+//     CHECK-NOT:   gpu.barrier
+//         CHECK:   scf.yield {{.*}} : vector<f32>
 
 // Distributed reduction: everyone loads then 5 xor + addf expected.
 //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
-//         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %[[IDX]]]
+//         CHECK: vector.transfer_read %{{.*}}[]
+//         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %[[TIDX]]]
 // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
-
 
 //         CHECK:   %[[RES:.*]] = arith.addf %{{.*}}
 //         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
@@ -228,31 +235,33 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //   CHECK-LABEL: func.func @group_elementwise_reduction_elementwise
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, 3>
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x32xf32, 3>
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
-//         CHECK:   %[[IDX:.*]] = affine.apply{{.*}}%[[TIDX]]
-//         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][0, %[[IDX]]]{{.*}}to memref<2xf32, strided<[1], offset: ?>, 3>
-//         CHECK:   gpu.barrier
 
-// Local per-thread scf.for-based reduction, after the single-iteration scf.for was canonicalized.
-//         CHECK:   vector.transfer_read
-//         CHECK:   vector.transfer_read
-//         CHECK:   %[[PARTIAL_1:.*]] = arith.addf %[[ARG:.*]], %[[ARG]]
-//         CHECK:   %[[PARTIAL_2:.*]] = arith.addf %[[PARTIAL_1]], %[[PARTIAL_1]]
-//         CHECK:   arith.addf %[[PARTIAL_2]], %{{.*}} : vector<2xf32>
-//         CHECK:   vector.transfer_write
-//         CHECK:   gpu.barrier
+// Fusion occurred, no barrier before the loop
+//     CHECK-NOT: gpu.barrier
+//     CHECK:   vector.transfer_read {{.*}} vector<f32>
+// Local per-thread scf.for-based reduction.
+//         CHECK: scf.for
+//         CHECK:   vector.transfer_read {{.*}} vector<2xf32>
+//         CHECK:   arith.addf{{.*}} : vector<2xf32>
+//         CHECK:   arith.addf{{.*}} : vector<2xf32>
+//         CHECK:   vector.reduction <add>{{.*}} : vector<2xf32> into f32
+//         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
+// No barrier within the loop
+//     CHECK-NOT:   gpu.barrier
+//         CHECK:   scf.yield {{.*}} : vector<f32>
 
 // Distributed reduction: everyone loads then 5 xor + addf expected.
 //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
-//         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %[[IDX]]]
+//         CHECK: vector.transfer_read %{{.*}}[]
+//         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %[[TIDX]]]
 // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
 //         CHECK:   %[[PARTIAL:.*]] = arith.addf %{{.*}}
-//         CHECK:   %[[PARTIAL_VEC:.*]] = vector.broadcast %[[PARTIAL]] : f32 to vector<f32>
-//         CHECK:   %[[ELEM:.*]] = vector.extractelement %[[PARTIAL_VEC]][]
-//         CHECK:   %[[RES:.*]] = math.sqrt %[[ELEM]]
-//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
+//         CHECK:   vector.broadcast %[[PARTIAL]] : f32 to vector<f32>
+//         CHECK:   math.sqrt
+//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %{{.*}}: f32 to vector<f32>
 //         CHECK:   %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
 //         CHECK:   scf.if %[[CONDXIS0]]
 //         CHECK:     vector.transfer_write %[[RES_VEC]]
@@ -292,21 +301,25 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //   CHECK-LABEL: func.func @group_reduction_larger
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x128xf32, 3>
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, 3>
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
-//         CHECK:   %[[IDX:.*]] = affine.apply{{.*}}%[[TIDX]]
-//         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][0, %[[IDX]]]{{.*}}to memref<4xf32, strided<[1], offset: ?>, 3>
-//         CHECK:   gpu.barrier
 
-// Local per-thread scf.for-based reduction, after the single-iteration scf.for was canonicalized.
+// Fusion occurred, no barrier before the loop
+//     CHECK-NOT: gpu.barrier
+//     CHECK:   vector.transfer_read {{.*}} vector<f32>
+// Local per-thread scf.for-based reduction.
+//         CHECK: scf.for
 //         CHECK:   vector.transfer_read
-//         CHECK:   vector.transfer_read
-//         CHECK:   arith.addf %{{.*}} : vector<4xf32>
-//         CHECK:   vector.transfer_write
-//         CHECK:   gpu.barrier
+//         CHECK:   vector.reduction <add>{{.*}} : vector<4xf32> into f32
+//         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
+// No barrier within the loop
+//     CHECK-NOT:   gpu.barrier
+//         CHECK:   scf.yield {{.*}} : vector<f32>
 
 // Distributed reduction: everyone loads then 5 xor + addf expected.
 //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
+//         CHECK: vector.transfer_read %{{.*}}[]
+//         CHECK: %[[IDX:.*]] = affine.apply{{.*}}%[[TIDX]]
 //         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %[[IDX]]]
 // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
