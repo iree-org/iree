@@ -54,23 +54,22 @@ IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
 
 #if IREE_HAL_DRIVER_CUDA_NCCL
 
-static iree_status_t iree_hal_nccl_init_root(iree_hal_cuda_driver_t* driver) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, NCCL_RESULT_TO_STATUS(&driver->syms, ncclInitRoot(), "ncclInitRoot"));
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_nccl_get_unique_id_from_env(
     iree_hal_cuda_driver_t* driver) {
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  char* nccl_comm_id_str = getenv("NCCL_COMM_ID");
+  if (!nccl_comm_id_str) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INTERNAL);
+  }
+
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, NCCL_RESULT_TO_STATUS(
               &driver->syms,
-              ncclGetUniqueIdFromEnv(
+              ncclGetUniqueId(
                   (ncclUniqueId*)&driver->default_params.nccl_default_id),
-              "ncclGetUniqueIdFromEnv"));
+              "ncclGetUniqueId"));
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -106,13 +105,6 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
 #if IREE_HAL_DRIVER_CUDA_NCCL
   // Initialize NCCL if NPROCS is set.
   if (driver->default_params.nccl_default_count > 0) {
-    if (driver->default_params.nccl_default_rank == 0) {
-      status = iree_hal_nccl_init_root(driver);
-      if (!iree_status_is_ok(status)) {
-        iree_hal_driver_release((iree_hal_driver_t*)driver);
-        return status;
-      }
-    }
     // get a unique ID from the environmental variable
     status = iree_hal_nccl_get_unique_id_from_env(driver);
     if (!iree_status_is_ok(status)) {

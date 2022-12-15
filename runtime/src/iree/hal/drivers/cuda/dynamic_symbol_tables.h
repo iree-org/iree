@@ -62,8 +62,6 @@ CU_PFN_DECL(cuLaunchKernel, CUfunction, unsigned int, unsigned int,
 
 NCCL_PFN_DECL(ncclGetVersion, int *)
 NCCL_PFN_DECL(ncclGetUniqueId, ncclUniqueId *)
-NCCL_PFN_DECL(ncclInitRoot)
-NCCL_PFN_DECL(ncclGetUniqueIdFromEnv, ncclUniqueId *)
 NCCL_PFN_DECL(ncclCommInitRankConfig, ncclComm_t *, int, ncclUniqueId, int,
               ncclConfig_t *)
 NCCL_PFN_DECL(ncclCommInitRank, ncclComm_t *, int, ncclUniqueId, int)
