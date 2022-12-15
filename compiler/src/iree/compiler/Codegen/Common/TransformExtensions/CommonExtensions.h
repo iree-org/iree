@@ -29,6 +29,26 @@ struct TileSizesSpec;
 struct NumThreadsSpec;
 class TransformTypeInterface;
 }  // namespace transform
+
+namespace iree_compiler {
+namespace IREE {
+namespace transform_dialect {
+/// Selected patterns for ApplyPatternOp.
+struct ApplyPatternsOpPatterns {
+  bool additionalIreePatterns = false;
+  bool bubbleCollapseExpand = false;
+  bool canonicalization = false;
+  bool eraseUnnecessaryTensorOperands = false;
+  bool foldReassociativeReshapes = false;
+  bool promoteForeachThreadCaptureToShared = false;
+  bool rankReducing = false;
+  bool expandMemrefStridedMetadata = false;
+  bool swapPaddingElideConditional = false;
+  bool swappingPatterns = false;
+};
+}  // namespace transform_dialect
+}  // namespace IREE
+}  // namespace iree_compiler
 }  // namespace mlir
 
 #define GET_OP_CLASSES
@@ -43,7 +63,7 @@ void registerTransformDialectCommonExtension(DialectRegistry &registry);
 
 namespace IREE {
 namespace transform_dialect {
-// Hook to register common transformations to the transform dialect.
+/// Hook to register common transformations to the transform dialect.
 class CommonExtensions
     : public transform::TransformDialectExtension<CommonExtensions> {
  public:
