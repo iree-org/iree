@@ -39,12 +39,12 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x1024xf32, 3>
   
   //         CHECK: %[[TIDX:.]] = gpu.thread_id  x
-  //         CHECK: %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][0, %[[TIDX]]]{{.*}}to memref<1x1xf32, strided<[1024, 1], offset: ?>, 3>
+  //         CHECK: %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][0, %[[TIDX]]]{{.*}}to memref<f32, strided<[], offset: ?>, 3>
   // Local per-thread scf.for-based reduction.
   //         CHECK: scf.for
-  //         CHECK:   vector.transfer_read %{{.*}} {in_bounds = [true]} : memref<?x?xf32>, vector<1xf32>
-  //         CHECK:   arith.addf {{.*}} : vector<1xf32>
-  //         CHECK:   scf.yield %{{.*}} : vector<1xf32>
+  //         CHECK:   vector.transfer_read %{{.*}} : memref<f32, strided<[], offset: ?>>, vector<f32>
+  //         CHECK:   arith.addf {{.*}} : f32
+  //         CHECK:   scf.yield %{{.*}} : vector<f32>
 
   //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
   // Distributed reduction: everyone loads then 5 xor + addf expected
@@ -53,7 +53,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 
   //         CHECK: %[[RES:.*]] = arith.addf %{{.*}}
 
-  //         CHECK: %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<1xf32>
+  //         CHECK: %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
   //         CHECK: %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
   //         CHECK: scf.if %[[CONDXIS0]]
   //         CHECK:   vector.transfer_write %[[RES_VEC]]
