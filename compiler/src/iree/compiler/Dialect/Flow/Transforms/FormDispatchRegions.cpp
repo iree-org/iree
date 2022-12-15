@@ -781,18 +781,11 @@ static FailureOr<linalg::GenericOp> collapseLinalgGeneric(
   return newGenericOp;
 }
 
-/// Finds whether genericOp contains an external tensor in ExtractOp that is not
-/// input/output.
-static bool hasExternalTensor(linalg::GenericOp genericOp) {
-  Optional<bool> hasExternal = llvm::None;
-  genericOp->walk([&](mlir::tensor::ExtractOp extractOp) {
-    auto usedTensor = extractOp.getTensor();
-    hasExternal = (llvm::all_of(genericOp.getInputs(),
-                                [&](Value val) { return val != usedTensor; }) &&
-                   llvm::all_of(genericOp.getOutputs(),
-                                [&](Value val) { return val != usedTensor; }));
-  });
-  return hasExternal.value_or(false);
+/// Finds whether genericOp contains IndexOp
+static bool hasLinalgIndexOp(linalg::GenericOp genericOp) {
+  auto walkResult = genericOp->walk(
+      [&](mlir::linalg::IndexOp indexOp) { return WalkResult::interrupt(); });
+  return walkResult.wasInterrupted();
 }
 
 /// Returns true if the given op is collapsable.
@@ -819,12 +812,9 @@ static bool isEligibleForCollapse(Operation *op,
     return false;
   }
 
-  // We only linearize tensors that are input/output, not the external tensors.
-  // After collapse loop structure is changed so data access. We cannot
-  // guarantee that collapsing is profitable in this case.
-  if (hasExternalTensor(genericOp)) {
-    return false;
-  }
+  // IndexOp allows accesing induction variables. Collapsing would require
+  // recalculating them. Therefore, we skip collapsing.
+  if (hasLinalgIndexOp(genericOp)) return false;
 
   return true;
 }
