@@ -34,31 +34,24 @@ from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework import serialization
 from e2e_test_artifacts import iree_artifacts
 
-
-def get_device_spec(
-    config: iree_definitions.E2EModelRunConfig
-) -> common_definitions.DeviceSpec:
-  return config.target_device_spec
-
-
 PresetMatcher = Callable[[iree_definitions.E2EModelRunConfig], bool]
 BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
     "x86_64":
-        lambda config: get_device_spec(config).architecture.architecture ==
+        lambda config: config.target_device_spec.architecture.architecture ==
         "x86_64",
     "cuda":
-        lambda config: get_device_spec(config).architecture.architecture ==
+        lambda config: config.target_device_spec.architecture.architecture ==
         "cuda",
     "android-cpu":
         lambda config:
-        (get_device_spec(config).architecture.type == common_definitions.
-         ArchitectureType.CPU and get_device_spec(
-             config).host_environment.platform == "android"),
+        (config.target_device_spec.architecture.type == common_definitions.
+         ArchitectureType.CPU and config.target_device_spec.host_environment.
+         platform == "android"),
     "android-gpu":
         lambda config:
-        (get_device_spec(config).architecture.type == common_definitions.
-         ArchitectureType.GPU and get_device_spec(
-             config).host_environment.platform == "android"),
+        (config.target_device_spec.architecture.type == common_definitions.
+         ArchitectureType.GPU and config.target_device_spec.host_environment.
+         platform == "android"),
 }
 
 
