@@ -61,7 +61,7 @@ static void computeRegionValueAliases(Operation *regionOp,
   auto tiedStreamOp = cast<IREE::Util::TiedOpInterface>(regionOp);
   auto yieldOp = cast<IREE::Stream::YieldOp>(block->getTerminator());
   for (auto it :
-       llvm::zip_equal(regionOp->getResults(), yieldOp.getResourceOperands())) {
+       llvm::zip(regionOp->getResults(), yieldOp.getResourceOperands())) {
     auto outerResult = std::get<0>(it);
     auto innerResult = std::get<1>(it);
     auto tiedOperandIndex =
@@ -1206,7 +1206,7 @@ static LogicalResult allocateExecutionRegion(
   }
   SmallVector<ResultReservation> resultReservations;
   for (auto it :
-       llvm::zip_equal(executeOp.getResults(), executeOp.getResultSizes())) {
+       llvm::zip(executeOp.getResults(), executeOp.getResultSizes())) {
     auto result = std::get<0>(it);
     auto resultSize = std::get<1>(it);
     auto resultType = result.getType().cast<IREE::Stream::ResourceType>();
@@ -1295,7 +1295,7 @@ static LogicalResult allocateExecutionRegion(
     });
 
     for (auto it :
-         llvm::zip_equal(reservationSet.reservations, allocOp.getResults())) {
+         llvm::zip(reservationSet.reservations, allocOp.getResults())) {
       auto &reservation = std::get<0>(it);
       auto allocResult = std::get<1>(it);
 
@@ -1395,8 +1395,8 @@ static LogicalResult allocateExecutionRegion(
   asmState = getRootAsmState(newExecuteOp->getParentOp());
   newExecuteOp.getBody().walk<WalkOrder::PreOrder>(
       [&](IREE::Stream::AsyncConcurrentOp concurrentOp) {
-        for (auto it : llvm::zip_equal(concurrentOp.getResourceOperands(),
-                                       concurrentOp.getBody().getArguments())) {
+        for (auto it : llvm::zip(concurrentOp.getResourceOperands(),
+                                 concurrentOp.getBody().getArguments())) {
           auto outerValue = std::get<0>(it);
           auto innerValue = std::get<1>(it);
           LLVM_DEBUG({
@@ -1412,8 +1412,8 @@ static LogicalResult allocateExecutionRegion(
         }
         auto yieldOp = cast<IREE::Stream::YieldOp>(
             concurrentOp.getBody().front().getTerminator());
-        for (auto it : llvm::zip_equal(yieldOp.getResourceOperands(),
-                                       concurrentOp.getResults())) {
+        for (auto it : llvm::zip(yieldOp.getResourceOperands(),
+                                 concurrentOp.getResults())) {
           auto innerValue = std::get<0>(it);
           auto outerValue = std::get<1>(it);
           LLVM_DEBUG({
