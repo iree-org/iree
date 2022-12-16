@@ -399,3 +399,65 @@ func.func @collapse11() -> !type_out {
 // CHECK: %[[RES:.+]] = flow.dispatch.region
 // CHECK: linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP]]], iterator_types = ["parallel"]}
 
+// -----
+
+!type = tensor<16x32xi32>
+func.func @dont_collapse_dueto_index(%height : index, %width : index) -> !type {
+  %init_source = tensor.empty() : !type
+  %source = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      outs(%init_source : !type) {
+    ^bb0(%b0 : i32):
+      %outer = linalg.index 0 : index
+      %inner = linalg.index 1 : index
+      %strided = arith.muli %outer, %width : index
+      %linearized = arith.addi %inner, %strided : index
+      %linearized_i32 = arith.index_cast %linearized : index to i32
+      linalg.yield %linearized_i32 : i32
+  } -> !type
+  return %source : !type
+}
+
+// CHECK-LABEL: func.func @dont_collapse
+// CHECK: linalg.generic {indexing_maps = [#[[$MAP:.+]]], iterator_types = ["parallel", "parallel"]}
+
+// -----
+
+!type = tensor<2x4x8x16x32x64xf32>
+util.global private @"__transpose_10_input" {noinline} = dense<1.0> : !type
+
+func.func @collapse12() -> (!type,!type,!type,!type) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %input_ptr = util.global.address @"__transpose_10_input" : !util.ptr<!type>
+  %input = util.global.load.indirect %input_ptr : !util.ptr<!type> -> !type
+  %output = tensor.empty() : !type
+  %output1 = tensor.empty() : !type
+  %output2 = tensor.empty() : !type
+  %output3 = tensor.empty() : !type
+  
+  %6, %7, %8, %9 = linalg.generic { indexing_maps = [ 
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>, 
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>, 
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>, 
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>, 
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>],
+            iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
+         }
+    ins(%input : !type) outs(%output, %output1, %output2, %output3 : !type, !type, !type, !type) {
+    ^bb0(%arg1: f32, %arg2: f32, %arg3: f32, %arg4: f32, %arg5: f32):
+      %0 = arith.addf %arg1, %arg2 : f32
+      %1 = arith.addf %0, %arg3 : f32
+      %2 = arith.addf %1, %arg4 : f32
+      %3 = arith.addf %2, %arg5 : f32
+      linalg.yield %0,%1,%2,%3 : f32, f32, f32, f32
+    } -> (!type,!type,!type,!type)
+  return %6, %7, %8, %9  : !type,!type,!type,!type
+}
+
+// CHECK: #[[$MAP:.+]] = affine_map<(d0) -> (d0)>
+// CHECK-LABEL: func.func @collapse12
+// CHECK: %[[RES:.+]] = flow.dispatch.region
+// CHECK: linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]], #[[$MAP]], #[[$MAP]]], iterator_types = ["parallel"]}
+

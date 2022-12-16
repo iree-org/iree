@@ -735,10 +735,8 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(
   }
   if (range.size() > 1) contiguousLoops.push_back(range);
 
-  // Couldn't find anything to collapse
-  if (contiguousLoops.empty()) return contiguousLoops;
   LLVM_DEBUG({
-    llvm::dbgs() << "Collapsing parallel loops: ";
+    llvm::dbgs() << "Collapsing dimensions if possible: ";
     for (auto indices : contiguousLoops) {
       llvm::dbgs() << "[";
       for (auto idx : indices) llvm::dbgs() << idx << ",";
@@ -781,13 +779,6 @@ static FailureOr<linalg::GenericOp> collapseLinalgGeneric(
   return newGenericOp;
 }
 
-/// Finds whether genericOp contains IndexOp
-static bool hasLinalgIndexOp(linalg::GenericOp genericOp) {
-  auto walkResult = genericOp->walk(
-      [&](mlir::linalg::IndexOp indexOp) { return WalkResult::interrupt(); });
-  return walkResult.wasInterrupted();
-}
-
 /// Returns true if the given op is collapsable.
 static bool isEligibleForCollapse(Operation *op,
                                   ArrayRef<Operation *> producers) {
@@ -812,9 +803,9 @@ static bool isEligibleForCollapse(Operation *op,
     return false;
   }
 
-  // IndexOp allows accesing induction variables. Collapsing would require
-  // recalculating them. Therefore, we skip collapsing.
-  if (hasLinalgIndexOp(genericOp)) return false;
+  // IndexOp allows accesing induction variables. Collapsing might cause
+  // performance regression, so we disable it.
+  if (genericOp.hasIndexSemantics()) return false;
 
   return true;
 }
