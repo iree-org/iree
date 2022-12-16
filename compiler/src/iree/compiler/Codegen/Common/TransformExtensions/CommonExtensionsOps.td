@@ -40,6 +40,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       registered dialects and ops.
       - erase_unnecessary_tensor_operands: add patterns that erase unnecessary
       tensor operands.
+      - fold_memref_aliases: adds patterns for folding ops such as
+      memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
       extract_slice ops with reassociative reshape ops.
       - promote_foreach_thread_capture_to_shared: adds patterns that rewrite
@@ -80,6 +82,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$bubble_collapse_expand,
                        UnitAttr:$canonicalization,
                        UnitAttr:$erase_unnecessary_tensor_operands,
+                       UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
                        UnitAttr:$promote_foreach_thread_capture_to_shared,
                        UnitAttr:$rank_reducing,

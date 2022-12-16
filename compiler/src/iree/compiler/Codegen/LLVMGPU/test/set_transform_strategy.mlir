@@ -48,7 +48,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   transform.structured.match ops{["func.func"]} in %{{.*}}
 //         CHECK:   transform.iree.foreach_thread_to_workgroup
 //         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [32, 1, 1]}
-//         CHECK:   transform.iree.apply_patterns %{{.*}} {rank_reducing}
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {fold_memref_aliases, rank_reducing}
 //         CHECK:   transform.structured.match ops{["scf.if"]} in %{{.*}}
 //         CHECK:   sequence {{.*}} failures(suppress) {
 //         CHECK:     transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 32 : i64}

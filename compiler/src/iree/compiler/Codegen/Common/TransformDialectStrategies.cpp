@@ -254,6 +254,7 @@ Value mlir::iree_compiler::buildDistributeVectors(ImplicitLocOpBuilder &b,
                                                   Value variantH, Value funcH,
                                                   int64_t warpSize) {
   ApplyPatternsOpPatterns patterns;
+  patterns.foldMemrefAliases = true;
   patterns.rankReducing = true;
   funcH = b.create<ApplyPatternsOp>(funcH, patterns);
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
