@@ -234,7 +234,8 @@ def parse_arguments():
                       help="Print internal information during execution.")
 
   subparser = parser.add_subparsers(title="tool version", required=True)
-  legacy_parser = subparser.add_parser("legacy")
+  legacy_parser = subparser.add_parser("legacy",
+                                       help="use with legacy benchmark suites.")
   legacy_parser.set_defaults(
       get_module_map_and_build_log=legacy_get_module_map_and_build_log)
   legacy_parser.add_argument(
@@ -242,7 +243,8 @@ def parse_arguments():
       type=check_dir_path,
       help="Path to the build directory containing benchmark suites.")
 
-  alpha_parser = subparser.add_parser("alpha")
+  alpha_parser = subparser.add_parser("alpha",
+                                      help="use with e2e test artifacts.")
   alpha_parser.set_defaults(
       get_module_map_and_build_log=alpha_get_module_map_and_build_log)
   alpha_parser.add_argument(
