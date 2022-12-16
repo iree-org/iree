@@ -187,7 +187,7 @@ static void insertConstantTableLookup(mlir::func::FuncOp funcOp,
   // TODO(benvanik): invert this loop so that we preserve argument order.
 
   // Replace the arguments with lookups into the lookup table tensors.
-  for (auto it : llvm::zip(constantTable.sets, tableTensors)) {
+  for (auto it : llvm::zip_equal(constantTable.sets, tableTensors)) {
     auto &set = std::get<0>(it);
     auto tableTensor = std::get<1>(it);
     for (auto operandValues : llvm::enumerate(set.values)) {

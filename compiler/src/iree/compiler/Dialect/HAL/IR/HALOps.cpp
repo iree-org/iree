@@ -95,22 +95,23 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
                                        TypeRange bufferTypes,
                                        ValueRange bufferOffsets,
                                        ValueRange bufferLengths) {
-  llvm::interleaveComma(
-      llvm::zip(ordinals, buffers, bufferTypes, bufferOffsets, bufferLengths),
-      p, [&](std::tuple<Value, Value, Type, Value, Value> it) {
-        p.printNewline();
-        p << "  ";
-        p.printOperand(std::get<0>(it));
-        p << " = (";
-        p.printOperand(std::get<1>(it));
-        p << " : ";
-        p.printType(std::get<2>(it));
-        p << ")[";
-        p.printOperand(std::get<3>(it));
-        p << ", ";
-        p.printOperand(std::get<4>(it));
-        p << "]";
-      });
+  llvm::interleaveComma(llvm::zip_equal(ordinals, buffers, bufferTypes,
+                                        bufferOffsets, bufferLengths),
+                        p,
+                        [&](std::tuple<Value, Value, Type, Value, Value> it) {
+                          p.printNewline();
+                          p << "  ";
+                          p.printOperand(std::get<0>(it));
+                          p << " = (";
+                          p.printOperand(std::get<1>(it));
+                          p << " : ";
+                          p.printType(std::get<2>(it));
+                          p << ")[";
+                          p.printOperand(std::get<3>(it));
+                          p << ", ";
+                          p.printOperand(std::get<4>(it));
+                          p << "]";
+                        });
   p.printNewline();
 }
 
@@ -140,7 +141,7 @@ LogicalResult ReturnOp::verify() {
                               << expectedTypes.size() << ")";
     }
     for (auto pair :
-         llvm::enumerate(llvm::zip(op.getOperands(), expectedTypes))) {
+         llvm::enumerate(llvm::zip_equal(op.getOperands(), expectedTypes))) {
       auto operand = std::get<0>(pair.value());
       auto expectedType = std::get<1>(pair.value());
       if (operand.getType() != expectedType) {
@@ -582,7 +583,7 @@ void DeviceSwitchOp::print(OpAsmPrinter &p) {
   p << "\n";
   p.getStream().indent(4);
   interleave(
-      llvm::zip(getConditions(), getConditionRegions()),
+      llvm::zip_equal(getConditions(), getConditionRegions()),
       [&](std::tuple<Attribute, Region &> it) {
         auto &conditionAttr = std::get<0>(it);
         auto &conditionRegion = std::get<1>(it);

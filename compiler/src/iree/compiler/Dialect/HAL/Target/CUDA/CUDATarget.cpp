@@ -300,8 +300,8 @@ class CUDATargetBackend final : public TargetBackend {
       }
 
       for (auto [exportOp, workgroupSize] :
-           llvm::zip(variantOp.getOps<IREE::HAL::ExecutableExportOp>(),
-                     workgroupSizes)) {
+           llvm::zip_equal(variantOp.getOps<IREE::HAL::ExecutableExportOp>(),
+                           workgroupSizes)) {
         auto *llvmFunc = llvmModule->getFunction(exportOp.getName());
         if (llvmFunc->isDeclaration()) continue;
 

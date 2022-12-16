@@ -1054,9 +1054,9 @@ struct FuseWidenOperands : public OpRewritePattern<Op> {
       operands.push_back(operand);
     }
 
-    if (llvm::all_of(llvm::zip(operands, op->getOperands()), [](auto pair) {
-          return std::get<0>(pair) == std::get<1>(pair);
-        }))
+    if (llvm::all_of(
+            llvm::zip_equal(operands, op->getOperands()),
+            [](auto pair) { return std::get<0>(pair) == std::get<1>(pair); }))
       return failure();
 
     rewriter.replaceOpWithNewOp<Op>(op, op->getResultTypes(), operands,

@@ -298,7 +298,8 @@ struct ResourceAllocOpPattern
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
     SmallVector<Value> results;
-    for (auto it : llvm::zip(allocOp.getResults(), allocOp.getStorageSizes())) {
+    for (auto it :
+         llvm::zip_equal(allocOp.getResults(), allocOp.getStorageSizes())) {
       auto resourceResult = std::get<0>(it);
       auto resourceType =
           resourceResult.getType().cast<IREE::Stream::ResourceType>();

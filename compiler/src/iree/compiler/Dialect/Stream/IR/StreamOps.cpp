@@ -43,7 +43,7 @@ namespace Stream {
 static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
                        ArrayRef<Type> types,
                        SmallVector<OpAsmParser::Argument> &args) {
-  for (auto argAndType : llvm::zip(operands, types)) {
+  for (auto argAndType : llvm::zip_equal(operands, types)) {
     auto &arg = args.emplace_back();
     arg.ssaName = std::get<0>(argAndType);
     arg.type = std::get<1>(argAndType);
@@ -64,8 +64,8 @@ static LogicalResult verifyDispatchWorkload(
              << workgroupCount.getNumArguments()
              << " arguments but dispatch provides " << workload.size();
     }
-    for (auto it : llvm::enumerate(llvm::zip(workgroupCount.getArgumentTypes(),
-                                             workload.getTypes()))) {
+    for (auto it : llvm::enumerate(llvm::zip_equal(
+             workgroupCount.getArgumentTypes(), workload.getTypes()))) {
       auto expectedType = std::get<0>(it.value());
       auto actualType = std::get<1>(it.value());
       if (expectedType != actualType) {
@@ -170,7 +170,7 @@ static LogicalResult verifyEscapingResources(Region &region,
       return yieldOp.emitOpError()
              << "yield result count mismatch with parent op";
     }
-    for (auto it : llvm::zip(results, yieldOp.getResourceOperands())) {
+    for (auto it : llvm::zip_equal(results, yieldOp.getResourceOperands())) {
       auto outerValue = std::get<0>(it);
       auto innerValue = std::get<1>(it);
       if (outerValue.getType() != innerValue.getType()) {
@@ -179,7 +179,8 @@ static LogicalResult verifyEscapingResources(Region &region,
                << " but got " << innerValue.getType();
       }
     }
-    for (auto it : llvm::zip(resultSizes, yieldOp.getResourceOperandSizes())) {
+    for (auto it :
+         llvm::zip_equal(resultSizes, yieldOp.getResourceOperandSizes())) {
       auto outerSize = std::get<0>(it);
       auto innerSize = std::get<1>(it);
       if (outerSize != innerSize) {
@@ -340,7 +341,7 @@ static void printResourceRegion(OpAsmPrinter &p, Operation *op,
                                 Region &body) {
   p << "(";
   llvm::interleaveComma(
-      llvm::zip(operands, body.getArguments()), p, [&](auto it) {
+      llvm::zip_equal(operands, body.getArguments()), p, [&](auto it) {
         auto operand = std::get<0>(it);
         auto arg = std::get<1>(it);
         p << operand;
@@ -421,7 +422,7 @@ static void printExplicitResourceRegion(OpAsmPrinter &p, Operation *op,
                                         ValueRange operandSizes, Region &body) {
   p << "(";
   llvm::interleaveComma(
-      llvm::zip(operands, body.getArguments()), p, [&](auto it) {
+      llvm::zip_equal(operands, body.getArguments()), p, [&](auto it) {
         auto operand = std::get<0>(it);
         auto arg = std::get<1>(it);
         p << operand;
@@ -573,7 +574,7 @@ static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
 
   // Verify the return types match.
   for (auto returnOp : body.getOps<IREE::Stream::ReturnOp>()) {
-    for (auto it : llvm::zip(returnTypes, returnOp.getOperandTypes())) {
+    for (auto it : llvm::zip_equal(returnTypes, returnOp.getOperandTypes())) {
       if (std::get<0>(it) != std::get<1>(it)) {
         return returnOp.emitOpError()
                << "operands do not match expected region return types";
@@ -1692,8 +1693,8 @@ void AsyncDispatchOp::getAsyncAccessRanges(
     }
   }
   for (auto [i, result, resultSize] :
-       llvm::zip(llvm::seq<unsigned>(0, getResults().size()), getResults(),
-                 getResultSizes())) {
+       llvm::zip_equal(llvm::seq<unsigned>(0, getResults().size()),
+                       getResults(), getResultSizes())) {
     if (getTiedResultOperandIndex(i).has_value()) {
       // Already covered above.
       continue;
@@ -1778,9 +1779,9 @@ template <typename Op>
 static void getExecutionAsyncAccessRanges(
     Op op, SmallVectorImpl<AsyncAccessRange> &ranges) {
   unsigned tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
-  for (auto [i, operand, operandSize] :
-       llvm::zip(llvm::seq<unsigned>(0, op.getResourceOperands().size()),
-                 op.getResourceOperands(), op.getResourceOperandSizes())) {
+  for (auto [i, operand, operandSize] : llvm::zip_equal(
+           llvm::seq<unsigned>(0, op.getResourceOperands().size()),
+           op.getResourceOperands(), op.getResourceOperandSizes())) {
     if (!operand.getType().template isa<IREE::Stream::ResourceType>()) continue;
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = op.getOperandTiedResults(tiedOperandBase + i);
@@ -1793,8 +1794,8 @@ static void getExecutionAsyncAccessRanges(
     }
   }
   for (auto [i, result, resultSize] :
-       llvm::zip(llvm::seq<unsigned>(0, op.getResults().size()),
-                 op.getResults(), op.getResultSizes())) {
+       llvm::zip_equal(llvm::seq<unsigned>(0, op.getResults().size()),
+                       op.getResults(), op.getResultSizes())) {
     if (op.getTiedResultOperandIndex(i).has_value()) {
       // Already covered above.
       continue;

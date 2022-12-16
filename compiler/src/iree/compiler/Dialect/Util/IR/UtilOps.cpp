@@ -206,7 +206,7 @@ ParseResult parseRangeList(
 
 void printRangeList(OpAsmPrinter &p, Operation *op, OperandRange offsets,
                     OperandRange lengths) {
-  llvm::interleaveComma(llvm::zip(offsets, lengths), p, [&](auto it) {
+  llvm::interleaveComma(llvm::zip_equal(offsets, lengths), p, [&](auto it) {
     auto offset = std::get<0>(it);
     auto length = std::get<1>(it);
     p << "[";

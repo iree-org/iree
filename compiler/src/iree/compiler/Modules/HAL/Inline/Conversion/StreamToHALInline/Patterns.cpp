@@ -72,7 +72,7 @@ struct ResourceAllocOpPattern
 
     SmallVector<Value> results;
     for (auto [resourceResult, storageSize] :
-         llvm::zip(allocOp.getResults(), allocOp.getStorageSizes())) {
+         llvm::zip_equal(allocOp.getResults(), allocOp.getStorageSizes())) {
       auto allocateOp = rewriter.create<IREE::HAL::Inline::BufferAllocateOp>(
           allocOp.getLoc(), deviceBufferType, hostBufferType, minAlignment,
           storageSize);
@@ -434,8 +434,8 @@ struct CmdDispatchOpPattern
     SmallVector<Value> bindingBuffers;
     SmallVector<Value> bindingOffsets;
     for (auto [resource, resourceSize, resourceOffset] :
-         llvm::zip(adaptor.getResources(), adaptor.getResourceSizes(),
-                   adaptor.getResourceOffsets())) {
+         llvm::zip_equal(adaptor.getResources(), adaptor.getResourceSizes(),
+                         adaptor.getResourceOffsets())) {
       auto storage = getResourceStorage(loc, resource, resourceSize, rewriter);
       bindingBuffers.push_back(storage.buffer);
       bindingOffsets.push_back(resourceOffset);
