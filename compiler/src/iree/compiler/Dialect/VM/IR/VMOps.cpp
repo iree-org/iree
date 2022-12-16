@@ -1187,7 +1187,7 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
   p << ' ' << op->getAttr("callee") << '(';
   int operand = 0;
   llvm::interleaveComma(
-      llvm::zip(getSegmentSizes(), getSegmentTypes()), p,
+      llvm::zip_equal(getSegmentSizes(), getSegmentTypes()), p,
       [&](std::tuple<APInt, Attribute> segmentSizeType) {
         int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
         Type segmentType =
@@ -1225,7 +1225,7 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
                           });
   p << " : (";
   llvm::interleaveComma(
-      llvm::zip(getSegmentSizes(), getSegmentTypes()), p,
+      llvm::zip_equal(getSegmentSizes(), getSegmentTypes()), p,
       [&](std::tuple<APInt, Attribute> segmentSizeType) {
         int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
         Type segmentType =

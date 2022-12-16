@@ -47,7 +47,7 @@ namespace Flow {
 static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
                        ArrayRef<Type> types,
                        SmallVector<OpAsmParser::Argument> &args) {
-  for (auto argAndType : llvm::zip(operands, types)) {
+  for (auto argAndType : llvm::zip_equal(operands, types)) {
     auto &arg = args.emplace_back();
     arg.ssaName = std::get<0>(argAndType);
     arg.type = std::get<1>(argAndType);
@@ -68,8 +68,8 @@ static LogicalResult verifyDispatchWorkload(
              << workgroupCount.getNumArguments()
              << " arguments but dispatch provides " << workload.size();
     }
-    for (auto it : llvm::enumerate(llvm::zip(workgroupCount.getArgumentTypes(),
-                                             workload.getTypes()))) {
+    for (auto it : llvm::enumerate(llvm::zip_equal(
+             workgroupCount.getArgumentTypes(), workload.getTypes()))) {
       auto expectedType = std::get<0>(it.value());
       auto actualType = std::get<1>(it.value());
       if (expectedType != actualType) {
@@ -164,7 +164,7 @@ static bool doesSliceSpanWholeTarget(
                              ShapedType::kDynamic);
   auto targetType = dispatchType;
   if (staticSizes != targetType.getShape() ||
-      llvm::any_of(llvm::zip(dynamicSizes, dispatchTypeDims),
+      llvm::any_of(llvm::zip_equal(dynamicSizes, dispatchTypeDims),
                    [](std::tuple<Value, Value> en) {
                      return std::get<0>(en) != std::get<1>(en);
                    })) {
@@ -211,7 +211,7 @@ static ParseResult parseWorkgroupCountRegionWithoutKeyword(OpAsmParser &parser,
 
   // Verify the return types match.
   for (auto returnOp : body.getOps<IREE::Flow::ReturnOp>()) {
-    for (auto it : llvm::zip(returnTypes, returnOp.getOperandTypes())) {
+    for (auto it : llvm::zip_equal(returnTypes, returnOp.getOperandTypes())) {
       if (std::get<0>(it) != std::get<1>(it)) {
         return returnOp.emitOpError()
                << "operands do not match expected region return types";
@@ -288,7 +288,8 @@ LogicalResult DispatchRegionOp::verify() {
   // Verify terminator.
   auto term = dyn_cast<Flow::ReturnOp>(getBody().front().getTerminator());
   if (!term) return emitOpError() << "expected 'flow.return' terminator";
-  for (const auto &it : llvm::zip(getResultTypes(), term->getOperandTypes()))
+  for (const auto &it :
+       llvm::zip_equal(getResultTypes(), term->getOperandTypes()))
     if (std::get<0>(it) != std::get<1>(it))
       return term->emitOpError()
              << "operand types do not match with parent results";
@@ -860,7 +861,8 @@ LogicalResult verifyWorkgroupCountRegion(Operation *op, ValueRange workload,
            << "workload operands and workgroup count args mismatch ("
            << workload.size() << " vs " << region.getNumArguments() << ")";
   }
-  for (auto it : llvm::enumerate(llvm::zip(workload, region.getArguments()))) {
+  for (auto it :
+       llvm::enumerate(llvm::zip_equal(workload, region.getArguments()))) {
     auto workloadValue = std::get<0>(it.value());
     auto capturedArg = std::get<1>(it.value());
     if (workloadValue.getType() != capturedArg.getType()) {

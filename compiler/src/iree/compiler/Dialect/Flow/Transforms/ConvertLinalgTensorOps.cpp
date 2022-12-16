@@ -49,8 +49,8 @@ struct LinalgTensorReshapeToFlowTensorReshape
       return failure();
     }
     SmallVector<Value> outputDynamicShapes;
-    for (auto shape :
-         llvm::zip(reshapeOp.getResultType().getShape(), outputShape[0])) {
+    for (auto shape : llvm::zip_equal(reshapeOp.getResultType().getShape(),
+                                      outputShape[0])) {
       if (std::get<0>(shape) != ShapedType::kDynamic) continue;
       outputDynamicShapes.push_back(std::get<1>(shape));
     }

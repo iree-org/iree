@@ -92,8 +92,9 @@ class PackAllocationsPass : public PackAllocationsBase<PackAllocationsPass> {
       auto slabSize = packOp.getTotalLength();
 
       // Replace all resources with subviews into the new slab.
-      for (auto it : llvm::zip(allocOp.getResults(), packOp.getPackedOffsets(),
-                               allocOp.getStorageSizes())) {
+      for (auto it :
+           llvm::zip_equal(allocOp.getResults(), packOp.getPackedOffsets(),
+                           allocOp.getStorageSizes())) {
         auto originalValue = std::get<0>(it);
         auto subviewOffset = std::get<1>(it);
         auto subviewLength = std::get<2>(it);

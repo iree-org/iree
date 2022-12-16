@@ -383,7 +383,7 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
     // Marshal arguments to import types.
     SmallVector<Value> importArgs;
     for (auto [operand, importType] :
-         llvm::zip(operands, importSignature.getInputs())) {
+         llvm::zip_equal(operands, importSignature.getInputs())) {
       importArgs.push_back(castToImportType(operand, importType, rewriter));
     }
 
@@ -394,7 +394,7 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
     // Marshal results from import types.
     SmallVector<Value> callResults;
     for (auto [importResult, resultType] :
-         llvm::zip(newOp.getResults(), resultTypes)) {
+         llvm::zip_equal(newOp.getResults(), resultTypes)) {
       callResults.push_back(
           castFromImportType(importResult, resultType, rewriter));
     }

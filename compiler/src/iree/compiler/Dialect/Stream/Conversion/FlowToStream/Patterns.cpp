@@ -229,7 +229,7 @@ struct ConvertTensorTraceOp
       IREE::Flow::TensorTraceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> exportedTensors;
-    for (auto it : llvm::zip(op.getOperands(), adaptor.getOperands())) {
+    for (auto it : llvm::zip_equal(op.getOperands(), adaptor.getOperands())) {
       auto tensorOperand = std::get<0>(it);
       auto resourceOperand = std::get<1>(it);
       auto source =
@@ -273,7 +273,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     SmallVector<Value> dispatchOperandLengths;
     SmallVector<Value> operandSizes;
     for (auto oldNewOperand :
-         llvm::zip(op.getArguments(), adaptor.getArguments())) {
+         llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
       auto oldOperand = std::get<0>(oldNewOperand);
       auto newOperand = std::get<1>(oldNewOperand);
       if (oldOperand.getType().isa<ShapedType>()) {

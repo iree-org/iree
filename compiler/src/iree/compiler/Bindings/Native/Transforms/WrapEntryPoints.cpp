@@ -130,7 +130,7 @@ static func::FuncOp createImportWrapperFunc(
         auto barrierOp = entryBuilder.create<IREE::HAL::TensorBarrierOp>(
             importOp.getLoc(), tensorArgs, waitFence);
         for (auto [argIndex, readyArg] :
-             llvm::zip(tensorArgIndices, barrierOp.getResults())) {
+             llvm::zip_equal(tensorArgIndices, barrierOp.getResults())) {
           entryArgs[argIndex] = readyArg;
         }
       }
