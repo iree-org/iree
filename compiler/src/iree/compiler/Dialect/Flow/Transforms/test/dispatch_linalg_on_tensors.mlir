@@ -1212,7 +1212,7 @@ func.func @dont_fuse_tensor_insert_dest_producer(%arg0 : tensor<2x2xf32>) -> ten
   %cst = arith.constant dense<0.0> : tensor<3x3xf32>
   %init = tensor.empty() : tensor<2x2xf32>
   %0 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1, d0)>],
       iterator_types = ["parallel", "parallel"]}
       ins(%arg0 : tensor<2x2xf32>) outs(%init : tensor<2x2xf32>) {
     ^bb0(%b0 : f32, %b1 : f32) :
