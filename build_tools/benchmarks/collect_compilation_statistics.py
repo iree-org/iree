@@ -23,15 +23,18 @@ import re
 import zipfile
 
 from dataclasses import asdict
-from typing import BinaryIO, Dict, Optional, TextIO
-from pathlib import PurePath
+from typing import BinaryIO, Dict, List, Optional, TextIO, Tuple
 
 from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes, get_git_commit_hash
-from common.benchmark_suite import BENCHMARK_SUITE_REL_PATH, BenchmarkSuite
+from common.benchmark_suite import BenchmarkSuite
+from common import benchmark_config
+from e2e_test_artifacts import iree_artifacts
+from e2e_test_framework import serialization
+from e2e_test_framework.definitions import iree_definitions
 
 BENCHMARK_FLAGFILE = "flagfile"
 MODULE_DIR = "vmfb"
-MODULE_FILE_EXTENSION = ".vmfb"
+MODULE_FILE_EXTENSION = "vmfb"
 NINJA_LOG_HEADER = "ninja log v5"
 NINJA_BUILD_LOG = ".ninja_log"
 COMPILATION_STATS_MODULE_SUFFIX = "compile-stats"
@@ -46,17 +49,17 @@ DISPATCH_COMPONENT_PATTERNS = [
 ]
 
 
-def match_module_cmake_target(module_path: str) -> Optional[str]:
-  # Get the last 4 parts of module path. They are expected to be:
-  # benchmark_suites/<category>/vmfb/<module filename>.vmfb
-  path_parts = PurePath(module_path).parts[-4:]
-  if len(path_parts) < 4:
-    return None
-  if path_parts[0] != BENCHMARK_SUITE_REL_PATH:
-    return None
-  if path_parts[2] != MODULE_DIR:
-    return None
-  if os.path.splitext(path_parts[3])[1] != MODULE_FILE_EXTENSION:
+def match_module_cmake_target(module_path: pathlib.PurePath) -> Optional[str]:
+  if module_path.match(f"{benchmark_config.E2E_TEST_ARTIFACTS_REL_PATH}/iree_*/"
+                       f"{iree_artifacts.MODULE_FILENAME}"):
+    # <e2e test artifacts dir>/iree_<module dir>/<module filename>
+    path_parts = module_path.parts[-3:]
+  elif module_path.match(
+      f"{benchmark_config.BENCHMARK_SUITE_REL_PATH}/*/{MODULE_DIR}/"
+      f"*.{MODULE_FILE_EXTENSION}"):
+    # <benchmark_suites dir>/<category>/vmfb/<module filename>.vmfb
+    path_parts = module_path.parts[-4:]
+  else:
     return None
   # Join to get the CMake target name. This is *not* a filesystem path, so we
   # don't want \ separators on Windows that we would get with os.path.join().
@@ -77,7 +80,7 @@ def parse_compilation_time_from_ninja_log(log: TextIO) -> Dict[str, int]:
 
   for line in log:
     start_time, end_time, _, target, _ = line.strip().split("\t")
-    cmake_target = match_module_cmake_target(target)
+    cmake_target = match_module_cmake_target(pathlib.PurePath(target))
     if cmake_target is None:
       continue
 
@@ -130,47 +133,46 @@ def get_module_path(flag_file: TextIO) -> Optional[str]:
   return module_path
 
 
-def parse_arguments():
-  """Returns an argument parser with common options."""
+def get_module_list_from_generation_config(
+    serialized_gen_config: TextIO, e2e_test_artifacts_dir: pathlib.PurePath
+) -> List[Tuple[CompilationInfo, pathlib.Path]]:
+  gen_configs = serialization.unpack_and_deserialize(
+      data=json.load(serialized_gen_config),
+      root_type=List[iree_definitions.ModuleGenerationConfig])
+  module_list = []
+  for gen_config in gen_configs:
+    model = gen_config.imported_model.model
+    compile_config = gen_config.compile_config
+    target_archs = []
+    for compile_target in compile_config.compile_targets:
+      arch = compile_target.target_architecture
+      target_archs.append(
+          (f"{arch.type.value}-{arch.architecture}-{arch.microarchitecture}-"
+           f"{compile_target.target_abi.value}"))
+    compilation_info = CompilationInfo(
+        model_name=model.name,
+        model_tags=model.tags,
+        model_source=model.source_type.value,
+        target_arch=f"[{','.join(target_archs)}]",
+        compile_tags=compile_config.tags)
+    module_dir_path = iree_artifacts.get_module_dir_path(
+        module_generation_config=gen_config, root_path=e2e_test_artifacts_dir)
+    module_path = module_dir_path / iree_artifacts.MODULE_FILENAME
+    module_list.append((compilation_info, pathlib.Path(module_path)))
 
-  def check_dir_path(path):
-    path = pathlib.Path(path)
-    if path.is_dir():
-      return path
-    else:
-      raise argparse.ArgumentTypeError(path)
-
-  parser = argparse.ArgumentParser()
-  parser.add_argument("--output",
-                      required=True,
-                      type=pathlib.Path,
-                      help="Path to output JSON file.")
-  parser.add_argument(
-      "build_dir",
-      metavar="<build-dir>",
-      type=check_dir_path,
-      help="Path to the build directory containing benchmark suites.")
-  parser.add_argument("--verbose",
-                      action="store_true",
-                      help="Print internal information during execution.")
-
-  return parser.parse_args()
+  return module_list
 
 
-def main(args: argparse.Namespace):
-  benchmark_suite_dir = args.build_dir / BENCHMARK_SUITE_REL_PATH
+def get_module_list_from_benchmark_suite(
+    benchmark_suite_dir: pathlib.Path
+) -> List[Tuple[CompilationInfo, pathlib.Path]]:
   benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
       benchmark_suite_dir)
-
-  with (args.build_dir / NINJA_BUILD_LOG).open("r") as log_file:
-    target_build_time_map = parse_compilation_time_from_ninja_log(log_file)
-
-  compilation_statistics_list = []
+  module_list = []
   for category, _ in benchmark_suite.list_categories():
     benchmark_cases = benchmark_suite.filter_benchmarks_for_category(
         category=category)
     for benchmark_case in benchmark_cases:
-      # TODO(#11076): Support run_config.
       if benchmark_case.benchmark_case_dir is None:
         raise ValueError("benchmark_case_dir can't be None.")
       benchmark_case_dir = benchmark_case.benchmark_case_dir
@@ -183,44 +185,114 @@ def main(args: argparse.Namespace):
         raise RuntimeError(
             f"Can't find the module file in the flagfile: {flag_file_path}")
       module_path = (benchmark_case_dir / module_path).resolve()
-
-      with module_path.open("rb") as module_file:
-        module_component_sizes = get_module_component_info(
-            module_file,
-            module_path.stat().st_size)
-
-      cmake_target = match_module_cmake_target(str(module_path))
-      if cmake_target is None:
-        raise RuntimeError(
-            f"Module path isn't a module cmake target: {module_path}")
-      compilation_time_ms = target_build_time_map[cmake_target]
-
-      if benchmark_case.run_config is not None:
-        compile_tags = benchmark_case.run_config.module_generation_config.compile_config.tags
-      else:
-        # TODO(#11071): Remove legacy path.
-        compile_tags = benchmark_case.bench_mode
       compilation_info = CompilationInfo(model_name=benchmark_case.model_name,
                                          model_tags=benchmark_case.model_tags,
                                          model_source=category,
                                          target_arch=benchmark_case.target_arch,
-                                         compile_tags=compile_tags)
-      compilation_statistics = CompilationStatistics(
-          compilation_info=compilation_info,
-          module_component_sizes=module_component_sizes,
-          compilation_time_ms=compilation_time_ms)
-      compilation_statistics_list.append(compilation_statistics)
+                                         compile_tags=benchmark_case.bench_mode)
+      module_list.append((compilation_info, module_path))
+
+  return module_list
+
+
+def parse_arguments():
+  """Returns an argument parser with common options."""
+
+  def check_dir_path(path):
+    path = pathlib.Path(path)
+    if path.is_dir():
+      return path
+    else:
+      raise argparse.ArgumentTypeError(f"{path} is not a directory.")
+
+  def check_file_path(path):
+    path = pathlib.Path(path)
+    if path.is_file():
+      return path
+    else:
+      raise argparse.ArgumentTypeError(f"{path} is not a file.")
+
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--output",
+                      type=pathlib.Path,
+                      help="Path to output JSON file.")
+  parser.add_argument("--verbose",
+                      action="store_true",
+                      help="Print internal information during execution.")
+  parser.add_argument("--build_log",
+                      type=check_file_path,
+                      help="Path to the ninja build log.")
+  parser.add_argument(
+      "--generation_config",
+      type=check_file_path,
+      help="Exported module generation config of e2e test artifacts.")
+
+  artifacts_dir_parser = parser.add_mutually_exclusive_group(required=True)
+  artifacts_dir_parser.add_argument(
+      "build_dir",
+      type=check_dir_path,
+      nargs="?",
+      help="Path to the build directory containing benchmark suites.")
+  artifacts_dir_parser.add_argument(
+      "--e2e_test_artifacts_dir",
+      type=check_dir_path,
+      help="Path to the e2e test artifacts directory.")
+
+  args = parser.parse_args()
+  if args.e2e_test_artifacts_dir is not None and args.build_log is None:
+    raise ValueError("--e2e_test_artifacts_dir must use with --build_log.")
+
+  return args
+
+
+def main(args: argparse.Namespace):
+  if args.generation_config is not None:
+    if args.e2e_test_artifacts_dir is not None:
+      e2e_test_artifacts_dir = args.e2e_test_artifacts_dir
+    else:
+      e2e_test_artifacts_dir = args.build_dir / benchmark_config.E2E_TEST_ARTIFACTS_REL_PATH
+    module_list = get_module_list_from_generation_config(
+        args.generation_config.open("r"), e2e_test_artifacts_dir)
+  else:
+    # TODO(#11076): Remove legacy path.
+    benchmark_suite_dir = args.build_dir / benchmark_config.BENCHMARK_SUITE_REL_PATH
+    module_list = get_module_list_from_benchmark_suite(benchmark_suite_dir)
+
+  if args.e2e_test_artifacts_dir is not None:
+    build_log_path = args.build_log
+  else:
+    build_log_path = (args.build_log if args.build_log is not None else
+                      args.build_dir / NINJA_BUILD_LOG)
+  with build_log_path.open("r") as log_file:
+    target_build_time_map = parse_compilation_time_from_ninja_log(log_file)
+
+  compilation_statistics_list = []
+  for compilation_info, module_path in module_list:
+    with module_path.open("rb") as module_file:
+      module_component_sizes = get_module_component_info(
+          module_file,
+          module_path.stat().st_size)
+
+    cmake_target = match_module_cmake_target(module_path)
+    if cmake_target is None:
+      raise RuntimeError(
+          f"Module path isn't a module cmake target: {module_path}")
+    compilation_time_ms = target_build_time_map[cmake_target]
+    compilation_statistics = CompilationStatistics(
+        compilation_info=compilation_info,
+        module_component_sizes=module_component_sizes,
+        compilation_time_ms=compilation_time_ms)
+    compilation_statistics_list.append(compilation_statistics)
 
   commit = get_git_commit_hash("HEAD")
   compilation_results = CompilationResults(
       commit=commit, compilation_statistics=compilation_statistics_list)
 
-  json_object = asdict(compilation_results)
-  with open(args.output, "w") as f:
-    json.dump(json_object, f)
-
-  if args.verbose:
-    print(json.dumps(json_object, indent=4))
+  json_output = json.dumps(asdict(compilation_results), indent=2)
+  if args.output is None:
+    print(json_output)
+  else:
+    args.output.write_text(json_output)
 
 
 if __name__ == "__main__":

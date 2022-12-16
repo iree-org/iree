@@ -139,7 +139,7 @@ class IreeRuleBuilder(object):
           f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
           f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
       ]
-    elif arch_info.architecture == "rv64":
+    elif arch_info.architecture == "riscv_64":
       flags = [
           f"--iree-llvm-target-triple=riscv64-pc-{target.target_abi.value}",
           "--iree-llvm-target-cpu=generic-rv64", "--iree-llvm-target-abi=lp64d",
@@ -147,7 +147,7 @@ class IreeRuleBuilder(object):
           "--riscv-v-vector-bits-min=512",
           "--riscv-v-fixed-length-vector-lmul-max=8"
       ]
-    elif arch_info.architecture == "rv32":
+    elif arch_info.architecture == "riscv_32":
       flags = [
           f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
           "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
