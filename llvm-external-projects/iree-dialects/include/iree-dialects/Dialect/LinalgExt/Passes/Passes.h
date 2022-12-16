@@ -190,7 +190,10 @@ struct LinalgEnablingOptions {
     return *this;
   }
   /// Enable hoisting of redundant vector transfer ops.
-  bool hoistRedundantVectorTransfers = true;
+  /// TODO: MLIR does currently not model parallel contexts. It can be unsafe
+  /// to hoist transfers from buffers in a multi-threaded environment, so this
+  /// should not be enabled by default.
+  bool hoistRedundantVectorTransfers = false;
   LinalgEnablingOptions &enableHoistRedundantVectorTransfers(bool val = true) {
     hoistRedundantVectorTransfers = val;
     return *this;

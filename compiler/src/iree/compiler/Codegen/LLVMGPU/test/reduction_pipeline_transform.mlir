@@ -36,15 +36,15 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
-//     CHECK:   vector.transfer_read {{.*}} vector<f32>
 // Local per-thread scf.for-based reduction.
 //         CHECK: scf.for
 //         CHECK:   vector.transfer_read {{.*}} vector<2xf32>
+//         CHECK:   vector.transfer_read {{.*}} vector<f32>
 //         CHECK:   vector.reduction <add>{{.*}} : vector<2xf32> into f32
 //         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
 // No barrier within the loop
 //     CHECK-NOT:   gpu.barrier
-//         CHECK:   scf.yield {{.*}} : vector<f32>
+//         CHECK:   vector.transfer_write {{.*}} vector<f32>
 
 // Distributed reduction: everyone loads then 5 xor + addf expected.
 //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
@@ -103,15 +103,15 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
-//     CHECK:   vector.transfer_read {{.*}} vector<f32>
 // Local per-thread scf.for-based reduction.
 //         CHECK: scf.for
 //         CHECK:   vector.transfer_read {{.*}} vector<2xf32>
+//         CHECK:   vector.transfer_read {{.*}} vector<f32>
 //         CHECK:   vector.reduction <add>{{.*}} : vector<2xf32> into f32
 //         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
 // No barrier within the loop
 //     CHECK-NOT:   gpu.barrier
-//         CHECK:   scf.yield {{.*}} : vector<f32>
+//         CHECK:   vector.transfer_write {{.*}} vector<f32>
 
 // Distributed reduction: everyone loads then 5 xor + addf expected.
 //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
@@ -169,17 +169,17 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
-//     CHECK:   vector.transfer_read {{.*}} vector<f32>
 // Local per-thread scf.for-based reduction.
 //         CHECK: scf.for
 //         CHECK:   vector.transfer_read {{.*}} vector<2xf32>
+//         CHECK:   vector.transfer_read {{.*}} vector<f32>
 //         CHECK:   arith.addf{{.*}} : vector<2xf32>
 //         CHECK:   arith.addf{{.*}} : vector<2xf32>
 //         CHECK:   vector.reduction <add>{{.*}} : vector<2xf32> into f32
 //         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
 // No barrier within the loop
 //     CHECK-NOT:   gpu.barrier
-//         CHECK:   scf.yield {{.*}} : vector<f32>
+//         CHECK:   vector.transfer_write {{.*}} vector<f32>
 
 // Distributed reduction: everyone loads then 5 xor + addf expected.
 //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
@@ -240,17 +240,17 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
-//     CHECK:   vector.transfer_read {{.*}} vector<f32>
 // Local per-thread scf.for-based reduction.
 //         CHECK: scf.for
 //         CHECK:   vector.transfer_read {{.*}} vector<2xf32>
+//         CHECK:   vector.transfer_read {{.*}} vector<f32>
 //         CHECK:   arith.addf{{.*}} : vector<2xf32>
 //         CHECK:   arith.addf{{.*}} : vector<2xf32>
 //         CHECK:   vector.reduction <add>{{.*}} : vector<2xf32> into f32
 //         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
 // No barrier within the loop
 //     CHECK-NOT:   gpu.barrier
-//         CHECK:   scf.yield {{.*}} : vector<f32>
+//         CHECK:   vector.transfer_write {{.*}} vector<f32>
 
 // Distributed reduction: everyone loads then 5 xor + addf expected.
 //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
@@ -306,15 +306,15 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
-//     CHECK:   vector.transfer_read {{.*}} vector<f32>
 // Local per-thread scf.for-based reduction.
 //         CHECK: scf.for
 //         CHECK:   vector.transfer_read
+//         CHECK:   vector.transfer_read {{.*}} vector<f32>
 //         CHECK:   vector.reduction <add>{{.*}} : vector<4xf32> into f32
 //         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
 // No barrier within the loop
 //     CHECK-NOT:   gpu.barrier
-//         CHECK:   scf.yield {{.*}} : vector<f32>
+//         CHECK:   vector.transfer_write {{.*}} vector<f32>
 
 // Distributed reduction: everyone loads then 5 xor + addf expected.
 //         CHECK: %[[TIDY:.]] = gpu.thread_id  y

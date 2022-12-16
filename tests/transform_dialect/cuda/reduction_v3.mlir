@@ -48,8 +48,9 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   // Local per-thread scf.for-based reduction.
   //         CHECK: scf.for
   //         CHECK:   vector.transfer_read %{{.*}} : memref<f32, strided<[], offset: ?>>, vector<f32>
+  //         CHECK:   vector.transfer_read %{{.*}} vector<f32>
   //         CHECK:   arith.addf {{.*}} : f32
-  //         CHECK:   scf.yield %{{.*}} : vector<f32>
+  //         CHECK:   vector.transfer_write {{.*}} vector<f32>
 
   //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
   // Distributed reduction: everyone loads then 5 xor + addf expected
