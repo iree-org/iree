@@ -1,13 +1,42 @@
 // RUN: iree-opt --split-input-file --iree-import-ml-program %s | FileCheck %s
 
 // CHECK-LABEL: module @globals
-builtin.module @globals {
-  // CHECK: util.global public mutable @global2 = 51 : i32
-  ml_program.global public mutable @global2(51 : i32) : i32
-  // CHECK: util.global private mutable @global3 = 52 : i32
-  ml_program.global private mutable @global3(52 :i32) : i32
-  // CHECK: util.global private @global4 = 53 : i32
-  ml_program.global private @global4(53 : i32) : i32
+builtin.module @globals attributes {
+    ml_program.public_global_accessors = {
+      get = "global${0}$get", set = "global${0}$set"}} {
+  // CHECK: util.global private mutable @global_pubmut = 51 : i32
+  // CHECK: func @global$global_pubmut$get() -> i32
+  // CHECK: func @global$global_pubmut$set(%{{.*}}: i32)
+  // CHECK-NOT: func
+  ml_program.global public mutable @global_pubmut(51 : i32) : i32
+  // CHECK: util.global private @global_pub = 52 : i32
+  // CHECK: func @global$global_pub$get() -> i32
+  // CHECK-NOT: func
+  ml_program.global public @global_pub(52 : i32) : i32
+  // CHECK: util.global private mutable @global_privmut = 53 : i32
+  // CHECK-NOT: func
+  ml_program.global private mutable @global_privmut(53 : i32) : i32
+  // CHECK: util.global private @global_priv = 54 : i32
+  ml_program.global private @global_priv(54 : i32) : i32
+}
+
+// -----
+// CHECK-LABEL: module @globals
+builtin.module @globals attributes {
+    ml_program.public_global_accessors = {get = "global__{0}__get"}} {
+  // CHECK: util.global private mutable @global_pubmut = 51 : i32
+  // CHECK: func @global__global_pubmut__get() -> i32
+  // CHECK: func @global$global_pubmut$set
+  ml_program.global public mutable @global_pubmut(51 : i32) : i32
+}
+
+// -----
+// CHECK-LABEL: module @no_accessors_globals
+builtin.module @no_accessors_globals {
+  // CHECK: util.global private mutable @global_pubmut = 51 : i32
+  // CHECK: func @global$global_pubmut$get() -> i32
+  // CHECK: func @global$global_pubmut$set(%{{.*}}: i32)
+  ml_program.global public mutable @global_pubmut(51 : i32) : i32
 }
 
 // -----
