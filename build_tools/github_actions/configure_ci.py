@@ -12,6 +12,7 @@ not.
 """
 
 import fnmatch
+import json
 import os
 import pathlib
 import subprocess
@@ -100,11 +101,14 @@ def modifies_included_path(base_ref: str) -> bool:
 def should_run_ci(event_name, trailers) -> bool:
   base_ref = os.environ["BASE_REF"]
 
-  print(pathlib.Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
-
   if event_name != "pull_request":
     print(f"Running CI independent of diff because run was not triggered by a"
           f" pull request event (event name is '{event_name}')")
+    return True
+
+  event_obj = json.load(pathlib.Path(os.environ["GITHUB_EVENT_PATH"]).open("r"))
+  print(event_obj)
+  if event_obj["action"] in {"labeled", "unlabeled"}:
     return False
 
   if SKIP_CI_KEY in trailers:
