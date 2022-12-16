@@ -56,8 +56,10 @@ class command_buffer_push_constants_test : public CtsTestBase {
         iree_make_cstring_view("command_buffer_push_constants_test.bin"));
     executable_params.pipeline_layout_count = 1;
     executable_params.pipeline_layouts = &pipeline_layout_;
-    executable_params.constant_count = 1;
-    executable_params.constants = push_constants_storage;
+    // No executable-level "specialization constants" (not to be confused with
+    // per-dispatch varying "push constants").
+    executable_params.constant_count = 0;
+    executable_params.constants = NULL;
 
     IREE_ASSERT_OK(iree_hal_executable_cache_prepare_executable(
         executable_cache_, &executable_params, &executable_));
@@ -76,7 +78,6 @@ class command_buffer_push_constants_test : public CtsTestBase {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout_ = NULL;
   iree_hal_pipeline_layout_t* pipeline_layout_ = NULL;
   iree_hal_executable_t* executable_ = NULL;
-  uint32_t push_constants_storage[1] = {0};
 };
 
 TEST_P(command_buffer_push_constants_test, DispatchWithPushConstants) {
@@ -99,10 +100,11 @@ TEST_P(command_buffer_push_constants_test, DispatchWithPushConstants) {
       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_view_t* input_buffer_view = NULL;
   float input_data[4] = {1.1f, 2.2f, 3.3f, 4.4f};
+  iree_hal_dim_t input_shape[1] = {IREE_ARRAYSIZE(input_data)};
   IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
-      device_allocator_,
-      /*shape_rank=*/0, /*shape=*/NULL, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, input_params,
+      device_allocator_, IREE_ARRAYSIZE(input_shape), input_shape,
+      IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+      input_params,
       iree_make_const_byte_span((void*)input_data, sizeof(input_data)),
       &input_buffer_view));
   iree_hal_buffer_params_t output_params = {0};
