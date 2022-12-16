@@ -23,11 +23,11 @@ import pathlib
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
-from typing import Callable, Dict, List
 import argparse
 import collections
 import dataclasses
 import json
+from typing import Callable, Dict, List
 
 from benchmark_suites.iree import benchmark_collections
 from e2e_test_framework.definitions import common_definitions, iree_definitions
