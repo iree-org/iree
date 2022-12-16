@@ -56,7 +56,7 @@ steps to enable compilation statistics collection.
 ```sh
 ./collect_compilation_statistics.py \
   --output "compile-stats.json" \
-  "${IREE_BUILD_DIR}"
+  legacy "${IREE_BUILD_DIR}"
 ```
 
 ## Generating Benchmark Report

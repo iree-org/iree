@@ -115,7 +115,7 @@ steps:
       python3 build_tools/benchmarks/collect_compilation_statistics.py \
         --verbose \
         --output "compile-stats-results-$${BUILDKITE_BUILD_NUMBER}.json" \
-        "build-host"
+        legacy "build-host"
     if: >
       build.pull_request.id == null ||
       build.pull_request.labels includes 'buildkite:benchmark-android'
