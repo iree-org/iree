@@ -103,8 +103,7 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
     llvm::ReversePostOrderTraversal<Block *> traversal(&b);
     rhsBlocks.insert(traversal.begin(), traversal.end());
   }
-  if (lhsBlocks.size() != rhsBlocks.size())
-    return false;
+  if (lhsBlocks.size() != rhsBlocks.size()) return false;
   for (auto blockPair : llvm::zip_equal(lhsBlocks, rhsBlocks)) {
     auto &lhsBlock = std::get<0>(blockPair);
     auto &rhsBlock = std::get<1>(blockPair);
