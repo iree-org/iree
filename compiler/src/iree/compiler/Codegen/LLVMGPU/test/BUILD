@@ -26,7 +26,6 @@ iree_lit_test_suite(
             "gpu_set_num_workgroups.mlir",
             "nvvm_pipeline_test.mlir",
             "reduction_pipeline_transform.mlir",
-            "reduction_pipeline.mlir",
             "rocdl_pipeline_test.mlir",
             "set_transform_strategy.mlir",
             "illegal_configuration.mlir",

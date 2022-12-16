@@ -865,10 +865,6 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //   CHECK-LABEL: hal.executable public @warp_reduction_dispatch
 //         CHECK:   hal.executable.variant public @cuda
 // CHECK-COUNT-5:     nvvm.shfl.sync  bfly
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} : !llvm.ptr<f32, 3>
-//         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load {{.*}} : !llvm.ptr<f32, 3>
-// CHECK-COUNT-3:     nvvm.shfl.sync  bfly
 
 // -----
 
@@ -929,10 +925,6 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 // CHECK-COUNT-5:     nvvm.shfl.sync  bfly
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} : !llvm.ptr<f32, 3>
 //         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load {{.*}} : !llvm.ptr<f32, 3>
-// CHECK-COUNT-3:     nvvm.shfl.sync  bfly
-//         CHECK:     llvm.fdiv %{{.*}}, %{{.*}}  : vector<4xf32>
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : !llvm.ptr<vector<4xf32>>
 
 // -----
 
