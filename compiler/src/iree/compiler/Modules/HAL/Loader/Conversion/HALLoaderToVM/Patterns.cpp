@@ -104,9 +104,9 @@ struct ExecutableDispatchOpConversion
         static_cast<int16_t>(adaptor.getBindingBuffers().size()),
     };
     callOperands.append(pushConstants.begin(), pushConstants.end());
-    for (auto it :
-         llvm::zip(adaptor.getBindingBuffers(), adaptor.getBindingOffsets(),
-                   adaptor.getBindingLengths())) {
+    for (auto it : llvm::zip_equal(adaptor.getBindingBuffers(),
+                                   adaptor.getBindingOffsets(),
+                                   adaptor.getBindingLengths())) {
       callOperands.push_back(std::get<0>(it));
       callOperands.push_back(
           castToImportType(std::get<1>(it), rewriter.getI64Type(), rewriter));

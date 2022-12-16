@@ -167,7 +167,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
     staticLoopRanges.resize(workloadValues.size(), ShapedType::kDynamic);
     Location loc = workgroupCountOp.getLoc();
     auto numTiles = llvm::to_vector(llvm::map_range(
-        llvm::zip(workloadValues, staticLoopRanges, tileSizes),
+        llvm::zip_equal(workloadValues, staticLoopRanges, tileSizes),
         [&](std::tuple<Value, int64_t, OpFoldResult> p) -> OpFoldResult {
           auto tileSize = std::get<2>(p);
           if (isConstantIntValue(tileSize, 0)) {
@@ -188,9 +188,8 @@ struct LowerDispatchWorkgroupCountForDagRootOp
     // If there is interchange, first apply interchange on the number of tiles.
     if (!givenInterchange.empty()) {
       SmallVector<OpFoldResult> interchangedNumTiles = numTiles;
-      for (auto interchangedLoop : llvm::enumerate(givenInterchange)) {
-        interchangedNumTiles[interchangedLoop.value()] =
-            numTiles[interchangedLoop.index()];
+      for (auto [index, loop] : llvm::enumerate(givenInterchange)) {
+        interchangedNumTiles[loop] = numTiles[index];
       }
       numTiles = interchangedNumTiles;
     }

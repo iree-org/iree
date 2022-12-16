@@ -9,10 +9,15 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -24,7 +29,7 @@ namespace {
 
 struct ImportMLProgramPass : public ImportMLProgramBase<ImportMLProgramPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Util::UtilDialect>();
+    registry.insert<IREE::Util::UtilDialect, func::FuncDialect>();
   }
   void runOnOperation() override;
 };
@@ -77,9 +82,83 @@ class MLProgramGlobalOpPattern
         srcOpAttr.has_value()
             ? Optional<TypedAttr>(srcOpAttr.value().cast<TypedAttr>())
             : std::nullopt;
+    const bool isMutable = srcOp.getIsMutable();
+    const SymbolTable::Visibility visibility = srcOp.getVisibility();
     auto globalOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(
         srcOp, srcOp.getName(), srcOp.getIsMutable(), newType, srcOpTypedAttr);
-    globalOp.setVisibility(srcOp.getVisibility());
+    globalOp.setVisibility(SymbolTable::Visibility::Private);
+
+    if (visibility != SymbolTable::Visibility::Public) return success();
+
+    ModuleOp module = srcOp->getParentOfType<ModuleOp>();
+
+    // Generate accessor methods for global variables. For a given global
+    // variable generate using the format provided on the Module.  The format
+    // dict requires single "{0}" which will be replaced by the global variable
+    // name. E.g., if the format dict is `{get: "get{0}", set: "set{0}"}` then
+    // for a variable X
+    //   * `getX` will be generated to read the variable;
+    //   * `setX` will be generated to set the variable (if X is mutable);
+    //
+    // If unset the default is `global${0}$get` and `global${0}$set`.
+
+    std::string getterName, setterName;
+
+    auto verifyFormat = [](const std::string &format) {
+      StringRef s = format;
+      // Verify only single replacement of 0th index.
+      s = s.drop_until([](char c) { return c == '{'; });
+      if (s.empty() || !s.consume_front("{")) return failure();
+      if (!s.consume_front("0")) return failure();
+      if (!s.consume_front("}")) return failure();
+      s = s.drop_until([](char c) { return c == '{'; });
+      return success(s.empty());
+    };
+
+    auto v = module->getAttrOfType<DictionaryAttr>(
+        "ml_program.public_global_accessors");
+    // TODO(jpienaar): The attribute should be verified before here.
+    StringAttr get =
+        v ? llvm::dyn_cast_if_present<StringAttr>(v.get("get")) : nullptr;
+    {
+      const std::string getFormat = get ? get.str() : "global${0}$get";
+      if (failed(verifyFormat(getFormat))) return failure();
+      getterName = llvm::formatv(getFormat.c_str(), globalOp.getSymName());
+    }
+    auto set =
+        v ? llvm::dyn_cast_if_present<StringAttr>(v.get("set")) : nullptr;
+    {
+      const std::string setFormat = set ? set.str() : "global${0}$set";
+      if (failed(verifyFormat(setFormat))) return failure();
+      setterName = llvm::formatv(setFormat.c_str(), globalOp.getSymName());
+    }
+
+    // Add public getter function.
+    if (!getterName.empty()) {
+      FunctionType funcType =
+          rewriter.getFunctionType(/*input=*/TypeRange{}, /*outputs=*/newType);
+      ImplicitLocOpBuilder b(globalOp.getLoc(), rewriter);
+      auto funcOp = b.create<func::FuncOp>(getterName, funcType);
+      funcOp.setPublic();
+      b.setInsertionPointToStart(funcOp.addEntryBlock());
+      auto val = b.create<IREE::Util::GlobalLoadOp>(
+          newType, SymbolRefAttr::get(globalOp.getSymNameAttr()));
+      b.create<func::ReturnOp>(val.getResult());
+    }
+
+    if (!setterName.empty() && isMutable) {
+      // Add public setter function.
+      FunctionType funcType =
+          rewriter.getFunctionType(/*input=*/newType, /*outputs=*/TypeRange{});
+      ImplicitLocOpBuilder b(globalOp.getLoc(), rewriter);
+      auto funcOp = b.create<func::FuncOp>(setterName, funcType);
+      funcOp.setPublic();
+      b.setInsertionPointToStart(funcOp.addEntryBlock());
+      b.create<IREE::Util::GlobalStoreOp>(funcOp.getArgument(0),
+                                          globalOp.getSymNameAttr());
+      b.create<func::ReturnOp>();
+    }
+
     return success();
   }
 };

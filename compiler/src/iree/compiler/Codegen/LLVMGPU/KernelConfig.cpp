@@ -416,14 +416,15 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   }
 
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    for (auto outputOperand : enumerate(genericOp.getDpsInitOperands())) {
-      if (!genericOp.getMatchingIndexingMap(outputOperand.value())
+    for (auto [index, outputOperand] :
+         llvm::enumerate(genericOp.getDpsInitOperands())) {
+      if (!genericOp.getMatchingIndexingMap(outputOperand)
                .isProjectedPermutation()) {
         vectorSize = 1;
         break;
       }
       ArrayRef<int64_t> shape = cast<linalg::LinalgOp>(op)
-                                    .getDpsInitOperand(outputOperand.index())
+                                    .getDpsInitOperand(index)
                                     ->get()
                                     .getType()
                                     .cast<ShapedType>()
@@ -487,13 +488,13 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
 // function currently only support the case where all the dimensions are static
 // while we want to support dynamic shapes.
 static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
-  for (auto map : llvm::enumerate(op.getIndexingMapsArray())) {
-    for (auto dim : llvm::enumerate(map.value().getResults())) {
-      auto expr = dim.value().dyn_cast<AffineDimExpr>();
+  for (auto [mapIdx, map] : llvm::enumerate(op.getIndexingMapsArray())) {
+    for (auto [dimIdx, dim] : llvm::enumerate(map.getResults())) {
+      auto expr = dim.dyn_cast<AffineDimExpr>();
       if (expr && expr.getPosition() == d) {
-        auto type = op->getOperand(map.index()).getType().cast<ShapedType>();
-        if (type.isDynamicDim(dim.index())) return std::nullopt;
-        return type.getDimSize(dim.index());
+        auto type = op->getOperand(mapIdx).getType().cast<ShapedType>();
+        if (type.isDynamicDim(dimIdx)) return std::nullopt;
+        return type.getDimSize(dimIdx);
       }
     }
   }

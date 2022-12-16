@@ -46,14 +46,13 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   
   //         CHECK: %[[TIDX:.]] = gpu.thread_id  x
   //         CHECK: %[[IDX:.*]] = affine.apply{{.*}}%[[TIDX]]
-  //         CHECK: %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][0, %[[IDX]]]{{.*}}to memref<4xf32, strided<[1], offset: ?>, 3>
   //         CHECK: gpu.barrier
   // Local per-thread scf.for-based reduction.
   //         CHECK: scf.for
   //         CHECK:   vector.transfer_read 
-  //         CHECK:   vector.transfer_read 
+  //         CHECK:   vector.transfer_read %[[SHMEM_ALLOC]][%[[C0]], %[[IDX]]]
   //         CHECK:   arith.addf %{{.*}}, %{{.*}} : vector<4xf32>
-  //         CHECK:   vector.transfer_write
+  //         CHECK:   vector.transfer_write %{{.*}}, %[[SHMEM_ALLOC]][%[[C0]], %[[IDX]]]
   // TODO: remote unnecessary barrier within the loop
   //         CHECK:   gpu.barrier
 

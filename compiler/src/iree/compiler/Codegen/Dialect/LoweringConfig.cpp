@@ -60,8 +60,8 @@ static ArrayAttr getI64IntegerArrayAttr(MLIRContext *context,
 static SmallVector<int64_t> getIntegerVals(ArrayAttr arrayAttr) {
   if (!arrayAttr) return {};
   SmallVector<int64_t> values(arrayAttr.size());
-  for (auto attr : llvm::enumerate(arrayAttr)) {
-    values[attr.index()] = attr.value().cast<IntegerAttr>().getInt();
+  for (auto [index, attr] : llvm::enumerate(arrayAttr)) {
+    values[index] = attr.cast<IntegerAttr>().getInt();
   }
   return values;
 }

@@ -48,17 +48,18 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
     // Determine the padded shape from the load
     ArrayRef<int64_t> shape = linalgOp.getShape(&opOperand);
     SmallVector<int64_t> paddedShape(shape.begin(), shape.end());
-    for (const auto &en : llvm::enumerate(tensorLoad.getMixedSizes())) {
-      if (Optional<int64_t> cst = getConstantIntValue(en.value())) {
-        paddedShape[en.index()] = cst.value();
+    for (const auto &[index, size] :
+         llvm::enumerate(tensorLoad.getMixedSizes())) {
+      if (Optional<int64_t> cst = getConstantIntValue(size)) {
+        paddedShape[index] = cst.value();
       } else {
         FailureOr<int64_t> upperBound =
-            linalg::getConstantUpperBoundForIndex(en.value().get<Value>());
+            linalg::getConstantUpperBoundForIndex(size.get<Value>());
         if (failed(upperBound)) {
           return rewriter.notifyMatchFailure(
               linalgOp, "No constant bounding box can be found for padding");
         }
-        paddedShape[en.index()] = *upperBound;
+        paddedShape[index] = *upperBound;
       }
     }
 
@@ -89,9 +90,8 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
 
   SmallVector<Value> paddedSubviewResults;
   paddedSubviewResults.reserve(paddedOp->getNumResults());
-  for (const auto &en : llvm::enumerate(paddedOp->getResults())) {
-    Value paddedResult = en.value();
-    int64_t resultNumber = en.index();
+  for (const auto &[resultNumber, paddedResult] :
+       llvm::enumerate(paddedOp->getResults())) {
     int64_t rank = paddedResult.getType().cast<RankedTensorType>().getRank();
     SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> sizes;

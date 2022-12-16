@@ -278,7 +278,7 @@ static UploadResult buildStagingUpload(
   SmallVector<Copy> copies;
   SmallVector<Value> capturedResources;
   SmallVector<Value> capturedResourceSizes;
-  for (auto it : llvm::zip(storageResources, storageBuffers)) {
+  for (auto it : llvm::zip_equal(storageResources, storageBuffers)) {
     auto &storageResource = std::get<0>(it);
     auto storageBuffer = std::get<1>(it);
 
@@ -366,7 +366,7 @@ static UploadResult buildTryMapConstantResources(
   SmallVector<Type> resultTypes;
   Value ok;
   auto zero = indexSet.get(0);
-  for (auto it : llvm::zip(storageResources, storageBuffers)) {
+  for (auto it : llvm::zip_equal(storageResources, storageBuffers)) {
     auto &storageResource = std::get<0>(it);
     auto storageBuffer = std::get<1>(it);
     auto tryMapOp = builder.create<IREE::Stream::ResourceTryMapOp>(
@@ -415,7 +415,7 @@ static UploadResult buildTryMapConstantResources(
   // Use the result of either the direct mapping or the staging upload.
   UploadResult uploadResult;
   uploadResult.timepoint = ifTimepoint;
-  for (auto it : llvm::zip(storageResources, ifResources)) {
+  for (auto it : llvm::zip_equal(storageResources, ifResources)) {
     auto &storageResource = std::get<0>(it);
     auto ifResource = std::get<1>(it);
     uploadResult.allocations.push_back({
@@ -434,8 +434,8 @@ static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
   SmallVector<ConstantSlice> slices;
   slices.reserve(constantsOp.getResults().size());
   for (auto [result, resultSize, value] :
-       llvm::zip(constantsOp.getResults(), constantsOp.getResultSizes(),
-                 constantsOp.getValues())) {
+       llvm::zip_equal(constantsOp.getResults(), constantsOp.getResultSizes(),
+                       constantsOp.getValues())) {
     auto resourceType = result.getType().cast<IREE::Stream::ResourceType>();
     if (resourceType.getLifetime() != lifetime) continue;
     slices.push_back(ConstantSlice{
@@ -480,7 +480,7 @@ static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
   }
 
   // Build subviews for all packed spans back into storage buffers.
-  for (auto it : llvm::zip(storageResources, uploadResult.allocations)) {
+  for (auto it : llvm::zip_equal(storageResources, uploadResult.allocations)) {
     auto &storageResource = std::get<0>(it);
     auto &allocatedStorage = std::get<1>(it);
     for (auto &span : storageResource.spans) {

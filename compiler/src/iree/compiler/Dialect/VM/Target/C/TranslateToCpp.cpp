@@ -93,7 +93,7 @@ static LogicalResult printOperation(CppEmitter &emitter,
   Block &successor = *branchOp.getSuccessor();
 
   for (auto pair :
-       llvm::zip(branchOp.getOperands(), successor.getArguments())) {
+       llvm::zip_equal(branchOp.getOperands(), successor.getArguments())) {
     Value &operand = std::get<0>(pair);
     BlockArgument &argument = std::get<1>(pair);
     os << emitter.getOrCreateName(argument) << " = "
@@ -117,7 +117,7 @@ static LogicalResult printOperation(CppEmitter &emitter,
      << ") {\n";
 
   // If condition is true.
-  for (auto pair : llvm::zip(condBranchOp.getTrueOperands(),
+  for (auto pair : llvm::zip_equal(condBranchOp.getTrueOperands(),
                              trueSuccessor.getArguments())) {
     Value &operand = std::get<0>(pair);
     BlockArgument &argument = std::get<1>(pair);
@@ -132,7 +132,7 @@ static LogicalResult printOperation(CppEmitter &emitter,
   os << emitter.getOrCreateName(trueSuccessor) << ";\n";
   os << "} else {\n";
   // If condition is false.
-  for (auto pair : llvm::zip(condBranchOp.getFalseOperands(),
+  for (auto pair : llvm::zip_equal(condBranchOp.getFalseOperands(),
                              falseSuccessor.getArguments())) {
     Value &operand = std::get<0>(pair);
     BlockArgument &argument = std::get<1>(pair);
@@ -265,7 +265,7 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::ForOp forOp) {
     }
   }
 
-  for (auto pair : llvm::zip(iterArgs, operands)) {
+  for (auto pair : llvm::zip_equal(iterArgs, operands)) {
     if (failed(emitter.emitType(forOp.getLoc(), std::get<0>(pair).getType())))
       return failure();
     os << " " << emitter.getOrCreateName(std::get<0>(pair)) << " = ";
@@ -306,7 +306,7 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::ForOp forOp) {
 
   Operation *yieldOp = forRegion.getBlocks().front().getTerminator();
   // Copy yield operands into iterArgs at the end of a loop iteration.
-  for (auto pair : llvm::zip(iterArgs, yieldOp->getOperands())) {
+  for (auto pair : llvm::zip_equal(iterArgs, yieldOp->getOperands())) {
     BlockArgument iterArg = std::get<0>(pair);
     Value operand = std::get<1>(pair);
     os << emitter.getOrCreateName(iterArg) << " = "
@@ -316,7 +316,7 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::ForOp forOp) {
   os.unindent() << "}";
 
   // Copy iterArgs into results after the for loop.
-  for (auto pair : llvm::zip(results, iterArgs)) {
+  for (auto pair : llvm::zip_equal(results, iterArgs)) {
     OpResult result = std::get<0>(pair);
     BlockArgument iterArg = std::get<1>(pair);
     os << "\n"
@@ -382,7 +382,7 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::YieldOp yieldOp) {
   }
 
   if (failed(interleaveWithError(
-          llvm::zip(parentOp.getResults(), yieldOp.getOperands()),
+          llvm::zip_equal(parentOp.getResults(), yieldOp.getOperands()),
           [&](auto pair) -> LogicalResult {
             auto result = std::get<0>(pair);
             auto operand = std::get<1>(pair);

@@ -691,8 +691,8 @@ struct DeduplicateExecutableConstantBlockKeys
     SmallVector<Type> resultTypes;
     SetVector<Attribute> resultKeys;
     int i = 0;
-    for (auto [resultKey, resultType] :
-         llvm::zip(blockOp.getKeys().getValue(), blockOp.getResultTypes())) {
+    for (auto [resultKey, resultType] : llvm::zip_equal(
+             blockOp.getKeys().getValue(), blockOp.getResultTypes())) {
       if (resultKeys.insert(resultKey)) {
         resultIndices.set(i);
         resultTypes.push_back(resultType);

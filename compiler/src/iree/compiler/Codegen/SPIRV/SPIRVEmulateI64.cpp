@@ -127,7 +127,7 @@ struct FlattenElementwisePattern final : RewritePattern {
 
     // Shape cast results.
     for (auto [oldResult, newResult] :
-         llvm::zip(op->getResults(), newOp->getResults())) {
+         llvm::zip_equal(op->getResults(), newOp->getResults())) {
       Value cast = rewriter.create<vector::ShapeCastOp>(
           loc, oldResult.getType(), newResult);
       rewriter.replaceAllUsesWith(oldResult, cast);

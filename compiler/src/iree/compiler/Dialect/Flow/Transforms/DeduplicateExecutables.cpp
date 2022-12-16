@@ -77,8 +77,8 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
             if (lhsBlock.getNumArguments() != rhsBlock.getNumArguments()) {
               return false;
             }
-            for (auto argPair :
-                 llvm::zip(lhsBlock.getArguments(), rhsBlock.getArguments())) {
+            for (auto argPair : llvm::zip_equal(lhsBlock.getArguments(),
+                                                rhsBlock.getArguments())) {
               auto &lhsArg = std::get<0>(argPair);
               auto &rhsArg = std::get<1>(argPair);
               if (lhsArg.getType() != rhsArg.getType()) return false;
@@ -103,11 +103,14 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
     llvm::ReversePostOrderTraversal<Block *> traversal(&b);
     rhsBlocks.insert(traversal.begin(), traversal.end());
   }
-  for (auto blockPair : llvm::zip(lhsBlocks, rhsBlocks)) {
+  if (lhsBlocks.size() != rhsBlocks.size()) return false;
+  for (auto blockPair : llvm::zip_equal(lhsBlocks, rhsBlocks)) {
     auto &lhsBlock = std::get<0>(blockPair);
     auto &rhsBlock = std::get<1>(blockPair);
-    for (auto opPair :
-         llvm::zip(lhsBlock->getOperations(), rhsBlock->getOperations())) {
+    auto &lhsOperations = lhsBlock->getOperations();
+    auto &rhsOperations = rhsBlock->getOperations();
+    if (lhsOperations.size() != rhsOperations.size()) return false;
+    for (auto opPair : llvm::zip_equal(lhsOperations, rhsOperations)) {
       auto &lhsOp = std::get<0>(opPair);
       auto &rhsOp = std::get<1>(opPair);
       if (!isStructurallyEquivalentTo(lhsOp, rhsOp, mapping)) {
@@ -145,7 +148,7 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   // If the op references blocks (such as a branch) then we expect to have them
   // in the mapping already from the parent region to do the lhs->rhs mapping.
   for (auto successorPair :
-       llvm::zip(lhs.getSuccessors(), rhs.getSuccessors())) {
+       llvm::zip_equal(lhs.getSuccessors(), rhs.getSuccessors())) {
     auto *lhsSuccessor = std::get<0>(successorPair);
     auto *rhsSuccessor = std::get<1>(successorPair);
     if (rhsSuccessor != parentMapping.lookup(lhsSuccessor)) return false;
@@ -155,7 +158,7 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   // For many ops if the result types don't match it's a good (cheap) indicator
   // that the operands won't match either so this still allows a somewhat-early
   // exit prior to the full traversal.
-  for (auto resultPair : llvm::zip(lhs.getResults(), rhs.getResults())) {
+  for (auto resultPair : llvm::zip_equal(lhs.getResults(), rhs.getResults())) {
     auto &lhsValue = std::get<0>(resultPair);
     auto &rhsValue = std::get<1>(resultPair);
     if (lhsValue.getType() != rhsValue.getType()) return false;
@@ -164,7 +167,8 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
 
   // Check operands using the lhs->rhs mapping; since this op is only consuming
   // these values they should already be defined in the mapping.
-  for (auto operandPair : llvm::zip(lhs.getOperands(), rhs.getOperands())) {
+  for (auto operandPair :
+       llvm::zip_equal(lhs.getOperands(), rhs.getOperands())) {
     auto &lhsValue = std::get<0>(operandPair);
     auto &rhsValue = std::get<1>(operandPair);
     if (lhsValue.getType() != rhsValue.getType()) return false;
@@ -172,7 +176,7 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   }
 
   // Recurse into regions.
-  for (auto regionPair : llvm::zip(lhs.getRegions(), rhs.getRegions())) {
+  for (auto regionPair : llvm::zip_equal(lhs.getRegions(), rhs.getRegions())) {
     auto &lhsRegion = std::get<0>(regionPair);
     auto &rhsRegion = std::get<1>(regionPair);
 
@@ -238,7 +242,7 @@ class DeduplicateExecutablesPass
         duplicateExecutableOps.push_back(duplicateExecutableOp);
 
         // Record entry point reference replacements.
-        for (auto exportOpPair : llvm::zip(
+        for (auto exportOpPair : llvm::zip_equal(
                  duplicateExecutableOp.getBlock().getOps<ExecutableExportOp>(),
                  referenceExecutableOp.getBlock()
                      .getOps<ExecutableExportOp>())) {

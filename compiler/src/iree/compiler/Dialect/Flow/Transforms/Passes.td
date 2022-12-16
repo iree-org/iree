@@ -77,6 +77,8 @@ def FormDispatchRegions :
            /*default=*/"false", "Fuse with aggressive heuristics">,
     Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
            /*default=*/"true", "Generate workload regions of WorkgroupOps">,
+    Option<"collapse", "collapse", "bool",
+           /*default=*/"true", "Collapse Op and tensors that are used">,
   ];
 }
 

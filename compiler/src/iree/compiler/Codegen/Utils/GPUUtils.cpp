@@ -72,9 +72,9 @@ std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp) {
   llvm::Optional<mlir::ArrayAttr> workgroupSizeAttr =
       exportOp->getWorkgroupSize();
   assert(workgroupSizeAttr.has_value());
-  for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
-    workgroupSize[it.index()] =
-        it.value().cast<mlir::IntegerAttr>().getValue().getZExtValue();
+  for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
+    workgroupSize[index] =
+        attr.cast<mlir::IntegerAttr>().getValue().getZExtValue();
   }
   return workgroupSize;
 }
@@ -89,9 +89,9 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
   // Verify that each dimension of the shape can be distributed on the
   // threads
   int64_t threadsAvailable = threadCount;
-  for (auto &dim : llvm::enumerate(llvm::reverse(shape))) {
-    int64_t numElementPerThread = dim.index() == 0 ? vectorSize : 1;
-    int64_t numThreads = dim.value() / numElementPerThread;
+  for (auto &[index, dim] : llvm::enumerate(llvm::reverse(shape))) {
+    int64_t numElementPerThread = index == 0 ? vectorSize : 1;
+    int64_t numThreads = dim / numElementPerThread;
     if (numThreads == 0) return false;
     if (numThreads > threadsAvailable) {
       // If there are no enough remaining threads to distribute the current
