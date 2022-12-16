@@ -13,6 +13,7 @@ not.
 
 import fnmatch
 import os
+import pathlib
 import subprocess
 from typing import Iterable, Mapping, MutableMapping
 
@@ -99,10 +100,12 @@ def modifies_included_path(base_ref: str) -> bool:
 def should_run_ci(event_name, trailers) -> bool:
   base_ref = os.environ["BASE_REF"]
 
+  print(pathlib.Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+
   if event_name != "pull_request":
     print(f"Running CI independent of diff because run was not triggered by a"
           f" pull request event (event name is '{event_name}')")
-    return True
+    return False
 
   if SKIP_CI_KEY in trailers:
     print(f"Not running CI because PR description has '{SKIP_CI_KEY}' trailer.")
