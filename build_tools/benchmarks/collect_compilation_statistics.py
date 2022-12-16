@@ -183,14 +183,14 @@ def get_module_map_from_benchmark_suite(
       if module_path is None:
         raise RuntimeError(
             f"Can't find the module file in the flagfile: {flag_file_path}")
-      module_path = (benchmark_case_dir / module_path).resolve()
       compilation_info = CompilationInfo(
           model_name=benchmark_case.model_name,
           model_tags=tuple(benchmark_case.model_tags),
           model_source=category,
           target_arch=benchmark_case.target_arch,
           compile_tags=tuple(benchmark_case.bench_mode))
-      module_map[compilation_info] = module_path
+      module_map[compilation_info] = (benchmark_case_dir /
+                                      module_path).resolve()
 
   return module_map
 
@@ -211,15 +211,15 @@ def alpha_get_module_map_and_build_log(args: argparse.Namespace):
 def parse_arguments():
   """Returns an argument parser with common options."""
 
-  def check_dir_path(path):
-    path = pathlib.Path(path)
+  def check_dir_path(path_str: str) -> pathlib.Path:
+    path = pathlib.Path(path_str)
     if path.is_dir():
       return path
     else:
       raise argparse.ArgumentTypeError(f"{path} is not a directory.")
 
-  def check_file_path(path):
-    path = pathlib.Path(path)
+  def check_file_path(path_str: str) -> pathlib.Path:
+    path = pathlib.Path(path_str)
     if path.is_file():
       return path
     else:
