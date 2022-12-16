@@ -5,11 +5,11 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from io import BytesIO, StringIO
 import json
 import pathlib
 import unittest
 import zipfile
-from io import BytesIO, StringIO
 
 from common.benchmark_definition import ModuleComponentSizes
 from collect_compilation_statistics import CONST_COMPONENT_NAME, VM_COMPONENT_NAME, get_module_component_info, get_module_path, parse_compilation_time_from_ninja_log
@@ -93,7 +93,7 @@ class CollectCompilationStatistics(unittest.TestCase):
 
     self.assertEqual(moduel_path, "/abcd-compile-stats.vmfb")
 
-  def test_get_module_list_from_generation_config(self):
+  def test_get_module_map_from_generation_config(self):
     model_a = common_definitions.Model(
         id="1234",
         name="tflite_m",
@@ -137,29 +137,31 @@ class CollectCompilationStatistics(unittest.TestCase):
         serialization.serialize_and_pack([gen_config_a, gen_config_b]))
     root_dir = pathlib.PurePath("artifacts_dir")
 
-    module_list = collect_compilation_statistics.get_module_list_from_generation_config(
+    module_map = collect_compilation_statistics.get_module_map_from_generation_config(
         serialized_gen_config=StringIO(serialized_gen_config),
         e2e_test_artifacts_dir=root_dir)
 
     compile_info_a = common.benchmark_definition.CompilationInfo(
         model_name=model_a.name,
-        model_tags=model_a.tags,
+        model_tags=tuple(model_a.tags),
         model_source=model_a.source_type.value,
         target_arch=f"[cpu-x86_64-cascadelake-linux-gnu]",
-        compile_tags=gen_config_a.compile_config.tags)
+        compile_tags=tuple(gen_config_a.compile_config.tags))
     module_a_path = iree_artifacts.get_module_dir_path(
         gen_config_a, root_dir) / iree_artifacts.MODULE_FILENAME
     compile_info_b = common.benchmark_definition.CompilationInfo(
         model_name=model_a.name,
-        model_tags=model_a.tags,
+        model_tags=tuple(model_a.tags),
         model_source=model_a.source_type.value,
         target_arch=
         f"[cpu-riscv_64-generic-linux-gnu,cpu-riscv_32-generic-linux-gnu]",
-        compile_tags=gen_config_a.compile_config.tags)
+        compile_tags=tuple(gen_config_a.compile_config.tags))
     module_b_path = iree_artifacts.get_module_dir_path(
         gen_config_b, root_dir) / iree_artifacts.MODULE_FILENAME
-    self.assertEqual(module_list, [(compile_info_a, module_a_path),
-                                   (compile_info_b, module_b_path)])
+    self.assertEqual(module_map, {
+        compile_info_a: module_a_path,
+        compile_info_b: module_b_path
+    })
 
 
 if __name__ == "__main__":
