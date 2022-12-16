@@ -351,6 +351,10 @@ _mlirModuleGetContext
 _mlirModuleGetOperation
 _mlirNamedAttributeGet
 _mlirNoneTypeGet
+_mlirOpOperandGetNextUse
+_mlirOpOperandGetOperandNumber
+_mlirOpOperandGetOwner
+_mlirOpOperandIsNull
 _mlirOpPassManagerAddOwnedPass
 _mlirOpPassManagerAddPipeline
 _mlirOpPassManagerGetNestedUnder
@@ -533,6 +537,7 @@ _mlirUnrankedTensorTypeGet
 _mlirUnrankedTensorTypeGetChecked
 _mlirValueDump
 _mlirValueEqual
+_mlirValueGetFirstUse
 _mlirValueGetType
 _mlirValueIsABlockArgument
 _mlirValueIsAOpResult

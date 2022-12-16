@@ -352,6 +352,10 @@ EXPORTS
   mlirModuleGetOperation
   mlirNamedAttributeGet
   mlirNoneTypeGet
+  mlirOpOperandGetNextUse
+  mlirOpOperandGetOperandNumber
+  mlirOpOperandGetOwner
+  mlirOpOperandIsNull
   mlirOpPassManagerAddOwnedPass
   mlirOpPassManagerAddPipeline
   mlirOpPassManagerGetNestedUnder
@@ -534,6 +538,7 @@ EXPORTS
   mlirUnrankedTensorTypeGetChecked
   mlirValueDump
   mlirValueEqual
+  mlirValueGetFirstUse
   mlirValueGetType
   mlirValueIsABlockArgument
   mlirValueIsAOpResult

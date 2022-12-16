@@ -353,6 +353,10 @@ VER_0 {
     mlirModuleGetOperation;
     mlirNamedAttributeGet;
     mlirNoneTypeGet;
+    mlirOpOperandGetNextUse;
+    mlirOpOperandGetOperandNumber;
+    mlirOpOperandGetOwner;
+    mlirOpOperandIsNull;
     mlirOpPassManagerAddOwnedPass;
     mlirOpPassManagerAddPipeline;
     mlirOpPassManagerGetNestedUnder;
@@ -535,6 +539,7 @@ VER_0 {
     mlirUnrankedTensorTypeGetChecked;
     mlirValueDump;
     mlirValueEqual;
+    mlirValueGetFirstUse;
     mlirValueGetType;
     mlirValueIsABlockArgument;
     mlirValueIsAOpResult;
