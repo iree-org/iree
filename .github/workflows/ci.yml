@@ -726,6 +726,14 @@ jobs:
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
+    outputs:
+      # We can't collect all outputs from the matrix jobs due to Github's
+      # limitation (https://github.com/orgs/community/discussions/17245).
+      # Therefore, the output is the GCS directory that stores all benchmark
+      # tools archives. The following jobs need to construct the archive names
+      # by themselves and combine with path of GCS directory here to fetch the
+      # archives.
+      benchmark-tools-gcs-artifact-dir: ${{ steps.upload.outputs.benchmark-tools-gcs-artifact-dir }}
     strategy:
       matrix:
         target:
@@ -787,9 +795,10 @@ jobs:
         id: upload
         env:
           BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}
-          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.benchmark-tools-archive }}
+          BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/benchmark-tools
         run: |
-          gcloud alpha storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT}"
+          gcloud alpha storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}/"
+          echo "benchmark-tools-gcs-artifact-dir=${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
 
   build_e2e_test_artifacts:
     needs: [setup, build_all, build_tf_integrations]
@@ -862,6 +871,7 @@ jobs:
       runner-env: ${{ needs.setup.outputs.runner-env }}
       e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
       e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
       benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
 
   ############################## Crosscompilation ##############################

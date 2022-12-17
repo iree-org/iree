@@ -25,6 +25,9 @@ on:
       e2e-test-artifacts-gcs-artifact-dir:
         required: true
         type: string
+      benchmark-tools-gcs-artifact-dir:
+        required: true
+        type: string
       benchmark-presets:
         required: true
         type: string
@@ -107,7 +110,7 @@ jobs:
           # See `build_benchmark_tools` step in ci.yml for the name format of
           # benchmark tools artifacts.
           BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM_ARCH }}-benchmark-tools.tar
-          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ env.PLATFORM_ARCH }}-benchmark-tools.tar
+          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ inputs.benchmark-tools-gcs-artifact-dir }}/${{ env.PLATFORM_ARCH }}-benchmark-tools.tar
         run: |
           gcloud alpha storage cp "${BENCHMARK_TOOLS_GCS_ARTIFACT}" "${BENCHMARK_TOOLS_ARCHIVE}"
           echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
