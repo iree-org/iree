@@ -5,8 +5,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Script to run benchmarks with a proper docker image and benchmark tool based
-# on device name.
+# Script to run benchmarks on CI with the proper docker image and benchmark tool
+# based on the IREE_DEVICE_NAME.
 
 set -euo pipefail
 

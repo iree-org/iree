@@ -12,9 +12,7 @@ not.
 """
 
 import fnmatch
-import json
 import os
-import pathlib
 import subprocess
 from typing import Iterable, Mapping, MutableMapping
 
@@ -52,7 +50,7 @@ SKIP_PATH_PATTERNS = [
 RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
-BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64"]
+BENCHMARK_PRESET_OPTIONS = ["all", "cuda"]
 
 
 def skip_path(path: str) -> bool:
@@ -105,11 +103,6 @@ def should_run_ci(event_name, trailers) -> bool:
     print(f"Running CI independent of diff because run was not triggered by a"
           f" pull request event (event name is '{event_name}')")
     return True
-
-  event_obj = json.load(pathlib.Path(os.environ["GITHUB_EVENT_PATH"]).open("r"))
-  print(event_obj)
-  if event_obj["action"] in {"labeled", "unlabeled"}:
-    return False
 
   if SKIP_CI_KEY in trailers:
     print(f"Not running CI because PR description has '{SKIP_CI_KEY}' trailer.")
