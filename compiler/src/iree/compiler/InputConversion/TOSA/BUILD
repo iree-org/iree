@@ -40,8 +40,8 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:LinalgDialect",
-        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
     ],
 )

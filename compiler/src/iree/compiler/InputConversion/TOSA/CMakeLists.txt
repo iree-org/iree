@@ -28,7 +28,11 @@ iree_cc_library(
     "Passes.h.inc"
   DEPS
     ::PassesIncGen
+    IREELinalgExtDialect
+    MLIRFuncDialect
+    MLIRLinalgDialect
     MLIRPass
+    MLIRTensorDialect
     MLIRTransforms
   PUBLIC
 )
@@ -45,9 +49,13 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    IREELinalgExtDialect
+    MLIRFuncDialect
     MLIRIR
+    MLIRLinalgDialect
     MLIRPass
     MLIRSCFToControlFlow
+    MLIRTensorDialect
     MLIRTosaDialect
     MLIRTosaToArith
     MLIRTosaToLinalg
