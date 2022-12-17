@@ -40,6 +40,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "Passes.cpp"
+    "TosaToLinalgExt.cpp"
     "VerifyCompilerTOSAInputLegality.cpp"
   DEPS
     ::PassHeaders

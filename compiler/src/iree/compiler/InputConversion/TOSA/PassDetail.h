@@ -7,6 +7,10 @@
 #ifndef IREE_COMPILER_INPUTCONVERSION_TOSA_PASSDETAIL_H_
 #define IREE_COMPILER_INPUTCONVERSION_TOSA_PASSDETAIL_H_
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 

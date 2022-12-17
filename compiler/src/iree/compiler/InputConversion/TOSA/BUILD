@@ -46,6 +46,7 @@ iree_compiler_cc_library(
     name = "TOSA",
     srcs = [
         "Passes.cpp",
+        "TosaToLinalgExt.cpp",
         "VerifyCompilerTOSAInputLegality.cpp",
     ],
     hdrs = [
