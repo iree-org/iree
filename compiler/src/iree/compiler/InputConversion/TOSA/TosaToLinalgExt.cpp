@@ -84,22 +84,29 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
                                        indicesTy.getElementType(), dynDims)
               .getResult();
 
-      SmallVector<AffineMap, 3> indexingMaps(
-          2, builder.getMultiDimIdentityMap(indicesTy.getRank()));
-      Value batchIdx =
-          builder
-              .create<linalg::GenericOp>(
-                  indicesTy, indices, empty, indexingMaps,
-                  getNParallelLoopsAttrs(indicesTy.getRank()),
-                  [&](OpBuilder &nestedBuilder, Location nestedLoc,
-                      ValueRange blockArgs) {
-                    ImplicitLocOpBuilder b(op.getLoc(), nestedBuilder);
-                    auto index = b.create<linalg::IndexOp>(0);
-                    auto cast = b.create<arith::IndexCastOp>(
-                        indicesTy.getElementType(), index);
-                    b.create<linalg::YieldOp>(cast.getResult());
-                  })
-              .getResult(0);
+      Value batchIdx = nullptr;
+
+      if (indicesTy.getDimSize(0) == 1) {
+        Value zero = builder.create<arith::ConstantOp>(
+            rewriter.getZeroAttr(indicesTy.getElementType()));
+        batchIdx = builder.create<linalg::FillOp>(zero, empty).getResult(0);
+      } else {
+        SmallVector<AffineMap, 3> indexingMaps(
+            2, builder.getMultiDimIdentityMap(indicesTy.getRank()));
+        batchIdx = builder
+                       .create<linalg::GenericOp>(
+                           indicesTy, indices, empty, indexingMaps,
+                           getNParallelLoopsAttrs(indicesTy.getRank()),
+                           [&](OpBuilder &nestedBuilder, Location nestedLoc,
+                               ValueRange blockArgs) {
+                             ImplicitLocOpBuilder b(op.getLoc(), nestedBuilder);
+                             auto index = b.create<linalg::IndexOp>(0);
+                             auto cast = b.create<arith::IndexCastOp>(
+                                 indicesTy.getElementType(), index);
+                             b.create<linalg::YieldOp>(cast.getResult());
+                           })
+                       .getResult(0);
+      }
 
       indicesTy = indicesTy.clone(
           {indicesTy.getDimSize(0), indicesTy.getDimSize(1), 2});
