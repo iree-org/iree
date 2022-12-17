@@ -29,6 +29,7 @@ iree_cc_library(
   DEPS
     ::PassesIncGen
     IREELinalgExtDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRLinalgDialect
     MLIRPass
@@ -50,6 +51,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREELinalgExtDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect

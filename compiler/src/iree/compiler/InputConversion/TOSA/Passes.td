@@ -14,6 +14,7 @@ def TosaToLinalgExt :
   let summary = "Convert TOSA operations to their equivalent linalg-ext operations.";
   let constructor = "mlir::iree_compiler::createTosaToLinalgExt()";
   let dependentDialects = [
+    "arith::ArithDialect",
     "linalg::LinalgDialect",
     "tensor::TensorDialect",
     "IREE::LinalgExt::IREELinalgExtDialect",
