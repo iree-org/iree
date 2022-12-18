@@ -169,27 +169,43 @@ class ReductionStrategyThreadDistributionSizes {
   int64_t maxNumThreadsToUse;
 };
 
+static int64_t maxMultipleOf(int64_t val, int64_t multiple) {
+  assert(val > 0 && "expected nonnegative quantity");
+  assert(multiple > 0 && "expected nonnegative quantity");
+  return (val / multiple) * multiple;
+}
+static int64_t nextMultipleOf(int64_t val, int64_t multiple) {
+  assert(val > 0 && "expected nonnegative quantity");
+  assert(multiple > 0 && "expected nonnegative quantity");
+  return ((val + multiple - 1) / multiple) * multiple;
+}
+
 void ReductionStrategyThreadDistributionSizes::computeStrategy() {
   vectorTileSize = 1;
   reductionTileSize = maxNumThreadsToUse;
   if (reductionDimensionSize <= 0) return;
 
-  // TODO: refine even further based on mod 2 and mod 4 only + min
-  // canonicalizations.
-  int64_t warpVector4Size = 4 * iree_compiler::kCudaWarpSize;
-  int64_t warpVector2Size = 2 * iree_compiler::kCudaWarpSize;
-  if (reductionDimensionSize % warpVector4Size == 0) {
-    int64_t f1 = reductionDimensionSize / warpVector4Size;
-    int64_t f2 = maxNumThreadsToUse / warpVector4Size;
-    reductionTileSize = std::min(f1, f2) * iree_compiler::kCudaWarpSize;
+  // When we know the problem size is divisible by k, we know we want to
+  // target vector<kxf32>. Over-provision to the next multiple of the warp
+  // size fo ensure we tile to a multiple of the warp size to allow proper
+  // distribution across warp shuffles.
+  // TODO: refine with elemental type bitwidth and GPU memory transaction size.
+  if (reductionDimensionSize % 4 == 0) {
+    reductionTileSize = std::min(
+        nextMultipleOf(reductionDimensionSize / 4,
+                       iree_compiler::kCudaWarpSize),
+        maxMultipleOf(maxNumThreadsToUse, iree_compiler::kCudaWarpSize));
     vectorTileSize = 4;
-  } else if (reductionDimensionSize % warpVector2Size == 0) {
-    int64_t f1 = reductionDimensionSize / warpVector2Size;
-    int64_t f2 = maxNumThreadsToUse / warpVector2Size;
-    reductionTileSize = std::min(f1, f2) * iree_compiler::kCudaWarpSize;
+  } else if (reductionDimensionSize % 2 == 0) {
+    reductionTileSize = std::min(
+        nextMultipleOf(reductionDimensionSize / 2,
+                       iree_compiler::kCudaWarpSize),
+        maxMultipleOf(maxNumThreadsToUse, iree_compiler::kCudaWarpSize));
     vectorTileSize = 2;
   } else {
-    reductionTileSize = std::min(maxNumThreadsToUse, reductionDimensionSize);
+    reductionTileSize = std::min(
+        nextMultipleOf(reductionDimensionSize, iree_compiler::kCudaWarpSize),
+        maxMultipleOf(maxNumThreadsToUse, iree_compiler::kCudaWarpSize));
     vectorTileSize = 1;
   }
 }
@@ -236,15 +252,16 @@ static std::pair<Value, Value> createReductionStrategyBlockDistribution(
   Value fusionTargetH = fusionTargetSelector.getFirst();
   Value fusionGroupH = fusionTargetSelector.getRest();
   ArrayRef<Attribute> allBlocksRef(infos.allBlockAttrs);
-  iree_compiler::TileAndFuseAndDistributeResult tileResult = iree_compiler::
-      buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
-          /*builder=*/b,
-          /*rootH=*/fusionTargetH,
-          /*opsToFuseH=*/fusionGroupH,
-          /*tileSizes=*/
-          getAsOpFoldResult(b.getI64ArrayAttr(infos.workgroupTileSizes)),
-          /*threadDimMapping=*/
-          b.getArrayAttr(allBlocksRef.take_front(infos.rank - 1)));
+  iree_compiler::TileToForeachThreadAndFuseAndDistributeResult tileResult =
+      iree_compiler::
+          buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
+              /*builder=*/b,
+              /*rootH=*/fusionTargetH,
+              /*opsToFuseH=*/fusionGroupH,
+              /*tileSizes=*/
+              getAsOpFoldResult(b.getI64ArrayAttr(infos.workgroupTileSizes)),
+              /*threadDimMapping=*/
+              b.getArrayAttr(allBlocksRef.take_front(infos.rank - 1)));
   Value foreachThreadH =
       b.create<FuseIntoContainingOp>(fillH, tileResult.foreachThreadH);
   foreachThreadH =
@@ -261,7 +278,6 @@ static std::pair<Value, Value> createReductionStrategyBlockDistribution(
 static void createReductionStrategyThreadDistribution(
     ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledTrailingH,
     const GPUReductionStrategyInfos &infos) {
-  auto pdlOperation = pdl::OperationType::get(b.getContext());
   auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
                                                       mlir::gpu::Threads::DimX);
   auto threadY = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
@@ -288,16 +304,23 @@ static void createReductionStrategyThreadDistribution(
       blockParallelFillH, blockParallelForeachThreadOp);
 
   // Map the combiner reduction to one thread along y so it can be mapped
-  // further via predication. Fuse it into the trailing elementwise if
-  // present.
-  auto selector = b.create<TakeFirstOp>(
-      pdlOperation, pdlOperation,
-      ArrayRef<Value>({maybeTiledTrailingH, blockCombinerOpH}));
-  Value fusionRootH = selector.getFirst();
-  Value fusionGroupH = selector.getRest();
+  // further via predication.
   iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
-      b, fusionRootH, fusionGroupH, getAsOpFoldResult(b.getI64ArrayAttr({1})),
+      b, blockCombinerOpH, {}, getAsOpFoldResult(b.getI64ArrayAttr({1})),
       b.getArrayAttr(threadY));
+
+  // Map the potential maybeTiledTrailingH.
+  if (maybeTiledTrailingH) {
+    auto res = iree_compiler::buildTileFuseToScfFor(
+        b, maybeTiledTrailingH, {},
+        getAsOpFoldResult(b.getI64ArrayAttr(
+            {0, infos.threadDistributionSizes.reductionTileSize})));
+    iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
+        b, res.tiledOpH, {},
+        getAsOpFoldResult(b.getI64ArrayAttr(
+            {0, infos.threadDistributionSizes.reductionTileSize})),
+        b.getArrayAttr({threadX}));
+  }
 }
 
 /// Builds the transform IR tiling reductions for CUDA targets. Supports
