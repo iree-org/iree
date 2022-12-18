@@ -259,8 +259,6 @@ Value mlir::iree_compiler::buildMapToBlockAndThreads(
   return b.create<MapNestedForeachThreadToGpuThreadsOp>(funcH, blockSize);
 }
 
-static constexpr unsigned kCudaWarpSize = 32;
-
 /// Post-bufferization vector distribution with rank-reduction.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.

@@ -18,7 +18,7 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 
 /// Prints `handles` in order. Prints the whole IR if `handles` is empty.
-static void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
+void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 
 /// Result of the combined transform performing tiling, fusion and distribution
 /// to parallel constructs.
@@ -27,7 +27,7 @@ struct TileToScfForAndFuseResult {
   SmallVector<Value> forLoops;
   /// Handles to fused operations other than the final consumer operation. May
   /// be empty if fusion was not performed iteratively.
-  /// /// This is currently empty
+  /// This is currently empty
   // TODO: support returning handles from `fuse_into_containing_op` and remove
   // the restriction above.
   SmallVector<Value> resultingFusedOpsHandles;

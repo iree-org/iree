@@ -1,6 +1,10 @@
-// iree-transform-compile   /usr/local/google/home/ntv/github/iree/tests/transform_dialect/cuda/warp_reduction_dispatch.mlir -b cuda -- --iree-hal-benchmark-dispatch-repeat-count=5 | \
-// /usr/local/cuda-11.4/bin/nvprof  --print-gpu-trace  iree-run-module --entry_function=warp_reduction_dispatch --device=cuda --function_input="512x10240xf32=1"
-
+// Example usage:
+//
+// cat tests/transform_dialect/cuda/benchmark_linalg_reductions.stub.mlir | \
+// sed "s/\${SZ1}/32/g" | \
+// sed "s/\${SZ2}/32/g" | \
+// iree-transform-compile - -b cuda -- --iree-hal-benchmark-dispatch-repeat-count=5 | \
+// /usr/local/cuda-11.4/bin/nvprof  --print-gpu-trace  iree-run-module --entry_function=reduction_2d_static --device=cuda --function_input="32x32xf32=1"
 
 !in_tensor_reduction_2d_static_t = tensor<${SZ1}x${SZ2}xf32>
 !out_tensor_reduction_2d_static_t = tensor<${SZ1}xf32>
