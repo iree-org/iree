@@ -55,13 +55,15 @@ See https://cloud.google.com/functions/docs for more details.
 
 import flask
 import functions_framework
+import google.api_core.exceptions
+import google.auth.exceptions
 import requests
-from google.api_core import exceptions
 from google.auth import transport
 from google.cloud import compute
 from google.oauth2 import id_token
 
 AUTH_HEADER_PREFIX = "Bearer "
+MIG_METADATA_KEY = "created-by"
 
 instances_client = compute.InstancesClient()
 migs_client = compute.RegionInstanceGroupManagersClient()
@@ -70,14 +72,14 @@ session = requests.Session()
 print("Server started")
 
 
-def verify_token(token: str) -> dict:
+def _verify_token(token: str) -> dict:
   """Verify token signature and return the token payload"""
   request = transport.requests.Request(session)
   payload = id_token.verify_oauth2_token(token, request=request)
   return payload
 
 
-def get_region(zone: str) -> str:
+def _get_region(zone: str) -> str:
   """Extract region name from zone name"""
   # Drop the trailing zone identifier to get the region. Yeah it kinda does seem
   # like there should be a better way to do this...
@@ -85,13 +87,13 @@ def get_region(zone: str) -> str:
   return region
 
 
-def get_name_from_resource(resource: str) -> str:
+def _get_name_from_resource(resource: str) -> str:
   """Extract just the final name component from a fully scoped resource name."""
   _, name = resource.rsplit("/", maxsplit=1)
   return name
 
 
-def get_from_items(items: compute.Items, key: str):
+def _get_from_items(items: compute.Items, key: str):
   # Why would the GCP Python API return something as silly as a dictionary?
   return next((item.value for item in items if item.key == key), None)
 
@@ -113,13 +115,12 @@ def delete_self(request):
   """
   if request.method != "DELETE":
     return flask.abort(
-        400, f"Invalid method '{request.method}'. Only DELETE is supported.")
+        400, f"Invalid method {request.method}. Only DELETE is supported.")
 
   # No path is needed, since the token contains all the information we need.
   if request.path != "/":
     return flask.abort(
-        400,
-        f"Invalid request path '{request.path}'. Only root path is valid).")
+        400, f"Invalid request path {request.path}. Only root path is valid).")
 
   auth_header = request.headers.get("Authorization")
   if auth_header is None:
@@ -127,7 +128,7 @@ def delete_self(request):
   if not auth_header.startswith(AUTH_HEADER_PREFIX):
     return flask.abort(
         401, f"Authorization header does not start with expected string"
-        f" '{AUTH_HEADER_PREFIX}'.")
+        f" {AUTH_HEADER_PREFIX}.")
 
   token = auth_header[len(AUTH_HEADER_PREFIX):]
 
@@ -135,8 +136,8 @@ def delete_self(request):
     # We don't verify audience here because Cloud IAM will have already done so
     # and jwt's matching of audiences is exact, which means trailing slashes or
     # http vs https matters and that's pretty brittle.
-    token_payload = verify_token(token)
-  except ValueError as e:
+    token_payload = _verify_token(token)
+  except (ValueError, google.auth.exceptions.GoogleAuthError) as e:
     print(e)
     return flask.abort(401, "Decoding bearer token failed.")
 
@@ -144,10 +145,9 @@ def delete_self(request):
 
   try:
     compute_info = token_payload["google"]["compute_engine"]
-  except KeyError as e:
+  except KeyError:
     return flask.abort(
-        401,
-        "Bearer token payload does not have expected field 'google.compute'")
+        401, "Bearer token payload does not have expected field google.compute")
 
   project = compute_info["project_id"]
   zone = compute_info["zone"]
@@ -156,9 +156,12 @@ def delete_self(request):
     instance = instances_client.get(instance=instance_name,
                                     project=project,
                                     zone=zone)
-  except exceptions.NotFound as e:
+  except google.api_core.exceptions.NotFound as e:
     print(e)
-    return flask.abort(404, "Instance not found")
+    return flask.abort(
+        404,
+        f"Instance {instance_name} not found for zone={zone}, project={project}"
+    )
 
   instance_id = int(compute_info["instance_id"])
   # Verify it's *actually* the same instance. Names get reused, but IDs
@@ -167,20 +170,22 @@ def delete_self(request):
   if instance.id != instance_id:
     return flask.abort(
         400,
-        f"Existing instance of the same name '{instance.name}' has a different"
-        f" ID '{instance.id}' than token specifies '{instance_id}'.")
+        f"Existing instance of the same name {instance.name} has a different"
+        f" ID {instance.id} than token specifies {instance_id}.")
 
-  mig = get_from_items(instance.metadata.items, "created-by")
+  mig = _get_from_items(instance.metadata.items, MIG_METADATA_KEY)
 
   if mig is None:
-    return flask.abort(400, "Instance is not part of a managed instance group.")
-  mig = get_name_from_resource(mig)
+    return flask.abort(400,
+                       (f"Instance is not part of a managed instance group."
+                        f" Did not find {MIG_METADATA_KEY} in metadata."))
+  mig = _get_name_from_resource(mig)
 
   try:
     operation = migs_client.delete_instances(
         instance_group_manager=mig,
         project=project,
-        region=get_region(zone),
+        region=_get_region(zone),
         # For some reason we can't just use a list of instance names and need to
         # build this RhymingRythmicJavaClasses proto. Also, unlike all the other
         # parameters, the instance has to be a fully-specified URL for the
@@ -191,21 +196,23 @@ def delete_self(request):
   except Exception as e:
     # An error here means we screwed up the syntax of the request. That is
     # almost certainly a server error
-    return flask.abort(
-        500, f"Error requesting that '{mig}' delete '{instance_name}'.")
+    return flask.abort(500,
+                       f"Error requesting that {mig} delete {instance_name}.")
 
   try:
-    result = operation.result()
-  except exceptions.ClientError as e:
+    # This is actually an extended operation that you have to poll to get its
+    # status, but we just check the status once because it appears that errors
+    # always show up here.
+    operation.result()
+  except google.api_core.exceptions.ClientError as e:
     print(e)
     # Unpack the actual usable error message
-    msg = f"Error requesting that '{mig}' delete '{instance_name}':" + "".join(
-        ["\n"
-         f"{err.code}: {err.message}" for err in e.response.error.errors])
+    msg = f"Error requesting that {mig} delete {instance_name}:" "\n" + "\n".join(
+        [f"{err.code}: {err.message}" for err in e.response.error.errors])
     print(msg)
     # We're not actually totally sure whether this is a client or server error
     # for the overall request, but let's call it a client error (the only client
     # here is our VM instances, so I think we can be a bit loose).
     return flask.abort(400, msg)
 
-  return f"'{instance_name}' has been marked for deletion by '{mig}'."
+  return f"{instance_name} has been marked for deletion by {mig}."
