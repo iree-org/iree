@@ -140,6 +140,9 @@ static FailureOr<PackOp> lowerSetEncodingOpToPackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
+  Optional<TensorEncoding> encoding = getEncoding(resultType);
+  if (!encoding)
+    return failure();
   SmallVector<OpFoldResult> resultDims =
       PackOp::getResultShape(rewriter, loc, sourceDims, *innerTileSizesOfr,
                              materializeEncodingInfo->innerDimsPos,
@@ -147,9 +150,20 @@ static FailureOr<PackOp> lowerSetEncodingOpToPackOp(
   auto initTensor = rewriter.create<tensor::EmptyOp>(
       loc, resultDims, resultType.getElementType());
   Optional<Value> paddingValue = getPaddingValue(source);
-  return rewriter.create<PackOp>(
+  auto packOp = rewriter.create<PackOp>(
       loc, source, initTensor, materializeEncodingInfo->innerDimsPos,
       *innerTileSizesOfr, paddingValue, materializeEncodingInfo->outerDimsPerm);
+  // As we rewrite the SetEncoding and its old result tensor, which used to hold
+  // the TensorEncodingAttr, into a pack op with a new result tensor which does
+  // not have a TensorEncodingAttr, we lose the information that used to be
+  // stored in that attr. That shouldn't matter, as the purpose of that attr
+  // was to enable exactly this rewrite, but there is a catch: at the moment,
+  // in IREE's TileAndDistributeToWorkgroupsPass.cpp, we need the encoding value
+  // again. See the comment there. So we re-add the attribute on the pack op
+  // itself as a temporary work-around.
+  packOp->setAttr(StringAttr::get(rewriter.getContext(), "encoding"),
+                  EncodingAttr::get(rewriter.getContext(), *encoding));
+  return packOp;
 }
 
 /// Utility method to convert from `set_encoding` op to `pack` operation.
