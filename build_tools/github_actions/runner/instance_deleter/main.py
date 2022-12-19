@@ -55,9 +55,9 @@ See https://cloud.google.com/functions/docs for more details.
 
 import flask
 import functions_framework
-import google.auth.transport.requests
 import requests
 from google.api_core import exceptions
+from google.auth import transport
 from google.cloud import compute
 from google.oauth2 import id_token
 
@@ -72,7 +72,7 @@ print("Server started")
 
 def verify_token(token: str) -> dict:
   """Verify token signature and return the token payload"""
-  request = google.auth.transport.requests.Request(session)
+  request = transport.requests.Request(session)
   payload = id_token.verify_oauth2_token(token, request=request)
   return payload
 
@@ -91,7 +91,7 @@ def get_name_from_resource(resource: str) -> str:
   return name
 
 
-def get_from_items(items: compute.types.Items, key: str):
+def get_from_items(items: compute.Items, key: str):
   # Why would the GCP Python API return something as silly as a dictionary?
   return next((item.value for item in items if item.key == key), None)
 
@@ -156,7 +156,7 @@ def delete_self(request):
     instance = instances_client.get(instance=instance_name,
                                     project=project,
                                     zone=zone)
-  except google.api_core.exceptions.NotFound as e:
+  except exceptions.NotFound as e:
     print(e)
     return flask.abort(404, "Instance not found")
 
