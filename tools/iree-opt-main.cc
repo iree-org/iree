@@ -9,6 +9,7 @@
 // Based on mlir-opt but registers the passes and dialects we care about.
 
 #include "iree/compiler/API2/ToolEntryPoints.h"
+#include "llvm/Support/PrettyStackTrace.h"
 
 int main(int argc, char **argv) {
   llvm::setBugReportMsg(
