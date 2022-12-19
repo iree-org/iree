@@ -105,16 +105,12 @@ transform_ext::StructuredOpMatcher::dim(SmallVector<int64_t> &&dimensions,
 }
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(AllDims tag, utils::IteratorType kind) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    return llvm::all_of(
-        linalgOp.getIteratorTypesArray(),
-        [=](utils::IteratorType iteratorType) { return iteratorType == kind; });
-  });
-  return *this;
+  return dim(AllDimsExcept({}), kind);
 }
 
 transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::dim(AllDimsExcept &&dims, utils::IteratorType kind) {
+transform_ext::StructuredOpMatcher::dim(AllDimsExcept &&dims,
+                                        utils::IteratorType kind) {
   predicates.push_back(
       [dimensions = std::move(dims), kind](linalg::LinalgOp linalgOp) -> bool {
         int64_t rank = linalgOp.getNumLoops();
@@ -135,7 +131,6 @@ transform_ext::StructuredOpMatcher::dim(AllDimsExcept &&dims, utils::IteratorTyp
       });
   return *this;
 }
-
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(int64_t dimension,

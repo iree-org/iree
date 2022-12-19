@@ -45,6 +45,7 @@ struct AllDimsExcept {
   ArrayRef<int64_t> getExcluded() const {
     return llvm::makeArrayRef(exceptions);
   }
+
 private:
   SmallVector<int64_t> exceptions;
 };
