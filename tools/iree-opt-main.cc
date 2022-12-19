@@ -9,11 +9,5 @@
 // Based on mlir-opt but registers the passes and dialects we care about.
 
 #include "iree/compiler/API2/ToolEntryPoints.h"
-#include "llvm/Support/PrettyStackTrace.h"
 
-int main(int argc, char **argv) {
-  llvm::setBugReportMsg(
-      "Please report issues to https://github.com/iree-org/iree/issues and "
-      "include the crash backtrace.\n");
-  return ireeOptRunMain(argc, argv);
-}
+int main(int argc, char **argv) { return ireeOptRunMain(argc, argv); }
