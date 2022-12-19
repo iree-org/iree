@@ -6,8 +6,7 @@
 """Generates CMake rules to fetch model artifacts."""
 
 from dataclasses import dataclass
-from typing import Iterable, List, OrderedDict
-import collections
+from typing import Dict, Iterable, List
 import pathlib
 import urllib.parse
 
@@ -25,10 +24,10 @@ class ModelRule(object):
 
 def generate_model_rule_map(
     root_path: pathlib.PurePath,
-    models: Iterable[common_definitions.Model]) -> OrderedDict[str, ModelRule]:
+    models: Iterable[common_definitions.Model]) -> Dict[str, ModelRule]:
   """Returns the model rules keyed by model id in an ordered map."""
 
-  model_rules = collections.OrderedDict()
+  model_rules = {}
   for model in models:
     # Model target: <package_name>-model-<model_id>
     target_name = f"model-{model.id}"
