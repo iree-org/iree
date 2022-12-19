@@ -21,12 +21,15 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -362,6 +365,8 @@ bool SPIRVTileAndPromotePass::isCooperativeMatrixFusable(
     linalg::GenericOp genericOp) const {
   if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) return false;
 
+  // Look at fused elementwise ops to make sure they are allowed by the
+  // cooperative matrix spec.
   for (Operation &op : genericOp.getBlock()->without_terminator()) {
     if (!isa<
             // These ops are directly allowed to use cooperative matrix types.
@@ -375,6 +380,19 @@ bool SPIRVTileAndPromotePass::isCooperativeMatrixFusable(
             arith::MulFOp>(op))
       return false;
   }
+
+  // Look at operands to make sure we don't have inlined constants. Cooperative
+  // matrix loads can only happen from StorageBuffer or Workgroup storage
+  // classes.
+  for (Value input : genericOp.getInputs()) {
+    while (auto subviewOp = input.getDefiningOp<memref::SubViewOp>()) {
+      input = subviewOp.getViewSource();
+    }
+    if (auto toMemrefOp = input.getDefiningOp<bufferization::ToMemrefOp>()) {
+      if (matchPattern(toMemrefOp.getTensor(), m_Constant())) return false;
+    }
+  }
+
   return true;
 }
 
