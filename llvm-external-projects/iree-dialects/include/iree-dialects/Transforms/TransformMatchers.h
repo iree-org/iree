@@ -36,13 +36,41 @@ enum class ShapeKind { Static, Dynamic };
 /// for all dimensions.
 struct AllDims {};
 
+/// A predicate indicating the structured op matcher to check the predicate for
+/// all dimensions except the specified ones.
+struct AllDimsExcept {
+  explicit AllDimsExcept(std::initializer_list<int64_t> range) {
+    llvm::append_range(exceptions, range);
+  }
+  ArrayRef<int64_t> getExcluded() const {
+    return llvm::makeArrayRef(exceptions);
+  }
+
+private:
+  SmallVector<int64_t> exceptions;
+};
+
 /// A placeholder indicating the structured op matcher to check the predicate
 /// for all operands of the relevant kind.
 struct AllOperands {};
 
-struct CaptureDim {
-  explicit CaptureDim(int64_t &value) : value(value) {}
-  int64_t &value;
+/// Base class for single-value captures. Concrete captures should inherit this
+/// and forward the constructor via `using Base::Base`.
+template <typename T>
+struct CaptureStaticValue {
+  using Base = CaptureStaticValue<T>;
+  explicit CaptureStaticValue(T &value) : value(value) {}
+  T &value;
+};
+
+/// Captures the (static) size of the dimension.
+struct CaptureDim : public CaptureStaticValue<int64_t> {
+  using Base::Base;
+};
+
+/// Captures the rank of the operation.
+struct CaptureRank : public CaptureStaticValue<int64_t> {
+  using Base::Base;
 };
 
 /// A tag indicating to look for any user of the operation's result that would
@@ -69,6 +97,16 @@ struct NumEqualsTo : public SingleValuePredicateParam<size_t> {
   using Base::Base;
 };
 
+/// Indicates that the number of entities must be greater than the given value.
+struct NumGreaterEqualTo : public SingleValuePredicateParam<size_t> {
+  using Base::Base;
+};
+
+/// Indicates that the number of entities must be greater than the given value.
+struct NumLowerEqualTo : public SingleValuePredicateParam<size_t> {
+  using Base::Base;
+};
+
 /// Indicates that the bit width of the elemental type must be equal to the give
 /// value.
 struct ElementTypeBitWidth : public SingleValuePredicateParam<size_t> {
@@ -77,6 +115,9 @@ struct ElementTypeBitWidth : public SingleValuePredicateParam<size_t> {
 
 /// Predicate tag indicating that the affine map is a permutation.
 struct IsPermutation {};
+
+/// Predicate tag indicating that the affine map is a projected permutation.
+struct IsProjectedPermutation {};
 
 /// Indicates that the match optional. The matcher is still expected to run and
 /// capture if successful. The parameter can be set to false
@@ -135,12 +176,24 @@ public:
   /// Matches the given operation, hook for `matchPattern`.
   bool match(Operation *op);
 
+  //===-------------------------------------------------------------------===//
+  // Constraints on op rank and dims.
+  //===-------------------------------------------------------------------===//
+  /// Adds a predicate checking that the given rank must be greater than some
+  /// constant value.
+  // TODO: Base class, derived class and proper API.
+  StructuredOpMatcher &rank(NumGreaterEqualTo minRank);
+  StructuredOpMatcher &rank(NumLowerEqualTo maxRank);
+
   /// Adds a predicate checking that the given iteration space dimension is
   /// static/dynamic. The dimension index may be negative, in which case
   /// dimensions are counted from the last one (i.e. Python-style), or be an
   /// AllDims tag, in which case all dimensions are checked. This may be
   /// eventually extended to slices and/or lists of dimensions.
-  StructuredOpMatcher &dim(int64_t dimension, ShapeKind kind);
+  StructuredOpMatcher &dim(int64_t dimension, ShapeKind kind) {
+    return dim(SmallVector<int64_t>{dimension}, kind);
+  }
+  StructuredOpMatcher &dim(SmallVector<int64_t> &&dimensions, ShapeKind kind);
   StructuredOpMatcher &dim(AllDims tag, ShapeKind kind);
 
   /// Adds a predicate checking that the given iteration space dimension has the
@@ -149,8 +202,15 @@ public:
   /// (i.e. Python-style), or be an AllDims tag, in which case all dimensions
   /// are checked. This may be eventually extended to slices and/or lists of
   /// dimensions.
-  StructuredOpMatcher &dim(int64_t dimension, utils::IteratorType kind);
+  StructuredOpMatcher &dim(int64_t dimension, utils::IteratorType kind) {
+    return dim(SmallVector<int64_t>{dimension}, kind);
+  }
+  // Ownership may get tricky here so we wrap in an explicit vector.
+  StructuredOpMatcher &dim(SmallVector<int64_t> &&dimensions,
+                           utils::IteratorType kind);
   StructuredOpMatcher &dim(AllDims tag, utils::IteratorType kind);
+  StructuredOpMatcher &dim(AllDimsExcept &&dimensions,
+                           utils::IteratorType kind);
 
   /// Adds a predicate checking that the given iteration space dimension is
   /// statically known to be divisible by the given value. The dimension index
@@ -158,8 +218,16 @@ public:
   /// (i.e. Python-style).
   StructuredOpMatcher &dim(int64_t dimension, DivisibleBy divisibleBy);
 
-  StructuredOpMatcher &dim(int64_t dimension, CaptureDim capture);
+  //===-------------------------------------------------------------------===//
+  // Capture directives.
+  //===-------------------------------------------------------------------===//
+  StructuredOpMatcher &rank(CaptureStaticValue<int64_t> capture);
+  StructuredOpMatcher &dim(int64_t dimension,
+                           CaptureStaticValue<int64_t> capture);
 
+  //===-------------------------------------------------------------------===//
+  // Constraints on input operands.
+  //===-------------------------------------------------------------------===//
   /// Adds a predicate checking that the structured op has the given number of
   /// inputs.
   StructuredOpMatcher &input(NumEqualsTo num) {
@@ -208,11 +276,18 @@ public:
   /// have a permutation indexing map.
   StructuredOpMatcher &input(AllOperands tag, IsPermutation);
 
+  /// Adds a predicate checking that all input operands of the structured op
+  /// have a projected permutation indexing map.
+  StructuredOpMatcher &input(AllOperands tag, IsProjectedPermutation);
+
   /// Adds a predicate that recursively applies another predicate to the
   /// operation defining the `position`-th input operand, looking through any
   /// "subsetting" operation such as "tensor.extract_slice".
   StructuredOpMatcher &input(int64_t position, SubsetOf subset);
 
+  //===-------------------------------------------------------------------===//
+  // Constraints on output operands.
+  //===-------------------------------------------------------------------===//
   /// Adds a predicate that recursively applies another predicate to the
   /// operation defining the `position`-th output operand, looking through any
   /// "subsetting" operation such as "tensor.extract_slice".
@@ -230,6 +305,10 @@ public:
   /// Adds a predicate checking that all output operands of the structured op
   /// have a permutation indexing map.
   StructuredOpMatcher &output(AllOperands tag, IsPermutation);
+
+  /// Adds a predicate checking that all output operands of the structured op
+  /// have a projected permutation indexing map.
+  StructuredOpMatcher &output(AllOperands tag, IsProjectedPermutation);
 
   /// Adds a predicate checking that the bit width of the elemental type of the
   /// structured op output at the given position is equal to the given value.
@@ -307,6 +386,9 @@ public:
     return *this;
   }
 
+  //===-------------------------------------------------------------------===//
+  // Constraints on results.
+  //===-------------------------------------------------------------------===//
   /// Adds a predicate that recursively applies to users of the `positions`-th
   /// result, looking through any "subsetting" operation such as
   /// "tensor.extract_slice". Succeeds if any user matches the predicate.
@@ -443,6 +525,11 @@ private:
 // Case-specific matcher builders.
 //===---------------------------------------------------------------------===//
 
+struct MatchedReductionCaptures {
+  int64_t rank;
+  int64_t reductionDimensionSize;
+};
+
 /// Creates a group of matchers for:
 ///
 ///     trailing(reduction(leading(), fill()))
@@ -453,7 +540,7 @@ void makeReductionMatcher(StructuredOpMatcher &reduction,
                           StructuredOpMatcher &fill,
                           StructuredOpMatcher &leading,
                           StructuredOpMatcher &trailing,
-                          int64_t &reductionDimensionSize);
+                          MatchedReductionCaptures &captures);
 
 /// Creates a group of matchers for:
 ///
