@@ -139,15 +139,14 @@ iree_hal_cuda_allocator_query_compatibility(
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
 
-  // CUDA supports host <-> device for all copies.
-  if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
+  if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
     compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
   }
 
   // Buffers can only be used on the queue if they are device visible.
   if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
-    if (iree_all_bits_set(params->usage,
-                          IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
+    if (iree_any_bit_set(params->usage,
+                         IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
     }
   }
