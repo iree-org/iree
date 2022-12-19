@@ -7,6 +7,7 @@
 #include "iree-dialects/Transforms/TransformMatchers.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
 using namespace mlir;
@@ -488,7 +489,8 @@ void transform_ext::makeReductionMatcher(
   // TODO: careful about multi-output and turning into a contraction.
   //
   trailing = leading;
-  reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch());
+  reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch())
+                  .allTilableOpsCaptured<func::FuncOp>();
 }
 
 void transform_ext::makeSplitReductionMatcher(
@@ -529,5 +531,6 @@ void transform_ext::makeSplitReductionMatcher(
           .output(0, SubsetOf(original_fill))
           .output(0, ElementTypeBitWidth(32))
           .output(0, SingleCombinerReduction())
-          .result(0, HasAnyUse(), SubsetOf(trailing), OptionalMatch());
+          .result(0, HasAnyUse(), SubsetOf(trailing), OptionalMatch())
+          .allTilableOpsCaptured<func::FuncOp>();
 }

@@ -82,29 +82,6 @@ public:
   StructuredTransformOpsExtension();
 };
 
-//===---------------------------------------------------------------------===//
-// IMPORTANT WARNING FOR ALL MATCH CALLBACK OPS !!!
-//===---------------------------------------------------------------------===//
-// We need to temporarily encode additional constraints in C++ that we
-// cannot yet express in the Matchers.
-//
-// These extra constraints are necessary because of the layering IREE
-// imposes on us: the dispatch regions are already pre-formed and we must
-// match **exactly** (best effort..) to avoid leaving dangling payload IR
-// in the dispatch that is not transformed (and leads to catastrophic
-// performance bugs or even miscompiles).
-// A future more robust system will let us form our own dispatches and we
-// won't need to be as strict on matching **exactly**.
-//
-// It is important that these additional C++ constraints can all be
-// expressed as separable matchers (and in the future as contraint IR).
-//
-// In the following, we make the assumption that TilingInterface ops are
-// exactly the payload ops that we must not miss.
-// This is best effort and if anything else must not be missed, it should also
-// be added here.
-int64_t getNumPayloadOpsThatWeMustMatch(Operation *root);
-
 } // namespace transform_ext
 } // namespace mlir
 

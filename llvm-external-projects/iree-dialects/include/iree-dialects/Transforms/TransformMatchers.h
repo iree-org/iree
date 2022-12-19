@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Matchers.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 
 namespace mlir {
@@ -140,6 +141,8 @@ struct SubsetOf {
 namespace detail {
 template <typename T>
 using has_reset_capture_t = decltype(std::declval<T>().resetCapture());
+template <typename T>
+using has_get_capture_t = decltype(std::declval<T>().getCaptured());
 } // namespace detail
 
 /// Structured op matcher with additional predicates attachable through the
@@ -153,6 +156,7 @@ class StructuredOpMatcher {
   friend StructuredOpMatcher m_StructuredOp();
   using PredicateFn = std::function<bool(linalg::LinalgOp)>;
   using CaptureResetFn = std::function<void()>;
+  using GetCapturedFn = std::function<Operation *()>;
 
   /// Matches a structured operation if the given predicate is satisfied.
   StructuredOpMatcher(PredicateFn &&firstPredicate) {
@@ -286,8 +290,39 @@ public:
   StructuredOpMatcher &input(int64_t position, SubsetOf subset);
 
   //===-------------------------------------------------------------------===//
+  // Constraints on adjacent ops.
+  //===-------------------------------------------------------------------===//
+
+  /// Adds a predicate checking that all ops implementing TilingInterface in the
+  /// parent of the given type (e.g., a function or a module) were matched by
+  /// this or nested matchers. This is useful to ensure that the matcher covered
+  /// the entire parent region, not just a parent of it. This predicate **must**
+  /// be added *after* all the other predicates that capture.
+  template <typename OpTy>
+  StructuredOpMatcher &allTilableOpsCaptured() {
+    predicates.push_back([this](linalg::LinalgOp linalgOp) {
+      int64_t numTilableOps = 0;
+      Operation *parent = linalgOp->getParentOfType<OpTy>();
+      parent->walk([&](TilingInterface Op) { ++numTilableOps; });
+
+      llvm::SmallPtrSet<Operation *, 6> matched;
+      for (const GetCapturedFn &fn : getCapturedFns) {
+        if (Operation *captured = fn())
+          matched.insert(captured);
+      }
+
+      // Note that `getCapturedFn` doesn't include the root of the match, add it
+      // manually.
+      matched.insert(linalgOp);
+      return numTilableOps == matched.size();
+    });
+    return *this;
+  }
+
+  //===-------------------------------------------------------------------===//
   // Constraints on output operands.
   //===-------------------------------------------------------------------===//
+
   /// Adds a predicate that recursively applies another predicate to the
   /// operation defining the `position`-th output operand, looking through any
   /// "subsetting" operation such as "tensor.extract_slice".
@@ -354,6 +389,10 @@ public:
     return *this;
   }
 
+  //===-------------------------------------------------------------------===//
+  // Constraints on results.
+  //===-------------------------------------------------------------------===//
+
   /// Adds a predicate that recursively applies to users of the `position`-th
   /// result of the structured op. Succeeds if any user matches the predicate.
   /// When the match is optional, the predicate check succeeds as long as the
@@ -386,9 +425,6 @@ public:
     return *this;
   }
 
-  //===-------------------------------------------------------------------===//
-  // Constraints on results.
-  //===-------------------------------------------------------------------===//
   /// Adds a predicate that recursively applies to users of the `positions`-th
   /// result, looking through any "subsetting" operation such as
   /// "tensor.extract_slice". Succeeds if any user matches the predicate.
@@ -410,19 +446,24 @@ private:
   /// Informs the matcher that it has another, nested matcher. Practically,
   /// records the captured value cleanup function so it runs when required.
   template <typename T>
-  std::enable_if_t<llvm::is_detected<detail::has_reset_capture_t, T>::value>
-  recordNestedMatcher(T &nested) {
-    captureResetFns.push_back([&nested] { nested.resetCapture(); });
+  void recordNestedMatcher(T &nested) {
+    if constexpr (llvm::is_detected<detail::has_reset_capture_t, T>::value) {
+      captureResetFns.push_back([&nested] { nested.resetCapture(); });
+    }
+    if constexpr (llvm::is_detected<detail::has_get_capture_t, T>::value) {
+      getCapturedFns.push_back([&nested] { return nested.getCaptured(); });
+    }
   }
-  template <typename T>
-  std::enable_if_t<!llvm::is_detected<detail::has_reset_capture_t, T>::value>
-  recordNestedMatcher(T &nested) {}
 
   /// Additional predicates to be checked on the structured op.
   SmallVector<PredicateFn> predicates;
 
   /// Callbacks to reset captures of nested matchers.
   SmallVector<CaptureResetFn> captureResetFns;
+
+  /// Callbacks to get values captured by nested matchers.
+  // TODO: consider having an abstract base class instead.
+  SmallVector<GetCapturedFn> getCapturedFns;
 
   /// Matched value.
   linalg::LinalgOp captured = nullptr;
