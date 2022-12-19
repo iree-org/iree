@@ -32,7 +32,7 @@ iree_cc_library(
     "mmt4d_tile_arm_64.S"
   DEPS
     ::assembly
-    iree::builtins::ukernel::exported_flag_bits
+    iree::builtins::ukernel::exported_bits
 )
 list(APPEND IREE_UK_MMT4D_TILE_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_tile_arm_64")
 
@@ -48,7 +48,7 @@ if(IREE_UK_BUILD_ARM_64_DOTPROD)
       "-march=armv8.2-a+dotprod"
     DEPS
       ::assembly
-      iree::builtins::ukernel::exported_flag_bits
+      iree::builtins::ukernel::exported_bits
 
   )
   list(APPEND IREE_UK_MMT4D_TILE_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_tile_arm_64_dotprod")
@@ -66,7 +66,7 @@ if(IREE_UK_BUILD_ARM_64_I8MM)
       "-march=armv8.2-a+i8mm"
     DEPS
       ::assembly
-      iree::builtins::ukernel::exported_flag_bits
+      iree::builtins::ukernel::exported_bits
   )
   list(APPEND IREE_UK_MMT4D_TILE_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_tile_arm_64_i8mm")
 endif()
@@ -102,7 +102,7 @@ iree_cc_library(
   SRCS
     "pack_tile_arm_64.c"
   DEPS
-    iree::builtins::ukernel::exported_flag_bits
+    iree::builtins::ukernel::exported_bits
 )
 
 ###############################################################################

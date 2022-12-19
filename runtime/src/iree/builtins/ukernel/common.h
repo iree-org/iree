@@ -97,7 +97,7 @@
 #include "iree/builtins/ukernel/arch/config.h"
 
 // Include common flag values, shared with the compiler.
-#include "iree/builtins/ukernel/exported_flag_bits.h"
+#include "iree/builtins/ukernel/exported_bits.h"
 
 // Include IREE_UK_STATIC_ASSERT.
 #include "iree/builtins/ukernel/static_assert.h"
@@ -365,7 +365,7 @@ static inline const char* iree_uk_status_message(iree_uk_status_t status) {
 //     (C++ scoped enums would be perfect, but this is C code).
 //   * If people ever need these type ids in assembly code, then the raw
 //     numerical macros will be the only thing we'll be able to share with that
-//     (as is the case today with  exported_flag_bits.h).
+//     (as is the case today with  exported_bits.h).
 
 // Defines the element type of a buffer passed to a microkernel.
 //
