@@ -311,14 +311,18 @@ static void createReductionStrategyThreadDistribution(
 
   // Map the potential maybeTiledTrailingH.
   if (maybeTiledTrailingH) {
+    assert(infos.rank >= 1);
+    SmallVector<int64_t> trailingTileSizes(infos.rank - 1, 0);
+    if (infos.rank > 1) {
+      trailingTileSizes.back() =
+          infos.threadDistributionSizes.reductionTileSize;
+    }
     auto res = iree_compiler::buildTileFuseToScfFor(
         b, maybeTiledTrailingH, {},
-        getAsOpFoldResult(b.getI64ArrayAttr(
-            {0, infos.threadDistributionSizes.reductionTileSize})));
+        getAsOpFoldResult(b.getI64ArrayAttr(trailingTileSizes)));
     iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
         b, res.tiledOpH, {},
-        getAsOpFoldResult(b.getI64ArrayAttr(
-            {0, infos.threadDistributionSizes.reductionTileSize})),
+        getAsOpFoldResult(b.getI64ArrayAttr(trailingTileSizes)),
         b.getArrayAttr({threadX}));
   }
 }
