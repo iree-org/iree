@@ -161,6 +161,12 @@ typedef enum iree_allocator_command_e {
   //   params: unused
   //   inout_ptr: pointer to free
   IREE_ALLOCATOR_COMMAND_FREE,
+
+  // TODO(benvanik): add optional IREE_ALLOCATOR_COMMAND_BIND like mbind:
+  // https://man7.org/linux/man-pages/man2/mbind.2.html
+  // This would take a pointer/length and a NUMA node ID to bind the memory to.
+  // We may want flags for controlling whether this is a new allocation getting
+  // bound or an existing one that is migrating to use MPOL_MF_MOVE.
 } iree_allocator_command_t;
 
 // Parameters for various allocation commands.
