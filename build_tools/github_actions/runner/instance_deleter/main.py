@@ -91,7 +91,7 @@ def get_name_from_resource(resource: str) -> str:
   return name
 
 
-def get_from_items(items: google.cloud.compute_v1.types.Items, key: str):
+def get_from_items(items: compute.types.Items, key: str):
   # Why would the GCP Python API return something as silly as a dictionary?
   return next((item.value for item in items if item.key == key), None)
 
