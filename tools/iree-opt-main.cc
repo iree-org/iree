@@ -10,4 +10,9 @@
 
 #include "iree/compiler/API2/ToolEntryPoints.h"
 
-int main(int argc, char **argv) { return ireeOptRunMain(argc, argv); }
+int main(int argc, char **argv) {
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/iree-org/iree/issues and "
+      "include the crash backtrace.\n");
+  return ireeOptRunMain(argc, argv);
+}
