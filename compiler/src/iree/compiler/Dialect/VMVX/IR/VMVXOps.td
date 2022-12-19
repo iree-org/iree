@@ -11,6 +11,7 @@ include "iree/compiler/Dialect/VMVX/IR/VMVXBase.td"
 include "iree/compiler/Dialect/VMVX/IR/VMVXInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/OpBase.td"
 
 class VMVX_PureOp<string mnemonic, list<Trait> traits = []> :
     VMVX_Op<mnemonic, !listconcat(traits, [Pure])>;
@@ -71,6 +72,25 @@ def VMVX_GetRawInterfaceBindingBufferOp : VMVX_PureOp<
   );
   let assemblyFormat = [{
     `set` `(` $set `)` `binding` `(` $binding `)` attr-dict
+  }];
+}
+
+def VMVX_QueryTileSizesOp : VMVX_PureOp<"query_tile_sizes"> {
+  let summary = "Returns tile sizes to use to materialize the given encoding, based on runtime CPU capabilities.";
+  let description = [{
+    TODO write me
+  }];
+
+  let arguments = (ins
+    I64:$encoding,
+    Variadic<VMVX_Index>:$sizes
+  );
+  let results = (outs
+    Variadic<VMVX_Index>:$tileSizes
+  );
+
+  let assemblyFormat = [{
+    `encoding` `(` $encoding `)` `sizes` `(` $sizes `)` `->` type(results) attr-dict
   }];
 }
 
