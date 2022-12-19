@@ -49,6 +49,9 @@ enum class CompileMode {
 }  // namespace mlir
 
 int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/iree-org/iree/issues and "
+      "include the crash backtrace.\n");
   llvm::InitLLVM y(argc, argv);
   static llvm::cl::OptionCategory mainOptions("IREE Main Options");
   ireeCompilerGlobalInitialize(/*initializeCommandLine=*/true);
