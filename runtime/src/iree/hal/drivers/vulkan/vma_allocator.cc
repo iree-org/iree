@@ -222,7 +222,7 @@ iree_hal_vulkan_vma_allocator_query_compatibility(
   // Buffers can only be used on the queue if they are device visible.
   if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
     if (iree_any_bit_set(params->usage,
-                          IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
+                         IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
     }
   }
