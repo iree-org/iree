@@ -36,14 +36,40 @@ enum class ShapeKind { Static, Dynamic };
 /// for all dimensions.
 struct AllDims {};
 
+/// A predicate indicating the structured op matcher to check the predicate for
+/// all dimensions except the specified ones.
+struct AllDimsExcept {
+  explicit AllDimsExcept(std::initializer_list<int64_t> range) {
+    llvm::append_range(exceptions, range);
+  }
+  ArrayRef<int64_t> getExcluded() const {
+    return llvm::makeArrayRef(exceptions);
+  }
+private:
+  SmallVector<int64_t> exceptions;
+};
+
 /// A placeholder indicating the structured op matcher to check the predicate
 /// for all operands of the relevant kind.
 struct AllOperands {};
 
+/// Base class for single-value captures. Concrete captures should inherit this
+/// and forward the constructor via `using Base::Base`.
 template <typename T>
 struct CaptureStaticValue {
+  using Base = CaptureStaticValue<T>;
   explicit CaptureStaticValue(T &value) : value(value) {}
   T &value;
+};
+
+/// Captures the (static) size of the dimension.
+struct CaptureDim : public CaptureStaticValue<int64_t> {
+  using Base::Base;
+};
+
+/// Captures the rank of the operation.
+struct CaptureRank : public CaptureStaticValue<int64_t> {
+  using Base::Base;
 };
 
 /// A tag indicating to look for any user of the operation's result that would
@@ -87,14 +113,10 @@ struct ElementTypeBitWidth : public SingleValuePredicateParam<size_t> {
 };
 
 /// Predicate tag indicating that the affine map is a permutation.
-struct IsPermutation {
-  IsPermutation(){};
-  IsPermutation &setProjectedPermutation(bool val) {
-    projectedPermutation = val;
-    return *this;
-  }
-  bool projectedPermutation;
-};
+struct IsPermutation {};
+
+/// Predicate tag indicating that the affine map is a projected permutation.
+struct IsProjectedPermutation {};
 
 /// Indicates that the match optional. The matcher is still expected to run and
 /// capture if successful. The parameter can be set to false
@@ -167,14 +189,10 @@ public:
   /// dimensions are counted from the last one (i.e. Python-style), or be an
   /// AllDims tag, in which case all dimensions are checked. This may be
   /// eventually extended to slices and/or lists of dimensions.
-  /// When strictInBounds is false, matching succeeds if the dimension is out of
-  /// bounds.
-  StructuredOpMatcher &dim(int64_t dimension, ShapeKind kind,
-                           bool strictInBounds = true) {
-    return dim(SmallVector<int64_t>{dimension}, kind, strictInBounds);
+  StructuredOpMatcher &dim(int64_t dimension, ShapeKind kind) {
+    return dim(SmallVector<int64_t>{dimension}, kind);
   }
-  StructuredOpMatcher &dim(SmallVector<int64_t> &&dimensions, ShapeKind kind,
-                           bool strictInBounds = true);
+  StructuredOpMatcher &dim(SmallVector<int64_t> &&dimensions, ShapeKind kind);
   StructuredOpMatcher &dim(AllDims tag, ShapeKind kind);
 
   /// Adds a predicate checking that the given iteration space dimension has the
@@ -183,17 +201,15 @@ public:
   /// (i.e. Python-style), or be an AllDims tag, in which case all dimensions
   /// are checked. This may be eventually extended to slices and/or lists of
   /// dimensions.
-  /// When strictInBounds is false, matching succeeds if the dimension is out of
-  /// bounds.
-  StructuredOpMatcher &dim(int64_t dimension, utils::IteratorType kind,
-                           bool strictInBounds = true) {
-    return dim(SmallVector<int64_t>{dimension}, kind, strictInBounds);
+  StructuredOpMatcher &dim(int64_t dimension, utils::IteratorType kind) {
+    return dim(SmallVector<int64_t>{dimension}, kind);
   }
   // Ownership may get tricky here so we wrap in an explicit vector.
   StructuredOpMatcher &dim(SmallVector<int64_t> &&dimensions,
-                           utils::IteratorType kind,
-                           bool strictInBounds = true);
+                           utils::IteratorType kind);
   StructuredOpMatcher &dim(AllDims tag, utils::IteratorType kind);
+  StructuredOpMatcher &dim(AllDimsExcept &&dimensions,
+                           utils::IteratorType kind);
 
   /// Adds a predicate checking that the given iteration space dimension is
   /// statically known to be divisible by the given value. The dimension index
@@ -257,7 +273,11 @@ public:
 
   /// Adds a predicate checking that all input operands of the structured op
   /// have a permutation indexing map.
-  StructuredOpMatcher &input(AllOperands tag, IsPermutation perm);
+  StructuredOpMatcher &input(AllOperands tag, IsPermutation);
+
+  /// Adds a predicate checking that all input operands of the structured op
+  /// have a projected permutation indexing map.
+  StructuredOpMatcher &input(AllOperands tag, IsProjectedPermutation);
 
   /// Adds a predicate that recursively applies another predicate to the
   /// operation defining the `position`-th input operand, looking through any
@@ -283,7 +303,11 @@ public:
 
   /// Adds a predicate checking that all output operands of the structured op
   /// have a permutation indexing map.
-  StructuredOpMatcher &output(AllOperands tag, IsPermutation perm);
+  StructuredOpMatcher &output(AllOperands tag, IsPermutation);
+
+  /// Adds a predicate checking that all output operands of the structured op
+  /// have a projected permutation indexing map.
+  StructuredOpMatcher &output(AllOperands tag, IsProjectedPermutation);
 
   /// Adds a predicate checking that the bit width of the elemental type of the
   /// structured op output at the given position is equal to the given value.

@@ -52,15 +52,15 @@ transform_ext::StructuredOpMatcher::rank(NumLowerEqualTo maxRank) {
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(SmallVector<int64_t> &&dimensions,
-                                        ShapeKind kind, bool strictInBounds) {
-  predicates.push_back([dimensions = std::move(dimensions), kind,
-                        strictInBounds](linalg::LinalgOp linalgOp) -> bool {
+                                        ShapeKind kind) {
+  predicates.push_back([dimensions = std::move(dimensions),
+                        kind](linalg::LinalgOp linalgOp) -> bool {
     SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
     for (auto dimension : dimensions) {
       int64_t transformedDimension =
           dimension >= 0 ? dimension : shape.size() + dimension;
       if (transformedDimension < 0 || transformedDimension >= shape.size())
-        return !strictInBounds;
+        return false;
       if (ShapedType::isDynamic(shape[transformedDimension]) ^
           (kind == ShapeKind::Static))
         continue;
@@ -84,16 +84,15 @@ transform_ext::StructuredOpMatcher::dim(AllDims tag, ShapeKind kind) {
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(SmallVector<int64_t> &&dimensions,
-                                        utils::IteratorType kind,
-                                        bool strictInBounds) {
-  predicates.push_back([dimensions = std::move(dimensions), kind,
-                        strictInBounds](linalg::LinalgOp linalgOp) -> bool {
+                                        utils::IteratorType kind) {
+  predicates.push_back([dimensions = std::move(dimensions),
+                        kind](linalg::LinalgOp linalgOp) -> bool {
     unsigned rank = linalgOp.getNumLoops();
     for (auto dimension : dimensions) {
       int64_t transformedDimension =
           dimension >= 0 ? dimension : rank + dimension;
       if (transformedDimension < 0 || transformedDimension >= rank)
-        return !strictInBounds;
+        return false;
       utils::IteratorType iteratorKind =
           linalgOp.getIteratorTypesArray()[transformedDimension];
       if (iteratorKind == kind)
@@ -113,6 +112,30 @@ transform_ext::StructuredOpMatcher::dim(AllDims tag, utils::IteratorType kind) {
   });
   return *this;
 }
+
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::dim(AllDimsExcept &&dims, utils::IteratorType kind) {
+  predicates.push_back(
+      [dimensions = std::move(dims), kind](linalg::LinalgOp linalgOp) -> bool {
+        int64_t rank = linalgOp.getNumLoops();
+        llvm::SmallDenseSet<int64_t> excludedDims;
+        for (int64_t dim : dimensions.getExcluded()) {
+          excludedDims.insert(dim >= 0 ? dim : rank + dim);
+        }
+
+        for (auto [index, type] :
+             llvm::enumerate(linalgOp.getIteratorTypesArray())) {
+          if (excludedDims.contains(index))
+            continue;
+          if (type == kind)
+            continue;
+          return false;
+        }
+        return true;
+      });
+  return *this;
+}
+
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(int64_t dimension,
@@ -162,17 +185,25 @@ transform_ext::StructuredOpMatcher::dim(int64_t dimension,
 // Constraints on input operands.
 //===---------------------------------------------------------------------===//
 transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::input(AllOperands tag, IsPermutation perm) {
+transform_ext::StructuredOpMatcher::input(AllOperands tag, IsPermutation) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      if (perm.projectedPermutation) {
-        if (!linalgOp.getMatchingIndexingMap(operand).isProjectedPermutation())
-          return false;
-        continue;
-      }
-      // Default: exact permutation.
       if (!linalgOp.getMatchingIndexingMap(operand).isPermutation())
+        return false;
+    }
+    return true;
+  });
+  return *this;
+}
+
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::input(AllOperands tag,
+                                          IsProjectedPermutation) {
+  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+    // all_of with a lambda requires const-casting dance, so using a loop.
+    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
+      if (!linalgOp.getMatchingIndexingMap(operand).isProjectedPermutation())
         return false;
     }
     return true;
@@ -260,16 +291,23 @@ transform_ext::StructuredOpMatcher::input(int64_t position, SubsetOf subset) {
 // Constraints on output operands.
 //===---------------------------------------------------------------------===//
 transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::output(AllOperands tag,
-                                           IsPermutation perm) {
+transform_ext::StructuredOpMatcher::output(AllOperands tag, IsPermutation) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-      if (perm.projectedPermutation) {
-        if (!linalgOp.getMatchingIndexingMap(operand).isProjectedPermutation())
-          return false;
-        continue;
-      }
       if (!linalgOp.getMatchingIndexingMap(operand).isPermutation())
+        return false;
+    }
+    return true;
+  });
+  return *this;
+}
+
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::output(AllOperands tag,
+                                           IsProjectedPermutation) {
+  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
+      if (!linalgOp.getMatchingIndexingMap(operand).isProjectedPermutation())
         return false;
     }
     return true;
@@ -390,17 +428,7 @@ void transform_ext::makeReductionMatcher(
           .dim(-1, utils::IteratorType::reduction)
           .dim(-1, CaptureStaticValue<int64_t>(captures.reductionDimensionSize))
           // All other dimensions are parallel.
-          // This needs captures.rank to be properly captured, which does not
-          // seem to happen right now.
-          // TODO: fix this.
-          //
-          // .dim(llvm::to_vector(llvm::seq<int64_t>(0, captures.rank - 1)),
-          //      utils::IteratorType::parallel)
-          // Until then, allow progress with "strictInBounds".
-          //
-          .dim(-2, utils::IteratorType::parallel, /*strictInBounds=*/false)
-          .dim(-3, utils::IteratorType::parallel, /*strictInBounds=*/false)
-          .dim(-4, utils::IteratorType::parallel, /*strictInBounds=*/false)
+          .dim(AllDimsExcept({-1}), utils::IteratorType::parallel)
           // Single input for now, can be arbitrary projected permutations.
           // TODO: Multiple inputs, can be arbitrary projected permutations.
           // TODO: Watch out for multiple inputs though as a reduction turns
@@ -410,14 +438,14 @@ void transform_ext::makeReductionMatcher(
           //       and has a very different schedule.
           //
           .input(NumEqualsTo(1))
-          .input(AllOperands(), IsPermutation().setProjectedPermutation(true))
+          .input(AllOperands(), IsProjectedPermutation())
           // Single output supported atm.
           // TODO: Multiple outputs.
           //
           .output(NumEqualsTo(1))
           // A reduction output must be a projected permutation, match it but we
           // could also drop this technically.
-          .output(AllOperands(), IsPermutation().setProjectedPermutation(true))
+          .output(AllOperands(), IsProjectedPermutation())
           // Only single combiner over 32 bits for now due to reduction warp
           // distribution.
           // TODO: relax this once reduction distribution is more powerful.
@@ -441,8 +469,8 @@ void transform_ext::makeReductionMatcher(
       m_StructuredOp<linalg::GenericOp>()
           // All parallel dimensions.
           .dim(AllDims(), utils::IteratorType::parallel)
-          // All inputs are any projectected permutation.
-          .input(AllOperands(), IsPermutation().setProjectedPermutation(true))
+          // All inputs are any projected permutation.
+          .input(AllOperands(), IsProjectedPermutation())
           .output(AllOperands(), IsPermutation())
           // leading and trailing may have 0, 1 or more input as long as they do
           // not come from unmatched ops. This extra constraint is taken care of
