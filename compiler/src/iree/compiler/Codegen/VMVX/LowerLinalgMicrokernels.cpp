@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/builtins/ukernel/exported_flag_bits.h"
+#include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"

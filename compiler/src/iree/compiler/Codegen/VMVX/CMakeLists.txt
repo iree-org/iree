@@ -29,7 +29,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPass
     MLIRTransforms
-    iree::builtins::ukernel::exported_flag_bits
+    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Util::IR
