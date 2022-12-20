@@ -23,6 +23,7 @@ _ireeCompilerOptionsDestroy
 _ireeCompilerOptionsGetFlags
 _ireeCompilerOptionsSetFlags
 _ireeCompilerOutputDestroy
+_ireeCompilerOutputOpenFD
 _ireeCompilerOutputOpenFile
 _ireeCompilerOutputWrite
 _ireeCompilerRegisterAllDialects
@@ -32,6 +33,8 @@ _ireeCompilerRunLldMain
 _ireeCompilerRunMain
 _ireeCompilerSessionCreate
 _ireeCompilerSessionDestroy
+_ireeCompilerSessionGetFlags
+_ireeCompilerSessionSetFlags
 _ireeCompilerSourceDestroy
 _ireeCompilerSourceOpenFile
 _ireeCompilerSourceSplit

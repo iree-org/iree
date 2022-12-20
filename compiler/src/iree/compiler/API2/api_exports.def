@@ -24,6 +24,7 @@ EXPORTS
   ireeCompilerOptionsGetFlags
   ireeCompilerOptionsSetFlags
   ireeCompilerOutputDestroy
+  ireeCompilerOutputOpenFD
   ireeCompilerOutputOpenFile
   ireeCompilerOutputWrite
   ireeCompilerRegisterAllDialects
@@ -33,6 +34,8 @@ EXPORTS
   ireeCompilerRunMain
   ireeCompilerSessionCreate
   ireeCompilerSessionDestroy
+  ireeCompilerSessionGetFlags
+  ireeCompilerSessionSetFlags
   ireeCompilerSourceDestroy
   ireeCompilerSourceOpenFile
   ireeCompilerSourceSplit

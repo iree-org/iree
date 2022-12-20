@@ -19,6 +19,16 @@ exports_files([
     "api_exports.lst",
 ])
 
+# If only embedding the compiler and not accessing the MLIR interop, then
+# you can depend on this and not have any dependencies.
+iree_compiler_cc_library(
+    name = "EmbedHeaders",
+    hdrs = [
+        "Embed.h",
+    ],
+)
+
+# All headers for APIs exported by the library.
 iree_compiler_cc_library(
     name = "Headers",
     hdrs = [

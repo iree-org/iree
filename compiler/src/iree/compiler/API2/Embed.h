@@ -111,6 +111,17 @@ IREE_EMBED_EXPORTED iree_compiler_session_t *ireeCompilerSessionCreate();
 IREE_EMBED_EXPORTED void ireeCompilerSessionDestroy(
     iree_compiler_session_t *session);
 
+// Sets session-local flags. These are a subset of flags supported by CLI
+// tools and are privately scoped.
+IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerSessionSetFlags(
+    iree_compiler_session_t *session, int argc, const char *const *argv);
+
+// Gets textual flags actually in effect from any source. Optionally, only
+// calls back for non-default valued flags.
+IREE_EMBED_EXPORTED void ireeCompilerSessionGetFlags(
+    iree_compiler_session_t *session, bool nonDefaultOnly,
+    void (*onFlag)(const char *flag, size_t length, void *), void *userData);
+
 //===----------------------------------------------------------------------===//
 // Run management.
 // Runs execute against a session and represent a discrete invocation of the
@@ -239,6 +250,11 @@ IREE_EMBED_EXPORTED void ireeCompilerOutputDestroy(
 // Must be destroyed via ireeCompilerOutputDestroy().
 IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFile(
     const char *filePath, iree_compiler_output_t **out_output);
+
+// Opens a file descriptor for output.
+// Must be destroyed via ireeCompilerOutputDestroy().
+IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFD(
+    int fd, iree_compiler_output_t **out_output);
 
 // For file or other persistent outputs, by default they will be deleted on
 // destroy. It is necessary to call |ireeCompileOutputKeep| in order to have
