@@ -41,12 +41,6 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
-
-llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes(
-    "iree-codegen-llvmgpu-workgroup-tile-sizes",
-    llvm::cl::desc("Fixed tile sizes when using the transform dialect starting "
-                   "from IR already workgroup distributed"),
-    llvm::cl::CommaSeparated);
 }  // namespace iree_compiler
 }  // namespace mlir
 
@@ -829,17 +823,6 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
-  if (!clGPUCodegenTransformDialectTileSizes.empty()) {
-    SmallVector<int64_t, 4> workgroupTileSizes(
-        clGPUCodegenTransformDialectTileSizes.begin(),
-        clGPUCodegenTransformDialectTileSizes.end());
-    TileSizesListType tileSizes;
-    tileSizes.emplace_back(std::move(workgroupTileSizes));
-    auto config = IREE::Codegen::LoweringConfigAttr::get(
-        computeOp->getContext(), tileSizes);
-    setLoweringConfig(computeOp, config);
-    return success();
-  }
   TargetInfo targetInfo = getTargetInfo(entryPointFn);
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(computeOp)) {
