@@ -32,8 +32,8 @@ def uniform(shape: Sequence[int],
             high: float = 1.0) -> np.ndarray:
   """np.random.uniform with simplified API and dtype and bool support."""
   dtype = dtype.as_numpy_dtype if isinstance(dtype, tf.DType) else dtype
-  if dtype == np.bool:
-    return np.random.choice(2, shape).astype(np.bool)
+  if dtype == bool:
+    return np.random.choice(2, shape).astype(bool)
   else:
     values = np.random.uniform(size=shape, low=low, high=high)
     if np.issubdtype(dtype, np.integer):
@@ -230,8 +230,8 @@ def check_same(ref: Any, tar: Any, rtol: float,
     # Ignore np.bool != np.int8 because the IREE python runtime awkwardly
     # returns np.int8s instead of np.bools.
     if ref.dtype != tar.dtype and not (
-        (ref.dtype == np.bool and tar.dtype == np.int8) or
-        (ref.dtype == np.int8 and tar.dtype == np.bool)):
+        (ref.dtype == bool and tar.dtype == np.int8) or
+        (ref.dtype == np.int8 and tar.dtype == bool)):
       error = ("Expected ref and tar to have the same dtype, but got "
                f"'{ref.dtype}' and '{tar.dtype}'")
       logging.error(error)
