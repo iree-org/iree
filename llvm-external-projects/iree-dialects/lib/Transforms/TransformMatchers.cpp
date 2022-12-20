@@ -381,6 +381,7 @@ transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::result(
         traverseSubsetsForwardAnyUse(linalgOp->getResult(transformedPosition));
     return subset.matcher.match(user) || optional.value;
   });
+  recordNestedMatcher(subset.matcher);
   return *this;
 }
 
