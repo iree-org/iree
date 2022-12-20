@@ -368,6 +368,7 @@ transform_ext::StructuredOpMatcher::output(int64_t position, SubsetOf subset) {
 //===---------------------------------------------------------------------===//
 // Constraints on results.
 //===---------------------------------------------------------------------===//
+
 transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::result(
     int64_t position, HasAnyUse tag, SubsetOf subset, OptionalMatch optional) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
@@ -381,6 +382,26 @@ transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::result(
     return subset.matcher.match(user) || optional.value;
   });
   return *this;
+}
+
+bool transform_ext::StructuredOpMatcher::checkAllTilableMatched(
+    Operation *parent, linalg::LinalgOp linalgOp,
+    ArrayRef<transform_ext::CapturingOpMatcher *> matchers) {
+  int64_t numTilableOps = 0;
+  if (!parent)
+    return false;
+  parent->walk([&](TilingInterface Op) { ++numTilableOps; });
+
+  llvm::SmallPtrSet<Operation *, 6> matched;
+  for (CapturingOpMatcher *nested : matchers) {
+    if (Operation *captured = nested->getCaptured()) {
+      matched.insert(captured);
+    }
+  }
+
+  // Don't forget to include the root matcher.
+  matched.insert(linalgOp);
+  return numTilableOps == matched.size();
 }
 
 //===---------------------------------------------------------------------===//
