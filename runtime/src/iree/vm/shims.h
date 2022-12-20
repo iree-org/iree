@@ -201,6 +201,12 @@ IREE_VM_ABI_FIXED_STRUCT(II, {
   int64_t i1;
 });
 
+IREE_VM_ABI_FIXED_STRUCT(IIi, {
+  int64_t i0;
+  int64_t i1;
+  int32_t i2;
+});
+
 IREE_VM_ABI_FIXED_STRUCT(iii, {
   int32_t i0;
   int32_t i1;

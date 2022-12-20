@@ -599,12 +599,12 @@ vm.import @unpack.i32i32(
 )
 
 //==============================================================================
-// get_tile_size ops
+// query_tile_size ops
 //==============================================================================
 
 vm.import @query_tile_sizes.2d(
-  %encoding : i64,
-  %sizes : tuple<i64, i64>
+  %sizes : tuple<i64, i64>,
+  %flags : i32
 ) -> (i64, i64)
 
 }  // module
