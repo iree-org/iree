@@ -62,7 +62,7 @@ See https://cloud.google.com/functions/docs for more details.
 import os
 import re
 from http.client import (BAD_REQUEST, FORBIDDEN, INTERNAL_SERVER_ERROR,
-                         NOT_FOUND)
+                         NOT_FOUND, UNAUTHORIZED)
 
 import flask
 import functions_framework
@@ -138,10 +138,11 @@ def delete_self(request):
 
   auth_header = request.headers.get("Authorization")
   if auth_header is None:
-    return flask.abort(401, "Authorization header is missing")
+    return flask.abort(UNAUTHORIZED, "Authorization header is missing")
   if not auth_header.startswith(AUTH_HEADER_PREFIX):
     return flask.abort(
-        401, f"Authorization header does not start with expected string"
+        UNAUTHORIZED,
+        f"Authorization header does not start with expected string"
         f" {AUTH_HEADER_PREFIX}.")
 
   token = auth_header[len(AUTH_HEADER_PREFIX):]
@@ -153,7 +154,7 @@ def delete_self(request):
     token_payload = _verify_token(token)
   except (ValueError, google.auth.exceptions.GoogleAuthError) as e:
     print(e)
-    return flask.abort(401, "Decoding bearer token failed.")
+    return flask.abort(UNAUTHORIZED, "Decoding bearer token failed.")
 
   print(f"Token payload: {token_payload}")
 
@@ -161,7 +162,8 @@ def delete_self(request):
     compute_info = token_payload["google"]["compute_engine"]
   except KeyError:
     return flask.abort(
-        401, "Bearer token payload does not have expected field google.compute")
+        UNAUTHORIZED,
+        "Bearer token payload does not have expected field google.compute")
 
   project = compute_info["project_id"]
   zone = compute_info["zone"]
