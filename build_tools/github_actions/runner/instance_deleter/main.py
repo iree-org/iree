@@ -48,10 +48,21 @@ To deploy:
     --region=us-central1 \
     --source=. \
     --entry-point=delete_self \
-    --trigger-http
+    --trigger-http \
+    --run-service-account=managed-instance-deleter@iree-oss.iam.gserviceaccount.com \
+    --service-account=managed-instance-deleter@iree-oss.iam.gserviceaccount.com \
+    --ingress-settings=internal-only \
+    --timeout=30s \
+    --set-env-vars ALLOWED_MIG_PATTERN='github-runner-.*'
+
 
 See https://cloud.google.com/functions/docs for more details.
 """
+
+import os
+import re
+from http.client import (BAD_REQUEST, FORBIDDEN, INTERNAL_SERVER_ERROR,
+                         NOT_FOUND)
 
 import flask
 import functions_framework
@@ -69,12 +80,12 @@ instances_client = compute.InstancesClient()
 migs_client = compute.RegionInstanceGroupManagersClient()
 session = requests.Session()
 
-print("Server started")
+ALLOWED_MIG_PATTERN = os.environ.get("ALLOWED_MIG_PATTERN")
+if ALLOWED_MIG_PATTERN is None:
+  raise RuntimeError("Missing required environemtn variable ALLOWED_MIG_PATTERN")
+ALLOWED_MIG_REGEX = re.compile(ALLOWED_MIG_PATTERN)
 
-# Constants for HTTP status codes
-BAD_REQUEST = 400
-NOT_FOUND = 404
-INTERNAL_SERVER_ERROR = 500
+print("Server started")
 
 
 def _verify_token(token: str) -> dict:
@@ -163,12 +174,12 @@ def delete_self(request):
     instance = instances_client.get(instance=instance_name,
                                     project=project,
                                     zone=zone)
-  except google.api_core.exceptions.NotFound as e:
+  except (google.api_core.exceptions.NotFound,
+          google.api_core.exceptions.Forbidden) as e:
     print(e)
     return flask.abort(
-        NOT_FOUND,
-        f"Instance {instance_name} not found for zone={zone}, project={project}"
-    )
+        e.code,
+        f"Cannot view {instance_name} in zone={zone}, project={project}")
 
   instance_id = int(compute_info["instance_id"])
   # Verify it's *actually* the same instance. Names get reused, but IDs
@@ -188,6 +199,9 @@ def delete_self(request):
                         f" Did not find {MIG_METADATA_KEY} in metadata."))
   mig = _get_name_from_resource(mig)
 
+  if not ALLOWED_MIG_REGEX.fullmatch(mig):
+    return flask.abort(FORBIDDEN, f"No access to MIG {mig}")
+
   try:
     operation = migs_client.delete_instances(
         instance_group_manager=mig,
@@ -200,9 +214,14 @@ def delete_self(request):
         region_instance_group_managers_delete_instances_request_resource=(
             compute.RegionInstanceGroupManagersDeleteInstancesRequest(
                 instances=[instance.self_link])))
+  except (google.api_core.exceptions.Forbidden,
+          google.api_core.exceptions.Unauthorized) as e:
+    print(e)
+    return flask.abort(e.code,
+                       f"Error requesting that {mig} delete {instance_name}.")
   except Exception as e:
-    # An error here means we screwed up the syntax of the request. That is
-    # almost certainly a server error
+    # We'll call any other error here a server error.
+    print(e)
     return flask.abort(INTERNAL_SERVER_ERROR,
                        f"Error requesting that {mig} delete {instance_name}.")
 
