@@ -118,6 +118,93 @@ static void iree_hal_cuda_allocator_query_statistics(
   });
 }
 
+static iree_status_t iree_hal_cuda_allocator_query_memory_heaps(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_host_size_t capacity,
+    iree_hal_allocator_memory_heap_t* IREE_RESTRICT heaps,
+    iree_host_size_t* IREE_RESTRICT out_count) {
+  iree_hal_cuda_allocator_t* allocator =
+      iree_hal_cuda_allocator_cast(base_allocator);
+
+  // TODO(benvanik): check CU_DEVICE_ATTRIBUTE_INTEGRATED and return a unified
+  // set of heaps (likely still a cached and uncached, at minimum).
+  iree_host_size_t count = 3;
+  if (allocator->supports_concurrent_managed_access) {
+    ++count;  // device-local | host-visible
+  }
+  if (out_count) *out_count = count;
+  if (capacity < count) {
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+  }
+
+  // Don't think there's a query for these.
+  // Max allocation size may be much smaller in certain memory types such as
+  // page-locked memory and it'd be good to enforce that.
+  const iree_device_size_t max_allocation_size = ~(iree_device_size_t)0;
+  const iree_device_size_t min_alignment = 64;
+
+  int i = 0;
+
+  // Device-local memory (dispatch resources):
+  heaps[i++] = (iree_hal_allocator_memory_heap_t){
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+      .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                       IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
+                       IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
+                       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE,
+      .max_allocation_size = max_allocation_size,
+      .min_alignment = min_alignment,
+  };
+
+  if (allocator->supports_concurrent_managed_access) {
+    // Device-local managed memory with host mapping support:
+    heaps[i++] = (iree_hal_allocator_memory_heap_t){
+        .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
+                IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
+        .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                         IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
+                         IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
+                         IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                         IREE_HAL_BUFFER_USAGE_MAPPING,
+        .max_allocation_size = max_allocation_size,
+        .min_alignment = min_alignment,
+    };
+  }
+
+  // Write-combined page-locked host-local memory (upload):
+  heaps[i++] = (iree_hal_allocator_memory_heap_t){
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE |
+              IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+              IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
+      .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                       IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
+                       IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
+                       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                       IREE_HAL_BUFFER_USAGE_MAPPING,
+      .max_allocation_size = max_allocation_size,
+      .min_alignment = min_alignment,
+  };
+
+  // Cached page-locked host-local memory (download):
+  heaps[i++] = (iree_hal_allocator_memory_heap_t){
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE |
+              IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+              IREE_HAL_MEMORY_TYPE_HOST_COHERENT |
+              IREE_HAL_MEMORY_TYPE_HOST_CACHED,
+      .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                       IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
+                       IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
+                       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                       IREE_HAL_BUFFER_USAGE_MAPPING,
+      .max_allocation_size = max_allocation_size,
+      .min_alignment = min_alignment,
+  };
+
+  IREE_ASSERT(i == count);
+  return iree_ok_status();
+}
+
 static iree_hal_buffer_compatibility_t
 iree_hal_cuda_allocator_query_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
@@ -430,6 +517,7 @@ static const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable = {
     .host_allocator = iree_hal_cuda_allocator_host_allocator,
     .trim = iree_hal_cuda_allocator_trim,
     .query_statistics = iree_hal_cuda_allocator_query_statistics,
+    .query_memory_heaps = iree_hal_cuda_allocator_query_memory_heaps,
     .query_compatibility = iree_hal_cuda_allocator_query_compatibility,
     .allocate_buffer = iree_hal_cuda_allocator_allocate_buffer,
     .deallocate_buffer = iree_hal_cuda_allocator_deallocate_buffer,

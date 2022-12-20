@@ -105,6 +105,16 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
 #endif  // IREE_STATISTICS_ENABLE
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_allocator_query_memory_heaps(
+    iree_hal_allocator_t* IREE_RESTRICT allocator, iree_host_size_t capacity,
+    iree_hal_allocator_memory_heap_t* IREE_RESTRICT heaps,
+    iree_host_size_t* IREE_RESTRICT out_count) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  if (out_count) *out_count = 0;
+  return _VTABLE_DISPATCH(allocator, query_memory_heaps)(allocator, capacity,
+                                                         heaps, out_count);
+}
+
 IREE_API_EXPORT iree_hal_buffer_compatibility_t
 iree_hal_allocator_query_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
@@ -137,6 +147,8 @@ IREE_API_EXPORT void iree_hal_allocator_deallocate_buffer(
   IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(
+      z0, (int64_t)iree_hal_buffer_allocation_size(buffer));
   _VTABLE_DISPATCH(allocator, deallocate_buffer)(allocator, buffer);
   IREE_TRACE_ZONE_END(z0);
 }
