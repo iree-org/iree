@@ -17,7 +17,7 @@
 
 #include <array>
 
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -39,6 +39,16 @@ int64_t getTileBytes(int64_t mTileSize, int64_t nTileSize, int64_t kTileSize,
 /// Adjusts the shared memory usage based on the pipelining depth.
 int64_t getMultiBufferMemoryUsage(int64_t usedBytes, unsigned depth,
                                   unsigned storeStage);
+
+/// Returns true if the given generic op is an elementwise op that can be fused
+/// together with cooperative matrix in the same dispatch.
+bool isCooperativeMatrixFusable(linalg::GenericOp genericOp);
+
+/// Returns true if we need to promote C matrix to use cooperative matrix for
+/// the the give matmul.
+///
+/// This is conservative by default--all unsupported cases will return true.
+bool needToPrmoteCForCooperativeMatrix(linalg::LinalgOp matmulOp);
 
 namespace detail {
 

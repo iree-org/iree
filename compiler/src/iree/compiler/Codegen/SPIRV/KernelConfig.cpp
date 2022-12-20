@@ -21,6 +21,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
@@ -747,6 +749,59 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
 // Cooperative Matrix Default Configuration
 //===----------------------------------------------------------------------===//
 
+bool isCooperativeMatrixFusable(linalg::GenericOp genericOp) {
+  if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) return false;
+
+  // Look at fused elementwise ops to make sure they are allowed by the
+  // cooperative matrix spec.
+  for (Operation &op : genericOp.getBlock()->without_terminator()) {
+    if (!isa<
+            // These ops are directly allowed to use cooperative matrix types.
+            arith::AddFOp, arith::AddIOp, arith::SubFOp, arith::SubIOp,
+            arith::DivFOp, arith::DivSIOp, arith::DivUIOp, arith::NegFOp,
+            arith::TruncFOp, arith::TruncIOp, arith::ExtFOp, arith::ExtSIOp,
+            arith::ExtUIOp, arith::FPToSIOp, arith::FPToUIOp, arith::SIToFPOp,
+            arith::UIToFPOp,
+            // Special cases of these ops are directly allowed to sue
+            // cooperative matrix types. Other cases can use a loop.
+            arith::MulFOp>(op))
+      return false;
+  }
+
+  // Look at operands to make sure we don't have inlined constants. Cooperative
+  // matrix loads can only happen from StorageBuffer or Workgroup storage
+  // classes.
+  for (Value input : genericOp.getInputs()) {
+    if (input.getType().isa<TensorType>()) {
+      if (matchPattern(input, m_Constant())) return false;
+      continue;
+    }
+
+    // For buffers we need to walk back the subview chain to see if it's
+    // originally from a constant.
+    while (auto subviewOp = input.getDefiningOp<memref::SubViewOp>()) {
+      input = subviewOp.getViewSource();
+    }
+    if (auto toMemrefOp = input.getDefiningOp<bufferization::ToMemrefOp>()) {
+      if (matchPattern(toMemrefOp.getTensor(), m_Constant())) return false;
+    }
+  }
+
+  return true;
+}
+
+bool needToPrmoteCForCooperativeMatrix(linalg::LinalgOp matmulOp) {
+  assert(matmulOp.hasTensorSemantics());
+  Value result = matmulOp.getOperation()->getResult(0);
+  if (!result.hasOneUse()) return true;  // Be conservative.
+  Operation *user = *result.getUsers().begin();
+  if (isa<IREE::Flow::DispatchTensorStoreOp>(user)) return false;
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(user)) {
+    return !isCooperativeMatrixFusable(genericOp);
+  }
+  return true;  // Be conservative.
+}
+
 struct CooperativeMatrixSize {
   int64_t mSize;       // Native cooperative matrix size along M dimension
   int64_t nSize;       // Native cooperative matrix size along N dimension
@@ -963,10 +1018,7 @@ LogicalResult setCooperativeMatrixConfig(
   }
 
   // Check if the C matrix will be promoted for computing shared memory usage.
-  auto matmulResult = op.getDpsInitOperand(0)->get();
-  bool promoteC =
-      !matmulResult.hasOneUse() ||
-      !isa<IREE::Flow::DispatchTensorStoreOp>(*matmulResult.getUsers().begin());
+  bool promoteC = needToPrmoteCForCooperativeMatrix(op);
 
   // Decrease pipeline depth until it fits in shared memory.
   const int maxBytes = limits.getMaxComputeSharedMemorySize();

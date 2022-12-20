@@ -20,8 +20,6 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -29,7 +27,6 @@
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -142,10 +139,6 @@ class SPIRVTileAndPromotePass final
   /// Promotes C matrix to shared memory when necessary and returns success if
   /// no error happens.
   LogicalResult doPromoteCMatrix(func::FuncOp funcOp) const;
-
-  /// Returns true if the given generic op is an elementwise op that can use
-  /// cooperative matrix type eventually.
-  bool isCooperativeMatrixFusable(linalg::GenericOp genericOp) const;
 
   // Whether to promote C matrix to use shared memory.
   bool promoteCMatrix = false;
@@ -357,41 +350,6 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
     llvm::dbgs() << "\n\n";
   });
   return success();
-}
-
-bool SPIRVTileAndPromotePass::isCooperativeMatrixFusable(
-    linalg::GenericOp genericOp) const {
-  if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) return false;
-
-  // Look at fused elementwise ops to make sure they are allowed by the
-  // cooperative matrix spec.
-  for (Operation &op : genericOp.getBlock()->without_terminator()) {
-    if (!isa<
-            // These ops are directly allowed to use cooperative matrix types.
-            arith::AddFOp, arith::AddIOp, arith::SubFOp, arith::SubIOp,
-            arith::DivFOp, arith::DivSIOp, arith::DivUIOp, arith::NegFOp,
-            arith::TruncFOp, arith::TruncIOp, arith::ExtFOp, arith::ExtSIOp,
-            arith::ExtUIOp, arith::FPToSIOp, arith::FPToUIOp, arith::SIToFPOp,
-            arith::UIToFPOp,
-            // Special cases of these ops are directly allowed to sue
-            // cooperative matrix types. Other cases can use a loop.
-            arith::MulFOp>(op))
-      return false;
-  }
-
-  // Look at operands to make sure we don't have inlined constants. Cooperative
-  // matrix loads can only happen from StorageBuffer or Workgroup storage
-  // classes.
-  for (Value input : genericOp.getInputs()) {
-    while (auto subviewOp = input.getDefiningOp<memref::SubViewOp>()) {
-      input = subviewOp.getViewSource();
-    }
-    if (auto toMemrefOp = input.getDefiningOp<bufferization::ToMemrefOp>()) {
-      if (matchPattern(toMemrefOp.getTensor(), m_Constant())) return false;
-    }
-  }
-
-  return true;
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
