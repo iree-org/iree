@@ -82,7 +82,8 @@ session = requests.Session()
 
 ALLOWED_MIG_PATTERN = os.environ.get("ALLOWED_MIG_PATTERN")
 if ALLOWED_MIG_PATTERN is None:
-  raise RuntimeError("Missing required environemtn variable ALLOWED_MIG_PATTERN")
+  raise RuntimeError(
+      "Missing required environemtn variable ALLOWED_MIG_PATTERN")
 ALLOWED_MIG_REGEX = re.compile(ALLOWED_MIG_PATTERN)
 
 print("Server started")
