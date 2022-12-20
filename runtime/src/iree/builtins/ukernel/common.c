@@ -16,7 +16,7 @@ IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status) {
     case iree_uk_status_bad_type:
       return "bad mmt4d type enum";
     case iree_uk_status_unsupported_huge_or_negative_dimension:
-      return "unsupported huge or negative size in mmt4d";
+      return "unsupported huge or negative dimension size";
     case iree_uk_status_unsupported_generic_tile_size:
       return "tile size too large for the generic tile implementation";
     case iree_uk_status_shapes_mismatch:

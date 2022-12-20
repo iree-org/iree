@@ -81,12 +81,14 @@ iree_runtime_cc_library(
     srcs = [
         "mmt4d.c",
         "pack.c",
+        "query_tile_sizes.c",
         "unpack.c",
     ],
     hdrs = [
         "elementwise.h",
         "mmt4d.h",
         "pack.h",
+        "query_tile_sizes.h",
         "unpack.h",
     ],
     deps = [

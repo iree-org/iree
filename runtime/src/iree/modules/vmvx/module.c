@@ -22,6 +22,7 @@
 #include "iree/builtins/ukernel/elementwise.h"
 #include "iree/builtins/ukernel/mmt4d.h"
 #include "iree/builtins/ukernel/pack.h"
+#include "iree/builtins/ukernel/query_tile_sizes.h"
 #include "iree/builtins/ukernel/unpack.h"
 
 #define IREE_VMVX_MODULE_VERSION_0_0 0x00000000u
@@ -936,16 +937,31 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_i32i32, unpack, v) {
 // Exported query_tile_sizes function definitions
 //===----------------------------------------------------------------------===//
 
-IREE_VMVX_ABI_FIXED_STRUCT(query_tile_sizes_2d, III, {
-  int64_t encoding;
+IREE_VMVX_ABI_FIXED_STRUCT(query_tile_sizes_2d, IIi, {
   int64_t size0;
   int64_t size1;
+  uint32_t flags;
 });
 IREE_VMVX_ABI_DEFINE_SHIM(query_tile_sizes_2d, II);
 
 IREE_VMVX_ABI_EXPORT(iree_vmvx_query_tile_sizes_2d, query_tile_sizes_2d, II) {
-  rets->i0 = 1;
-  rets->i1 = 1;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_uk_query_tile_sizes_2d_params_t ukernel_params = {
+      .size0 = args->size0,
+      .size1 = args->size1,
+      .flags = args->flags,
+      .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
+  };
+  iree_uk_query_tile_sizes_2d_out_params_t ukernel_out_params;
+  iree_uk_status_t status =
+      iree_uk_query_tile_sizes_2d(&ukernel_params, &ukernel_out_params);
+  IREE_TRACE_ZONE_END(z0);
+  if (status != iree_uk_status_ok) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            iree_uk_status_message(status));
+  }
+  rets->i0 = ukernel_out_params.tile_size0;
+  rets->i1 = ukernel_out_params.tile_size1;
   return iree_ok_status();
 }
 

@@ -82,10 +82,12 @@ iree_cc_library(
     "elementwise.h"
     "mmt4d.h"
     "pack.h"
+    "query_tile_sizes.h"
     "unpack.h"
   SRCS
     "mmt4d.c"
     "pack.c"
+    "query_tile_sizes.c"
     "unpack.c"
   DEPS
     ::common

@@ -17,9 +17,6 @@ extern "C" {
 IREE_UK_EXPORT iree_uk_status_t
 iree_uk_pack(const iree_uk_pack_params_t* params);
 
-// Convert a status code to a human-readable string.
-IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
