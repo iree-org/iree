@@ -93,9 +93,8 @@ namespace {
 /// follows: when the `reductionDimensionSize` is a multiple of 4, choose 4;
 /// otherwise try with 2; otherwise just use 1.
 ///
-// TODO: refine with support for various elemental types.
-// TODO: when it makes sense, consider splitting to ensure 4 on most of the
-// problem and use a 1-epilogue.
+// TODO: Support various elemental types.
+// TODO: Split to ensure 4 on most of the problem and use a 1-epilogue.
 class ReductionStrategyThreadDistribution {
  public:
   ReductionStrategyThreadDistribution() = default;
@@ -138,10 +137,8 @@ class ReductionStrategyThreadDistribution {
   /// `maxNumThreadsToUse` and the `warpShuffleSize`.
   /// The latter 2 numbers control the tradeoff between parallelism and shared
   /// memory consumption.
-  // TODO: Characterize shared memory consumption of this strategy and limit
-  // accordingly for good occupancy.
-  // TODO: refine with elemental type bitwidth and GPU memory transaction
-  // size.
+  // TODO: Characterize shared memory consumption and limit for good occupancy.
+  // TODO: Support various elemental types.
   void compute(int64_t reductionDimensionSize, int64_t maxNumThreadsToUse,
                int64_t warpShuffleSize);
 };
@@ -169,7 +166,7 @@ void ReductionStrategyThreadDistribution::compute(
 
   // Stage 1.
   // Maximal vector size that divides the problem size.
-  // TODO: investigate splitting/peeling for more vector operations.
+  // TODO: Split to ensure 4 on most of the problem and use a 1-epilogue.
   if (reductionDimensionSize > 0 && reductionDimensionSize % 4 == 0)
     vectorSizeStage1 = 4;
   else if (reductionDimensionSize > 0 && reductionDimensionSize % 2 == 0)
@@ -327,13 +324,15 @@ static void createElementwiseStrategyThreadStep(ImplicitLocOpBuilder &b,
                        foreachTileSizes = trailingTileSizes;
   // The following assumes we only want to tile the most-minor dimension of the
   // trailing operation. This may be a completely wrong choice.
-  // TODO: more robustness to permutations of most-minor dimensions.
-  // TODO: capture most minor size and compute tile size based on it.
+  // TODO: More robustness to permutations of most-minor dimensions.
+  // TODO: Capture most minor size and compute tile size based on it.
   scfForTileSizes.back() = numThreadsXInBlock;
   foreachTileSizes.back() = numThreadsXInBlock;
-  // TODO: only tile by scf.for if we wish to normalize the tiling (i.e. if
+  // TODO: Only tile by scf.for if we wish to normalize the tiling (i.e. if
   // the result has a lot more values than the number of threads in block).
   // This allows us to avoid uncoalesced accesses.
+  // TODO: Refine elementwise strategy to allow vector<2/4>.
+  // TODO: Consider splitting the elementwise strategy to ensure vector<2/4>.
   auto res = iree_compiler::buildTileFuseToScfFor(
       b, elementwiseH, {},
       getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
@@ -349,6 +348,7 @@ static void createReductionStrategyThreadDistribution(
     ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledLeadingH,
     Value maybeTiledTrailingH, const GPUReductionStrategyInfos &infos) {
   // Map the potential maybeTiledLeadingH.
+  // TODO: Consider fusing leading elementwise into threads.
   if (infos.maybeLeadingRank > 0) {
     createElementwiseStrategyThreadStep(
         b, maybeTiledLeadingH, infos.maybeLeadingRank,
@@ -435,16 +435,16 @@ static void createReductionCudaStrategy(
   iree_compiler::buildDistributeVectors(b, variantH, funcH);
 }
 
-static FailureOr<GPUReductionStrategyInfos> matchGPUReduction(
-    linalg::LinalgOp op) {
-  StructuredOpMatcher reduction, fill, leading, trailing;
-  transform_ext::MatchedReductionCaptures captures;
-  makeReductionMatcher(reduction, fill, leading, trailing, captures);
-  if (!matchPattern(op, reduction)) return failure();
+struct GPUReductionConfig {
+  int64_t maxNumThreads;
+  int64_t warpShuffleSize;
+};
 
-  GPUReductionStrategyInfos infos(op->getContext(), captures);
-  // TODO: lift some of this logic as hints and/or heuristics to also work
-  // properly in the dynamic case.
+// TODO: Lift some of the strategy sizing logic as hints and/or heuristics to
+// also work properly in the dynamic case.
+// TODO: Support more HW configs and make it more pluggable.
+static GPUReductionConfig getReductionConfigRTX2080Ti(
+    const transform_ext::MatchedReductionCaptures &captures) {
   int64_t maxNumThreads = 8 * iree_compiler::kCudaWarpSize;
   int64_t warpShuffleSize = 2 * iree_compiler::kCudaWarpSize;
   if (captures.reductionDimensionSize > 0) {
@@ -460,9 +460,24 @@ static FailureOr<GPUReductionStrategyInfos> matchGPUReduction(
       warpShuffleSize = 2 * iree_compiler::kCudaWarpSize;
     }
   }
-  infos.computeThreadDistribution(maxNumThreads, warpShuffleSize);
+  return GPUReductionConfig{maxNumThreads, warpShuffleSize};
+}
+
+static FailureOr<GPUReductionStrategyInfos> matchGPUReduction(
+    linalg::LinalgOp op) {
+  StructuredOpMatcher reduction, fill, leading, trailing;
+  transform_ext::MatchedReductionCaptures captures;
+  makeReductionMatcher(reduction, fill, leading, trailing, captures);
+  if (!matchPattern(op, reduction)) return failure();
+
+  GPUReductionStrategyInfos infos(op->getContext(), captures);
+  GPUReductionConfig gpuReductionConfig = getReductionConfigRTX2080Ti(captures);
+  infos.computeThreadDistribution(gpuReductionConfig.maxNumThreads,
+                                  gpuReductionConfig.warpShuffleSize);
 
   // Tile all the parallel dimensions to 1 and create many blocks.
+  // TODO: Better strategy for very small reductions requires tiling across
+  // other dimensions than threadIdx.x.
   int64_t numParallelLoops = captures.reductionRank - 1;
   infos.workgroupTileSizes.append(numParallelLoops, 1);
   // Tile and distribute the reduction across `reductionTileSizeStage1`
