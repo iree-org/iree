@@ -32,12 +32,14 @@ iree_cc_library(
     "TransformDialectStrategiesCPU.cpp"
     "TransformDialectStrategiesGPU.cpp"
   DEPS
+    IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
+    MLIRAnalysis
     MLIRArithDialect
     MLIRArithTransforms
     MLIRArithUtils

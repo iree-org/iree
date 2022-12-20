@@ -79,6 +79,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:VectorDialect",
         # IR
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
@@ -94,7 +95,9 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:DialectUtils",
         # TransformExtensions
+        "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
         "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
