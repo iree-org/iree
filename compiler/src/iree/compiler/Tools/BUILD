@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -33,6 +35,20 @@ cc_library(
         "@mlir-hlo//stablehlo:chlo_ops",
         "@mlir-hlo//stablehlo:stablehlo_ops",
         "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
+    ],
+)
+
+cc_library(
+    name = "init_iree",
+    srcs = [
+        "init_iree.cc",
+    ],
+    hdrs = [
+        "init_iree.h",
+    ],
+    deps = [
+        ":version",
+        "@llvm-project//llvm:Support",
     ],
 )
 
@@ -182,9 +198,16 @@ cc_library(
     ],
     hdrs = ["iree_compile_lib.h"],
     deps = [
+        ":init_iree",
         "//compiler/src/iree/compiler/API2:Headers",
         "//compiler/src/iree/compiler/API2/Internal:Embed",
         "//compiler/src/iree/compiler/Pipelines",
         "@llvm-project//llvm:Support",
     ],
+)
+
+iree_compiler_cc_library(
+    name = "version",
+    srcs = ["version.cc"],
+    hdrs = ["version.h"],
 )
