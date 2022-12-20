@@ -348,23 +348,6 @@ static FailureOr<GPUReductionStrategyInfos> matchGPUReduction(
   makeReductionMatcher(reduction, fill, leading, trailing, captures);
   if (!matchPattern(op, reduction)) return failure();
 
-  //
-  // !!We must match exactly all payload ops when the dispatch is pre-formed!!
-  //
-  int64_t mustMatchNumPayloadOps =
-      transform_ext::getNumPayloadOpsThatWeMustMatch(
-          op->getParentOfType<func::FuncOp>());
-  int64_t numMatchedOps = 2;  // Mandatory operations.
-  if (leading.getCaptured()) ++numMatchedOps;
-  if (trailing.getCaptured()) ++numMatchedOps;
-  if (numMatchedOps != mustMatchNumPayloadOps) {
-    LLVM_DEBUG({
-      DBGS() << "Failed to match " << mustMatchNumPayloadOps
-             << " payload ops, matched " << numMatchedOps << " instead\n";
-    });
-    return failure();
-  }
-
   GPUReductionStrategyInfos info(op->getContext(), captures.rank,
                                  captures.reductionDimensionSize);
 
