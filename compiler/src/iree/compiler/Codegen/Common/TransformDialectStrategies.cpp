@@ -6,44 +6,23 @@
 
 #include "iree/compiler/Codegen/Common/TransformDialectStrategies.h"
 
-#include <numeric>
-#include <type_traits>
-
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
+// Needed because ApplyPatternOp is used everywhere.
+// TODO: Separate out GPU-specific patterns.
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
-#include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+// Needed because we only have gpu::GPUBlockMappingAttr available atm.
+// TODO: IREE should have its own attributes.
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
-#include "mlir/IR/Location.h"
-#include "mlir/IR/Matchers.h"
-#include "mlir/IR/Types.h"
-#include "mlir/IR/Value.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassRegistry.h"
 
 using namespace mlir;
 
@@ -53,7 +32,6 @@ using namespace mlir;
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
-using iree_compiler::IREE::transform_dialect::ConfigExtractPart;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
@@ -74,12 +52,6 @@ using transform::SplitHandlesOp;
 using transform::SplitReductionOp;
 using transform::TileToForeachThreadOp;
 using transform::VectorizeOp;
-using transform_ext::AllDims;
-using transform_ext::IsPermutation;
-using transform_ext::m_StructuredOp;
-using transform_ext::NumEqualsTo;
-using transform_ext::ShapeKind;
-using transform_ext::StructuredOpMatcher;
 
 /// Matches `args` within `targetH` and unpacks a number of handles `N`.
 /// Assumes there are exactly `N` matched ops (but could be relaxed).
