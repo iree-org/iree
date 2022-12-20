@@ -468,9 +468,11 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
     case TargetTripleArch::Unknown:
       // Use the largest subgroup size we can find across various vendors.
       subgroupSize = 64;
+
       // The following capabilities have 90%+ device coverage (Vulkan 1.1+)
-      // from https://vulkan.gpuinfo.org/listfeaturesextensions.php.
-      variablePointers = variablePointersStorageBuffer = false;
+      // from https://vulkan.gpuinfo.org/listfeaturescore11.php.
+      storageBuffer16BitAccess = uniformAndStorageBuffer16BitAccess = true;
+      variablePointers = variablePointersStorageBuffer = true;
       // Use Vulkan default for others.
       break;
   }

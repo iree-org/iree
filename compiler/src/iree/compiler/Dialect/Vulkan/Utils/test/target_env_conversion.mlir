@@ -13,7 +13,7 @@
 // #vk.target_env in input assembly and convert them.
 
 // DEFAULT: #spirv.target_env<#spirv.vce<v1.3,
-// DEFAULT-SAME: [Shader, GroupNonUniform], [SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,
+// DEFAULT-SAME: [Shader, StorageBuffer16BitAccess, StorageUniform16, GroupNonUniform, VariablePointers, VariablePointersStorageBuffer], [SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,
 // DEFAULT-SAME: api=Vulkan, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 64, cooperative_matrix_properties_nv = []>>
 
 // ADRENO: #spirv.target_env<#spirv.vce<v1.4,
