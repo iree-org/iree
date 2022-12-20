@@ -71,6 +71,11 @@ session = requests.Session()
 
 print("Server started")
 
+# Constants for HTTP status codes
+BAD_REQUEST = 400
+NOT_FOUND = 404
+INTERNAL_SERVER_ERROR = 500
+
 
 def _verify_token(token: str) -> dict:
   """Verify token signature and return the token payload"""
@@ -115,12 +120,14 @@ def delete_self(request):
   """
   if request.method != "DELETE":
     return flask.abort(
-        400, f"Invalid method {request.method}. Only DELETE is supported.")
+        BAD_REQUEST,
+        f"Invalid method {request.method}. Only DELETE is supported.")
 
   # No path is needed, since the token contains all the information we need.
   if request.path != "/":
     return flask.abort(
-        400, f"Invalid request path {request.path}. Only root path is valid).")
+        BAD_REQUEST,
+        f"Invalid request path {request.path}. Only root path is valid).")
 
   auth_header = request.headers.get("Authorization")
   if auth_header is None:
@@ -159,7 +166,7 @@ def delete_self(request):
   except google.api_core.exceptions.NotFound as e:
     print(e)
     return flask.abort(
-        404,
+        NOT_FOUND,
         f"Instance {instance_name} not found for zone={zone}, project={project}"
     )
 
@@ -169,14 +176,14 @@ def delete_self(request):
   # of the APIs.
   if instance.id != instance_id:
     return flask.abort(
-        400,
+        BAD_REQUEST,
         f"Existing instance of the same name {instance.name} has a different"
         f" ID {instance.id} than token specifies {instance_id}.")
 
   mig = _get_from_items(instance.metadata.items, MIG_METADATA_KEY)
 
   if mig is None:
-    return flask.abort(400,
+    return flask.abort(BAD_REQUEST,
                        (f"Instance is not part of a managed instance group."
                         f" Did not find {MIG_METADATA_KEY} in metadata."))
   mig = _get_name_from_resource(mig)
@@ -196,7 +203,7 @@ def delete_self(request):
   except Exception as e:
     # An error here means we screwed up the syntax of the request. That is
     # almost certainly a server error
-    return flask.abort(500,
+    return flask.abort(INTERNAL_SERVER_ERROR,
                        f"Error requesting that {mig} delete {instance_name}.")
 
   try:
@@ -213,6 +220,6 @@ def delete_self(request):
     # We're not actually totally sure whether this is a client or server error
     # for the overall request, but let's call it a client error (the only client
     # here is our VM instances, so I think we can be a bit loose).
-    return flask.abort(400, msg)
+    return flask.abort(BAD_REQUEST, msg)
 
   return f"{instance_name} has been marked for deletion by {mig}."
