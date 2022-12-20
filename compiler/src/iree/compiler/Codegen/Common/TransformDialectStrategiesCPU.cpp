@@ -70,9 +70,8 @@ static bool matchCPUReduction(linalg::LinalgOp op,
 
 // TODO: generalize and automate over and over.
 // TODO: significantly shrink this down.
-static LogicalResult createReductionCpuStrategy(
-    ImplicitLocOpBuilder &b, Value variantH,
-    const CPUReductionStrategyInfos &info) {
+static void createReductionCpuStrategy(ImplicitLocOpBuilder &b, Value variantH,
+                                       const CPUReductionStrategyInfos &info) {
   // Step 0. Fetch transform information from the config and materialize it in
   // the payload IR.
   // TODO: this still requires specific knowledge of ops present in the IR
@@ -100,8 +99,6 @@ static LogicalResult createReductionCpuStrategy(
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
-
-  return success();
 }
 
 LogicalResult iree_compiler::matchAndSetCPUReductionTransformStrategy(
@@ -109,10 +106,10 @@ LogicalResult iree_compiler::matchAndSetCPUReductionTransformStrategy(
   // 1. Match
   CPUReductionStrategyInfos infos;
   if (!matchCPUReduction(op, infos)) return failure();
-  auto startegyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
+  auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
     return createReductionCpuStrategy(b, variant, infos);
   };
   // 2. Add the strategy.
-  createTransformRegion(entryPoint, startegyBuilder);
+  createTransformRegion(entryPoint, strategyBuilder);
   return success();
 }
