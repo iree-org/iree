@@ -234,22 +234,16 @@ def PadDynamicAlloc :
 
 def TransformDialectInterpreter :
     Pass<"iree-transform-dialect-interpreter"> {
-  let summary = "Pass to apply transform dialect operations one by one.";
+  let summary = "Pass to apply transform dialect operations.";
   let constructor =
     "mlir::iree_compiler::createTransformDialectInterpreterPass()";
   let options = [
     Option<"transformFileName", "transform-file-name", "std::string",
             /*default=*/"\"\"",
             "Optional filename containing a transform dialect specification to "
-            "apply. If left empty, the IR is assumed to contain a transform "
-            "dialect spec embedded next to the top-level op.">,
+            "apply. If left empty, the IR is assumed to contain one top-level "
+            "transform dialect operation somewhere in the module.">,
   ];
-}
-def TransformDialectJitter :
-    Pass<"iree-transform-dialect-jitter"> {
-  let summary = "Pass to create and apply transform dialect on the fly.";
-  let constructor =
-    "mlir::iree_compiler::createTransformDialectJitterPass()";
 }
 
 def GPUVectorization :

@@ -172,7 +172,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
 /// registrations necessary for IREE.
 std::unique_ptr<Pass> createTransformDialectInterpreterPass(
     llvm::StringRef transformFileName = llvm::StringRef());
-std::unique_ptr<Pass> createTransformDialectJitterPass();
 
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(

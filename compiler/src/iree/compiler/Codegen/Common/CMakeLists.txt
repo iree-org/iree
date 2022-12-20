@@ -22,72 +22,22 @@ iree_tablegen_library(
 iree_cc_library(
   NAME
     TransformDialectInterpreterPass
-  SRCS
-    "TransformDialectInterpreterPass.cpp"
-  DEPS
-    IREELinalgExtDialect
-    IREELinalgExtTransformOps
-    IREELinalgTransformDialect
-    LLVMSupport
-    MLIRAffineDialect
-    MLIRAffineUtils
-    MLIRArithDialect
-    MLIRArithTransforms
-    MLIRArithUtils
-    MLIRAsyncDialect
-    MLIRBufferizationDialect
-    MLIRBufferizationTransforms
-    MLIRFuncDialect
-    MLIRGPUOps
-    MLIRIR
-    MLIRLLVMDialect
-    MLIRLinalgDialect
-    MLIRLinalgTransformOps
-    MLIRLinalgTransforms
-    MLIRPDLDialect
-    MLIRPDLInterpDialect
-    MLIRParser
-    MLIRPass
-    MLIRRewrite
-    MLIRSCFDialect
-    MLIRSCFTransforms
-    MLIRSCFUtils
-    MLIRSupport
-    MLIRTensorDialect
-    MLIRTensorTransforms
-    MLIRTransformDialect
-    MLIRVectorDialect
-    MLIRVectorTransforms
-    iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
-    iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
-    iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
-    iree::compiler::Codegen::PassHeaders
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    TransformDialectJitterPass
   HDRS
     "TransformDialectStrategies.h"
     "TransformDialectStrategiesCPU.h"
     "TransformDialectStrategiesGPU.h"
   SRCS
-    "TransformDialectJitterPass.cpp"
+    "TransformDialectInterpreterPass.cpp"
     "TransformDialectStrategies.cpp"
     "TransformDialectStrategiesCPU.cpp"
     "TransformDialectStrategiesGPU.cpp"
   DEPS
-    IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
-    MLIRAnalysis
     MLIRArithDialect
     MLIRArithTransforms
     MLIRArithUtils
@@ -116,7 +66,6 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::PassHeaders
@@ -236,7 +185,6 @@ iree_cc_library(
   DEPS
     ::CommonPasses
     ::TransformDialectInterpreterPass
-    ::TransformDialectJitterPass
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms

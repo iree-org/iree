@@ -440,7 +440,8 @@ void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
 
 void addGPUTransformDialectJitterPasses(OpPassManager &passManager) {
   // Give control to the transform dialect.
-  passManager.addPass(mlir::iree_compiler::createTransformDialectJitterPass());
+  passManager.addPass(
+      mlir::iree_compiler::createTransformDialectInterpreterPass());
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
   //      schedule once applied.
