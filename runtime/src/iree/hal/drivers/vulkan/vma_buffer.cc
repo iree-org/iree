@@ -46,6 +46,7 @@ iree_status_t iree_hal_vulkan_vma_buffer_wrap(
   IREE_ASSERT_ARGUMENT(allocation);
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)allocation_size);
 
   iree_allocator_t host_allocator =
       iree_hal_allocator_host_allocator(allocator);
@@ -84,6 +85,8 @@ static void iree_hal_vulkan_vma_buffer_destroy(iree_hal_buffer_t* base_buffer) {
       iree_hal_vulkan_vma_buffer_cast(base_buffer);
   iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(
+      z0, (int64_t)iree_hal_buffer_allocation_size(base_buffer));
 
   // IREE_TRACE_FREE_NAMED("VMA", (void*)buffer->handle);
 
