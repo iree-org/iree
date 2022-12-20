@@ -21,7 +21,7 @@ import argparse
 import http.server
 
 
-class HealthCheckServer(http.server.BaseHTTPRequestHandler):
+class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
 
   def do_GET(self):
     self.send_response(200)
@@ -30,7 +30,7 @@ class HealthCheckServer(http.server.BaseHTTPRequestHandler):
 
 
 def main(args):
-  webServer = http.server.HTTPServer(("", args.port), HealthCheckServer)
+  webServer = http.server.HTTPServer(("", args.port), HealthCheckHandler)
   print(f"Server started on port {args.port}. Ctrl+C to stop.")
 
   try:
