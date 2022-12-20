@@ -75,16 +75,11 @@ from google.oauth2 import id_token
 
 AUTH_HEADER_PREFIX = "Bearer "
 MIG_METADATA_KEY = "created-by"
+ALLOWED_MIG_PATTERN_ENV_VARIABLE = "ALLOWED_MIG_PATTERN"
 
 instances_client = compute.InstancesClient()
 migs_client = compute.RegionInstanceGroupManagersClient()
 session = requests.Session()
-
-ALLOWED_MIG_PATTERN = os.environ.get("ALLOWED_MIG_PATTERN")
-if ALLOWED_MIG_PATTERN is None:
-  raise RuntimeError(
-      "Missing required environemtn variable ALLOWED_MIG_PATTERN")
-ALLOWED_MIG_REGEX = re.compile(ALLOWED_MIG_PATTERN)
 
 print("Server started")
 
@@ -200,7 +195,17 @@ def delete_self(request):
                         f" Did not find {MIG_METADATA_KEY} in metadata."))
   mig = _get_name_from_resource(mig)
 
-  if not ALLOWED_MIG_REGEX.fullmatch(mig):
+  # General good practice would be to compile the regex once, but the only way
+  # to do that is to make it a global, which makes this difficult to test and
+  # compiling this regex should not be expensive.
+  allowed_mig_pattern = os.environ.get(ALLOWED_MIG_PATTERN_ENV_VARIABLE)
+  if allowed_mig_pattern is None:
+    flask.abort(
+        INTERNAL_SERVER_ERROR,
+        f"Missing required environment variable {ALLOWED_MIG_PATTERN_ENV_VARIABLE}"
+    )
+
+  if not re.fullmatch(allowed_mig_pattern, mig):
     return flask.abort(FORBIDDEN, f"No access to MIG {mig}")
 
   try:

@@ -59,6 +59,9 @@ class InstanceDeleterTest(unittest.TestCase):
     self.instances_client = instances_client_patcher.start()
     migs_client_patcher = mock.patch("main.migs_client", autospec=True)
     self.migs_client = migs_client_patcher.start()
+    os_environ_patcher = mock.patch.dict(
+        "os.environ", {main.ALLOWED_MIG_PATTERN_ENV_VARIABLE: ".*"})
+    self.environ = os_environ_patcher.start()
 
   def test_happy_path(self):
     req = Request({}, populate_request=False, shallow=True)
@@ -100,6 +103,54 @@ class InstanceDeleterTest(unittest.TestCase):
 
     self.migs_client.delete_instances.assert_called_once_with(
         instance_group_manager=MIG_NAME,
+        project=PROJECT,
+        region=REGION,
+        region_instance_group_managers_delete_instances_request_resource=compute
+        .RegionInstanceGroupManagersDeleteInstancesRequest(
+            instances=[instance.self_link]))
+
+  def test_narrow_allowed_migs(self):
+    req = Request({}, populate_request=False, shallow=True)
+    req.method = "DELETE"
+
+    token = make_token({
+        "google": {
+            "compute_engine": {
+                "project_id": PROJECT,
+                "zone": f"{REGION}-a",
+                "instance_name": INSTANCE_NAME,
+                "instance_id": str(ID1),
+            }
+        }
+    })
+
+    req.headers = {"Authorization": f"Bearer {token}"}
+
+    mig_name = "github-runner-foo-bar"
+    self.environ[main.ALLOWED_MIG_PATTERN_ENV_VARIABLE] = "github-runner-.*"
+    self_link = f"{INSTANCE_LINK_PREFIX}{INSTANCE_NAME}"
+    instance = compute.Instance(
+        id=ID1,
+        name=INSTANCE_NAME,
+        zone=ZONE,
+        self_link=self_link,
+        metadata=compute.Metadata(items=[
+            compute.Items(key=main.MIG_METADATA_KEY,
+                          value=f"{MIG_PATH_PREFIX}{mig_name}")
+        ]))
+    self.instances_client.get.return_value = instance
+
+    ext_operation = mock.MagicMock(
+        google.api_core.extended_operation.ExtendedOperation)
+    ext_operation.result.return_value = None
+
+    response = main.delete_self(req)
+
+    self.assertIn(mig_name, response)
+    self.assertIn(INSTANCE_NAME, response)
+
+    self.migs_client.delete_instances.assert_called_once_with(
+        instance_group_manager=mig_name,
         project=PROJECT,
         region=REGION,
         region_instance_group_managers_delete_instances_request_resource=compute
@@ -248,6 +299,112 @@ class InstanceDeleterTest(unittest.TestCase):
       main.delete_self(req)
 
     self.assertIn(main.MIG_METADATA_KEY, get_message(ctx))
+
+  def test_mig_pattern_unset(self):
+    req = Request({}, populate_request=False, shallow=True)
+    req.method = "DELETE"
+
+    token = make_token({
+        "google": {
+            "compute_engine": {
+                "project_id": PROJECT,
+                "zone": f"{REGION}-a",
+                "instance_name": INSTANCE_NAME,
+                "instance_id": str(ID1),
+            }
+        }
+    })
+
+    req.headers = {"Authorization": f"Bearer {token}"}
+
+    self_link = f"{INSTANCE_LINK_PREFIX}{INSTANCE_NAME}"
+    instance = compute.Instance(
+        id=ID1,
+        name=INSTANCE_NAME,
+        zone=ZONE,
+        self_link=self_link,
+        metadata=compute.Metadata(items=[
+            compute.Items(key=main.MIG_METADATA_KEY,
+                          value=f"{MIG_PATH_PREFIX}{MIG_NAME}")
+        ]))
+    self.instances_client.get.return_value = instance
+
+    del self.environ[main.ALLOWED_MIG_PATTERN_ENV_VARIABLE]
+
+    with self.assertRaises(werkzeug.exceptions.InternalServerError) as ctx:
+      main.delete_self(req)
+
+    self.assertIn(main.ALLOWED_MIG_PATTERN_ENV_VARIABLE, get_message(ctx))
+
+  def test_no_migs_allowed(self):
+    req = Request({}, populate_request=False, shallow=True)
+    req.method = "DELETE"
+
+    token = make_token({
+        "google": {
+            "compute_engine": {
+                "project_id": PROJECT,
+                "zone": f"{REGION}-a",
+                "instance_name": INSTANCE_NAME,
+                "instance_id": str(ID1),
+            }
+        }
+    })
+
+    req.headers = {"Authorization": f"Bearer {token}"}
+
+    instance = compute.Instance(
+        id=ID1,
+        name=INSTANCE_NAME,
+        zone=ZONE,
+        self_link=f"{INSTANCE_LINK_PREFIX}{INSTANCE_NAME}",
+        metadata=compute.Metadata(items=[
+            compute.Items(key=main.MIG_METADATA_KEY,
+                          value=f"{MIG_PATH_PREFIX}{MIG_NAME}")
+        ]))
+    self.instances_client.get.return_value = instance
+
+    self.environ[main.ALLOWED_MIG_PATTERN_ENV_VARIABLE] = ""
+
+    with self.assertRaises(werkzeug.exceptions.Forbidden) as ctx:
+      main.delete_self(req)
+
+    self.assertIn(MIG_NAME, get_message((ctx)))
+
+  def test_mig_not_allowed(self):
+    req = Request({}, populate_request=False, shallow=True)
+    req.method = "DELETE"
+
+    token = make_token({
+        "google": {
+            "compute_engine": {
+                "project_id": PROJECT,
+                "zone": f"{REGION}-a",
+                "instance_name": INSTANCE_NAME,
+                "instance_id": str(ID1),
+            }
+        }
+    })
+
+    req.headers = {"Authorization": f"Bearer {token}"}
+
+    mig_name = "not-github-runner"
+    self.environ[main.ALLOWED_MIG_PATTERN_ENV_VARIABLE] = "github-runner-.*"
+    instance = compute.Instance(
+        id=ID1,
+        name=INSTANCE_NAME,
+        zone=ZONE,
+        self_link=f"{INSTANCE_LINK_PREFIX}{INSTANCE_NAME}",
+        metadata=compute.Metadata(items=[
+            compute.Items(key=main.MIG_METADATA_KEY,
+                          value=f"{MIG_PATH_PREFIX}{mig_name}")
+        ]))
+    self.instances_client.get.return_value = instance
+
+    with self.assertRaises(werkzeug.exceptions.Forbidden) as ctx:
+      main.delete_self(req)
+
+    self.assertIn(mig_name, get_message((ctx)))
 
   def test_bad_deletion_request_server(self):
     req = Request({}, populate_request=False, shallow=True)
