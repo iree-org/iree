@@ -496,7 +496,7 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 }
 
 /// Set configuration for reduction transform dialect based strategy.
-static LogicalResult setReductionTransformJitConfig(
+static LogicalResult setReductionTransformDialectConfig(
     func::FuncOp entryPoint, linalg::LinalgOp op,
     const TargetInfo &targetInfo) {
   if (!clGPUCodegenTransformDialectFileName.empty() &&
@@ -513,21 +513,17 @@ static LogicalResult setReductionTransformJitConfig(
   if (!targetInfo.hasWarpShuffle) return failure();
 
   // Transform script file provided, use it.
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPoint.getContext(),
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
   if (!clGPUCodegenTransformDialectFileName.empty()) {
-    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        entryPoint.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectInterpreterCodegen);
     return setTranslationInfo(entryPoint, translationInfo);
   }
 
   if (failed(matchAndSetGPUReductionTransformStrategy(entryPoint, op)))
     return failure();
 
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPoint->getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                    TransformDialectJitterCodegen);
-  if (failed(setTranslationInfo(entryPoint, translationInfo))) return failure();
-  return success();
+  return setTranslationInfo(entryPoint, translationInfo);
 }
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
@@ -831,8 +827,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     return setUserConfig(entryPointFn, computeOp, compilationInfo);
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
-    if (succeeded(setReductionTransformJitConfig(entryPointFn, linalgOp,
-                                                 targetInfo))) {
+    if (succeeded(setReductionTransformDialectConfig(entryPointFn, linalgOp,
+                                                     targetInfo))) {
       return success();
     }
     if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
@@ -856,8 +852,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
          "Can't use both transform dialect interpreted and jitted modes");
   if (clGPUCodegenTransformDialectFileName.size() > 0) {
     auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        entryPointFn.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                       TransformDialectInterpreterCodegen);
+        entryPointFn.getContext(),
+        IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
     return setTranslationInfo(entryPointFn, translationInfo);
   }
 
