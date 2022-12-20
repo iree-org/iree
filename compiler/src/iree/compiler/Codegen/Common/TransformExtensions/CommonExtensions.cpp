@@ -755,10 +755,21 @@ using mlir::bufferization::OneShotBufferizationOptions;
 
 void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
                                                OperationState &result,
-                                               Value target, bool targetGpu) {
+                                               Value target, bool targetGpu,
+                                               bool testAnalysisOnly,
+                                               bool printConflicts) {
   result.addOperands(target);
   if (targetGpu) {
     result.addAttribute(IREEBufferizeOp::getTargetGpuAttrName(result.name),
+                        builder.getUnitAttr());
+  }
+  if (testAnalysisOnly) {
+    result.addAttribute(
+        IREEBufferizeOp::getTestAnalysisOnlyAttrName(result.name),
+        builder.getUnitAttr());
+  }
+  if (printConflicts) {
+    result.addAttribute(IREEBufferizeOp::getPrintConflictsAttrName(result.name),
                         builder.getUnitAttr());
   }
   MLIRContext *ctx = builder.getContext();
@@ -939,6 +950,12 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   });
   if (res.wasInterrupted())
     return DiagnosedSilenceableFailure::definiteFailure();
+
+  // Early exit if test_analysis_only is set.
+  if (getTestAnalysisOnly()) {
+    results.set(getOperation()->getOpResult(0), payload.front());
+    return DiagnosedSilenceableFailure::success();
+  }
 
   //   3. Post-bufferization passes are fine.
   PassManager pm(getContext());
