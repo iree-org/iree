@@ -15,8 +15,8 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 2. Split the reduction to get meatier parallelism.
   // This also parallelizes to threads.
   // ===========================================================================
-  %foreach_thread, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
-     transform.structured.tile_reduction_using_foreach_thread %grid_reduction 
+  %foreach_thread, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 =
+     transform.structured.tile_reduction_using_foreach_thread %grid_reduction
         by num_threads = [0, 1024], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
 
   // Fuse the fill and pointwise to privatize them.
@@ -24,15 +24,15 @@ transform.structured.canonicalized_sequence failures(propagate) {
     into %foreach_thread
 
   // block_combiner_op_2 op is [parallel, reduction] of 1x384 that cannot fuse.
-  // map the 1-dim to threadIdx.y to trigger mapping of the reduction to 
+  // map the 1-dim to threadIdx.y to trigger mapping of the reduction to
   // threadIdx.x via predication via `if (x==0)`.
-  transform.structured.tile_to_foreach_thread_op %block_combiner_op_2 num_threads [1] 
+  transform.structured.tile_to_foreach_thread_op %block_combiner_op_2 num_threads [1]
     ( mapping = [#gpu.thread<y>] )
 
   // Step 3. Rank-reduce and vectorize.
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op
-  // TODO: masked vectorization on block_more_parallel_op_2 if we want 
+  // TODO: masked vectorization on block_more_parallel_op_2 if we want
   // vector<4> to work as intended.
   %func_2 = transform.iree.apply_patterns %func { rank_reducing }
   %func_3 = transform.structured.vectorize %func_2
@@ -60,4 +60,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
   transform.iree.vector.warp_distribute %func_10
+  // TODO: Make this part of the above apply_patterns op once the
+  // GreedyPatternRewriter is fixed.
+  %func_11 = transform.iree.apply_patterns %func_10 { fold_scalar_vector_transfers }
 }

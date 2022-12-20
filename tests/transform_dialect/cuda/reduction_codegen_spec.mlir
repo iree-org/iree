@@ -23,7 +23,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // ===========================================================================
   %fill_1d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1xf32> in %variant_op
   %foreach_thread_block_combiner_op, %block_combiner_op =
-    transform.structured.tile_to_foreach_thread_op %grid_combiner_op tile_sizes [1] 
+    transform.structured.tile_to_foreach_thread_op %grid_combiner_op tile_sizes [1]
     ( mapping = [#gpu.thread<z>] )
   transform.structured.fuse_into_containing_op %fill_1d into %foreach_thread_block_combiner_op
 
@@ -31,7 +31,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %grid_more_parallel_op = transform.structured.match ops{["linalg.generic"]}
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op
   %foreach_thread_block_more_parallel_op, %block_more_parallel_op =
-    transform.structured.tile_to_foreach_thread_op %grid_more_parallel_op tile_sizes [1, 1] 
+    transform.structured.tile_to_foreach_thread_op %grid_more_parallel_op tile_sizes [1, 1]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
   transform.structured.fuse_into_containing_op %fill_2d into %foreach_thread_block_more_parallel_op
 
@@ -67,4 +67,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
     transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
   }
   transform.iree.vector.warp_distribute %func_8
+  // TODO: Make this part of the above apply_patterns op once the
+  // GreedyPatternRewriter is fixed.
+  %func_9 = transform.iree.apply_patterns %func_8 { fold_scalar_vector_transfers }
 }

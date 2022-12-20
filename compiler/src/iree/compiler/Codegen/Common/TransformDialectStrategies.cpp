@@ -253,10 +253,12 @@ static constexpr unsigned kCudaWarpSize = 32;
 Value mlir::iree_compiler::buildDistributeVectors(ImplicitLocOpBuilder &b,
                                                   Value variantH, Value funcH,
                                                   int64_t warpSize) {
-  ApplyPatternsOpPatterns patterns;
-  patterns.foldMemrefAliases = true;
-  patterns.rankReducing = true;
-  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+  {
+    ApplyPatternsOpPatterns patterns;
+    patterns.foldMemrefAliases = true;
+    patterns.rankReducing = true;
+    funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+  }
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
   // Locally suppress failures for this op only because it doesn't cover the
   // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.
@@ -270,6 +272,11 @@ Value mlir::iree_compiler::buildDistributeVectors(ImplicitLocOpBuilder &b,
     b.create<transform::YieldOp>();
   }
   b.create<VectorWarpDistributionOp>(funcH);
+  {
+    ApplyPatternsOpPatterns patterns;
+    patterns.foldScalarVectorTransfers = true;
+    funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+  }
   return funcH;
 }
 

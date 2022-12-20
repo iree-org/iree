@@ -44,6 +44,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
       extract_slice ops with reassociative reshape ops.
+      - fold_scalar_vector_transfers: adds patterns that fold scalar vector
+      transfer ops.
       - promote_foreach_thread_capture_to_shared: adds patterns that rewrite
       uses of values captured by scf.foreach_thread with the matching
       shared_outs bbarg. This checks that the values captured are
@@ -84,6 +86,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$erase_unnecessary_tensor_operands,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
+                       UnitAttr:$fold_scalar_vector_transfers,
                        UnitAttr:$promote_foreach_thread_capture_to_shared,
                        UnitAttr:$rank_reducing,
                        UnitAttr:$expand_memref_strided_metadata,

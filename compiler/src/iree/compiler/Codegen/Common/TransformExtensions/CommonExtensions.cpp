@@ -72,6 +72,7 @@ void transform_dialect::ApplyPatternsOp::build(
               getEraseUnnecessaryTensorOperandsAttrName)
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
+  ADD_PATTERN(foldScalarVectorTransfers, getFoldScalarVectorTransfersAttrName)
   ADD_PATTERN(promoteForeachThreadCaptureToShared,
               getPromoteForeachThreadCaptureToSharedAttrName)
   ADD_PATTERN(rankReducing, getRankReducingAttrName)
@@ -167,6 +168,10 @@ static void addFoldMemrefAliasPatterns(RewritePatternSet &patterns) {
   memref::populateFoldMemRefAliasOpPatterns(patterns);
 }
 
+static void addFoldScalarVectorTransfersPatterns(RewritePatternSet &patterns) {
+  vector::populateScalarVectorTransferLoweringPatterns(patterns);
+}
+
 static void addForeachThreadCapturePromotionPatterns(
     RewritePatternSet &patterns) {
   patterns.add<PromoteCaptureToSharedOut>(patterns.getContext());
@@ -231,6 +236,8 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
+  if (getFoldScalarVectorTransfers())
+    addFoldScalarVectorTransfersPatterns(patterns);
   if (getPromoteForeachThreadCaptureToShared())
     addForeachThreadCapturePromotionPatterns(patterns);
   if (getRankReducing()) addRankReducingPatterns(patterns);
