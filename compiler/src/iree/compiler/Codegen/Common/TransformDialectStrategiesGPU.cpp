@@ -137,22 +137,29 @@ namespace {
 ///
 // TODO: Support various elemental types.
 // TODO: Split to ensure 4 on most of the problem and use a 1-epilogue.
-class ReductionStrategyThreadDistribution {
+class ReductionStrategy3StageThreadDistribution {
  public:
-  ReductionStrategyThreadDistribution() = default;
-  ReductionStrategyThreadDistribution(int64_t reductionDimensionSize,
-                                      int64_t maxNumThreadsToUse,
-                                      int64_t warpShuffleSize) {
+  ReductionStrategy3StageThreadDistribution() = default;
+  ReductionStrategy3StageThreadDistribution(int64_t reductionDimensionSize,
+                                            int64_t maxNumThreadsToUse,
+                                            int64_t warpShuffleSize) {
     compute(reductionDimensionSize, maxNumThreadsToUse, warpShuffleSize);
   }
-  ReductionStrategyThreadDistribution(
-      const ReductionStrategyThreadDistribution &) = default;
+  ReductionStrategy3StageThreadDistribution(
+      const ReductionStrategy3StageThreadDistribution &) = default;
 
-  ReductionStrategyThreadDistribution &operator=(
-      const ReductionStrategyThreadDistribution &) = default;
+  ReductionStrategy3StageThreadDistribution &operator=(
+      const ReductionStrategy3StageThreadDistribution &) = default;
 
   int64_t getVectorSizeStage1() { return vectorSizeStage1; }
+
   int64_t getNumThreadsXInBlock() { return reductionTileSizeStage1; }
+  int64_t getNumThreadsYInBlock() { return 1; }
+  int64_t getNumThreadsZInBlock() { return 1; }
+  std::array<int64_t, 3> getNumThreadsInBlock() {
+    return {getNumThreadsXInBlock(), getNumThreadsYInBlock(),
+            getNumThreadsZInBlock()};
+  }
 
   bool hasStage2() { return reductionTileSizeStage2.has_value(); }
   int64_t getWarpShuffleSize() { return reductionTileSizeStage2.value(); }
@@ -185,7 +192,7 @@ class ReductionStrategyThreadDistribution {
                int64_t warpShuffleSize);
 };
 
-void ReductionStrategyThreadDistribution::compute(
+void ReductionStrategy3StageThreadDistribution::compute(
     int64_t reductionDimensionSize, int64_t maxNumThreadsToUse,
     int64_t warpShuffleSize) {
   assert(warpShuffleSize > 0 && "warpShuffleSize must > 0");
@@ -254,8 +261,9 @@ struct GPUReductionStrategyInfos {
 
   void computeThreadDistribution(int64_t maxNumThreads,
                                  int64_t warpShuffleSize) {
-    threadDistribution = std::make_unique<ReductionStrategyThreadDistribution>(
-        reductionDimensionSize, maxNumThreads, warpShuffleSize);
+    threadDistribution3Stages =
+        std::make_unique<ReductionStrategy3StageThreadDistribution>(
+            reductionDimensionSize, maxNumThreads, warpShuffleSize);
   }
 
   /// Constructor quantities.
@@ -266,7 +274,8 @@ struct GPUReductionStrategyInfos {
   int64_t maybeTrailingRank;
 
   /// Derived quantities.
-  std::unique_ptr<ReductionStrategyThreadDistribution> threadDistribution;
+  std::unique_ptr<ReductionStrategy3StageThreadDistribution>
+      threadDistribution3Stages;
   SmallVector<Attribute> allBlockAttrs;
   // Tile sizes for the workgroup / determines grid size.
   SmallVector<int64_t> workgroupTileSizes;
@@ -314,11 +323,9 @@ static std::tuple<Value, Value, Value> createReductionStrategyBlockDistribution(
 }
 
 static std::tuple<Value, Value, Value>
-createReductionStrategyThreadDistributionStep(ImplicitLocOpBuilder &b,
-                                              Value gridReductionH,
-                                              int64_t reductionRank,
-                                              int64_t reductionTileSizeStage,
-                                              int64_t reductionVectorSize) {
+createReductionStrategy3StageThreadDistributionStep(
+    ImplicitLocOpBuilder &b, Value gridReductionH, int64_t reductionRank,
+    int64_t reductionTileSizeStage, int64_t reductionVectorSize) {
   auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
                                                       mlir::gpu::Threads::DimX);
   // Split the reduction into a parallel and combiner part, then tile the
@@ -374,7 +381,7 @@ static void createElementwiseStrategyThreadStep(ImplicitLocOpBuilder &b,
       b.getArrayAttr({threadX}));
 }
 
-static void createReductionStrategyThreadDistribution(
+static void createReductionStrategy3StageThreadDistribution(
     ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledLeadingH,
     Value maybeTiledTrailingH, const GPUReductionStrategyInfos &infos) {
   // Map the potential maybeTiledLeadingH.
@@ -382,25 +389,25 @@ static void createReductionStrategyThreadDistribution(
   if (infos.maybeLeadingRank > 0) {
     createElementwiseStrategyThreadStep(
         b, maybeTiledLeadingH, infos.maybeLeadingRank,
-        infos.threadDistribution->getNumThreadsXInBlock());
+        infos.threadDistribution3Stages->getNumThreadsXInBlock());
   }
 
   // Staged reduction step 1: break gridReductionH apart.
   auto [blockParallelForeachThreadOp, blockParallelFillH, blockCombinerOpH] =
-      createReductionStrategyThreadDistributionStep(
+      createReductionStrategy3StageThreadDistributionStep(
           b, gridReductionH, infos.reductionRank,
-          infos.threadDistribution->getNumThreadsXInBlock(),
-          infos.threadDistribution->getVectorSizeStage1());
+          infos.threadDistribution3Stages->getNumThreadsXInBlock(),
+          infos.threadDistribution3Stages->getVectorSizeStage1());
 
   // Staged reduction step 2: break blockCombinerOpH apart.
   // Note, if necessary, we could have additional intermediate steps.
   Value warpParallelForeachThreadOp, warpParallelFillH, warpCombinerOpH;
-  if (infos.threadDistribution->hasStage2()) {
+  if (infos.threadDistribution3Stages->hasStage2()) {
     std::tie(warpParallelForeachThreadOp, warpParallelFillH, warpCombinerOpH) =
-        createReductionStrategyThreadDistributionStep(
+        createReductionStrategy3StageThreadDistributionStep(
             b, blockCombinerOpH, infos.reductionRank,
-            infos.threadDistribution->getWarpShuffleSize(),
-            infos.threadDistribution->getVectorSizeStage1());
+            infos.threadDistribution3Stages->getWarpShuffleSize(),
+            infos.threadDistribution3Stages->getVectorSizeStage1());
   } else {
     warpCombinerOpH = blockCombinerOpH;
   }
@@ -418,7 +425,7 @@ static void createReductionStrategyThreadDistribution(
   if (infos.maybeTrailingRank > 0) {
     createElementwiseStrategyThreadStep(
         b, maybeTiledTrailingH, infos.maybeTrailingRank,
-        infos.threadDistribution->getNumThreadsXInBlock());
+        infos.threadDistribution3Stages->getNumThreadsXInBlock());
   }
 }
 
@@ -445,8 +452,8 @@ static void createReductionCudaStrategy(
 
   // Step 3. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
-  createReductionStrategyThreadDistribution(b, gridReductionH, maybeLeadingH,
-                                            maybeTiledTrailingH, infos);
+  createReductionStrategy3StageThreadDistribution(
+      b, gridReductionH, maybeLeadingH, maybeTiledTrailingH, infos);
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
@@ -512,8 +519,7 @@ static FailureOr<GPUReductionStrategyInfos> matchGPUReduction(
   infos.workgroupTileSizes.append(numParallelLoops, 1);
   // Tile and distribute the reduction across `reductionTileSizeStage1`
   // threads.
-  infos.workgroupSize = {infos.threadDistribution->getNumThreadsXInBlock(), 1,
-                         1};
+  infos.workgroupSize = infos.threadDistribution3Stages->getNumThreadsInBlock();
   return infos;
 }
 
