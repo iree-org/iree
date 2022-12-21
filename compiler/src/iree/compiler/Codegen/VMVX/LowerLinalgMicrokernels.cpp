@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -27,6 +28,22 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
+
+static llvm::cl::opt<bool> clAssumeDynamicDimsContiguous(
+    "iree-vmvx-microkernels-assume-dynamic-dims-contiguous",
+    llvm::cl::desc(
+        "In the VMVX backend, when deciding whether an op can be rewritten as "
+        "a microkernel call, we need to check if memref layouts inner "
+        "dimeensions are contiguous row-major as expected by the microkernel. "
+        "When a dimension has dynamic size, that is hard to do as a static "
+        "analysis. By default, to be safe, we treat any dynamic-size dimension "
+        "as non-contiguous. When this command-line flag is `true`, we instead "
+        "assume any dynamic size dimension to be contiguous. This is unsafe as "
+        "that assumption is not checked and if it's broken, we will perform "
+        "incorrect memory accesses. This flag only affects dynamic dimensions; "
+        "static dimensions remain checked regardless. Issue #11633 tracks "
+        "removing this flag."),
+    llvm::cl::init(false));
 
 // Permutes raw strides against a projected permutation map returning a
 // vector of strides that is the permutation with expansion positions
@@ -102,9 +119,15 @@ bool verifyMemRefInnerDimsContiguousRowMajor(MemRefType type) {
   int64_t product_of_inner_sizes = 1;
   for (int i = rank - 1; i >= 2; --i) {
     if (sizes[i] == ShapedType::kDynamic) {
-      return false;
+      if (!clAssumeDynamicDimsContiguous) {
+        return false;
+      }
+      product_of_inner_sizes = ShapedType::kDynamic;
+    } else {
+      if (product_of_inner_sizes != ShapedType::kDynamic) {
+        product_of_inner_sizes *= sizes[i];
+      }
     }
-    product_of_inner_sizes *= sizes[i];
     if (strides[i - 1] != product_of_inner_sizes) {
       return false;
     }
