@@ -64,6 +64,7 @@ jobs:
           BENCHMARK_PRESETS: ${{ inputs.benchmark-presets }}
         run: |
           ./build_tools/benchmarks/export_benchmark_config.py \
+            execution \
             --benchmark_presets="${BENCHMARK_PRESETS}" \
             --output="${BENCHMARK_CONFIG}"
           echo "benchmark-config=${BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"
