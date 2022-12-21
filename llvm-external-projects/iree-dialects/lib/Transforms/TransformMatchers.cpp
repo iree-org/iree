@@ -441,7 +441,7 @@ void transform_ext::makeReductionMatcher(
           //
           .rank(NumGreaterEqualTo(2))
           .rank(NumLowerEqualTo(4))
-          .rank(CaptureStaticValue<int64_t>(captures.rank))
+          .rank(CaptureStaticValue<int64_t>(captures.reductionRank))
           // Op has a single most-minor reduction that we capture.
           .dim(-1, utils::IteratorType::reduction)
           .dim(-1, CaptureStaticValue<int64_t>(captures.reductionDimensionSize))
@@ -477,13 +477,13 @@ void transform_ext::makeReductionMatcher(
   fill = m_StructuredOp<linalg::FillOp>();
   reduction = reduction.output(NumEqualsTo(1)).output(0, fill);
 
-  // Optional leading op can be any map, transpose, broadcast but not reduce
-  // or windowing operation for now.
+  // Optional leading or trailign op can be any map, transpose, broadcast but
+  // not reduce or windowing operation for now.
   // It must create the unique input for the reduction.
   // TODO: match more optional leading ops, one per input of the reduction.
   // TODO: careful about multi-output and turning into a contraction.
   //
-  leading =
+  transform_ext::StructuredOpMatcher commonLeadingOrTrailing =
       m_StructuredOp<linalg::GenericOp>()
           // All parallel dimensions.
           .dim(AllDims(), utils::IteratorType::parallel)
@@ -502,6 +502,8 @@ void transform_ext::makeReductionMatcher(
   // TODO: match more optional leading ops, one per input of the reduction.
   // TODO: careful about multi-output and turning into a contraction.
   //
+  leading = commonLeadingOrTrailing.rank(
+      CaptureStaticValue<int64_t>(captures.maybeLeadingRank));
   reduction = reduction.input(0, leading, OptionalMatch());
 
   // Optional trailing can be any map, transpose, broadcast but not reduce or
@@ -510,7 +512,8 @@ void transform_ext::makeReductionMatcher(
   // TODO: match more optional leading ops, one per input of the reduction.
   // TODO: careful about multi-output and turning into a contraction.
   //
-  trailing = leading;
+  trailing = commonLeadingOrTrailing.rank(
+      CaptureStaticValue<int64_t>(captures.maybeTrailingRank));
   reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch())
                   .allTilableOpsCaptured<func::FuncOp>();
 }

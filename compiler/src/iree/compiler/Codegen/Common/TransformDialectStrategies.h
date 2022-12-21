@@ -18,11 +18,30 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 
 /// Prints `handles` in order. Prints the whole IR if `handles` is empty.
-static void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
+void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 
 /// Result of the combined transform performing tiling, fusion and distribution
 /// to parallel constructs.
-struct TileAndFuseAndDistributeResult {
+struct TileToScfForAndFuseResult {
+  /// Vector of `scf.for` loops containing the tiled and fused operations.
+  SmallVector<Value> forLoops;
+  /// Handles to fused operations other than the final consumer operation. May
+  /// be empty if fusion was not performed iteratively.
+  /// This is currently empty
+  // TODO: support returning handles from `fuse_into_containing_op` and remove
+  // the restriction above.
+  SmallVector<Value> resultingFusedOpsHandles;
+  /// Handle to the tiled final consumer operation.
+  Value tiledOpH;
+};
+
+TileToScfForAndFuseResult buildTileFuseToScfFor(
+    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<OpFoldResult> tileSizes);
+
+/// Result of the combined transform performing tiling, fusion and distribution
+/// to parallel constructs.
+struct TileToForeachThreadAndFuseAndDistributeResult {
   /// Outer `scf.foreach_thread` loop containing the tiled and fused operations.
   Value foreachThreadH;
   /// Handles to fused operations other than the final consumer operation. May
@@ -51,19 +70,23 @@ struct TileAndFuseAndDistributeResult {
 /// enabling transform will be introduced and may result in better fusions.
 ///
 // TODO: if someone knows how to properly export templates go for it .. sigh.
-TileAndFuseAndDistributeResult buildTileFuseDistToForeachThreadWithTileSizes(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping);
-TileAndFuseAndDistributeResult
+TileToForeachThreadAndFuseAndDistributeResult
+buildTileFuseDistToForeachThreadWithTileSizes(ImplicitLocOpBuilder &b,
+                                              Value rootH,
+                                              ValueRange opsHToFuse,
+                                              ArrayRef<OpFoldResult> tileSizes,
+                                              ArrayAttr threadDimMapping);
+TileToForeachThreadAndFuseAndDistributeResult
 buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping);
 
 /// See buildTileFuseDistWithTileSizes.
-TileAndFuseAndDistributeResult buildTileFuseDistToForeachThreadWithNumThreads(
+TileToForeachThreadAndFuseAndDistributeResult
+buildTileFuseDistToForeachThreadWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
-TileAndFuseAndDistributeResult
+TileToForeachThreadAndFuseAndDistributeResult
 buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
