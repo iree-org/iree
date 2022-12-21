@@ -4,9 +4,9 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Exports JSON config for benchmarking.
+"""Exports JSON config for benchmarking and compilation statistics.
 
-The exported JSON is a list of object:
+Export type: "benchmark" outputs a list of object:
 [
   <target device name>: {
     host_environment: HostEnvironment,
@@ -15,6 +15,11 @@ The exported JSON is a list of object:
   },
   ...
 ]
+Designed to be used in build_tools/benchmarks/run_benchmarks_on_*.py
+
+Export type: "compile-stats" outputs a serialized list of
+iree_definitions.ModuleGenerationConfig defined for compilation statistics.
+Designed to be used in build_tools/benchmarks/collect_compilation_statistics.py
 """
 
 import sys
@@ -157,11 +162,11 @@ def _parse_arguments():
   parser = argparse.ArgumentParser(
       description="Export JSON config for benchmarking.")
 
-  subparser = parser.add_subparsers(required=True, title="config type")
+  subparser = parser.add_subparsers(required=True, title="export type")
   benchmark_parser = subparser.add_parser(
       "benchmark",
       parents=[subparser_base],
-      help="Export config to run benchmarks.")
+      help="Export benchmark run config to run benchmarks.")
   benchmark_parser.set_defaults(handler=_benchmark_handler)
   benchmark_parser.add_argument(
       "--target_device_names",
@@ -178,7 +183,8 @@ def _parse_arguments():
   compile_stats_parser = subparser.add_parser(
       "compile-stats",
       parents=[subparser_base],
-      help="Export config to collect compilation statistics.")
+      help=("Export serialized list of module generation configs defined for "
+            "compilation statistics."))
   compile_stats_parser.set_defaults(handler=_compile_stats_handler)
 
   return parser.parse_args()
