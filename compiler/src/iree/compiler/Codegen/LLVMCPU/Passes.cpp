@@ -650,21 +650,11 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addTransformDialectInterpreterPasses(OpPassManager &passManager) {
+void addTransformDialectPasses(OpPassManager &passManager) {
   // Give control to the transform dialect.
   passManager.addPass(
       mlir::iree_compiler::createTransformDialectInterpreterPass(
           clCPUCodegenTransformDialectFileName));
-  // Dropping the schedule is needed:
-  //   1. if we want to embed the transform in the module: we should drop the
-  //      schedule once applied.
-  //   2. if transform.do_not_dce_operands ops are introduced.
-  passManager.addPass(createDropSchedulePass());
-}
-
-void addTransformDialectJitterPasses(OpPassManager &passManager) {
-  // Give control to the transform dialect.
-  passManager.addPass(mlir::iree_compiler::createTransformDialectJitterPass());
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
   //      schedule once applied.

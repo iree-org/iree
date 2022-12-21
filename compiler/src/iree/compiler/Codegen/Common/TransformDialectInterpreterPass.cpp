@@ -129,13 +129,40 @@ class TransformDialectInterpreterPass
   void runOnOperation() override {
     Operation *target = getOperation();
     bool parsedTransform = (sharedTransformModule && *sharedTransformModule);
-    assert(parsedTransform || (target->getNumRegions() == 1 &&
-                               target->getRegion(0).getBlocks().size() == 1) &&
-                                  "Cannot extract transform from op");
-    Region &transformRegion = parsedTransform
-                                  ? (*sharedTransformModule)->getRegion()
-                                  : target->getRegion(0);
-    if (failed(transform::applyTransformsInRegion(transformRegion, target))) {
+
+    Region *transformRegion = nullptr;
+    if (!parsedTransform) {
+      transform::TransformOpInterface topLevelTransform = nullptr;
+      WalkResult walkResult = target->walk<WalkOrder::PreOrder>(
+          [&](transform::TransformOpInterface transformOp) {
+            if (!topLevelTransform) {
+              topLevelTransform = transformOp;
+              return WalkResult::skip();
+            }
+            auto diag = transformOp.emitError()
+                        << "more than one top-level transform op";
+            diag.attachNote(topLevelTransform.getLoc())
+                << "previous top-level transform op";
+            return WalkResult::interrupt();
+          });
+      if (walkResult.wasInterrupted()) return signalPassFailure();
+      if (!topLevelTransform) {
+        auto diag = target->emitError()
+                    << "could not find a nested top-level transform op";
+        diag.attachNote() << "use the '" << transformFileName.getArgStr()
+                          << "' option to provide transform as external file";
+        return signalPassFailure();
+      }
+
+      transformRegion = topLevelTransform->getParentRegion();
+    } else {
+      transformRegion = &(*sharedTransformModule)->getRegion();
+    }
+
+    // TODO: lift this assertion.
+    assert(transformRegion->getBlocks().size() == 1 &&
+           "expected single-region block");
+    if (failed(transform::applyTransformsInRegion(*transformRegion, target))) {
       target->emitOpError() << "transform dialect interpreter failed";
       return signalPassFailure();
     }

@@ -1219,8 +1219,8 @@ static LogicalResult setTransformStrategyRootConfig(
   if (failed(matchAndSetCPUReductionTransformStrategy(entryPointFn, genericOp)))
     return success();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                      TransformDialectJitterCodegen);
+      entryPointFn->getContext(),
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
   if (failed(setTranslationInfo(entryPointFn, translationInfo)))
     return failure();
   return success();
@@ -1737,17 +1737,11 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     assert((clCPUCodegenTransformDialectFileName.empty() ||
             !clCPUEnableTransformDialectJit) &&
            "Can't use both transform dialect interpreted and jitted modes");
-    if (!clCPUCodegenTransformDialectFileName.empty()) {
+    if (!clCPUCodegenTransformDialectFileName.empty() ||
+        clCPUEnableTransformDialectJit) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectInterpreterCodegen);
-      if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
-      continue;
-    }
-    if (clCPUEnableTransformDialectJit) {
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectJitterCodegen);
+          moduleOp.getContext(),
+          IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
       if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
       continue;
     }
