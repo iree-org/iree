@@ -59,6 +59,7 @@ GITHUB_RUNNER_SCOPE=iree-org
 GITHUB_RUNNER_VERSION="2.299.1"
 GITHUB_RUNNER_ARCHIVE_DIGEST="147c14700c6cb997421b9a239c012197f11ea9854cd901ee88ead6fe73a72c74"
 GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
+INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-zbhz5clunq-uc.a.run.app"
 
 declare -a METADATA=(
   "github-runner-version=${GITHUB_RUNNER_VERSION}"
@@ -67,6 +68,7 @@ declare -a METADATA=(
   "github-runner-config-repo=${TEMPLATE_CONFIG_REPO}"
   "github-runner-scope=${GITHUB_RUNNER_SCOPE}"
   "github-token-proxy-url=${GITHUB_TOKEN_PROXY_URL}"
+  "instance-self-deleter-url=${INSTANCE_SELF_DELETER_URL}"
 )
 
 declare -a common_args=(
