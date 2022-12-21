@@ -33,6 +33,7 @@
 #include "mlir/Support/FileUtilities.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/SourceMgr.h"
 
 #define DEBUG_TYPE "transform-dialect-interpreter"
@@ -44,8 +45,9 @@ LogicalResult mlir::transform::parseTransformModuleFromFile(
     MLIRContext *context, llvm::StringRef transformFileName,
     OwningOpRef<ModuleOp> &transformModule) {
   if (transformFileName.empty()) {
-    llvm::errs() << "no transform file name specified, assuming the transform "
-                    "module is embedded in the IR next to the top-level\n";
+    LLVM_DEBUG(
+        DBGS() << "no transform file name specified, assuming the transform "
+                  "module is embedded in the IR next to the top-level\n");
     return success();
   }
   // Parse transformFileName content into a ModuleOp.
