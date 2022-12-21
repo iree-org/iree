@@ -113,9 +113,10 @@ steps:
         "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
       tar -xzvf "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz"
       python3 build_tools/benchmarks/collect_compilation_statistics.py \
+        legacy \
         --verbose \
         --output "compile-stats-results-$${BUILDKITE_BUILD_NUMBER}.json" \
-        legacy "build-host"
+        "build-host"
     if: >
       build.pull_request.id == null ||
       build.pull_request.labels includes 'buildkite:benchmark-android'

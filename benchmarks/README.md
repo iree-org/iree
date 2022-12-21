@@ -138,8 +138,9 @@ Then run the command below to collect the statistics:
 
 ```sh
 build_tools/benchmarks/collect_compilation_statistics.py \
+  legacy \
   --output "compile-stats.json" \
-  legacy "${IREE_BUILD_DIR}"
+  "${IREE_BUILD_DIR}"
 ```
 
 Then `build_tools/benchmarks/diff_local_benchmarks.py` can also compare the

@@ -125,9 +125,10 @@ steps:
         tar -xzvf "{}"
       ls build-targets | xargs -I "{target}" -- \
         python3 build_tools/benchmarks/collect_compilation_statistics.py \
+          legacy \
           --verbose \
           --output "compile-stats-results-{target}-$${BUILDKITE_BUILD_NUMBER}.json" \
-          legacy "build-targets/{target}"
+          "build-targets/{target}"
     if: >
       build.pull_request.id == null ||
       build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||
