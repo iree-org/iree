@@ -208,32 +208,40 @@ def alpha_get_module_map_and_build_log(args: argparse.Namespace):
   return module_map, args.build_log
 
 
+def check_dir_path(path_str: str) -> pathlib.Path:
+  path = pathlib.Path(path_str)
+  if not path.is_dir():
+    raise argparse.ArgumentTypeError(f"{path} is not a directory.")
+  return path
+
+
+def check_file_path(path_str: str) -> pathlib.Path:
+  path = pathlib.Path(path_str)
+  if not path.is_file():
+    raise argparse.ArgumentTypeError(f"{path} is not a file.")
+  return path
+
+
 def parse_arguments():
   """Returns an argument parser with common options."""
 
-  def check_dir_path(path_str: str) -> pathlib.Path:
-    path = pathlib.Path(path_str)
-    if path.is_dir():
-      return path
-    else:
-      raise argparse.ArgumentTypeError(f"{path} is not a directory.")
+  # Makes global options come *after* command.
+  # See https://stackoverflow.com/q/23296695
+  subparser_base = argparse.ArgumentParser(add_help=False)
+  subparser_base.add_argument("--output",
+                              type=pathlib.Path,
+                              help="Path to output JSON file.")
+  subparser_base.add_argument(
+      "--verbose",
+      action="store_true",
+      help="Print internal information during execution.")
 
-  def check_file_path(path_str: str) -> pathlib.Path:
-    path = pathlib.Path(path_str)
-    if not path.is_file():
-      raise argparse.ArgumentTypeError(f"{path} is not a file.")
-    return path      
-
-  parser = argparse.ArgumentParser()
-  parser.add_argument("--output",
-                      type=pathlib.Path,
-                      help="Path to output JSON file.")
-  parser.add_argument("--verbose",
-                      action="store_true",
-                      help="Print internal information during execution.")
+  parser = argparse.ArgumentParser(
+      description="Collects compilation statistics from benchmark suites.")
 
   subparser = parser.add_subparsers(title="tool version", required=True)
   legacy_parser = subparser.add_parser("legacy",
+                                       parents=[subparser_base],
                                        help="use with legacy benchmark suites.")
   legacy_parser.set_defaults(
       get_module_map_and_build_log=legacy_get_module_map_and_build_log)
@@ -243,6 +251,7 @@ def parse_arguments():
       help="Path to the build directory containing benchmark suites.")
 
   alpha_parser = subparser.add_parser("alpha",
+                                      parents=[subparser_base],
                                       help="use with e2e test artifacts.")
   alpha_parser.set_defaults(
       get_module_map_and_build_log=alpha_get_module_map_and_build_log)
