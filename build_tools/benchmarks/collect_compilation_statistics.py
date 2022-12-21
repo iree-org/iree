@@ -195,34 +195,34 @@ def get_module_map_from_benchmark_suite(
   return module_map
 
 
-def legacy_get_module_map_and_build_log(args: argparse.Namespace):
+def _legacy_get_module_map_and_build_log(args: argparse.Namespace):
   module_map = get_module_map_from_benchmark_suite(
       args.build_dir / benchmark_config.BENCHMARK_SUITE_REL_PATH)
   return module_map, args.build_dir / NINJA_BUILD_LOG
 
 
-def alpha_get_module_map_and_build_log(args: argparse.Namespace):
+def _alpha_get_module_map_and_build_log(args: argparse.Namespace):
   module_map = get_module_map_from_generation_config(
       serialized_gen_config=args.generation_config.open("r"),
       e2e_test_artifacts_dir=args.e2e_test_artifacts_dir)
   return module_map, args.build_log
 
 
-def check_dir_path(path_str: str) -> pathlib.Path:
+def _check_dir_path(path_str: str) -> pathlib.Path:
   path = pathlib.Path(path_str)
   if not path.is_dir():
     raise argparse.ArgumentTypeError(f"{path} is not a directory.")
   return path
 
 
-def check_file_path(path_str: str) -> pathlib.Path:
+def _check_file_path(path_str: str) -> pathlib.Path:
   path = pathlib.Path(path_str)
   if not path.is_file():
     raise argparse.ArgumentTypeError(f"{path} is not a file.")
   return path
 
 
-def parse_arguments():
+def _parse_arguments():
   """Returns an argument parser with common options."""
 
   # Makes global options come *after* command.
@@ -244,28 +244,28 @@ def parse_arguments():
                                        parents=[subparser_base],
                                        help="Use with legacy benchmark suites.")
   legacy_parser.set_defaults(
-      get_module_map_and_build_log=legacy_get_module_map_and_build_log)
+      get_module_map_and_build_log=_legacy_get_module_map_and_build_log)
   legacy_parser.add_argument(
       "build_dir",
-      type=check_dir_path,
+      type=_check_dir_path,
       help="Path to the build directory containing benchmark suites.")
 
   alpha_parser = subparser.add_parser("alpha",
                                       parents=[subparser_base],
                                       help="Use with e2e test artifacts.")
   alpha_parser.set_defaults(
-      get_module_map_and_build_log=alpha_get_module_map_and_build_log)
+      get_module_map_and_build_log=_alpha_get_module_map_and_build_log)
   alpha_parser.add_argument(
       "--generation_config",
-      type=check_file_path,
+      type=_check_file_path,
       required=True,
       help="Exported module generation config of e2e test artifacts.")
   alpha_parser.add_argument("--build_log",
-                            type=check_file_path,
+                            type=_check_file_path,
                             required=True,
                             help="Path to the ninja build log.")
   alpha_parser.add_argument("--e2e_test_artifacts_dir",
-                            type=check_dir_path,
+                            type=_check_dir_path,
                             required=True,
                             help="Path to the e2e test artifacts directory.")
 
@@ -307,4 +307,4 @@ def main(args: argparse.Namespace):
 
 
 if __name__ == "__main__":
-  main(parse_arguments())
+  main(_parse_arguments())
