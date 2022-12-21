@@ -220,10 +220,9 @@ def parse_arguments():
 
   def check_file_path(path_str: str) -> pathlib.Path:
     path = pathlib.Path(path_str)
-    if path.is_file():
-      return path
-    else:
+    if not path.is_file():
       raise argparse.ArgumentTypeError(f"{path} is not a file.")
+    return path      
 
   parser = argparse.ArgumentParser()
   parser.add_argument("--output",
