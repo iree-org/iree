@@ -243,6 +243,16 @@ def TransformDialectInterpreter :
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
             "transform dialect operation somewhere in the module.">,
+    Option<"payloadRootTag", "payload-root-tag", "std::string",
+            /*default=*/"\"\"",
+            "Select the operation with 'transform.iree_tag' attribute having "
+            "the given value as payload root. If not provided, select the "
+            "pass anchor operation as payload root.">,
+    Option<"transformRootTag", "transform-root-tag", "std::string",
+            /*default=*/"\"\"",
+            "Select the operation with 'transform.iree_tag' attribute having "
+            "the given value as container for top-level transform ops. If not "
+            "provided, select the container of top-level transform op.">
   ];
 }
 
