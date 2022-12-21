@@ -13,6 +13,18 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Return the greatest value smaller or equal to `val` that is a multiple of
+/// `multiple`. Asserts that all quantities are nonnegative.
+/// I.e. returns `(val / multiple) * multiple`
+///        a.k.a `floordiv(val, multiple) * multiple`.
+int64_t previousMultipleOf(int64_t val, int64_t multiple);
+
+/// Return the smallest value greater or equal to `val` that is a multiple of
+/// `multiple`. Asserts that all quantities are nonnegative.
+/// I.e. returns `((val + multiple - 1) / multiple) * multiple`  a.k.a
+///        a.k.a `ceildiv(val, multiple) * multiple`.
+int64_t nextMultipleOf(int64_t val, int64_t multiple);
+
 //===----------------------------------------------------------------------===//
 // Low-level reusable builder APIs, these should follow MLIR-style builders.
 //===----------------------------------------------------------------------===//
@@ -20,8 +32,8 @@ namespace iree_compiler {
 /// Prints `handles` in order. Prints the whole IR if `handles` is empty.
 void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 
-/// Result of the combined transform performing tiling, fusion and distribution
-/// to parallel constructs.
+/// Result of the combined transform performing tiling, fusion and
+/// distribution to parallel constructs.
 struct TileToScfForAndFuseResult {
   /// Vector of `scf.for` loops containing the tiled and fused operations.
   SmallVector<Value> forLoops;
@@ -39,10 +51,11 @@ TileToScfForAndFuseResult buildTileFuseToScfFor(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes);
 
-/// Result of the combined transform performing tiling, fusion and distribution
-/// to parallel constructs.
+/// Result of the combined transform performing tiling, fusion and
+/// distribution to parallel constructs.
 struct TileToForeachThreadAndFuseAndDistributeResult {
-  /// Outer `scf.foreach_thread` loop containing the tiled and fused operations.
+  /// Outer `scf.foreach_thread` loop containing the tiled and fused
+  /// operations.
   Value foreachThreadH;
   /// Handles to fused operations other than the final consumer operation. May
   /// be empty if fusion was not performed iteratively.
@@ -62,8 +75,9 @@ struct TileToForeachThreadAndFuseAndDistributeResult {
 ///
 /// Fusion operates in batch mode: a single fusion command is issued and a
 /// topological sort is automatically computed by the fusion.
-/// Since this applies a single fusion, no interleaved canonicalization / cse /
-/// enabling transformation occurs and the resulting fusion may not be as good.
+/// Since this applies a single fusion, no interleaved canonicalization / cse
+/// / enabling transformation occurs and the resulting fusion may not be as
+/// good.
 ///
 /// In the future, an iterative mode in which the user is responsible for
 /// providing the fusion order and has interleaved canonicalization / cse /
@@ -100,21 +114,6 @@ Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH);
 /// Takes a handle variantOp and returns a handle to the same variant op.
 Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH,
                      bool targetGpu = false);
-
-/// Post-bufferization mapping to blocks and threads.
-/// Takes a handle to a func.func and returns an updated handle to a
-/// func.func.
-Value buildMapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
-                                ArrayRef<int64_t> blockSize);
-
-static constexpr unsigned kCudaWarpSize = 32;
-static constexpr unsigned kCudaMaxNumThreads = 1024;
-
-/// Post-bufferization vector distribution with rank-reduction.
-/// Takes a handle to a func.func and returns an updated handle to a
-/// func.func.
-Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
-                             Value funcH, int64_t warpSize = kCudaWarpSize);
 
 using StrategyBuilderFn = std::function<void(ImplicitLocOpBuilder &, Value)>;
 

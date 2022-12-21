@@ -27,9 +27,16 @@ using namespace mlir;
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 // TODO: significantly better namespacing.
+using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
+using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
+using iree_compiler::IREE::transform_dialect::
+    MapNestedForeachThreadToGpuThreadsOp;
+using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
+using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
 using transform::FuseIntoContainingOp;
 using transform::MatchOp;
+using transform::SequenceOp;
 using transform_ext::MatchCallbackOp;
 using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::StructuredOpMatcher;
@@ -51,6 +58,41 @@ auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
   std::array<Value, N> a;
   for (int64_t i = 0; i < N; ++i) a[i] = matchOp->getResult(i);
   return std::tuple_cat(a);
+}
+
+/// Post-bufferization mapping to blocks and threads.
+/// Takes a handle to a func.func and returns an updated handle to a
+/// func.func.
+Value mlir::iree_compiler::buildMapToBlockAndThreads(
+    ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize) {
+  funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
+  return b.create<MapNestedForeachThreadToGpuThreadsOp>(funcH, blockSize);
+}
+
+/// Post-bufferization vector distribution with rank-reduction.
+/// Takes a handle to a func.func and returns an updated handle to a
+/// func.func.
+Value mlir::iree_compiler::buildDistributeVectors(ImplicitLocOpBuilder &b,
+                                                  Value variantH, Value funcH,
+                                                  int64_t warpSize) {
+  ApplyPatternsOpPatterns patterns;
+  patterns.foldMemrefAliases = true;
+  patterns.rankReducing = true;
+  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+  Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
+  // Locally suppress failures for this op only because it doesn't cover the
+  // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.
+  auto sequence = b.create<SequenceOp>(
+      TypeRange(), transform::FailurePropagationMode::Suppress, variantH);
+  {
+    OpBuilder::InsertionGuard guard(b);
+    b.createBlock(&sequence.getBody(), sequence.getBody().begin(),
+                  pdl::OperationType::get(b.getContext()), b.getLoc());
+    ifH = b.create<VectorToWarpExecuteOnLane0Op>(ifH, warpSize);
+    b.create<transform::YieldOp>();
+  }
+  b.create<VectorWarpDistributionOp>(funcH);
+  return funcH;
 }
 
 //===----------------------------------------------------------------------===//
@@ -143,18 +185,6 @@ class ReductionStrategyThreadDistribution {
                int64_t warpShuffleSize);
 };
 
-static int64_t maxMultipleOf(int64_t val, int64_t multiple) {
-  assert(val > 0 && "expected nonnegative val");
-  assert(multiple > 0 && "expected nonnegative multiple");
-  return (val / multiple) * multiple;
-}
-
-static int64_t nextMultipleOf(int64_t val, int64_t multiple) {
-  assert(val > 0 && "expected nonnegative val");
-  assert(multiple > 0 && "expected nonnegative multiple");
-  return ((val + multiple - 1) / multiple) * multiple;
-}
-
 void ReductionStrategyThreadDistribution::compute(
     int64_t reductionDimensionSize, int64_t maxNumThreadsToUse,
     int64_t warpShuffleSize) {
@@ -178,13 +208,13 @@ void ReductionStrategyThreadDistribution::compute(
   // This locally reduces the large unknown reduction into a guaranteed
   // multiple of `warpShuffleSize`.
   if (reductionDimensionSize > 0) {
-    reductionTileSizeStage1 =
-        std::min(nextMultipleOf(reductionDimensionSize / vectorSizeStage1,
-                                warpShuffleSize),
-                 maxMultipleOf(maxNumThreadsToUse, warpShuffleSize));
+    reductionTileSizeStage1 = std::min(
+        iree_compiler::nextMultipleOf(reductionDimensionSize / vectorSizeStage1,
+                                      warpShuffleSize),
+        iree_compiler::previousMultipleOf(maxNumThreadsToUse, warpShuffleSize));
   } else {
     reductionTileSizeStage1 =
-        maxMultipleOf(maxNumThreadsToUse, warpShuffleSize);
+        iree_compiler::previousMultipleOf(maxNumThreadsToUse, warpShuffleSize);
   }
   // Stage 2 is only needed if `reductionTileSizeStage1` consists of multiple
   // `warpShuffleSize`; otherwise, we just skip this step.

@@ -9,9 +9,6 @@
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
-// Needed because ApplyPatternOp is used everywhere.
-// TODO: Separate out GPU-specific patterns.
-#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
@@ -38,11 +35,7 @@ using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
     IREEEraseHALDescriptorTypeFromMemRefOp;
 using iree_compiler::IREE::transform_dialect::
-    MapNestedForeachThreadToGpuThreadsOp;
-using iree_compiler::IREE::transform_dialect::
     TileToForeachThreadAndWorkgroupCountRegionOp;
-using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
-using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
 using transform::FuseIntoContainingOp;
 using transform::MatchOp;
 using transform::MergeHandlesOp;
@@ -66,6 +59,18 @@ auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
   std::array<Value, N> a;
   for (int64_t i = 0; i < N; ++i) a[i] = matchOp->getResult(i);
   return std::tuple_cat(a);
+}
+
+int64_t mlir::iree_compiler::previousMultipleOf(int64_t val, int64_t multiple) {
+  assert(val > 0 && "expected nonnegative val");
+  assert(multiple > 0 && "expected nonnegative multiple");
+  return (val / multiple) * multiple;
+}
+
+int64_t mlir::iree_compiler::nextMultipleOf(int64_t val, int64_t multiple) {
+  assert(val > 0 && "expected nonnegative val");
+  assert(multiple > 0 && "expected nonnegative multiple");
+  return ((val + multiple - 1) / multiple) * multiple;
 }
 
 //===----------------------------------------------------------------------===//
@@ -220,41 +225,6 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
       b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   b.create<IREEEraseHALDescriptorTypeFromMemRefOp>(memrefFunc);
   return variantH;
-}
-
-/// Post-bufferization mapping to blocks and threads.
-/// Takes a handle to a func.func and returns an updated handle to a
-/// func.func.
-Value mlir::iree_compiler::buildMapToBlockAndThreads(
-    ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize) {
-  funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
-  return b.create<MapNestedForeachThreadToGpuThreadsOp>(funcH, blockSize);
-}
-
-/// Post-bufferization vector distribution with rank-reduction.
-/// Takes a handle to a func.func and returns an updated handle to a
-/// func.func.
-Value mlir::iree_compiler::buildDistributeVectors(ImplicitLocOpBuilder &b,
-                                                  Value variantH, Value funcH,
-                                                  int64_t warpSize) {
-  ApplyPatternsOpPatterns patterns;
-  patterns.foldMemrefAliases = true;
-  patterns.rankReducing = true;
-  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
-  Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
-  // Locally suppress failures for this op only because it doesn't cover the
-  // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.
-  auto sequence = b.create<SequenceOp>(
-      TypeRange(), transform::FailurePropagationMode::Suppress, variantH);
-  {
-    OpBuilder::InsertionGuard guard(b);
-    b.createBlock(&sequence.getBody(), sequence.getBody().begin(),
-                  pdl::OperationType::get(b.getContext()), b.getLoc());
-    ifH = b.create<VectorToWarpExecuteOnLane0Op>(ifH, warpSize);
-    b.create<transform::YieldOp>();
-  }
-  b.create<VectorWarpDistributionOp>(funcH);
-  return funcH;
 }
 
 namespace {
