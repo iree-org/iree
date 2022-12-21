@@ -139,6 +139,15 @@ def get_ci_stage(event_name):
 
 
 def get_benchmark_presets(trailers: Mapping[str, str]) -> str:
+  """Parses the benchmark presets from trailers.
+  
+  Args:
+    trailers: trailers from PR description.
+
+  Returns:
+    A comma separated preset string, which later will be parsed by
+    build_tools/benchmarks/export_benchmark_config.py.
+  """
   trailer = trailers.get(BENCHMARK_PRESET_KEY)
   if trailer is None:
     return ""
