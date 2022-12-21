@@ -108,31 +108,39 @@ def compile_stats_handler(_args: argparse.Namespace):
   return serialization.serialize_and_pack(compile_stats_gen_configs)
 
 
+def parse_and_strip_list_argument(arg) -> List[str]:
+  return [part.strip() for part in arg.split(",")]
+
+
+def parse_benchmark_presets(arg) -> List[PresetMatcher]:
+  matchers = []
+  for preset in parse_and_strip_list_argument(arg):
+    matcher = BENCHMARK_PRESET_MATCHERS.get(preset)
+    if matcher is None:
+      raise argparse.ArgumentTypeError(
+          f"Unrecognized benchmark preset: '{preset}'.")
+    matchers.append(matcher)
+  return matchers
+
+
 def parse_arguments():
   """Parses command-line options."""
 
-  def parse_and_strip_list_argument(arg) -> List[str]:
-    return [part.strip() for part in arg.split(",")]
-
-  def parse_benchmark_presets(arg) -> List[PresetMatcher]:
-    matchers = []
-    for preset in parse_and_strip_list_argument(arg):
-      matcher = BENCHMARK_PRESET_MATCHERS.get(preset)
-      if matcher is None:
-        raise argparse.ArgumentTypeError(
-            f"Unrecognized benchmark preset: '{preset}'.")
-      matchers.append(matcher)
-    return matchers
+  # Makes global options come *after* command.
+  # See https://stackoverflow.com/q/23296695
+  subparser_base = argparse.ArgumentParser(add_help=False)
+  subparser_base.add_argument("--output",
+                              type=pathlib.Path,
+                              help="path to write the JSON output.")
 
   parser = argparse.ArgumentParser(
-      description="Exports JSON config for benchmarking.")
-  parser.add_argument("--output",
-                      type=pathlib.Path,
-                      help="path to write the JSON output.")
-  subparser = parser.add_subparsers(required=True, title="config type")
+      description="Export JSON config for benchmarking.")
 
+  subparser = parser.add_subparsers(required=True, title="config type")
   benchmark_parser = subparser.add_parser(
-      "benchmark", help="exports config to run benchmarks.")
+      "benchmark",
+      parents=[subparser_base],
+      help="export config to run benchmarks.")
   benchmark_parser.set_defaults(handler=benchmark_handler)
   benchmark_parser.add_argument(
       "--target_device_names",
@@ -147,7 +155,9 @@ def parse_arguments():
             f"{','.join(BENCHMARK_PRESET_MATCHERS.keys())}"))
 
   compile_stats_parser = subparser.add_parser(
-      "compile-stats", help="exports config to collect compilation statistics")
+      "compile-stats",
+      parents=[subparser_base],
+      help="export config to collect compilation statistics.")
   compile_stats_parser.set_defaults(handler=compile_stats_handler)
 
   return parser.parse_args()
