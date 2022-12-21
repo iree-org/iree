@@ -159,7 +159,7 @@ jobs:
             "${BENCHMARK_CONFIG}" > "${IREE_RUN_CONFIG}"
           ./build_tools/benchmarks/run_benchmarks.sh
           echo "benchmark-results=${IREE_BENCHMARK_RESULTS}" >> "${GITHUB_OUTPUT}"
-      - name: "Uploading reuslts"
+      - name: "Uploading benchmark results"
         id: upload
         env:
           BENCHMARK_RESULTS: ${{ steps.run.outputs.benchmark-results }}
