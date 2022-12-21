@@ -27,7 +27,7 @@ import argparse
 import collections
 import dataclasses
 import json
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional, Set
 
 from benchmark_suites.iree import benchmark_collections
 from e2e_test_artifacts import iree_artifacts
@@ -56,15 +56,24 @@ BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
 }
 
 
-def benchmark_handler(args: argparse.Namespace):
-  _, all_run_configs = benchmark_collections.generate_benchmarks()
+def filter_and_group_benchmarks(
+    run_configs: List[iree_definitions.E2EModelRunConfig],
+    target_device_names: Optional[Set[str]] = None,
+    preset_matchers: Optional[List[PresetMatcher]] = None
+) -> Dict[str, List[iree_definitions.E2EModelRunConfig]]:
+  """Filters run configs and groups by target device name.
+  
+  Args:
+    run_configs: source e2e model run configs.
+    target_device_names: list of target device names, includes all if not set.
+    preset_matchers: list of preset matcher, matches all if not set.
 
-  target_device_names = (set(args.target_device_names)
-                         if args.target_device_names is not None else None)
-  preset_matchers = args.benchmark_presets
-
+  Returns:
+    A map of e2e model run configs keyed by target device name.
+  """
   grouped_run_config_map = collections.defaultdict(list)
-  for run_config in all_run_configs:
+
+  for run_config in run_configs:
     device_name = run_config.target_device_spec.device_name
     if (target_device_names is not None and
         device_name not in target_device_names):
@@ -73,6 +82,18 @@ def benchmark_handler(args: argparse.Namespace):
         not any(matcher(run_config) for matcher in preset_matchers)):
       continue
     grouped_run_config_map[device_name].append(run_config)
+
+  return grouped_run_config_map
+
+
+def _benchmark_handler(args: argparse.Namespace):
+  _, all_run_configs = benchmark_collections.generate_benchmarks()
+  target_device_names = (set(args.target_device_names)
+                         if args.target_device_names is not None else None)
+  grouped_run_config_map = filter_and_group_benchmarks(
+      all_run_configs,
+      target_device_names=target_device_names,
+      preset_matchers=args.benchmark_presets)
 
   output_map = {}
   for device_name, run_configs in grouped_run_config_map.items():
@@ -98,7 +119,7 @@ def benchmark_handler(args: argparse.Namespace):
   return output_map
 
 
-def compile_stats_handler(_args: argparse.Namespace):
+def _compile_stats_handler(_args: argparse.Namespace):
   all_gen_configs, _ = benchmark_collections.generate_benchmarks()
   compile_stats_gen_configs = [
       config for config in all_gen_configs
@@ -108,13 +129,13 @@ def compile_stats_handler(_args: argparse.Namespace):
   return serialization.serialize_and_pack(compile_stats_gen_configs)
 
 
-def parse_and_strip_list_argument(arg) -> List[str]:
+def _parse_and_strip_list_argument(arg) -> List[str]:
   return [part.strip() for part in arg.split(",")]
 
 
-def parse_benchmark_presets(arg) -> List[PresetMatcher]:
+def _parse_benchmark_presets(arg) -> List[PresetMatcher]:
   matchers = []
-  for preset in parse_and_strip_list_argument(arg):
+  for preset in _parse_and_strip_list_argument(arg):
     matcher = BENCHMARK_PRESET_MATCHERS.get(preset)
     if matcher is None:
       raise argparse.ArgumentTypeError(
@@ -123,7 +144,7 @@ def parse_benchmark_presets(arg) -> List[PresetMatcher]:
   return matchers
 
 
-def parse_arguments():
+def _parse_arguments():
   """Parses command-line options."""
 
   # Makes global options come *after* command.
@@ -131,7 +152,7 @@ def parse_arguments():
   subparser_base = argparse.ArgumentParser(add_help=False)
   subparser_base.add_argument("--output",
                               type=pathlib.Path,
-                              help="path to write the JSON output.")
+                              help="Path to write the JSON output.")
 
   parser = argparse.ArgumentParser(
       description="Export JSON config for benchmarking.")
@@ -140,25 +161,25 @@ def parse_arguments():
   benchmark_parser = subparser.add_parser(
       "benchmark",
       parents=[subparser_base],
-      help="export config to run benchmarks.")
-  benchmark_parser.set_defaults(handler=benchmark_handler)
+      help="Export config to run benchmarks.")
+  benchmark_parser.set_defaults(handler=_benchmark_handler)
   benchmark_parser.add_argument(
       "--target_device_names",
-      type=parse_and_strip_list_argument,
-      help=("target device names, separated by comma, not specified means "
+      type=_parse_and_strip_list_argument,
+      help=("Target device names, separated by comma, not specified means "
             "including all devices."))
   benchmark_parser.add_argument(
       "--benchmark_presets",
-      type=parse_benchmark_presets,
-      help=("presets that select a bundle of benchmarks, separated by comma, "
+      type=_parse_benchmark_presets,
+      help=("Presets that select a bundle of benchmarks, separated by comma, "
             "multiple presets will be union. Available options: "
             f"{','.join(BENCHMARK_PRESET_MATCHERS.keys())}"))
 
   compile_stats_parser = subparser.add_parser(
       "compile-stats",
       parents=[subparser_base],
-      help="export config to collect compilation statistics.")
-  compile_stats_parser.set_defaults(handler=compile_stats_handler)
+      help="Export config to collect compilation statistics.")
+  compile_stats_parser.set_defaults(handler=_compile_stats_handler)
 
   return parser.parse_args()
 
@@ -173,4 +194,4 @@ def main(args: argparse.Namespace):
 
 
 if __name__ == "__main__":
-  main(parse_arguments())
+  main(_parse_arguments())
