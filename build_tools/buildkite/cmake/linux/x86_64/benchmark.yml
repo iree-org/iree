@@ -72,6 +72,7 @@ steps:
         "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
       tar -xzvf "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz"
       python3 build_tools/benchmarks/collect_compilation_statistics.py \
+        legacy \
         --verbose \
         --output "compile-stats-results-linux-$${BUILDKITE_BUILD_NUMBER}.json" \
         build-host/

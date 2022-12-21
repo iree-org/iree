@@ -138,6 +138,7 @@ Then run the command below to collect the statistics:
 
 ```sh
 build_tools/benchmarks/collect_compilation_statistics.py \
+  legacy \
   --output "compile-stats.json" \
   "${IREE_BUILD_DIR}"
 ```
