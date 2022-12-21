@@ -32,7 +32,7 @@ COMMON_EXEC_CONFIG = iree_definitions.ModuleExecutionConfig(
 
 class ExportBenchmarkConfigTest(unittest.TestCase):
 
-  def test_filter_and_group_benchmarks_set_all_filters(self):
+  def test_filter_and_group_run_configs_set_all_filters(self):
     device_spec_a = common_definitions.DeviceSpec(
         id="dev_a_cpu",
         device_name="dev_a_cpu",
@@ -68,7 +68,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
                 (lambda config: config.target_device_spec.host_environment.
                  platform == "android")]
 
-    run_config_map = export_benchmark_config.filter_and_group_benchmarks(
+    run_config_map = export_benchmark_config.filter_and_group_run_configs(
         run_configs=[
             matched_run_config_a, unmatched_run_config_b, matched_run_config_c
         ],
@@ -80,7 +80,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         "dev_c": [matched_run_config_c],
     })
 
-  def test_filter_and_group_benchmarks_include_all(self):
+  def test_filter_and_group_run_configs_include_all(self):
     device_spec_a = common_definitions.DeviceSpec(
         id="dev_a_cpu",
         device_name="dev_a_cpu",
@@ -112,7 +112,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         target_device_spec=device_spec_c,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
 
-    run_config_map = export_benchmark_config.filter_and_group_benchmarks(
+    run_config_map = export_benchmark_config.filter_and_group_run_configs(
         run_configs=[run_config_a, run_config_b, run_config_c])
 
     self.maxDiff = 100000
@@ -122,7 +122,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         "dev_a_gpu": [run_config_b, run_config_c],
     })
 
-  def test_filter_and_group_benchmarks_set_target_device_names(self):
+  def test_filter_and_group_run_configs_set_target_device_names(self):
     device_spec_a = common_definitions.DeviceSpec(
         id="dev_a",
         device_name="dev_a",
@@ -144,7 +144,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         target_device_spec=device_spec_b,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
 
-    run_config_map = export_benchmark_config.filter_and_group_benchmarks(
+    run_config_map = export_benchmark_config.filter_and_group_run_configs(
         run_configs=[run_config_a, run_config_b],
         target_device_names={"dev_a", "dev_b"})
 
@@ -153,7 +153,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         "dev_b": [run_config_b],
     })
 
-  def test_filter_and_group_benchmarks_set_preset_matchers(self):
+  def test_filter_and_group_run_configs_set_preset_matchers(self):
     small_model = common_definitions.Model(
         id="small_model",
         name="small_model",
@@ -200,7 +200,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         target_device_spec=device_spec_b,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
 
-    run_config_map = export_benchmark_config.filter_and_group_benchmarks(
+    run_config_map = export_benchmark_config.filter_and_group_run_configs(
         run_configs=[run_config_a, run_config_b],
         preset_matchers=[
             lambda config: config.module_generation_config.imported_model.model.

@@ -6,7 +6,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Exports JSON config for benchmarking and compilation statistics.
 
-Export type: "benchmark" outputs a list of object:
+Export type: "execution" outputs:
 [
   <target device name>: {
     host_environment: HostEnvironment,
@@ -15,11 +15,11 @@ Export type: "benchmark" outputs a list of object:
   },
   ...
 ]
-Designed to be used in build_tools/benchmarks/run_benchmarks_on_*.py
+to be used in build_tools/benchmarks/run_benchmarks_on_*.py
 
-Export type: "compile-stats" outputs a serialized list of
-iree_definitions.ModuleGenerationConfig defined for compilation statistics.
-Designed to be used in build_tools/benchmarks/collect_compilation_statistics.py
+Export type: "compilation" outputs a serialized list of module generation config
+defined for compilation statistics, to be used in
+build_tools/benchmarks/collect_compilation_statistics.py
 """
 
 import sys
@@ -62,7 +62,7 @@ BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
 }
 
 
-def filter_and_group_benchmarks(
+def filter_and_group_run_configs(
     run_configs: List[iree_definitions.E2EModelRunConfig],
     target_device_names: Optional[Set[str]] = None,
     preset_matchers: Optional[List[PresetMatcher]] = None
@@ -92,11 +92,11 @@ def filter_and_group_benchmarks(
   return grouped_run_config_map
 
 
-def _benchmark_handler(args: argparse.Namespace):
+def _export_execution_handler(args: argparse.Namespace):
   _, all_run_configs = benchmark_collections.generate_benchmarks()
   target_device_names = (set(args.target_device_names)
                          if args.target_device_names is not None else None)
-  grouped_run_config_map = filter_and_group_benchmarks(
+  grouped_run_config_map = filter_and_group_run_configs(
       all_run_configs,
       target_device_names=target_device_names,
       preset_matchers=args.benchmark_presets)
@@ -125,7 +125,7 @@ def _benchmark_handler(args: argparse.Namespace):
   return output_map
 
 
-def _compile_stats_handler(_args: argparse.Namespace):
+def _export_compilation_handler(_args: argparse.Namespace):
   all_gen_configs, _ = benchmark_collections.generate_benchmarks()
   compile_stats_gen_configs = [
       config for config in all_gen_configs
@@ -163,7 +163,7 @@ def _parse_arguments():
   parser = argparse.ArgumentParser(
       formatter_class=argparse.RawDescriptionHelpFormatter,
       description=textwrap.dedent("""
-      Export type: "benchmark" outputs a list of object:
+      Export type: "execution" outputs:
       [
         <target device name>: {
           host_environment: HostEnvironment,
@@ -172,37 +172,37 @@ def _parse_arguments():
         },
         ...
       ]
-      Designed to be used in build_tools/benchmarks/run_benchmarks_on_*.py
+      to be used in build_tools/benchmarks/run_benchmarks_on_*.py
 
-      Export type: "compile-stats" outputs a serialized list of
-      iree_definitions.ModuleGenerationConfig defined for compilation statistics.
-      Designed to be used in build_tools/benchmarks/collect_compilation_statistics.py
+      Export type: "compilation" outputs a serialized list of module generation
+      config defined for compilation statistics, to be used in
+      build_tools/benchmarks/collect_compilation_statistics.py
       """))
 
   subparser = parser.add_subparsers(required=True, title="export type")
-  benchmark_parser = subparser.add_parser(
-      "benchmark",
+  execution_parser = subparser.add_parser(
+      "execution",
       parents=[subparser_base],
-      help="Export benchmark run config to run benchmarks.")
-  benchmark_parser.set_defaults(handler=_benchmark_handler)
-  benchmark_parser.add_argument(
+      help="Export execution config to run benchmarks.")
+  execution_parser.set_defaults(handler=_export_execution_handler)
+  execution_parser.add_argument(
       "--target_device_names",
       type=_parse_and_strip_list_argument,
       help=("Target device names, separated by comma, not specified means "
             "including all devices."))
-  benchmark_parser.add_argument(
+  execution_parser.add_argument(
       "--benchmark_presets",
       type=_parse_benchmark_presets,
       help=("Presets that select a bundle of benchmarks, separated by comma, "
             "multiple presets will be union. Available options: "
             f"{','.join(BENCHMARK_PRESET_MATCHERS.keys())}"))
 
-  compile_stats_parser = subparser.add_parser(
-      "compile-stats",
+  compilation_parser = subparser.add_parser(
+      "compilation",
       parents=[subparser_base],
       help=("Export serialized list of module generation configs defined for "
             "compilation statistics."))
-  compile_stats_parser.set_defaults(handler=_compile_stats_handler)
+  compilation_parser.set_defaults(handler=_export_compilation_handler)
 
   return parser.parse_args()
 
