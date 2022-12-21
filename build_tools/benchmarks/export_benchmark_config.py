@@ -28,11 +28,12 @@ import pathlib
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
+from typing import Callable, Dict, List, Optional, Set
 import argparse
 import collections
 import dataclasses
 import json
-from typing import Callable, Dict, List, Optional, Set
+import textwrap
 
 from benchmark_suites.iree import benchmark_collections
 from e2e_test_artifacts import iree_artifacts
@@ -160,7 +161,23 @@ def _parse_arguments():
                               help="Path to write the JSON output.")
 
   parser = argparse.ArgumentParser(
-      description="Export JSON config for benchmarking.")
+      formatter_class=argparse.RawDescriptionHelpFormatter,
+      description=textwrap.dedent("""
+      Export type: "benchmark" outputs a list of object:
+      [
+        <target device name>: {
+          host_environment: HostEnvironment,
+          module_dir_paths: [<paths of dependent module directories>],
+          run_configs: [E2EModelRunConfig]
+        },
+        ...
+      ]
+      Designed to be used in build_tools/benchmarks/run_benchmarks_on_*.py
+
+      Export type: "compile-stats" outputs a serialized list of
+      iree_definitions.ModuleGenerationConfig defined for compilation statistics.
+      Designed to be used in build_tools/benchmarks/collect_compilation_statistics.py
+      """))
 
   subparser = parser.add_subparsers(required=True, title="export type")
   benchmark_parser = subparser.add_parser(
