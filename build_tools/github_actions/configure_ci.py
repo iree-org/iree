@@ -139,8 +139,8 @@ def get_ci_stage(event_name):
 
 
 def get_benchmark_presets(trailers: Mapping[str, str]) -> str:
-  """Parses the benchmark presets from trailers.
-  
+  """Parses and validates the benchmark presets from trailers.
+
   Args:
     trailers: trailers from PR description.
 
