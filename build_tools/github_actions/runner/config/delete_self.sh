@@ -6,7 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Deregisters the GitHub actions runner using proxy token.
+# Calls the instance deletion proxy to delete this instance through the GCE API.
 
 set -euo pipefail
 
