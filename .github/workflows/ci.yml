@@ -71,6 +71,7 @@ jobs:
       runner-env: ${{ steps.configure.outputs.runner-env }}
       runner-group: ${{ steps.configure.outputs.runner-group }}
       write-caches: ${{ steps.configure.outputs.write-caches }}
+      benchmark-presets: ${{ steps.configure.outputs.benchmark-presets }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
@@ -725,6 +726,14 @@ jobs:
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
+    outputs:
+      # We can't collect all outputs from the matrix jobs due to Github's
+      # limitation (https://github.com/orgs/community/discussions/17245).
+      # Therefore, the output is the GCS directory that stores all benchmark
+      # tools archives. The following jobs need to construct the archive names
+      # by themselves and combine with path of GCS directory here to fetch the
+      # archives.
+      benchmark-tools-gcs-artifact-dir: ${{ steps.upload.outputs.benchmark-tools-gcs-artifact-dir }}
     strategy:
       matrix:
         target:
@@ -779,15 +788,17 @@ jobs:
           BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools.tar
         run: |
           tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
-            "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module
+            "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module \
+            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt
           echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading the benchmark tools archive"
         id: upload
         env:
           BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}
-          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.benchmark-tools-archive }}
+          BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/benchmark-tools
         run: |
-          gcloud alpha storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT}"
+          gcloud alpha storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}/"
+          echo "benchmark-tools-gcs-artifact-dir=${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
 
   build_e2e_test_artifacts:
     needs: [setup, build_all, build_tf_integrations]
@@ -848,6 +859,20 @@ jobs:
             gcloud alpha storage cp --read-paths-from-stdin -r \
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
+
+  benchmarks:
+    needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+    uses: ./.github/workflows/benchmarks.yml
+    with:
+      # env.GCS_DIR is also duplicated in this workflow. See the note there on
+      # why this is.
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+      e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
+      benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
@@ -1082,6 +1107,9 @@ jobs:
 
       # Test modules from benchmark pipeline
       - test_benchmark_suites
+
+      # Benchmark pipeline
+      - benchmarks
     steps:
       - name: Getting combined job status
         run: |

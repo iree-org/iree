@@ -84,10 +84,12 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         run_config.target_device_spec)
     cmds.append(tool_path)
 
-    module_path = iree_artifacts.get_module_path(
+    module_dir_path = iree_artifacts.get_module_dir_path(
         run_config.module_generation_config,
-        root_dir_path=self.config.root_benchmark_dir)
-    cmds += [f"--module_file={module_path}"]
+        root_path=self.config.root_benchmark_dir)
+    cmds += [
+        f"--module_file={module_dir_path / iree_artifacts.MODULE_FILENAME}"
+    ]
     cmds += run_module_utils.build_run_flags_for_model(
         model=run_config.module_generation_config.imported_model.model,
         model_input_data=run_config.input_data)
