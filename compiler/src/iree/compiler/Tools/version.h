@@ -11,7 +11,7 @@
 
 namespace mlir::iree_compiler {
 
-// Returns the IREE compiler version. Empty if build without IREE_VERSION
+// Returns the IREE compiler version. Empty if built without IREE_VERSION
 // defined.
 std::string getIreeRevision();
 
