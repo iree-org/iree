@@ -237,12 +237,12 @@ def parse_arguments():
       help="Print internal information during execution.")
 
   parser = argparse.ArgumentParser(
-      description="Collects compilation statistics from benchmark suites.")
+      description="Collect compilation statistics from benchmark suites.")
 
   subparser = parser.add_subparsers(title="tool version", required=True)
   legacy_parser = subparser.add_parser("legacy",
                                        parents=[subparser_base],
-                                       help="use with legacy benchmark suites.")
+                                       help="Use with legacy benchmark suites.")
   legacy_parser.set_defaults(
       get_module_map_and_build_log=legacy_get_module_map_and_build_log)
   legacy_parser.add_argument(
@@ -252,7 +252,7 @@ def parse_arguments():
 
   alpha_parser = subparser.add_parser("alpha",
                                       parents=[subparser_base],
-                                      help="use with e2e test artifacts.")
+                                      help="Use with e2e test artifacts.")
   alpha_parser.set_defaults(
       get_module_map_and_build_log=alpha_get_module_map_and_build_log)
   alpha_parser.add_argument(
