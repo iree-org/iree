@@ -749,13 +749,17 @@ endif()
 # TODO(#11263): This conditional block should be merged with the block above
 # once we remove IREE_BUILD_BENCHMARKS.
 if(IREE_BUILD_EXPERIMENTAL_E2E_TEST_ARTIFACTS)
+  # iree-e2e-compile-stats-suites compiles the benchmark models with specific
+  # flags to collect the compilation statistics.
+  add_custom_target(iree-e2e-compile-stats-suites)
+
   # iree-e2e-test-artifacts builds all e2e test artifacts, including benchmarks
   # and model tests.
   add_custom_target(iree-e2e-test-artifacts)
-
   add_dependencies(iree-e2e-test-artifacts
     iree-benchmark-import-models
     iree-benchmark-suites
+    iree-e2e-compile-stats-suites
   )
 endif()
 
