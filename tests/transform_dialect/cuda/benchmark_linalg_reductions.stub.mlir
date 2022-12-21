@@ -1,10 +1,22 @@
-// Example usage:
+// Example usages:
+//
+// With the IREE pipeline:
 //
 // cat tests/transform_dialect/cuda/benchmark_linalg_reductions.stub.mlir | \
-// sed "s/\${SZ1}/32/g" | \
-// sed "s/\${SZ2}/32/g" | \
-// iree-transform-compile - -b cuda -- --iree-hal-benchmark-dispatch-repeat-count=5 | \
-// /usr/local/cuda-11.4/bin/nvprof  --print-gpu-trace  iree-run-module --entry_function=reduction_2d_static --device=cuda --function_input="32x32xf32=1"
+// sed "s/\${SZ1}/1024/g" | \
+// sed "s/\${SZ2}/1024/g" | \
+// iree-compile - --iree-hal-target-backends=cuda --iree-hal-benchmark-dispatch-repeat-count=5 | \
+// nvprof --print-gpu-trace iree-run-module --entry_function=reduction_2d_static --device=cuda --function_input="1024x1024xf32=1" 2>&1 | \
+// grep reduction
+//
+// With the transform dialect:
+//
+// cat tests/transform_dialect/cuda/benchmark_linalg_reductions.stub.mlir | \
+// sed "s/\${SZ1}/1024/g" | \
+// sed "s/\${SZ2}/1024/g" | \
+// iree-compile - --iree-hal-target-backends=cuda --iree-codegen-llvmgpu-enable-transform-dialect-jit --iree-hal-benchmark-dispatch-repeat-count=5 | \
+// nvprof --print-gpu-trace iree-run-module --entry_function=reduction_2d_static --device=cuda --function_input="1024x1024xf32=1" 2>&1 | \
+// grep reduction
 
 !in_tensor_reduction_2d_static_t = tensor<${SZ1}x${SZ2}xf32>
 !out_tensor_reduction_2d_static_t = tensor<${SZ1}xf32>
