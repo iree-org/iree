@@ -168,6 +168,7 @@ def delete_self(request):
   project = compute_info["project_id"]
   zone = compute_info["zone"]
   instance_name = compute_info["instance_name"]
+  print(f"Received request to delete {instance_name}")
   try:
     instance = instances_client.get(instance=instance_name,
                                     project=project,
@@ -249,4 +250,6 @@ def delete_self(request):
     # here is our VM instances, so I think we can be a bit loose).
     return flask.abort(BAD_REQUEST, msg)
 
-  return f"{instance_name} has been marked for deletion by {mig}."
+  success_msg = f"{instance_name} has been marked for deletion by {mig}."
+  print(success_msg)
+  return success_msg
