@@ -32,7 +32,7 @@ iree_cc_test(
   NAME
     LoaderTest
   SRCS
-    "LoaderTest.cpp"
+    "LoaderTest.c"
   ARGS
     "$<TARGET_FILE:iree::compiler::API2::SharedImpl>"
   DEPS
