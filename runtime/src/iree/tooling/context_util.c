@@ -507,3 +507,5 @@ iree_status_t iree_tooling_create_context_from_flags(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+bool iree_tooling_trace_execution(void) { return FLAG_trace_execution; }

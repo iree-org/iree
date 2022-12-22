@@ -189,6 +189,7 @@ cc_library(
     srcs = ["trace_replay.c"],
     hdrs = ["trace_replay.h"],
     deps = [
+        ":context_util",
         ":yaml_util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",

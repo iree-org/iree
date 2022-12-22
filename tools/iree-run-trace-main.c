@@ -29,10 +29,8 @@ static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
                                          iree_vm_instance_t* instance) {
   iree_trace_replay_t replay;
   IREE_RETURN_IF_ERROR(iree_trace_replay_initialize(
-      root_path, instance,
-      FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
-                           : IREE_VM_CONTEXT_FLAG_NONE,
-      iree_hal_available_driver_registry(), iree_allocator_system(), &replay));
+      root_path, instance, iree_hal_available_driver_registry(),
+      iree_allocator_system(), &replay));
 
   // Query device overrides, if any. When omitted the devices from the trace
   // file will be used.

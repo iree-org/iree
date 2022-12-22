@@ -210,6 +210,7 @@ iree_cc_library(
   SRCS
     "trace_replay.c"
   DEPS
+    ::context_util
     ::yaml_util
     iree::base
     iree::base::internal

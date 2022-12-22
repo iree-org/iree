@@ -17,6 +17,7 @@
 #include "iree/base/internal/path.h"
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/module.h"
+#include "iree/tooling/context_util.h"
 #include "iree/vm/bytecode_module.h"
 
 // Parameter for locally defined lcg similar to std::minstd_rand.
@@ -25,7 +26,6 @@
 
 iree_status_t iree_trace_replay_initialize(
     iree_string_view_t root_path, iree_vm_instance_t* instance,
-    iree_vm_context_flags_t context_flags,
     iree_hal_driver_registry_t* driver_registry,
     iree_allocator_t host_allocator, iree_trace_replay_t* out_replay) {
   memset(out_replay, 0, sizeof(*out_replay));
@@ -37,7 +37,10 @@ iree_status_t iree_trace_replay_initialize(
 
   out_replay->instance = instance;
   iree_vm_instance_retain(out_replay->instance);
-  out_replay->context_flags = context_flags;
+
+  if (iree_tooling_trace_execution()) {
+    out_replay->context_flags |= IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION;
+  }
 
   out_replay->driver_registry = driver_registry;
 
@@ -100,6 +103,34 @@ static iree_status_t iree_trace_replay_create_device(
                                 host_allocator, out_device);
 }
 
+static iree_status_t iree_trace_replay_register_module_and_dependencies(
+    iree_trace_replay_t* replay, iree_vm_module_t* module) {
+  // Resolve module dependencies.
+  iree_tooling_module_list_t resolved_list;
+  iree_tooling_module_list_initialize(&resolved_list);
+  IREE_RETURN_IF_ERROR(iree_tooling_resolve_modules(
+      replay->instance, /*user_module_count=*/1, /*user_modules=*/&module,
+      /*default_device_uri=*/iree_string_view_empty(), replay->host_allocator,
+      &resolved_list, /*device=*/NULL, /*device_allocator=*/NULL));
+  // Put together and `all_modules` list, concatenating `resolved_list` with
+  // `module` itself.
+  iree_vm_module_t** all_modules = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      replay->host_allocator,
+      (resolved_list.count + 1) * sizeof(iree_vm_module_t*),
+      (void**)&all_modules));
+  memcpy(all_modules, resolved_list.values,
+         resolved_list.count * sizeof(iree_vm_module_t*));
+  all_modules[resolved_list.count] = module;
+  // Register `all_modules`.
+  iree_status_t status = iree_vm_context_register_modules(
+      replay->context, resolved_list.count + 1, all_modules);
+  // Cleanup.
+  iree_allocator_free(replay->host_allocator, all_modules);
+  iree_tooling_module_list_reset(&resolved_list);
+  return status;
+}
+
 static iree_status_t iree_trace_replay_load_builtin_module(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* module_node) {
@@ -124,8 +155,9 @@ static iree_status_t iree_trace_replay_load_builtin_module(
         (int)name_node->data.scalar.length, name_node->data.scalar.value);
   }
 
-  iree_status_t status = iree_vm_context_register_modules(
-      replay->context, /*module_count=*/1, /*modules=*/&module);
+  iree_status_t status =
+      iree_trace_replay_register_module_and_dependencies(replay, module);
+
   iree_vm_module_release(module);
   return status;
 }
@@ -167,10 +199,8 @@ static iree_status_t iree_trace_replay_load_bytecode_module(
     }
   }
 
-  // Register the bytecode module with the context.
   if (iree_status_is_ok(status)) {
-    status = iree_vm_context_register_modules(
-        replay->context, /*module_count=*/1, /*modules=*/&module);
+    status = iree_trace_replay_register_module_and_dependencies(replay, module);
   }
 
   iree_vm_module_release(module);

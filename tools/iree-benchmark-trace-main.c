@@ -199,8 +199,7 @@ static iree_status_t iree_replay_benchmark_run_file(
   iree_trace_replay_t replay;
   IREE_RETURN_IF_ERROR(iree_trace_replay_initialize(
       registration->root_path, registration->instance,
-      IREE_VM_CONTEXT_FLAG_NONE, iree_hal_available_driver_registry(),
-      iree_allocator_system(), &replay));
+      iree_hal_available_driver_registry(), iree_allocator_system(), &replay));
 
   // Query device overrides, if any. When omitted the devices from the trace
   // file will be used.

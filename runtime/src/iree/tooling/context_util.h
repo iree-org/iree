@@ -87,6 +87,15 @@ iree_status_t iree_tooling_create_context_from_flags(
     iree_hal_device_t** out_device,
     iree_hal_allocator_t** out_device_allocator);
 
+//===----------------------------------------------------------------------===//
+// Misc
+//===----------------------------------------------------------------------===//
+
+// Returns the value of the `trace_execution` command-line flag. Exposing this
+// is needed for trace_replay, which links to context_util but calls
+// iree_vm_context_create directly.
+bool iree_tooling_trace_execution(void);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
