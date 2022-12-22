@@ -85,6 +85,47 @@ hal.executable private @dot_dispatch_1  {
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @unaligned_k  {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.export @unaligned_k layout(#pipeline_layout)
+    builtin.module {
+      func.func @unaligned_k() {
+        %c0 = arith.constant 0 : index
+        %c4 = arith.constant 4 : index
+        %c2 = arith.constant 2 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<128x258xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<258x64xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<128x64xf32>
+        linalg.fill ins(%cst : f32) outs(%2 : memref<128x64xf32>)
+        linalg.matmul ins(%0, %1 : memref<128x258xf32>, memref<258x64xf32>) outs(%2 : memref<128x64xf32>)
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128, 2]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
+//      CHECK: hal.executable.export public @unaligned_k
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+// CHECK-SAME:     workgroup_size = [32 : index, 8 : index, 1 : index]
+//      CHECK: func.func @unaligned_k
+//      CHECK:   linalg.fill
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+//      CHECK:   linalg.matmul
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
