@@ -117,6 +117,7 @@ def VK_TTA_Valhall   : I32EnumAttrCase<"ARM_Valhall", 300, "valhall">;
 // NVIDIA GPU
 def VK_TTA_Turing    : I32EnumAttrCase<"NV_Turing", 400, "turing">;
 def VK_TTA_Ampere    : I32EnumAttrCase<"NV_Ampere", 401, "ampere">;
+def VK_TTA_Pascal    : I32EnumAttrCase<"NV_Pascal", 402, "pascal">;
 // Qualcomm Adreno GPU
 def VK_TTA_Adreno    : I32EnumAttrCase<"QC_Adreno", 500, "adreno">;
 
@@ -124,7 +125,7 @@ def VK_TargetArchAttr : VK_I32Enum<
   "TargetTripleArch", "recognized target architecture", [
     VK_TTA_Unknown, VK_TTA_CPU, VK_TTA_RDNAv1, VK_TTA_RDNAv2,
     VK_TTA_RDNAv3, VK_TTA_M1, VK_TTA_Valhall, VK_TTA_Turing, VK_TTA_Ampere,
-    VK_TTA_Adreno,
+    VK_TTA_Pascal, VK_TTA_Adreno,
   ]>;
 
 def VK_TTP_Unknown     : I32EnumAttrCase<"Unknown", 0, "unknown">;
