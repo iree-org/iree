@@ -50,7 +50,7 @@ SKIP_PATH_PATTERNS = [
 RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
-BENCHMARK_PRESET_OPTIONS = ["all", "cuda"]
+BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64"]
 
 
 def skip_path(path: str) -> bool:

@@ -37,6 +37,15 @@ if [[ "${DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
         --run_config="${RUN_CONFIG}" \
         --output="${BENCHMARK_RESULTS}" \
         --verbose
+elif [[ "${DEVICE_NAME}" == "c2-standard-16" ]]; then
+  ${DOCKER_WRAPPER} \
+    gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
+      ./build_tools/benchmarks/run_benchmarks_on_linux.py \
+        --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
+        --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
+        --run_config="${RUN_CONFIG}" \
+        --output="${BENCHMARK_RESULTS}" \
+        --verbose
 else
   echo "${DEVICE_NAME} is not supported yet."
   exit 1
