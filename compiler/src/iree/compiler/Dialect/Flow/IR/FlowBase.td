@@ -156,4 +156,23 @@ def FLOW_Dummy1 : AttrDef<Flow_Dialect, "Dummy", []> {
   let mnemonic = "dummy";
 }
 
+//===----------------------------------------------------------------------===//
+// Flow channel type
+//===----------------------------------------------------------------------===//
+
+def FLOW_Channel : TypeDef<Flow_Dialect, "Channel", []> {
+  let mnemonic = "channel";
+  let summary = [{a collecive communication channel}];
+  let description = [{
+    Represents a single participant in a collective clique. Multiple channels
+    may exist within the same program to allow for partial operations or
+    hierarchical operations.
+
+    In programs that have already been partitioned prior to being compiled there
+    will often exist only one channel and `flow.channel.default` can be used
+    to reference it. In programs that model SPMD behavior internally channels
+    can be created or provided by hosting applications.
+  }];
+}
+
 #endif  // IREE_DIALECT_FLOW_BASE

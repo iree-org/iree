@@ -1545,6 +1545,30 @@ void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
           context);
 }
 
+//===----------------------------------------------------------------------===//
+// flow.channel.count
+//===----------------------------------------------------------------------===//
+void ChannelCountOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "channel_count");
+}
+
+//===----------------------------------------------------------------------===//
+// flow.channel.default
+//===----------------------------------------------------------------------===//
+void ChannelDefaultOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "channel_default");
+}
+
+//===----------------------------------------------------------------------===//
+// flow.channel.rank
+//===----------------------------------------------------------------------===//
+void ChannelRankOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "channel_rank");
+}
+
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

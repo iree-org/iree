@@ -1304,4 +1304,69 @@ def FLOW_DispatchWorkgroupCountFromSetEncodingOp :
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// Collective communication ops
+//===----------------------------------------------------------------------===//
+
+def FLOW_ChannelDefaultOp : FLOW_Op<"channel.default", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+]> {
+  let summary = [{returns a default collective communication channel}];
+  let description = [{
+    Returns a channel initialized using the runtime environment.
+  }];
+
+  let results = (outs
+    FLOW_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def FLOW_ChannelRankOp : FLOW_Op<"channel.rank", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the rank of the local participant in the group}];
+  let description = [{
+    Returns the rank the channel represents as a participant in a collective
+    group in `[0, count)`.
+  }];
+
+  let arguments = (ins
+    FLOW_Channel:$channel
+  );
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{
+     $channel `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def FLOW_ChannelCountOp : FLOW_Op<"channel.count", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the total number of participants in the group}];
+  let description = [{
+    Returns the total participant count in the collective communicator group.
+  }];
+
+  let arguments = (ins
+    FLOW_Channel:$channel
+  );
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{
+    $channel `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
 #endif  // IREE_DIALECT_FLOW_OPS
