@@ -20,6 +20,8 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/Support/LogicalResult.h"
 
 using namespace mlir;
 
@@ -101,6 +103,30 @@ Value mlir::iree_compiler::buildDistributeVectors(ImplicitLocOpBuilder &b,
 //===----------------------------------------------------------------------===//
 
 namespace {
+/// Structure to hold the parameters related to GPU reduction strategy.
+struct GPUReductionBlockStrategy {
+  explicit GPUReductionBlockStrategy(
+      MLIRContext *context,
+      const transform_ext::MatchedReductionCaptures &captures)
+      : context(context), captures(captures) {
+    auto blockX =
+        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimX);
+    auto blockY =
+        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimY);
+    auto blockZ =
+        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimZ);
+    allBlockAttrs = SmallVector<Attribute>{blockX, blockY, blockZ};
+  }
+
+  /// Constructor quantities.
+  MLIRContext *context;
+  transform_ext::MatchedReductionCaptures captures;
+
+  /// Derived quantities.
+  SmallVector<Attribute> allBlockAttrs;
+  // Tile sizes for the workgroup / determines grid size.
+  SmallVector<int64_t> workgroupTileSizes;
+};
 
 /// Encodes a strategy for a 1-d reduction mapped to a block.
 ///
@@ -137,33 +163,35 @@ namespace {
 ///
 // TODO: Support various elemental types.
 // TODO: Split to ensure 4 on most of the problem and use a 1-epilogue.
-class ReductionStrategy3StageThreadDistribution {
+class ReductionStrategyStagedThreadDistribution
+    : public GPUReductionBlockStrategy {
  public:
-  ReductionStrategy3StageThreadDistribution() = default;
-  ReductionStrategy3StageThreadDistribution(int64_t reductionDimensionSize,
-                                            int64_t maxNumThreadsToUse,
-                                            int64_t warpShuffleSize) {
-    compute(reductionDimensionSize, maxNumThreadsToUse, warpShuffleSize);
+  ReductionStrategyStagedThreadDistribution(
+      MLIRContext *context,
+      const transform_ext::MatchedReductionCaptures &captures,
+      int64_t maxNumThreadsToUse, int64_t warpShuffleSize)
+      : GPUReductionBlockStrategy(context, captures) {
+    compute(maxNumThreadsToUse, warpShuffleSize);
   }
-  ReductionStrategy3StageThreadDistribution(
-      const ReductionStrategy3StageThreadDistribution &) = default;
+  ReductionStrategyStagedThreadDistribution(
+      const ReductionStrategyStagedThreadDistribution &) = default;
 
-  ReductionStrategy3StageThreadDistribution &operator=(
-      const ReductionStrategy3StageThreadDistribution &) = default;
+  ReductionStrategyStagedThreadDistribution &operator=(
+      const ReductionStrategyStagedThreadDistribution &) = default;
 
-  int64_t getVectorSizeStage1() { return vectorSizeStage1; }
+  int64_t getVectorSizeStage1() const { return vectorSizeStage1; }
 
-  int64_t getNumThreadsXInBlock() { return reductionTileSizeStage1; }
-  int64_t getNumThreadsYInBlock() { return 1; }
-  int64_t getNumThreadsZInBlock() { return 1; }
-  std::array<int64_t, 3> getNumThreadsInBlock() {
+  int64_t getNumThreadsXInBlock() const { return reductionTileSizeStage1; }
+  int64_t getNumThreadsYInBlock() const { return 1; }
+  int64_t getNumThreadsZInBlock() const { return 1; }
+  std::array<int64_t, 3> getNumThreadsInBlock() const {
     return {getNumThreadsXInBlock(), getNumThreadsYInBlock(),
             getNumThreadsZInBlock()};
   }
 
-  bool hasStage2() { return reductionTileSizeStage2.has_value(); }
-  int64_t getWarpShuffleSize() { return reductionTileSizeStage2.value(); }
-  int64_t getVectorSizeStage2() { return vectorSizeStage2.value(); }
+  bool hasStage2() const { return reductionTileSizeStage2.has_value(); }
+  int64_t getWarpShuffleSize() const { return reductionTileSizeStage2.value(); }
+  int64_t getVectorSizeStage2() const { return vectorSizeStage2.value(); }
 
  private:
   /// Maximal vector size (among {1, 2, 4}) that divides the
@@ -188,13 +216,11 @@ class ReductionStrategy3StageThreadDistribution {
   /// memory consumption.
   // TODO: Characterize shared memory consumption and limit for good occupancy.
   // TODO: Support various elemental types.
-  void compute(int64_t reductionDimensionSize, int64_t maxNumThreadsToUse,
-               int64_t warpShuffleSize);
+  void compute(int64_t maxNumThreadsToUse, int64_t warpShuffleSize);
 };
 
-void ReductionStrategy3StageThreadDistribution::compute(
-    int64_t reductionDimensionSize, int64_t maxNumThreadsToUse,
-    int64_t warpShuffleSize) {
+void ReductionStrategyStagedThreadDistribution::compute(
+    int64_t maxNumThreadsToUse, int64_t warpShuffleSize) {
   assert(warpShuffleSize > 0 && "warpShuffleSize must > 0");
   assert(warpShuffleSize % iree_compiler::kCudaWarpSize == 0 &&
          "warpShuffleSize must be a multiple of warpSize");
@@ -204,6 +230,7 @@ void ReductionStrategy3StageThreadDistribution::compute(
   // Stage 1.
   // Maximal vector size that divides the problem size.
   // TODO: Split to ensure 4 on most of the problem and use a 1-epilogue.
+  int64_t reductionDimensionSize = captures.reductionDimensionSize;
   if (reductionDimensionSize > 0 && reductionDimensionSize % 4 == 0)
     vectorSizeStage1 = 4;
   else if (reductionDimensionSize > 0 && reductionDimensionSize % 2 == 0)
@@ -241,58 +268,17 @@ void ReductionStrategy3StageThreadDistribution::compute(
   }
 }
 
-/// Structure to hold the parameters related to GPU reduction strategy.
-struct GPUReductionStrategyInfos {
-  explicit GPUReductionStrategyInfos(
-      MLIRContext *context, transform_ext::MatchedReductionCaptures captures)
-      : context(context),
-        reductionRank(captures.reductionRank),
-        reductionDimensionSize(captures.reductionDimensionSize),
-        maybeLeadingRank(captures.maybeLeadingRank),
-        maybeTrailingRank(captures.maybeTrailingRank) {
-    auto blockX =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimX);
-    auto blockY =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimY);
-    auto blockZ =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimZ);
-    allBlockAttrs = SmallVector<Attribute>{blockX, blockY, blockZ};
-  }
-
-  void computeThreadDistribution(int64_t maxNumThreads,
-                                 int64_t warpShuffleSize) {
-    threadDistribution3Stages =
-        std::make_unique<ReductionStrategy3StageThreadDistribution>(
-            reductionDimensionSize, maxNumThreads, warpShuffleSize);
-  }
-
-  /// Constructor quantities.
-  MLIRContext *context;
-  int64_t reductionRank;
-  int64_t reductionDimensionSize;
-  int64_t maybeLeadingRank;
-  int64_t maybeTrailingRank;
-
-  /// Derived quantities.
-  std::unique_ptr<ReductionStrategy3StageThreadDistribution>
-      threadDistribution3Stages;
-  SmallVector<Attribute> allBlockAttrs;
-  // Tile sizes for the workgroup / determines grid size.
-  SmallVector<int64_t> workgroupTileSizes;
-  // Launch bounds for the workgroups / block size.
-  std::array<int64_t, 3> workgroupSize;
-};
 }  // namespace
 
 static std::tuple<Value, Value, Value> createReductionStrategyBlockDistribution(
     ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
-    Value maybeTrailingH, const GPUReductionStrategyInfos &infos) {
+    Value maybeTrailingH, const GPUReductionBlockStrategy &strategy) {
   auto pdlOperation = pdl::OperationType::get(b.getContext());
   auto fusionTargetSelector = b.create<TakeFirstOp>(
       pdlOperation, pdlOperation, ArrayRef<Value>{maybeTrailingH, reductionH});
   Value fusionTargetH = fusionTargetSelector.getFirst();
   Value fusionGroupH = fusionTargetSelector.getRest();
-  ArrayRef<Attribute> allBlocksRef(infos.allBlockAttrs);
+  ArrayRef<Attribute> allBlocksRef(strategy.allBlockAttrs);
   iree_compiler::TileToForeachThreadAndFuseAndDistributeResult tileResult =
       iree_compiler::
           buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
@@ -300,11 +286,12 @@ static std::tuple<Value, Value, Value> createReductionStrategyBlockDistribution(
               /*rootH=*/fusionTargetH,
               /*opsToFuseH=*/fusionGroupH,
               /*tileSizes=*/
-              getAsOpFoldResult(b.getI64ArrayAttr(infos.workgroupTileSizes)),
+              getAsOpFoldResult(b.getI64ArrayAttr(strategy.workgroupTileSizes)),
               /*threadDimMapping=*/
-              b.getArrayAttr(allBlocksRef.take_front(infos.reductionRank - 1)));
+              b.getArrayAttr(allBlocksRef.take_front(
+                  strategy.captures.reductionRank - 1)));
   fillH = b.create<FuseIntoContainingOp>(fillH, tileResult.foreachThreadH);
-  if (infos.maybeLeadingRank > 0) {
+  if (strategy.captures.maybeLeadingRank > 0) {
     maybeLeadingH = b.create<FuseIntoContainingOp>(maybeLeadingH,
                                                    tileResult.foreachThreadH);
   }
@@ -323,7 +310,7 @@ static std::tuple<Value, Value, Value> createReductionStrategyBlockDistribution(
 }
 
 static std::tuple<Value, Value, Value>
-createReductionStrategy3StageThreadDistributionStep(
+createReductionStrategyStagedThreadDistributionStep(
     ImplicitLocOpBuilder &b, Value gridReductionH, int64_t reductionRank,
     int64_t reductionTileSizeStage, int64_t reductionVectorSize) {
   auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
@@ -381,33 +368,32 @@ static void createElementwiseStrategyThreadStep(ImplicitLocOpBuilder &b,
       b.getArrayAttr({threadX}));
 }
 
-static void createReductionStrategy3StageThreadDistribution(
+static void createReductionStrategyStagedThreadDistribution(
     ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledLeadingH,
-    Value maybeTiledTrailingH, const GPUReductionStrategyInfos &infos) {
+    Value maybeTiledTrailingH,
+    const ReductionStrategyStagedThreadDistribution &strategy) {
   // Map the potential maybeTiledLeadingH.
   // TODO: Consider fusing leading elementwise into threads.
-  if (infos.maybeLeadingRank > 0) {
-    createElementwiseStrategyThreadStep(
-        b, maybeTiledLeadingH, infos.maybeLeadingRank,
-        infos.threadDistribution3Stages->getNumThreadsXInBlock());
+  if (strategy.captures.maybeLeadingRank > 0) {
+    createElementwiseStrategyThreadStep(b, maybeTiledLeadingH,
+                                        strategy.captures.maybeLeadingRank,
+                                        strategy.getNumThreadsXInBlock());
   }
 
   // Staged reduction step 1: break gridReductionH apart.
   auto [blockParallelForeachThreadOp, blockParallelFillH, blockCombinerOpH] =
-      createReductionStrategy3StageThreadDistributionStep(
-          b, gridReductionH, infos.reductionRank,
-          infos.threadDistribution3Stages->getNumThreadsXInBlock(),
-          infos.threadDistribution3Stages->getVectorSizeStage1());
+      createReductionStrategyStagedThreadDistributionStep(
+          b, gridReductionH, strategy.captures.reductionRank,
+          strategy.getNumThreadsXInBlock(), strategy.getVectorSizeStage1());
 
   // Staged reduction step 2: break blockCombinerOpH apart.
   // Note, if necessary, we could have additional intermediate steps.
   Value warpParallelForeachThreadOp, warpParallelFillH, warpCombinerOpH;
-  if (infos.threadDistribution3Stages->hasStage2()) {
+  if (strategy.hasStage2()) {
     std::tie(warpParallelForeachThreadOp, warpParallelFillH, warpCombinerOpH) =
-        createReductionStrategy3StageThreadDistributionStep(
-            b, blockCombinerOpH, infos.reductionRank,
-            infos.threadDistribution3Stages->getWarpShuffleSize(),
-            infos.threadDistribution3Stages->getVectorSizeStage1());
+        createReductionStrategyStagedThreadDistributionStep(
+            b, blockCombinerOpH, strategy.captures.reductionRank,
+            strategy.getWarpShuffleSize(), strategy.getVectorSizeStage1());
   } else {
     warpCombinerOpH = blockCombinerOpH;
   }
@@ -422,19 +408,19 @@ static void createReductionStrategy3StageThreadDistribution(
       b.getArrayAttr(threadY));
 
   // Map the potential maybeTiledTrailingH.
-  if (infos.maybeTrailingRank > 0) {
-    createElementwiseStrategyThreadStep(
-        b, maybeTiledTrailingH, infos.maybeTrailingRank,
-        infos.threadDistribution3Stages->getNumThreadsXInBlock());
+  if (strategy.captures.maybeTrailingRank > 0) {
+    createElementwiseStrategyThreadStep(b, maybeTiledTrailingH,
+                                        strategy.captures.maybeTrailingRank,
+                                        strategy.getNumThreadsXInBlock());
   }
 }
 
 /// Builds the transform IR tiling reductions for CUDA targets. Supports
 /// reductions in the last dimension, with optional leading and trailing
 /// elementwise operations.
-static void createReductionCudaStrategy(
+static void createCudaReductionStrategyStagedThreadDistribution(
     ImplicitLocOpBuilder &b, Value variantH,
-    const GPUReductionStrategyInfos &infos) {
+    const ReductionStrategyStagedThreadDistribution &strategy) {
   // Step 1. Call the matcher. Note that this is the same matcher as used to
   // trigger this compilation path, so it must always apply.
   b.create<RegisterMatchCallbacksOp>();
@@ -447,13 +433,13 @@ static void createReductionCudaStrategy(
   // single block/workgroup. Keep everything fused.
   auto [maybeLeadingHFused, gridReductionH, maybeTiledTrailingH] =
       createReductionStrategyBlockDistribution(
-          b, maybeLeadingH, fillH, reductionH, maybeTrailingH, infos);
+          b, maybeLeadingH, fillH, reductionH, maybeTrailingH, strategy);
   maybeLeadingH = maybeLeadingHFused;
 
   // Step 3. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
-  createReductionStrategy3StageThreadDistribution(
-      b, gridReductionH, maybeLeadingH, maybeTiledTrailingH, infos);
+  createReductionStrategyStagedThreadDistribution(
+      b, gridReductionH, maybeLeadingH, maybeTiledTrailingH, strategy);
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
@@ -465,8 +451,8 @@ static void createReductionCudaStrategy(
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH =
-      iree_compiler::buildMapToBlockAndThreads(b, funcH, infos.workgroupSize);
+  funcH = iree_compiler::buildMapToBlockAndThreads(
+      b, funcH, strategy.getNumThreadsInBlock());
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   iree_compiler::buildDistributeVectors(b, variantH, funcH);
@@ -500,38 +486,40 @@ static GPUReductionConfig getReductionConfigRTX2080Ti(
   return GPUReductionConfig{maxNumThreads, warpShuffleSize};
 }
 
-static FailureOr<GPUReductionStrategyInfos> matchGPUReduction(
-    linalg::LinalgOp op) {
+static ReductionStrategyStagedThreadDistribution
+configureGPUReductionStrategyStagedThreadDistribution(
+    MLIRContext *context,
+    const transform_ext::MatchedReductionCaptures &captures) {
+  GPUReductionConfig gpuReductionConfig = getReductionConfigRTX2080Ti(captures);
+  ReductionStrategyStagedThreadDistribution strategy(
+      context, captures, gpuReductionConfig.maxNumThreads,
+      gpuReductionConfig.warpShuffleSize);
+
+  // Tile all the parallel dimensions to 1 and create many blocks.
+  int64_t numParallelLoops = strategy.captures.reductionRank - 1;
+  strategy.workgroupTileSizes.append(numParallelLoops, 1);
+  return strategy;
+}
+
+LogicalResult iree_compiler::matchAndSetGPUReductionTransformStrategy(
+    func::FuncOp entryPoint, linalg::LinalgOp op) {
+  // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher reduction, fill, leading, trailing;
   transform_ext::MatchedReductionCaptures captures;
   makeReductionMatcher(reduction, fill, leading, trailing, captures);
   if (!matchPattern(op, reduction)) return failure();
 
-  GPUReductionStrategyInfos infos(op->getContext(), captures);
-  GPUReductionConfig gpuReductionConfig = getReductionConfigRTX2080Ti(captures);
-  infos.computeThreadDistribution(gpuReductionConfig.maxNumThreads,
-                                  gpuReductionConfig.warpShuffleSize);
-
-  // Tile all the parallel dimensions to 1 and create many blocks.
-  // TODO: Better strategy for very small reductions requires tiling across
-  // other dimensions than threadIdx.x.
-  int64_t numParallelLoops = captures.reductionRank - 1;
-  infos.workgroupTileSizes.append(numParallelLoops, 1);
-  // Tile and distribute the reduction across `reductionTileSizeStage1`
-  // threads.
-  infos.workgroupSize = infos.threadDistribution3Stages->getNumThreadsInBlock();
-  return infos;
-}
-
-LogicalResult iree_compiler::matchAndSetGPUReductionTransformStrategy(
-    func::FuncOp entryPoint, linalg::LinalgOp op) {
-  // 1. Match.
-  FailureOr<GPUReductionStrategyInfos> maybeInfos = matchGPUReduction(op);
-  if (failed(maybeInfos)) return failure();
+  // 2. Construct the configuration and the strategy builder.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    return createReductionCudaStrategy(b, variant, *maybeInfos);
+    // TODO: Better strategy for very small reductions.
+    ReductionStrategyStagedThreadDistribution strategy =
+        configureGPUReductionStrategyStagedThreadDistribution(op->getContext(),
+                                                              captures);
+    return createCudaReductionStrategyStagedThreadDistribution(b, variant,
+                                                               strategy);
   };
-  // 2. Add the strategy.
+
+  // 3. Build strategy embedded into the IR.
   createTransformRegion(entryPoint, strategyBuilder);
   return success();
 }
