@@ -40,6 +40,7 @@ spirv::Vendor getVendor(const TargetTriple &triple) {
       return spirv::Vendor::Apple;
     case TargetTripleArch::NV_Turing:
     case TargetTripleArch::NV_Ampere:
+    case TargetTripleArch::NV_Pascal:
       return spirv::Vendor::NVIDIA;
     case TargetTripleArch::QC_Adreno:
       return spirv::Vendor::Qualcomm;
@@ -68,6 +69,7 @@ spirv::DeviceType getDeviceType(const TargetTriple &triple) {
     case TargetTripleArch::AMD_RDNAv3:
     case TargetTripleArch::NV_Turing:
     case TargetTripleArch::NV_Ampere:
+    case TargetTripleArch::NV_Pascal:
       return spirv::DeviceType::DiscreteGPU;
     case TargetTripleArch::Apple_M1:
     case TargetTripleArch::ARM_Valhall:
@@ -381,6 +383,29 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
           /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
           /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope));
     } break;
+    case TargetTripleArch::NV_Pascal:
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=17937
+      maxComputeSharedMemorySize = 49152;
+      maxComputeWorkGroupInvocations = 1536;
+      maxComputeWorkGroupSize = {1536, 1024, 64};
+
+      subgroupSize = 32, minSubgroupSize = 32, maxSubgroupSize = 32;
+      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                         SubgroupFeature::Shuffle |
+                         SubgroupFeature::ShuffleRelative |
+                         SubgroupFeature::Clustered | SubgroupFeature::Quad;
+
+      shaderFloat16 = shaderFloat64 = true;
+      shaderInt8 = shaderInt16 = shaderInt64 = true;
+
+      storageBuffer16BitAccess = storagePushConstant16 = true;
+      uniformAndStorageBuffer16BitAccess = true;
+      storageBuffer8BitAccess = true, storagePushConstant8 = true;
+      uniformAndStorageBuffer8BitAccess = true;
+
+      variablePointers = variablePointersStorageBuffer = true;
+      break;
     case TargetTripleArch::QC_Adreno:
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983 (11)
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=16312 (12)
