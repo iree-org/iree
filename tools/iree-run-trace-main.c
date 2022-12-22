@@ -17,8 +17,6 @@
 #include "iree/tooling/yaml_util.h"
 #include "iree/vm/api.h"
 
-IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
-
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
