@@ -5,9 +5,9 @@
 
 static void versionPrinter(llvm::raw_ostream &os) {
   os << "IREE (https://iree-org.github.io/):\n  ";
-  std::string version = mlir::iree_compiler::getIreeRevision()
+  std::string version = mlir::iree_compiler::getIreeRevision();
   if (version.empty()) {
-    version = "(unknown)"
+    version = "(unknown)";
   }
   os << "IREE compiler version " << version << "\n  ";
   os << "LLVM version " << LLVM_VERSION_STRING << "\n  ";

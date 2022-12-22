@@ -4,12 +4,25 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+bool_flag(
+    name = "IREE_EMBEDDED_RELEASE_INFO",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "embedding_enabled",
+    flag_values = {
+        ":IREE_EMBEDDED_RELEASE_INFO": "True",
+    },
 )
 
 cc_library(
@@ -38,7 +51,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "init_iree",
     srcs = [
         "init_iree.cc",
@@ -210,4 +223,11 @@ iree_compiler_cc_library(
     name = "version",
     srcs = ["version.cc"],
     hdrs = ["version.h"],
+    local_defines = select({
+        ":embedding_enabled": [
+            "IREE_RELEASE_REVISION=\\\"$(IREE_RELEASE_REVISION)\\\"",
+            "IREE_RELEASE_VERSION=\\\"$(IREE_RELEASE_VERSION)\\\"",
+        ],
+        "//conditions:default": [],
+    })
 )
