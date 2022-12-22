@@ -13,6 +13,29 @@
 namespace mlir {
 namespace iree_compiler {
 
+//===----------------------------------------------------------------------===//
+// Low-level reusable builder APIs, these should follow MLIR-style builders.
+//===----------------------------------------------------------------------===//
+
+static constexpr unsigned kCudaWarpSize = 32;
+static constexpr unsigned kCudaMaxNumThreads = 1024;
+
+/// Post-bufferization mapping to blocks and threads.
+/// Takes a handle to a func.func and returns an updated handle to a
+/// func.func.
+Value buildMapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
+                                ArrayRef<int64_t> blockSize);
+
+/// Post-bufferization vector distribution with rank-reduction.
+/// Takes a handle to a func.func and returns an updated handle to a
+/// func.func.
+Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
+                             Value funcH, int64_t warpSize = kCudaWarpSize);
+
+//===----------------------------------------------------------------------===//
+// Higher-level problem-specific strategy creation APIs, these should favor
+// user-friendliness.
+//===----------------------------------------------------------------------===//
 /// Return success if the IR matches what the GPU reduction strategy can handle.
 /// If it is success it will append the transform dialect after the entry point
 /// module.
