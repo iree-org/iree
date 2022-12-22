@@ -45,6 +45,7 @@ using transform::SplitHandlesOp;
 using transform::SplitReductionOp;
 using transform::TileToForeachThreadOp;
 using transform::VectorizeOp;
+using transform_ext::TakeFirstOp;
 
 /// Matches `args` within `targetH` and unpacks a number of handles `N`.
 /// Assumes there are exactly `N` matched ops (but could be relaxed).
@@ -73,6 +74,15 @@ int64_t mlir::iree_compiler::nextMultipleOf(int64_t val, int64_t multiple) {
   return ((val + multiple - 1) / multiple) * multiple;
 }
 
+FailureOr<int64_t> mlir::iree_compiler::maxDivisorOfValueBelowLimit(
+    int64_t value, int64_t limit) {
+  assert(limit <= 1024 && "limit must be smaller than 1024");
+  // If either value or limit is <= 0, the loop is skipped and we fail.
+  for (int64_t i = std::min(value, limit); i > 1; --i)
+    if (value % i == 0) return i;
+  return failure();
+}
+
 //===----------------------------------------------------------------------===//
 // Low-level reusable builder APIs, these should follow MLIR-style builders.
 //===----------------------------------------------------------------------===//
@@ -82,6 +92,22 @@ void mlir::iree_compiler::buildPrint(ImplicitLocOpBuilder &b,
                                      ValueRange handles) {
   if (handles.empty()) b.create<PrintOp>();
   for (auto h : handles) b.create<PrintOp>(h);
+}
+
+/// Dynamically selects the first non-empty handle; i.e. if (h1, h2) is:
+///   - (non-empty, non-empty), returns (h1, h2)
+///   - (empty, non-empty), returns (h2, empty)
+///   - (non-empty, empty), returns (h1, empty)
+///   - (empty, empty), returns (empty, empty)
+/// This is used as a normalization operation that replaces conditionals, either
+/// in C++ or in transform IR.
+/// This can be thought of as a control-flow -> data-dependent conversion.
+std::pair<Value, Value> mlir::iree_compiler::buildSelectFirstNonEmpty(
+    ImplicitLocOpBuilder &b, Value handle1, Value handle2) {
+  auto pdlOperation = pdl::OperationType::get(b.getContext());
+  auto selector = b.create<TakeFirstOp>(pdlOperation, pdlOperation,
+                                        ArrayRef<Value>{handle1, handle2});
+  return std::make_pair(selector.getFirst(), selector.getRest());
 }
 
 mlir::iree_compiler::TileToScfForAndFuseResult

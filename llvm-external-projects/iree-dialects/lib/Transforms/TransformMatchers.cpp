@@ -435,8 +435,8 @@ void transform_ext::makeReductionMatcher(
   // The core part of the matcher is anchored on a particular reduction op.
   reduction =
       m_StructuredOp()
-          // Op has at least a parallel a reduction dimension and at most 3
-          // parallel dimensions.
+          // Op has at least a parallel a reduction dimension and at
+          // most 3 parallel dimensions.
           // TODO: relax once we have global collapse/expand_shape.
           //
           .rank(NumGreaterEqualTo(2))
@@ -444,6 +444,8 @@ void transform_ext::makeReductionMatcher(
           .rank(CaptureStaticValue<int64_t>(captures.reductionRank))
           // Op has a single most-minor reduction that we capture.
           .dim(-1, utils::IteratorType::reduction)
+          .dim(-2, CaptureStaticValue<int64_t>(
+                       captures.mostMinorParallelDimensionSize))
           .dim(-1, CaptureStaticValue<int64_t>(captures.reductionDimensionSize))
           // All other dimensions are parallel.
           .dim(AllDimsExcept({-1}), utils::IteratorType::parallel)
