@@ -20,7 +20,7 @@ iree_cc_library(
     "Loader.cpp"
   DEPS
     ${CMAKE_DL_LIBS}
-    iree::compiler::API2::Headers
+    iree::compiler::API2::EmbedHeaders
   PUBLIC
 )
 
