@@ -43,9 +43,10 @@ static iree_uk_status_t iree_uk_pack_validate(
     iree_uk_ssize_swap(&tile_size0, &tile_size1);
   }
   if (outer_size0 * tile_size0 < params->in_size0 ||
-      outer_size1 * tile_size1 < params->in_size1 ||
+      outer_size1 * tile_size1 < params->in_size1 /* ||
       (outer_size0 - 1) * tile_size0 >= params->in_size0 ||
-      (outer_size1 - 1) * tile_size1 >= params->in_size1) {
+      (outer_size1 - 1) * tile_size1 >= params->in_size1 */
+      /* TODO(#11632): reenable these conditions. */) {
     return iree_uk_status_shapes_mismatch;
   }
 #endif  // IREE_UK_ENABLE_VALIDATION
@@ -94,11 +95,18 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   bool l1_has_padding = outer_size1 * tile_size1 != params->in_size1;
   iree_uk_ssize_t l0_full_tile_end = outer_size0 - (l0_has_padding ? 1 : 0);
   iree_uk_ssize_t l1_full_tile_end = outer_size1 - (l1_has_padding ? 1 : 0);
+
+  // TODO(#11632): this fix-up is needed only because at the moment,
+  // there may actually be padding in more than just the last tile along each
+  // dimension, because dispatch region formation rounds small sizes up.
+  while (l0_full_tile_end * tile_size0 > params->in_size0) --l0_full_tile_end;
+  while (l1_full_tile_end * tile_size1 > params->in_size1) --l1_full_tile_end;
+
   for (iree_uk_ssize_t outer_i0 = 0; outer_i0 < outer_size0; ++outer_i0) {
     // If we're on the final iteration of outer loop 0 and there is padding,
     // set l1_full_tile_end to 0, so henceforth it is sufficient to check
     // against l1_full_tile_end to tell if we are padding.
-    if (outer_i0 == l0_full_tile_end) {
+    if (outer_i0 >= l0_full_tile_end) {
       l1_full_tile_end = 0;
     }
     // Handle full tiles, using the (fast) tile_func.
