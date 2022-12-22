@@ -32,6 +32,7 @@ iree_runtime_cc_library(
         "common.h",
         "mmt4d_types.h",
         "pack_types.h",
+        "query_tile_sizes_types.h",
         "unpack_types.h",
     ],
     deps = [
