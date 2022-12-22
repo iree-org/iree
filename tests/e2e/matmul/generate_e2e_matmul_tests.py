@@ -541,6 +541,12 @@ def parse_arguments():
       help=
       "Target requirements for this module. Comma-separated. As in -iree-llvm-target-cpu-features. If the target device does not meet all of the requirements, the test will be skipped.",
       required=False)
+  parser.add_argument(
+      "--target_backend",
+      type=str,
+      help=
+      "Target backend that the resulting bytecode module is expected to be compiled to.",
+      required=False)
   return parser.parse_args()
 
 
@@ -550,27 +556,33 @@ def write_code_file(function_definitions, filename):
       file.write(function_definitions[funcname] + "\n")
 
 
-def write_trace_file(traces, filename, module_path, requirements):
-  yaml_documents = [
-      {
-          "type": "context_load",
-      },
-      {
-          "type": "module_load",
-          "module": {
-              "name": "hal",
-              "type": "builtin",
-          }
-      },
-      {
-          "type": "module_load",
-          "module": {
-              "name": "module",
-              "type": "bytecode",
-              "path": os.path.relpath(module_path, os.path.dirname(filename))
-          }
-      },
-  ]
+def write_trace_file(traces, filename, module_path, requirements,
+                     target_backend):
+  yaml_documents = [{
+      "type": "context_load",
+  }, {
+      "type": "module_load",
+      "module": {
+          "name": "hal",
+          "type": "builtin",
+      }
+  }]
+  if target_backend == "vmvx":
+    yaml_documents.append({
+        "type": "module_load",
+        "module": {
+            "name": "vmvx",
+            "type": "builtin",
+        }
+    })
+  yaml_documents.append({
+      "type": "module_load",
+      "module": {
+          "name": "module",
+          "type": "bytecode",
+          "path": os.path.relpath(module_path, os.path.dirname(filename))
+      }
+  })
   if requirements:
     yaml_documents.append({
         "type": "requirements",
@@ -615,7 +627,7 @@ def main(args):
 
   write_code_file(function_definitions, args.output_code)
   write_trace_file(traces, args.output_trace, args.module_path,
-                   args.requirements)
+                   args.requirements, args.target_backend)
 
 
 if __name__ == "__main__":

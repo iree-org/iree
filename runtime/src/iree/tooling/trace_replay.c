@@ -18,6 +18,7 @@
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/bytecode_module.h"
+#include "runtime/src/iree/modules/vmvx/module.h"
 
 // Parameter for locally defined lcg similar to std::minstd_rand.
 #define IREE_PRNG_MULTIPLIER 48271
@@ -117,6 +118,10 @@ static iree_status_t iree_trace_replay_load_builtin_module(
     IREE_RETURN_IF_ERROR(iree_hal_module_create(
         replay->instance, replay->device, IREE_HAL_MODULE_FLAG_NONE,
         replay->host_allocator, &module));
+  } else if (iree_yaml_string_equal(name_node,
+                                    iree_make_cstring_view("vmvx"))) {
+    IREE_RETURN_IF_ERROR(iree_vmvx_module_create(
+        replay->instance, replay->host_allocator, &module));
   }
   if (!module) {
     return iree_make_status(
