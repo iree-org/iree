@@ -3,8 +3,8 @@
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb0(%arg0: !pdl.operation):
   %0 = pdl_match @match in %arg0 : (!pdl.operation) -> !pdl.operation
-  // expected-error@below {{expects iterator_interchange to be a permutation, found [1, 1]}}
-  transform.structured.interchange %0 {iterator_interchange = [1, 1]}
+  // expected-error@below {{expects iterator_interchange to be a permutation, found 1, 1}}
+  transform.structured.interchange %0 iterator_interchange = [1, 1]
 }
 
 // -----
