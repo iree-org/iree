@@ -229,5 +229,5 @@ iree_compiler_cc_library(
             "IREE_RELEASE_VERSION=\\\"$(IREE_RELEASE_VERSION)\\\"",
         ],
         "//conditions:default": [],
-    })
+    }),
 )
