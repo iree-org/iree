@@ -105,7 +105,33 @@ GlobalInit::GlobalInit(bool initializeCommandLine)
 struct Session {
   Session(GlobalInit &globalInit);
 
+  Error *setFlags(int argc, const char *const *argv) {
+    std::string errorMessage;
+    auto callback = [&](llvm::StringRef message) {
+      if (errorMessage.empty()) {
+        errorMessage = "Error parsing flags:";
+      }
+      errorMessage.append("\n  ");
+      errorMessage.append(message.data(), message.size());
+    };
+
+    if (failed(binder.parseArguments(argc, argv, callback))) {
+      return new Error(std::move(errorMessage));
+    }
+    return nullptr;
+  }
+
+  void getFlags(bool nonDefaultOnly,
+                void (*onFlag)(const char *flag, size_t length, void *),
+                void *userData) {
+    auto flagVector = binder.printArguments(nonDefaultOnly);
+    for (std::string &value : flagVector) {
+      onFlag(value.c_str(), value.size(), userData);
+    }
+  }
+
   GlobalInit &globalInit;
+  OptionsBinder binder;
   MLIRContext context;
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
@@ -119,7 +145,8 @@ struct Session {
 #endif
 };
 
-Session::Session(GlobalInit &globalInit) : globalInit(globalInit) {
+Session::Session(GlobalInit &globalInit)
+    : globalInit(globalInit), binder(OptionsBinder::local()) {
   context.allowUnregisteredDialects();
   context.appendDialectRegistry(globalInit.registry);
 
@@ -137,6 +164,17 @@ Session::Session(GlobalInit &globalInit) : globalInit(globalInit) {
     cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
 #endif
   }
+
+  // Register each options struct with the binder so we can manipulate
+  // mnemonically via the API.
+  bindingOptions.bindOptions(binder);
+  inputOptions.bindOptions(binder);
+  highLevelOptimizationOptions.bindOptions(binder);
+  schedulingOptions.bindOptions(binder);
+  halTargetOptions.bindOptions(binder);
+  vmTargetOptions.bindOptions(binder);
+  bytecodeTargetOptions.bindOptions(binder);
+  // TODO: Fix binder support for cTargetOptions.
 }
 
 struct Source {
@@ -211,6 +249,7 @@ Error *Source::split(void (*callback)(iree_compiler_source_t *source,
 
 struct Output {
   Error *openFile(const char *filePath);
+  Error *openFD(int fd);
   void keep();
 
   Error *getWriteError() {
@@ -233,6 +272,14 @@ Error *Output::openFile(const char *filePath) {
   if (!outputFile) {
     return new Error(std::move(err));
   }
+  outputStream = &outputFile->os();
+  return nullptr;
+}
+
+Error *Output::openFD(int fd) {
+  outputFile = std::make_unique<llvm::ToolOutputFile>("output_file", fd);
+  // Don't try to delete, etc.
+  outputFile->keep();
   outputStream = &outputFile->os();
   return nullptr;
 }
@@ -375,6 +422,7 @@ Error *Invocation::outputVMBytecode(Output &output) {
   if (failed(result)) {
     return new Error("failed to generate bytecode");
   }
+  output.outputStream->flush();
   return output.getWriteError();
 }
 
@@ -398,6 +446,7 @@ Error *Invocation::outputVMCSource(Output &output) {
   if (failed(result)) {
     return new Error("failed to generate bytecode");
   }
+  output.outputStream->flush();
   return output.getWriteError();
 #endif
 }
@@ -417,6 +466,7 @@ Error *Invocation::outputHALExecutable(Output &output) {
   auto binaryOp = binaryOps.front();
   auto rawData = binaryOp.getData().getRawData();
   output.outputStream->write(rawData.data(), rawData.size());
+  output.outputStream->flush();
   return output.getWriteError();
 }
 
@@ -524,6 +574,17 @@ void ireeCompilerSessionDestroy(iree_compiler_session_t *session) {
   delete unwrap(session);
 }
 
+iree_compiler_error_t *ireeCompilerSessionSetFlags(
+    iree_compiler_session_t *session, int argc, const char *const *argv) {
+  return wrap(unwrap(session)->setFlags(argc, argv));
+}
+
+void ireeCompilerSessionGetFlags(
+    iree_compiler_session_t *session, bool nonDefaultOnly,
+    void (*onFlag)(const char *flag, size_t length, void *), void *userData) {
+  unwrap(session)->getFlags(nonDefaultOnly, onFlag, userData);
+}
+
 iree_compiler_invocation_t *ireeCompilerInvocationCreate(
     iree_compiler_session_t *session) {
   return wrap(new Invocation(*unwrap(session)));
@@ -594,6 +655,13 @@ iree_compiler_error_t *ireeCompilerOutputOpenFile(
   auto output = new Output();
   *out_output = wrap(output);
   return wrap(output->openFile(filePath));
+}
+
+iree_compiler_error_t *ireeCompilerOutputOpenFD(
+    int fd, iree_compiler_output_t **out_output) {
+  auto output = new Output();
+  *out_output = wrap(output);
+  return wrap(output->openFD(fd));
 }
 
 void ireeCompileOutputKeep(iree_compiler_output_t *output) {

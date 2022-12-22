@@ -25,6 +25,7 @@ VER_0 {
     ireeCompilerOptionsGetFlags;
     ireeCompilerOptionsSetFlags;
     ireeCompilerOutputDestroy;
+    ireeCompilerOutputOpenFD;
     ireeCompilerOutputOpenFile;
     ireeCompilerOutputWrite;
     ireeCompilerRegisterAllDialects;
@@ -34,6 +35,8 @@ VER_0 {
     ireeCompilerRunMain;
     ireeCompilerSessionCreate;
     ireeCompilerSessionDestroy;
+    ireeCompilerSessionGetFlags;
+    ireeCompilerSessionSetFlags;
     ireeCompilerSourceDestroy;
     ireeCompilerSourceOpenFile;
     ireeCompilerSourceSplit;
