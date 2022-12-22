@@ -45,6 +45,8 @@ elif [[ "${DEVICE_NAME}" == "c2-standard-16" ]]; then
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
         --run_config="${RUN_CONFIG}" \
         --output="${BENCHMARK_RESULTS}" \
+        --device_model=GCP-c2-standard-16 \
+        --cpu_uarch=CascadeLake \
         --verbose
 else
   echo "${DEVICE_NAME} is not supported yet."
