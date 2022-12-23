@@ -246,13 +246,20 @@ def TransformDialectInterpreter :
     Option<"payloadRootTag", "payload-root-tag", "std::string",
             /*default=*/"\"\"",
             "Select the operation with 'transform.iree_tag' attribute having "
-            "the given value as payload root. If not provided, select the "
-            "pass anchor operation as payload root.">,
+            "the given value as payload IR root. This allows user control on "
+            "what operation to transform in debug mode, without requiring "
+            "intimate knowledge of the IREE nested pass pipeline.\\n"
+            "If empty (normal operation mode), select the pass anchor "
+            "operation in the IREE pipeline, as the payload IR root.">,
     Option<"transformRootTag", "transform-root-tag", "std::string",
             /*default=*/"\"\"",
             "Select the operation with 'transform.iree_tag' attribute having "
-            "the given value as container for top-level transform ops. If not "
-            "provided, select the container of top-level transform op.">
+            "the given value as container IR for top-level transform ops. This "
+            "allows user control on what transformation to apply in debug "
+            "mode, without requiring intimate knowledge of the IREE nested "
+            "pass pipeline.\\n"
+            "If empty (normal operation mode), select the container of the "
+            "top-level transform op.">
   ];
 }
 

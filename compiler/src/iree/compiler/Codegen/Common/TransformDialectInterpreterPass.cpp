@@ -145,22 +145,37 @@ class TransformDialectInterpreterPass
     Operation *target = getOperation();
     bool parsedTransform = (sharedTransformModule && *sharedTransformModule);
 
+    // Step 1
+    // ------
+    // Get the default payloadRoot and transformRegion that one expects
+    // when running the IREE nested pass pipeline or the interpreter.
+    Operation *payloadRoot = target;
     Region *transformRegion = nullptr;
-    if (!parsedTransform) {
+    // If a parsed transform was specified separately, use it immediately.
+    // Otherwise, the transform is embedded in the IR: go inspect the IR and
+    // get the first top-level transform we find.
+    if (parsedTransform) {
+      transformRegion = &(*sharedTransformModule)->getRegion();
+    } else {
+      // TODO: In large IR we will likely want more control in selecting a
+      // particular transform to focus on, this may warrant a user-specified
+      // attribute that one would manually injected in the IR when operating in
+      // interpreted mode.
       Operation *topLevelTransform = findTopLevelTransform(target);
       if (!topLevelTransform) return signalPassFailure();
       transformRegion = topLevelTransform->getParentRegion();
-    } else {
-      transformRegion = &(*sharedTransformModule)->getRegion();
     }
     assert(transformRegion && "unexpected detached root transform op");
 
-    Operation *payloadRoot = target;
-    if (payloadRootTag.empty()) {
-      target->setAttr(
-          kTransformIreeTagAttrName,
-          StringAttr::get(&getContext(), kTransformIreeTagPayloadRootValue));
-    } else {
+    // Step 2
+    // ------
+    // Optionally override payloadRoot if the payloadRootTag was passed.
+    //
+    // If payloadRootTag was passed, then we are in user-specified selection
+    // of the transformed IR. This corresponds to REPL debug mode.
+    // Otherwise, just apply to `target`, which is what the IREE nested
+    // pipeline wants to operate on.
+    if (!payloadRootTag.empty()) {
       payloadRoot = findOpWithTag(target, payloadRootTag);
       if (!payloadRoot) {
         target->emitError()
@@ -171,12 +186,15 @@ class TransformDialectInterpreterPass
       }
     }
 
-    if (transformRootTag.empty()) {
-      transformRegion->getParentOp()->setAttr(
-          kTransformIreeTagAttrName,
-          StringAttr::get(&getContext(),
-                          kTransformIreeTagTransformContainerValue));
-    } else {
+    // Step 3
+    // ------
+    // Optionally override transformRegion if the transformRootTag was passed.
+    //
+    // If transformRootTag was passed, then we are in user-specified
+    // selection of the transforming IR. This corresponds to REPL debug mode.
+    // Otherwise, just apply to the existing `transformRegion`, which is what
+    // the IREE nested pipeline wants to operate on.
+    if (!transformRootTag.empty()) {
       Operation *transformRoot =
           findOpWithTag(transformRegion->getParentOp(),
                         kTransformIreeTagTransformContainerValue);
@@ -196,28 +214,15 @@ class TransformDialectInterpreterPass
       transformRegion = &transformRoot->getRegion(0);
     }
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_STDERR, {
-      Operation *root = getRootOperation(target);
-      llvm::dbgs() << "=== Transform Interpreter Repro ===\n";
-      printIreeOptReproCall(llvm::dbgs() << "cat <<EOF | ",
-                            root->getName().getStringRef());
-      printModuleForRepro(llvm::dbgs(), root, transformRegion->getParentOp());
-      llvm::dbgs() << "\nEOF\n";
-      llvm::dbgs() << "===================================\n";
-    });
+    // Step 4
+    // ------
+    // Optionally perform debug actions requested by the user to dump IR and a
+    // repro to stderr and/or a fie.
+    performOptionalDebugActions(target, transformRegion);
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_FILE, {
-      saveReproToTempFile(llvm::dbgs(), target, transformRegion->getParentOp());
-    });
-
-    if (payloadRootTag.empty()) {
-      target->removeAttr(kTransformIreeTagAttrName);
-    }
-    if (transformRootTag.empty()) {
-      transformRegion->getParentOp()->removeAttr(
-          kTransformIreeTagTransformContainerValue);
-    }
-
+    // Step 5
+    // ------
+    // Apply the transform to the IR
     // TODO: lift this assertion.
     assert(transformRegion->getBlocks().size() == 1 &&
            "expected single-region block");
@@ -229,6 +234,45 @@ class TransformDialectInterpreterPass
   }
 
  private:
+  // Optionally perform debug actions requested by the user to dump IR and a
+  // repro to stderr and/or a fie.
+  void performOptionalDebugActions(Operation *target, Region *transformRegion) {
+    // Add temporary debug / repro attributes, these must never leak out.
+    if (payloadRootTag.empty()) {
+      target->setAttr(
+          kTransformIreeTagAttrName,
+          StringAttr::get(&getContext(), kTransformIreeTagPayloadRootValue));
+    }
+    if (!transformRootTag.empty()) {
+      transformRegion->getParentOp()->setAttr(
+          kTransformIreeTagAttrName,
+          StringAttr::get(&getContext(),
+                          kTransformIreeTagTransformContainerValue));
+    }
+
+    DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_STDERR, {
+      Operation *root = getRootOperation(target);
+      llvm::dbgs() << "=== Transform Interpreter Repro ===\n";
+      printIreeOptReproCall(llvm::dbgs() << "cat <<EOF | ",
+                            root->getName().getStringRef());
+      printModuleForRepro(llvm::dbgs(), root, transformRegion->getParentOp());
+      llvm::dbgs() << "\nEOF\n";
+      llvm::dbgs() << "===================================\n";
+    });
+    DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_FILE, {
+      saveReproToTempFile(llvm::dbgs(), target, transformRegion->getParentOp());
+    });
+
+    // Drop the temporary debug / repro attributes, these must never leak out.
+    if (transformRootTag.empty()) {
+      transformRegion->getParentOp()->removeAttr(
+          kTransformIreeTagTransformContainerValue);
+    }
+    if (payloadRootTag.empty()) {
+      target->removeAttr(kTransformIreeTagAttrName);
+    }
+  }
+
   /// Finds the single top-level transform operation with `root` as ancestor.
   /// Reports an error if there is more than one such operation and returns the
   /// first one found. Reports an error returns nullptr if no such operation
