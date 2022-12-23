@@ -95,14 +95,14 @@ llvm::cl::opt<bool> clCPUEnableTransformDialectJit(
     "iree-codegen-llvmcpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
-llvm::cl::opt<std::string> clCPUCodegenTransformDialectPayloadTag(
-    "iree-codegen-llvmcpu-transform-dialect-payload-tag",
+llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugPayloadTag(
+    "iree-codegen-llvmcpu-transform-dialect-debug-payload-tag",
     llvm::cl::desc("tag attribute value for the transform dialect interpreter "
                    "payload root operation"),
     llvm::cl::init(""));
 
-llvm::cl::opt<std::string> clCPUCodegenTransformDialectTransformTag(
-    "iree-codegen-llvmcpu-transform-dialect-transform-tag",
+llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugTransformTag(
+    "iree-codegen-llvmcpu-transform-dialect-debug-transform-tag",
     llvm::cl::desc(
         "tag attribute value for the transform dialect transform op container"),
     llvm::cl::init(""));

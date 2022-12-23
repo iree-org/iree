@@ -167,17 +167,18 @@ class TransformDialectInterpreterPass
     linalg::registerTransformDialectExtension(registry);
   }
 
-  TransformDialectInterpreterPass(StringRef transformFileName = StringRef(),
-                                  StringRef payloadRootTag = StringRef(),
-                                  StringRef transformRootTag = StringRef()) {
+  TransformDialectInterpreterPass(
+      StringRef transformFileName = StringRef(),
+      StringRef debugPayloadRootTag = StringRef(),
+      StringRef debugTransformRootTag = StringRef()) {
     this->transformFileName = transformFileName.str();
-    this->payloadRootTag = payloadRootTag.str();
-    this->transformRootTag = transformRootTag.str();
+    this->debugPayloadRootTag = debugPayloadRootTag.str();
+    this->debugTransformRootTag = debugTransformRootTag.str();
   }
   TransformDialectInterpreterPass(const TransformDialectInterpreterPass &pass) {
     this->transformFileName = pass.transformFileName;
-    this->payloadRootTag = pass.payloadRootTag;
-    this->transformRootTag = pass.transformRootTag;
+    this->debugPayloadRootTag = pass.debugPayloadRootTag;
+    this->debugTransformRootTag = pass.debugTransformRootTag;
     // TODO: if we really don't like shared_ptr, we could also clone the
     // transformModule here.
     sharedTransformModule = pass.sharedTransformModule;
@@ -262,13 +263,13 @@ llvm::raw_ostream &TransformDialectInterpreterPass::printIreeOptReproCall(
       "iree-opt "
       "--pass-pipeline=\"{0}(iree-transform-dialect-interpreter{{{1}={2} "
       "{3}={4}})\"",
-      rootOpName, payloadRootTag.getArgStr(),
-      payloadRootTag.empty() ? StringRef(kTransformIreeTagPayloadRootValue)
-                             : payloadRootTag,
-      transformRootTag.getArgStr(),
-      transformRootTag.empty()
+      rootOpName, debugPayloadRootTag.getArgStr(),
+      debugPayloadRootTag.empty() ? StringRef(kTransformIreeTagPayloadRootValue)
+                                  : debugPayloadRootTag,
+      debugTransformRootTag.getArgStr(),
+      debugTransformRootTag.empty()
           ? StringRef(kTransformIreeTagTransformContainerValue)
-          : transformRootTag);
+          : debugTransformRootTag);
   return os;
 }
 
@@ -320,12 +321,12 @@ void TransformDialectInterpreterPass::saveReproToTempFile(
 void TransformDialectInterpreterPass::performOptionalDebugActions(
     Operation *target, Region *transformRegion) {
   // Add temporary debug / repro attributes, these must never leak out.
-  if (payloadRootTag.empty()) {
+  if (debugPayloadRootTag.empty()) {
     target->setAttr(
         kTransformIreeTagAttrName,
         StringAttr::get(&getContext(), kTransformIreeTagPayloadRootValue));
   }
-  if (!transformRootTag.empty()) {
+  if (!debugTransformRootTag.empty()) {
     transformRegion->getParentOp()->setAttr(
         kTransformIreeTagAttrName,
         StringAttr::get(&getContext(),
@@ -346,11 +347,11 @@ void TransformDialectInterpreterPass::performOptionalDebugActions(
   });
 
   // Drop the temporary debug / repro attributes, these must never leak out.
-  if (transformRootTag.empty()) {
+  if (debugTransformRootTag.empty()) {
     transformRegion->getParentOp()->removeAttr(
         kTransformIreeTagTransformContainerValue);
   }
-  if (payloadRootTag.empty()) {
+  if (debugPayloadRootTag.empty()) {
     target->removeAttr(kTransformIreeTagAttrName);
   }
 }
@@ -384,15 +385,15 @@ void TransformDialectInterpreterPass::runOnOperation() {
 
   // Step 2
   // ------
-  // Optionally override payloadRoot if the payloadRootTag was passed.
+  // Optionally override payloadRoot if the debugPayloadRootTag was passed.
   //
-  // If payloadRootTag was passed, then we are in user-specified selection
+  // If debugPayloadRootTag was passed, then we are in user-specified selection
   // of the transformed IR. This corresponds to REPL debug mode.
   // Otherwise, just apply to `target`, which is what the IREE nested
   // pipeline wants to operate on.
-  if (!payloadRootTag.empty()) {
+  if (!debugPayloadRootTag.empty()) {
     payloadRoot =
-        findOpWithTag(target, kTransformIreeTagAttrName, payloadRootTag);
+        findOpWithTag(target, kTransformIreeTagAttrName, debugPayloadRootTag);
     if (!payloadRoot) {
       target->emitError() << "couldn't find the root payload op with "
                           << kTransformIreeTagAttrName << "=\""
@@ -404,13 +405,14 @@ void TransformDialectInterpreterPass::runOnOperation() {
 
   // Step 3
   // ------
-  // Optionally override transformRegion if the transformRootTag was passed.
+  // Optionally override transformRegion if the debugTransformRootTag was
+  // passed.
   //
-  // If transformRootTag was passed, then we are in user-specified
+  // If debugTransformRootTag was passed, then we are in user-specified
   // selection of the transforming IR. This corresponds to REPL debug mode.
   // Otherwise, just apply to the existing `transformRegion`, which is what
   // the IREE nested pipeline wants to operate on.
-  if (!transformRootTag.empty()) {
+  if (!debugTransformRootTag.empty()) {
     Operation *transformRoot =
         findOpWithTag(transformRegion->getParentOp(), kTransformIreeTagAttrName,
                       kTransformIreeTagTransformContainerValue);
@@ -453,10 +455,10 @@ namespace mlir {
 namespace iree_compiler {
 /// Create a Transform dialect interpreter pass.
 std::unique_ptr<Pass> createTransformDialectInterpreterPass(
-    llvm::StringRef transformFileName, llvm::StringRef payloadRootTag,
-    llvm::StringRef transformRootTag) {
+    llvm::StringRef transformFileName, llvm::StringRef debugPayloadRootTag,
+    llvm::StringRef debugTransformRootTag) {
   return std::make_unique<TransformDialectInterpreterPass>(
-      transformFileName, payloadRootTag, transformRootTag);
+      transformFileName, debugPayloadRootTag, debugTransformRootTag);
 }
 }  // namespace iree_compiler
 }  // namespace mlir

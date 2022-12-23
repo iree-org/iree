@@ -42,14 +42,14 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
 
-llvm::cl::opt<std::string> clGPUCodegenTransformDialectPayloadTag(
-    "iree-codegen-llvmgpu-transform-dialect-payload-tag",
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag(
+    "iree-codegen-llvmgpu-transform-dialect-debug-payload-tag",
     llvm::cl::desc("tag attribute value for the transform dialect interpreter "
                    "payload root operation"),
     llvm::cl::init(""));
 
-llvm::cl::opt<std::string> clGPUCodegenTransformDialectTransformTag(
-    "iree-codegen-llvmgpu-transform-dialect-transform-tag",
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
+    "iree-codegen-llvmgpu-transform-dialect-debug-transform-tag",
     llvm::cl::desc(
         "tag attribute value for the transform dialect transform op container"),
     llvm::cl::init(""));

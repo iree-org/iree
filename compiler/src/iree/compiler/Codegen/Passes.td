@@ -243,7 +243,7 @@ def TransformDialectInterpreter :
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
             "transform dialect operation somewhere in the module.">,
-    Option<"payloadRootTag", "payload-root-tag", "std::string",
+    Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",
             /*default=*/"\"\"",
             "Select the operation with 'transform.iree_tag' attribute having "
             "the given value as payload IR root. This allows user control on "
@@ -251,7 +251,7 @@ def TransformDialectInterpreter :
             "intimate knowledge of the IREE nested pass pipeline.\\n"
             "If empty (normal operation mode), select the pass anchor "
             "operation in the IREE pipeline, as the payload IR root.">,
-    Option<"transformRootTag", "transform-root-tag", "std::string",
+    Option<"debugTransformRootTag", "debug-transform-root-tag", "std::string",
             /*default=*/"\"\"",
             "Select the operation with 'transform.iree_tag' attribute having "
             "the given value as container IR for top-level transform ops. This "
