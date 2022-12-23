@@ -481,13 +481,6 @@ def Util_GlobalOp : Util_Op<"global", [
       "StringRef":$name,
       "bool":$isMutable,
       "Type":$type,
-      "TypedAttr":$initialValue,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
-    )>,
-    OpBuilder<(ins
-      "StringRef":$name,
-      "bool":$isMutable,
-      "Type":$type,
       "Optional<TypedAttr>":$initialValue,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     )>,

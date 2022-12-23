@@ -761,13 +761,6 @@ static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
 }
 
 void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
-                     bool isMutable, Type type, TypedAttr initialValue,
-                     ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type,
-        Optional<TypedAttr>(initialValue), attrs);
-}
-
-void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      bool isMutable, Type type,
                      Optional<TypedAttr> initialValue,
                      ArrayRef<NamedAttribute> attrs) {
