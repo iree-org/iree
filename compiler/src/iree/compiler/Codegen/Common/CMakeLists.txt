@@ -73,8 +73,6 @@ iree_cc_library(
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::Stream::IR
   PUBLIC
 )
 

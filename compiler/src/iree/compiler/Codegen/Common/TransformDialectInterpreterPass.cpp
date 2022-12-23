@@ -14,14 +14,10 @@
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-// TODO: Must we really take this dependence?
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensions.h"
-// TODO: Must we really take this dependence?
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-// TODO: Must we really take this dependence?
-#include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -108,36 +104,10 @@ static Operation *findOpWithTag(Operation *root, StringRef tagKey,
     // In debug mode, continue the traversal to see if the tag is not
     // duplicated.
 #ifndef NDEBUG
-    return WalkResult::interrupt();
+    return WalkResult::advance();
 #else
-    return WalkResult::advance();
+    return WalkResult::interrupt();
 #endif  // NDEBUG
-  });
-  return found;
-}
-
-// To make the flow compose with "iree-compile -compile-mode=hal-executable",
-// we must have a single HAL::ExecutablOp in the module **and** the
-// func::FuncOp that dispatches into it.
-// This helper traverses the IR to find this func::FuncOp.
-// TODO: revisit this filtering in the future.
-// TODO: there must be a better way than rolling our own manually and taking the
-// Stream dependence ..
-static func::FuncOp findFuncWithDispatchOfSymbol(Operation *root,
-                                                 StringRef symbolName) {
-  func::FuncOp found = nullptr;
-  root->walk([&](func::FuncOp funcOp) {
-    // TODO: Also handle Stream::AsyncDispatchOp ?
-    funcOp->walk([&](iree_compiler::IREE::Stream::CmdDispatchOp dispatchOp) {
-      if (dispatchOp.getEntryPoint().getRootReference().getValue() ==
-          symbolName) {
-        found = funcOp;
-        return WalkResult::interrupt();
-      }
-      return WalkResult::advance();
-    });
-    if (found) return WalkResult::interrupt();
-    return WalkResult::advance();
   });
   return found;
 }
@@ -253,22 +223,12 @@ class TransformDialectInterpreterPass
 
   /// Prints the CLI command running the repro with the current path.
   llvm::raw_ostream &printIreeOptReproCall(llvm::raw_ostream &os,
-                                           StringRef rootOpName,
-                                           StringRef filename = {});
+                                           StringRef rootOpName);
 
   /// Prints the module rooted at `root` to `os` and appends
-  /// `transformContainer` if it is not null and not nested under `root`.
-  llvm::raw_ostream &printModuleForRepro(
-      llvm::raw_ostream &os, Operation *root,
-      Operation *transformContainer = nullptr);
-
-  // To make the flow compose with "iree-compile -compile-mode=hal-executable",
-  // we must have a single HAL::ExecutablOp in the module **and** the
-  // func::FuncOp that dispatches into it.
-  // The uniqueness also makes sense for us because only one such op is tagged
-  // by the transform dialect repro.
-  // TODO: revisit this filtering in the future.
-  Operation *separateSingleExecutableModuleCloneForRepro(Operation *root);
+  /// `transformContainer` if it is not nested in `root`.
+  llvm::raw_ostream &printModuleForRepro(llvm::raw_ostream &os, Operation *root,
+                                         Operation *transformContainer);
 
   /// Saves the payload and the transform IR into a temporary file and reports
   /// the file name to `os`.
@@ -289,8 +249,8 @@ class TransformDialectInterpreterPass
   //      IREE stack. This may be only shift the problem as we have passes
   //      building pass managers in IREE.
   //   3. build better support to embed the transformation module in the
-  //      input IR and transport it to the place of use in IREE. This is
-  //      deemed too intrusive atm.
+  //      input IR and transport it to the place of use in IREE. This is deemed
+  //      too intrusive atm.
   //   4. (future) config/resources mechanism that is being proposed in core?
   std::shared_ptr<OwningOpRef<ModuleOp>> sharedTransformModule;
 };
@@ -298,23 +258,18 @@ class TransformDialectInterpreterPass
 
 /// Prints the CLI command running the repro with the current path.
 llvm::raw_ostream &TransformDialectInterpreterPass::printIreeOptReproCall(
-    llvm::raw_ostream &os, StringRef rootOpName, StringRef filename) {
-  os << "\n=== Transform Interpreter Repro ===\n";
+    llvm::raw_ostream &os, StringRef rootOpName) {
   os << llvm::formatv(
-            "iree-opt "
-            "--pass-pipeline=\"{0}(iree-transform-dialect-interpreter{{{1}={2} "
-            "{3}={4}})\"",
-            rootOpName, debugPayloadRootTag.getArgStr(),
-            debugPayloadRootTag.empty()
-                ? StringRef(kTransformIreeTagPayloadRootValue)
-                : debugPayloadRootTag,
-            debugTransformRootTag.getArgStr(),
-            debugTransformRootTag.empty()
-                ? StringRef(kTransformIreeTagTransformContainerValue)
-                : debugTransformRootTag)
-     << " " << filename << "\n";
-  os << "iree-compile -compile-mode=hal-executable " << filename << "\n";
-  os << "===================================\n";
+      "iree-opt "
+      "--pass-pipeline=\"{0}(iree-transform-dialect-interpreter{{{1}={2} "
+      "{3}={4}})\"",
+      rootOpName, debugPayloadRootTag.getArgStr(),
+      debugPayloadRootTag.empty() ? StringRef(kTransformIreeTagPayloadRootValue)
+                                  : debugPayloadRootTag,
+      debugTransformRootTag.getArgStr(),
+      debugTransformRootTag.empty()
+          ? StringRef(kTransformIreeTagTransformContainerValue)
+          : debugTransformRootTag);
   return os;
 }
 
@@ -323,48 +278,10 @@ llvm::raw_ostream &TransformDialectInterpreterPass::printIreeOptReproCall(
 llvm::raw_ostream &TransformDialectInterpreterPass::printModuleForRepro(
     llvm::raw_ostream &os, Operation *root, Operation *transformContainer) {
   root->print(os);
-  if (transformContainer && !root->isAncestor(transformContainer)) {
+  if (!root->isAncestor(transformContainer)) {
     transformContainer->print(os);
   }
   return os;
-}
-
-/// To make the flow compose with "iree-compile -compile-mode=hal-executable",
-/// we must have a single HAL::ExecutablOp in the module **and** the
-/// func::FuncOp that dispatches into it.
-/// The uniqueness also makes sense for us because only one such op is tagged by
-/// the transform dialect repro.
-// TODO: revisit this filtering in the future.
-// TODO: there must be a better way than rolling our own manually and taking the
-// HAL dependence ..
-Operation *
-TransformDialectInterpreterPass::separateSingleExecutableModuleCloneForRepro(
-    Operation *root) {
-  // Find the executableOp we want.
-  Operation *variantOp = findOpWithTag(root, kTransformIreeTagAttrName,
-                                       kTransformIreeTagPayloadRootValue);
-  assert(isa<iree_compiler::IREE::HAL::ExecutableVariantOp>(variantOp) &&
-         "must be a HAL::ExecutableOp op");
-  auto executableOp =
-      variantOp->getParentOfType<iree_compiler::IREE::HAL::ExecutableOp>();
-  assert(executableOp && "needs non-empty be a HAL::ExecutableOp op");
-
-  // Clone a version of root with only the executableOp we want.
-  Operation *rootOpWithSingleExecutable = root->cloneWithoutRegions();
-  Region &clonedRegion = rootOpWithSingleExecutable->getRegions().front();
-  assert(clonedRegion.empty() && "expected empty region");
-  OpBuilder b(root->getContext());
-  b.createBlock(&clonedRegion, clonedRegion.end());
-  b.clone(*executableOp);
-
-  // Also clone the func::FuncOp that dispatches into executableOp otherwise
-  // "iree-compile -compile-mode=hal-executable" crashes.
-  func::FuncOp executableCallingOp =
-      findFuncWithDispatchOfSymbol(root, executableOp.getSymName());
-  assert(executableCallingOp && "missing func::Func calling the executable op");
-  b.clone(*executableCallingOp);
-
-  return rootOpWithSingleExecutable;
 }
 
 /// Saves the payload and the transform IR into a temporary file and reports
@@ -384,9 +301,7 @@ void TransformDialectInterpreterPass::saveReproToTempFile(
   }
 
   llvm::raw_fd_ostream fout(tempFile->FD, /*shouldClose=*/false);
-  Operation *newRoot = separateSingleExecutableModuleCloneForRepro(root);
-  printModuleForRepro(fout, newRoot);
-  newRoot->erase();
+  printModuleForRepro(fout, root, transformContainer);
   fout.flush();
   std::string filename = tempFile->TmpName;
 
@@ -395,7 +310,10 @@ void TransformDialectInterpreterPass::saveReproToTempFile(
     return;
   }
 
-  printIreeOptReproCall(os, root->getName().getStringRef(), filename);
+  os << "=== Transform Interpreter Repro ===\n";
+  printIreeOptReproCall(os, root->getName().getStringRef())
+      << " " << filename << "\n";
+  os << "===================================\n";
 }
 
 // Optionally perform debug actions requested by the user to dump IR and a
@@ -408,7 +326,7 @@ void TransformDialectInterpreterPass::performOptionalDebugActions(
         kTransformIreeTagAttrName,
         StringAttr::get(&getContext(), kTransformIreeTagPayloadRootValue));
   }
-  if (debugTransformRootTag.empty()) {
+  if (!debugTransformRootTag.empty()) {
     transformRegion->getParentOp()->setAttr(
         kTransformIreeTagAttrName,
         StringAttr::get(&getContext(),
@@ -469,8 +387,8 @@ void TransformDialectInterpreterPass::runOnOperation() {
   // ------
   // Optionally override payloadRoot if the debugPayloadRootTag was passed.
   //
-  // If debugPayloadRootTag was passed, then we are in user-specified
-  // selection of the transformed IR. This corresponds to REPL debug mode.
+  // If debugPayloadRootTag was passed, then we are in user-specified selection
+  // of the transformed IR. This corresponds to REPL debug mode.
   // Otherwise, just apply to `target`, which is what the IREE nested
   // pipeline wants to operate on.
   if (!debugPayloadRootTag.empty()) {
