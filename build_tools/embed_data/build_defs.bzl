@@ -22,6 +22,7 @@ def c_embed_data(
         strip_prefix = None,
         flatten = False,
         identifier = None,
+        generator = None,
         **kwargs):
     """Embeds 'srcs' into a C module.
 
@@ -61,9 +62,11 @@ def c_embed_data(
       strip_prefix: Strips this verbatim prefix from filenames (in the TOC).
       flatten: Removes all directory components from filenames (in the TOC).
       identifier: The identifier to use in generated names (defaults to name).
+      generator: Overrides the 'generate_embed_data' generator target.
       **kwargs: Args to pass to the cc_library.
     """
-    generator = clean_dep("//build_tools/embed_data:generate_embed_data")
+    if not generator:
+        generator = "//build_tools/embed_data:generate_embed_data"
     generator_location = "$(location %s)" % generator
     if identifier == None:
         identifier = name

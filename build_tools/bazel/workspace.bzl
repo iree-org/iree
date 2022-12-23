@@ -8,6 +8,63 @@
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 load("@bazel_skylib//lib:paths.bzl", "paths")
 
+CUDA_TOOLKIT_ROOT_ENV_KEY = "IREE_CUDA_TOOLKIT_ROOT"
+
+# See base docker image: We place a stripped down CUDA directory tree
+# here if this env var is set on CI.
+CUDA_DEPS_DIR_FOR_CI_ENV_KEY = "IREE_CUDA_DEPS_DIR"
+
+def cuda_auto_configure_impl(repository_ctx):
+    env = repository_ctx.os.environ
+    found = False
+    cuda_toolkit_root = None
+
+    # Probe environment for CUDA toolkit location.
+    env_cuda_toolkit_root = env.get(CUDA_TOOLKIT_ROOT_ENV_KEY)
+    env_cuda_deps_dir_for_ci = env.get(CUDA_DEPS_DIR_FOR_CI_ENV_KEY)
+    if env_cuda_toolkit_root:
+        cuda_toolkit_root = env_cuda_toolkit_root
+        found = True
+    elif env_cuda_deps_dir_for_ci:
+        cuda_toolkit_root = env_cuda_deps_dir_for_ci
+        found = True
+
+    # Symlink the tree.
+    libdevice_rel_path = "iree_local/libdevice.bc"
+    if found:
+        # Symlink top-level directories we care about.
+        repository_ctx.symlink(cuda_toolkit_root + "/include", "include")
+
+        # TODO: Should be probing for the libdevice, as it can change from
+        # version to version.
+        repository_ctx.symlink(
+            cuda_toolkit_root + "/nvvm/libdevice/libdevice.10.bc",
+            libdevice_rel_path,
+        )
+
+    repository_ctx.template(
+        "BUILD",
+        Label("@iree_core//:build_tools/third_party/cuda/BUILD.template"),
+        {
+            "%ENABLED%": "True" if found else "False",
+            "%LIBDEVICE_REL_PATH%": libdevice_rel_path,
+        },
+    )
+
+cuda_auto_configure = repository_rule(
+    environ = [
+        CUDA_DEPS_DIR_FOR_CI_ENV_KEY,
+        CUDA_TOOLKIT_ROOT_ENV_KEY,
+    ],
+    implementation = cuda_auto_configure_impl,
+)
+
+def configure_iree_cuda_deps():
+    maybe(
+        cuda_auto_configure,
+        name = "iree_cuda",
+    )
+
 def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
     """Configure all of IREE's simple repository dependencies that come from submodules.
 

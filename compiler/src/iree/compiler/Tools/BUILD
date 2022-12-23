@@ -173,6 +173,13 @@ cc_library(
     ],
 )
 
+config_setting(
+    name = "cuda_enabled",
+    flag_values = {
+        "@iree_cuda//:enabled": "True",
+    },
+)
+
 cc_library(
     name = "init_targets",
     srcs = ["init_targets.cc"],
@@ -183,14 +190,20 @@ cc_library(
         "IREE_HAVE_ROCM_TARGET",
         "IREE_HAVE_VMVX_TARGET",
         "IREE_HAVE_VULKANSPIRV_TARGET",
-    ],
+    ] + select({
+        ":cuda_enabled": ["IREE_HAVE_CUDA_TARGET"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVM",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/MetalSPIRV",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/ROCM",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/VMVX",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
-    ],
+    ] + select({
+        ":cuda_enabled": ["//compiler/src/iree/compiler/Dialect/HAL/Target/CUDA"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_library(
