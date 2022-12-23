@@ -41,7 +41,15 @@ set -xeu -o errtrace
 
 this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
-repo_root="$(cd "${this_dir}" && git rev-parse --show-toplevel)"
+
+# We avoid using git rev-parse --show-toplevel here since some filesystem
+# permissions may trigger git errors/warnings when used via docker
+repo_root=$this_dir
+while [ ! -e "$repo_root/.git" ]; do
+  repo_root=$(dirname $repo_root)
+  if [ "$repo_root" = "/" ]; then break; fi
+done
+
 manylinux_docker_image="${manylinux_docker_image:-gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:b3b096e4b96746c3ae4cc52e880000d91038e79441334a7cfce9914cbbec1312}"
 python_versions="${override_python_versions:-cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
