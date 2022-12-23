@@ -72,6 +72,8 @@ static llvm::cl::opt<bool> clEnableReassociateFpReductions(
 // Defined externally in KernelDispatch.cpp to control the codegen pass
 // pipeline.
 extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName;
+extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugPayloadTag;
+extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugTransformTag;
 
 //===---------------------------------------------------------------------===//
 // Default Linalg code generation options for CPU backend
@@ -654,7 +656,9 @@ void addTransformDialectPasses(OpPassManager &passManager) {
   // Give control to the transform dialect.
   passManager.addPass(
       mlir::iree_compiler::createTransformDialectInterpreterPass(
-          clCPUCodegenTransformDialectFileName));
+          clCPUCodegenTransformDialectFileName,
+          clCPUCodegenTransformDialectDebugPayloadTag,
+          clCPUCodegenTransformDialectDebugTransformTag));
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
   //      schedule once applied.

@@ -41,6 +41,18 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
+
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag(
+    "iree-codegen-llvmgpu-transform-dialect-debug-payload-tag",
+    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
+                   "payload root operation"),
+    llvm::cl::init(""));
+
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
+    "iree-codegen-llvmgpu-transform-dialect-debug-transform-tag",
+    llvm::cl::desc(
+        "tag attribute value for the transform dialect transform op container"),
+    llvm::cl::init(""));
 }  // namespace iree_compiler
 }  // namespace mlir
 
