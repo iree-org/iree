@@ -38,7 +38,7 @@ compilers:
     If using Homebrew:
 
     ``` shell
-    brew install cmake ninja-build
+    brew install cmake ninja
     ```
 
 === "Windows"
