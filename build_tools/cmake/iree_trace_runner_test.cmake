@@ -316,8 +316,7 @@ function(iree_generated_trace_runner_test)
       set(_TARGET_CPU_FEATURES_VARIANTS "default")
     endif()
     foreach(_TARGET_CPU_FEATURES_LIST_ELEM IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
-      process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX _TARGET_PASS_OPTIONS)
-      string(REPLACE "#pass_options_variant#" "${_TARGET_PASS_OPTIONS}" _PROCESSED_COMPILER_FLAGS "${_RULE_COMPILER_FLAGS}")
+      process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX)
       if(NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
         continue()
@@ -336,7 +335,7 @@ function(iree_generated_trace_runner_test)
         DRIVER
           ${_DRIVER}
         COMPILER_FLAGS
-          ${_PROCESSED_COMPILER_FLAGS}
+          ${_RULE_COMPILER_FLAGS}
         RUNNER_ARGS
           ${_RULE_RUNNER_ARGS}
         LABELS
