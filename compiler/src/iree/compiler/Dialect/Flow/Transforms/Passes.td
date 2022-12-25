@@ -202,23 +202,6 @@ def PadLinalgOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadLinalgOpsToIntegerMultiplePass()";
 }
 
-def ConvertLinalgMatmulToMmt4D :
-    Pass<"iree-flow-convert-linalg-matmul-to-mmt4d", ""> {
-  let summary = "Convert linalg.matmul to linalg.mmt4d";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertLinalgMatmulToMmt4DPass()";
-  let options = [
-    Option<"arch", "arch", "std::string",
-           /*default=*/"",
-           "Target architecture, e.g. aarch64">,
-    Option<"features", "features", "std::string",
-           /*default=*/"",
-           "Additional CPU feature flags, e.g. +dotprod">,
-    Option<"enableGenericSlow", "enable_generic_slow", "bool",
-           /*default=*/"false",
-           "For tests only. Use mmt4d even for cases that are not expected to compile to efficient code by using some arbitrary generic tile shape.">,
-  ];
-}
-
 def SetEncoding : Pass<"iree-flow-set-encoding", ""> {
   let summary = "Introduce tensor encoding for compute operations";
   let constructor = "mlir::iree_compiler::IREE::Flow::createSetEncodingPass()";
