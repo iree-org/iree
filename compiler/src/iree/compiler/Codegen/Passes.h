@@ -12,7 +12,6 @@
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -292,7 +291,7 @@ createVectorContractCustomKernelsPass();
 /// Populates `patterns` to convert certain vector.contract ops to special
 /// "kernels" written either in SIMD intrinsics or inline assembly.
 void populateVectorContractCustomKernelsPatterns(
-    const CustomKernelsTargetInfo &targetInfo, RewritePatternSet &patterns);
+    IREE::HAL::ExecutableTargetAttr target, RewritePatternSet &patterns);
 
 void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
                                        RewritePatternSet &patterns);

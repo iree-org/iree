@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64 features=+dotprod intrinsics' %s | FileCheck %s
+// RUN: iree-opt --iree-llvmcpu-vector-contract-custom-kernels %s | FileCheck %s
 
 // CHECK-LABEL: @vector_i8i8i32matmul(
 // CHECK-SAME:          %[[LHS:[^:[:space:]]+]]
@@ -85,7 +85,9 @@
 func.func @vector_i8i8i32matmul(
     %lhs: vector<8x4xi8>,
     %rhs: vector<8x4xi8>,
-    %acc: vector<8x8xi32>) -> vector<8x8xi32> {
+    %acc: vector<8x8xi32>) -> vector<8x8xi32> attributes {
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+dotprod", prefer_intrinsics_over_asm=true}>
+} {
   %lhs_wide = arith.extsi %lhs : vector<8x4xi8> to vector<8x4xi32>
   %rhs_wide = arith.extsi %rhs : vector<8x4xi8> to vector<8x4xi32>
   %res = vector.contract {
@@ -104,7 +106,9 @@ func.func @vector_i8i8i32matmul(
 func.func @vector_f32f32f32matmul(
     %lhs: vector<8x4xf32>,
     %rhs: vector<8x4xf32>,
-    %acc: vector<8x8xf32>) -> vector<8x8xf32> {
+    %acc: vector<8x8xf32>) -> vector<8x8xf32> attributes {
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+dotprod", prefer_intrinsics_over_asm=true}>
+} {
   // CHECK: vector.contract
   %res = vector.contract {
       indexing_maps = [
@@ -123,7 +127,9 @@ func.func @vector_f32f32f32matmul(
 func.func @vector_i32i32i32matmul(
     %lhs: vector<8x4xi32>,
     %rhs: vector<8x4xi32>,
-    %acc: vector<8x8xi32>) -> vector<8x8xi32> {
+    %acc: vector<8x8xi32>) -> vector<8x8xi32> attributes {
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+dotprod", prefer_intrinsics_over_asm=true}>
+} {
   // CHECK: vector.contract
   %res = vector.contract {
       indexing_maps = [

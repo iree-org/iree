@@ -141,6 +141,12 @@ bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return enableMicrokernels && enableMicrokernels->getValue();
 }
 
+bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  auto intrinsicsAttr =
+      getConfigBoolAttr(targetAttr, "prefer_intrinsics_over_asm");
+  return intrinsicsAttr && intrinsicsAttr->getValue();
+}
+
 // TODO(dcaballe): If we have to check for a significantly large number of
 // features in the future, we may want to consider a persistent state to carry
 // over processed HAL information or keeping the TTI instance alive and query
