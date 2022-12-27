@@ -207,7 +207,7 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
   # Read the Bazel BUILD file and interpret it.
   with open(build_file_path, "rt") as build_file:
     build_file_contents = build_file.read()
-  if build_file_contents.count("# SKIP: bazel_to_cmake") > 0:
+  if "bazel-to-cmake: skip" in build_file_contents:
     return Status.SKIPPED
   build_file_code = compile(build_file_contents, build_file_path, "exec")
   try:
