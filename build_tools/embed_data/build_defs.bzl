@@ -6,13 +6,6 @@
 
 """Embeds data files into a C module."""
 
-def clean_dep(dep):
-    """Returns an absolute Bazel path to 'dep'.
-
-    This is necessary when calling these functions from another workspace.
-    """
-    return str(Label(dep))
-
 def c_embed_data(
         name,
         srcs,
