@@ -10,7 +10,7 @@ function(fetch_cuda_toolkit)
   #   https://developer.download.nvidia.com/compute/cuda/redist/
   set(_VERSION "11.6.2")
   set(_PRODUCT "cuda")
-  if(UNIX)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(_OS "linux")
   elseif(WIN32)
     set(_OS "windows")
@@ -49,10 +49,10 @@ function(fetch_cuda_toolkit)
     list(APPEND _COMPONENTS_TO_FETCH "cuda_nvcc")
     list(APPEND _COMPONENTS_TO_FETCH "cuda_cudart")
 
-    message(STATUS "Extracting to ${_TARGET_DIR}")
+    message(STATUS "Extracting CUDA Toolkit to ${_TARGET_DIR}")
     file(MAKE_DIRECTORY ${_TARGET_DIR})
 
-    # First fetch the download script to the tmp dir.
+    # First fetch the download script to its own directory.
     file(DOWNLOAD ${_DOWNLOAD_SCRIPT_URL} ${_DOWNLOAD_SCRIPT_PATH})
 
     # Then use the download script to fetch and flatten each component we want
@@ -82,12 +82,14 @@ if(DEFINED ENV{IREE_CUDA_DEPS_DIR})
   # We define the magic IREE_CUDA_DEPS_DIR env var in our CI docker images if we
   # have a stripped down CUDA toolkit suitable for compiling available. We
   # trigger on this below as a fallback for locating headers and libdevice
-  # files. See build_tools/docker/base/fetch_cuda_deps.sh for what this
+  # files. See build_tools/docker/context/fetch_cuda_deps.sh for what this
   # includes (it does not include enough for the normal CMake toolkit search
   # to succeed).
   set(CUDAToolkit_ROOT "$ENV{IREE_CUDA_DEPS_DIR}")
   message(STATUS "Using CUDA minimal deps for CI using IREE_CUDA_DEPS = ${CUDAToolkit_ROOT}")
 else()
+  # Attempt to deduce a CUDAToolkit_ROOT (possibly downloading) if not
+  # explicitly set.
   if(NOT CUDAToolkit_ROOT)
     # Download the CUDA toolkit if needed.
     fetch_cuda_toolkit()
@@ -125,7 +127,7 @@ elseif(IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH)
   message(STATUS "Using downloaded CUDA libdevice")
   set(IREE_CUDA_LIBDEVICE_PATH "${IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH}")
 else()
-  message(FATAL_ERROR "Building with IREE_TARGET_BACKEND_CUDA requires either a CUDA SDK (consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html) or an explicit path to libdevice (set with -DIREE_CUDA_LIBDEVICE_PATH=/path/to/libdevice.10.bc)")
+  message(FATAL_ERROR "Building with CUDA enabled requires either a CUDA SDK (consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html) or an explicit path to libdevice (set with -DIREE_CUDA_LIBDEVICE_PATH=/path/to/libdevice.10.bc)")
 endif()
 
 if(EXISTS "${IREE_CUDA_LIBDEVICE_PATH}")
@@ -151,7 +153,7 @@ elseif(IREE_CUDA_DOWNLOAD_INCLUDE_PATH)
   message(STATUS "Using downloaded CUDA includes")
   set(CUDAToolkit_INCLUDE_DIRS "${IREE_CUDA_DOWNLOAD_INCLUDE_PATH}")
 else()
-  message(SEND_ERROR "Cannot build IREE runtime CUDA components (-DIREE_HAL_DRIVER_CUDA=ON) because a CUDA SDK was not found. Consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html")
+  message(SEND_ERROR "Cannot build IREE with CUDA enabled because a CUDA SDK was not found. Consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html")
 endif()
 
 ################################################################################
@@ -170,7 +172,7 @@ iree_c_embed_data(
   H_FILE_OUTPUT
     "iree_cuda/libdevice_embedded.h"
   INCLUDES
-    # Allows an include like "iree_cuda/cuda_libdevice.h"
+    # Allows an include like "iree_cuda/libdevice_embedded.h"
     "${CMAKE_CURRENT_BINARY_DIR}"
   FLATTEN
   PUBLIC
