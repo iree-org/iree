@@ -58,8 +58,7 @@ def c_embed_data(
       generator: Overrides the 'generate_embed_data' generator target.
       **kwargs: Args to pass to the cc_library.
     """
-    if not generator:
-        generator = "//build_tools/embed_data:generate_embed_data"
+    generator = generator or "//build_tools/embed_data:generate_embed_data"
     generator_location = "$(location %s)" % generator
     if identifier == None:
         identifier = name
