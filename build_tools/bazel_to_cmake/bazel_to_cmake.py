@@ -183,31 +183,33 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
 
   old_lines = []
   preserved_footer_lines = ["\n" + PRESERVE_TAG + "\n"]
-  # Only process if there is a CMake file.
-  if not os.path.isfile(cmakelists_file_path):
-    return Status.SKIPPED
 
-  # Check if the CMake file has the auto-generated header.
-  found_autogeneration_tag = False
-  found_preserve_tag = False
-  with open(cmakelists_file_path) as f:
-    old_lines = f.readlines()
+  # Read CMakeLists.txt and check if it has the auto-generated header.
+  if os.path.isfile(cmakelists_file_path):
+    found_autogeneration_tag = False
+    found_preserve_tag = False
+    with open(cmakelists_file_path) as f:
+      old_lines = f.readlines()
 
-  for line in old_lines:
-    if not found_autogeneration_tag and autogeneration_tag in line:
-      found_autogeneration_tag = True
-    if not found_preserve_tag and PRESERVE_TAG in line:
-      found_preserve_tag = True
-    elif found_preserve_tag:
-      preserved_footer_lines.append(line)
-  if not found_autogeneration_tag:
-    if verbosity >= 1:
-      log(f"Skipped. Did not find autogeneration line.", indent=2)
-    return Status.SKIPPED
+    for line in old_lines:
+      if not found_autogeneration_tag and autogeneration_tag in line:
+        found_autogeneration_tag = True
+      if not found_preserve_tag and PRESERVE_TAG in line:
+        found_preserve_tag = True
+      elif found_preserve_tag:
+        preserved_footer_lines.append(line)
+    if not found_autogeneration_tag:
+      if verbosity >= 1:
+        log(f"Skipped. Did not find autogeneration line.", indent=2)
+      return Status.SKIPPED
   preserved_footer = "".join(preserved_footer_lines)
 
+  # Read the Bazel BUILD file and interpret it.
   with open(build_file_path, "rt") as build_file:
-    build_file_code = compile(build_file.read(), build_file_path, "exec")
+    build_file_contents = build_file.read()
+  if build_file_contents.count("# SKIP: bazel_to_cmake") > 0:
+    return Status.SKIPPED
+  build_file_code = compile(build_file_contents, build_file_path, "exec")
   try:
     converted_build_file = bazel_to_cmake_converter.convert_build_file(
         build_file_code, allow_partial_conversion=allow_partial_conversion)
