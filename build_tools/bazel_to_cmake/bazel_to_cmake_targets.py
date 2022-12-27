@@ -111,6 +111,9 @@ EXPLICIT_TARGET_MAPPING = {
         "TorchMLIRTMTensorDialect"
     ],
 
+    # Tracy.
+    "@tracy_client//:runtime_impl": ["tracy_client::runtime_impl"],
+
     # Vulkan
     "@vulkan_headers": ["Vulkan::Headers"],
     # Misc single targets
