@@ -156,13 +156,13 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
   build_file_basenames = ["BUILD", "BUILD.bazel"]
   for build_file_basename in build_file_basenames:
     build_file_path = os.path.join(directory_path, build_file_basename)
-    cmakelists_file_path = os.path.join(directory_path, "CMakeLists.txt")
 
-    rel_cmakelists_file_path = repo_relpath(cmakelists_file_path)
     rel_build_file_path = repo_relpath(build_file_path)
     if os.path.isfile(build_file_path):
       build_file_found = True
       break
+  cmakelists_file_path = os.path.join(directory_path, "CMakeLists.txt")
+  rel_cmakelists_file_path = repo_relpath(cmakelists_file_path)
 
   if not build_file_found:
     return Status.NO_BUILD_FILE
