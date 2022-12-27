@@ -10,7 +10,7 @@
 
 # Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING.
 # Builds the runtime with tracing support enabled.
-build:iree_enable_runtime_tracing --@tracy_client//:runtime_enable=true
+build --flag_alias=iree_enable_runtime_tracing=@tracy_client//:runtime_enable
 
 ###############################################################################
 # Common flags that apply to all configurations.
