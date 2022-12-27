@@ -326,7 +326,7 @@ void TransformDialectInterpreterPass::performOptionalDebugActions(
         kTransformIreeTagAttrName,
         StringAttr::get(&getContext(), kTransformIreeTagPayloadRootValue));
   }
-  if (!debugTransformRootTag.empty()) {
+  if (debugTransformRootTag.empty()) {
     transformRegion->getParentOp()->setAttr(
         kTransformIreeTagAttrName,
         StringAttr::get(&getContext(),
