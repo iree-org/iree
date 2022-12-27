@@ -5,6 +5,14 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 ###############################################################################
+# Short-hand config settings for IREE specific features.
+###############################################################################
+
+# Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING.
+# Builds the runtime with tracing support enabled.
+build --flag_alias=iree_enable_runtime_tracing=@tracy_client//:runtime_enable
+
+###############################################################################
 # Common flags that apply to all configurations.
 # Use sparingly for things common to all compilers and platforms.
 ###############################################################################
