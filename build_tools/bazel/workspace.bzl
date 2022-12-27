@@ -48,7 +48,7 @@ def cuda_auto_configure_impl(repository_ctx):
         "BUILD",
         Label("@iree_core//:build_tools/third_party/cuda/BUILD.template"),
         {
-            "%ENABLED%": "True" if found else "False",
+            "%ENABLED%": "True" if cuda_toolkit_root else "False",
             "%LIBDEVICE_REL_PATH%": libdevice_rel_path,
         },
     )
