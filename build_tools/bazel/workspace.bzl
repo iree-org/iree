@@ -10,13 +10,17 @@ load("@bazel_skylib//lib:paths.bzl", "paths")
 
 CUDA_TOOLKIT_ROOT_ENV_KEY = "IREE_CUDA_TOOLKIT_ROOT"
 
-# See base docker image: We place a stripped down CUDA directory tree
-# here if this env var is set on CI.
+# Our CI docker images use a stripped down CUDA directory tree in some
+# images, and it is tailored just to support building key elements.
+# When this is done, the IREE_CUDA_DEPS_DIR env var is set, and we
+# respect that here in order to match the CMake side (which needs it
+# because CUDA toolkit detection differs depending on whether it is
+# stripped down or not).
+# TODO: Simplify this on the CMake/docker side and update here to match.
 CUDA_DEPS_DIR_FOR_CI_ENV_KEY = "IREE_CUDA_DEPS_DIR"
 
 def cuda_auto_configure_impl(repository_ctx):
     env = repository_ctx.os.environ
-    found = False
     cuda_toolkit_root = None
 
     # Probe environment for CUDA toolkit location.
@@ -24,14 +28,12 @@ def cuda_auto_configure_impl(repository_ctx):
     env_cuda_deps_dir_for_ci = env.get(CUDA_DEPS_DIR_FOR_CI_ENV_KEY)
     if env_cuda_toolkit_root:
         cuda_toolkit_root = env_cuda_toolkit_root
-        found = True
     elif env_cuda_deps_dir_for_ci:
         cuda_toolkit_root = env_cuda_deps_dir_for_ci
-        found = True
 
     # Symlink the tree.
     libdevice_rel_path = "iree_local/libdevice.bc"
-    if found:
+    if cuda_toolkit_root != None:
         # Symlink top-level directories we care about.
         repository_ctx.symlink(cuda_toolkit_root + "/include", "include")
 
