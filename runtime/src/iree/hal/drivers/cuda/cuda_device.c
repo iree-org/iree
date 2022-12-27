@@ -46,7 +46,8 @@ typedef struct iree_hal_cuda_device_t {
   // Parameters used to control device behavior.
   iree_hal_cuda_device_params_t params;
 
-  CUdevice device;
+  iree_host_size_t num_devices;
+  CUdevice* devices;
 
   // TODO: support multiple streams.
   CUstream stream;
@@ -90,11 +91,11 @@ static iree_status_t iree_hal_cuda_device_check_params(
 
 static iree_status_t iree_hal_cuda_device_create_internal(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
-    const iree_hal_cuda_device_params_t* params, CUdevice cu_device,
+    const iree_hal_cuda_device_params_t* params, iree_host_size_t num_devices, CUdevice* cu_devices,
     CUstream stream, CUcontext context, iree_hal_cuda_dynamic_symbols_t* syms,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_cuda_device_t* device = NULL;
-  iree_host_size_t total_size = iree_sizeof_struct(*device) + identifier.size;
+  iree_host_size_t total_size = (iree_sizeof_struct(*device) * num_devices) + identifier.size;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(host_allocator, total_size, (void**)&device));
   memset(device, 0, total_size);
@@ -103,9 +104,10 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   iree_hal_driver_retain(device->driver);
   iree_string_view_append_to_buffer(
       identifier, &device->identifier,
-      (char*)device + iree_sizeof_struct(*device));
+      (char*)device + (iree_sizeof_struct(*device) * num_devices));
   device->params = *params;
-  device->device = cu_device;
+  device->num_devices  = num_devices;
+  device->devices = cu_devices;
   device->stream = stream;
   device->context_wrapper.cu_context = context;
   device->context_wrapper.host_allocator = host_allocator;
@@ -114,7 +116,7 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   device->context_wrapper.syms = syms;
 
   iree_status_t status = iree_hal_cuda_allocator_create(
-      (iree_hal_device_t*)device, &device->context_wrapper, cu_device, stream,
+      (iree_hal_device_t*)device, &device->context_wrapper, num_devices, cu_devices, stream,
       &device->device_allocator);
 
   if (iree_status_is_ok(status) &&
@@ -137,7 +139,7 @@ static iree_status_t iree_hal_cuda_device_create_internal(
 iree_status_t iree_hal_cuda_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     const iree_hal_cuda_device_params_t* params,
-    iree_hal_cuda_dynamic_symbols_t* syms, CUdevice device,
+    iree_hal_cuda_dynamic_symbols_t* syms, iree_host_size_t num_devices, CUdevice* devices,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(params);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -146,7 +148,7 @@ iree_status_t iree_hal_cuda_device_create(
   CUcontext context;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
-      CU_RESULT_TO_STATUS(syms, cuDevicePrimaryCtxRetain(&context, device)));
+      CU_RESULT_TO_STATUS(syms, cuDevicePrimaryCtxRetain(&context, devices[0])));
   iree_status_t status = CU_RESULT_TO_STATUS(syms, cuCtxSetCurrent(context));
   CUstream stream;
   if (iree_status_is_ok(status)) {
@@ -154,15 +156,15 @@ iree_status_t iree_hal_cuda_device_create(
         syms, cuStreamCreate(&stream, CU_STREAM_NON_BLOCKING));
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_cuda_device_create_internal(driver, identifier, params,
-                                                  device, stream, context, syms,
+    status = iree_hal_cuda_device_create_internal(driver, identifier, params, num_devices,
+                                                  devices, stream, context, syms,
                                                   host_allocator, out_device);
   }
   if (!iree_status_is_ok(status)) {
     if (stream) {
       syms->cuStreamDestroy(stream);
     }
-    syms->cuDevicePrimaryCtxRelease(device);
+    syms->cuDevicePrimaryCtxRelease(devices[0]);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -182,7 +184,7 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   iree_arena_block_pool_deinitialize(&device->block_pool);
 
   CUDA_IGNORE_ERROR(device->context_wrapper.syms,
-                    cuDevicePrimaryCtxRelease(device->device));
+                    cuDevicePrimaryCtxRelease(device->devices[0]));
 
   // Finally, destroy the device.
   iree_hal_driver_release(device->driver);

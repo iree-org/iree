@@ -30,6 +30,7 @@ typedef struct iree_hal_cuda_driver_t {
   iree_string_view_t identifier;
   iree_hal_cuda_device_params_t default_params;
   int default_device_index;
+  int num_devices;
   // CUDA symbols.
   iree_hal_cuda_dynamic_symbols_t syms;
 } iree_hal_cuda_driver_t;
@@ -265,6 +266,8 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_id(
   // Use either the specified device (enumerated earlier) or whatever default
   // one was specified when the driver was created.
   CUdevice device = 0;
+  iree_hal_device_info_t* device_infos = NULL;
+  iree_host_size_t device_count = 1;
   if (device_id == IREE_HAL_DEVICE_ID_DEFAULT) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_cuda_driver_select_default_device(
@@ -276,9 +279,14 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_id(
 
   iree_string_view_t device_name = iree_make_cstring_view("cuda");
 
+  CUdevice* devices = (CUdevice*) calloc(device_count, sizeof(CUdevice));
+  for (iree_host_size_t i = 0; i < device_count; i++) {
+    devices[i] = device_infos[i].device_id;
+  }
+
   // Attempt to create the device.
   iree_status_t status = iree_hal_cuda_device_create(
-      base_driver, device_name, &driver->default_params, &driver->syms, device,
+      base_driver, device_name, &driver->default_params, &driver->syms, device_count, devices,
       host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
@@ -361,6 +369,46 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_index(
   return status;
 }
 
+static iree_status_t iree_hal_cuda_driver_create_all_devices(
+    iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
+    iree_host_size_t param_count,
+    const iree_string_pair_t* params, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
+  iree_hal_cuda_driver_t* driver = iree_hal_cuda_driver_cast(base_driver);
+
+  // Ensure CUDA is initialized before querying it.
+  IREE_RETURN_IF_ERROR(iree_hal_cuda_init(driver));
+
+  iree_hal_device_info_t* device_infos = NULL;
+  iree_host_size_t device_count = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_cuda_driver_query_available_devices(
+      base_driver, host_allocator, &device_count, &device_infos));
+
+  for (int i = 0; i < device_count; i++) {
+    int path_size = device_infos[i].path.size;
+    char* path_str = (char*) malloc((path_size + 1) * sizeof(char));
+    memset(path_str, '\0', path_size + 1);
+    strncpy(path_str, device_infos[i].path.data, path_size);
+    device_infos[i].path = iree_string_view_trim(iree_make_string_view(
+      path_str, path_size));
+  }
+
+  iree_string_view_t device_name = iree_make_cstring_view("cuda");
+
+  CUdevice* devices = (CUdevice*) calloc(device_count, sizeof(CUdevice));
+  for (iree_host_size_t i = 0; i < device_count; i++) {
+    devices[i] = device_infos[i].device_id - 1;
+  }
+
+  // Attempt to create the device.
+  iree_status_t status = iree_hal_cuda_device_create(
+      base_driver, device_name, &driver->default_params, &driver->syms, device_count, devices,
+      host_allocator, out_device);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static iree_status_t iree_hal_cuda_driver_create_device_by_path(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     iree_string_view_t device_path, iree_host_size_t param_count,
@@ -389,10 +437,16 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_path(
 
   // Try to parse as a device index.
   int device_index = 0;
-  if (iree_string_view_atoi_int32(device_path, &device_index)) {
-    return iree_hal_cuda_driver_create_device_by_index(
-        base_driver, driver_name, device_index, param_count, params,
-        host_allocator, out_device);
+  if (!iree_string_view_equal(device_path, IREE_SV("all"))) {
+    if (iree_string_view_atoi_int32(device_path, &device_index)) {
+      return iree_hal_cuda_driver_create_device_by_index(
+          base_driver, driver_name, device_index, param_count, params,
+          host_allocator, out_device);
+    }
+  } else {
+    return iree_hal_cuda_driver_create_all_devices(
+          base_driver, driver_name, param_count, params,
+          host_allocator, out_device);
   }
 
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unsupported device path");

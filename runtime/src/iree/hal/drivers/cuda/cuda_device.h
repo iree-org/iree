@@ -20,7 +20,7 @@ extern "C" {
 iree_status_t iree_hal_cuda_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     const iree_hal_cuda_device_params_t* params,
-    iree_hal_cuda_dynamic_symbols_t* syms, CUdevice device,
+    iree_hal_cuda_dynamic_symbols_t* syms, iree_host_size_t num_devices, CUdevice* devices,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 #ifdef __cplusplus
