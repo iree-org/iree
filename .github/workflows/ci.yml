@@ -1117,13 +1117,13 @@ jobs:
         id: failed_jobs
         run: |
           echo '${{ toJson(needs) }}'
-          FAILING_JOBS="$(echo '${{ toJson(needs) }}' \
+          FAILED_JOBS="$(echo '${{ toJson(needs) }}' \
             | jq --raw-output \
             'map_values(select(.result!="success" and .result!="skipped")) | keys | join(",")' \
           )"
-          echo "failed-jobs=${FAILING_JOBS}" >> $GITHUB_OUTPUT
-          if [[ "${FAILING_JOBS}" != "" ]]; then
-            echo "The following jobs failed: ${FAILING_JOBS}"
+          echo "failed-jobs=${FAILED_JOBS}" >> $GITHUB_OUTPUT
+          if [[ "${FAILED_JOBS}" != "" ]]; then
+            echo "The following jobs failed: ${FAILED_JOBS}"
             exit 1
           fi
       - name: Posting to Discord
