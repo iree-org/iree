@@ -81,6 +81,10 @@ declare -a common_args=(
   # Matches firewall rule for health check traffic
   --tags="allow-health-checks"
   --provisioning-model=STANDARD
+  # The instance group manager handles this for us and this is necessary to
+  # achieve better local SSD performance:
+  # https://cloud.google.com/compute/docs/disks/optimizing-local-ssd-performance#disable-automatic-restart
+  --no-restart-on-failure
   --scopes=https://www.googleapis.com/auth/cloud-platform
   --no-shielded-secure-boot
   --shielded-vtpm
@@ -126,6 +130,8 @@ function create_template() {
       --maintenance-policy=TERMINATE
       --accelerator=count=1,type=nvidia-tesla-a100
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-balanced"
+      # See comment in build_tools/github_actions/runner/config/setup.sh
+      --local-ssd=interface=NVME
     )
   elif [[ "${type}" == cpu ]]; then
     cmd+=(
