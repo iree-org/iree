@@ -7,6 +7,7 @@
 #include "LLVMGPUExtensions.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -351,23 +352,6 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
   return builder.create<memref::AllocOp>(loc, memrefType);
 }
 
-/// Emit warp reduction code sequence for a given input.
-static Value warpReduction(Location loc, OpBuilder &builder, Value input,
-                           vector::CombiningKind kind, uint32_t size) {
-  // First reduce on a single thread to get per lane reduction value.
-  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-  // Parallel reduction using butterfly shuffles.
-  for (uint64_t i = 1; i < size; i <<= 1) {
-    Value shuffled = builder
-                         .create<gpu::ShuffleOp>(loc, laneVal, i,
-                                                 /*width=*/size,
-                                                 /*mode=*/gpu::ShuffleMode::XOR)
-                         .getShuffleResult();
-    laneVal = makeArithReduction(builder, loc, kind, laneVal, shuffled);
-  }
-  return laneVal;
-}
-
 /// Return a value yielded by `warpOp` which statifies the filter lamdba
 /// condition and is not dead.
 static OpOperand *getWarpResult(vector::WarpExecuteOnLane0Op warpOp,
@@ -536,10 +520,15 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
 static void populatePropagateVectorDistribution(Operation *target,
                                                 RewritePatternSet &patterns,
                                                 PatternBenefit benefit) {
+  auto groupReductionFn = [](Location loc, OpBuilder &builder, Value input,
+                             vector::CombiningKind kind, uint32_t size) {
+    return mlir::iree_compiler::emitGPUGroupReduction(loc, builder, input, kind,
+                                                      size, 32);
+  };
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populatePropagateWarpVectorDistributionPatterns(
       patterns, simpleDistributionFunction, simpleWarpShuffleFunction, benefit);
-  vector::populateDistributeReduction(patterns, warpReduction, benefit);
+  vector::populateDistributeReduction(patterns, groupReductionFn, benefit);
   patterns.add<WarpOpLoad, HoistSharedMemoryAlloc>(target->getContext(),
                                                    benefit);
 }
