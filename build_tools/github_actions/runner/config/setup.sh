@@ -29,7 +29,7 @@ if [[ "${RUNNER_TYPE}" == gpu ]]; then
   mount --options discard,defaults,nobarrier /dev/nvme0n1 /runner-root
 else
   echo "Mounting tmpfs for working directory"
-  mount --types tmpfs --options size=50g tmpfs /runner-root
+  mount --types tmpfs --options size=100g tmpfs /runner-root
 fi
 
 cp -r "${SCRIPT_DIR}" /runner-root/config
