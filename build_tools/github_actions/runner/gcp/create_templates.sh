@@ -133,7 +133,6 @@ function create_template() {
       # See comment in build_tools/github_actions/runner/config/setup.sh
       --local-ssd=interface=NVME
     )
-    local_ssd_count=1
   elif [[ "${type}" == cpu ]]; then
     cmd+=(
       --machine-type=n1-standard-96
@@ -144,7 +143,6 @@ function create_template() {
     echo "Got unrecognized type '${type}'" >2
     exit 1
   fi
-
   if (( DRY_RUN==1 )); then
     # Prefix the command with a noop. It will still be printed by set -x
     cmd=(":" "${cmd[@]}")
