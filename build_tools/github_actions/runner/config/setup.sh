@@ -26,10 +26,10 @@ if [[ "${RUNNER_TYPE}" == gpu ]]; then
   echo "Formatting and mounting local SSD for working directory"
   mkfs.ext4 -F /dev/nvme0n1
   # Options suggested from https://cloud.google.com/compute/docs/disks/optimizing-local-ssd-performance#disable_flush
-  mount --options discard,defaults,nobarrier --source /dev/nvme0n1 --target /runner-root
+  mount --options discard,defaults,nobarrier /dev/nvme0n1 /runner-root
 else
   echo "Mounting tmpfs for working directory"
-  mount -t tmpfs -o size=50g tmpfs /runner-root
+  mount --types tmpfs --options size=50g tmpfs /runner-root
 fi
 
 cp -r "${SCRIPT_DIR}" /runner-root/config
