@@ -152,6 +152,13 @@ def _convert_llvm_target(target):
   return ["LLVM" + target.rsplit(":")[-1]]
 
 
+def _convert_iree_cuda_target(target):
+  # Convert like:
+  #   @iree_cuda//:libdevice_embedded -> iree_cuda::libdevice_embedded
+  label = target.rsplit(":")[-1]
+  return [f"iree_cuda::{label}"]
+
+
 def _convert_iree_dialects_target(target):
   # Just take the target name as-is.
   return [target.rsplit(":")[-1]]
@@ -190,6 +197,8 @@ def convert_target(target):
     return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
+  if target.startswith("@iree_cuda//"):
+    return _convert_iree_cuda_target(target)
   if target.startswith("@"):
     raise KeyError(f"No conversion found for target '{target}'")
 
