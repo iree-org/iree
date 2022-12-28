@@ -88,6 +88,7 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}}));
 
+  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}}));
@@ -298,7 +299,8 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
     // Pick the best configuration where the original shape is aligned on the
     // tile size.
     for (TileWorkgroupSizePair &config : tileSizeConfig) {
-      if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
+      if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0 &&
+          sizeK % config.tileSize[2] == 0) {
         return setMatmulConfig(
             config.tileSize[0], config.tileSize[1], config.tileSize[2],
             config.workgroupSize, softwarePipelineDepthSimt,
@@ -315,7 +317,13 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   const TileWorkgroupSizePair &config = tileSizeConfig[configIndex];
   const int64_t tileX = config.tileSize[0];
   const int64_t tileY = config.tileSize[1];
-  const int64_t tileK = config.tileSize[2];
+  int64_t tileK = config.tileSize[2];
+  // Since specialization doesn't work for K loop and peeling is not enabled yet
+  // we pick a tileK size that is aligned on the K size.
+  if (ShapedType::isDynamic(sizeK)) tileK = 1;
+  while (sizeK % tileK != 0) {
+    tileK >>= 1;
+  }
   const std::array<int64_t, 3> workgroupSize{config.workgroupSize[0],
                                              config.workgroupSize[1],
                                              config.workgroupSize[2]};
