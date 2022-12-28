@@ -4,11 +4,11 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
-# Workflow for all benchmark-related jobs. It is designed to be called from
-# the main workflow ci.yml. The concurrency of this workflow is controlled by
-# the caller's job.
+# Workflow for execution-benchmark-related jobs. It is designed to be called
+# from the main workflow ci.yml. The concurrency of this workflow is controlled
+# by the caller's job.
 
-name: Benchmarks
+name: Benchmark execution
 
 on:
   workflow_call:
