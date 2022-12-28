@@ -1124,9 +1124,10 @@ jobs:
       - name: Getting failed jobs
         id: failed_jobs
         run: |
-          FAILING_JOBS="$(echo '${{ toJson(needs.*) }}' \
+          echo '${{ toJson(needs) }}'
+          FAILING_JOBS="$(echo '${{ toJson(needs) }}' \
             | jq --raw-output \
-            'map_values(select(.status!="success" and .status!="skipped")) | keys | join(",")' \
+            'map_values(select(.result!="success" and .result!="skipped")) | keys | join(",")' \
           )"
           echo "failed-jobs=${FAILING_JOBS}" >> $GITHUB_OUTPUT
           if [[ "${FAILING_JOBS}" != "" ]]; then
