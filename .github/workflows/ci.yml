@@ -888,7 +888,7 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: "Downloading assets"
+      - name: "Exporting configs"
         id: "export"
         env:
           COMPILATION_CONFIG: "compilation-config.json"
@@ -902,14 +902,16 @@ jobs:
         env:
           COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
         run: |
-          gcloud alpha storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" \
+          gcloud alpha storage cp \
+            "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" \
             "${E2E_TEST_ARTIFACTS_BUILD_LOG}"
           mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
           jq -r \
             --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
             '.module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
             "${COMPILATION_CONFIG}" | \
-            gcloud alpha storage cp -r --read-paths-from-stdin "${E2E_TEST_ARTIFACTS_DIR}"
+            gcloud alpha storage cp -r --read-paths-from-stdin \
+              "${E2E_TEST_ARTIFACTS_DIR}"
       - name: "Collecting compilation statistics"
         id: collect
         env:

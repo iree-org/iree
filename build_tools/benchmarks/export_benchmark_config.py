@@ -11,7 +11,7 @@ Export type: "execution" outputs:
   <target device name>: {
     host_environment: HostEnvironment,
     module_dir_paths: [<paths of dependent module directories>],
-    run_configs: [E2EModelRunConfig]
+    run_configs: serialized [E2EModelRunConfig]
   },
   ...
 ]
