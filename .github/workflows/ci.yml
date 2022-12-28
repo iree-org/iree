@@ -1134,4 +1134,4 @@ jobs:
         if: failure() && needs.setup.outputs.ci-stage == 'postsubmit'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          description: "The following jobs failed: ${{ steps.failed_jobs.failed_jobs }}"
+          description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
