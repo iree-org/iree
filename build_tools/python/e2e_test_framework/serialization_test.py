@@ -80,30 +80,19 @@ class SerializationTest(unittest.TestCase):
     self.maxDiff = None
     self.assertEqual(
         results, {
-            "main_obj": [{
-                "b_list": ["id_a", "id_b"],
-                "c_obj": {
-                    "float_val": 0.1
-                },
-                "str_val": "test1",
-                "enum_val": "OPTION_B"
-            }, {
-                "b_list": ["id_a"],
-                "c_obj": {
-                    "float_val": 0.2
-                },
-                "str_val": None,
-                "enum_val": "OPTION_C"
-            }],
+            "main_obj": [
+                dict(b_list=["id_a", "id_b"],
+                     c_obj=dict(float_val=0.1),
+                     str_val="test1",
+                     enum_val="OPTION_B"),
+                dict(b_list=["id_a"],
+                     c_obj=dict(float_val=0.2),
+                     str_val=None,
+                     enum_val="OPTION_C")
+            ],
             "obj_map": {
-                "test_b:id_a": {
-                    "key": "id_a",
-                    "int_val": 10
-                },
-                "test_b:id_b": {
-                    "key": "id_b",
-                    "int_val": 20
-                }
+                "test_b:id_a": dict(key="id_a", int_val=10),
+                "test_b:id_b": dict(key="id_b", int_val=20)
             }
         })
 
