@@ -81,6 +81,10 @@ declare -a common_args=(
   # Matches firewall rule for health check traffic
   --tags="allow-health-checks"
   --provisioning-model=STANDARD
+  # The instance group manager handles this for us and this is necessary to
+  # achieve better local SSD performance:
+  # https://cloud.google.com/compute/docs/disks/optimizing-local-ssd-performance#disable-automatic-restart
+  --no-restart-on-failure
   --scopes=https://www.googleapis.com/auth/cloud-platform
   --no-shielded-secure-boot
   --shielded-vtpm
@@ -127,16 +131,23 @@ function create_template() {
       --accelerator=count=1,type=nvidia-tesla-a100
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-balanced"
     )
+    local_ssd_count=1
   elif [[ "${type}" == cpu ]]; then
     cmd+=(
       --machine-type=n1-standard-96
       --maintenance-policy=MIGRATE
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
     )
+    # This is the lowest number of local SSDs you can have on this machine type.
+    local_ssd_count=16
   else
     echo "Got unrecognized type '${type}'" >2
     exit 1
   fi
+  for i in $(seq "${local_ssd_count}"); do
+    cmd+=(--local-ssd=interface=NVME)
+  done
+
   if (( DRY_RUN==1 )); then
     # Prefix the command with a noop. It will still be printed by set -x
     cmd=(":" "${cmd[@]}")
