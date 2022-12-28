@@ -1122,6 +1122,6 @@ jobs:
           echo '${{ toJson(needs.*.result) }}' \
             | jq --exit-status 'all(.=="success" or .=="skipped")' > /dev/null
       - uses: sarisia/actions-status-discord@c193626e5ce172002b8161e116aa897de7ab5383 # v1.10.2
-        if: failure() && needs.setup.ci-stage == 'postsubmit'
+        if: failure() && needs.setup.outputs.ci-stage == 'postsubmit'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
