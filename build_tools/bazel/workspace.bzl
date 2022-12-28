@@ -22,6 +22,7 @@ CUDA_DEPS_DIR_FOR_CI_ENV_KEY = "IREE_CUDA_DEPS_DIR"
 def cuda_auto_configure_impl(repository_ctx):
     env = repository_ctx.os.environ
     cuda_toolkit_root = None
+    iree_repo_alias = repository_ctx.attr.iree_repo_alias
 
     # Probe environment for CUDA toolkit location.
     env_cuda_toolkit_root = env.get(CUDA_TOOLKIT_ROOT_ENV_KEY)
@@ -46,10 +47,11 @@ def cuda_auto_configure_impl(repository_ctx):
 
     repository_ctx.template(
         "BUILD",
-        Label("@iree_core//:build_tools/third_party/cuda/BUILD.template"),
+        Label("%s//:build_tools/third_party/cuda/BUILD.template" % iree_repo_alias),
         {
             "%ENABLED%": "True" if cuda_toolkit_root else "False",
             "%LIBDEVICE_REL_PATH%": libdevice_rel_path,
+            "%IREE_REPO_ALIAS%": iree_repo_alias,
         },
     )
 
@@ -59,12 +61,16 @@ cuda_auto_configure = repository_rule(
         CUDA_TOOLKIT_ROOT_ENV_KEY,
     ],
     implementation = cuda_auto_configure_impl,
+    attrs = {
+        "iree_repo_alias": attr.string(default = "@iree_core"),
+    },
 )
 
-def configure_iree_cuda_deps():
+def configure_iree_cuda_deps(iree_repo_alias = None):
     maybe(
         cuda_auto_configure,
         name = "iree_cuda",
+        iree_repo_alias = iree_repo_alias,
     )
 
 def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
