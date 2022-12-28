@@ -14,12 +14,24 @@ set -xeEuo pipefail
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 source "${SCRIPT_DIR}/functions.sh"
 
-echo "Formatting and mounting local SSD"
 mkdir /runner-root
-mkfs.ext4 -F /dev/nvme0n1
 
-# Options suggested from https://cloud.google.com/compute/docs/disks/optimizing-local-ssd-performance#disable_flush
-mount --options discard,defaults,nobarrier --source /dev/nvme0n1 --target /runner-root
+RUNNER_TYPE="$(get_attribute github-runner-type)"
+
+# On the CPU machines we use a ramdisk because they have 360GB of RAM, but the
+# GPU machines only have 80GB. We don't use local SSD on the CPU machines
+# because they require a minimum of 16 local SSD if any, which is quite wasteful
+# (increases cost by about 20%).
+if [[ "${RUNNER_TYPE}" == gpu ]]; then
+  echo "Formatting and mounting local SSD for working directory"
+  mkfs.ext4 -F /dev/nvme0n1
+  # Options suggested from https://cloud.google.com/compute/docs/disks/optimizing-local-ssd-performance#disable_flush
+  mount --options discard,defaults,nobarrier --source /dev/nvme0n1 --target /runner-root
+else
+  echo "Mounting tmpfs for working directory"
+  mount -t tmpfs -o size=50g tmpfs /runner-root
+fi
+
 cp -r "${SCRIPT_DIR}" /runner-root/config
 chown -R runner:runner /runner-root/
 

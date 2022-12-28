@@ -130,6 +130,8 @@ function create_template() {
       --maintenance-policy=TERMINATE
       --accelerator=count=1,type=nvidia-tesla-a100
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-balanced"
+      # See comment in build_tools/github_actions/runner/config/setup.sh
+      --local-ssd=interface=NVME
     )
     local_ssd_count=1
   elif [[ "${type}" == cpu ]]; then
@@ -138,15 +140,10 @@ function create_template() {
       --maintenance-policy=MIGRATE
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
     )
-    # This is the lowest number of local SSDs you can have on this machine type.
-    local_ssd_count=16
   else
     echo "Got unrecognized type '${type}'" >2
     exit 1
   fi
-  for i in $(seq "${local_ssd_count}"); do
-    cmd+=(--local-ssd=interface=NVME)
-  done
 
   if (( DRY_RUN==1 )); then
     # Prefix the command with a noop. It will still be printed by set -x
