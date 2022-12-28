@@ -295,26 +295,27 @@ jobs:
     env:
       BUILD_DIR: build-runtime
     steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Building runtime"
-        # Note ccache is read-only here since this job runs on a GitHub-hosted runner
-        # and GitHub runners don't have write access to GCS
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "BUILD_PRESET=test" \
-            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
-            ./build_tools/cmake/build_runtime.sh \
-            "${BUILD_DIR}"
-      - name: "Testing runtime"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=1 \
-            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
+        - run: exit 0
+      # - name: "Checking out repository"
+      #   uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+      # - name: "Checking out runtime submodules"
+      #   run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      # - name: "Building runtime"
+      #   # Note ccache is read-only here since this job runs on a GitHub-hosted runner
+      #   # and GitHub runners don't have write access to GCS
+      #   run: |
+      #     ./build_tools/github_actions/docker_run.sh \
+      #       --env "BUILD_PRESET=test" \
+      #       gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
+      #       ./build_tools/cmake/build_runtime.sh \
+      #       "${BUILD_DIR}"
+      # - name: "Testing runtime"
+      #   run: |
+      #     ./build_tools/github_actions/docker_run.sh \
+      #       --env IREE_VULKAN_DISABLE=1 \
+      #       gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
+      #       ./build_tools/cmake/ctest_all.sh \
+      #       "${BUILD_DIR}"
 
   # build_test_runtime_windows:
   #   needs: setup
@@ -635,25 +636,26 @@ jobs:
     env:
       BUILD_DIR: build-runtime
     steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Building size-optimized runtime"
-        # Note ccache is read-only here since this job runs on a GitHub-hosted runner
-        # and GitHub runners don't have write access to GCS
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
-            ./build_tools/cmake/build_runtime_small.sh \
-            "${BUILD_DIR}"
-      - name: "Testing runtime"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=1 \
-            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
+      - run: exit 1
+      # - name: "Checking out repository"
+      #   uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+      # - name: "Checking out runtime submodules"
+      #   run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      # - name: "Building size-optimized runtime"
+      #   # Note ccache is read-only here since this job runs on a GitHub-hosted runner
+      #   # and GitHub runners don't have write access to GCS
+      #   run: |
+      #     ./build_tools/github_actions/docker_run.sh \
+      #       gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
+      #       ./build_tools/cmake/build_runtime_small.sh \
+      #       "${BUILD_DIR}"
+      # - name: "Testing runtime"
+      #   run: |
+      #     ./build_tools/github_actions/docker_run.sh \
+      #       --env IREE_VULKAN_DISABLE=1 \
+      #       gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
+      #       ./build_tools/cmake/ctest_all.sh \
+      #       "${BUILD_DIR}"
 
   # gcc:
   #   needs: setup
