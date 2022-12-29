@@ -11,14 +11,18 @@ Export type: "execution" outputs:
   <target device name>: {
     host_environment: HostEnvironment,
     module_dir_paths: [<paths of dependent module directories>],
-    run_configs: [E2EModelRunConfig]
+    run_configs: serialized [E2EModelRunConfig]
   },
   ...
 ]
 to be used in build_tools/benchmarks/run_benchmarks_on_*.py
 
-Export type: "compilation" outputs a serialized list of module generation config
-defined for compilation statistics, to be used in
+Export type: "compilation" outputs:
+{
+  module_dir_paths: [<paths of dependent module directories>],
+  generation_configs: serialized [ModuleGenerationConfig]
+}
+of generation configs defined for compilation statistics, to be used in
 build_tools/benchmarks/collect_compilation_statistics.py
 """
 
@@ -28,7 +32,7 @@ import pathlib
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
-from typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, Iterable, List, Optional, Set
 import argparse
 import collections
 import dataclasses
@@ -92,6 +96,17 @@ def filter_and_group_run_configs(
   return grouped_run_config_map
 
 
+def _get_distinct_module_dir_paths(
+    module_generation_configs: Iterable[
+        iree_definitions.ModuleGenerationConfig],
+    root_path: pathlib.PurePath = pathlib.PurePath()
+) -> List[str]:
+  module_dir_paths = (str(
+      iree_artifacts.get_module_dir_path(config, root_path=root_path))
+                      for config in module_generation_configs)
+  return sorted(set(module_dir_paths))
+
+
 def _export_execution_handler(args: argparse.Namespace):
   _, all_run_configs = benchmark_collections.generate_benchmarks()
   target_device_names = (set(args.target_device_names)
@@ -111,14 +126,12 @@ def _export_execution_handler(args: argparse.Namespace):
       )
     host_environment = host_environments.pop()
 
-    all_module_dir_paths = (str(
-        iree_artifacts.get_module_dir_path(config.module_generation_config))
-                            for config in run_configs)
-    module_dir_paths = sorted(set(all_module_dir_paths))
+    distinct_module_dir_paths = _get_distinct_module_dir_paths(
+        config.module_generation_config for config in run_configs)
 
     output_map[device_name] = {
         "host_environment": dataclasses.asdict(host_environment),
-        "module_dir_paths": module_dir_paths,
+        "module_dir_paths": distinct_module_dir_paths,
         "run_configs": serialization.serialize_and_pack(run_configs),
     }
 
@@ -132,7 +145,15 @@ def _export_compilation_handler(_args: argparse.Namespace):
       if benchmark_collections.COMPILE_STATS_TAG in config.compile_config.tags
   ]
 
-  return serialization.serialize_and_pack(compile_stats_gen_configs)
+  distinct_module_dir_paths = _get_distinct_module_dir_paths(
+      compile_stats_gen_configs)
+
+  return {
+      "module_dir_paths":
+          distinct_module_dir_paths,
+      "generation_configs":
+          serialization.serialize_and_pack(compile_stats_gen_configs)
+  }
 
 
 def _parse_and_strip_list_argument(arg) -> List[str]:
@@ -168,14 +189,18 @@ def _parse_arguments():
         <target device name>: {
           host_environment: HostEnvironment,
           module_dir_paths: [<paths of dependent module directories>],
-          run_configs: [E2EModelRunConfig]
+          run_configs: serialized [E2EModelRunConfig]
         },
         ...
       ]
       to be used in build_tools/benchmarks/run_benchmarks_on_*.py
 
-      Export type: "compilation" outputs a serialized list of module generation
-      config defined for compilation statistics, to be used in
+      Export type: "compilation" outputs:
+      {
+        module_dir_paths: [<paths of dependent module directories>],
+        generation_configs: serialized [ModuleGenerationConfig]
+      }
+      of generation configs defined for compilation statistics, to be used in
       build_tools/benchmarks/collect_compilation_statistics.py
       """))
 

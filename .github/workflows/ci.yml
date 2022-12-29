@@ -819,6 +819,8 @@ jobs:
     outputs:
       e2e-test-artifacts-dir: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
       e2e-test-artifacts-gcs-artifact-dir: ${{ steps.upload.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      e2e-test-artifacts-build-log: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
+      e2e-test-artifacts-build-log-gcs-artifact: ${{ steps.upload.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
@@ -844,11 +846,14 @@ jobs:
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
+          echo "e2e-test-artifacts-build-log=${BUILD_E2E_TEST_ARTIFACTS_DIR}/.ninja_log" >> "${GITHUB_OUTPUT}"
       - name: "Uploading e2e test artifacts"
         id: upload
         env:
           E2E_TEST_ARTIFACTS_DIR: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
+          E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
+          E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ env.GCS_DIR }}/e2e-test-artifacts/ninja_log
         run: |
           # Uploads all IREE artifacts and MLIR files (including the imported
           # MLIR files and MLIR source models).
@@ -858,12 +863,85 @@ jobs:
             -name "iree_*" -o -name "model_*.mlir" | \
             gcloud alpha storage cp --read-paths-from-stdin -r \
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
+          gcloud alpha storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
+              "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
+          echo "e2e-test-artifacts-build-log-gcs-artifact=${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
-  benchmarks:
+  compilation_benchmarks:
+    needs: [setup, build_e2e_test_artifacts]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+      E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log }}
+      E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
+    outputs:
+      compile-stats-results: ${{ steps.collect.outputs.compile-stats-results }}
+      compile-stats-results-gcs-artifact: ${{ steps.upload.outputs.compile-stats-results-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+      - name: "Exporting configs"
+        id: "export"
+        env:
+          COMPILATION_CONFIG: "compilation-config.json"
+        run: |
+          ./build_tools/benchmarks/export_benchmark_config.py \
+            compilation \
+            --output="${COMPILATION_CONFIG}"
+          echo "compilation-config=${COMPILATION_CONFIG}" >> "${GITHUB_OUTPUT}"
+      - name: "Downloading assets"
+        id: "download-assets"
+        env:
+          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
+        run: |
+          gcloud alpha storage cp \
+            "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" \
+            "${E2E_TEST_ARTIFACTS_BUILD_LOG}"
+          mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
+          jq -r \
+            --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
+            '.module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
+            "${COMPILATION_CONFIG}" | \
+            gcloud alpha storage cp -r --read-paths-from-stdin \
+              "${E2E_TEST_ARTIFACTS_DIR}"
+      - name: "Collecting compilation statistics"
+        id: collect
+        env:
+          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
+          GENERATION_CONFIG: generation-config.json
+          COMPILE_STATS_RESULTS: benchmark-results/compile-stats-results.json
+        run: |
+          jq '.generation_configs' "${COMPILATION_CONFIG}" > "${GENERATION_CONFIG}"
+          mkdir -p benchmark-results
+          ./build_tools/benchmarks/collect_compilation_statistics.py alpha \
+            --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
+            --build_log="${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
+            --generation_config="${GENERATION_CONFIG}" \
+            --output="${COMPILE_STATS_RESULTS}"
+          echo "compile-stats-results=${COMPILE_STATS_RESULTS}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading benchmark results"
+        id: upload
+        env:
+          COMPILE_STATS_RESULTS: ${{ steps.collect.outputs.compile-stats-results }}
+          COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.collect.outputs.compile-stats-results }}
+        run: |
+          gcloud alpha storage cp \
+            "${COMPILE_STATS_RESULTS}" \
+            "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
+          echo "compile-stats-results-gcs-artifact=${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
+
+  execution_benchmarks:
     needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
     if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
-    uses: ./.github/workflows/benchmarks.yml
+    uses: ./.github/workflows/benchmark_execution.yml
     with:
       # env.GCS_DIR is also duplicated in this workflow. See the note there on
       # why this is.
@@ -1111,7 +1189,8 @@ jobs:
       - test_benchmark_suites
 
       # Benchmark pipeline
-      - benchmarks
+      - compilation_benchmarks
+      - execution_benchmarks
     steps:
       - name: Getting failed jobs
         id: failed_jobs
