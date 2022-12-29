@@ -19,17 +19,40 @@ all but a few IPs and even those are internal to the network.
 
 import argparse
 import http.server
+import subprocess
+from http.client import INTERNAL_SERVER_ERROR, NOT_FOUND, OK
+
+RUNNER_SERVICE_NAME = "gh-runner"
+CHECK_SERVICE_CMD = ["systemctl", "is-active", RUNNER_SERVICE_NAME]
+CHECK_SERVICE_TIMEOUT = 10
 
 
 class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
 
-  def do_GET(self):
-    self.send_response(200)
+  def send_success(self):
+    self.send_response(OK)
     self.send_header("Content-type", "text/html")
     self.end_headers()
 
+  def do_GET(self):
+    try:
+      subprocess.run(CHECK_SERVICE_CMD,
+                     check=True,
+                     text=True,
+                     stdout=subprocess.PIPE,
+                     timeout=CHECK_SERVICE_TIMEOUT)
+    except subprocess.TimeoutExpired as e:
+      msg = f"'{' '.join(e.cmd)}' timed out: {e.stdout}"
+      return self.send_error(INTERNAL_SERVER_ERROR, msg)
+    except subprocess.CalledProcessError as e:
+      return self.send_error(
+          NOT_FOUND, f"Runner service not found: '{' '.join(e.cmd)}' returned"
+          f" '{e.stdout.strip()}' (exit code {e.returncode})")
 
-def main(args):
+    return self.send_success()
+
+
+def main(args: argparse.Namespace):
   webServer = http.server.HTTPServer(("", args.port), HealthCheckHandler)
   print(f"Server started on port {args.port}. Ctrl+C to stop.")
 
@@ -39,7 +62,6 @@ def main(args):
     # Don't print an exception on interrupt. Add a newline to handle printing of
     # "^C"
     print()
-    pass
 
   webServer.server_close()
   print("Server stopped.")

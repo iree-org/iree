@@ -55,21 +55,22 @@ echo "Registering the runner."
 runuser --user runner /runner-root/config/register.sh
 
 echo "Setting up the deregister service."
-cp /runner-root/config/github-actions-runner-deregister.service /etc/systemd/system/
+cp /runner-root/config/gh-runner-deregister.service /etc/systemd/system/
 
 echo "Setting up the runner service."
-cp /runner-root/config/github-actions-runner-start.service /etc/systemd/system/
+cp /runner-root/config/gh-runner.service /etc/systemd/system/
+
+echo "Setting up the health check service."
+cp /runner-root/config/health-check.service /etc/systemd/system/
 
 echo "Reloading system service files to reflect changes."
 systemctl daemon-reload
 
 echo "Enabling the deregister service."
-systemctl enable github-actions-runner-deregister
+systemctl enable gh-runner-deregister
 
 echo "Starting the runner service."
-systemctl start github-actions-runner-start
+systemctl start gh-runner
 
-# The health check server confirms that we've at least made it this far and
-# therefore registering the runner has succeeded.
-echo "Starting health check server"
-/runner-root/config/health_server/health_server.py
+echo "Starting the health check service"
+systemctl start health-check
