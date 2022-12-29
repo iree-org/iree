@@ -7,7 +7,6 @@
 
 from dataclasses import dataclass
 from typing import Dict, List, Sequence
-import collections
 import pathlib
 
 from benchmark_suites.iree import benchmark_collections
@@ -203,7 +202,7 @@ def generate_rules(
 
   rule_builder = IreeRuleBuilder(package_name=package_name)
 
-  all_imported_models = collections.OrderedDict(
+  all_imported_models = dict(
       (config.imported_model.model.id, config.imported_model)
       for config in module_generation_configs)
 
