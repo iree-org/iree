@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "affinemin_canonicalization.mlir"
     "bufferize_copy_only_dispatches.mlir"
     "canonicalize_interface_load_store.mlir"
+    "chained_reduction.mlir"
     "convert_to_destination_passing_style.mlir"
     "dead_alloc.mlir"
     "decompose_linalg_generic.mlir"
@@ -52,6 +53,7 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
+    chained_reduction_match_spec.mlir
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir
 )

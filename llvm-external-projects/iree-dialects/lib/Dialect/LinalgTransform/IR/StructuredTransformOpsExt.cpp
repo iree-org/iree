@@ -1235,6 +1235,7 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   transform_ext::StructuredOpMatcher pattern, fill, leading, trailing;
   transform_ext::MatchedReductionCaptures ignore;
   makeReductionMatcher(pattern, fill, leading, trailing, ignore);
+  pattern = pattern.allTilableOpsCaptured<func::FuncOp>();
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
@@ -1269,12 +1270,88 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
+static DiagnosedSilenceableFailure
+chainedReductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
+                         const mlir::transform::TransformState &state,
+                         ValueRange handles) {
+  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+
+  transform_ext::StructuredOpMatcher reduction_1, fill_1, leading_1, trailing_1;
+  transform_ext::StructuredOpMatcher reduction_2, fill_2, leading_2, trailing_2;
+  transform_ext::MatchedReductionCaptures captures_1, captures_2;
+  makeReductionMatcher(reduction_1, fill_1, leading_1, trailing_1, captures_1);
+  makeReductionMatcher(reduction_2, fill_2, leading_2, trailing_2, captures_2,
+                       /*leadingOptional=*/false);
+
+  // TODO: is there any way to make leading_2 an optional match and latch onto
+  // reduction_2 instead?
+  leading_2.input(1, reduction_1);
+  reduction_2 = reduction_2.allTilableOpsCaptured<func::FuncOp>();
+
+  // TODO: need a mechanism for this to go around the entire IR,
+  // potentially with list matches for each group.
+  Operation *root = state.getPayloadOps(handles[0])[0];
+
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    reduction_2.resetCapture();
+    if (!matchPattern(op, reduction_2))
+      return WalkResult::advance();
+
+    // Note that trailing_1 and leading_2 are identical elementwise matchers, so
+    // they match the exact same operation.
+    assert(trailing_1.getCaptured() == leading_2.getCaptured() &&
+           "expected leading 1 and trailing 2 to be the same for the "
+           "composition to work");
+
+    LLVM_DEBUG({
+      DBGS() << "leading 1: ";
+      if (leading_1.getCaptured())
+        llvm::dbgs() << leading_1.getCaptured();
+      llvm::dbgs() << "\n";
+      DBGS() << "fill_1: " << fill_1.getCaptured() << "\n";
+      DBGS() << "reduction_1: " << reduction_1.getCaptured() << "\n";
+      DBGS() << "trailing_1: ";
+      if (trailing_1.getCaptured())
+        llvm::dbgs() << trailing_1.getCaptured();
+      llvm::dbgs() << "\n";
+
+      DBGS() << "leading 2: ";
+      if (leading_2.getCaptured())
+        llvm::dbgs() << leading_2.getCaptured();
+      llvm::dbgs() << "\n";
+      DBGS() << "fill_2: " << fill_2.getCaptured() << "\n";
+      DBGS() << "reduction_2: " << reduction_2.getCaptured() << "\n";
+      DBGS() << "trailing_2: ";
+      if (trailing_2.getCaptured())
+        llvm::dbgs() << trailing_2.getCaptured();
+      llvm::dbgs() << "\n";
+    });
+
+    res.addPotentiallyEmptyPayloadGroup(leading_1.getCaptured());
+    res.addPayloadGroup({fill_1.getCaptured()});
+    res.addPayloadGroup({reduction_1.getCaptured()});
+    res.addPayloadGroup({leading_2.getCaptured()});
+    res.addPayloadGroup({fill_2.getCaptured()});
+    res.addPayloadGroup({reduction_2.getCaptured()});
+    res.addPotentiallyEmptyPayloadGroup(trailing_2.getCaptured());
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
 DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
     mlir::transform::TransformResults &results,
     mlir::transform::TransformState &state) {
   auto &registry = state.addExtension<transform_ext::MatchCallbacksRegistry>();
   registry.registerCallback("_test_match_callback", testMatchCallbackCallback);
   registry.registerCallback("reduction", reductionCallback);
+  registry.registerCallback("chained_reduction", chainedReductionCallback);
   return DiagnosedSilenceableFailure::success();
 }
 

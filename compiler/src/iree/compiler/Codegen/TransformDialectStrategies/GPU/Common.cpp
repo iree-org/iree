@@ -381,7 +381,9 @@ LogicalResult mlir::iree_compiler::gpu::matchAndSetReductionStrategy(
   StructuredOpMatcher reduction, fill, leading, trailing;
   transform_ext::MatchedReductionCaptures captures;
   makeReductionMatcher(reduction, fill, leading, trailing, captures);
-  if (!matchPattern(op, reduction)) return failure();
+  if (!matchPattern(op, reduction.allTilableOpsCaptured<func::FuncOp>())) {
+    return failure();
+  }
 
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.

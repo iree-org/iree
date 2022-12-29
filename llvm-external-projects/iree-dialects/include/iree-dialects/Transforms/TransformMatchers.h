@@ -557,7 +557,8 @@ void makeReductionMatcher(StructuredOpMatcher &reduction,
                           StructuredOpMatcher &fill,
                           StructuredOpMatcher &leading,
                           StructuredOpMatcher &trailing,
-                          MatchedReductionCaptures &captures);
+                          MatchedReductionCaptures &captures,
+                          bool leadingOptional = true);
 
 } // namespace transform_ext
 } // namespace mlir

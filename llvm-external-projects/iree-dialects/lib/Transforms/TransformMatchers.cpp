@@ -556,7 +556,7 @@ void transform_ext::makeReductionMatcher(
     transform_ext::StructuredOpMatcher &fill,
     transform_ext::StructuredOpMatcher &leading,
     transform_ext::StructuredOpMatcher &trailing,
-    MatchedReductionCaptures &captures) {
+    MatchedReductionCaptures &captures, bool leadingOptional) {
   // The core part of the matcher is anchored on a particular reduction op.
   reduction =
       m_StructuredOp()
@@ -637,7 +637,7 @@ void transform_ext::makeReductionMatcher(
           // Capture output elemental type.
           .output(0, CaptureElementTypeBitWidth(
                          captures.maybeLeadingOutputElementalTypeBitWidth));
-  reduction = reduction.input(0, leading, OptionalMatch());
+  reduction = reduction.input(0, leading, OptionalMatch(leadingOptional));
 
   // Optional trailing can be any map, transpose, broadcast but not reduce or
   // windowing operation for now.
@@ -653,6 +653,5 @@ void transform_ext::makeReductionMatcher(
           // Capture output elemental type.
           .output(0, CaptureElementTypeBitWidth(
                          captures.maybeTrailingOutputElementalTypeBitWidth));
-  reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch())
-                  .allTilableOpsCaptured<func::FuncOp>();
+  reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch());
 }
