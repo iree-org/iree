@@ -55,6 +55,9 @@ cp /runner-root/config/gh-runner-deregister.service /etc/systemd/system/
 echo "Setting up the runner service."
 cp /runner-root/config/gh-runner.service /etc/systemd/system/
 
+echo "Setting up the health check service."
+cp /runner-root/config/health-check.service /etc/systemd/system/
+
 echo "Reloading system service files to reflect changes."
 systemctl daemon-reload
 
@@ -64,7 +67,5 @@ systemctl enable gh-runner-deregister
 echo "Starting the runner service."
 systemctl start gh-runner
 
-# The health check server confirms that we've at least made it this far and
-# therefore registering the runner has succeeded.
-echo "Starting health check server"
-/runner-root/config/health_server/health_server.py
+echo "Starting the health check service"
+systemctl start health-check
