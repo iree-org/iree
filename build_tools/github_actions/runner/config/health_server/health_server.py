@@ -52,7 +52,7 @@ class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
     return self.send_success()
 
 
-def main(args: argparse.Namespace()):
+def main(args: argparse.Namespace):
   webServer = http.server.HTTPServer(("", args.port), HealthCheckHandler)
   print(f"Server started on port {args.port}. Ctrl+C to stop.")
 
