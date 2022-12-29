@@ -15,5 +15,6 @@
 set -euo pipefail
 
 echo "Starting runner"
+exit 1
 
 /runner-root/actions-runner/bin/Runner.Listener run --startuptype service
