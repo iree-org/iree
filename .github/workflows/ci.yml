@@ -1070,6 +1070,8 @@ jobs:
     if: always()
     runs-on: ubuntu-20.04
     needs:
+      - setup
+
       # Basic
       - build_all
       - build_test_all_windows
@@ -1111,7 +1113,22 @@ jobs:
       # Benchmark pipeline
       - benchmarks
     steps:
-      - name: Getting combined job status
+      - name: Getting failed jobs
+        id: failed_jobs
         run: |
-          echo '${{ toJson(needs.*.result) }}' \
-            | jq --exit-status 'all(.=="success" or .=="skipped")' > /dev/null
+          echo '${{ toJson(needs) }}'
+          FAILED_JOBS="$(echo '${{ toJson(needs) }}' \
+            | jq --raw-output \
+            'map_values(select(.result!="success" and .result!="skipped")) | keys | join(",")' \
+          )"
+          echo "failed-jobs=${FAILED_JOBS}" >> $GITHUB_OUTPUT
+          if [[ "${FAILED_JOBS}" != "" ]]; then
+            echo "The following jobs failed: ${FAILED_JOBS}"
+            exit 1
+          fi
+      - name: Posting to Discord
+        uses: sarisia/actions-status-discord@c193626e5ce172002b8161e116aa897de7ab5383 # v1.10.2
+        if: failure() && needs.setup.outputs.ci-stage == 'postsubmit'
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
