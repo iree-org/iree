@@ -9,8 +9,6 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -20,6 +18,15 @@ using namespace mlir;
 
 #define DEBUG_TYPE "transform-matchers"
 #define DBGS() llvm::dbgs() << "[" DEBUG_TYPE "] "
+
+void transform_ext::CapturingOpMatcher::getAllNested(
+    SmallVectorImpl<CapturingOpMatcher *> &nested) {
+  int64_t start = nested.size();
+  llvm::append_range(nested, nestedCapturingMatchers);
+  for (int64_t position = start; position < nested.size(); ++position) {
+    llvm::append_range(nested, nested[position]->nestedCapturingMatchers);
+  }
+}
 
 //===---------------------------------------------------------------------===//
 // StructuredOpMatcher and friends.
