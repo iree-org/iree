@@ -14,8 +14,6 @@ SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 source "${SCRIPT_DIR}/functions.sh"
 
 
-sleep 100
-
 # If the nice way fails, hard shutdown
 function shutdown_now() {
   sudo /usr/sbin/shutdown -P now
