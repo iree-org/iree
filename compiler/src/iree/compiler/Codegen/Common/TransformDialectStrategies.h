@@ -25,12 +25,31 @@ int64_t previousMultipleOf(int64_t val, int64_t multiple);
 ///        a.k.a `ceildiv(val, multiple) * multiple`.
 int64_t nextMultipleOf(int64_t val, int64_t multiple);
 
+/// Find the highest divisor of `value` that is smaller than `limit`. This is
+/// useful to capture any tiling that is guaranteed to keep the IR static.
+/// Asserts that `limit` is smaller than 1024 to avoid prohibitively long
+/// compile time overheads.
+// TODO: approximate with a faster implementation based on a few desirable
+// primes.
+FailureOr<int64_t> maxDivisorOfValueBelowLimit(int64_t value, int64_t limit);
+
 //===----------------------------------------------------------------------===//
 // Low-level reusable builder APIs, these should follow MLIR-style builders.
 //===----------------------------------------------------------------------===//
 
 /// Prints `handles` in order. Prints the whole IR if `handles` is empty.
 void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
+
+/// Dynamically selects the first non-empty handle; i.e. if (h1, h2) is:
+///   - (non-empty, non-empty), returns (h1, h2)
+///   - (empty, non-empty), returns (h2, empty)
+///   - (non-empty, empty), returns (h1, empty)
+///   - (empty, empty), returns (empty, empty)
+/// This is used as a normalization operation that replaces conditionals, either
+/// in C++ or in transform IR.
+/// This can be thought of as a control-flow -> data-dependent conversion.
+std::pair<Value, Value> buildSelectFirstNonEmpty(ImplicitLocOpBuilder &b,
+                                                 Value handle1, Value handle2);
 
 /// Result of the combined transform performing tiling, fusion and
 /// distribution to parallel constructs.

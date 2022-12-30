@@ -129,5 +129,5 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 //   CHECK-LABEL: func.func @group_reduction_32
 //         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
-//         CHECK:   transform.structured.tile_reduction_using_foreach_thread %{{.*}} by num_threads = [0, 32], tile_sizes = [0, 4], mapping = [#gpu.thread<x>]
+//         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}}   num_threads [32] tile_sizes [](mapping = [#gpu.thread<x>])
 //         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [32, 1, 1]}
