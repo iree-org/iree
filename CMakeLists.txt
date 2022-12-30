@@ -756,15 +756,17 @@ if(IREE_BUILD_BENCHMARKS)
   add_subdirectory(benchmarks)
 endif()
 
+# tools/ can depend on compiler/ and runtime/.
+# Note: tools sub directory is added before compiler/ so that phony targets for
+# files with the same names from different rules are disambiguated towards
+# those in tools/.
+add_subdirectory(tools)
+
 if(IREE_BUILD_COMPILER)
   add_subdirectory(compiler)
 endif()
 
 add_subdirectory(runtime)
-
-# tools/ can depend on compiler/ and runtime/
-add_subdirectory(tools)
-
 
 if(IREE_ENABLE_CLANG_TIDY)
   set(CMAKE_CXX_CLANG_TIDY "")
