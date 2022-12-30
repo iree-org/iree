@@ -613,8 +613,7 @@ static void createCudaReductionStrategyStagedThreadDistribution(
   createCommonTrailingStrategy(b, variantH, strategy);
 }
 
-static std::tuple<Value, Value, Value>
-createSmallReductionStrategyThreadDistribution(
+static void createSmallReductionStrategyThreadDistribution(
     ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
     Value maybeTrailingH, const GPUReductionStrategy &strategy) {
   auto [fusionTargetH, fusionGroupH] =
@@ -642,28 +641,36 @@ createSmallReductionStrategyThreadDistribution(
   Value fusedH = b.create<ScalarizeOp>(
       pdlOperation, tileResult.resultingFusedOpsHandles.front());
 
+  // Splitting into explicit vector<4> helps a lot on alignment.
+  constexpr int64_t vectorSize = 4;
+  // TODO: first split should be dynamic and based on the future stride.
+  if (ShapedType::isDynamic(strategy.captures.reductionDimensionSize)) return;
+  if (strategy.captures.reductionDimensionSize <= vectorSize - 1) return;
+
   auto [blockReductionH, maybeBlockTrailingH] =
       iree_compiler::buildSelectFirstNonEmpty(b, fusedH, tiledH);
 
-  // Splitting into explicit vector<4> helps a lot on alignment.
-  // TODO: first split should be dynamic and based on the future stride.
-  assert(!ShapedType::isDynamic(strategy.captures.reductionDimensionSize) &&
-         "reduction must be static to split a constant number of times");
-  for (int64_t i = 0, e = (strategy.captures.reductionDimensionSize - 1) / 4;
-       i < e; ++i) {
-    auto split = b.create<transform::SplitOp>(
+  if (strategy.captures.reductionDimensionSize % vectorSize != 0) {
+    int64_t splitSize = iree_compiler::previousMultipleOf(
+        strategy.captures.reductionDimensionSize, vectorSize);
+    auto splitBlockReductionOp = b.create<transform::SplitOp>(
         pdlOperation, pdlOperation, blockReductionH,
         b.getI64IntegerAttr(strategy.captures.reductionRank - 1), Value(),
-        b.getI64IntegerAttr(4));
-    blockReductionH = split.getSecond();
-    auto split2 = b.create<transform::SplitOp>(
+        b.getI64IntegerAttr(splitSize));
+    blockReductionH = splitBlockReductionOp.getFirst();
+    auto splitBlockTrailingOp = b.create<transform::SplitOp>(
         pdlOperation, pdlOperation, maybeBlockTrailingH,
         b.getI64IntegerAttr(strategy.captures.reductionRank - 1), Value(),
-        b.getI64IntegerAttr(4));
-    maybeBlockTrailingH = split2.getSecond();
+        b.getI64IntegerAttr(splitSize));
+    maybeBlockTrailingH = splitBlockTrailingOp.getFirst();
   }
-
-  return std::make_tuple(maybeLeadingH, blockReductionH, maybeBlockTrailingH);
+  // Tile the reduction by vector size.
+  iree_compiler::buildTileFuseToScfFor(
+      b, blockReductionH, ValueRange{},
+      getAsOpFoldResult(b.getI64ArrayAttr({0, vectorSize})));
+  iree_compiler::buildTileFuseToScfFor(
+      b, maybeBlockTrailingH, ValueRange{},
+      getAsOpFoldResult(b.getI64ArrayAttr({0, vectorSize})));
 }
 
 /// Builds the transform IR tiling reductions for CUDA targets. Supports
