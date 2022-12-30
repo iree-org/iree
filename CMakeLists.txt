@@ -756,7 +756,10 @@ if(IREE_BUILD_BENCHMARKS)
   add_subdirectory(benchmarks)
 endif()
 
-# tools/ can depend on compiler/ and runtime/
+# tools/ can depend on compiler/ and runtime/.
+# Note: tools sub directory is added before compiler/ so that phony targets for
+# files with the same names from different rules are disambiguated towards
+# those in tools/.
 add_subdirectory(tools)
 
 if(IREE_BUILD_COMPILER)
