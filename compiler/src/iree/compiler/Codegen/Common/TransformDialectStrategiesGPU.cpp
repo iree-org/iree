@@ -644,6 +644,25 @@ createSmallReductionStrategyThreadDistribution(
 
   auto [blockReductionH, maybeBlockTrailingH] =
       iree_compiler::buildSelectFirstNonEmpty(b, fusedH, tiledH);
+
+  // Splitting into explicit vector<4> helps a lot on alignment.
+  // TODO: first split should be dynamic and based on the future stride.
+  assert(!ShapedType::isDynamic(strategy.captures.reductionDimensionSize) &&
+         "reduction must be static to split a constant number of times");
+  for (int64_t i = 0, e = (strategy.captures.reductionDimensionSize - 1) / 4;
+       i < e; ++i) {
+    auto split = b.create<transform::SplitOp>(
+        pdlOperation, pdlOperation, blockReductionH,
+        b.getI64IntegerAttr(strategy.captures.reductionRank - 1), Value(),
+        b.getI64IntegerAttr(4));
+    blockReductionH = split.getSecond();
+    auto split2 = b.create<transform::SplitOp>(
+        pdlOperation, pdlOperation, maybeBlockTrailingH,
+        b.getI64IntegerAttr(strategy.captures.reductionRank - 1), Value(),
+        b.getI64IntegerAttr(4));
+    maybeBlockTrailingH = split2.getSecond();
+  }
+
   return std::make_tuple(maybeLeadingH, blockReductionH, maybeBlockTrailingH);
 }
 
