@@ -27,8 +27,8 @@ int64_t nextMultipleOf(int64_t val, int64_t multiple);
 
 /// Find the highest divisor of `value` that is smaller than `limit`. This is
 /// useful to capture any tiling that is guaranteed to keep the IR static.
-/// Asserts that `limit` is smaller than 1024 to avoid prohibitively long
-/// compile time overheads.
+/// Conservatively return failure when `limit` is greater than 1024 to avoid
+/// prohibitively long compile time overheads.
 // TODO: approximate with a faster implementation based on a few desirable
 // primes.
 FailureOr<int64_t> maxDivisorOfValueBelowLimit(int64_t value, int64_t limit);

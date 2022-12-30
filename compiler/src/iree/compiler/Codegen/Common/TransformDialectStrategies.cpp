@@ -76,7 +76,11 @@ int64_t mlir::iree_compiler::nextMultipleOf(int64_t val, int64_t multiple) {
 
 FailureOr<int64_t> mlir::iree_compiler::maxDivisorOfValueBelowLimit(
     int64_t value, int64_t limit) {
-  assert(limit <= 1024 && "limit must be smaller than 1024");
+  // Conservatively return failure when `limit` is greater than 1024 to avoid
+  // prohibitively long compile time overheads.
+  // TODO: approximate with a faster implementation based on a few desirable
+  // primes.
+  if (limit > 1024) return failure();
   // If either value or limit is <= 0, the loop is skipped and we fail.
   for (int64_t i = std::min(value, limit); i > 1; --i)
     if (value % i == 0) return i;
