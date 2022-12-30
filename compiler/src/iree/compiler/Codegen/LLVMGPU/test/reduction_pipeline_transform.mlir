@@ -31,12 +31,16 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Small reduction computes the whole reduction on a single thread.
 //   CHECK-LABEL: func.func @small_reduction
 //     CHECK-NOT:   memref.alloc()
-//     CHECK: gpu.thread_id  x
-//     CHECK: vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<13xf32>
-//     CHECK: vector.extractelement %{{.*}}[] : vector<f32>
-//     CHECK: vector.reduction <add>, %{{.*}} : vector<13xf32> into f32
-//     CHECK: vector.broadcast %{{.*}} : f32 to vector<f32>
-//     CHECK: vector.transfer_write {{.*}} : vector<f32>, memref<1024xf32>
+//         CHECK: gpu.thread_id  x
+//         CHECK: vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<4xf32>
+//         CHECK: vector.reduction <add>, %{{.*}} : vector<4xf32> into f32
+//         CHECK: vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<4xf32>
+//         CHECK: vector.reduction <add>, %{{.*}} : vector<4xf32> into f32
+//         CHECK: vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<4xf32>
+//         CHECK: vector.reduction <add>, %{{.*}} : vector<4xf32> into f32
+//         CHECK: vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<f32>
+//         CHECK: arith.addf %{{.*}} : f32
+//         CHECK: vector.transfer_write {{.*}} : vector<f32>, memref<1024xf32>
 
 // -----
 

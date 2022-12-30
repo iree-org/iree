@@ -613,8 +613,7 @@ static void createCudaReductionStrategyStagedThreadDistribution(
   createCommonTrailingStrategy(b, variantH, strategy);
 }
 
-static std::tuple<Value, Value, Value>
-createSmallReductionStrategyThreadDistribution(
+static void createSmallReductionStrategyThreadDistribution(
     ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
     Value maybeTrailingH, const GPUReductionStrategy &strategy) {
   auto [fusionTargetH, fusionGroupH] =
@@ -644,7 +643,24 @@ createSmallReductionStrategyThreadDistribution(
 
   auto [blockReductionH, maybeBlockTrailingH] =
       iree_compiler::buildSelectFirstNonEmpty(b, fusedH, tiledH);
-  return std::make_tuple(maybeLeadingH, blockReductionH, maybeBlockTrailingH);
+
+  // Splitting into explicit vector<4> helps a lot on alignment.
+  // TODO: first split should be dynamic and based on the future stride.
+  if (ShapedType::isDynamic(strategy.captures.reductionDimensionSize)) return;
+
+  for (int64_t i = 0, e = (strategy.captures.reductionDimensionSize - 1) / 4;
+       i < e; ++i) {
+    auto split = b.create<transform::SplitOp>(
+        pdlOperation, pdlOperation, blockReductionH,
+        b.getI64IntegerAttr(strategy.captures.reductionRank - 1), Value(),
+        b.getI64IntegerAttr(4));
+    blockReductionH = split.getSecond();
+    auto split2 = b.create<transform::SplitOp>(
+        pdlOperation, pdlOperation, maybeBlockTrailingH,
+        b.getI64IntegerAttr(strategy.captures.reductionRank - 1), Value(),
+        b.getI64IntegerAttr(4));
+    maybeBlockTrailingH = split2.getSecond();
+  }
 }
 
 /// Builds the transform IR tiling reductions for CUDA targets. Supports
