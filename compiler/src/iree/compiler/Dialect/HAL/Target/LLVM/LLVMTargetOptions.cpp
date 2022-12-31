@@ -25,8 +25,8 @@ LLVMTargetOptions getDefaultLLVMTargetOptions() {
   static LLVMTargetOptions targetOptions;
   static std::once_flag onceFlag;
   std::call_once(onceFlag, [&]() {
-    // Host target triple.
-    targetOptions.target.triple = llvm::sys::getDefaultTargetTriple();
+    // Get process target triple along with host CPU name and features.
+    targetOptions.target.triple = llvm::sys::getProcessTriple();
     targetOptions.target.cpu = llvm::sys::getHostCPUName().str();
     {
       llvm::SubtargetFeatures features;
