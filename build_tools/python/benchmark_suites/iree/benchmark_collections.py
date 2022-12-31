@@ -51,7 +51,9 @@ def generate_benchmarks(
             # Enable zip polyglot to provide component sizes.
             "--iree-vm-emit-polyglot-zip=true",
             # Disable debug symbols to provide correct component sizes.
-            "--iree-llvmcpu-debug-symbols=false"
+            "--iree-llvmcpu-debug-symbols=false",
+            "--iree-scheduling-dump-statistics-format=json",
+            f"--iree-scheduling-dump-statistics-file={iree_definitions.MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER}/stream_stats.json"
         ])
     compile_stats_gen_configs.append(
         iree_definitions.ModuleGenerationConfig.build(

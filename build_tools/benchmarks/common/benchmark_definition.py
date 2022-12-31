@@ -493,20 +493,40 @@ class ModuleComponentSizes(object):
 
 
 @dataclass(frozen=True)
+class ModuleStreamStatistics(object):
+  fill_count: int
+  copy_count: int
+  dispatch_count: int
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return ModuleStreamStatistics(**json_object)
+
+
+@dataclass(frozen=True)
 class CompilationStatistics(object):
   compilation_info: CompilationInfo
   # Module file and component sizes.
   module_component_sizes: ModuleComponentSizes
+  # Module stream-level statistics
+  module_stream_stats: Optional[ModuleStreamStatistics]
   # Module compilation time in ms.
   compilation_time_ms: int
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
+    module_stream_stats_json = json_object.get("module_stream_stats")
+    if module_stream_stats_json is None:
+      module_stream_stats = None
+    else:
+      module_stream_stats = ModuleStreamStatistics.from_json_object(
+          module_stream_stats_json)
     return CompilationStatistics(
         compilation_info=CompilationInfo.from_json_object(
             json_object["compilation_info"]),
         module_component_sizes=ModuleComponentSizes.from_json_object(
             json_object["module_component_sizes"]),
+        module_stream_stats=module_stream_stats,
         compilation_time_ms=json_object["compilation_time_ms"])
 
 

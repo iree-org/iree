@@ -22,9 +22,10 @@ import os
 import re
 import zipfile
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from typing import BinaryIO, Dict, List, Optional, TextIO
 
+from common import benchmark_definition
 from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes, get_git_commit_hash
 from common.benchmark_suite import BenchmarkSuite
 from common import benchmark_config
@@ -47,6 +48,12 @@ DISPATCH_COMPONENT_PATTERNS = [
     r".+_cuda_nvptx_fb\.fb",
     r".+_vmvx_bytecode_fb\.fb",
 ]
+
+
+@dataclass(frozen=True)
+class ModuleInfo(object):
+  module_path: pathlib.Path
+  stream_stats_path: Optional[pathlib.Path] = None
 
 
 def match_module_cmake_target(module_path: pathlib.PurePath) -> Optional[str]:
@@ -161,13 +168,15 @@ def get_module_map_from_compilation_benchmark_config(
     module_dir_path = iree_artifacts.get_module_dir_path(
         module_generation_config=gen_config, root_path=e2e_test_artifacts_dir)
     module_path = module_dir_path / iree_artifacts.MODULE_FILENAME
-    module_map[compilation_info] = pathlib.Path(module_path)
+    module_map[compilation_info] = ModuleInfo(
+        module_path=pathlib.Path(module_path),
+        stream_stats_path=module_dir_path / "stream_stats.json")
 
   return module_map
 
 
 def get_module_map_from_benchmark_suite(
-    benchmark_suite_dir: pathlib.Path) -> Dict[CompilationInfo, pathlib.Path]:
+    benchmark_suite_dir: pathlib.Path) -> Dict[CompilationInfo, ModuleInfo]:
   benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
       benchmark_suite_dir)
   module_map = {}
@@ -192,8 +201,8 @@ def get_module_map_from_benchmark_suite(
           model_source=category,
           target_arch=benchmark_case.target_arch,
           compile_tags=tuple(benchmark_case.bench_mode))
-      module_map[compilation_info] = (benchmark_case_dir /
-                                      module_path).resolve()
+      module_map[compilation_info] = ModuleInfo(
+          module_path=(benchmark_case_dir / module_path).resolve())
 
   return module_map
 
@@ -282,7 +291,8 @@ def main(args: argparse.Namespace):
     target_build_time_map = parse_compilation_time_from_ninja_log(log_file)
 
   compilation_statistics_list = []
-  for compilation_info, module_path in module_map.items():
+  for compilation_info, module_info in module_map.items():
+    module_path = module_info.module_path
     with module_path.open("rb") as module_file:
       module_component_sizes = get_module_component_info(
           module_file,
@@ -293,9 +303,21 @@ def main(args: argparse.Namespace):
       raise RuntimeError(
           f"Module path isn't a module cmake target: {module_path}")
     compilation_time_ms = target_build_time_map[cmake_target]
+
+    if module_info.stream_stats_path is None:
+      module_stream_stats = None
+    else:
+      stream_stats_json = json.loads(module_info.stream_stats_path.read_text())
+      execution_stats_json = stream_stats_json["stream-aggregate"]["execution"]
+      module_stream_stats = benchmark_definition.ModuleStreamStatistics(
+          fill_count=execution_stats_json["fill-count"],
+          copy_count=execution_stats_json["copy-count"],
+          dispatch_count=execution_stats_json["dispatch-count"])
+
     compilation_statistics = CompilationStatistics(
         compilation_info=compilation_info,
         module_component_sizes=module_component_sizes,
+        module_stream_stats=module_stream_stats,
         compilation_time_ms=compilation_time_ms)
     compilation_statistics_list.append(compilation_statistics)
 

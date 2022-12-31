@@ -8,6 +8,7 @@
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
+import pathlib
 from typing import List, Optional, Sequence
 
 from e2e_test_framework.definitions import common_definitions
@@ -245,6 +246,9 @@ class ImportedModel(object):
                import_config=config)
 
 
+MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER = "${MODULE_DIR}"
+
+
 @serialization.serializable(type_key="iree_module_generation_configs",
                             id_field="composite_id")
 @dataclass(frozen=True)
@@ -263,9 +267,12 @@ class ModuleGenerationConfig(object):
   def __str__(self):
     return self.name
 
-  def materialize_compile_flags(self):
+  def materialize_compile_flags(self, module_dir_path: pathlib.PurePath):
     """Materialize flags with dependent values."""
-    return self.compile_flags
+    return [
+        flag.replace(MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER,
+                     str(module_dir_path)) for flag in self.compile_flags
+    ]
 
   @classmethod
   def build(cls, imported_model: ImportedModel, compile_config: CompileConfig):
