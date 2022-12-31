@@ -391,8 +391,18 @@ LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
   return eliminateEmptyTensors(
       rewriter, op, state,
       /*anchorMatchFunc=*/
-      [&](OpOperand &operand, SmallVector<Value> &) {
-        return isa<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
+      [&](OpOperand &operand, SmallVector<Value> &neededValues) {
+        auto storeOp =
+            dyn_cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
+        if (!storeOp) return false;
+        neededValues.append(storeOp.getOffsets().begin(),
+                            storeOp.getOffsets().end());
+        neededValues.append(storeOp.getSizes().begin(),
+                            storeOp.getSizes().end());
+        neededValues.append(storeOp.getStrides().begin(),
+                            storeOp.getStrides().end());
+        neededValues.push_back(storeOp.getTarget());
+        return true;
       },
       /*rewriteFunc=*/
       [](OpBuilder &b, Location loc, OpOperand &operand) {
