@@ -29,15 +29,15 @@ TEMPLATE_CONFIG_REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
 TEMPLATE_BASE_NAME="${TEMPLATE_BASE_NAME:-${PROD_TEMPLATE_BASE_NAME}}"
 
 if (( TESTING==0 )) && ! git merge-base --is-ancestor "${TEMPLATE_CONFIG_REF}" main; then
-  echo "Creating testing template because TEMPLATE_CONFIG_REF='${TEMPLATE_CONFIG_REF}' is not on the main branch"
+  echo "Creating testing template because TEMPLATE_CONFIG_REF='${TEMPLATE_CONFIG_REF}' is not on the main branch" >&2
   TESTING=1
 fi
 if (( TESTING==0 )) && [[ "${TEMPLATE_CONFIG_REPO}" != "${PROD_TEMPLATE_CONFIG_REPO}" ]]; then
-  echo "Creating testing template because TEMPLATE_CONFIG_REPO '${TEMPLATE_CONFIG_REPO}'!='${PROD_TEMPLATE_CONFIG_REPO}'"
+  echo "Creating testing template because TEMPLATE_CONFIG_REPO '${TEMPLATE_CONFIG_REPO}'!='${PROD_TEMPLATE_CONFIG_REPO}'" >&2
   TESTING=1
 fi
 if (( TESTING==0 )) && [[ "${TEMPLATE_BASE_NAME}" != "${PROD_TEMPLATE_BASE_NAME}" ]]; then
-  echo "Creating testing template because TEMPLATE_BASE_NAME '${TEMPLATE_BASE_NAME}'!='${PROD_TEMPLATE_BASE_NAME}'"
+  echo "Creating testing template because TEMPLATE_BASE_NAME '${TEMPLATE_BASE_NAME}'!='${PROD_TEMPLATE_BASE_NAME}'" >&2
   TESTING=1
 fi
 
@@ -118,6 +118,10 @@ function create_template() {
 
   local -a cmd=(
     gcloud compute instance-templates create
+    --quiet
+  )
+
+  cmd+=(
     "${TEMPLATE_BASE_NAME}-${group}-${type}-${VERSION}"
     "${common_args[@]}"
     --service-account="github-runner-${trust}-trust@iree-oss.iam.gserviceaccount.com"
@@ -147,8 +151,9 @@ function create_template() {
     # Prefix the command with a noop. It will still be printed by set -x
     cmd=(":" "${cmd[@]}")
   fi
-  (set -x; "${cmd[@]}")
-  echo ''
+
+  (set -x; "${cmd[@]}") >&2
+  echo '' >&2
 }
 
 for group in presubmit postsubmit; do
@@ -156,4 +161,6 @@ for group in presubmit postsubmit; do
     create_template "${group}" "${type}"
   done
 done
-echo "Created new templates for version: ${VERSION}"
+
+echo "Created new templates for version: ${VERSION}" >&2
+echo "${VERSION}"
