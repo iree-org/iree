@@ -8,11 +8,9 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
-
-source "${SCRIPT_DIR}/functions.sh"
+source /runner-root/config/functions.sh
 
 RUNNER_GROUP="$(get_attribute github-runner-group)"
 
-"${SCRIPT_DIR}/validate_trigger.${RUNNER_GROUP}.sh"
-"${SCRIPT_DIR}/chown_workdir.sh"
+"/runner-root/config/hooks/validate_trigger.${RUNNER_GROUP}.sh"
+/runner-root/config/hooks/chown_workdir.sh

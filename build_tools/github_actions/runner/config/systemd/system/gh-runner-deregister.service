@@ -7,7 +7,7 @@ Before=halt.target shutdown.target reboot.target
 User=runner
 Group=runner
 Type=oneshot
-ExecStart=/runner-root/config/deregister.sh
+ExecStart=/runner-root/config/systemd/scripts/deregister.sh
 RemainAfterExit=yes
 
 [Install]

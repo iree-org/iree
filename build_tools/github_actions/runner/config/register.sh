@@ -12,8 +12,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
-source "${SCRIPT_DIR}/functions.sh"
+source /runner-root/config/functions.sh
 
 # These use OS inventory management to fetch information about the VM operating
 # system (https://cloud.google.com/compute/docs/instances/os-inventory-management).
