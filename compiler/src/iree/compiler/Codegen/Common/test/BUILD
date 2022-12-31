@@ -25,6 +25,7 @@ iree_lit_test_suite(
             "dead_alloc.mlir",
             "decompose_linalg_generic.mlir",
             "distribute_gpu_shared_memory.mlir",
+            "eliminate_empty_tensors.mlir",
             "erase_hal_descriptor_type.mlir",
             "flatten_memref_subspan.mlir",
             "fold_affine_min_in_distributed_loops.mlir",
