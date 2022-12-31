@@ -60,6 +60,7 @@ See https://cloud.google.com/functions/docs for more details.
 """
 
 import os
+import random
 import re
 import time
 from http.client import (BAD_REQUEST, FORBIDDEN, INTERNAL_SERVER_ERROR,
@@ -78,8 +79,7 @@ AUTH_HEADER_PREFIX = "Bearer "
 ALLOWED_HTTP_METHODS = ["DELETE", "GET"]
 MIG_METADATA_KEY = "created-by"
 ALLOWED_MIG_PATTERN_ENV_VARIABLE = "ALLOWED_MIG_PATTERN"
-STABILIZE_TIMEOUT_SECONDS = 30
-STABILIZE_RETRY_INTERVAL_SECONDS = 2
+STABILIZE_TIMEOUT_SECONDS = 100
 
 instances_client = compute.InstancesClient()
 migs_client = compute.RegionInstanceGroupManagersClient()
@@ -176,9 +176,11 @@ def should_scale_down(mig_name: str, project: str, region: str):
                             instance_group_manager=mig_name)
       if mig.status.is_stable:
         break
-      print(f"{mig_name} is not stable. Retrying in {STABILIZE_RETRY_INTERVAL}"
-            f" seconds")
-      time.sleep(STABILIZE_RETRY_INTERVAL_SECONDS)
+      # We sleep for a random amount of time here to avoid synchronizing callers
+      # waiting for the MIG to be stable.
+      sleep_secs = random.randint(1, 15)
+      print(f"{mig_name} is not stable. Retrying in {sleep_secs} seconds")
+      time.sleep(sleep_secs)
   except google.api_core.exceptions.NotFound as e:
     print(e)
     return flask.abort(

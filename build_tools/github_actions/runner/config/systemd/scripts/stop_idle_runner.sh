@@ -13,16 +13,14 @@ set -euo pipefail
 
 source /runner-root/config/functions.sh
 
-SLEEP_MAX=30
-
-function get_self_status() {
-  nice_curl localhost:8080 || ret=$?
+function get_runner_status() {
+  nice_curl localhost:8080; ret=$?
   if (( ret!=0 )); then
     echo "failed"
   fi
 }
 
-function should_scale_down() {
+function get_should_scale_down() {
   local self_deletion_service_url="$(get_attribute instance-self-deleter-url)"
   local id_token=$(get_metadata "instance/service-accounts/default/identity?audience=${self_deletion_service_url}&format=full")
 
@@ -30,31 +28,38 @@ function should_scale_down() {
 }
 
 function maybe_stop_runner() {
-  if [[ "$(get_self_status)" != "idle" ]]; then
+  echo "Checking runner status"
+  local runner_status="$(get_runner_status)"
+  echo "runner_status='${runner_status}'"
+  if [[ "${runner_status}" != "idle" ]]; then
+    echo "Exiting"
     return 0
   fi
+  echo "Proceeding"
 
-  if [[ "$(should_scale_down)" != "true" ]]; then
+  echo "Checking MIG autoscaling status. This could take a while as it waits" \
+       "for the MIG to stabilize."
+  local should_scale_down="$(get_should_scale_down)"
+  echo "should_scale_down='${should_scale_down}'"
+  if [[ "${should_scale_down}" != "true" ]]; then
+    echo "Exiting"
     return 0
   fi
+  echo "Proceeding"
 
-  # Sleep for a random interval. This is to avoid runners all shutting
-  # themselves down at once since waiting for the MIG to be stable will
-  # synchronize them.
-  sleep "$((${RANDOM} % ${SLEEP_MAX}))"
-
-  # Now repeat our queries. In reverse order because the second one is faster
-  # and it's more important that it be correct before we proceed because we
-  # definitely don't want to stop a runner that's in the middle of a job. We did
-  # the self status check first before because it's much faster.
-  if [[ "$(should_scale_down)" != "true" ]]; then
+  # Double check that the runner is still idle. The above call can take a while
+  # as it waits random intervals for the MIG to be become stable. We definitely
+  # don't want to stop a runner that's in the middle of a job. We did the runner
+  # status check first before because it's much faster and an easy chance to
+  # bail out.
+  echo "Rechecking runner status"
+  local runner_status="$(get_runner_status)"
+  echo "runner_status='${runner_status}'"
+  if [[ "${runner_status}" != "idle" ]]; then
+    echo "Exiting"
     return 0
   fi
-
-  if [[ "$(get_self_status)" != "idle" ]]; then
-    return 0
-  fi
-
+  echo "Stopping runner"
   systemctl stop gh-runner
 }
 
