@@ -15,6 +15,7 @@ SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 
 TESTING="${TEMPLATE_TESTING:-0}"
 DRY_RUN="${DRY_RUN:-0}"
+TESTING_SELF_DELETER="${TESTING_SELF_DELETER:-0}"
 
 GPU_IMAGE="github-runner-gpu-2022-09-29-1664451806"
 GPU_DISK_SIZE_GB=100
@@ -59,7 +60,12 @@ GITHUB_RUNNER_SCOPE=iree-org
 GITHUB_RUNNER_VERSION="2.299.1"
 GITHUB_RUNNER_ARCHIVE_DIGEST="147c14700c6cb997421b9a239c012197f11ea9854cd901ee88ead6fe73a72c74"
 GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
-INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-zbhz5clunq-uc.a.run.app"
+
+if (( TESTING_SELF_DELETER==1 )); then
+  INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-testing-zbhz5clunq-uc.a.run.app"
+else
+  INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-zbhz5clunq-uc.a.run.app"
+fi
 
 declare -a METADATA=(
   "github-runner-version=${GITHUB_RUNNER_VERSION}"
