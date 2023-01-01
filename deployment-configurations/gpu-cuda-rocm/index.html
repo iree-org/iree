@@ -1248,13 +1248,13 @@ environment. It can be verified by the following steps:</p>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>Run the following command in a shell:</p>
-<div class="highlight"><pre><span></span><code>nvidia-smi <span class="p">|</span> grep CUDA
+<div class="highlight"><pre><span></span><code>nvidia-smi<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>CUDA
 </code></pre></div>
 <p>If <code>nvidia-smi</code> does not exist, you will need to <a href="https://developer.nvidia.com/cuda-downloads">install the latest CUDA Toolkit SDK</a>.</p>
 </div>
 <div class="tabbed-block">
 <p>Run the following command in a shell:</p>
-<div class="highlight"><pre><span></span><code>rocm-smi <span class="p">|</span> grep rocm
+<div class="highlight"><pre><span></span><code>rocm-smi<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>rocm
 </code></pre></div>
 <p>If <code>rocm-smi</code> does not exist, you will need to <a href="https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html">install the latest ROCm Toolkit SDK</a>.</p>
 </div>
@@ -1276,7 +1276,7 @@ to build IREE from source, then enable the CUDA HAL driver with the
 <p>Python packages for various IREE functionalities are regularly published
 to <a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the <a href="../../bindings/python/">Python Bindings</a> page for more
 details. The core <code>iree-compiler</code> package includes the CUDA compiler:</p>
-<div class="highlight"><pre><span></span><code>python -m pip install iree-compiler
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-compiler
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
@@ -1284,7 +1284,7 @@ details. The core <code>iree-compiler</code> package includes the CUDA compiler:
 you pip install with the user mode, it is under <code>${HOME}/.local/bin</code>, or
 <code>%APPDATA%Python</code> on Windows. You may want to include the path in your
 system's <code>PATH</code> environment variable.
-<div class="highlight"><pre><span></span><code><span class="nb">export</span> <span class="nv">PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/.local/bin:<span class="si">${</span><span class="nv">PATH</span><span class="si">}</span>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/.local/bin:<span class="si">${</span><span class="nv">PATH</span><span class="si">}</span>
 </code></pre></div></p>
 </div>
 </div>
@@ -1314,12 +1314,12 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 <div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Nvidia/CUDA</label><label for="__tabbed_3_2">AMD/ROCm</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>iree-compile <span class="se">\</span>
-<span class="hll">    --iree-hal-target-backends<span class="o">=</span>cuda <span class="se">\</span>
-</span><span class="hll">    --iree-hal-cuda-llvm-target-arch<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
-</span><span class="hll">    --iree-hal-cuda-disable-loop-nounroll-wa <span class="se">\</span>
-</span>    --iree-input-type<span class="o">=</span>mhlo <span class="se">\</span>
-    iree_input.mlir -o mobilenet-cuda.vmfb
+<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-hal-cuda-llvm-target-arch<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-hal-cuda-disable-loop-nounroll-wa<span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>--iree-input-type<span class="o">=</span>mhlo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet-cuda.vmfb
 </code></pre></div>
 <p>Note that a cuda target architecture(<code>iree-hal-cuda-llvm-target-arch</code>) of
 the form <code>sm_&lt;arch_number&gt;</code> is needed to compile towards each GPU
@@ -1354,13 +1354,13 @@ architecture. If no architecture is specified then we will default to
 </table>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>iree-compile <span class="se">\</span>
-<span class="hll">    --iree-hal-target-backends<span class="o">=</span>rocm <span class="se">\</span>
-</span><span class="hll">    --iree-rocm-target-chip<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
-</span><span class="hll">    --iree-rocm-link-bc<span class="o">=</span><span class="nb">true</span> <span class="se">\</span>
-</span><span class="hll">    --iree-rocm-bc-dir<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
-</span>    --iree-input-type<span class="o">=</span>mhlo <span class="se">\</span>
-    iree_input.mlir -o mobilenet-rocm.vmfb
+<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>rocm<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-rocm-target-chip<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-rocm-link-bc<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-rocm-bc-dir<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>--iree-input-type<span class="o">=</span>mhlo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet-rocm.vmfb
 </code></pre></div>
 <p>Note ROCm Bitcode Dir(<code>iree-rocm-bc-dir</code>) path is required. If the system you are compiling IREE in has ROCm installed, then the default value of <code>/opt/rocm/amdgcn/bitcode</code> will usually suffice. If you intend on building ROCm compiler in a non-ROCm capable system, please set <code>iree-rocm-bc-dir</code> to the absolute path where you might have saved the amdgcn bitcode.</p>
 <p>Note that a ROCm target chip(<code>iree-rocm-target-chip</code>) of the form <code>gfx&lt;arch_number&gt;</code> is needed
@@ -1401,19 +1401,19 @@ Here are a table of commonly used architecture</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="4:2"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Nvidia/CUDA</label><label for="__tabbed_4_2">AMD/ROCm</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>iree-run-module <span class="se">\</span>
-<span class="hll">    --device<span class="o">=</span>cuda <span class="se">\</span>
-</span>    --module_file<span class="o">=</span>mobilenet-cuda.vmfb <span class="se">\</span>
-    --entry_function<span class="o">=</span>predict <span class="se">\</span>
-    --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
+<div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--device<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>--module_file<span class="o">=</span>mobilenet-cuda.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--entry_function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>iree-run-module <span class="se">\</span>
-<span class="hll">    --device<span class="o">=</span>rocm <span class="se">\</span>
-</span>    --module_file<span class="o">=</span>mobilenet-rocm.vmfb <span class="se">\</span>
-    --entry_function<span class="o">=</span>predict <span class="se">\</span>
-    --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
+<div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--device<span class="o">=</span>rocm<span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>--module_file<span class="o">=</span>mobilenet-rocm.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--entry_function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
 </code></pre></div>
 </div>
 </div>

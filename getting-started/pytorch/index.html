@@ -1166,17 +1166,17 @@ as well as models defined using <a href="https://pytorch.org/functorch/"><code>f
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>Install IREE pip packages, either from pip or by
 <a href="../../building-from-source/python-bindings-and-importers/">building from source</a>:</p>
-<div class="highlight"><pre><span></span><code>pip install <span class="se">\</span>
-  iree-compiler <span class="se">\</span>
-  iree-runtime
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-runtime
 </code></pre></div>
 <p>Install <a href="https://github.com/llvm/torch-mlir"><code>torch-mlir</code></a>, necessary for
 compiling PyTorch models to a format IREE is able to execute:</p>
-<div class="highlight"><pre><span></span><code>pip install -f https://llvm.github.io/torch-mlir/package-index/ torch-mlir
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-f<span class="w"> </span>https://llvm.github.io/torch-mlir/package-index/<span class="w"> </span>torch-mlir
 </code></pre></div>
 <p>A special <code>iree_torch</code> package makes it easy to compile PyTorch programs and
 run them on IREE:</p>
-<div class="highlight"><pre><span></span><code>pip install git+https://github.com/iree-org/iree-torch.git
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>git+https://github.com/iree-org/iree-torch.git
 </code></pre></div>
 <h2 id="running-a-model">Running a model<a class="headerlink" href="#running-a-model" title="Permanent link">&para;</a></h2>
 <p>Going from a loaded PyTorch model to one that's executing on IREE happens in

@@ -1179,14 +1179,14 @@ or stored in the <code>SavedModel</code>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>Install TensorFlow by following the
 <a href="https://www.tensorflow.org/install">official documentation</a>:</p>
-<div class="highlight"><pre><span></span><code>python -m pip install tf-nightly
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>tf-nightly
 </code></pre></div>
 <p>Install IREE pip packages, either from pip or by
 <a href="../../building-from-source/python-bindings-and-importers/">building from source</a>:</p>
-<div class="highlight"><pre><span></span><code>python -m pip install <span class="se">\</span>
-  iree-compiler <span class="se">\</span>
-  iree-runtime <span class="se">\</span>
-  iree-tools-tf
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-runtime<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-tools-tf
 </code></pre></div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -1221,9 +1221,9 @@ supported via <code>iree-import-tf -help</code>. Using
 <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>
 as an example and assuming the serving signature is <code>predict</code>:</p>
 <div class="highlight"><pre><span></span><code>iree-import-tf
-  --tf-import-type<span class="o">=</span>savedmodel_v1 <span class="se">\</span>
-  --tf-savedmodel-exported-names<span class="o">=</span>predict <span class="se">\</span>
-  /path/to/savedmodel -o iree_input.mlir
+<span class="w">  </span>--tf-import-type<span class="o">=</span>savedmodel_v1<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tf-savedmodel-exported-names<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>/path/to/savedmodel<span class="w"> </span>-o<span class="w"> </span>iree_input.mlir
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>

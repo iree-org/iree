@@ -1123,10 +1123,10 @@ FlatBuffers</a>. These files can be
 imported into an IREE-compatible format then compiled to a series of backends.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>Install TensorFlow-Lite specific dependencies using pip:</p>
-<div class="highlight"><pre><span></span><code>python -m pip install <span class="se">\</span>
-  iree-compiler <span class="se">\</span>
-  iree-runtime <span class="se">\</span>
-  iree-tools-tflite
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-runtime<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-tools-tflite
 </code></pre></div>
 <h2 id="importing-and-compiling">Importing and Compiling<a class="headerlink" href="#importing-and-compiling" title="Permanent link">&para;</a></h2>
 <p>IREE's tooling is divided into two components: import and compilation.</p>
@@ -1146,17 +1146,17 @@ be executed by IREE.</li>
 <span class="nv">MODULE_PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">WORKDIR</span><span class="si">}</span>/module.vmfb
 
 <span class="c1"># Fetch the sample model</span>
-wget <span class="si">${</span><span class="nv">TFLITE_URL</span><span class="si">}</span> -O <span class="si">${</span><span class="nv">TFLITE_PATH</span><span class="si">}</span>
+wget<span class="w"> </span><span class="si">${</span><span class="nv">TFLITE_URL</span><span class="si">}</span><span class="w"> </span>-O<span class="w"> </span><span class="si">${</span><span class="nv">TFLITE_PATH</span><span class="si">}</span>
 
 <span class="c1"># Import the sample model to an IREE compatible form</span>
-iree-import-tflite <span class="si">${</span><span class="nv">TFLITE_PATH</span><span class="si">}</span> -o <span class="si">${</span><span class="nv">IMPORT_PATH</span><span class="si">}</span>
+iree-import-tflite<span class="w"> </span><span class="si">${</span><span class="nv">TFLITE_PATH</span><span class="si">}</span><span class="w"> </span>-o<span class="w"> </span><span class="si">${</span><span class="nv">IMPORT_PATH</span><span class="si">}</span>
 
 <span class="c1"># Compile for the CPU backend</span>
-iree-compile <span class="se">\</span>
-    --iree-input-type<span class="o">=</span>tosa <span class="se">\</span>
-    --iree-hal-target-backends<span class="o">=</span>llvm-cpu <span class="se">\</span>
-    <span class="si">${</span><span class="nv">IMPORT_PATH</span><span class="si">}</span> <span class="se">\</span>
-    -o <span class="si">${</span><span class="nv">MODULE_PATH</span><span class="si">}</span>
+iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--iree-input-type<span class="o">=</span>tosa<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="si">${</span><span class="nv">IMPORT_PATH</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-o<span class="w"> </span><span class="si">${</span><span class="nv">MODULE_PATH</span><span class="si">}</span>
 </code></pre></div>
 <h3 id="using-the-python-api">Using the Python API<a class="headerlink" href="#using-the-python-api" title="Permanent link">&para;</a></h3>
 <p>The example below demonstrates downloading, compiling, and executing a TFLite

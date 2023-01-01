@@ -1295,7 +1295,7 @@ architectures are well optimized; etc.</p>
 <p>Python packages for various IREE functionalities are regularly published
 to <a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the <a href="../../bindings/python/">Python Bindings</a> page for more
 details. The core <code>iree-compiler</code> package includes the LLVM-based CPU compiler:</p>
-<div class="highlight"><pre><span></span><code>python -m pip install iree-compiler
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-compiler
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
@@ -1303,7 +1303,7 @@ details. The core <code>iree-compiler</code> package includes the LLVM-based CPU
 pip install with the user mode, it is under <code>${HOME}/.local/bin</code>, or
 <code>%APPDATA%Python</code> on Windows. You may want to include the path in your
 system's <code>PATH</code> environment variable.
-<div class="highlight"><pre><span></span><code><span class="nb">export</span> <span class="nv">PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/.local/bin:<span class="si">${</span><span class="nv">PATH</span><span class="si">}</span>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/.local/bin:<span class="si">${</span><span class="nv">PATH</span><span class="si">}</span>
 </code></pre></div></p>
 </div>
 <h4 id="build-compiler-from-source">Build compiler from source<a class="headerlink" href="#build-compiler-from-source" title="Permanent link">&para;</a></h4>
@@ -1333,10 +1333,10 @@ weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classifi
 <h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>Run the following command (passing <code>--iree-input-type=</code> as needed for your
 import tool):</p>
-<div class="highlight"><pre><span></span><code>iree-compile <span class="se">\</span>
-<span class="hll">    --iree-hal-target-backends<span class="o">=</span>llvm-cpu <span class="se">\</span>
-</span>    --iree-input-type<span class="o">=</span>mhlo <span class="se">\</span>
-    iree_input.mlir -o mobilenet_cpu.vmfb
+<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>--iree-input-type<span class="o">=</span>mhlo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_cpu.vmfb
 </code></pre></div>
 <p>where <code>iree_input.mlir</code> is the imported program.</p>
 <div class="admonition tip">
@@ -1362,11 +1362,11 @@ options are <code>ON</code> when configuring for the target.</p>
 <h3 id="run-the-model">Run the model<a class="headerlink" href="#run-the-model" title="Permanent link">&para;</a></h3>
 <h4 id="run-using-the-command-line">Run using the command-line<a class="headerlink" href="#run-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>In the build directory, run the following command:</p>
-<div class="highlight"><pre><span></span><code>tools/iree-run-module <span class="se">\</span>
-<span class="hll">    --device<span class="o">=</span>local-task <span class="se">\</span>
-</span>    --module_file<span class="o">=</span>mobilenet_cpu.vmfb <span class="se">\</span>
-    --entry_function<span class="o">=</span>predict <span class="se">\</span>
-    --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
+<div class="highlight"><pre><span></span><code>tools/iree-run-module<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>--module_file<span class="o">=</span>mobilenet_cpu.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--entry_function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
 </code></pre></div>
 <p>The above assumes the exported function in the model is named as <code>predict</code> and
 it expects one 224x224 RGB image. We are feeding in an image with all 0 values

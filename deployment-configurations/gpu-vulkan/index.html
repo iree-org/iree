@@ -1336,7 +1336,7 @@ make sure the device's Android version is 10 or higher.</p>
 </div>
 <div class="tabbed-block">
 <p>Run the following command in a shell:</p>
-<div class="highlight"><pre><span></span><code>vulkaninfo <span class="p">|</span> grep apiVersion
+<div class="highlight"><pre><span></span><code>vulkaninfo<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>apiVersion
 </code></pre></div>
 <p>If <code>vulkaninfo</code> does not exist, you will need to <a href="https://vulkan.lunarg.com/sdk/home/">install the latest Vulkan
 SDK</a>. For Ubuntu 18.04/20.04, installing via LunarG's package
@@ -1347,7 +1347,7 @@ driver for your GPU.</p>
 </div>
 <div class="tabbed-block">
 <p>Run the following command in a shell:</p>
-<div class="highlight"><pre><span></span><code>vulkaninfo <span class="p">|</span> grep apiVersion
+<div class="highlight"><pre><span></span><code>vulkaninfo<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>apiVersion
 </code></pre></div>
 <p>If <code>vulkaninfo</code> does not exist, you will need to <a href="https://vulkan.lunarg.com/sdk/home/">install the latest Vulkan
 SDK</a>.</p>
@@ -1380,7 +1380,7 @@ binary exchange format, which the model must be compiled into.</p>
 <p>Python packages for various IREE functionalities are regularly published
 to <a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the <a href="../../bindings/python/">Python Bindings</a> page for more
 details. The core <code>iree-compiler</code> package includes the SPIR-V compiler:</p>
-<div class="highlight"><pre><span></span><code>python -m pip install iree-compiler
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-compiler
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
@@ -1388,7 +1388,7 @@ details. The core <code>iree-compiler</code> package includes the SPIR-V compile
 pip install with the user mode, it is under <code>${HOME}/.local/bin</code>, or
 <code>%APPDATA%Python</code> on Windows. You may want to include the path in your
 system's <code>PATH</code> environment variable.
-<div class="highlight"><pre><span></span><code><span class="nb">export</span> <span class="nv">PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/.local/bin:<span class="si">${</span><span class="nv">PATH</span><span class="si">}</span>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/.local/bin:<span class="si">${</span><span class="nv">PATH</span><span class="si">}</span>
 </code></pre></div></p>
 </div>
 <h4 id="build-compiler-from-source">Build compiler from source<a class="headerlink" href="#build-compiler-from-source" title="Permanent link">&para;</a></h4>
@@ -1412,11 +1412,11 @@ weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classifi
 <h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>Run the following command (passing <code>--iree-input-type=</code> as needed for your
 import tool):</p>
-<p><div class="highlight"><pre><span></span><code>iree-compile <span class="se">\</span>
-<span class="hll">    --iree-hal-target-backends<span class="o">=</span>vulkan-spirv <span class="se">\</span>
-</span><span class="hll">    --iree-vulkan-target-triple<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
-</span>    --iree-input-type<span class="o">=</span>mhlo <span class="se">\</span>
-    iree_input.mlir -o mobilenet-vulkan.vmfb
+<p><div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>vulkan-spirv<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-vulkan-target-triple<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>--iree-input-type<span class="o">=</span>mhlo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet-vulkan.vmfb
 </code></pre></div>
 where <code>iree_input.mlir</code> is the imported program.</p>
 <p>Note that a target triple of the form <code>&lt;vendor/arch&gt;-&lt;product&gt;-&lt;os&gt;</code> is needed
@@ -1457,11 +1457,11 @@ currently recognized ones:</p>
 <h3 id="run-the-model">Run the model<a class="headerlink" href="#run-the-model" title="Permanent link">&para;</a></h3>
 <h4 id="run-using-the-command-line">Run using the command-line<a class="headerlink" href="#run-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>In the build directory, run the following command:</p>
-<div class="highlight"><pre><span></span><code>tools/iree-run-module <span class="se">\</span>
-<span class="hll">    --device<span class="o">=</span>vulkan <span class="se">\</span>
-</span>    --module_file<span class="o">=</span>mobilenet-vulkan.vmfb <span class="se">\</span>
-    --entry_function<span class="o">=</span>predict <span class="se">\</span>
-    --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
+<div class="highlight"><pre><span></span><code>tools/iree-run-module<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--device<span class="o">=</span>vulkan<span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>--module_file<span class="o">=</span>mobilenet-vulkan.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--entry_function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
 </code></pre></div>
 <p>The above assumes the exported function in the model is named as <code>predict</code> and
 it expects one 224x224 RGB image. We are feeding in an image with all 0 values

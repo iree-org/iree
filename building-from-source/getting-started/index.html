@@ -1132,7 +1132,7 @@ improve support for these are always welcome.</p>
 </li>
 </ol>
 <p>On a relatively recent Debian/Ubuntu:</p>
-<div class="highlight"><pre><span></span><code>sudo apt install cmake ninja-build clang lld
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>cmake<span class="w"> </span>ninja-build<span class="w"> </span>clang<span class="w"> </span>lld
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -1146,7 +1146,7 @@ improve support for these are always welcome.</p>
 </li>
 </ol>
 <p>If using Homebrew:</p>
-<div class="highlight"><pre><span></span><code>brew install cmake ninja
+<div class="highlight"><pre><span></span><code>brew<span class="w"> </span>install<span class="w"> </span>cmake<span class="w"> </span>ninja
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -1177,9 +1177,9 @@ for details.</p>
 <h2 id="clone-and-build">Clone and build<a class="headerlink" href="#clone-and-build" title="Permanent link">&para;</a></h2>
 <p>Use <a href="https://git-scm.com/">Git</a> to clone the IREE repository and initialize its
 submodules:</p>
-<div class="highlight"><pre><span></span><code>git clone https://github.com/iree-org/iree.git
-<span class="nb">cd</span> iree
-git submodule update --init
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/iree-org/iree.git
+<span class="nb">cd</span><span class="w"> </span>iree
+git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init
 </code></pre></div>
 <p>Configure then build all targets using CMake:</p>
 <p>Configure CMake:</p>
@@ -1187,12 +1187,12 @@ git submodule update --init
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><span class="c1"># Recommended for simple development using clang and lld:</span>
-cmake -GNinja -B ../iree-build/ -S . <span class="se">\</span>
-    -DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo <span class="se">\</span>
-    -DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON <span class="se">\</span>
-    -DCMAKE_C_COMPILER<span class="o">=</span>clang <span class="se">\</span>
-    -DCMAKE_CXX_COMPILER<span class="o">=</span>clang++ <span class="se">\</span>
-    -DIREE_ENABLE_LLD<span class="o">=</span>ON
+cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DCMAKE_C_COMPILER<span class="o">=</span>clang<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DCMAKE_CXX_COMPILER<span class="o">=</span>clang++<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_ENABLE_LLD<span class="o">=</span>ON
 
 <span class="c1"># Alternately, with system compiler and your choice of CMake generator:</span>
 <span class="c1"># cmake -B ../iree-build/ -S .</span>
@@ -1205,15 +1205,15 @@ cmake -GNinja -B ../iree-build/ -S . <span class="se">\</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>cmake -GNinja -B ../iree-build/ -S . <span class="se">\</span>
-    -DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo <span class="se">\</span>
-    -DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON
 </code></pre></div>
 </div>
 </div>
 </div>
 <p>Build:</p>
-<div class="highlight"><pre><span></span><code>cmake --build ../iree-build/
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/
 </code></pre></div>
 <details class="tip" open="open">
 <summary>Tip</summary>
@@ -1230,16 +1230,16 @@ for general details.</p>
 
 <h3 id="running-tests">Running tests<a class="headerlink" href="#running-tests" title="Permanent link">&para;</a></h3>
 <p>Build test dependencies:</p>
-<div class="highlight"><pre><span></span><code>cmake --build ../iree-build --target iree-test-deps
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build<span class="w"> </span>--target<span class="w"> </span>iree-test-deps
 </code></pre></div>
 <p>Run all built tests through
 <a href="https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest">CTest</a>:</p>
-<div class="highlight"><pre><span></span><code>ctest --test-dir ../iree-build/ --output-on-failure
+<div class="highlight"><pre><span></span><code>ctest<span class="w"> </span>--test-dir<span class="w"> </span>../iree-build/<span class="w"> </span>--output-on-failure
 </code></pre></div>
 <h3 id="take-a-look-around">Take a look around<a class="headerlink" href="#take-a-look-around" title="Permanent link">&para;</a></h3>
 <p>Check out the contents of the 'tools' build directory:</p>
-<div class="highlight"><pre><span></span><code>ls ../iree-build/tools/
-../iree-build/tools/iree-compile --help
+<div class="highlight"><pre><span></span><code>ls<span class="w"> </span>../iree-build/tools/
+../iree-build/tools/iree-compile<span class="w"> </span>--help
 </code></pre></div>
 <!-- TODO(scotttodd): troubleshooting section? link to github issues? -->
 

@@ -1238,23 +1238,23 @@ through the Hardware Abstraction Layer (HAL) interface.</p>
 <h2 id="using-the-c-api">Using the C API<a class="headerlink" href="#using-the-c-api" title="Permanent link">&para;</a></h2>
 <h3 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h3>
 <p>Include headers:</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/base/api.h&quot;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/api.h&quot;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/vm/api.h&quot;</span><span class="cp"></span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/base/api.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/api.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/vm/api.h&quot;</span>
 
 <span class="c1">// The VM bytecode and HAL modules will typically be included, along</span>
 <span class="c1">// with those for the specific HAL drivers your application uses.</span>
 <span class="c1">// Functionality extensions can be used via custom modules.</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/modules/hal/module.h&quot;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/drivers/local_task/registration/driver_module.h&quot;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/vm/bytecode_module.h&quot;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/modules/hal/module.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/drivers/local_task/registration/driver_module.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/vm/bytecode_module.h&quot;</span>
 </code></pre></div>
 <p>Check the API version and register components:</p>
 <div class="highlight"><pre><span></span><code><span class="c1">// Device drivers are managed through registries.</span>
 <span class="c1">// Applications may use multiple registries to more finely control driver</span>
 <span class="c1">// lifetimes and visibility.</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_local_task_driver_module_register</span><span class="p">(</span><span class="w"></span>
-<span class="w">    </span><span class="n">iree_hal_driver_registry_default</span><span class="p">()));</span><span class="w"></span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_local_task_driver_module_register</span><span class="p">(</span>
+<span class="w">    </span><span class="n">iree_hal_driver_registry_default</span><span class="p">()));</span>
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
@@ -1265,36 +1265,36 @@ Applications should propagate errors and handle or report them as desired.</p>
 <p>Create a VM instance along with a HAL driver and device:</p>
 <div class="highlight"><pre><span></span><code><span class="c1">// Applications should try to reuse instances so resource usage across contexts</span>
 <span class="c1">// is handled and extraneous device interaction is avoided.</span>
-<span class="n">iree_vm_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_instance_create</span><span class="p">(</span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">instance</span><span class="p">));</span><span class="w"></span>
+<span class="n">iree_vm_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_instance_create</span><span class="p">(</span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">instance</span><span class="p">));</span>
 
 <span class="c1">// Modules with custom types must be statically registered before use.</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_module_register_all_types</span><span class="p">(</span><span class="n">instance</span><span class="p">));</span><span class="w"></span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_module_register_all_types</span><span class="p">(</span><span class="n">instance</span><span class="p">));</span>
 
 <span class="c1">// We use the CPU &quot;local-task&quot; driver in this example, but could use a different</span>
 <span class="c1">// driver like the GPU &quot;vulkan&quot; driver. The driver(s) used should match with</span>
 <span class="c1">// the target(s) specified during compilation.</span>
-<span class="n">iree_hal_driver_t</span><span class="o">*</span><span class="w"> </span><span class="n">driver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_driver_registry_try_create</span><span class="p">(</span><span class="w"></span>
-<span class="w">    </span><span class="n">iree_hal_driver_registry_default</span><span class="p">(),</span><span class="w"></span>
-<span class="w">    </span><span class="n">iree_string_view_literal</span><span class="p">(</span><span class="s">&quot;local-task&quot;</span><span class="p">),</span><span class="w"></span>
-<span class="w">    </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">driver</span><span class="p">));</span><span class="w"></span>
+<span class="n">iree_hal_driver_t</span><span class="o">*</span><span class="w"> </span><span class="n">driver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_driver_registry_try_create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">iree_hal_driver_registry_default</span><span class="p">(),</span>
+<span class="w">    </span><span class="n">iree_string_view_literal</span><span class="p">(</span><span class="s">&quot;local-task&quot;</span><span class="p">),</span>
+<span class="w">    </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">driver</span><span class="p">));</span>
 
 <span class="c1">// Drivers may support multiple devices, such as when a machine has multiple</span>
 <span class="c1">// GPUs. You may either enumerate devices and select based on their properties,</span>
 <span class="c1">// or just use the default device.</span>
-<span class="n">iree_hal_device_t</span><span class="o">*</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_driver_create_default_device</span><span class="p">(</span><span class="w"></span>
-<span class="w">    </span><span class="n">driver</span><span class="p">,</span><span class="w"> </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">device</span><span class="p">));</span><span class="w"></span>
+<span class="n">iree_hal_device_t</span><span class="o">*</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_driver_create_default_device</span><span class="p">(</span>
+<span class="w">    </span><span class="n">driver</span><span class="p">,</span><span class="w"> </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">device</span><span class="p">));</span>
 
 <span class="c1">// Create a HAL module initialized to use the newly created device.</span>
 <span class="c1">// We&#39;ll load this module into a VM context later.</span>
-<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">hal_module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="w"></span>
-<span class="w">    </span><span class="n">iree_hal_module_create</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_HAL_MODULE_FLAG_NONE</span><span class="p">,</span><span class="w"></span>
-<span class="w">                           </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">hal_module</span><span class="p">));</span><span class="w"></span>
+<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">hal_module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span>
+<span class="w">    </span><span class="n">iree_hal_module_create</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_HAL_MODULE_FLAG_NONE</span><span class="p">,</span>
+<span class="w">                           </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">hal_module</span><span class="p">));</span>
 <span class="c1">// The reference to the driver can be released now.</span>
-<span class="n">iree_hal_driver_release</span><span class="p">(</span><span class="n">driver</span><span class="p">);</span><span class="w"></span>
+<span class="n">iree_hal_driver_release</span><span class="p">(</span><span class="n">driver</span><span class="p">);</span>
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
@@ -1304,12 +1304,12 @@ but custom allocators may also be used.</p>
 <p>Load a <abbr title="VM FlatBuffer">vmfb</abbr> bytecode module containing program data:</p>
 <div class="highlight"><pre><span></span><code><span class="c1">// (Application-specific loading into memory, such as loading from a file)</span>
 
-<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">bytecode_module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_bytecode_module_create</span><span class="p">(</span><span class="w"></span>
-<span class="w">    </span><span class="n">instance</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="n">iree_const_byte_span_t</span><span class="p">{</span><span class="n">module_data</span><span class="p">,</span><span class="w"> </span><span class="n">module_size</span><span class="p">},</span><span class="w"></span>
-<span class="w">    </span><span class="cm">/*flatbuffer_allocator=*/</span><span class="n">iree_allocator_null</span><span class="p">(),</span><span class="w"></span>
-<span class="w">    </span><span class="cm">/*allocator=*/</span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bytecode_module</span><span class="p">));</span><span class="w"></span>
+<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">bytecode_module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_bytecode_module_create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">instance</span><span class="p">,</span>
+<span class="w">    </span><span class="n">iree_const_byte_span_t</span><span class="p">{</span><span class="n">module_data</span><span class="p">,</span><span class="w"> </span><span class="n">module_size</span><span class="p">},</span>
+<span class="w">    </span><span class="cm">/*flatbuffer_allocator=*/</span><span class="n">iree_allocator_null</span><span class="p">(),</span>
+<span class="w">    </span><span class="cm">/*allocator=*/</span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bytecode_module</span><span class="p">));</span>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -1320,36 +1320,36 @@ Applications should use what makes sense for their platforms and deployment
 configurations.</p>
 </div>
 <p>Create a VM context and load modules into it:</p>
-<div class="highlight"><pre><span></span><code><span class="n">iree_vm_context_t</span><span class="o">*</span><span class="w"> </span><span class="n">context</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
-<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">modules</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">hal_module</span><span class="p">,</span><span class="w"> </span><span class="n">bytecode_module</span><span class="p">};</span><span class="w"></span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_context_create_with_modules</span><span class="p">(</span><span class="w"></span>
-<span class="w">    </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_VM_CONTEXT_FLAG_NONE</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="n">IREE_ARRAYSIZE</span><span class="p">(</span><span class="n">modules</span><span class="p">),</span><span class="w"> </span><span class="n">modules</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">context</span><span class="p">));</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">iree_vm_context_t</span><span class="o">*</span><span class="w"> </span><span class="n">context</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">modules</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">hal_module</span><span class="p">,</span><span class="w"> </span><span class="n">bytecode_module</span><span class="p">};</span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_context_create_with_modules</span><span class="p">(</span>
+<span class="w">    </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_VM_CONTEXT_FLAG_NONE</span><span class="p">,</span>
+<span class="w">    </span><span class="n">IREE_ARRAYSIZE</span><span class="p">(</span><span class="n">modules</span><span class="p">),</span><span class="w"> </span><span class="n">modules</span><span class="p">,</span>
+<span class="w">    </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">context</span><span class="p">));</span>
 <span class="c1">// References to the modules can be released now.</span>
-<span class="n">iree_vm_module_release</span><span class="p">(</span><span class="n">hal_module</span><span class="p">);</span><span class="w"></span>
-<span class="n">iree_vm_module_release</span><span class="p">(</span><span class="n">bytecode_module</span><span class="p">);</span><span class="w"></span>
+<span class="n">iree_vm_module_release</span><span class="p">(</span><span class="n">hal_module</span><span class="p">);</span>
+<span class="n">iree_vm_module_release</span><span class="p">(</span><span class="n">bytecode_module</span><span class="p">);</span>
 </code></pre></div>
 <p>Look up the function(s) to call:</p>
-<div class="highlight"><pre><span></span><code><span class="n">iree_vm_function_t</span><span class="w"> </span><span class="n">main_function</span><span class="p">;</span><span class="w"></span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_context_resolve_function</span><span class="p">(</span><span class="w"></span>
-<span class="w">    </span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">iree_string_view_literal</span><span class="p">(</span><span class="s">&quot;module.main_function&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">main_function</span><span class="p">));</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">iree_vm_function_t</span><span class="w"> </span><span class="n">main_function</span><span class="p">;</span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_context_resolve_function</span><span class="p">(</span>
+<span class="w">    </span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">iree_string_view_literal</span><span class="p">(</span><span class="s">&quot;module.main_function&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">main_function</span><span class="p">));</span>
 </code></pre></div>
 <h3 id="invoke-functions">Invoke functions<a class="headerlink" href="#invoke-functions" title="Permanent link">&para;</a></h3>
 <!-- TODO(scotttodd): I/O buffers (TODO pending new helpers) -->
 
 <div class="highlight"><pre><span></span><code><span class="c1">// (Application-specific I/O buffer setup, making data available to the device)</span>
 
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_invoke</span><span class="p">(</span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">main_function</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_VM_INVOCATION_FLAG_NONE</span><span class="p">,</span><span class="w"></span>
-<span class="w">                             </span><span class="cm">/*policy=*/</span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="p">,</span><span class="w"> </span><span class="n">outputs</span><span class="p">,</span><span class="w"></span>
-<span class="w">                             </span><span class="n">iree_allocator_system</span><span class="p">()));</span><span class="w"></span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_invoke</span><span class="p">(</span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">main_function</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_VM_INVOCATION_FLAG_NONE</span><span class="p">,</span>
+<span class="w">                             </span><span class="cm">/*policy=*/</span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="p">,</span><span class="w"> </span><span class="n">outputs</span><span class="p">,</span>
+<span class="w">                             </span><span class="n">iree_allocator_system</span><span class="p">()));</span>
 
 <span class="c1">// (Application-specific output buffer retrieval and reading back from the device)</span>
 </code></pre></div>
 <h3 id="cleanup-resources">Cleanup resources<a class="headerlink" href="#cleanup-resources" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="n">iree_hal_device_release</span><span class="p">(</span><span class="n">device</span><span class="p">);</span><span class="w"></span>
-<span class="n">iree_vm_context_release</span><span class="p">(</span><span class="n">context</span><span class="p">);</span><span class="w"></span>
-<span class="n">iree_vm_instance_release</span><span class="p">(</span><span class="n">instance</span><span class="p">);</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">iree_hal_device_release</span><span class="p">(</span><span class="n">device</span><span class="p">);</span>
+<span class="n">iree_vm_context_release</span><span class="p">(</span><span class="n">context</span><span class="p">);</span>
+<span class="n">iree_vm_instance_release</span><span class="p">(</span><span class="n">instance</span><span class="p">);</span>
 </code></pre></div>
 <!-- ## Advanced usage -->
 
