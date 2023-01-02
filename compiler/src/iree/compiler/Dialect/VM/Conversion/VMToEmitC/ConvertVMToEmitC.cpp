@@ -1885,14 +1885,9 @@ class ImportOpConverter {
         /*memberName=*/"module",
         /*operand=*/import);
 
-    auto conditionI1 = builder.create<emitc::CallOp>(
-        /*location=*/location,
-        /*type=*/boolType,
-        /*callee=*/StringAttr::get(ctx, "EMITC_NOT"),
-        /*args=*/
-        ArrayAttr::get(ctx, {builder.getIndexAttr(0)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{importModule});
+    auto conditionI1 = emitc_builders::unaryOperator(
+        builder, location, emitc_builders::UnaryOperator::LOGICAL_NOT,
+        importModule, boolType);
 
     // Start by splitting the block into two. The part before will contain the
     // condition, and the part after will contain the continuation point.
@@ -1924,8 +1919,8 @@ class ImportOpConverter {
     }
 
     builder.setInsertionPointToEnd(condBlock);
-    builder.create<IREE::VM::CondBranchOp>(location, conditionI1.getResult(0),
-                                           failureBlock, continuationBlock);
+    builder.create<IREE::VM::CondBranchOp>(location, conditionI1, failureBlock,
+                                           continuationBlock);
 
     builder.setInsertionPointToStart(continuationBlock);
   }
@@ -2068,15 +2063,9 @@ class ImportOpConverter {
       Type valueType = typeConverter.convertTypeAsNonPointer(type);
       Value size = callSizeof(builder, loc, TypeAttr::get(valueType));
 
-      result = builder
-                   .create<emitc::CallOp>(
-                       /*location=*/loc,
-                       /*type=*/hostSizeType,
-                       /*callee=*/StringAttr::get(ctx, "EMITC_ADD"),
-                       /*args=*/ArrayAttr{},
-                       /*templateArgs=*/ArrayAttr{},
-                       /*operands=*/ArrayRef<Value>{result, size})
-                   .getResult(0);
+      result = emitc_builders::binaryOperator(
+          builder, loc, emitc_builders::BinaryOperator::ADDITION, result, size,
+          hostSizeType);
     }
 
     return {result};
@@ -2248,16 +2237,9 @@ class ImportOpConverter {
       if (i < inputTypes.size() - 1) {
         Type valueType = typeConverter.convertTypeAsNonPointer(argType);
         Value size = callSizeof(builder, loc, TypeAttr::get(valueType));
-
-        uint8Ptr = builder
-                       .create<emitc::CallOp>(
-                           /*location=*/loc,
-                           /*type=*/bytePtrType,
-                           /*callee=*/StringAttr::get(ctx, "EMITC_ADD"),
-                           /*args=*/ArrayAttr{},
-                           /*templateArgs=*/ArrayAttr{},
-                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
-                       .getResult(0);
+        uint8Ptr = emitc_builders::binaryOperator(
+            builder, loc, emitc_builders::BinaryOperator::ADDITION, uint8Ptr,
+            size, bytePtrType);
       }
     }
     return success();
@@ -2329,16 +2311,9 @@ class ImportOpConverter {
       if (i < resultTypes.size() - 1) {
         Type valueType = argType.cast<emitc::PointerType>().getPointee();
         Value size = callSizeof(builder, loc, TypeAttr::get(valueType));
-
-        uint8Ptr = builder
-                       .create<emitc::CallOp>(
-                           /*location=*/loc,
-                           /*type=*/bytePtrType,
-                           /*callee=*/StringAttr::get(ctx, "EMITC_ADD"),
-                           /*args=*/ArrayAttr{},
-                           /*templateArgs=*/ArrayAttr{},
-                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
-                       .getResult(0);
+        uint8Ptr = emitc_builders::binaryOperator(
+            builder, loc, emitc_builders::BinaryOperator::ADDITION, uint8Ptr,
+            size, bytePtrType);
       }
     }
     return success();
@@ -3264,27 +3239,12 @@ class ImportResolvedOpConversion
         /*operand=*/import);
 
     Type boolType = rewriter.getIntegerType(1);
-    auto conditionI1 = rewriter
-                           .create<emitc::CallOp>(
-                               /*location=*/loc,
-                               /*type=*/boolType,
-                               /*callee=*/StringAttr::get(ctx, "EMITC_NOT"),
-                               /*args=*/
-                               ArrayAttr::get(ctx, {rewriter.getIndexAttr(0)}),
-                               /*templateArgs=*/ArrayAttr{},
-                               /*operands=*/ArrayRef<Value>{importModule})
-                           .getResult(0);
-    auto invConditionI1 =
-        rewriter
-            .create<emitc::CallOp>(
-                /*location=*/loc,
-                /*type=*/boolType,
-                /*callee=*/StringAttr::get(ctx, "EMITC_NOT"),
-                /*args=*/
-                ArrayAttr::get(ctx, {rewriter.getIndexAttr(0)}),
-                /*templateArgs=*/ArrayAttr{},
-                /*operands=*/ArrayRef<Value>{conditionI1})
-            .getResult(0);
+    auto conditionI1 = emitc_builders::unaryOperator(
+        rewriter, loc, emitc_builders::UnaryOperator::LOGICAL_NOT, importModule,
+        boolType);
+    auto invConditionI1 = emitc_builders::unaryOperator(
+        rewriter, loc, emitc_builders::UnaryOperator::LOGICAL_NOT, conditionI1,
+        boolType);
 
     auto i32Type = rewriter.getIntegerType(32);
     auto conditionI32 = rewriter.create<emitc::CastOp>(
@@ -3934,7 +3894,7 @@ class ListGetRefOpConversion
     // (ref->type != IREE_VM_REF_TYPE_NULL &&
     // (iree_vm_type_def_is_value(type_def) || ref->type !=
     // type_def->ref_type))
-    emitc::CallOp invalidType;
+    Value invalidType;
     {
       auto refType = emitc_builders::structPtrMember(
           rewriter, loc,
@@ -3962,43 +3922,20 @@ class ListGetRefOpConversion
           /*memberName=*/"ref_type",
           /*operand=*/elementTypePtrOp.value().getResult());
 
-      auto refTypeIsNotNull = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/rewriter.getI1Type(),
-          /*callee=*/StringAttr::get(ctx, "EMITC_NE"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/
-          ArrayRef<Value>{refType, refTypeNull.getResult()});
+      auto refTypeIsNotNull = emitc_builders::binaryOperator(
+          rewriter, loc, emitc_builders::BinaryOperator::NOT_EQUAL_TO, refType,
+          refTypeNull.getResult(), rewriter.getI1Type());
+      auto refTypesDontMatch = emitc_builders::binaryOperator(
+          rewriter, loc, emitc_builders::BinaryOperator::NOT_EQUAL_TO, refType,
+          typedefRefType, rewriter.getI1Type());
 
-      auto refTypesDontMatch = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/rewriter.getI1Type(),
-          /*callee=*/StringAttr::get(ctx, "EMITC_NE"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/
-          ArrayRef<Value>{refType, typedefRefType});
+      auto invalidRefType = emitc_builders::binaryOperator(
+          rewriter, loc, emitc_builders::BinaryOperator::LOGICAL_OR,
+          typedefIsValue.getResult(0), refTypesDontMatch, rewriter.getI1Type());
 
-      auto invalidRefType = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/rewriter.getI1Type(),
-          /*callee=*/StringAttr::get(ctx, "EMITC_OR"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/
-          ArrayRef<Value>{typedefIsValue.getResult(0),
-                          refTypesDontMatch.getResult(0)});
-
-      invalidType = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/rewriter.getI1Type(),
-          /*callee=*/StringAttr::get(ctx, "EMITC_AND"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/
-          ArrayRef<Value>{refTypeIsNotNull.getResult(0),
-                          invalidRefType.getResult(0)});
+      invalidType = emitc_builders::binaryOperator(
+          rewriter, loc, emitc_builders::BinaryOperator::LOGICAL_AND,
+          refTypeIsNotNull, invalidRefType, rewriter.getI1Type());
     }
 
     // Start by splitting the block into two. The part before will contain
@@ -4021,8 +3958,8 @@ class ListGetRefOpConversion
     }
 
     rewriter.setInsertionPointToEnd(condBlock);
-    rewriter.create<IREE::VM::CondBranchOp>(loc, invalidType.getResult(0),
-                                            failureBlock, continuationBlock);
+    rewriter.create<IREE::VM::CondBranchOp>(loc, invalidType, failureBlock,
+                                            continuationBlock);
 
     rewriter.replaceOp(getOp, ref.value());
 
