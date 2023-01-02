@@ -1255,8 +1255,9 @@ ResultOpTy lookupSymbolRef(Operation *accessOp, StringRef attrName) {
 
 // Convert vm operations to emitc calls. The resultiong call has the ops
 // operands as arguments followed by an argument for every attribute.
-template <typename SrcOpTy, typename Adaptor = typename SrcOpTy::Adaptor>
+template <typename SrcOpTy>
 class GenericOpConversion : public OpConversionPattern<SrcOpTy> {
+  using Adaptor = typename SrcOpTy::Adaptor;
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
  public:
@@ -1304,8 +1305,8 @@ class GenericOpConversion : public OpConversionPattern<SrcOpTy> {
 
 template <typename SrcOpTy>
 class DeleteOpConversion : public OpConversionPattern<SrcOpTy> {
-  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
   using Adaptor = typename SrcOpTy::Adaptor;
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
  private:
   LogicalResult matchAndRewrite(
@@ -2668,9 +2669,10 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
   }
 };
 
-template <typename CmpOpTy, typename Adaptor = typename CmpOpTy::Adaptor>
+template <typename CmpOpTy>
 class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
  public:
+  using Adaptor = typename CmpOpTy::Adaptor;
   using OpConversionPattern<CmpOpTy>::OpConversionPattern;
 
   CompareRefOpConversion(TypeConverter &typeConverter, MLIRContext *context,
@@ -3350,9 +3352,9 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
   }
 };
 
-template <typename LoadOpTy, typename GlobalOpTy,
-          typename Adaptor = typename LoadOpTy::Adaptor>
+template <typename LoadOpTy, typename GlobalOpTy>
 class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
+  using Adaptor = typename LoadOpTy::Adaptor;
   using OpConversionPattern<LoadOpTy>::OpConversionPattern;
 
  public:
@@ -3402,11 +3404,11 @@ class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
   StringRef funcName;
 };
 
-template <typename LoadStoreOpTy,
-          typename Adaptor = typename LoadStoreOpTy::Adaptor>
+template <typename LoadStoreOpTy>
 class GlobalLoadStoreRefOpConversion
     : public OpConversionPattern<LoadStoreOpTy> {
  public:
+  using Adaptor = typename LoadStoreOpTy::Adaptor;
   using OpConversionPattern<LoadStoreOpTy>::OpConversionPattern;
 
  private:
@@ -3511,9 +3513,9 @@ class GlobalLoadStoreRefOpConversion
   }
 };
 
-template <typename StoreOpTy, typename GlobalOpTy,
-          typename Adaptor = typename StoreOpTy::Adaptor>
+template <typename StoreOpTy, typename GlobalOpTy>
 class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
+  using Adaptor = typename StoreOpTy::Adaptor;
   using OpConversionPattern<StoreOpTy>::OpConversionPattern;
 
  public:
@@ -3568,8 +3570,9 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
 // Convert vm list operations to two emitc calls. The wrapping ref pointer
 // is first dereferenced and the result is used as the argument of the
 // specified function name.
-template <typename SrcOpTy, typename Adaptor = typename SrcOpTy::Adaptor>
+template <typename SrcOpTy>
 class ListOpConversion : public OpConversionPattern<SrcOpTy> {
+  using Adaptor = typename SrcOpTy::Adaptor;
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
  public:
@@ -3746,8 +3749,9 @@ class ListAllocOpConversion
   }
 };
 
-template <typename GetOpTy, typename Adaptor = typename GetOpTy::Adaptor>
+template <typename GetOpTy>
 class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
+  using Adaptor = typename GetOpTy::Adaptor;
   using OpConversionPattern<GetOpTy>::OpConversionPattern;
 
  private:
@@ -3985,8 +3989,9 @@ class ListGetRefOpConversion
   }
 };
 
-template <typename SetOpTy, typename Adaptor = typename SetOpTy::Adaptor>
+template <typename SetOpTy>
 class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
+  using Adaptor = typename SetOpTy::Adaptor;
   using OpConversionPattern<SetOpTy>::OpConversionPattern;
 
  private:
