@@ -2783,7 +2783,7 @@ class ConstOpConversion : public OpConversionPattern<ConstOpTy> {
 
   LogicalResult matchAndRewrite(
       ConstOpTy constOp, Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+      ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<emitc::ConstantOp>(constOp, constOp.getType(),
                                                    constOp.getValue());
     return success();
@@ -2797,7 +2797,7 @@ class ConstZeroOpConversion : public OpConversionPattern<ConstZeroOpTy> {
 
   LogicalResult matchAndRewrite(
       ConstZeroOpTy constZeroOp, Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+      ConversionPatternRewriter &rewriter) const override {
     auto type = constZeroOp.getType();
 
     Attribute value = rewriter.getZeroAttr(type);
@@ -2813,7 +2813,7 @@ class ConstRefZeroOpConversion
 
   LogicalResult matchAndRewrite(
       IREE::VM::ConstRefZeroOp constRefZeroOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+      ConversionPatternRewriter &rewriter) const override {
     auto loc = constRefZeroOp.getLoc();
 
     IREE::VM::EmitCTypeConverter *typeConverter =
@@ -2840,7 +2840,7 @@ class ConstRefRodataOpConversion
 
   LogicalResult matchAndRewrite(
       IREE::VM::ConstRefRodataOp constRefRodataOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
+      ConversionPatternRewriter &rewriter) const override {
     auto ctx = constRefRodataOp.getContext();
     auto loc = constRefRodataOp.getLoc();
 
