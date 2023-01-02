@@ -1318,9 +1318,10 @@ class DeleteOpConversion : public OpConversionPattern<SrcOpTy> {
 
 class FuncOpConversion : public OpConversionPattern<mlir::func::FuncOp> {
   using OpConversionPattern<mlir::func::FuncOp>::OpConversionPattern;
+  using Adaptor = mlir::func::FuncOp::Adaptor;
 
   LogicalResult matchAndRewrite(
-      mlir::func::FuncOp funcOp, OpAdaptor adaptor,
+      mlir::func::FuncOp funcOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     TypeConverter::SignatureConversion signatureConverter(
         funcOp.getFunctionType().getNumInputs());
@@ -1345,6 +1346,7 @@ class FuncOpConversion : public OpConversionPattern<mlir::func::FuncOp> {
 };
 
 class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
+  using Adaptor = IREE::VM::ExportOp::Adaptor;
   using OpConversionPattern<IREE::VM::ExportOp>::OpConversionPattern;
 
   struct GeneratedStruct {
@@ -1354,7 +1356,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
   };
 
   LogicalResult matchAndRewrite(
-      IREE::VM::ExportOp exportOp, OpAdaptor adaptor,
+      IREE::VM::ExportOp exportOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = exportOp.getContext();
     auto loc = exportOp.getLoc();
@@ -2733,10 +2735,11 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
 
 class CompareRefNotZeroOpConversion
     : public OpConversionPattern<IREE::VM::CmpNZRefOp> {
+  using Adaptor = IREE::VM::CmpNZRefOp::Adaptor;
   using OpConversionPattern<IREE::VM::CmpNZRefOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::CmpNZRefOp cmpOp, OpAdaptor adaptor,
+      IREE::VM::CmpNZRefOp cmpOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = cmpOp.getContext();
     auto loc = cmpOp.getLoc();
@@ -2809,10 +2812,11 @@ class ConstZeroOpConversion : public OpConversionPattern<ConstZeroOpTy> {
 
 class ConstRefZeroOpConversion
     : public OpConversionPattern<IREE::VM::ConstRefZeroOp> {
+  using Adaptor = IREE::VM::ConstRefZeroOp::Adaptor;
   using OpConversionPattern<IREE::VM::ConstRefZeroOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::ConstRefZeroOp constRefZeroOp, OpAdaptor adaptor,
+      IREE::VM::ConstRefZeroOp constRefZeroOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = constRefZeroOp.getLoc();
 
@@ -2836,10 +2840,11 @@ class ConstRefZeroOpConversion
 
 class ConstRefRodataOpConversion
     : public OpConversionPattern<IREE::VM::ConstRefRodataOp> {
+  using Adaptor = IREE::VM::ConstRefRodataOp::Adaptor;
   using OpConversionPattern<IREE::VM::ConstRefRodataOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::ConstRefRodataOp constRefRodataOp, OpAdaptor adaptor,
+      IREE::VM::ConstRefRodataOp constRefRodataOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = constRefRodataOp.getContext();
     auto loc = constRefRodataOp.getLoc();
@@ -2907,10 +2912,11 @@ class ConstRefRodataOpConversion
 };
 
 class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
+  using Adaptor = IREE::VM::BranchOp::Adaptor;
   using OpConversionPattern<IREE::VM::BranchOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::BranchOp op, OpAdaptor adaptor,
+      IREE::VM::BranchOp op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
 
@@ -3016,10 +3022,11 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
 // clang-format on
 class CondBranchOpConversion
     : public OpConversionPattern<IREE::VM::CondBranchOp> {
+  using Adaptor = IREE::VM::CondBranchOp::Adaptor;
   using OpConversionPattern<IREE::VM::CondBranchOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::CondBranchOp op, OpAdaptor adaptor,
+      IREE::VM::CondBranchOp op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
 
@@ -3094,10 +3101,11 @@ class CondBranchOpConversion
 };
 
 class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
+  using Adaptor = IREE::VM::ReturnOp::Adaptor;
   using OpConversionPattern<IREE::VM::ReturnOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::ReturnOp op, OpAdaptor adaptor,
+      IREE::VM::ReturnOp op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
@@ -3155,6 +3163,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
 
 class ImportResolvedOpConversion
     : public OpConversionPattern<IREE::VM::ImportResolvedOp> {
+  using Adaptor = IREE::VM::ImportResolvedOp::Adaptor;
   using OpConversionPattern<IREE::VM::ImportResolvedOp>::OpConversionPattern;
 
  public:
@@ -3163,7 +3172,7 @@ class ImportResolvedOpConversion
 
  private:
   LogicalResult matchAndRewrite(
-      IREE::VM::ImportResolvedOp op, IREE::VM::ImportResolvedOpAdaptor adaptor,
+      IREE::VM::ImportResolvedOp op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
@@ -3236,10 +3245,11 @@ class ImportResolvedOpConversion
 };
 
 class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
+  using Adaptor = IREE::VM::FailOp::Adaptor;
   using OpConversionPattern<IREE::VM::FailOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::FailOp op, OpAdaptor adaptor,
+      IREE::VM::FailOp op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
@@ -3640,10 +3650,11 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
 
 class ListAllocOpConversion
     : public OpConversionPattern<IREE::VM::ListAllocOp> {
+  using Adaptor = IREE::VM::ListAllocOp::Adaptor;
   using OpConversionPattern<IREE::VM::ListAllocOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::ListAllocOp allocOp, OpAdaptor adaptor,
+      IREE::VM::ListAllocOp allocOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = allocOp.getContext();
     auto loc = allocOp.getLoc();
@@ -3815,10 +3826,11 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
 
 class ListGetRefOpConversion
     : public OpConversionPattern<IREE::VM::ListGetRefOp> {
+  using Adaptor = IREE::VM::ListGetRefOp::Adaptor;
   using OpConversionPattern<IREE::VM::ListGetRefOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::ListGetRefOp getOp, OpAdaptor adaptor,
+      IREE::VM::ListGetRefOp getOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = getOp.getContext();
     auto loc = getOp.getLoc();
@@ -4035,10 +4047,11 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
 
 class ListSetRefOpConversion
     : public OpConversionPattern<IREE::VM::ListSetRefOp> {
+  using Adaptor = IREE::VM::ListSetRefOp::Adaptor;
   using OpConversionPattern<IREE::VM::ListSetRefOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::ListSetRefOp setOp, OpAdaptor adaptor,
+      IREE::VM::ListSetRefOp setOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = setOp.getContext();
     auto loc = setOp.getLoc();
