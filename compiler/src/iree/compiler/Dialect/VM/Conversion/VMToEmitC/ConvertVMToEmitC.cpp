@@ -1308,7 +1308,6 @@ class DeleteOpConversion : public OpConversionPattern<SrcOpTy> {
   using Adaptor = typename SrcOpTy::Adaptor;
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       SrcOpTy op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -1318,10 +1317,8 @@ class DeleteOpConversion : public OpConversionPattern<SrcOpTy> {
 };
 
 class FuncOpConversion : public OpConversionPattern<mlir::func::FuncOp> {
- public:
   using OpConversionPattern<mlir::func::FuncOp>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       mlir::func::FuncOp funcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -1348,10 +1345,8 @@ class FuncOpConversion : public OpConversionPattern<mlir::func::FuncOp> {
 };
 
 class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
- public:
   using OpConversionPattern<IREE::VM::ExportOp>::OpConversionPattern;
 
- private:
   struct GeneratedStruct {
     Optional<Value> value = std::nullopt;
     Optional<std::string> name = std::nullopt;
@@ -2397,11 +2392,9 @@ class ImportOpConverter {
 
 template <typename CallOpTy>
 class CallOpConversion : public OpConversionPattern<CallOpTy> {
- public:
   using Adaptor = typename CallOpTy::Adaptor;
   using OpConversionPattern<CallOpTy>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       CallOpTy op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -2671,10 +2664,10 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
 
 template <typename CmpOpTy>
 class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
- public:
   using Adaptor = typename CmpOpTy::Adaptor;
   using OpConversionPattern<CmpOpTy>::OpConversionPattern;
 
+ public:
   CompareRefOpConversion(TypeConverter &typeConverter, MLIRContext *context,
                          StringRef funcName)
       : OpConversionPattern<CmpOpTy>(typeConverter, context),
@@ -2742,7 +2735,6 @@ class CompareRefNotZeroOpConversion
     : public OpConversionPattern<IREE::VM::CmpNZRefOp> {
   using OpConversionPattern<IREE::VM::CmpNZRefOp>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       IREE::VM::CmpNZRefOp cmpOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -2786,7 +2778,6 @@ class CompareRefNotZeroOpConversion
 
 template <typename ConstOpTy>
 class ConstOpConversion : public OpConversionPattern<ConstOpTy> {
- public:
   using Adaptor = typename ConstOpTy::Adaptor;
   using OpConversionPattern<ConstOpTy>::OpConversionPattern;
 
@@ -2801,7 +2792,6 @@ class ConstOpConversion : public OpConversionPattern<ConstOpTy> {
 
 template <typename ConstZeroOpTy>
 class ConstZeroOpConversion : public OpConversionPattern<ConstZeroOpTy> {
- public:
   using Adaptor = typename ConstZeroOpTy::Adaptor;
   using OpConversionPattern<ConstZeroOpTy>::OpConversionPattern;
 
@@ -2819,7 +2809,6 @@ class ConstZeroOpConversion : public OpConversionPattern<ConstZeroOpTy> {
 
 class ConstRefZeroOpConversion
     : public OpConversionPattern<IREE::VM::ConstRefZeroOp> {
- public:
   using OpConversionPattern<IREE::VM::ConstRefZeroOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
@@ -2847,7 +2836,6 @@ class ConstRefZeroOpConversion
 
 class ConstRefRodataOpConversion
     : public OpConversionPattern<IREE::VM::ConstRefRodataOp> {
- public:
   using OpConversionPattern<IREE::VM::ConstRefRodataOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
@@ -2921,7 +2909,6 @@ class ConstRefRodataOpConversion
 class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
   using OpConversionPattern<IREE::VM::BranchOp>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       IREE::VM::BranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -3031,7 +3018,6 @@ class CondBranchOpConversion
     : public OpConversionPattern<IREE::VM::CondBranchOp> {
   using OpConversionPattern<IREE::VM::CondBranchOp>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       IREE::VM::CondBranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -3110,7 +3096,6 @@ class CondBranchOpConversion
 class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
   using OpConversionPattern<IREE::VM::ReturnOp>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       IREE::VM::ReturnOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -3253,7 +3238,6 @@ class ImportResolvedOpConversion
 class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
   using OpConversionPattern<IREE::VM::FailOp>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       IREE::VM::FailOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -3407,11 +3391,9 @@ class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
 template <typename LoadStoreOpTy>
 class GlobalLoadStoreRefOpConversion
     : public OpConversionPattern<LoadStoreOpTy> {
- public:
   using Adaptor = typename LoadStoreOpTy::Adaptor;
   using OpConversionPattern<LoadStoreOpTy>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       LoadStoreOpTy op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -3658,10 +3640,8 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
 
 class ListAllocOpConversion
     : public OpConversionPattern<IREE::VM::ListAllocOp> {
- public:
   using OpConversionPattern<IREE::VM::ListAllocOp>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       IREE::VM::ListAllocOp allocOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -3754,7 +3734,6 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
   using Adaptor = typename GetOpTy::Adaptor;
   using OpConversionPattern<GetOpTy>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       GetOpTy getOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -3836,10 +3815,8 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
 
 class ListGetRefOpConversion
     : public OpConversionPattern<IREE::VM::ListGetRefOp> {
- public:
   using OpConversionPattern<IREE::VM::ListGetRefOp>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       IREE::VM::ListGetRefOp getOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -3994,7 +3971,6 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
   using Adaptor = typename SetOpTy::Adaptor;
   using OpConversionPattern<SetOpTy>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       SetOpTy setOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -4061,7 +4037,6 @@ class ListSetRefOpConversion
     : public OpConversionPattern<IREE::VM::ListSetRefOp> {
   using OpConversionPattern<IREE::VM::ListSetRefOp>::OpConversionPattern;
 
- private:
   LogicalResult matchAndRewrite(
       IREE::VM::ListSetRefOp setOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
