@@ -507,7 +507,7 @@ void releaseRefs(OpBuilder &builder, Location location,
 /// `negateCondition` is false.
 emitc::CallOp failableCall(
     OpBuilder &builder, Location location, Type type, StringAttr callee,
-    ArrayAttr args, ArrayAttr templateArgs, ArrayRef<Value> operands,
+    ArrayAttr args, ArrayRef<Value> operands,
     const std::function<void(emitc::CallOp &)> &failureBlockBuilder,
     bool negateCondition = false) {
   auto callOp = builder.create<emitc::CallOp>(
@@ -515,7 +515,7 @@ emitc::CallOp failableCall(
       /*type=*/type,
       /*callee=*/callee,
       /*args=*/args,
-      /*templateArgs=*/templateArgs,
+      /*templateArgs=*/ArrayAttr{},
       /*operands=*/operands);
 
   Type boolType = builder.getIntegerType(1);
@@ -554,7 +554,7 @@ emitc::CallOp failableCall(
 
 emitc::CallOp returnIfError(OpBuilder &builder, Location location,
                             StringAttr callee, ArrayAttr args,
-                            ArrayAttr templateArgs, ArrayRef<Value> operands,
+                            ArrayRef<Value> operands,
                             IREE::VM::EmitCTypeConverter &typeConverter) {
   auto blockBuilder = [&builder, &location,
                        &typeConverter](emitc::CallOp &callOp) {
@@ -568,13 +568,13 @@ emitc::CallOp returnIfError(OpBuilder &builder, Location location,
 
   auto ctx = builder.getContext();
   Type type = emitc::OpaqueType::get(ctx, "iree_status_t");
-  return failableCall(builder, location, type, callee, args, templateArgs,
-                      operands, blockBuilder, /*negateResult=*/true);
+  return failableCall(builder, location, type, callee, args, operands,
+                      blockBuilder, /*negateCondition=*/true);
 }
 
 emitc::CallOp failListNull(OpBuilder &builder, Location location, Type type,
                            StringAttr callee, ArrayAttr args,
-                           ArrayAttr templateArgs, ArrayRef<Value> operands,
+                           ArrayRef<Value> operands,
                            IREE::VM::EmitCTypeConverter &typeConverter) {
   auto blockBuilder = [&builder, &location,
                        &typeConverter](emitc::CallOp &callOp) {
@@ -598,8 +598,8 @@ emitc::CallOp failListNull(OpBuilder &builder, Location location, Type type,
     builder.create<mlir::func::ReturnOp>(location, statusOp.getResult(0));
   };
 
-  return failableCall(builder, location, type, callee, args, templateArgs,
-                      operands, blockBuilder);
+  return failableCall(builder, location, type, callee, args, operands,
+                      blockBuilder);
 }
 
 /// Generate a mlir.call op with one result and split the current block into a
@@ -665,7 +665,7 @@ mlir::func::CallOp returnIfError(OpBuilder &builder, Location location,
   };
 
   return failableCall(builder, location, callee, operands, blockBuilder,
-                      /*negateResult=*/true);
+                      /*negateCondition=*/true);
 }
 
 LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
@@ -770,8 +770,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operand=*/statePtr);
 
     returnIfError(builder, loc, StringAttr::get(ctx, "iree_allocator_malloc"),
-                  {}, {},
-                  {funcOp.getArgument(1), stateSize, voidPtr.getResult()},
+                  {}, {funcOp.getArgument(1), stateSize, voidPtr.getResult()},
                   /*typeConverter=*/typeConverter);
 
     builder.create<emitc::CallOp>(
@@ -1123,8 +1122,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operand=*/modulePtr);
 
     returnIfError(builder, loc, StringAttr::get(ctx, "iree_allocator_malloc"),
-                  {}, {},
-                  {funcOp.getArgument(1), moduleSize, voidPtr.getResult()},
+                  {}, {funcOp.getArgument(1), moduleSize, voidPtr.getResult()},
                   /*typeConverter=*/typeConverter);
 
     builder.create<emitc::CallOp>(
@@ -2322,9 +2320,7 @@ class ImportOpConverter {
                            builder.getIndexAttr(1),
                            builder.getIndexAttr(2),
                        }),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{importModule, stack, call},
+        /*operands=*/ArrayRef<Value>{importModule, stack, call},
         /*typeConverter=*/typeConverter);
 
     return success();
@@ -2900,7 +2896,6 @@ class ConstRefRodataOpConversion
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_ref_wrap_retain"),
         /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{byteBufferPtrOp, typeIdOp.getResult(0), ref.value()},
         /*typeConverter=*/*typeConverter);
@@ -3490,9 +3485,7 @@ class GlobalLoadStoreRefOpConversion
         ArrayAttr::get(ctx,
                        {rewriter.getBoolAttr(move), rewriter.getIndexAttr(0),
                         rewriter.getIndexAttr(1), rewriter.getIndexAttr(2)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{srcRef, typedefRefType, destRef},
+        /*operands=*/ArrayRef<Value>{srcRef, typedefRefType, destRef},
         /*typeConverter=*/*typeConverter);
 
     if (isLoad) {
@@ -3600,7 +3593,6 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{refValue},
         /*typeConverter=*/*typeConverter);
 
@@ -3621,7 +3613,6 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
           /*location=*/loc,
           /*callee=*/StringAttr::get(ctx, funcName),
           /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>(updatedOperands),
           /*typeConverter=*/*typeConverter);
 
@@ -3703,7 +3694,6 @@ class ListAllocOpConversion
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_create"),
         /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{elementTypePtrOp.value().getResult(),
                         adaptor.getOperands()[0], allocatorOp, listPtr},
@@ -3728,7 +3718,6 @@ class ListAllocOpConversion
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_ref_wrap_assign"),
         /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listOp.getResult(), refTypeOp.getResult(0),
                         ref.value()},
@@ -3795,7 +3784,6 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{refValue},
         /*typeConverter=*/*typeConverter);
 
@@ -3807,7 +3795,6 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         ArrayAttr::get(ctx, {rewriter.getIndexAttr(0), rewriter.getIndexAttr(1),
                              emitc::OpaqueAttr::get(ctx, valueTypeEnum.value()),
                              rewriter.getIndexAttr(2)}),
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listDerefOp.getResult(0), getOp.getIndex(), valuePtr},
         /*typeConverter=*/*typeConverter);
@@ -3848,7 +3835,6 @@ class ListGetRefOpConversion
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{listRefValue},
         /*typeConverter=*/*typeConverter);
 
@@ -3863,7 +3849,6 @@ class ListGetRefOpConversion
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_get_ref_retain"),
         /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listDerefOp.getResult(0), getOp.getIndex(),
                         ref.value()},
@@ -4025,7 +4010,6 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{refValue},
         /*typeConverter=*/*typeConverter);
 
@@ -4034,7 +4018,6 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_set_value"),
         /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listDerefOp.getResult(0), setOp.getIndex(), valuePtr},
         /*typeConverter=*/*typeConverter);
@@ -4069,7 +4052,6 @@ class ListSetRefOpConversion
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{refValue},
         /*typeConverter=*/*typeConverter);
 
@@ -4090,7 +4072,6 @@ class ListSetRefOpConversion
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, callee),
         /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listDerefOp.getResult(0), setOp.getIndex(),
                         adaptor.getValue()},
