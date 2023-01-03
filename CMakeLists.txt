@@ -55,11 +55,15 @@ option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's 
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ON)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
-option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
+
+option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
+# Tests under build_tools is less interesting to users and requires extra
+# dependencies. Disable them by default. Related issue: #10244
+cmake_dependent_option(IREE_ENABLE_BUILD_TOOL_TESTS "Enables tests of IREE build tools." OFF ${IREE_BUILD_TESTS} OFF)
 
 option(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
 
