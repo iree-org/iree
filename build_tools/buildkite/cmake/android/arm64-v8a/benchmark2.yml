@@ -131,13 +131,31 @@ steps:
   - label: "Comment benchmark results on pull request"
     commands: |
       git clean -fdx
+      # Fetch base branch for comparison.
+      git fetch -v --prune --no-recurse-submodules -- origin \
+        "$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+      git merge-base \
+        "origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
+        "$${BUILDKITE_COMMIT}" > "./pr-base-commit"
       buildkite-agent artifact download "benchmark-results-*.json" ./
       buildkite-agent artifact download "compile-stats-results-*.json" ./
-      python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py \
+      # The script will handle the wildcard patterns.
+      python3 build_tools/benchmarks/generate_benchmark_comment.py \
         --verbose \
-        --query-base \
-        --benchmark_files benchmark-results-*.json \
-        --compile_stats_files compile-stats-results-*.json
+        --benchmark_files="benchmark-results-*.json" \
+        --compile_stats_files="compile-stats-results-*.json" \
+        --pr_number="$${BUILDKITE_PULL_REQUEST}" \
+        --pr_commit="$${BUILDKITE_COMMIT}" \
+        --pr_base_commit="$(cat ./pr-base-commit)" \
+        --build_url="$${BUILDKITE_BUILD_URL}" \
+        --comment_title="Abbreviated Android Benchmark Summary" \
+        --comment_type_id="bf8cdf94-a992-466d-b11c-778cbd805a22" \
+        --output="benchmark-comment.json"
+      export GIST_BOT_TOKEN="$${GITHUB_TOKEN}"
+      python3 build_tools/benchmarks/post_benchmark_comment.py \
+        --verbose \
+        --pr_number="$${BUILDKITE_PULL_REQUEST}" \
+        "benchmark-comment.json"
     key: "post-on-pr"
     if: "build.pull_request.id != null && (build.pull_request.labels includes 'buildkite:benchmark' || build.pull_request.labels includes 'buildkite:benchmark-android')"
     agents:
