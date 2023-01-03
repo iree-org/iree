@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-codegen-erase-hal-descriptor-type-from-memref --allow-unregistered-dialect %s | FileCheck %s
 
-// CHECK-LABE: func.func @hal_uniform_buffer()
+// CHECK-LABEL: func.func @hal_uniform_buffer()
 func.func @hal_uniform_buffer() {
   // CHECK: %[[P:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32>
   // CHECK: "dialect.memref_consumer"(%[[P]]) : (memref<?x8xf32>) -> ()

@@ -32,18 +32,18 @@ hal.executable private @vulkan_client_api {
   }
 }
 
-// CHECK-LABE: func.func @vulkan_client_api()
-//      CHECK:   %[[P0:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<Uniform>>
-//      CHECK:   "dialect.memref_consumer"(%[[P0]]) : (memref<?x8xf32, #spirv.storage_class<Uniform>>) -> ()
+// CHECK-LABEL: func.func @vulkan_client_api()
+//       CHECK:   %[[P0:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<Uniform>>
+//       CHECK:   "dialect.memref_consumer"(%[[P0]]) : (memref<?x8xf32, #spirv.storage_class<Uniform>>) -> ()
 
-//      CHECK:   %[[P1:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<StorageBuffer>>
-//      CHECK:   "dialect.memref_consumer"(%[[P1]]) : (memref<?x8xf32, #spirv.storage_class<StorageBuffer>>) -> ()
+//       CHECK:   %[[P1:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<StorageBuffer>>
+//       CHECK:   "dialect.memref_consumer"(%[[P1]]) : (memref<?x8xf32, #spirv.storage_class<StorageBuffer>>) -> ()
 
-//      CHECK:   %[[P2:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<StorageBuffer>>
-//      CHECK:   "dialect.memref_consumer"(%[[P2]]) : (memref<?x8xf32, #spirv.storage_class<StorageBuffer>>) -> ()
+//       CHECK:   %[[P2:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<StorageBuffer>>
+//       CHECK:   "dialect.memref_consumer"(%[[P2]]) : (memref<?x8xf32, #spirv.storage_class<StorageBuffer>>) -> ()
 
-//      CHECK:   %[[P3:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<Workgroup>>
-//      CHECK:   "dialect.memref_consumer"(%[[P3]]) : (memref<?x8xf32, #spirv.storage_class<Workgroup>>) -> ()
+//       CHECK:   %[[P3:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<Workgroup>>
+//       CHECK:   "dialect.memref_consumer"(%[[P3]]) : (memref<?x8xf32, #spirv.storage_class<Workgroup>>) -> ()
 
 // -----
 
@@ -79,15 +79,15 @@ hal.executable private @opencl_client_api {
   }
 }
 
-// CHECK-LABE: func.func @opencl_client_api()
-//      CHECK:   %[[P0:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<Uniform>>
-//      CHECK:   "dialect.memref_consumer"(%[[P0]]) : (memref<?x8xf32, #spirv.storage_class<Uniform>>) -> ()
+// CHECK-LABEL: func.func @opencl_client_api()
+//       CHECK:   %[[P0:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<Uniform>>
+//       CHECK:   "dialect.memref_consumer"(%[[P0]]) : (memref<?x8xf32, #spirv.storage_class<Uniform>>) -> ()
 
-//      CHECK:   %[[P1:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<CrossWorkgroup>>
-//      CHECK:   "dialect.memref_consumer"(%[[P1]]) : (memref<?x8xf32, #spirv.storage_class<CrossWorkgroup>>) -> ()
+//       CHECK:   %[[P1:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<CrossWorkgroup>>
+//       CHECK:   "dialect.memref_consumer"(%[[P1]]) : (memref<?x8xf32, #spirv.storage_class<CrossWorkgroup>>) -> ()
 
-//      CHECK:   %[[P2:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<CrossWorkgroup>>
-//      CHECK:   "dialect.memref_consumer"(%[[P2]]) : (memref<?x8xf32, #spirv.storage_class<CrossWorkgroup>>) -> ()
+//       CHECK:   %[[P2:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<CrossWorkgroup>>
+//       CHECK:   "dialect.memref_consumer"(%[[P2]]) : (memref<?x8xf32, #spirv.storage_class<CrossWorkgroup>>) -> ()
 
-//      CHECK:   %[[P3:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<Workgroup>>
-//      CHECK:   "dialect.memref_consumer"(%[[P3]]) : (memref<?x8xf32, #spirv.storage_class<Workgroup>>) -> ()
+//       CHECK:   %[[P3:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, #spirv.storage_class<Workgroup>>
+//       CHECK:   "dialect.memref_consumer"(%[[P3]]) : (memref<?x8xf32, #spirv.storage_class<Workgroup>>) -> ()

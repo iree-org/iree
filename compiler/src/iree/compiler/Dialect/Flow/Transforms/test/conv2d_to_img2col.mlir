@@ -63,7 +63,7 @@ func.func @depthwise_conv_hwc_114x16x3(%input: tensor<1x114x114x16xf32>, %filter
 //      CHECK: %[[FILTER_T_INIT:.+]] = tensor.empty() : tensor<16x3x3xf32>
 //      CHECK: %[[FILTER_T:.+]] = linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP2]], #[[MAP3]]
-// CHECK-SMAE: iterator_types = ["parallel", "parallel", "parallel"]
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel"]
 // CHECK-SAME: ins(%[[FILTER]] : tensor<3x3x16xf32>) outs(%[[FILTER_T_INIT]] : tensor<16x3x3xf32>) {
 // CHECK-NEXT:      ^bb0(%{{.*}}: f32, %{{.*}}: f32):
 //      CHECK:      linalg.yield

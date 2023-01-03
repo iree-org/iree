@@ -4,7 +4,7 @@
 // their usage is more tied to the ops loading/storing the globals. This file
 // just tests the generic !stream.* type globals.
 
-// CHECK-: util.global private mutable @resource : !hal.buffer
+// CHECK: util.global private mutable @resource : !hal.buffer
 util.global private mutable @resource : !stream.resource<variable>
 
 // CHECK-LABEL: @resourceGlobals
