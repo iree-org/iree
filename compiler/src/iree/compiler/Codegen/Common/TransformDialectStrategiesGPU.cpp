@@ -156,18 +156,18 @@ struct GPUReductionStrategy {
 /// Stage 2: the second stage of the reduction is the first stage of the warp
 /// shuffle step. It is normalized to reduce from a "k-warps" abstraction,
 /// across all warps in parallel, to a k-element result. Only the first thread
-/// within each warp (e.g. threadIdx % kCudaWarpSize == 0) commits to memoruy.
+/// within each warp (e.g. threadIdx % kCudaWarpSize == 0) commits to memory.
 ///
 /// Stage 1: the first stage of the reduction is normalized to run on "k-warps"
 /// of maximal vector size for both the hardware and the problem sizes.
 /// The overprovisioning to "k-warps" allows multiple warps to run in parallel.
-/// The `reductionTileSizeStage1` is this "k-warps" quantity and is also the
+/// The `reductionTileSize` is this "k-warps" quantity and is also the
 /// number of threads (i.e. blockDim.x) used to parallelize the problem.
-/// This also results in `reductionTileSizeStage1` live values that are
+/// This also results in `reductionTileSize` live values that are
 /// allocated in shared memory and creates a tradeoff between parallelism and
 /// occupancy.
 /// The normalization guarantees that whatever the problem size P, we reduce
-/// from `tensor<P x T>` to `tensor<reductionTileSizeStage1 x T>` by using the
+/// from `tensor<P x T>` to `tensor<reductionTileSize x T>` by using the
 /// largest possible `vector.transfer` operations. The vector size is chosen as
 /// follows: when the `reductionDimensionSize` is a multiple of 4, choose 4;
 /// otherwise try with 2; otherwise just use 1.
@@ -179,9 +179,9 @@ class ReductionStrategyStagedThreadDistribution : public GPUReductionStrategy {
   ReductionStrategyStagedThreadDistribution(
       MLIRContext *context,
       const transform_ext::MatchedReductionCaptures &captures,
-      int64_t maxNumThreadsToUse, int64_t warpShuffleSize)
+      int64_t maxNumThreadsToUse, int64_t vectorSize)
       : GPUReductionStrategy(context, captures) {
-    compute(maxNumThreadsToUse, warpShuffleSize);
+    compute(maxNumThreadsToUse, vectorSize);
   }
 
   ReductionStrategyStagedThreadDistribution(
@@ -190,7 +190,7 @@ class ReductionStrategyStagedThreadDistribution : public GPUReductionStrategy {
   ReductionStrategyStagedThreadDistribution &operator=(
       const ReductionStrategyStagedThreadDistribution &) = default;
 
-  int64_t getNumThreadsXInBlock() const { return reductionTileSizeStage1; }
+  int64_t getNumThreadsXInBlock() const { return reductionTileSize; }
   int64_t getNumThreadsYInBlock() const { return 1; }
   int64_t getNumThreadsZInBlock() const { return 1; }
   std::array<int64_t, 3> getNumThreadsInBlock() const override {
@@ -201,36 +201,33 @@ class ReductionStrategyStagedThreadDistribution : public GPUReductionStrategy {
   // Always profitable.
   bool isProfitable() override { return true; }
 
-  int64_t getVectorSizeStage1() const { return vectorSizeStage1; }
+  int64_t getVectorSize() const { return vectorSize; }
 
  private:
   /// Maximal vector size (among {1, 2, 4}) that divides the
   /// `reductionDimensionSize` and is used for vector transfers in Stage 1.
-  int64_t vectorSizeStage1;
+  int64_t vectorSize;
   /// Maximal "k-warp" size within the limits of the `maxNumThreadsToUse` and
   /// `reductionDimensionSize` parameters.
   /// This is also the blockDim.x of the kernel.
-  int64_t reductionTileSizeStage1;
+  int64_t reductionTileSize;
 
   /// Compute the staged strategy based on the reductionDimensionSize, the
-  /// `maxNumThreadsToUse` and the `warpShuffleSize`.
+  /// `maxNumThreadsToUse` and the `vectorSize`.
   /// The latter 2 numbers control the tradeoff between parallelism and shared
   /// memory consumption.
   // TODO: Characterize shared memory consumption and limit for good occupancy.
   // TODO: Support various elemental types.
-  void compute(int64_t maxNumThreadsToUse, int64_t warpShuffleSize);
+  void compute(int64_t maxNumThreadsToUse, int64_t maxVectorSize);
 };
 
 void ReductionStrategyStagedThreadDistribution::compute(
-    int64_t maxNumThreadsToUse, int64_t warpShuffleSize) {
+    int64_t maxNumThreadsToUse, int64_t maxVectorSize) {
   assert(maxNumThreadsToUse > 0 && "maxNumThreadsToUse must be > 0");
   assert(maxNumThreadsToUse >= iree_compiler::kCudaWarpSize &&
          "not even a warp?");
-  assert(warpShuffleSize > 0 && "warpShuffleSize must be > 0");
-  assert(warpShuffleSize % iree_compiler::kCudaWarpSize == 0 &&
-         "warpShuffleSize must be a multiple of warpSize");
-  assert(warpShuffleSize <= 4 * iree_compiler::kCudaWarpSize &&
-         "must be smaller or equal to 4 * warp_size");
+  assert(maxVectorSize > 0 && "maxVectorSize must be > 0");
+  assert(maxVectorSize <= 4 && "must be smaller or equal to 4");
 
   // Block-level
   // ===========
@@ -246,22 +243,23 @@ void ReductionStrategyStagedThreadDistribution::compute(
   // TODO: Split to ensure 4 on most of the problem and use a 1-epilogue.
   int64_t reductionDimensionSize = captures.reductionOpSizes.back();
   if (reductionDimensionSize > 0 && reductionDimensionSize % 4 == 0)
-    vectorSizeStage1 = 4;
+    vectorSize = std::min(maxVectorSize, 4l);
   else if (reductionDimensionSize > 0 && reductionDimensionSize % 2 == 0)
-    vectorSizeStage1 = 2;
+    vectorSize = std::min(maxVectorSize, 2l);
   else
-    vectorSizeStage1 = 1;
-  // Tile reduction to the maximal multiple `warpShuffleSize` allowed.
+    vectorSize = 1;
+  // Tile reduction to the maximal multiple `vectorSize` allowed.
   // This locally reduces the large unknown reduction into a guaranteed
-  // multiple of `warpShuffleSize`.
+  // multiple of `vectorSize`.
   if (reductionDimensionSize > 0) {
-    reductionTileSizeStage1 = std::min(
-        iree_compiler::nextMultipleOf(reductionDimensionSize / vectorSizeStage1,
-                                      warpShuffleSize),
-        iree_compiler::previousMultipleOf(maxNumThreadsToUse, warpShuffleSize));
+    reductionTileSize = std::min(
+        iree_compiler::nextMultipleOf(reductionDimensionSize / vectorSize,
+                                      iree_compiler::kCudaWarpSize),
+        iree_compiler::previousMultipleOf(maxNumThreadsToUse,
+                                          iree_compiler::kCudaWarpSize));
   } else {
-    reductionTileSizeStage1 =
-        iree_compiler::previousMultipleOf(maxNumThreadsToUse, warpShuffleSize);
+    reductionTileSize = iree_compiler::previousMultipleOf(
+        maxNumThreadsToUse, iree_compiler::kCudaWarpSize);
   }
 }
 
@@ -534,7 +532,7 @@ static void createReductionStrategyStagedThreadDistribution(
   auto [blockParallelForeachThreadOp, blockParallelFillH, blockCombinerOpH] =
       createReductionStrategyStagedThreadDistributionStep(
           b, gridReductionH, strategy.captures.reductionRank,
-          strategy.getNumThreadsXInBlock(), strategy.getVectorSizeStage1());
+          strategy.getNumThreadsXInBlock(), strategy.getVectorSize());
 
   // Staged reduction step 2: multi-warp shuffle reduce.
   // Map the combiner reduction to one thread along y so it can be mapped
@@ -695,30 +693,47 @@ static void createCudaSmallReductionStrategy(
 
 struct GPUReductionConfig {
   int64_t maxNumThreads;
-  int64_t warpShuffleSize;
+  int64_t vectorSize;
 };
 
 // TODO: Lift some of the strategy sizing logic as hints and/or heuristics to
 // also work properly in the dynamic case.
 // TODO: Support more HW configs and make it more pluggable.
-static GPUReductionConfig getReductionConfigRTX2080Ti(
+static GPUReductionConfig getStagedReductionConfigRTX2080Ti(
     const transform_ext::MatchedReductionCaptures &captures) {
+  int64_t vectorSize = 4;
   int64_t maxNumThreads = 8 * iree_compiler::kCudaWarpSize;
-  int64_t warpShuffleSize = 2 * iree_compiler::kCudaWarpSize;
-  if (captures.reductionDimensionSize > 0) {
-    if (captures.reductionDimensionSize <= iree_compiler::kCudaWarpSize) {
-      maxNumThreads = warpShuffleSize = iree_compiler::kCudaWarpSize;
-    } else if (captures.reductionDimensionSize <=
-               2 * iree_compiler::kCudaWarpSize) {
-      maxNumThreads = 2 * iree_compiler::kCudaWarpSize;
-      warpShuffleSize = iree_compiler::kCudaWarpSize;
-    } else if (captures.reductionDimensionSize <=
-               4 * iree_compiler::kCudaWarpSize) {
-      maxNumThreads = 4 * iree_compiler::kCudaWarpSize;
-      warpShuffleSize = 2 * iree_compiler::kCudaWarpSize;
+  // No adjustments in the dynamic case, we need extra information to make a
+  // good decision.
+  int64_t reductionDimensionSize = captures.reductionOpSizes.back();
+  if (ShapedType::isDynamic(reductionDimensionSize))
+    return GPUReductionConfig{maxNumThreads, vectorSize};
+  // Scale down to smaller sizes (4, 8, 16)-warps.
+  if (reductionDimensionSize <= 4 * iree_compiler::kCudaWarpSize) {
+    vectorSize = 1;
+    maxNumThreads = 4 * iree_compiler::kCudaWarpSize;
+  } else if (reductionDimensionSize <= 8 * iree_compiler::kCudaWarpSize) {
+    vectorSize = 2;
+    maxNumThreads = 4 * iree_compiler::kCudaWarpSize;
+  } else if (reductionDimensionSize <= 8 * 2 * iree_compiler::kCudaWarpSize) {
+    vectorSize = 4;
+    maxNumThreads = 4 * iree_compiler::kCudaWarpSize;
+  }
+  // Scale up to larger sizes (32, 64, 128+)-warps, using vector-4.
+  if (!captures.trailingOpSizes.empty()) {
+    if (reductionDimensionSize >= 32 * 4 * iree_compiler::kCudaWarpSize) {
+      vectorSize = 4;
+      maxNumThreads = 32 * iree_compiler::kCudaWarpSize;
+    } else if (reductionDimensionSize >=
+               16 * 4 * iree_compiler::kCudaWarpSize) {
+      vectorSize = 4;
+      maxNumThreads = 16 * iree_compiler::kCudaWarpSize;
+    } else if (reductionDimensionSize >= 8 * 4 * iree_compiler::kCudaWarpSize) {
+      vectorSize = 4;
+      maxNumThreads = 8 * iree_compiler::kCudaWarpSize;
     }
   }
-  return GPUReductionConfig{maxNumThreads, warpShuffleSize};
+  return GPUReductionConfig{maxNumThreads, vectorSize};
 }
 
 static ReductionStrategyStagedThreadDistribution
@@ -726,12 +741,19 @@ configureGPUReductionStrategyStagedThreadDistribution(
     MLIRContext *context,
     const transform_ext::MatchedReductionCaptures &captures) {
   // TODO: Generalize along the HW axis.
-  GPUReductionConfig gpuReductionConfig = getReductionConfigRTX2080Ti(captures);
+  GPUReductionConfig gpuReductionConfig =
+      getStagedReductionConfigRTX2080Ti(captures);
   ReductionStrategyStagedThreadDistribution strategy(
       context, captures, gpuReductionConfig.maxNumThreads,
-      gpuReductionConfig.warpShuffleSize);
+      gpuReductionConfig.vectorSize);
   LLVM_DEBUG(DBGS() << "use staged reduction strategy\n");
   return strategy;
+}
+
+static GPUReductionConfig getSmallReductionConfigRTX2080Ti(
+    const transform_ext::MatchedReductionCaptures &captures) {
+  int64_t maxNumThreads = 4 * iree_compiler::kCudaWarpSize;
+  return GPUReductionConfig{maxNumThreads, 0};
 }
 
 static FailureOr<SmallReductionStrategy> configureGPUSmallReductionStrategy(
@@ -739,7 +761,8 @@ static FailureOr<SmallReductionStrategy> configureGPUSmallReductionStrategy(
     const transform_ext::MatchedReductionCaptures &captures,
     bool hasTrailingElementwise) {
   // TODO: Generalize along the HW axis.
-  GPUReductionConfig gpuReductionConfig = getReductionConfigRTX2080Ti(captures);
+  GPUReductionConfig gpuReductionConfig =
+      getSmallReductionConfigRTX2080Ti(captures);
   SmallReductionStrategy strategy(context, captures,
                                   gpuReductionConfig.maxNumThreads,
                                   hasTrailingElementwise);

@@ -17,8 +17,8 @@ namespace iree_compiler {
 // Low-level reusable builder APIs, these should follow MLIR-style builders.
 //===----------------------------------------------------------------------===//
 
-static constexpr unsigned kCudaWarpSize = 32;
-static constexpr unsigned kCudaMaxNumThreads = 1024;
+static constexpr int64_t kCudaWarpSize = 32;
+static constexpr int64_t kCudaMaxNumThreads = 1024;
 
 /// Post-bufferization mapping to blocks and threads.
 /// Takes a handle to a func.func and returns an updated handle to a
