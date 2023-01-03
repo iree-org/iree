@@ -151,13 +151,26 @@ steps:
         || grep -q "No artifacts found" ./bench-dl-log
       buildkite-agent artifact download "compile-stats-results-*.json" ./ 2>&1 | tee stats-dl-log \
         || grep -q "No artifacts found" ./stats-dl-log
+      git merge-base \
+        "origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
+        "$${BUILDKITE_COMMIT}" > "./pr-base-commit"
       # The script will handle the wildcard patterns.
-      python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py \
+      python3 build_tools/benchmarks/generate_benchmark_comment.py \
         --verbose \
-        --query-base \
-        --comment-title="Abbreviated Linux Benchmark Summary" \
-        --benchmark_files "benchmark-results-*.json" \
-        --compile_stats_files "compile-stats-results-*.json"
+        --benchmark_files="benchmark-results-*.json" \
+        --compile_stats_files="compile-stats-results-*.json" \
+        --pr_number="$${BUILDKITE_PULL_REQUEST}" \
+        --pr_commit="$${BUILDKITE_COMMIT}" \
+        --pr_base_commit="$(cat ./pr-base-commit)" \
+        --build_url="$${BUILDKITE_BUILD_URL}" \
+        --comment_title="Abbreviated Linux Benchmark Summary" \
+        --comment_type_id="37549014-3c67-4e74-8d88-8e929231abe3" \
+        --output="benchmark-comment.json"
+      export GIST_BOT_TOKEN="$${GITHUB_TOKEN}"
+      python3 build_tools/benchmarks/post_benchmark_comment.py \
+        --verbose \
+        --pr_number="$${BUILDKITE_PULL_REQUEST}" \
+        "benchmark-comment.json"
     if: >
       build.pull_request.id != null && (
         build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||
