@@ -4,51 +4,34 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Posts benchmark results to GitHub as pull request comments.
+"""Generates benchmark results as pull request comments.
 
-This script is meant to be used by Buildkite for automation. It requires the
-following environment to be set:
+This script is meant to be used by CI. It requires the following environment
+variables to be set:
 
-- BUILDKITE_BUILD_NUMBER: the build number of current Buildkite build.
-- BUILDKITE_BUILD_URL: the link to the current Buildkite build.
-- BUILDKITE_COMMIT: the pull request HEAD commit.
-- BUILDKITE_PULL_REQUEST: the current pull request number.
-- GITHUB_TOKEN: personal access token to authenticate against GitHub API;
-    it should have "public_repo" and "gist" scope.
-
-if --query-base in toggled on, then it additionally requires:
-
-- BUILDKITE_PULL_REQUEST_BASE_BRANCH: the targeting base branch.
 - IREE_DASHBOARD_URL: the url to IREE's performance dashboard.
 
 This script uses pip package "markdown_strings".
-
-Example usage:
-  # Export necessary environment variables:
-  export ...
-  # Then run the script:
-  python3 post_benchmarks_as_pr_comment.py <benchmark-json-file>...
-  #   where each <benchmark-json-file> is expected to be of format expected
-  #   by BenchmarkResults objects.
 """
 
+import sys
+import pathlib
+
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
+
+from typing import Any, Dict, Optional, Set, Tuple
 import argparse
+import dataclasses
 import json
+import markdown_strings as md
 import os
 import requests
-import markdown_strings as md
 
-from typing import Any, Dict, Optional, Sequence, Tuple
+from common import benchmark_definition, benchmark_presentation, common_arguments
+from reporting import benchmark_comment
 
-from common.common_arguments import expand_and_check_file_paths
-from common.benchmark_definition import execute_cmd_and_get_output
-from common.benchmark_presentation import *
-
-ABBR_PR_COMMENT_TITLE = "Abbreviated Benchmark Summary"
-GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
-GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/iree-org/iree"
 GITHUB_IREE_REPO_PREFIX = "https://github.com/iree-org/iree"
-GITHUB_USER = "iree-github-actions-bot"
 IREE_PROJECT_ID = 'IREE'
 # The maximal numbers of trials when querying base commit benchmark results.
 MAX_BASE_COMMIT_QUERY_COUNT = 10
@@ -65,30 +48,13 @@ def get_required_env_var(var: str) -> str:
   return value
 
 
-def get_git_commit_hash(commit: str, verbose: bool = False) -> str:
-  """Gets the commit hash for the given commit."""
-  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
-                                    cwd=THIS_DIRECTORY,
-                                    verbose=verbose)
-
-
 def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
-  count = execute_cmd_and_get_output(['git', 'rev-list', '--count', commit],
-                                     cwd=THIS_DIRECTORY,
-                                     verbose=verbose)
-  return int(count)
-
-
-def get_origin_tree_commit(distance: int, verbose: bool = False) -> str:
-  """Returns the hash for the commit with the given distance from top of the
-  tree for the origin base branch."""
-  base_branch = get_required_env_var("BUILDKITE_PULL_REQUEST_BASE_BRANCH")
-  execute_cmd_and_get_output(
-      ['git', 'fetch', '--prune', '--', 'origin', base_branch],
+  count = benchmark_definition.execute_cmd_and_get_output(
+      ['git', 'rev-list', '--count', commit],
       cwd=THIS_DIRECTORY,
       verbose=verbose)
-  return get_git_commit_hash(f'origin/{base_branch}~{distance}', verbose)
+  return int(count)
 
 
 def get_from_dashboard(url: str,
@@ -112,218 +78,98 @@ def get_from_dashboard(url: str,
   return data
 
 
-def query_base_benchmark_results(commit,
-                                 verbose: bool = False
-                                ) -> Dict[str, Dict[str, Any]]:
+def query_base_benchmark_results(
+    commit: str,
+    dashboard_api_url: str,
+    verbose: bool = False) -> Dict[str, Dict[str, Any]]:
   """Queries the benchmark results for the given commit."""
   build_id = get_git_total_commit_count(commit, verbose)
-
-  url = get_required_env_var('IREE_DASHBOARD_URL')
   payload = {'projectId': IREE_PROJECT_ID, 'buildId': build_id}
-  return get_from_dashboard(f'{url}/apis/v2/getBuild', payload, verbose=verbose)
+  return get_from_dashboard(f'{dashboard_api_url}/getBuild',
+                            payload,
+                            verbose=verbose)
 
 
-def get_benchmark_result_markdown(benchmark_files: Sequence[pathlib.Path],
-                                  compile_stats_files: Sequence[pathlib.Path],
-                                  query_base: bool,
-                                  comment_title: str,
-                                  verbose: bool = False) -> Tuple[str, str]:
+def _find_comparable_benchmark_results(
+    start_commit: str,
+    required_benchmark_keys: Set[str],
+    dashboard_api_url: str,
+    verbose: bool = False) -> Optional[Tuple[str, Dict[str, Dict[str, Any]]]]:
+  cmds = [
+      "git", "rev-list", f"--max-count={MAX_BASE_COMMIT_QUERY_COUNT}",
+      start_commit
+  ]
+  output = benchmark_definition.execute_cmd_and_get_output(cmds,
+                                                           cwd=THIS_DIRECTORY,
+                                                           verbose=verbose)
+  previous_commits = output.splitlines()
+  # Try to query some base benchmark to diff against, from the top of the
+  # tree. Bail out if the maximal trial number is exceeded.
+  for base_commit in previous_commits:
+    base_benchmarks = query_base_benchmark_results(
+        commit=base_commit,
+        dashboard_api_url=dashboard_api_url,
+        verbose=verbose)
+    base_benchmark_keys = set(base_benchmarks.keys())
+    if required_benchmark_keys <= base_benchmark_keys:
+      return base_commit, base_benchmarks
+
+  return None
+
+
+def _get_benchmark_result_markdown(
+    execution_benchmarks: Dict[
+        str, benchmark_presentation.AggregateBenchmarkLatency],
+    compilation_metrics: Dict[str, benchmark_presentation.CompilationMetrics],
+    pr_url: str, build_url: str, comment_title: str, comment_type_id: str,
+    commit_info_md: str) -> Tuple[str, str]:
   """Gets the full/abbreviated markdown summary of all benchmarks in files."""
-  pr_commit = get_required_env_var("BUILDKITE_COMMIT")
-  all_benchmarks = aggregate_all_benchmarks(benchmark_files,
-                                            pr_commit,
-                                            verbose=verbose)
-  all_compilation_metrics = collect_all_compilation_metrics(
-      compile_stats_files, pr_commit)
 
-  build_url = get_required_env_var("BUILDKITE_BUILD_URL")
-  pr_number = get_required_env_var("BUILDKITE_PULL_REQUEST")
-  pr_commit = md.link(pr_commit,
-                      f"{GITHUB_IREE_REPO_PREFIX}/commit/{pr_commit}")
-
-  commit_info = f"@ commit {pr_commit}"
-  if query_base:
-    # Collect the metric keys for each compilation target.
-    compilation_metric_keys = set()
-    for target_name in all_compilation_metrics:
-      for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
-        compilation_metric_keys.add(mapper.get_series_name(target_name))
-
-    # Try to query some base benchmark to diff against, from the top of the
-    # tree. Bail out if the maximal trial number is exceeded.
-    for i in range(MAX_BASE_COMMIT_QUERY_COUNT):
-      base_commit = get_origin_tree_commit(i, verbose)
-      base_benchmarks = query_base_benchmark_results(base_commit, verbose)
-      base_commit = md.link(base_commit,
-                            f"{GITHUB_IREE_REPO_PREFIX}/commit/{base_commit}")
-
-      # Skip if the base doesn't contain all benchmarks to be compared.
-      base_keys = set(base_benchmarks.keys())
-      if (not (set(all_benchmarks.keys()) <= base_keys) or
-          not (compilation_metric_keys <= base_keys)):
-        commit_info = (f"@ commit {pr_commit} (no previous benchmark results to"
-                       f" compare against since {base_commit})")
-        continue
-
-      # Update the aggregate benchmarks with base numbers.
-      for bench in all_benchmarks:
-        base_benchmark = base_benchmarks[bench]
-        if base_benchmark["sampleUnit"] != "ns":
-          raise ValueError("Only support nanoseconds for latency sample.")
-        all_benchmarks[bench].base_mean_time = base_benchmark["sample"]
-
-      # Update the compilation metrics with base numbers.
-      for target_name, metrics in all_compilation_metrics.items():
-        updated_metrics = metrics
-        for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
-          metric_key = mapper.get_series_name(target_name)
-          base_benchmark = base_benchmarks[metric_key]
-          if base_benchmark["sampleUnit"] != mapper.get_unit():
-            raise ValueError("Unit of the queried sample is mismatched.")
-          updated_metrics = mapper.update_base_value(updated_metrics,
-                                                     base_benchmark["sample"])
-        all_compilation_metrics[target_name] = updated_metrics
-
-      commit_info = f"@ commit {pr_commit} (vs. base {base_commit})"
-      break
-
-  pr_info = md.link("Pull request",
-                    f"{GITHUB_IREE_REPO_PREFIX}/pull/{pr_number}")
-  buildkite_info = md.link("Buildkite build", build_url)
+  pr_info = md.link("Pull request", pr_url)
+  build_info = md.link("Build", build_url)
 
   # Compose the full benchmark tables.
   full_table = [md.header("Full Benchmark Summary", 2)]
-  full_table.append(md.unordered_list([commit_info, pr_info, buildkite_info]))
-  full_table.append(categorize_benchmarks_into_tables(all_benchmarks))
+  full_table.append(md.unordered_list([commit_info_md, pr_info, build_info]))
+  full_table.append(
+      benchmark_presentation.categorize_benchmarks_into_tables(
+          execution_benchmarks))
 
   # Compose the full compilation metrics tables.
   full_table.append(
-      categorize_compilation_metrics_into_tables(all_compilation_metrics))
+      benchmark_presentation.categorize_compilation_metrics_into_tables(
+          compilation_metrics))
 
   # Compose the abbreviated benchmark tables.
   abbr_table = [md.header(comment_title, 2)]
-  abbr_table.append(commit_info)
+  abbr_table.append(commit_info_md)
 
-  abbr_benchmarks_tables = categorize_benchmarks_into_tables(
-      all_benchmarks, TABLE_SIZE_CUT)
+  abbr_benchmarks_tables = benchmark_presentation.categorize_benchmarks_into_tables(
+      execution_benchmarks, TABLE_SIZE_CUT)
   if len(abbr_benchmarks_tables) == 0:
     abbr_table.append("No improved or regressed benchmarks 🏖️")
   else:
     abbr_table.append(abbr_benchmarks_tables)
 
-  abbr_compilation_metrics_tables = categorize_compilation_metrics_into_tables(
-      all_compilation_metrics, TABLE_SIZE_CUT)
+  abbr_compilation_metrics_tables = benchmark_presentation.categorize_compilation_metrics_into_tables(
+      compilation_metrics, TABLE_SIZE_CUT)
   if len(abbr_compilation_metrics_tables) == 0:
     abbr_table.append("No improved or regressed compilation metrics 🏖️")
   else:
     abbr_table.append(abbr_compilation_metrics_tables)
 
   abbr_table.append("For more information:")
-  # We don't know until a Gist is really created. Use a placeholder for now
-  # and replace later.
+  # We don't know until a Gist is really created. Use a placeholder for now and
+  # replace later.
   full_result_info = md.link("Full benchmark result tables",
-                             "<<placeholder-link>>")
-  abbr_table.append(md.unordered_list([full_result_info, buildkite_info]))
+                             benchmark_comment.GIST_LINK_PLACEHORDER)
+  abbr_table.append(md.unordered_list([full_result_info, build_info]))
+
+  # Append the unique comment type id to help identify and update the existing
+  # comment.
+  abbr_table.append(f"<!--Comment type id: {comment_type_id}-->")
 
   return "\n\n".join(full_table), "\n\n".join(abbr_table)
-
-
-def post_to_gist(filename: str, content: str, verbose: bool = False):
-  """Posts the given content to a new GitHub Gist and returns the URL to it."""
-  api_token = get_required_env_var('GITHUB_TOKEN')
-  headers = {
-      "Accept": "application/vnd.github.v3+json",
-      "Authorization": f"token {api_token}",
-  }
-  payload = json.dumps({
-      "public": True,
-      "files": {
-          filename: {
-              "content": content
-          }
-      }
-  })
-
-  api_endpoint = GITHUB_GIST_API_PREFIX
-  response = requests.post(api_endpoint, data=payload, headers=headers)
-  if response.status_code != 201:
-    raise requests.RequestException(
-        f"Failed to comment on GitHub; error code: {response.status_code}")
-
-  response = response.json()
-  if verbose:
-    print(f"Gist posting response: {response}")
-
-  if response["truncated"]:
-    raise requests.RequestException(f"Content too large and gotten truncated")
-
-  gist_id = response["id"]
-  return f"https://gist.github.com/{GITHUB_USER}/{gist_id}"
-
-
-def get_previous_comment_on_pr(pr_number: str,
-                               comment_title: str,
-                               verbose: bool = False) -> Optional[int]:
-  """Gets the previous comment's ID from GitHub."""
-  # Increasing per_page limit requires user authentication.
-  api_token = get_required_env_var('GITHUB_TOKEN')
-  headers = {
-      "Accept": "application/vnd.github.v3+json",
-      "Authorization": f"token {api_token}",
-  }
-  payload = json.dumps({"per_page": 100})
-
-  api_endpoint = f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments"
-  response = requests.get(api_endpoint, data=payload, headers=headers)
-  if response.status_code != 200:
-    raise requests.RequestException(
-        f"Failed to get PR comments from GitHub; error code: {response.status_code}"
-    )
-
-  response = response.json()
-  if verbose:
-    print(f"Previous comment query response: {response}")
-
-  # Find the last comment from GITHUB_USER and has the ABBR_PR_COMMENT_TITILE
-  # keyword.
-  for comment in reversed(response):
-    escaped_title = md.esc_format(comment_title)
-    if (comment["user"]["login"] == GITHUB_USER) and (escaped_title
-                                                      in comment["body"]):
-      return comment["id"]
-  return None
-
-
-def create_comment_on_pr(pr_number: str, content: str, verbose: bool = False):
-  """Posts the given content as comments to the current pull request."""
-  api_token = get_required_env_var('GITHUB_TOKEN')
-  headers = {
-      "Accept": "application/vnd.github.v3+json",
-      "Authorization": f"token {api_token}",
-  }
-  payload = json.dumps({"body": content})
-
-  api_endpoint = f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments"
-  response = requests.post(api_endpoint, data=payload, headers=headers)
-  if response.status_code != 201:
-    raise requests.RequestException(
-        f"Failed to comment on GitHub; error code: {response.status_code}")
-
-
-def update_comment_on_pr(comment_id: int, content: str, verbose: bool = False):
-  """Updates the content of the given comment."""
-  api_token = get_required_env_var('GITHUB_TOKEN')
-  headers = {
-      "Accept": "application/vnd.github.v3+json",
-      "Authorization": f"token {api_token}",
-  }
-  payload = json.dumps({"body": content})
-
-  api_endpoint = f"{GITHUB_IREE_API_PREFIX}/issues/comments/{comment_id}"
-  response = requests.patch(api_endpoint, data=payload, headers=headers)
-  if response.status_code != 200:
-    raise requests.RequestException(
-        f"Failed to comment on GitHub; error code: {response.status_code}")
 
 
 def parse_arguments():
@@ -344,56 +190,115 @@ def parse_arguments():
       nargs="+",
       help=("Paths to the JSON files containing compilation statistics, "
             "accepts wildcards"))
-  parser.add_argument("--dry-run",
-                      action="store_true",
-                      help="Print the comment instead of posting to GitHub")
+  parser.add_argument("--pr_number", required=True, type=int, help="PR number")
+  parser.add_argument("--pr_commit",
+                      required=True,
+                      type=str,
+                      help="PR commit hash")
   parser.add_argument(
-      "--query-base",
-      action="store_true",
-      help=("Query the dashboard for the benchmark results of the targeting "
-            "base branch"))
-  parser.add_argument("--comment-title",
-                      default=ABBR_PR_COMMENT_TITLE,
+      "--pr_base_commit",
+      type=str,
+      default=None,
+      help="Start commit to find the benchmark results to compare in reverse. "
+      "Requires repo to have the full ancestor history of the start commit")
+  parser.add_argument("--comment_title",
+                      default="Abbreviated Benchmark Summary",
                       help="Title of the comment")
+  parser.add_argument("--comment_type_id",
+                      default="f6919a4c-7bb3-4fd6-af89-97980ce49f95",
+                      help="Unique id to identify previous comment")
+  parser.add_argument("--build_url",
+                      required=True,
+                      type=str,
+                      help="CI build page url to show in the report")
+  parser.add_argument("--output", type=pathlib.Path, default=None)
   parser.add_argument("--verbose",
                       action="store_true",
                       help="Print internal information during execution")
-  args = parser.parse_args()
 
-  return args
+  return parser.parse_args()
 
 
 def main(args):
-  benchmark_files = expand_and_check_file_paths(args.benchmark_files)
-  compile_stats_files = expand_and_check_file_paths(args.compile_stats_files)
-  full_md, abbr_md = get_benchmark_result_markdown(
-      benchmark_files,
-      compile_stats_files,
-      query_base=args.query_base,
-      comment_title=args.comment_title,
-      verbose=args.verbose)
+  dashboard_api_url = f'{get_required_env_var("IREE_DASHBOARD_URL")}/apis/v2'
 
-  if args.dry_run:
-    print(full_md, "\n\n", abbr_md)
-    return
+  benchmark_files = common_arguments.expand_and_check_file_paths(
+      args.benchmark_files)
+  compile_stats_files = common_arguments.expand_and_check_file_paths(
+      args.compile_stats_files)
 
-  pr_number = get_required_env_var("BUILDKITE_PULL_REQUEST")
-  # Buildkite sets this to "false" if not running on a PR:
-  # https://buildkite.com/docs/pipelines/environment-variables#bk-env-vars-buildkite-pull-request
-  if pr_number == "false":
-    raise ValueError("Not a pull request")
+  pr_commit = args.pr_commit
+  execution_benchmarks = benchmark_presentation.aggregate_all_benchmarks(
+      benchmark_files=benchmark_files, expected_pr_commit=pr_commit)
+  compilation_metrics = benchmark_presentation.collect_all_compilation_metrics(
+      compile_stats_files=compile_stats_files, expected_pr_commit=pr_commit)
 
-  build_number = get_required_env_var("BUILDKITE_BUILD_NUMBER")
-  filename = f"iree-full-benchmark-result-{build_number}.md"
-  gist_url = post_to_gist(filename, full_md, args.verbose)
-  abbr_md = abbr_md.replace("<<placeholder-link>>", gist_url)
-
-  previous_comment = get_previous_comment_on_pr(
-      pr_number, comment_title=args.comment_title, verbose=args.verbose)
-  if previous_comment is not None:
-    update_comment_on_pr(previous_comment, abbr_md, args.verbose)
+  pr_base_commit = args.pr_base_commit
+  if pr_base_commit is None:
+    baseline_results = None
   else:
-    create_comment_on_pr(pr_number, abbr_md, args.verbose)
+    required_benchmark_keys = set(execution_benchmarks.keys())
+    for target_name in compilation_metrics:
+      for mapper in benchmark_presentation.COMPILATION_METRICS_TO_TABLE_MAPPERS:
+        required_benchmark_keys.add(mapper.get_series_name(target_name))
+
+    baseline_results = _find_comparable_benchmark_results(
+        start_commit=pr_base_commit,
+        required_benchmark_keys=required_benchmark_keys,
+        dashboard_api_url=dashboard_api_url,
+        verbose=args.verbose)
+
+  if baseline_results is None:
+    baseline_commit = None
+  else:
+    baseline_commit, base_benchmarks = baseline_results
+    # Update the aggregate benchmarks with base numbers.
+    for bench in execution_benchmarks:
+      base_benchmark = base_benchmarks[bench]
+      if base_benchmark["sampleUnit"] != "ns":
+        raise ValueError("Only support nanoseconds for latency sample.")
+      execution_benchmarks[bench].base_mean_time = base_benchmark["sample"]
+
+    # Update the compilation metrics with base numbers.
+    for target_name, metrics in compilation_metrics.items():
+      updated_metrics = metrics
+      for mapper in benchmark_presentation.COMPILATION_METRICS_TO_TABLE_MAPPERS:
+        metric_key = mapper.get_series_name(target_name)
+        base_benchmark = base_benchmarks[metric_key]
+        if base_benchmark["sampleUnit"] != mapper.get_unit():
+          raise ValueError("Unit of the queried sample is mismatched.")
+        updated_metrics = mapper.update_base_value(updated_metrics,
+                                                   base_benchmark["sample"])
+      compilation_metrics[target_name] = updated_metrics
+
+  pr_commit_link = md.link(pr_commit,
+                           f"{GITHUB_IREE_REPO_PREFIX}/commit/{pr_commit}")
+  commit_info_md = f"@ commit {pr_commit_link}"
+  if baseline_commit is not None:
+    baseline_commit_link = md.link(
+        baseline_commit, f"{GITHUB_IREE_REPO_PREFIX}/commit/{baseline_commit}")
+    commit_info_md += f" (vs. base {baseline_commit_link})"
+  elif pr_base_commit is not None:
+    commit_info_md += " (no previous benchmark results to compare)"
+
+  comment_type_id = args.comment_type_id
+  full_md, abbr_md = _get_benchmark_result_markdown(
+      execution_benchmarks=execution_benchmarks,
+      compilation_metrics=compilation_metrics,
+      pr_url=f"{GITHUB_IREE_REPO_PREFIX}/pull/{args.pr_number}",
+      build_url=args.build_url,
+      comment_title=args.comment_title,
+      comment_type_id=comment_type_id,
+      commit_info_md=commit_info_md)
+
+  comment_data = benchmark_comment.CommentData(type_id=comment_type_id,
+                                               abbr_md=abbr_md,
+                                               full_md=full_md)
+  comment_json_data = json.dumps(dataclasses.asdict(comment_data), indent=2)
+  if args.output is None:
+    print(comment_json_data)
+  else:
+    args.output.write_text(comment_json_data)
 
 
 if __name__ == "__main__":

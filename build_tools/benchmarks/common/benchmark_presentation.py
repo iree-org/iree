@@ -204,8 +204,8 @@ COMPILATION_METRICS_TO_TABLE_MAPPERS: List[
 
 def aggregate_all_benchmarks(
     benchmark_files: Sequence[pathlib.Path],
-    expected_pr_commit: Optional[str] = None,
-    verbose: bool = False) -> Dict[str, AggregateBenchmarkLatency]:
+    expected_pr_commit: Optional[str] = None
+) -> Dict[str, AggregateBenchmarkLatency]:
   """Aggregates all benchmarks in the given files.
 
   Args:
