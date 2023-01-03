@@ -12,6 +12,10 @@ GIST_LINK_PLACEHORDER = "<<gist-link-placeholder>>"
 
 @dataclass(frozen=True)
 class CommentData(object):
+  """Benchmark comment data."""
+  # Unique id to identify the same kind of comment.
   type_id: str
+  # Abbreviated markdown to post as a comment.
   abbr_md: str
+  # Abbreviated markdown to post on gist.
   full_md: str

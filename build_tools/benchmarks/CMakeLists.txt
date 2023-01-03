@@ -54,3 +54,10 @@ benchmark_tool_py_test(
   SRC
     "export_benchmark_config_test.py"
 )
+
+benchmark_tool_py_test(
+  NAME
+    post_benchmark_comment_test
+  SRC
+    "post_benchmark_comment_test.py"
+)
