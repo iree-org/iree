@@ -18,7 +18,6 @@ set -xeuo pipefail
 BUILD_DIR="${1:-${IREE_BUILD_DIR:-build}}"
 INSTALL_DIR="${IREE_INSTALL_DIR:-${BUILD_DIR}/install}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
-IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
 # Enable WebGPU compiler builds and tests by default. All deps get fetched as
 # needed, but some of the deps are too large to enable by default for all
 # developers.

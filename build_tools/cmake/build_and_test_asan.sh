@@ -30,6 +30,7 @@ CMAKE_ARGS=(
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
   "-DIREE_ENABLE_ASAN=ON"
   "-B" "${BUILD_DIR?}"
+  "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
   # Also check if microbenchmarks are buildable.
   "-DIREE_BUILD_MICROBENCHMARKS=ON"

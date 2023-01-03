@@ -27,6 +27,7 @@ mkdir -p "${INSTALL_DIR}"
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
+  "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
   "-DCMAKE_INSTALL_PREFIX=$(realpath ${INSTALL_DIR})"
   "-DIREE_ENABLE_LLD=ON"

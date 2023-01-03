@@ -25,6 +25,7 @@ source build_tools/cmake/setup_build.sh
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
+  "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
   "-DIREE_BUILD_COMPILER=OFF"
   "-DIREE_HOST_BINARY_ROOT=${IREE_HOST_BINARY_ROOT}"
