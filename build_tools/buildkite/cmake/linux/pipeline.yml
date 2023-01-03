@@ -146,14 +146,17 @@ steps:
     key: "post-on-pr"
     commands: |
       set -euo pipefail
+      # Fetch base branch for comparison.
+      git fetch -v --prune --no-recurse-submodules -- origin \
+        "$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+      git merge-base \
+        "origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
+        "$${BUILDKITE_COMMIT}" > "./pr-base-commit"
       # Try to download the artifacts, continuing with a message if not found.
       buildkite-agent artifact download "benchmark-results-*.json" ./ 2>&1 | tee bench-dl-log \
         || grep -q "No artifacts found" ./bench-dl-log
       buildkite-agent artifact download "compile-stats-results-*.json" ./ 2>&1 | tee stats-dl-log \
         || grep -q "No artifacts found" ./stats-dl-log
-      git merge-base \
-        "origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
-        "$${BUILDKITE_COMMIT}" > "./pr-base-commit"
       # The script will handle the wildcard patterns.
       python3 build_tools/benchmarks/generate_benchmark_comment.py \
         --verbose \
