@@ -5,13 +5,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """
-Posts benchmark results to Gist and comments on pull requests.
+Posts benchmark results to gist and comments on pull requests.
 
 Requires the environment variables:
 
 - GITHUB_TOKEN: token from GitHub action that has write access on issues. See
   https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
-- GIST_BOT_TOKEN: token that has write access to Gist. Gist will be posted as
+- GIST_BOT_USER: user name that posts the gist.
+- GIST_BOT_TOKEN: token that has write access to gist. Gist will be posted as
   the owner of the token. See
   https://docs.github.com/en/rest/overview/permissions-required-for-fine-grained-personal-access-tokens#gists
 """
@@ -24,6 +25,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 from typing import Any, Optional
 import argparse
+import http.client
 import json
 import os
 import requests
@@ -31,8 +33,9 @@ import requests
 from reporting import benchmark_comment
 
 GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/iree-org/iree"
-GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
+GITHUB_GIST_API = "https://api.github.com/gists"
 GITHUB_API_VERSION = "2022-11-28"
+MAX_PAGES_TO_SEARCH_PREVIOUS_COMMENT = 10
 
 
 class APIRequester(object):
@@ -67,7 +70,7 @@ def post_to_gist(requester: APIRequester,
                  verbose: bool = False) -> str:
   """Posts the given content to a new GitHub Gist and returns the URL to it."""
 
-  response = requester.post(endpoint=GITHUB_GIST_API_PREFIX,
+  response = requester.post(endpoint=GITHUB_GIST_API,
                             payload={
                                 "public": True,
                                 "files": {
@@ -76,7 +79,7 @@ def post_to_gist(requester: APIRequester,
                                     }
                                 }
                             })
-  if response.status_code != 201:
+  if response.status_code != http.client.CREATED:
     raise RuntimeError(
         f"Failed to comment on GitHub; error code: {response.status_code}")
 
@@ -97,24 +100,29 @@ def get_previous_comment_on_pr(requester: APIRequester,
                                verbose: bool = False) -> Optional[int]:
   """Gets the previous comment's id from GitHub."""
 
-  # Assume the first 100 comments is enough.
-  response = requester.get(
-      endpoint=f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments",
-      payload={"per_page": 100})
-  if response.status_code != 200:
-    raise RuntimeError(
-        f"Failed to get PR comments from GitHub; error code: {response.status_code}"
-    )
+  for page in range(1, MAX_PAGES_TO_SEARCH_PREVIOUS_COMMENT + 1):
+    response = requester.get(
+        endpoint=f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments",
+        payload={
+            "per_page": 100,
+            "page": page,
+            "sort": "updated",
+            "direction": "desc"
+        })
+    if response.status_code != http.client.OK:
+      raise RuntimeError(
+          f"Failed to get PR comments from GitHub; error code: {response.status_code}"
+      )
 
-  response = response.json()
-  if verbose:
-    print(f"Previous comment query response: {response}")
+    comments = response.json()
+    if verbose:
+      print(f"Previous comment query response on page {page}: {comments}")
 
-  # Find the last comment from GITHUB_ACTIONS_USER and has the comment type id.
-  for comment in reversed(response):
-    if (comment["user"]["login"] == gist_bot_user and
-        comment_type_id in comment["body"]):
-      return comment["id"]
+    # Find the last comment from GITHUB_ACTIONS_USER and has the comment type id.
+    for comment in comments:
+      if (comment["user"]["login"] == gist_bot_user and
+          comment_type_id in comment["body"]):
+        return comment["id"]
 
   return None
 
@@ -126,7 +134,7 @@ def update_comment_on_pr(requester: APIRequester, comment_id: int,
   response = requester.patch(
       endpoint=f"{GITHUB_IREE_API_PREFIX}/issues/comments/{comment_id}",
       payload={"body": content})
-  if response.status_code != 200:
+  if response.status_code != http.client.OK:
     raise RuntimeError(
         f"Failed to comment on GitHub; error code: {response.status_code}")
 
@@ -137,12 +145,12 @@ def create_comment_on_pr(requester: APIRequester, pr_number: int, content: str):
   response = requester.post(
       endpoint=f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments",
       payload={"body": content})
-  if response.status_code != 201:
+  if response.status_code != http.client.CREATED:
     raise RuntimeError(
         f"Failed to comment on GitHub; error code: {response.status_code}")
 
 
-def parse_arguments():
+def _parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("comment_json", type=pathlib.Path)
   parser.add_argument("--verbose", action="store_true")
@@ -194,4 +202,4 @@ def main(args: argparse.Namespace):
 
 
 if __name__ == "__main__":
-  main(parse_arguments())
+  main(_parse_arguments())

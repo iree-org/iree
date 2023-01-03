@@ -199,14 +199,16 @@ def parse_arguments():
       "--pr_base_commit",
       type=str,
       default=None,
-      help="Start commit to find the benchmark results to compare in reverse. "
-      "Requires repo to have the full ancestor history of the start commit")
+      help="Start commit to find the benchmark results to compare in reverse, "
+      "requires repo to have the full ancestor history of the start commit")
   parser.add_argument("--comment_title",
                       default="Abbreviated Benchmark Summary",
                       help="Title of the comment")
-  parser.add_argument("--comment_type_id",
-                      default="f6919a4c-7bb3-4fd6-af89-97980ce49f95",
-                      help="Unique id to identify previous comment")
+  parser.add_argument(
+      "--comment_type_id",
+      default="f6919a4c-7bb3-4fd6-af89-97980ce49f95",
+      help="Unique id to identify the previous comment and update the one "
+      "with the same id when posting")
   parser.add_argument("--build_url",
                       required=True,
                       type=str,
@@ -252,7 +254,7 @@ def main(args):
     baseline_commit = None
   else:
     baseline_commit, base_benchmarks = baseline_results
-    # Update the aggregate benchmarks with base numbers.
+    # Update the execution benchmarks with base numbers.
     for bench in execution_benchmarks:
       base_benchmark = base_benchmarks[bench]
       if base_benchmark["sampleUnit"] != "ns":
