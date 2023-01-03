@@ -30,7 +30,7 @@ import requests
 
 from reporting import benchmark_comment
 
-GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/pzread/iree"
+GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/iree-org/iree"
 GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
 GITHUB_ACTIONS_USER = "github-actions[bot]"
 GITHUB_API_VERSION = "2022-11-28"
