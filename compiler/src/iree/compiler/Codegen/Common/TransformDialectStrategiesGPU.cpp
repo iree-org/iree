@@ -447,30 +447,71 @@ createReductionStrategyStagedThreadDistributionStep(
                          blockCombinerOpH);
 }
 
-static void createElementwiseStrategyThreadStep(ImplicitLocOpBuilder &b,
-                                                Value elementwiseH,
-                                                int64_t rank,
-                                                int64_t numThreadsXInBlock) {
+/// Search for the maximal `numThreadsXInBlock` times `vectorSize` smaller than
+/// `value`; where `vectorSize` is in `{4, 2, 1}`.
+/// If such a positive multiple exists:
+///   1. if it is `value`, then value is an even multiple of
+///   `numThreadsXInBlock` * `vectorSize` and we can tile evenly without
+///   splitting.
+///   2. otherwise, it is a split point at which we can split with vectorSize
+///   to obtain the largest divisible tiling.
+/// Return splitPoint and vector size.
+static std::pair<int64_t, int64_t> computeElementwiseSplitPoint(
+    int64_t value, int numThreadsXInBlock) {
+  int64_t zero = 0;
+  if (ShapedType::isDynamic(value)) return std::make_pair(zero, 1);
+  for (int64_t vectorSize : {4, 2, 1}) {
+    int64_t splitPoint = iree_compiler::previousMultipleOf(
+        value, numThreadsXInBlock * vectorSize);
+    if (splitPoint > 0) {
+      return (value == splitPoint) ? std::make_pair(zero, vectorSize)
+                                   : std::make_pair(splitPoint, vectorSize);
+    }
+  }
+  return std::make_pair(zero, 1);
+}
+
+static void createElementwiseStrategyThreadStep(
+    ImplicitLocOpBuilder &b, Value elementwiseH, int64_t rank,
+    SmallVector<int64_t> elementwiseSizes, int64_t numThreadsXInBlock) {
   assert(rank > 0 && "nonnegative rank expected");
   SmallVector<int64_t> trailingTileSizes(rank, 0);
-  SmallVector<int64_t> scfForTileSizes = trailingTileSizes,
-                       foreachTileSizes = trailingTileSizes;
   // The following assumes we only want to tile the most-minor dimension of the
   // trailing operation. This may be a completely wrong choice.
   // TODO: More robustness to permutations of most-minor dimensions.
-  // TODO: Capture most minor size and compute tile size based on it.
-  scfForTileSizes.back() = numThreadsXInBlock;
-  foreachTileSizes.back() = numThreadsXInBlock;
-  // TODO: Only tile by scf.for if we wish to normalize the tiling (i.e. if
-  // the result has a lot more values than the number of threads in block).
-  // This allows us to avoid uncoalesced accesses.
-  // TODO: Refine elementwise strategy to allow vector<2/4>.
-  // TODO: Consider splitting the elementwise strategy to ensure vector<2/4>.
+  // TODO: Split point should be aware of future stride / alignment.
+  int64_t mostMinorDim = rank - 1;
+  int64_t mostMinorSize = elementwiseSizes[mostMinorDim];
+  auto [splitPoint, vectorSize] =
+      computeElementwiseSplitPoint(mostMinorSize, numThreadsXInBlock);
+
+  SmallVector<int64_t> scfForTileSizes = trailingTileSizes,
+                       foreachTileSizes = trailingTileSizes;
+  scfForTileSizes[mostMinorDim] = numThreadsXInBlock * vectorSize;
+  foreachTileSizes[mostMinorDim] = numThreadsXInBlock;
+
+  auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
+                                                      mlir::gpu::Threads::DimX);
+  if (splitPoint > 0) {
+    auto pdlOperation = pdl::OperationType::get(b.getContext());
+    auto split =
+        b.create<transform::SplitOp>(pdlOperation, pdlOperation, elementwiseH,
+                                     b.getI64IntegerAttr(mostMinorDim), Value(),
+                                     b.getI64IntegerAttr(splitPoint));
+    elementwiseH = split.getFirst();
+    auto res = iree_compiler::buildTileFuseToScfFor(
+        b, elementwiseH, {},
+        getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
+    iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
+        b, res.tiledOpH, {},
+        getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
+        b.getArrayAttr({threadX}));
+    elementwiseH = split.getSecond();
+  }
+
   auto res = iree_compiler::buildTileFuseToScfFor(
       b, elementwiseH, {},
       getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
-  auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
-                                                      mlir::gpu::Threads::DimX);
   iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
       b, res.tiledOpH, {},
       getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
@@ -484,9 +525,9 @@ static void createReductionStrategyStagedThreadDistribution(
   // Map the potential maybeTiledLeadingH.
   // TODO: Consider fusing leading elementwise into threads.
   if (strategy.captures.maybeLeadingRank > 0) {
-    createElementwiseStrategyThreadStep(b, maybeTiledLeadingH,
-                                        strategy.captures.maybeLeadingRank,
-                                        strategy.getNumThreadsXInBlock());
+    createElementwiseStrategyThreadStep(
+        b, maybeTiledLeadingH, strategy.captures.maybeLeadingRank,
+        strategy.captures.leadingOpSizes, strategy.getNumThreadsXInBlock());
   }
 
   // Staged reduction step 1: break gridReductionH apart.
@@ -506,9 +547,9 @@ static void createReductionStrategyStagedThreadDistribution(
 
   // Map the potential maybeTiledTrailingH.
   if (strategy.captures.maybeTrailingRank > 0) {
-    createElementwiseStrategyThreadStep(b, maybeTiledTrailingH,
-                                        strategy.captures.maybeTrailingRank,
-                                        strategy.getNumThreadsXInBlock());
+    createElementwiseStrategyThreadStep(
+        b, maybeTiledTrailingH, strategy.captures.maybeTrailingRank,
+        strategy.captures.trailingOpSizes, strategy.getNumThreadsXInBlock());
   }
 }
 
