@@ -1250,7 +1250,7 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
       if (leading.getCaptured())
         DBGS() << leading.getCaptured() << "\n";
       DBGS() << "fill: " << fill.getCaptured() << "\n";
-      DBGS() << "pattern: " << fill.getCaptured() << "\n";
+      DBGS() << "pattern: " << pattern.getCaptured() << "\n";
       DBGS() << "trailing:\n";
       if (trailing.getCaptured())
         DBGS() << trailing.getCaptured() << "\n";
@@ -1386,4 +1386,23 @@ void transform_ext::TakeFirstOp::getEffects(
   mlir::transform::onlyReadsHandle(getInputs(), effects);
   mlir::transform::producesHandle(getFirst(), effects);
   mlir::transform::producesHandle(getRest(), effects);
+}
+
+//===---------------------------------------------------------------------===//
+// EmitRemarkOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_ext::EmitRemarkOp::applyToOne(
+    Operation *target, SmallVectorImpl<::mlir::Operation *> &results,
+    mlir::transform::TransformState &state) {
+  for (Operation *payload : state.getPayloadOps(getHandle())) {
+    payload->emitRemark(getMessage());
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_ext::EmitRemarkOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  mlir::transform::onlyReadsHandle(getHandle(), effects);
+  mlir::transform::onlyReadsPayload(effects);
 }

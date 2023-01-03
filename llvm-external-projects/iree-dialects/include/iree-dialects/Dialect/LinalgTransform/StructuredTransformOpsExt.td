@@ -201,4 +201,26 @@ def TakeFirstOp :
   let cppNamespace = "mlir::transform_ext";
 }
 
+def EmitRemarkOp :
+    Op<Transform_Dialect, "iree.emit_remark",
+       [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+        TransformOpInterface, TransformEachOpTrait]> {
+  let description = [{
+    Emits a diagnostic remark with the given message located at payload ops
+    associated with the given handle. This can be used, e.g., for debugging.
+  }];
+
+  let arguments = (ins TransformTypeInterface:$handle,
+                       StrAttr:$message);
+  let assemblyFormat = "$message `at` $handle attr-dict `:` type($handle)";
+  let cppNamespace = "mlir::transform_ext";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+      ::mlir::Operation *target,
+      ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+      ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // STRUCTURED_TRANSFORM_OPS_EXT

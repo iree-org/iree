@@ -54,6 +54,7 @@ iree_lit_test_suite(
         include = ["*.mlir"],
         exclude = [
             "reductions_codegen_spec.mlir",
+            "reductions_match_spec.mlir",
         ],
     ),
     cfg = "//compiler:lit.cfg.py",
@@ -61,6 +62,7 @@ iree_lit_test_suite(
     # they need to be included as data.
     data = [
         "reductions_codegen_spec.mlir",
+        "reductions_match_spec.mlir",
     ],
     tools = [
         "//tools:iree-opt",

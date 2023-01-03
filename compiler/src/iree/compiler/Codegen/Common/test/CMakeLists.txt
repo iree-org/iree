@@ -51,6 +51,7 @@ iree_lit_test_suite(
     iree-opt
   DATA
     reductions_codegen_spec.mlir
+    reductions_match_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
