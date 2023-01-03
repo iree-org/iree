@@ -41,6 +41,12 @@ enum {
   SHIM_ARGUMENT_MODULE_STATE,
 };
 
+enum {
+  CCONV_ARGUMENT_STACK = 0,
+  CCONV_ARGUMENT_MODULE,
+  CCONV_ARGUMENT_MODULE_STATE,
+};
+
 /// The EmitC dialect is currently missing operations to cleanly represent some
 /// constructs we need for the C target. This includes storage class specifiers
 /// on functions, forward declarations of functions, globals and arrays.
@@ -678,9 +684,11 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
   std::string moduleName{moduleOp.getName()};
 
-  // destroy
+  // void destroy(void*)
   {
     OpBuilder::InsertionGuard guard(builder);
+
+    const int moduleArgIndex = 0;
 
     auto funcType = mlir::FunctionType::get(
         ctx, {emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"))},
@@ -695,6 +703,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
+    const BlockArgument moduleArg = funcOp.getArgument(moduleArgIndex);
 
     builder.setInsertionPointToStart(entryBlock);
 
@@ -704,7 +713,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*location=*/loc,
         /*type=*/
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, moduleTypeName)),
-        /*operand=*/funcOp.getArgument(0));
+        /*operand=*/moduleArg);
 
     auto allocatorOp = emitc_builders::structPtrMember(
         builder, loc,
@@ -723,9 +732,13 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     builder.create<mlir::func::ReturnOp>(loc);
   }
 
-  // alloc_state
+  // iree_status_t alloc_state(void*, iree_allocator_t,
+  // iree_vm_module_state_t**)
   {
     OpBuilder::InsertionGuard guard(builder);
+
+    const int allocatorArgIndex = 1;
+    const int moduleStateArgIndex = 2;
 
     auto funcType = mlir::FunctionType::get(
         ctx,
@@ -744,6 +757,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
+
+    const BlockArgument allocatorArg = funcOp.getArgument(allocatorArgIndex);
+    const BlockArgument moduleStateArg =
+        funcOp.getArgument(moduleStateArgIndex);
 
     builder.setInsertionPointToStart(entryBlock);
 
@@ -770,7 +787,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operand=*/statePtr);
 
     returnIfError(builder, loc, StringAttr::get(ctx, "iree_allocator_malloc"),
-                  {}, {funcOp.getArgument(1), stateSize, voidPtr.getResult()},
+                  {}, {allocatorArg, stateSize, voidPtr.getResult()},
                   /*typeConverter=*/typeConverter);
 
     builder.create<emitc::CallOp>(
@@ -788,7 +805,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     emitc_builders::structPtrMemberAssign(builder, loc,
                                           /*memberName=*/"allocator",
                                           /*operand=*/stateOp.getResult(),
-                                          /*value=*/funcOp.getArgument(1));
+                                          /*value=*/allocatorArg);
 
     // Initialize buffers
     for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
@@ -905,16 +922,18 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{funcOp.getArgument(2), baseStateOp.getResult()});
+        ArrayRef<Value>{moduleStateArg, baseStateOp.getResult()});
 
     auto status = emitc_builders::ireeOkStatus(builder, loc);
 
     builder.create<mlir::func::ReturnOp>(loc, status);
   }
 
-  // free_state
+  // void free_state(void*, iree_vm_module_state_t*)
   {
     OpBuilder::InsertionGuard guard(builder);
+
+    const int moduleStateArgIndex = 1;
 
     auto funcType = mlir::FunctionType::get(
         ctx,
@@ -933,6 +952,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     Block *entryBlock = funcOp.addEntryBlock();
 
+    const BlockArgument moduleStateArg =
+        funcOp.getArgument(moduleStateArgIndex);
+
     builder.setInsertionPointToStart(entryBlock);
 
     std::string moduleStateTypeName = moduleName + "_state_t";
@@ -942,7 +964,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*type=*/
         emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, moduleStateTypeName)),
-        /*operand=*/funcOp.getArgument(1));
+        /*operand=*/moduleStateArg);
 
     // Release refs from state struct.
     auto ordinalCounts = moduleOp.getOrdinalCountsAttr();
@@ -992,9 +1014,19 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     builder.create<mlir::func::ReturnOp>(loc);
   }
 
-  // resolve_import
+  // iree_status_t resolve_import(
+  //   void*,
+  //   iree_vm_module_state_t*,
+  //   iree_host_size_t,
+  //   const iree_vm_function_t*,
+  //   const iree_vm_function_signature_t*
+  // )
   {
     OpBuilder::InsertionGuard guard(builder);
+
+    const int moduleStateArgIndex = 1;
+    const int ordinalArgIndex = 2;
+    const int functionArgIndex = 3;
 
     auto funcType = mlir::FunctionType::get(
         ctx,
@@ -1020,6 +1052,11 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     Block *entryBlock = funcOp.addEntryBlock();
 
+    const BlockArgument moduleStateArg =
+        funcOp.getArgument(moduleStateArgIndex);
+    const BlockArgument ordinalArg = funcOp.getArgument(ordinalArgIndex);
+    const BlockArgument functionArg = funcOp.getArgument(functionArgIndex);
+
     builder.setInsertionPointToStart(entryBlock);
 
     std::string moduleStateTypeName = moduleName + "_state_t";
@@ -1029,7 +1066,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*type=*/
         emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, moduleStateTypeName)),
-        /*operand=*/funcOp.getArgument(1));
+        /*operand=*/moduleStateArg);
 
     auto imports = emitc_builders::structPtrMember(
         builder, loc,
@@ -1048,7 +1085,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{imports, funcOp.getArgument(2)});
+        ArrayRef<Value>{imports, ordinalArg});
 
     builder.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1057,16 +1094,24 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{import.getResult(0), funcOp.getArgument(3)});
+        ArrayRef<Value>{import.getResult(0), functionArg});
 
     auto status = emitc_builders::ireeOkStatus(builder, loc);
 
     builder.create<mlir::func::ReturnOp>(loc, status);
   }
 
-  // create
+  // iree_status_t create(
+  //   iree_vm_instance_t*,
+  //   iree_allocator_t,
+  //   iree_vm_module_t**
+  // );
   {
     OpBuilder::InsertionGuard guard(builder);
+
+    const int instanceArgIndex = 0;
+    const int allocatorArgIndex = 1;
+    const int moduleArgIndex = 2;
 
     auto funcType = mlir::FunctionType::get(
         ctx,
@@ -1098,6 +1143,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     Block *entryBlock = funcOp.addEntryBlock();
 
+    const BlockArgument instanceArg = funcOp.getArgument(instanceArgIndex);
+    const BlockArgument allocatorArg = funcOp.getArgument(allocatorArgIndex);
+    const BlockArgument moduleArg = funcOp.getArgument(moduleArgIndex);
+
     builder.setInsertionPointToStart(entryBlock);
 
     std::string moduleTypeName = moduleName + "_t";
@@ -1122,7 +1171,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operand=*/modulePtr);
 
     returnIfError(builder, loc, StringAttr::get(ctx, "iree_allocator_malloc"),
-                  {}, {funcOp.getArgument(1), moduleSize, voidPtr.getResult()},
+                  {}, {allocatorArg, moduleSize, voidPtr.getResult()},
                   /*typeConverter=*/typeConverter);
 
     builder.create<emitc::CallOp>(
@@ -1140,7 +1189,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     emitc_builders::structPtrMemberAssign(builder, loc,
                                           /*memberName=*/"allocator",
                                           /*operand=*/module.getResult(),
-                                          /*value=*/funcOp.getArgument(1));
+                                          /*value=*/allocatorArg);
 
     auto vmModule = builder.create<emitc::VariableOp>(
         /*location=*/loc,
@@ -1190,7 +1239,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/
-          ArrayRef<Value>{funcOp.getArgument(1), module.getResult()});
+          ArrayRef<Value>{allocatorArg, module.getResult()});
 
       builder.create<mlir::func::ReturnOp>(loc,
                                            vmInitializeStatus.getResult(0));
@@ -1225,8 +1274,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                              builder.getIndexAttr(3)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{vmModulePtr, funcOp.getArgument(0),
-                        funcOp.getArgument(1), funcOp.getArgument(2)});
+        ArrayRef<Value>{vmModulePtr, instanceArg, allocatorArg, moduleArg});
 
     builder.create<mlir::func::ReturnOp>(loc, status.getResult(0));
   }
@@ -1937,7 +1985,8 @@ class ImportOpConverter {
                << "Failed to build size expressions for call struct";
       }
 
-      auto importArg = newFuncOp.getArgument(1);
+      const int importArgIndex = 1;
+      const BlockArgument importArg = newFuncOp.getArgument(importArgIndex);
       failIfImportUnresolved(builder, loc, importArg);
 
       auto call = buildIreeVmFunctionCallStruct(
@@ -1953,7 +2002,8 @@ class ImportOpConverter {
         return importOp.emitError() << "failed to pack argument struct";
       }
 
-      auto stackArg = newFuncOp.getArgument(0);
+      const BlockArgument stackArg =
+          newFuncOp.getArgument(CCONV_ARGUMENT_STACK);
       if (failed(createCall(call.value(), importArg, stackArg, builder, loc))) {
         return importOp.emitError() << "failed to create call";
       }
@@ -2425,9 +2475,12 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
 
     auto parentFuncOp = op->getParentOfType<mlir::func::FuncOp>();
 
-    BlockArgument stackArg = parentFuncOp.getArgument(0);
-    BlockArgument moduleArg = parentFuncOp.getArgument(1);
-    BlockArgument moduleStateArg = parentFuncOp.getArgument(2);
+    const BlockArgument stackArg =
+        parentFuncOp.getArgument(CCONV_ARGUMENT_STACK);
+    const BlockArgument moduleArg =
+        parentFuncOp.getArgument(CCONV_ARGUMENT_MODULE);
+    const BlockArgument moduleStateArg =
+        parentFuncOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
 
     updatedOperands = {stackArg, moduleArg, moduleStateArg};
 
@@ -2466,8 +2519,10 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
     int importOrdinal = importOp.getOrdinal()->getZExtValue();
 
     auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
-    BlockArgument stackArg = funcOp.getArgument(0);
-    BlockArgument stateArg = funcOp.getArgument(2);
+
+    const BlockArgument stackArg = funcOp.getArgument(CCONV_ARGUMENT_STACK);
+    const BlockArgument stateArg =
+        funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
 
     auto imports = emitc_builders::structPtrMember(
         rewriter, loc,
@@ -2854,7 +2909,9 @@ class ConstRefRodataOpConversion
     auto funcOp =
         constRefRodataOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
 
-    BlockArgument stateArg = funcOp.getArgument(2);
+    const BlockArgument stateArg =
+        funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
+
     auto rodataBuffersPtr = emitc_builders::structPtrMember(
         rewriter, loc,
         /*type=*/
@@ -3177,7 +3234,9 @@ class ImportResolvedOpConversion
     int importOrdinal = importOp.getOrdinal()->getZExtValue();
 
     auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
-    BlockArgument stateArg = funcOp.getArgument(2);
+
+    const BlockArgument stateArg =
+        funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
 
     auto imports = emitc_builders::structPtrMember(
         rewriter, loc,
@@ -3368,7 +3427,9 @@ class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
     auto funcOp =
         loadOp.getOperation()->template getParentOfType<mlir::func::FuncOp>();
 
-    BlockArgument stateArg = funcOp.getArgument(2);
+    const BlockArgument stateArg =
+        funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
+
     auto rwDataPtr = emitc_builders::structPtrMember(
         rewriter, loc,
         /*type=*/emitc::PointerType::get(rewriter.getIntegerType(8, false)),
@@ -3443,7 +3504,9 @@ class GlobalLoadStoreRefOpConversion
       return op->emitError() << "local ref not found";
     }
 
-    BlockArgument stateArg = funcOp.getArgument(2);
+    const BlockArgument stateArg =
+        funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
+
     auto refs = emitc_builders::structPtrMember(
         rewriter, loc,
         /*type=*/
@@ -3525,7 +3588,9 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
     auto funcOp =
         storeOp.getOperation()->template getParentOfType<mlir::func::FuncOp>();
 
-    BlockArgument stateArg = funcOp.getArgument(2);
+    const BlockArgument stateArg =
+        funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
+
     auto rwDataPtr = emitc_builders::structPtrMember(
         rewriter, loc,
         /*type=*/emitc::PointerType::get(rewriter.getIntegerType(8, false)),
@@ -3682,7 +3747,9 @@ class ListAllocOpConversion
     IREE::VM::EmitCTypeConverter *typeConverter =
         getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
-    BlockArgument stateArg = funcOp.getArgument(2);
+    const BlockArgument stateArg =
+        funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
+
     auto allocatorOp = emitc_builders::structPtrMember(
         rewriter, loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_allocator_t"),
