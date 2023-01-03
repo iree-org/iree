@@ -244,7 +244,7 @@ void ReductionStrategyStagedThreadDistribution::compute(
   // -------
   // Maximal vector size that divides the problem size.
   // TODO: Split to ensure 4 on most of the problem and use a 1-epilogue.
-  int64_t reductionDimensionSize = captures.reductionDimensionSize;
+  int64_t reductionDimensionSize = captures.reductionOpSizes.back();
   if (reductionDimensionSize > 0 && reductionDimensionSize % 4 == 0)
     vectorSizeStage1 = 4;
   else if (reductionDimensionSize > 0 && reductionDimensionSize % 2 == 0)
@@ -338,9 +338,11 @@ void SmallReductionStrategy::compute(int64_t maxNumThreadsToUse,
   // ===========
   // TODO: capture more dims than just the most minor parallel and have a more
   // powerful `maybeDivisor` evaluation.
+  int64_t mostMinorParallelDimensionSize =
+      ArrayRef<int64_t>(captures.reductionOpSizes).drop_back().back();
   FailureOr<int64_t> maybeDivisor =
       mlir::iree_compiler::maxDivisorOfValueBelowLimit(
-          captures.mostMinorParallelDimensionSize, maxNumThreadsToUse);
+          mostMinorParallelDimensionSize, maxNumThreadsToUse);
 
   // Trailing elementwise unaligned tiling created bounded local buffers that
   // are dynamic. Attempting to bound them in Common/PadDynamicAlloc.cpp results
@@ -357,14 +359,14 @@ void SmallReductionStrategy::compute(int64_t maxNumThreadsToUse,
   // TODO: explicit hint from above that we really want to do that.
   // TODO: evolve towards expressing this constraint with a perf-directed
   // matcher that composes with the existing structural matchers.
-  if (ShapedType::isDynamic(captures.reductionDimensionSize)) return;
+  int64_t reductionDimensionSize = captures.reductionOpSizes.back();
+  if (ShapedType::isDynamic(reductionDimensionSize)) return;
 
   // Otherwise, still only support the small cases for now and fall back to
   // other strategies otherwise.
   // TODO: evolve towards expressing this constraint with a perf-directed
   // matcher that composes with the existing structural matchers.
-  if (captures.reductionDimensionSize >= 2 * iree_compiler::kCudaWarpSize)
-    return;
+  if (reductionDimensionSize >= 2 * iree_compiler::kCudaWarpSize) return;
 
   // If the captured dimension has no satisfactory divisor, just tile the last
   // parallel dimension by 2 * iree_compiler::kCudaWarpSize.
@@ -604,10 +606,10 @@ static void createSmallReductionStrategyThreadDistribution(
 
   // Splitting into explicit vector<4> helps a lot on alignment.
   // TODO: first split should be dynamic and based on the future stride.
-  if (ShapedType::isDynamic(strategy.captures.reductionDimensionSize)) return;
+  int64_t reductionDimensionSize = strategy.captures.reductionOpSizes.back();
+  if (ShapedType::isDynamic(reductionDimensionSize)) return;
 
-  for (int64_t i = 0, e = (strategy.captures.reductionDimensionSize - 1) / 4;
-       i < e; ++i) {
+  for (int64_t i = 0, e = (reductionDimensionSize - 1) / 4; i < e; ++i) {
     auto split = b.create<transform::SplitOp>(
         pdlOperation, pdlOperation, blockReductionH,
         b.getI64IntegerAttr(strategy.captures.reductionRank - 1), Value(),
