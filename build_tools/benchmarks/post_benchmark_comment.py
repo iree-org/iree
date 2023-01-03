@@ -32,7 +32,6 @@ from reporting import benchmark_comment
 
 GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/iree-org/iree"
 GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
-GITHUB_ACTIONS_USER = "github-actions[bot]"
 GITHUB_API_VERSION = "2022-11-28"
 
 
@@ -93,6 +92,7 @@ def post_to_gist(requester: APIRequester,
 
 def get_previous_comment_on_pr(requester: APIRequester,
                                pr_number: int,
+                               gist_bot_user: str,
                                comment_type_id: str,
                                verbose: bool = False) -> Optional[int]:
   """Gets the previous comment's id from GitHub."""
@@ -112,7 +112,7 @@ def get_previous_comment_on_pr(requester: APIRequester,
 
   # Find the last comment from GITHUB_ACTIONS_USER and has the comment type id.
   for comment in reversed(response):
-    if (comment["user"]["login"] == GITHUB_ACTIONS_USER and
+    if (comment["user"]["login"] == gist_bot_user and
         comment_type_id in comment["body"]):
       return comment["id"]
 
@@ -155,6 +155,10 @@ def main(args: argparse.Namespace):
   if github_token is None:
     raise ValueError("GITHUB_TOKEN must be set.")
 
+  gist_bot_user = os.environ.get("GIST_BOT_USER")
+  if gist_bot_user is None:
+    raise ValueError("GIST_BOT_USER must be set.")
+
   gist_bot_token = os.environ.get("GIST_BOT_TOKEN")
   if gist_bot_token is None:
     raise ValueError("GIST_BOT_TOKEN must be set.")
@@ -173,6 +177,7 @@ def main(args: argparse.Namespace):
   previous_comment_id = get_previous_comment_on_pr(
       requester=pr_api_requester,
       pr_number=pr_number,
+      gist_bot_user=gist_bot_user,
       comment_type_id=comment_data.type_id,
       verbose=args.verbose)
 

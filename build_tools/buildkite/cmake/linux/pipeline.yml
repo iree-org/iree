@@ -169,6 +169,7 @@ steps:
         --comment_title="Abbreviated Linux Benchmark Summary" \
         --comment_type_id="37549014-3c67-4e74-8d88-8e929231abe3" \
         --output="benchmark-comment.json"
+      export GIST_BOT_USER="iree-github-actions-bot"
       export GIST_BOT_TOKEN="$${GITHUB_TOKEN}"
       python3 build_tools/benchmarks/post_benchmark_comment.py \
         --verbose \
