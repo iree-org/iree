@@ -38,8 +38,6 @@ python3 -m venv convperf.venv
 source convperf.venv/bin/activate
 pip install -r requirements.txt
 
-popd # convperf
-
 # Since the root user clones the convperf repo, we update permissions so that a
 # runner can access this repo, but we don't want to set the executable bit for
 # non-executables because git tracks this, so we then restore any git-tracked
@@ -48,4 +46,5 @@ chmod -R 777 .
 git restore .
 git submodule foreach --recursive git restore .
 
+popd # convperf
 popd # "${REPO_DIR}"
