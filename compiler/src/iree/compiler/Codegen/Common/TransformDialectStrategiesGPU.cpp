@@ -150,15 +150,13 @@ struct GPUReductionStrategy {
 ///
 /// Bottom-up perspective:
 /// ======================
-/// Stage 3: the warp shuffle step is normalized to run on a single warp using
-/// a vector<warp_shufle_vector_size x T> element. The size of this vector is
-/// controlled by a `warpShuffleSize` parameter passed to the constructor which
-/// must be a 1,2 or 4-multiple of the machine warp size.
+/// Stage 3: second stage of the the warp shuffle step reduces a vector<k x T>
+/// element to a single element. Only threadIdx == 0 commits to memory.
 ///
-/// Stage 2 (optional): the second stage of the reduction is normalized to
-/// reduce from a "k-warps" abstraction (k determined in Step 1) to a single
-/// `warpShuffleSize` that can be reduced unambiguously well on a single warp
-/// during Stage 3. This second stage is optional and only occurs when k > 1.
+/// Stage 2: the second stage of the reduction is the first stage of the warp
+/// shuffle step. It is normalized to reduce from a "k-warps" abstraction,
+/// across all warps in parallel, to a k-element result. Only the first thread
+/// within each warp (e.g. threadIdx % kCudaWarpSize == 0) commits to memoruy.
 ///
 /// Stage 1: the first stage of the reduction is normalized to run on "k-warps"
 /// of maximal vector size for both the hardware and the problem sizes.
@@ -205,10 +203,6 @@ class ReductionStrategyStagedThreadDistribution : public GPUReductionStrategy {
 
   int64_t getVectorSizeStage1() const { return vectorSizeStage1; }
 
-  bool hasStage2() const { return reductionTileSizeStage2.has_value(); }
-  int64_t getWarpShuffleSize() const { return reductionTileSizeStage2.value(); }
-  int64_t getVectorSizeStage2() const { return vectorSizeStage2.value(); }
-
  private:
   /// Maximal vector size (among {1, 2, 4}) that divides the
   /// `reductionDimensionSize` and is used for vector transfers in Stage 1.
@@ -217,14 +211,6 @@ class ReductionStrategyStagedThreadDistribution : public GPUReductionStrategy {
   /// `reductionDimensionSize` parameters.
   /// This is also the blockDim.x of the kernel.
   int64_t reductionTileSizeStage1;
-  /// Maximal vector size allowing to reduce from "k-warp" to single warp: when
-  /// `k` is a multiple of 4, choose 4; otherwise try with 2; otherwise just
-  /// use 1.
-  std::optional<int64_t> vectorSizeStage2;
-  /// `reductionTileSizeStage2` is exactly set to `warpShuffleSize` passed to
-  /// the constructor, only when reductionTileSizeStage1 > warpShuffleSize (i.e.
-  /// k > 1).
-  std::optional<int64_t> reductionTileSizeStage2;
 
   /// Compute the staged strategy based on the reductionDimensionSize, the
   /// `maxNumThreadsToUse` and the `warpShuffleSize`.
@@ -277,30 +263,6 @@ void ReductionStrategyStagedThreadDistribution::compute(
     reductionTileSizeStage1 =
         iree_compiler::previousMultipleOf(maxNumThreadsToUse, warpShuffleSize);
   }
-
-  // Stage 2
-  // -------
-  // Only needed if `reductionTileSizeStage1` consists of multiple
-  // `warpShuffleSize`; otherwise, we just skip this step.
-  if (reductionTileSizeStage1 > warpShuffleSize) {
-    // Tile reduction exactly to `warpShuffleSize` which will be used in the 3rd
-    // stage to distribute to warp shuffles.
-    reductionTileSizeStage2 = warpShuffleSize;
-    // The vector size we use depends on the number of `warpShuffleSize`s in
-    // `reductionTileSizeStage1`.
-    int64_t factor = reductionTileSizeStage1 / warpShuffleSize;
-    if (factor % 4 == 0)
-      vectorSizeStage2 = 4;
-    else if (factor % 2 == 0)
-      vectorSizeStage2 = 2;
-    else
-      vectorSizeStage2 = 1;
-  }
-
-  // Stage 3
-  // -------
-  // Stage 3 is non-ambiguous and does not ned to be configured (always uses
-  // warp shuffles).
 }
 
 /// Encodes a strategy targeted at (very) small reductions, for which other
@@ -531,25 +493,13 @@ static void createReductionStrategyStagedThreadDistribution(
           b, gridReductionH, strategy.captures.reductionRank,
           strategy.getNumThreadsXInBlock(), strategy.getVectorSizeStage1());
 
-  // Staged reduction step 2: break blockCombinerOpH apart.
-  // Note, if necessary, we could have additional intermediate steps.
-  Value warpParallelForeachThreadOp, warpParallelFillH, warpCombinerOpH;
-  if (strategy.hasStage2()) {
-    std::tie(warpParallelForeachThreadOp, warpParallelFillH, warpCombinerOpH) =
-        createReductionStrategyStagedThreadDistributionStep(
-            b, blockCombinerOpH, strategy.captures.reductionRank,
-            strategy.getWarpShuffleSize(), strategy.getVectorSizeStage1());
-  } else {
-    warpCombinerOpH = blockCombinerOpH;
-  }
-
-  // Staged reduction step 3: break blockCombinerOpH apart.
+  // Staged reduction step 2: multi-warp shuffle reduce.
   // Map the combiner reduction to one thread along y so it can be mapped
   // further via predication.
   auto threadY = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
                                                       mlir::gpu::Threads::DimY);
   iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
-      b, warpCombinerOpH, {}, getAsOpFoldResult(b.getI64ArrayAttr({1})),
+      b, blockCombinerOpH, {}, getAsOpFoldResult(b.getI64ArrayAttr({1})),
       b.getArrayAttr(threadY));
 
   // Map the potential maybeTiledTrailingH.
@@ -562,24 +512,25 @@ static void createReductionStrategyStagedThreadDistribution(
 
 /// Take care of the last common steps in a GPU strategy (i.e. vectorize,
 /// bufferize, maps to blocks and threads and distribute vectors).
-static void createCommonTrailingStrategy(ImplicitLocOpBuilder &b,
-                                         Value variantH,
-                                         const GPUReductionStrategy &strategy) {
-  // Step N-2. Bufferize and drop HAL decriptor from memref ops.
+/// Return the handles to the updated variant and the func::FuncOp ops under
+/// the variant op.
+static std::pair<Value, Value> createCommonTrailingStrategy(
+    ImplicitLocOpBuilder &b, Value variantH,
+    const GPUReductionStrategy &strategy) {
+  // Step N-1. Bufferize and drop HAL decriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = iree_compiler::buildVectorize(b, funcH);
   variantH = iree_compiler::buildBufferize(b, variantH,
                                            /*targetGpu=*/true);
 
-  // Step N-1. Post-bufferization mapping to blocks and threads.
+  // Step N. Post-bufferization mapping to blocks and threads.
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = iree_compiler::buildMapToBlockAndThreads(
       b, funcH, strategy.getNumThreadsInBlock());
 
-  // Step N. Post-bufferization vector distribution with rank-reduction.
-  iree_compiler::buildDistributeVectors(b, variantH, funcH);
+  return std::make_pair(variantH, funcH);
 }
 
 /// Builds the transform IR tiling reductions for CUDA targets. Supports
@@ -610,8 +561,14 @@ static void createCudaReductionStrategyStagedThreadDistribution(
       b, gridReductionH, maybeLeadingHBlock, maybeTiledTrailingHBlock,
       strategy);
 
-  // Step 4-6. Common trailing steps.
-  createCommonTrailingStrategy(b, variantH, strategy);
+  // Step 4-5. Common trailing steps.
+  auto [variantH2, funcH] = createCommonTrailingStrategy(b, variantH, strategy);
+
+  // Step 6. The staged strategy has a post-bufferization vector distribution
+  // with rank-reduction. The vector distribution occurs on multiple warps and
+  // is itself staged in 2 steps.
+  iree_compiler::buildDistributeVectors(b, variantH2, funcH,
+                                        strategy.getNumThreadsXInBlock());
 }
 
 static void createSmallReductionStrategyThreadDistribution(
