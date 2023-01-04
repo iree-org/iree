@@ -8,7 +8,6 @@
 
 #include <stdint.h>
 
-extern void ireeCompileOutputKeep();
 extern void ireeCompilerBuildIREEVMPassPipeline();
 extern void ireeCompilerEnumerateRegisteredHALTargetBackends();
 extern void ireeCompilerErrorDestroy();
@@ -18,6 +17,7 @@ extern void ireeCompilerGlobalInitialize();
 extern void ireeCompilerGlobalShutdown();
 extern void ireeCompilerInvocationCreate();
 extern void ireeCompilerInvocationDestroy();
+extern void ireeCompilerInvocationEnableCallbackDiagnostics();
 extern void ireeCompilerInvocationEnableConsoleDiagnostics();
 extern void ireeCompilerInvocationOutputHALExecutable();
 extern void ireeCompilerInvocationOutputIR();
@@ -32,6 +32,7 @@ extern void ireeCompilerOptionsDestroy();
 extern void ireeCompilerOptionsGetFlags();
 extern void ireeCompilerOptionsSetFlags();
 extern void ireeCompilerOutputDestroy();
+extern void ireeCompilerOutputKeep();
 extern void ireeCompilerOutputOpenFD();
 extern void ireeCompilerOutputOpenFile();
 extern void ireeCompilerOutputWrite();
@@ -581,7 +582,6 @@ extern void mlirVectorTypeGetChecked();
 
 uintptr_t __iree_compiler_hidden_force_extern() {
   uintptr_t x = 0;
-  x += (uintptr_t)&ireeCompileOutputKeep;
   x += (uintptr_t)&ireeCompilerBuildIREEVMPassPipeline;
   x += (uintptr_t)&ireeCompilerEnumerateRegisteredHALTargetBackends;
   x += (uintptr_t)&ireeCompilerErrorDestroy;
@@ -591,6 +591,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerGlobalShutdown;
   x += (uintptr_t)&ireeCompilerInvocationCreate;
   x += (uintptr_t)&ireeCompilerInvocationDestroy;
+  x += (uintptr_t)&ireeCompilerInvocationEnableCallbackDiagnostics;
   x += (uintptr_t)&ireeCompilerInvocationEnableConsoleDiagnostics;
   x += (uintptr_t)&ireeCompilerInvocationOutputHALExecutable;
   x += (uintptr_t)&ireeCompilerInvocationOutputIR;
@@ -605,6 +606,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerOptionsGetFlags;
   x += (uintptr_t)&ireeCompilerOptionsSetFlags;
   x += (uintptr_t)&ireeCompilerOutputDestroy;
+  x += (uintptr_t)&ireeCompilerOutputKeep;
   x += (uintptr_t)&ireeCompilerOutputOpenFD;
   x += (uintptr_t)&ireeCompilerOutputOpenFile;
   x += (uintptr_t)&ireeCompilerOutputWrite;
