@@ -177,7 +177,7 @@ std::unique_ptr<Pass> createTransformDialectInterpreterPass(
 
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
-    bool generateContract = true);
+    bool generateContract = true, int64_t maxVectorSize = 4096);
 
 /// Tile reductions and generate serial loops around reductions.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();

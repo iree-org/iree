@@ -271,6 +271,9 @@ def GPUVectorization :
     Option<"generateContract", "generate-contract", "bool",
             /*default=*/"true",
            "Try to convert reduction to vector.contract.">,
+    Option<"maxVectorSize", "max-vector-size", "int64_t",
+            /*default=*/"4096",
+           "Max vector size allowed to avoid creating large vectors.">
   ];
 }
 

@@ -317,7 +317,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
 
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass(
-      /*generateContract=*/false));
+      /*generateContract=*/false, /*maxVectorSize=*/16384));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
