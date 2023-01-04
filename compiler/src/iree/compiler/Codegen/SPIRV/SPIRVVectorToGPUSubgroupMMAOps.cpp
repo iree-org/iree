@@ -41,16 +41,6 @@ struct SPIRVVectorToGPUSubgroupMMAPass final
     }
 
     convertVectorToMMAOps(funcOp);
-
-    // Make sure we actually generate GPU subgroup mma ops.
-    WalkResult result = funcOp.walk([](Operation* op) {
-      return isa<gpu::SubgroupMmaComputeOp>(op) ? WalkResult::interrupt()
-                                                : WalkResult::advance();
-    });
-    if (!result.wasInterrupted()) {
-      funcOp->emitError("failed conversion to GPU subgroup MMA ops");
-      return signalPassFailure();
-    }
   }
 };
 }  // namespace
