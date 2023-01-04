@@ -204,11 +204,11 @@ def parse_arguments():
                       help="PR commit hash")
   parser.add_argument("--pr_base_branch", type=str, default=None, help="TODO")
   parser.add_argument("--comment_title",
-                      required=True,
+                      default="Abbreviated Benchmark Summary",
                       help="Title of the comment")
   parser.add_argument(
       "--comment_type_id",
-      required=True,
+      default="abbr-benchmark-summary",
       help="Unique id to identify the previous comment and update the one "
       "with the same id when posting")
   parser.add_argument("--build_url",

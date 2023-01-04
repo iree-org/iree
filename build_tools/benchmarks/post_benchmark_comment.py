@@ -47,21 +47,22 @@ class APIRequester(object):
         "Authorization": f"token {github_token}",
         "X-GitHub-Api-Version": GITHUB_API_VERSION,
     }
+    self._session = requests.session()
 
   def get(self, endpoint: str, payload: Any) -> requests.Response:
-    return requests.get(endpoint,
-                        data=json.dumps(payload),
-                        headers=self._api_headers)
+    return self._session.get(endpoint,
+                             data=json.dumps(payload),
+                             headers=self._api_headers)
 
   def post(self, endpoint: str, payload: Any) -> requests.Response:
-    return requests.post(endpoint,
-                         data=json.dumps(payload),
-                         headers=self._api_headers)
+    return self._session.post(endpoint,
+                              data=json.dumps(payload),
+                              headers=self._api_headers)
 
   def patch(self, endpoint: str, payload: Any) -> requests.Response:
-    return requests.patch(endpoint,
-                          data=json.dumps(payload),
-                          headers=self._api_headers)
+    return self._session.patch(endpoint,
+                               data=json.dumps(payload),
+                               headers=self._api_headers)
 
 
 class GithubClient(object):
