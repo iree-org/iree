@@ -16,7 +16,10 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 def VM_Dialect : Dialect {
   let name = "vm";
   let cppNamespace = "::mlir::iree_compiler::IREE::VM";
-  let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
+  // TODO(benvanik): change to kEmitAccessorPrefix_Prefixed once the op encoder
+  // tablegen goo supports it. Currently it requires accessors with the same
+  // name as the ODS fields.
+  let emitAccessorPrefix = kEmitAccessorPrefix_Both;
 
   let summary = [{
     A dialect representing operations against an abstract virtual machine.
@@ -87,13 +90,8 @@ include "iree/compiler/Dialect/VM/IR/VMOpcodesF64.td"
 //     return success();
 //   }
 
-class VM_EncEncodeExpr<code evalExpr, list<string> parameters = []> {
-  // A code snippet that can potentially contain placeholders (e.g., `{0}`).
+class VM_EncEncodeExpr<code evalExpr> {
   code expr = evalExpr;
-  // If so, `params` are expected to provide the substitutions for these
-  // placeholders. TableGen backends can process the parameters before
-  // plugging them in though.
-  list<string> params = parameters;
 }
 
 class VM_EncConstI8<int value> : VM_EncEncodeExpr<
@@ -103,15 +101,15 @@ class VM_EncOpcode<VM_OPC thisOpcode> : VM_EncEncodeExpr<
   VM_OPC opcode = thisOpcode;
 }
 class VM_EncFuncAttr<string name> : VM_EncEncodeExpr<
-    "e.encodeSymbolOrdinal(syms, {0}())", [name]>;
+    "e.encodeSymbolOrdinal(syms, " # name # "())">;
 class VM_EncGlobalAttr<string name> : VM_EncEncodeExpr<
-    "e.encodeSymbolOrdinal(syms, {0}())", [name]>;
+    "e.encodeSymbolOrdinal(syms, " # name # "())">;
 class VM_EncRodataAttr<string name> : VM_EncEncodeExpr<
-    "e.encodeSymbolOrdinal(syms, {0}())", [name]>;
+    "e.encodeSymbolOrdinal(syms, " # name # "())">;
 class VM_EncType<string expr> : VM_EncEncodeExpr<
     "e.encodeType(" # expr # ")">;
 class VM_EncTypeOf<string name> : VM_EncEncodeExpr<
-    "e.encodeType({0}())", [name]>;
+    "e.encodeType(" # name # "())">;
 class VM_EncPrimitiveAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
     "e.encodePrimitiveAttr(getOperation()->getAttrOfType<Attribute>(\"" # name # "\"))"> {
   int bitwidth = thisBitwidth;
@@ -123,15 +121,15 @@ class VM_EncPrimitiveArrayAttr<string name, int thisBitwidth> : VM_EncEncodeExpr
 class VM_EncStrAttr<string name> : VM_EncEncodeExpr<
     "e.encodeStrAttr(getOperation()->getAttrOfType<StringAttr>(\"" # name # "\"))">;
 class VM_EncBranch<string blockName, string operandsName, int successorIndex> : VM_EncEncodeExpr<
-    "e.encodeBranch({0}(), " # operandsName # "(), " # successorIndex # ")", [blockName]>;
+    "e.encodeBranch(" # blockName # "(), " # operandsName # "(), " # successorIndex # ")">;
 class VM_EncOperand<string name, int ordinal> : VM_EncEncodeExpr<
-    "e.encodeOperand({0}(), " # ordinal # ")", [name]>;
+    "e.encodeOperand(" # name # "(), " # ordinal # ")">;
 class VM_EncVariadicOperands<string name> : VM_EncEncodeExpr<
-    "e.encodeOperands({0}())", [name]>;
+    "e.encodeOperands(" # name # "())">;
 class VM_EncResult<string name> : VM_EncEncodeExpr<
-    "e.encodeResult({0}())", [name]>;
+    "e.encodeResult(" # name # "())">;
 class VM_EncVariadicResults<string name> : VM_EncEncodeExpr<
-    "e.encodeResults({0}())", [name]>;
+    "e.encodeResults(" # name # "())">;
 
 def VM_SerializableOpInterface : OpInterface<"VMSerializableOp"> {
   let description = [{
