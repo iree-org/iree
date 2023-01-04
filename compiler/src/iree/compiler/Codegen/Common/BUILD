@@ -57,6 +57,10 @@ iree_compiler_cc_library(
     deps = [
         # Dialects
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        # TODO: Must we really take this dependence?
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        # TODO: Must we really take this dependence?
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
