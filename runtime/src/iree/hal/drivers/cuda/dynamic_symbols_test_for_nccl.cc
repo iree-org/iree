@@ -1,14 +1,15 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2022 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/cuda/dynamic_symbols.h"
+#include <nccl.h>
 
 #include <iostream>
 
 #include "iree/base/api.h"
+#include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {
@@ -16,10 +17,10 @@ namespace hal {
 namespace cuda {
 namespace {
 
-#define CUDA_CHECK_ERRORS(expr)      \
-  {                                  \
-    CUresult status = expr;          \
-    ASSERT_EQ(CUDA_SUCCESS, status); \
+#define NCCL_CHECK_ERRORS(expr)     \
+  {                                 \
+    ncclResult_t status = expr;     \
+    ASSERT_EQ(ncclSuccess, status); \
   }
 
 TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
@@ -30,17 +31,12 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);
     std::cerr << "Symbols cannot be loaded, skipping test.";
-    GTEST_SKIP();
+    GTEST_FAIL();
   }
 
-  int device_count = 0;
-  CUDA_CHECK_ERRORS(symbols.cuInit(0));
-  CUDA_CHECK_ERRORS(symbols.cuDeviceGetCount(&device_count));
-  if (device_count > 0) {
-    CUdevice device;
-    CUDA_CHECK_ERRORS(symbols.cuDeviceGet(&device, /*ordinal=*/0));
-  }
-
+  int nccl_version = 0;
+  NCCL_CHECK_ERRORS(symbols.ncclGetVersion(&nccl_version));
+  ASSERT_EQ(NCCL_VERSION_CODE, nccl_version);
   iree_hal_cuda_dynamic_symbols_deinitialize(&symbols);
 }
 
