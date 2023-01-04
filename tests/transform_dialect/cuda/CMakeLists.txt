@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "reduction.mlir"
     "reduction_eltwise.mlir"
     "reduction_v2.mlir"
+    "reduction_v2_uneven.mlir"
     "reduction_v3.mlir"
     "softmax.mlir"
     "softmax_partial.mlir"

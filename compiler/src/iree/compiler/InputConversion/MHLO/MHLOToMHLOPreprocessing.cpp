@@ -1090,20 +1090,16 @@ struct DotToMul : public OpRewritePattern<mhlo::DotOp> {
     // the 0-th dimensions, of the left, and the 1st dimension of the right.
     // Concatenating them togething to make the final shape.
     Value batchSize = rewriter.create<mhlo::GetDimensionSizeOp>(
-        op.getLoc(), lhs, rewriter.getI64IntegerAttr(0));
-    Value batchSize1 = rewriter.create<mhlo::ReshapeOp>(
-        op.getLoc(), RankedTensorType::get({1}, rewriter.getI32Type()),
-        batchSize);
+        op.getLoc(), RankedTensorType::get({1}, rewriter.getI32Type()), lhs,
+        rewriter.getI64IntegerAttr(0));
 
     Value featureSize = rewriter.create<mhlo::GetDimensionSizeOp>(
-        op.getLoc(), rhs, rewriter.getI64IntegerAttr(1));
-    Value featureSize1 = rewriter.create<mhlo::ReshapeOp>(
-        op.getLoc(), RankedTensorType::get({1}, rewriter.getI32Type()),
-        featureSize);
+        op.getLoc(), RankedTensorType::get({1}, rewriter.getI32Type()), rhs,
+        rewriter.getI64IntegerAttr(1));
 
     Value outSize = rewriter.create<mhlo::ConcatenateOp>(
         op.getLoc(), RankedTensorType::get({2}, rewriter.getI32Type()),
-        ValueRange{batchSize1, featureSize1}, rewriter.getI64IntegerAttr(0));
+        ValueRange{batchSize, featureSize}, rewriter.getI64IntegerAttr(0));
 
     lhs = rewriter.create<mhlo::DynamicBroadcastInDimOp>(
         op.getLoc(), resultTy.clone(lhsTy.getElementType()), lhs, outSize,
@@ -1208,8 +1204,8 @@ struct DotGeneralIsMul : public OpRewritePattern<mhlo::DotGeneralOp> {
     // Drop all of the non-concat dimensions from the lhs.
     llvm::SmallVector<Value> lhsReshapeDims;
     for (int i = 0, s = lhsTy.getRank() - contractDimsL.size(); i < s; i++) {
-      Value dim = builder.create<mhlo::GetDimensionSizeOp>(lhs, i);
-      lhsReshapeDims.push_back(builder.create<mhlo::ReshapeOp>(dimI32Ty, dim));
+      lhsReshapeDims.push_back(
+          builder.create<mhlo::GetDimensionSizeOp>(dimI32Ty, lhs, i));
     }
     Value lhsDynShape = builder.create<mhlo::ConcatenateOp>(
         RankedTensorType::get({static_cast<int64_t>(lhsReshapeDims.size())},
@@ -1223,8 +1219,8 @@ struct DotGeneralIsMul : public OpRewritePattern<mhlo::DotGeneralOp> {
     // Drop all of the non concat dimensions from the rhs.
     llvm::SmallVector<Value> rhsReshapeDims;
     for (int i = 0, s = rhsTy.getRank() - contractDimsR.size(); i < s; i++) {
-      Value dim = builder.create<mhlo::GetDimensionSizeOp>(rhs, i);
-      rhsReshapeDims.push_back(builder.create<mhlo::ReshapeOp>(dimI32Ty, dim));
+      rhsReshapeDims.push_back(
+          builder.create<mhlo::GetDimensionSizeOp>(dimI32Ty, rhs, i));
     }
     Value rhsDynShape = builder.create<mhlo::ConcatenateOp>(
         RankedTensorType::get({static_cast<int64_t>(rhsReshapeDims.size())},

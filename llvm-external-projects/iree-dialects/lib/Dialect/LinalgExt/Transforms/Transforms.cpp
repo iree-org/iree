@@ -1037,9 +1037,10 @@ struct LinalgExtVectorizationPass
       vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
-      // TODO(hanchung): Capture the failure after the vectorization pattern
-      // rewrite converges.
-      (void)(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)));
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };

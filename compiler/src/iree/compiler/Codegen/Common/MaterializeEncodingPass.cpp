@@ -86,7 +86,7 @@ static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
   SmallVector<Value> convertedDynamicTargetShape;
   dispatchIndexOpFoldResults(convertedTargetShape.value(),
                              convertedDynamicTargetShape,
-                             convertedStaticTargetShape);
+                             convertedStaticTargetShape, ShapedType::kDynamic);
   return convertedDynamicTargetShape;
 }
 
@@ -359,7 +359,8 @@ struct MaterializeFlowDispatchTensorLoadOp
     SmallVector<int64_t> convertedStaticDims;
     SmallVector<Value> convertedDynamicDims;
     dispatchIndexOpFoldResults(convertedMixedSizes.value(),
-                               convertedDynamicDims, convertedStaticDims);
+                               convertedDynamicDims, convertedStaticDims,
+                               ShapedType::kDynamic);
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
         loadOp, adaptor.getSource(), convertedDynamicDims, convertedOffsets,
         convertedMixedSizes.value(), convertedStrides);
@@ -409,7 +410,8 @@ struct MaterializeFlowDispatchTensorStoreOp
     SmallVector<int64_t> convertedStaticDims;
     SmallVector<Value> convertedDynamicDims;
     dispatchIndexOpFoldResults(convertedMixedSizes.value(),
-                               convertedDynamicDims, convertedStaticDims);
+                               convertedDynamicDims, convertedStaticDims,
+                               ShapedType::kDynamic);
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
         storeOp, adaptor.getValue(), adaptor.getTarget(), convertedDynamicDims,
         convertedOffsets, convertedMixedSizes.value(), convertedStrides);
