@@ -36,6 +36,7 @@ declare -a args=(
   -G Ninja
   -B "${BUILD_DIR}"
   -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}"
+  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}"
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake"
   -DANDROID_ABI="${ANDROID_ABI}"
   -DANDROID_PLATFORM=android-29

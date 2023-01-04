@@ -44,6 +44,7 @@ declare -a CMAKE_ARGS=(
   # Enable building the python bindings on CI.
   "-DIREE_BUILD_PYTHON_BINDINGS=ON"
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
   # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
   # have enough deps to at least build CUDA support and compile CUDA binaries
