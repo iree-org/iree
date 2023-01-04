@@ -303,8 +303,7 @@ void addCPUDataTilingPipeline(OpPassManager &passManager);
 
 /// Populates the passes to lower to tiled/distributed/bufferized ops,
 /// suitable for library call dispatch and lowering to loops.
-void addVMVXDefaultPassPipeline(OpPassManager &passManager,
-                                bool enableMicrokernels);
+void addVMVXDefaultPassPipeline(OpPassManager &passManager);
 
 /// Populates the passes to lower linalg ops on buffers. Currenly this
 /// pipeline is only used for dispatches that just copy data from input

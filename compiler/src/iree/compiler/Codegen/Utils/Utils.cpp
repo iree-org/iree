@@ -92,16 +92,6 @@ Optional<IntegerAttr> getConfigIntegerAttr(
   return attr;
 }
 
-Optional<BoolAttr> getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                     StringRef integerAttr) {
-  if (!targetAttr) return llvm::None;
-  auto config = targetAttr.getConfiguration();
-  if (!config) return llvm::None;
-  auto attr = config.getAs<BoolAttr>(integerAttr);
-  if (!attr) return llvm::None;
-  return attr;
-}
-
 Optional<llvm::Triple> getTargetTriple(
     IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto triple = getConfigStringAttr(targetAttr, "target_triple");
@@ -133,12 +123,7 @@ bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
 }
 
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return targetAttr && targetAttr.getBackend().getValue().startswith("vmvx");
-}
-
-bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto enableMicrokernels = getConfigBoolAttr(targetAttr, "ukernels");
-  return enableMicrokernels && enableMicrokernels->getValue();
+  return targetAttr.getBackend().getValue().startswith("vmvx");
 }
 
 // TODO(dcaballe): If we have to check for a significantly large number of
