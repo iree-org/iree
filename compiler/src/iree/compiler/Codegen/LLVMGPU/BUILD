@@ -19,6 +19,7 @@ iree_compiler_cc_library(
         "ConvertToNVVM.cpp",
         "ConvertToROCDL.cpp",
         "KernelConfig.cpp",
+        "LLVMGPUBreakupMultiResultReductions.cpp",
         "LLVMGPUDistribute.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPUTensorAlloc.cpp",

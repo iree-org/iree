@@ -480,6 +480,12 @@ def LLVMGPUTensorPad :
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorPadPass()";
 }
 
+def LLVMGPUBreakupMultiResultReductions :
+    Pass<"iree-llvmgpu-breakup-multi-result-reductions", "func::FuncOp"> {
+  let summary = "Pass to break up reductions with multiple results.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUBreakupMultiResultReductionsPass()";
+}
+
 //------------------------------------------------------------------------------
 // SPIR-V
 //------------------------------------------------------------------------------

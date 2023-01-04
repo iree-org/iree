@@ -469,6 +469,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
 //. Pass to pad out tensors up to static dimensions.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
 
+/// Pass to breakup reduction ops with multiple results.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMGPUBreakupMultiResultReductionsPass();
+
 //------------------------------------------------------------------------------
 // SPIR-V Passes
 //------------------------------------------------------------------------------
