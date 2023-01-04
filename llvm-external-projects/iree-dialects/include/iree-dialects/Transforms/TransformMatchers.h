@@ -569,10 +569,8 @@ private:
 //===---------------------------------------------------------------------===//
 
 struct MatchedReductionCaptures {
-  int64_t reductionRank = 0;
-  int64_t reductionDimensionSize = 0;
-  int64_t maybeLeadingRank = 0;
-  int64_t maybeTrailingRank = 0;
+  int64_t rank;
+  int64_t reductionDimensionSize;
 };
 
 /// Creates a group of matchers for:

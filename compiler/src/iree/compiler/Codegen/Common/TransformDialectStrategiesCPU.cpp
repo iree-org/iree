@@ -6,19 +6,44 @@
 
 #include "iree/compiler/Codegen/Common/TransformDialectStrategiesCPU.h"
 
+#include <numeric>
+#include <type_traits>
+
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/TransformDialectStrategies.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
-#include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
+#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
+#include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
+#include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassRegistry.h"
 
 using namespace mlir;
 
@@ -26,13 +51,48 @@ using namespace mlir;
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 // TODO: significantly better namespacing.
+using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
+using iree_compiler::IREE::transform_dialect::ConfigExtractPart;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
+using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
+using iree_compiler::IREE::transform_dialect::
+    IREEEraseHALDescriptorTypeFromMemRefOp;
+using iree_compiler::IREE::transform_dialect::
+    MapNestedForeachThreadToGpuThreadsOp;
+using iree_compiler::IREE::transform_dialect::
+    TileToForeachThreadAndWorkgroupCountRegionOp;
+using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
+using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
+using transform::FuseIntoContainingOp;
 using transform::MatchOp;
+using transform::MergeHandlesOp;
+using transform::PrintOp;
+using transform::SequenceOp;
 using transform::SplitHandlesOp;
+using transform::SplitReductionOp;
+using transform::TileToForeachThreadOp;
+using transform::VectorizeOp;
 using transform_ext::AllDims;
+using transform_ext::IsPermutation;
 using transform_ext::m_StructuredOp;
 using transform_ext::NumEqualsTo;
 using transform_ext::ShapeKind;
+using transform_ext::StructuredOpMatcher;
+
+/// Matches `args` within `targetH` and unpacks a number of handles `N`.
+/// Assumes there are exactly `N` matched ops (but could be relaxed).
+/// Returns the tuple of handles.
+template <int N, typename... MatchingArgs>
+auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
+                    MatchingArgs... args) {
+  Value matchedH = b.create<MatchOp>(targetH, args...);
+  auto matchOp = b.create<SplitHandlesOp>(matchedH,
+                                          /*numHandles=*/N);
+  assert(matchOp->getNumResults() == N && "Unexpected number of results");
+  std::array<Value, N> a;
+  for (int64_t i = 0; i < N; ++i) a[i] = matchOp->getResult(i);
+  return std::tuple_cat(a);
+}
 
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor
@@ -70,8 +130,9 @@ static bool matchCPUReduction(linalg::LinalgOp op,
 
 // TODO: generalize and automate over and over.
 // TODO: significantly shrink this down.
-static void createReductionCpuStrategy(ImplicitLocOpBuilder &b, Value variantH,
-                                       const CPUReductionStrategyInfos &info) {
+static LogicalResult createReductionCpuStrategy(
+    ImplicitLocOpBuilder &b, Value variantH,
+    const CPUReductionStrategyInfos &info) {
   // Step 0. Fetch transform information from the config and materialize it in
   // the payload IR.
   // TODO: this still requires specific knowledge of ops present in the IR
@@ -99,6 +160,8 @@ static void createReductionCpuStrategy(ImplicitLocOpBuilder &b, Value variantH,
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
+
+  return success();
 }
 
 LogicalResult iree_compiler::matchAndSetCPUReductionTransformStrategy(
@@ -106,10 +169,10 @@ LogicalResult iree_compiler::matchAndSetCPUReductionTransformStrategy(
   // 1. Match
   CPUReductionStrategyInfos infos;
   if (!matchCPUReduction(op, infos)) return failure();
-  auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
+  auto startegyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
     return createReductionCpuStrategy(b, variant, infos);
   };
   // 2. Add the strategy.
-  createTransformRegion(entryPoint, strategyBuilder);
+  createTransformRegion(entryPoint, startegyBuilder);
   return success();
 }
