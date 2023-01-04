@@ -56,7 +56,7 @@ if (( TESTING!=0 )); then
   VERSION="${VERSION}-testing"
 fi
 GITHUB_RUNNER_SCOPE=iree-org
-GITHUB_RUNNER_VERSION="2.299.1"
+GITHUB_RUNNER_VERSION="2.300.2"
 GITHUB_RUNNER_ARCHIVE_DIGEST="147c14700c6cb997421b9a239c012197f11ea9854cd901ee88ead6fe73a72c74"
 GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
 INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-zbhz5clunq-uc.a.run.app"
