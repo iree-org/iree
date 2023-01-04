@@ -94,7 +94,6 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSupport
     MLIRTensorDialect
-    MLIRTensorTransforms
     MLIRTensorUtils
     MLIRTilingInterface
     MLIRTosaDialect
