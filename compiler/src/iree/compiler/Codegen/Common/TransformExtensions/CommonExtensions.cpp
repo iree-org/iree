@@ -560,7 +560,6 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
   auto workload = workgroupCountOp.getOperands();
 
   SmallVector<OpFoldResult> unpackedTileSizes;
-  int64_t numTiledDims = 0;
   for (auto ofr : tileSizes) {
     if (ofr.is<Value>() &&
         ofr.get<Value>().getType().isa<pdl::OperationType>()) {
@@ -577,7 +576,6 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
     } else {
       unpackedTileSizes.push_back(ofr);
     }
-    if (!isConstantIntValue(unpackedTileSizes.back(), 0)) ++numTiledDims;
   }
 
   if (unpackedTileSizes.size() > workload.size()) {
@@ -586,43 +584,33 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
         "number of tile sizes overflow the dimension from the workload");
   }
 
-  // Generate permutation of tiled dims based on the specified mapping.
-  SmallVector<int64_t> mappingPermutation;
-  if (mapping.has_value()) {
-    if (numTiledDims != mapping->size()) {
-      return rewriter.notifyMatchFailure(exportOp,
-                                         "number of mapping elements must "
-                                         "match number of non-zero tile sizes");
-    }
-    for (DeviceMappingAttrInterface map : mapping.value())
-      mappingPermutation.push_back(map.getMappingId());
-  } else {
-    // No mapping specified: No permutation.
-    for (int64_t i = 0; i < numTiledDims; ++i) mappingPermutation.push_back(i);
-  }
-
-  // Compute number of workgroups.
-  SmallVector<OpFoldResult> workgroupCount(3, rewriter.getIndexAttr(1));
+  SmallVector<OpFoldResult> workgroupCount, permutedWorkgroupCount;
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(workgroupCountOp);
   loc = workgroupCountOp.getLoc();
-  int64_t nextTiledDim = 0;
-  for (int64_t workgroupsDim : mappingPermutation) {
-    // Skip dims with tile size 0. These are not tiled.
-    while (isConstantIntValue(unpackedTileSizes[nextTiledDim], 0))
-      ++nextTiledDim;
+  for (auto tileSize : llvm::enumerate(unpackedTileSizes)) {
+    if (isConstantIntValue(tileSize.value(), 0)) {
+      workgroupCount.push_back(workload[tileSize.index()]);
+      continue;
+    }
     AffineExpr s0, s1;
     bindSymbols(rewriter.getContext(), s0, s1);
     auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
-    workgroupCount[workgroupsDim] = makeComposedFoldedAffineApply(
+    OpFoldResult count = makeComposedFoldedAffineApply(
         rewriter, loc, m,
-        ArrayRef<OpFoldResult>{workload[nextTiledDim],
-                               unpackedTileSizes[nextTiledDim]});
-    ++nextTiledDim;
+        ArrayRef<OpFoldResult>{workload[tileSize.index()], tileSize.value()});
+    workgroupCount.push_back(count);
   }
-
-  rewriter.replaceOp(workgroupCountOp, getValueOrCreateConstantIndexOp(
-                                           rewriter, loc, workgroupCount));
+  // Make sure to fill unused dimensions with 1
+  workgroupCount.resize(3, rewriter.getIndexAttr(1));
+  permutedWorkgroupCount.resize(3, rewriter.getIndexAttr(1));
+  int mappingId = 0;
+  for (DeviceMappingAttrInterface map : mapping->getValue()) {
+    permutedWorkgroupCount[map.getMappingId()] = workgroupCount[mappingId++];
+  }
+  rewriter.replaceOp(
+      workgroupCountOp,
+      getValueOrCreateConstantIndexOp(rewriter, loc, permutedWorkgroupCount));
   return success();
 }
 
