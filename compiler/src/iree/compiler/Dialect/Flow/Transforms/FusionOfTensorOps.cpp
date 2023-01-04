@@ -52,11 +52,11 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
       for (OpOperand &operand : sourceOp->getOpOperands()) {
         if (operand.get().getDefiningOp() == op) numUsesOfOp++;
       }
-      if (numUsesOfOp != 1) return std::nullopt;
+      if (numUsesOfOp != 1) return llvm::None;
       return &source;
     }
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 /// Check if the producer generic op is fusable with the consumer generic op.

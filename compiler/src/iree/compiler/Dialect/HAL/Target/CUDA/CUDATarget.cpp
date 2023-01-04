@@ -155,7 +155,7 @@ static void linkAndOptimize(llvm::Module &module,
   llvm::StandardInstrumentations si(module.getContext(), false);
   si.registerCallbacks(pic, &fam);
 
-  llvm::PassBuilder pb(&targetMachine, pto, std::nullopt, &pic);
+  llvm::PassBuilder pb(&targetMachine, pto, llvm::None, &pic);
   pb.registerModuleAnalyses(mam);
   pb.registerCGSCCAnalyses(cgam);
   pb.registerFunctionAnalyses(fam);

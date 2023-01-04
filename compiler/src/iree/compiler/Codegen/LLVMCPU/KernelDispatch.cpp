@@ -202,9 +202,9 @@ static Optional<int64_t> getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   auto nativeVectorSizeAttr =
       getConfigIntegerAttr(targetAttr, "native_vector_size");
-  if (!nativeVectorSizeAttr) return std::nullopt;
+  if (!nativeVectorSizeAttr) return llvm::None;
   int64_t nativeVectorSizeVal = nativeVectorSizeAttr->getInt();
-  if (!nativeVectorSizeVal) return std::nullopt;
+  if (!nativeVectorSizeVal) return llvm::None;
   return nativeVectorSizeVal;
 }
 

@@ -59,7 +59,7 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
     return std::make_pair(bound, bound);
   }
 
-  if (workgroupCount.empty()) return std::nullopt;
+  if (workgroupCount.empty()) return llvm::None;
 
   if (auto idOp =
           processorValue.getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>()) {
@@ -67,7 +67,7 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
 
     // Can't infer the range when workroupCount is unknown.
     unsigned index = idOp.getDimension().getZExtValue();
-    if (!workgroupCount[index]) return std::nullopt;
+    if (!workgroupCount[index]) return llvm::None;
 
     AffineExpr zero = builder.getAffineConstantExpr(0);
     AffineExpr ubExpr = builder.getAffineConstantExpr(workgroupCount[index]);
@@ -79,12 +79,12 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
 
     // Can't infer the range when workroupCount is unknown.
     unsigned index = dimOp.getDimension().getZExtValue();
-    if (!workgroupCount[index]) return std::nullopt;
+    if (!workgroupCount[index]) return llvm::None;
 
     AffineExpr bound = builder.getAffineConstantExpr(workgroupCount[index]);
     return std::make_pair(bound, bound);
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 /// Return true if the given tiled loop is distributed to workgroups.

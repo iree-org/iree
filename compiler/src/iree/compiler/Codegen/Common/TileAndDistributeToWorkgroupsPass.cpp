@@ -83,7 +83,7 @@ static LogicalResult getTileAndDistributeConfig(
   }
 
   partitionableLoops =
-      partitionableLoopInterface.getPartitionableLoops(std::nullopt);
+      partitionableLoopInterface.getPartitionableLoops(llvm::None);
   IREE::Codegen::LoweringConfigAttr rootOpConfig = getLoweringConfig(*rootOp);
   if (!rootOpConfig) {
     return rootOp.value()->emitOpError(

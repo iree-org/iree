@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree_tf_compiler/TF/Passes.h"
-#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_device.h"
@@ -77,7 +76,7 @@ class StripFunctionMetadataPass
 
     for (int i = 0; i < funcOp.getNumArguments(); ++i) {
       auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
-          mlir::function_interface_impl::getArgAttrs(funcOp, i),
+          funcOp.getArgAttrs(i),
           [](NamedAttribute namedAttr) { return isTFAttr(namedAttr); }));
       for (auto namedAttr : stripAttrs) {
         funcOp.removeArgAttr(i, namedAttr.getName());
@@ -86,7 +85,7 @@ class StripFunctionMetadataPass
 
     for (int i = 0; i < funcOp.getNumResults(); ++i) {
       auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
-          mlir::function_interface_impl::getResultAttrs(funcOp, i),
+          funcOp.getResultAttrs(i),
           [](NamedAttribute namedAttr) { return isTFAttr(namedAttr); }));
       for (auto namedAttr : stripAttrs) {
         funcOp.removeResultAttr(i, namedAttr.getName());

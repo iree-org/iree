@@ -35,7 +35,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
     if (RefType::isCompatible(type)) {
       return RefType::get(type);
     }
-    return std::nullopt;
+    return llvm::None;
   });
 
   // Pointer types remain as pointer types types are passed through unmodified.
@@ -44,7 +44,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
     // ptr<i32>, for example).
     auto targetType = convertType(type.getTargetType());
     if (!targetType) {
-      return std::nullopt;
+      return llvm::None;
     }
     return IREE::Util::PtrType::get(targetType);
   });
@@ -58,7 +58,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
       // Promote i1/i8/i16 -> i32.
       return IntegerType::get(integerType.getContext(), 32);
     }
-    return std::nullopt;
+    return llvm::None;
   });
 
   // Convert floating-point types.
@@ -69,14 +69,14 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
         return FloatType::getF32(floatType.getContext());
       } else {
         // f32 is not supported; can't compile.
-        return std::nullopt;
+        return llvm::None;
       }
     } else if (floatType.isF32()) {
       if (targetOptions_.f32Extension) {
         return floatType;
       } else {
         // f32 is not supported; can't compile.
-        return std::nullopt;
+        return llvm::None;
       }
     } else if (floatType.isF64()) {
       if (targetOptions_.f64Extension) {
@@ -89,7 +89,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
         return FloatType::getF32(floatType.getContext());
       }
     }
-    return std::nullopt;
+    return llvm::None;
   });
 
   // Convert index types to the target bit width.

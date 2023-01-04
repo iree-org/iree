@@ -127,7 +127,7 @@ class UnixLinkerTool : public LinkerTool {
     }
 
     auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine))) return std::nullopt;
+    if (failed(runLinkCommand(commandLine))) return llvm::None;
     return artifacts;
   }
 

@@ -302,7 +302,7 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
 FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
     RewriterBase &rewriter, Operation *op,
     Optional<Flow::WorkloadBuilder> workloadBuilder) {
-  Optional<ValueRange> workload = std::nullopt;
+  Optional<ValueRange> workload = llvm::None;
   if (workloadBuilder.has_value()) workload = workloadBuilder->workload;
   // Make an empty dispatch region right before the op.
   rewriter.setInsertionPointAfter(op);

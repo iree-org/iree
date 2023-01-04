@@ -35,7 +35,7 @@ HALTypeConverter::HALTypeConverter(
     if (HALTypeConverter::shouldConvertToBufferView(type)) {
       return IREE::HAL::BufferViewType::get(type.getContext());
     }
-    return std::nullopt;
+    return llvm::None;
   });
 
   addTargetMaterialization([](OpBuilder &builder, IREE::HAL::BufferType type,

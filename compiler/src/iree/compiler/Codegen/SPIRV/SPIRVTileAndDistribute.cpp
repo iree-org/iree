@@ -90,7 +90,7 @@ static void populateTilingReductionPatterns(
     const linalg::TileSizeComputationFunction &computeFn) {
   auto filter = IREE::LinalgExt::LinalgTransformationFilter(
       StringAttr::get(patterns.getContext(), getTileReductionMarker()),
-      std::nullopt);
+      llvm::None);
 
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)

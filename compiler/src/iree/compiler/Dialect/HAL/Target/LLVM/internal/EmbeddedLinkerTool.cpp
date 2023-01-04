@@ -101,7 +101,7 @@ class EmbeddedLinkerTool : public LinkerTool {
     artifacts.libraryFile.close();
 
     std::string embeddedToolPath = getEmbeddedToolPath();
-    if (embeddedToolPath.empty()) return std::nullopt;
+    if (embeddedToolPath.empty()) return llvm::None;
 
     SmallVector<std::string, 8> flags = {
         embeddedToolPath,
@@ -188,7 +188,7 @@ class EmbeddedLinkerTool : public LinkerTool {
           }
         }
       }
-      return std::nullopt;
+      return llvm::None;
     }
     return artifacts;
   }

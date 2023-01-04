@@ -665,7 +665,7 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
     return setOpConfigAndEntryPointFnTranslation(
         op->getParentOfType<func::FuncOp>(), op, tileSizes,
         CodeGenPipeline::SPIRVMatmulPromoteVectorize, workgroupSize,
-        /*subgroupSize=*/std::nullopt, pipelineDepth, storeStage);
+        /*subgroupSize=*/llvm::None, pipelineDepth, storeStage);
   }
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -785,7 +785,7 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
                                  mWarpCount, nWarpCount, mTileCount,
                                  nTileCount, kTileCount};
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 namespace detail {
@@ -1172,7 +1172,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
   // Distribute workload to the given `numThreads` by allowing a potental loss.
   auto distributeToThreads = [&](int64_t numThreads,
-                                 Optional<int64_t> lossFactor = std::nullopt) {
+                                 Optional<int64_t> lossFactor = llvm::None) {
     LLVM_DEBUG(llvm::dbgs() << "\nLoss factor: " << lossFactor << "\n");
     initConfiguration();
     // If there are more than 3 parallel dim try to tile the extra higher level

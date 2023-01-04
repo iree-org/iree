@@ -327,7 +327,7 @@ class GlobalInitializationPass
         inlinerInterface, &initializerOp.getBody(), builder.getInsertionBlock(),
         builder.getInsertionPoint(),
         /*inlinedOperands=*/ValueRange{},
-        /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/std::nullopt,
+        /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/llvm::None,
         /*shouldCloneInlinedRegion=*/false);
     builder.setInsertionPointToEnd(builder.getInsertionBlock());
     return result;

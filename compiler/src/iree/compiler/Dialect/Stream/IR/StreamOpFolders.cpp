@@ -48,11 +48,11 @@ namespace Stream {
 //    stream.yield
 //  }
 static Optional<IREE::Stream::YieldOp> getYieldIfOnlyOp(Block &block) {
-  if (block.empty()) return std::nullopt;
-  if (&block.front() != &block.back()) return std::nullopt;
+  if (block.empty()) return llvm::None;
+  if (&block.front() != &block.back()) return llvm::None;
   auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.back());
   if (yieldOp) return yieldOp;
-  return std::nullopt;
+  return llvm::None;
 }
 
 // Finds the insertion point before |targetOp| and after |earliestOp| that would

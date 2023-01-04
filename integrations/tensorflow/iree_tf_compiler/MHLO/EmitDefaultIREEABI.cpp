@@ -126,7 +126,7 @@ class EmitDefaultIREEABIPass
       return json::Value(std::move(name));
     }
 
-    return std::nullopt;
+    return llvm::None;
   }
 };
 
