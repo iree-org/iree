@@ -6,12 +6,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Generates benchmark results as pull request comments.
 
-This script is meant to be used by CI. It requires the following environment
-variables to be set:
-
-- IREE_DASHBOARD_URL: the url to IREE's performance dashboard.
-
-This script uses pip package "markdown_strings".
+This script is meant to be used by CI and uses pip package "markdown_strings".
 """
 
 import sys
@@ -20,18 +15,20 @@ import pathlib
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
-from typing import Any, Dict, Optional, Set, Tuple
 import argparse
 import dataclasses
 import json
-import markdown_strings as md
 import os
+from typing import Any, Dict, Optional, Set, Tuple
+
+import markdown_strings as md
 import requests
 
 from common import benchmark_definition, benchmark_presentation, common_arguments
 from reporting import benchmark_comment
 
 GITHUB_IREE_REPO_PREFIX = "https://github.com/iree-org/iree"
+IREE_DASHBOARD_URL = "https://perf.iree.dev/apis/v2"
 IREE_PROJECT_ID = 'IREE'
 # The maximal numbers of trials when querying base commit benchmark results.
 MAX_BASE_COMMIT_QUERY_COUNT = 10
@@ -78,10 +75,13 @@ def get_from_dashboard(url: str,
   return data
 
 
+BenchmarkQueryResults = Dict[str, Dict[str, Any]]
+
+
 def query_base_benchmark_results(
     commit: str,
     dashboard_api_url: str,
-    verbose: bool = False) -> Dict[str, Dict[str, Any]]:
+    verbose: bool = False) -> BenchmarkQueryResults:
   """Queries the benchmark results for the given commit."""
   build_id = get_git_total_commit_count(commit, verbose)
   payload = {'projectId': IREE_PROJECT_ID, 'buildId': build_id}
@@ -90,14 +90,20 @@ def query_base_benchmark_results(
                             verbose=verbose)
 
 
+@dataclasses.dataclass(frozen=True)
+class ComparableBenchmarkResults(object):
+  commit_sha: str
+  benchmark_results: BenchmarkQueryResults
+
+
 def _find_comparable_benchmark_results(
     start_commit: str,
     required_benchmark_keys: Set[str],
     dashboard_api_url: str,
-    verbose: bool = False) -> Optional[Tuple[str, Dict[str, Dict[str, Any]]]]:
+    verbose: bool = False) -> Optional[ComparableBenchmarkResults]:
   cmds = [
-      "git", "rev-list", f"--max-count={MAX_BASE_COMMIT_QUERY_COUNT}",
-      start_commit
+      "git", "rev-list", "--first-parent",
+      f"--max-count={MAX_BASE_COMMIT_QUERY_COUNT}", start_commit
   ]
   output = benchmark_definition.execute_cmd_and_get_output(cmds,
                                                            cwd=THIS_DIRECTORY,
@@ -112,7 +118,8 @@ def _find_comparable_benchmark_results(
         verbose=verbose)
     base_benchmark_keys = set(base_benchmarks.keys())
     if required_benchmark_keys <= base_benchmark_keys:
-      return base_commit, base_benchmarks
+      return ComparableBenchmarkResults(commit_sha=base_commit,
+                                        benchmark_results=base_benchmarks)
 
   return None
 
@@ -195,18 +202,13 @@ def parse_arguments():
                       required=True,
                       type=str,
                       help="PR commit hash")
-  parser.add_argument(
-      "--pr_base_commit",
-      type=str,
-      default=None,
-      help="Start commit to find the benchmark results to compare in reverse, "
-      "requires repo to have the full ancestor history of the start commit")
+  parser.add_argument("--pr_base_branch", type=str, default=None, help="TODO")
   parser.add_argument("--comment_title",
-                      default="Abbreviated Benchmark Summary",
+                      required=True,
                       help="Title of the comment")
   parser.add_argument(
       "--comment_type_id",
-      default="f6919a4c-7bb3-4fd6-af89-97980ce49f95",
+      required=True,
       help="Unique id to identify the previous comment and update the one "
       "with the same id when posting")
   parser.add_argument("--build_url",
@@ -222,8 +224,6 @@ def parse_arguments():
 
 
 def main(args):
-  dashboard_api_url = f'{get_required_env_var("IREE_DASHBOARD_URL")}/apis/v2'
-
   benchmark_files = common_arguments.expand_and_check_file_paths(
       args.benchmark_files)
   compile_stats_files = common_arguments.expand_and_check_file_paths(
@@ -237,26 +237,26 @@ def main(args):
 
   pr_base_commit = args.pr_base_commit
   if pr_base_commit is None:
-    baseline_results = None
+    comparable_results = None
   else:
     required_benchmark_keys = set(execution_benchmarks.keys())
     for target_name in compilation_metrics:
       for mapper in benchmark_presentation.COMPILATION_METRICS_TO_TABLE_MAPPERS:
         required_benchmark_keys.add(mapper.get_series_name(target_name))
 
-    baseline_results = _find_comparable_benchmark_results(
+    comparable_results = _find_comparable_benchmark_results(
         start_commit=pr_base_commit,
         required_benchmark_keys=required_benchmark_keys,
-        dashboard_api_url=dashboard_api_url,
+        dashboard_api_url=IREE_DASHBOARD_URL,
         verbose=args.verbose)
 
-  if baseline_results is None:
-    baseline_commit = None
+  if comparable_results is None:
+    comparable_commit = None
   else:
-    baseline_commit, base_benchmarks = baseline_results
+    comparable_commit = comparable_results.commit_sha
     # Update the execution benchmarks with base numbers.
     for bench in execution_benchmarks:
-      base_benchmark = base_benchmarks[bench]
+      base_benchmark = comparable_results.benchmark_results[bench]
       if base_benchmark["sampleUnit"] != "ns":
         raise ValueError("Only support nanoseconds for latency sample.")
       execution_benchmarks[bench].base_mean_time = base_benchmark["sample"]
@@ -266,7 +266,7 @@ def main(args):
       updated_metrics = metrics
       for mapper in benchmark_presentation.COMPILATION_METRICS_TO_TABLE_MAPPERS:
         metric_key = mapper.get_series_name(target_name)
-        base_benchmark = base_benchmarks[metric_key]
+        base_benchmark = comparable_results.benchmark_results[metric_key]
         if base_benchmark["sampleUnit"] != mapper.get_unit():
           raise ValueError("Unit of the queried sample is mismatched.")
         updated_metrics = mapper.update_base_value(updated_metrics,
@@ -276,9 +276,10 @@ def main(args):
   pr_commit_link = md.link(pr_commit,
                            f"{GITHUB_IREE_REPO_PREFIX}/commit/{pr_commit}")
   commit_info_md = f"@ commit {pr_commit_link}"
-  if baseline_commit is not None:
+  if comparable_commit is not None:
     baseline_commit_link = md.link(
-        baseline_commit, f"{GITHUB_IREE_REPO_PREFIX}/commit/{baseline_commit}")
+        comparable_commit,
+        f"{GITHUB_IREE_REPO_PREFIX}/commit/{comparable_commit}")
     commit_info_md += f" (vs. base {baseline_commit_link})"
   elif pr_base_commit is not None:
     commit_info_md += " (no previous benchmark results to compare)"

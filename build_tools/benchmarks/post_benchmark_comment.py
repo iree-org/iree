@@ -64,90 +64,95 @@ class APIRequester(object):
                           headers=self._api_headers)
 
 
-def post_to_gist(requester: APIRequester,
-                 filename: str,
-                 content: str,
-                 verbose: bool = False) -> str:
-  """Posts the given content to a new GitHub Gist and returns the URL to it."""
+class GithubClient(object):
+  """Helper to call Github REST APIs."""
 
-  response = requester.post(endpoint=GITHUB_GIST_API,
-                            payload={
-                                "public": True,
-                                "files": {
-                                    filename: {
-                                        "content": content
-                                    }
-                                }
-                            })
-  if response.status_code != http.client.CREATED:
-    raise RuntimeError(
-        f"Failed to comment on GitHub; error code: {response.status_code}")
+  def __init__(self, requester: APIRequester):
+    self._requester = requester
 
-  response = response.json()
-  if verbose:
-    print(f"Gist posting response: {response}")
+  def post_to_gist(self,
+                   filename: str,
+                   content: str,
+                   verbose: bool = False) -> str:
+    """Posts the given content to a new GitHub Gist and returns the URL to it."""
 
-  if response["truncated"]:
-    raise RuntimeError(f"Content too large and gotten truncated")
-
-  return response["html_url"]
-
-
-def get_previous_comment_on_pr(requester: APIRequester,
-                               pr_number: int,
-                               gist_bot_user: str,
-                               comment_type_id: str,
-                               verbose: bool = False) -> Optional[int]:
-  """Gets the previous comment's id from GitHub."""
-
-  for page in range(1, MAX_PAGES_TO_SEARCH_PREVIOUS_COMMENT + 1):
-    response = requester.get(
-        endpoint=f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments",
-        payload={
-            "per_page": 100,
-            "page": page,
-            "sort": "updated",
-            "direction": "desc"
-        })
-    if response.status_code != http.client.OK:
+    response = self._requester.post(endpoint=GITHUB_GIST_API,
+                                    payload={
+                                        "public": True,
+                                        "files": {
+                                            filename: {
+                                                "content": content
+                                            }
+                                        }
+                                    })
+    if response.status_code != http.client.CREATED:
       raise RuntimeError(
-          f"Failed to get PR comments from GitHub; error code: {response.status_code}"
+          f"Failed to comment on GitHub; error code: {response.status_code} - {response.text}"
       )
 
-    comments = response.json()
+    response = response.json()
     if verbose:
-      print(f"Previous comment query response on page {page}: {comments}")
+      print(f"Gist posting response: {response}")
 
-    # Find the last comment from GITHUB_ACTIONS_USER and has the comment type id.
-    for comment in comments:
-      if (comment["user"]["login"] == gist_bot_user and
-          comment_type_id in comment["body"]):
-        return comment["id"]
+    if response["truncated"]:
+      raise RuntimeError(f"Content is too large and was truncated")
 
-  return None
+    return response["html_url"]
 
+  def get_previous_comment_on_pr(self,
+                                 pr_number: int,
+                                 gist_bot_user: str,
+                                 comment_type_id: str,
+                                 verbose: bool = False) -> Optional[int]:
+    """Gets the previous comment's id from GitHub."""
 
-def update_comment_on_pr(requester: APIRequester, comment_id: int,
-                         content: str):
-  """Updates the content of the given comment id."""
+    for page in range(1, MAX_PAGES_TO_SEARCH_PREVIOUS_COMMENT + 1):
+      response = self._requester.get(
+          endpoint=f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments",
+          payload={
+              "per_page": 100,
+              "page": page,
+              "sort": "updated",
+              "direction": "desc"
+          })
+      if response.status_code != http.client.OK:
+        raise RuntimeError(
+            f"Failed to get PR comments from GitHub; error code: {response.status_code} - {response.text}"
+        )
 
-  response = requester.patch(
-      endpoint=f"{GITHUB_IREE_API_PREFIX}/issues/comments/{comment_id}",
-      payload={"body": content})
-  if response.status_code != http.client.OK:
-    raise RuntimeError(
-        f"Failed to comment on GitHub; error code: {response.status_code}")
+      comments = response.json()
+      if verbose:
+        print(f"Previous comment query response on page {page}: {comments}")
 
+      # Find the most recently updated comment that matches.
+      for comment in comments:
+        if (comment["user"]["login"] == gist_bot_user and
+            comment_type_id in comment["body"]):
+          return comment["id"]
 
-def create_comment_on_pr(requester: APIRequester, pr_number: int, content: str):
-  """Posts the given content as comments to the current pull request."""
+    return None
 
-  response = requester.post(
-      endpoint=f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments",
-      payload={"body": content})
-  if response.status_code != http.client.CREATED:
-    raise RuntimeError(
-        f"Failed to comment on GitHub; error code: {response.status_code}")
+  def update_comment_on_pr(self, comment_id: int, content: str):
+    """Updates the content of the given comment id."""
+
+    response = self._requester.patch(
+        endpoint=f"{GITHUB_IREE_API_PREFIX}/issues/comments/{comment_id}",
+        payload={"body": content})
+    if response.status_code != http.client.OK:
+      raise RuntimeError(
+          f"Failed to comment on GitHub; error code: {response.status_code} - {response.text}"
+      )
+
+  def create_comment_on_pr(self, pr_number: int, content: str):
+    """Posts the given content as comments to the current pull request."""
+
+    response = self._requester.post(
+        endpoint=f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments",
+        payload={"body": content})
+    if response.status_code != http.client.CREATED:
+      raise RuntimeError(
+          f"Failed to comment on GitHub; error code: {response.status_code} - {response.text}"
+      )
 
 
 def _parse_arguments():
@@ -175,15 +180,15 @@ def main(args: argparse.Namespace):
   comment_data = benchmark_comment.CommentData(
       **json.loads(args.comment_json.read_text()))
 
-  gist_url = post_to_gist(
-      requester=APIRequester(github_token=gist_bot_token),
+  gist_client = GithubClient(requester=APIRequester(
+      github_token=gist_bot_token))
+  gist_url = gist_client.post_to_gist(
       filename=f'iree-full-benchmark-results-{pr_number}.md',
       content=comment_data.full_md,
       verbose=args.verbose)
 
-  pr_api_requester = APIRequester(github_token=github_token)
-  previous_comment_id = get_previous_comment_on_pr(
-      requester=pr_api_requester,
+  pr_client = GithubClient(requester=APIRequester(github_token=github_token))
+  previous_comment_id = pr_client.get_previous_comment_on_pr(
       pr_number=pr_number,
       gist_bot_user=gist_bot_user,
       comment_type_id=comment_data.type_id,
@@ -192,13 +197,10 @@ def main(args: argparse.Namespace):
   abbr_md = comment_data.abbr_md.replace(
       benchmark_comment.GIST_LINK_PLACEHORDER, gist_url)
   if previous_comment_id is not None:
-    update_comment_on_pr(requester=pr_api_requester,
-                         comment_id=previous_comment_id,
-                         content=abbr_md)
+    pr_client.update_comment_on_pr(comment_id=previous_comment_id,
+                                   content=abbr_md)
   else:
-    create_comment_on_pr(requester=pr_api_requester,
-                         pr_number=pr_number,
-                         content=abbr_md)
+    pr_client.create_comment_on_pr(pr_number=pr_number, content=abbr_md)
 
 
 if __name__ == "__main__":
