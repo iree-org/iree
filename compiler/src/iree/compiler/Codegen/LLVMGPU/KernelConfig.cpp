@@ -51,14 +51,6 @@ llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes(
 }  // namespace mlir
 
 namespace {
-
-/// Structure to represent target features.
-struct TargetInfo {
-  // TODO: add finer grain control for other tensorcore types.
-  bool hasTF32TensorCore = false;
-  bool hasWarpShuffle = false;
-};
-
 struct TileWorkgroupSizePair {
   // How many scalar elements each workgroup should handle along each dimension.
   std::array<int64_t, 3> tileSize;
@@ -103,13 +95,13 @@ static void getTensorCoreConfig(
   }
 }
 
-static StringRef getTargetArch(func::FuncOp entryPoint) {
+static std::string getTargetArch(func::FuncOp entryPoint) {
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
     IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
     if (auto config = targetAttr.getConfiguration()) {
       if (auto attr = config.getAs<StringAttr>("target_arch")) {
-        return attr.getValue();
+        return attr.getValue().str();
       }
     }
   }
@@ -127,34 +119,11 @@ bool isCudaTarget(func::FuncOp entryPoint) {
   return false;
 }
 
-static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
-  TargetInfo info;
-  // TODO: fill out target info for other vendors.
-  if (!isCudaTarget(entryPoint)) return info;
-  // All the cuda target are assumed to have warp support.
-  info.hasWarpShuffle = true;
-  StringRef targetName = getTargetArch(entryPoint);
-  // If no target name is set assume all the features are off.
-  if (targetName == "") return info;
-  if (!StringRef(targetName).starts_with("sm_")) {
-    entryPoint.emitError("unknown target name ") << targetName;
-    return info;
-  }
-  APInt version;
-  if (targetName.substr(3).getAsInteger(10, version)) {
-    entryPoint.emitError("unknown target version ") << targetName;
-    return info;
-  }
-  int64_t smVersion = version.getZExtValue();
-  if (smVersion >= 80) info.hasTF32TensorCore = true;
-  return info;
-}
-
-static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
-                               const TargetInfo &targetInfo) {
+static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose
   // are supported upstream.
-  if (!targetInfo.hasTF32TensorCore) return false;
+  // TODO(thomasraoux): Enable batchMatmul and generic contraction.
+  if (getTargetArch(entryPoint) != "sm_80") return false;
   if (!(isa<linalg::MatmulOp>(op) || isa<linalg::BatchMatmulOp>(op))) {
     assert(linalg::isaContractionOpInterface(op));
     // If this is not a named op matmul check some properties to make sure that
@@ -177,8 +146,7 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
 }
 
 static LogicalResult setContractConfig(func::FuncOp entryPoint,
-                                       linalg::LinalgOp op,
-                                       const TargetInfo &targetInfo) {
+                                       linalg::LinalgOp op) {
   auto setMatmulConfig =
       [&entryPoint, &op](int64_t tileX, int64_t tileY, int64_t tileK,
                          llvm::ArrayRef<int64_t> workgroupSize,
@@ -247,7 +215,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
                       sizeK != ShapedType::kDynamic;
   if (isStaticSize) {
     /// Try tensorcore config first.
-    if (supportsTensorCore(entryPoint, op, targetInfo)) {
+    if (supportsTensorCore(entryPoint, op)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
 
       getTensorCoreConfig(TCtileSizeConfig, op.getDpsInputOperand(0)
@@ -493,11 +461,10 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 }
 
 /// Set configuration for reduction transform dialect based strategy.
-static LogicalResult setReductionTransformJitConfig(
-    func::FuncOp entryPoint, linalg::LinalgOp op,
-    const TargetInfo &targetInfo) {
+static LogicalResult setReductionTransformJitConfig(func::FuncOp entryPoint,
+                                                    linalg::LinalgOp op) {
   if (!clGPUEnableTransformDialectJit) return failure();
-  if (!targetInfo.hasWarpShuffle) return failure();
+  if (!isCudaTarget(entryPoint)) return failure();
   if (failed(matchAndSetGPUReductionTransformStrategy(entryPoint, op)))
     return failure();
 
@@ -510,9 +477,8 @@ static LogicalResult setReductionTransformJitConfig(
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
-                                            linalg::LinalgOp op,
-                                            const TargetInfo &targetInfo) {
-  if (!targetInfo.hasWarpShuffle) return failure();
+                                            linalg::LinalgOp op) {
+  if (!isCudaTarget(entryPoint)) return failure();
   if (!isa<linalg::GenericOp>(op)) return failure();
   // TODO(thomasraoux): Enable dynamic shape.
   if (op.hasDynamicShape()) return failure();
@@ -812,7 +778,6 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     setLoweringConfig(computeOp, config);
     return success();
   }
-  TargetInfo targetInfo = getTargetInfo(entryPointFn);
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(computeOp)) {
     // If the op already has a lowering config coming from the IR use this and
@@ -822,13 +787,12 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (linalg::isaContractionOpInterface(linalgOp) &&
         linalgOp.getNumParallelLoops() >= 2) {
-      return setContractConfig(entryPointFn, linalgOp, targetInfo);
+      return setContractConfig(entryPointFn, linalgOp);
     }
-    if (succeeded(setReductionTransformJitConfig(entryPointFn, linalgOp,
-                                                 targetInfo))) {
+    if (succeeded(setReductionTransformJitConfig(entryPointFn, linalgOp))) {
       return success();
     }
-    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp, targetInfo))) {
+    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp))) {
       return success();
     }
     if (succeeded(setConvolutionConfig(linalgOp, 32, 16))) {
