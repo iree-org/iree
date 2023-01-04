@@ -20,7 +20,6 @@ iree_lit_test_suite(
     "matmul.mlir"
     "mmt4d.mlir"
     "pack.mlir"
-    "query_tile_sizes.mlir"
     "unary.mlir"
     "unpack.mlir"
   TOOLS
