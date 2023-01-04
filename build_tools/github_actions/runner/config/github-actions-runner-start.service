@@ -10,7 +10,7 @@ Restart=no
 KillMode=process
 KillSignal=SIGTERM
 TimeoutStopSec=5min
-ExecStopPost=/runner-root/config/delete_self.sh
+ExecStopPost=sudo /usr/sbin/shutdown -P now
 
 [Install]
 WantedBy=multi-user.target
