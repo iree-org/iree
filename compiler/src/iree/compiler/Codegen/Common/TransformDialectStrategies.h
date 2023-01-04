@@ -110,7 +110,7 @@ buildTileFuseDistToForeachThreadWithTileSizes(ImplicitLocOpBuilder &b,
                                               ArrayRef<OpFoldResult> tileSizes,
                                               ArrayAttr threadDimMapping);
 TileToForeachThreadAndFuseAndDistributeResult
-buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
+buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping);
 

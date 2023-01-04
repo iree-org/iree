@@ -77,6 +77,11 @@ struct CaptureRank : public CaptureStaticValue<int64_t> {
   using Base::Base;
 };
 
+/// Captures the bitwidth of an element type.
+struct CaptureElementTypeBitWidth : public CaptureStaticValue<int64_t> {
+  using Base::Base;
+};
+
 /// A tag indicating to look for any user of the operation's result that would
 /// satisfy the predicate.
 struct HasAnyUse {};
@@ -283,6 +288,14 @@ public:
   /// have a projected permutation indexing map.
   StructuredOpMatcher &input(AllOperands tag, IsProjectedPermutation);
 
+  /// Adds a predicate checking that the bit width of the elemental type of the
+  /// structured op input at the given position is equal to the given value.
+  StructuredOpMatcher &input(int64_t position, ElementTypeBitWidth width);
+
+  /// Capture the elemental type bitwidth of input operand `position`.
+  StructuredOpMatcher &input(int64_t position,
+                             CaptureElementTypeBitWidth width);
+
   /// Adds a predicate that recursively applies another predicate to the
   /// operation defining the `position`-th input operand, looking through any
   /// "subsetting" operation such as "tensor.extract_slice".
@@ -331,6 +344,10 @@ public:
   /// Adds a predicate checking that the bit width of the elemental type of the
   /// structured op output at the given position is equal to the given value.
   StructuredOpMatcher &output(int64_t position, ElementTypeBitWidth width);
+
+  /// Capture the elemental type bitwidth of output operand `position`.
+  StructuredOpMatcher &output(int64_t position,
+                              CaptureElementTypeBitWidth width);
 
   /// Adds a predicate checking that the output of the structured op is produced
   /// by a reduction with a single-operation combinator (such as addf or mulf,
@@ -543,11 +560,14 @@ private:
 
 struct MatchedReductionCaptures {
   int64_t reductionRank = 0;
+  int64_t maybeLeadingRank = 0;
+  int64_t maybeTrailingRank = 0;
   SmallVector<int64_t> leadingOpSizes = {};
   SmallVector<int64_t> reductionOpSizes = {};
   SmallVector<int64_t> trailingOpSizes = {};
-  int64_t maybeLeadingRank = 0;
-  int64_t maybeTrailingRank = 0;
+  int64_t reductionOutputElementalTypeBitWidth = 0;
+  int64_t maybeLeadingOutputElementalTypeBitWidth = 0;
+  int64_t maybeTrailingOutputElementalTypeBitWidth = 0;
 };
 
 /// Creates a group of matchers for:
