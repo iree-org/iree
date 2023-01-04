@@ -196,63 +196,42 @@ void ReductionStrategyThreadDistributionSizes::computeStrategy() {
 
 /// Structure to hold the parameters related to GPU reduction strategy.
 struct GPUReductionStrategyInfos {
-  explicit GPUReductionStrategyInfos(MLIRContext *context, int64_t rank,
-                                     int64_t reductionDimensionSize)
-      : context(context),
-        rank(rank),
-        reductionDimensionSize(reductionDimensionSize),
+  explicit GPUReductionStrategyInfos(int64_t reductionDimensionSize)
+      : reductionDimensionSize(reductionDimensionSize),
         threadDistributionSizes(
-            ReductionStrategyThreadDistributionSizes(reductionDimensionSize)) {
-    auto blockX =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimX);
-    auto blockY =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimY);
-    auto blockZ =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimZ);
-    allBlockAttrs = SmallVector<Attribute>{blockX, blockY, blockZ};
-  }
-
-  /// Constructor quantities.
-  MLIRContext *context;
-  int64_t rank;
+            ReductionStrategyThreadDistributionSizes(reductionDimensionSize)) {}
   int64_t reductionDimensionSize;
   ReductionStrategyThreadDistributionSizes threadDistributionSizes;
 
-  /// Derived quantities.
-  SmallVector<Attribute> allBlockAttrs;
-  // Tile sizes for the workgroup / determines grid size.
-  SmallVector<int64_t> workgroupTileSizes;
-  // Launch bounds for the workgroups / block size.
   std::array<int64_t, 3> workgroupSize;
+  SmallVector<int64_t> workgroupTileSizes;
+  SmallVector<int64_t> fillSecondTileSizes;
+  SmallVector<int64_t> genericSecondTileSizes;
 };
 }  // namespace
 
 static std::pair<Value, Value> createReductionStrategyBlockDistribution(
     ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
-    Value maybeTrailingH, const GPUReductionStrategyInfos &infos) {
+    Value maybeTrailingH) {
   auto pdlOperation = pdl::OperationType::get(b.getContext());
   auto fusionTargetSelector = b.create<TakeFirstOp>(
       pdlOperation, pdlOperation, ArrayRef<Value>{maybeTrailingH, reductionH});
   Value fusionTargetH = fusionTargetSelector.getFirst();
   Value fusionGroupH = fusionTargetSelector.getRest();
-  ArrayRef<Attribute> allBlocksRef(infos.allBlockAttrs);
+  auto blockX = mlir::gpu::GPUBlockMappingAttr::get(b.getContext(),
+                                                    mlir::gpu::Blocks::DimX);
   iree_compiler::TileAndFuseAndDistributeResult tileResult = iree_compiler::
       buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
-          /*builder=*/b,
-          /*rootH=*/fusionTargetH,
-          /*opsToFuseH=*/fusionGroupH,
-          /*tileSizes=*/
-          getAsOpFoldResult(b.getI64ArrayAttr(infos.workgroupTileSizes)),
-          /*threadDimMapping=*/
-          b.getArrayAttr(allBlocksRef.take_front(infos.rank - 1)));
+          b, fusionTargetH, fusionGroupH,
+          getAsOpFoldResult(b.getI64ArrayAttr({1})), b.getArrayAttr(blockX));
   Value foreachThreadH =
       b.create<FuseIntoContainingOp>(fillH, tileResult.foreachThreadH);
   foreachThreadH =
       b.create<FuseIntoContainingOp>(maybeLeadingH, foreachThreadH);
   auto gridReductionSelector = b.create<TakeFirstOp>(
       pdlOperation, pdlOperation,
-      ValueRange{tileResult.resultingFusedOpsHandles.front(),
-                 tileResult.tiledOpH});
+      ArrayRef<Value>(
+          {tileResult.resultingFusedOpsHandles.front(), tileResult.tiledOpH}));
 
   return std::make_pair(gridReductionSelector.getFirst(),
                         gridReductionSelector.getRest());
@@ -260,7 +239,7 @@ static std::pair<Value, Value> createReductionStrategyBlockDistribution(
 
 static void createReductionStrategyThreadDistribution(
     ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledTrailingH,
-    const GPUReductionStrategyInfos &infos) {
+    const ReductionStrategyThreadDistributionSizes &sizes) {
   auto pdlOperation = pdl::OperationType::get(b.getContext());
   auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
                                                       mlir::gpu::Threads::DimX);
@@ -269,15 +248,10 @@ static void createReductionStrategyThreadDistribution(
 
   // Split the reduction into a parallel and combiner part, then tile the
   // parallel part and map it to a full warp so it works on vectors.
-  SmallVector<int64_t> leadingParallelDims(infos.rank - 1, 0);
-  SmallVector<int64_t> numThreads = leadingParallelDims;
-  numThreads.push_back(infos.threadDistributionSizes.reductionTileSize);
-  SmallVector<int64_t> tileSizes = leadingParallelDims;
-  tileSizes.push_back(infos.threadDistributionSizes.vectorTileSize);
   auto tileReduction = b.create<transform::TileReductionUsingForeachThreadOp>(
       /*target=*/gridReductionH,
-      /*numThreads=*/numThreads,
-      /*tileSizes=*/tileSizes,
+      /*numThreads=*/ArrayRef<int64_t>{0, sizes.reductionTileSize},
+      /*tileSizes=*/ArrayRef<int64_t>{0, sizes.vectorTileSize},
       /*threadDimMapping=*/b.getArrayAttr(threadX));
   Value blockParallelForeachThreadOp = tileReduction.getForeachThreadOp();
   Value blockParallelFillH = tileReduction.getFillOp();
@@ -317,13 +291,14 @@ static void createReductionCudaStrategy(
   // Step 2. Use tiling to introduce a single-iteration loop mapped to a
   // single block/workgroup. Keep everything fused.
   auto [gridReductionH, maybeTiledTrailingH] =
-      createReductionStrategyBlockDistribution(
-          b, maybeLeadingH, fillH, reductionH, maybeTrailingH, infos);
+      createReductionStrategyBlockDistribution(b, maybeLeadingH, fillH,
+                                               reductionH, maybeTrailingH);
 
   // Step 3. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
+  ReductionStrategyThreadDistributionSizes sizes(infos.reductionDimensionSize);
   createReductionStrategyThreadDistribution(b, gridReductionH,
-                                            maybeTiledTrailingH, infos);
+                                            maybeTiledTrailingH, sizes);
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
@@ -344,8 +319,9 @@ static void createReductionCudaStrategy(
 static FailureOr<GPUReductionStrategyInfos> matchGPUReduction(
     linalg::LinalgOp op) {
   StructuredOpMatcher reduction, fill, leading, trailing;
-  transform_ext::MatchedReductionCaptures captures;
-  makeReductionMatcher(reduction, fill, leading, trailing, captures);
+  int64_t reductionDimensionSize;
+  makeReductionMatcher(reduction, fill, leading, trailing,
+                       reductionDimensionSize);
   if (!matchPattern(op, reduction)) return failure();
 
   //
@@ -365,20 +341,23 @@ static FailureOr<GPUReductionStrategyInfos> matchGPUReduction(
     return failure();
   }
 
-  GPUReductionStrategyInfos info(op->getContext(), captures.rank,
-                                 captures.reductionDimensionSize);
-
-  // Tile all the parallel dimensions to 1 and create many blocks.
-  int64_t numParallelLoops = captures.rank - 1;
-  info.workgroupTileSizes.append(numParallelLoops, 1);
-  // Tile and distribute the reduction across `reductionTileSize` threads.
+  GPUReductionStrategyInfos info(reductionDimensionSize);
   info.workgroupSize = {info.threadDistributionSizes.reductionTileSize, 1, 1};
+  SmallVector<unsigned> partitionedLoops =
+      cast<iree_compiler::PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(iree_compiler::kNumMaxParallelDims);
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+
+  // Tile all the parallel dimension to 1.
+  info.workgroupTileSizes.append(numLoops, 1);
+  info.fillSecondTileSizes = {1, 0, 0};
+  info.genericSecondTileSizes = {1, 1, 0};
   return info;
 }
 
 LogicalResult iree_compiler::matchAndSetGPUReductionTransformStrategy(
     func::FuncOp entryPoint, linalg::LinalgOp op) {
-  // 1. Match.
+  // 1. Match
   FailureOr<GPUReductionStrategyInfos> maybeInfos = matchGPUReduction(op);
   if (failed(maybeInfos)) return failure();
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
