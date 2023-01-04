@@ -206,12 +206,19 @@ Error *Source::openFile(const char *filePath) {
 
 Error *Source::wrapBuffer(const char *bufferName, const char *buffer,
                           size_t length) {
+  // Sharp edge: MemoryBuffer::getMemBuffer will peek one past the passed length
+  // to verify a nul terminator, but this makes the API really hard to ensure
+  // memory safety for. For our API, we just require that the buffer is nul
+  // terminated and that the nul is included in the length. We then subtract
+  // by 1 when constructing the underlying MemoryBuffer. This is quite sad :(
   if (length == 0 || buffer[length - 1] != 0) {
     return new Error("expected nul terminated buffer");
   }
   std::unique_ptr<llvm::MemoryBuffer> memoryBuffer =
       llvm::MemoryBuffer::getMemBuffer(
-          StringRef(buffer, length), StringRef(bufferName, strlen(bufferName)));
+          StringRef(buffer, length - 1),
+          StringRef(bufferName, strlen(bufferName)),
+          /*RequiresNullTerminator=*/true);
   sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
   return nullptr;
 }

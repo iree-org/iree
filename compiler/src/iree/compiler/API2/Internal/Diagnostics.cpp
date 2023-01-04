@@ -22,9 +22,9 @@ namespace mlir::iree_compiler::embed {
 namespace {
 /// Return a processable CallSiteLoc from the given location.
 Optional<CallSiteLoc> getCallSiteLoc(Location loc) {
+  if (auto callLoc = dyn_cast<CallSiteLoc>(loc)) return callLoc;
   if (auto nameLoc = dyn_cast<NameLoc>(loc))
     return getCallSiteLoc(cast<NameLoc>(loc).getChildLoc());
-  if (auto callLoc = dyn_cast<CallSiteLoc>(loc)) return callLoc;
   if (auto fusedLoc = dyn_cast<FusedLoc>(loc)) {
     for (auto subLoc : cast<FusedLoc>(loc).getLocations()) {
       if (auto callLoc = getCallSiteLoc(subLoc)) {
@@ -131,7 +131,6 @@ LogicalResult FormattingDiagnosticHandler::emit(Diagnostic &diag) {
   // Otherwise, use the location stack.
   if (locationStack.empty()) {
     appendDiag(diag.getLocation(), diag.str(), diag.getSeverity());
-
   } else {
     appendDiag(locationStack.front().first, diag.str(), diag.getSeverity());
     for (auto &it : llvm::drop_begin(locationStack))
@@ -144,7 +143,7 @@ LogicalResult FormattingDiagnosticHandler::emit(Diagnostic &diag) {
   }
 
   // Emit.
-  callback(diag.getSeverity(), messageAccum);
+  callback(diag.getSeverity(), os.str());
 
   return success();
 }

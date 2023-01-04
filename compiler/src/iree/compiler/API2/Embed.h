@@ -143,11 +143,13 @@ IREE_EMBED_EXPORTED iree_compiler_invocation_t *ireeCompilerInvocationCreate(
 // records. It is not completely identical to
 // |ireeCompilerInvocationEnableConsoleDiagnostics| which produces output
 // suitable for an interactive stream (including color detection, etc) and has
-// additional features for reading source files, etc. This implementation makes
-// no demands on the system state.
+// additional features for reading source files, etc. With default flags, no
+// system state outside of the session will be used (i.e. no debug information
+// loaded from files, etc).
 // The |flags| parameter is reserved for the future and must be 0.
 // The |callback| may be invoked from any thread at any time prior to
-// destruction of the invocation.
+// destruction of the invocation. The callback should not make any calls back
+// into compiler APIs.
 // The |message| passes to the callback is only valid for the duration of
 // the callback and the |messageSize| does not include a terminator nul.
 IREE_EMBED_EXPORTED void ireeCompilerInvocationEnableCallbackDiagnostics(
@@ -282,8 +284,9 @@ IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFD(
     int fd, iree_compiler_output_t **out_output);
 
 // For file or other persistent outputs, by default they will be deleted on
-// destroy. It is necessary to call |ireeCompilerOutputKeep| in order to have
-// them committed to their accessible place.
+// |ireeCompilerOutputDestroy| (or exit). It is necessary to call
+// |ireeCompilerOutputKeep| in order to have them committed to their accessible
+// place.
 IREE_EMBED_EXPORTED void ireeCompilerOutputKeep(iree_compiler_output_t *output);
 
 // Writes arbitrary data to the output.

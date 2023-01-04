@@ -65,14 +65,14 @@ static bool manipulateFlags(iree_compiler_session_t *session) {
 
 static bool invokeWithConsoleDiagnostics(
     iree_compiler_session_t *session,
-    iree_compiler_source_t *source_with_errors) {
+    iree_compiler_source_t *sourceWithErrors) {
   bool rc;
   printf(
       "--- INVOKING WITH CONSOLE DIAGNOSTICS (console error expected) ---\n");
   iree_compiler_invocation_t *inv = ireeCompilerInvocationCreate(session);
   ireeCompilerInvocationEnableConsoleDiagnostics(inv);
   // Expected to fail - testing diagnostics.
-  rc = !ireeCompilerInvocationParseSource(inv, source_with_errors);
+  rc = !ireeCompilerInvocationParseSource(inv, sourceWithErrors);
   ireeCompilerInvocationDestroy(inv);
   return rc;
 }
@@ -93,7 +93,7 @@ static void callbackDiag(enum iree_compiler_diagnostic_severity_t severity,
 
 static bool invokeWithCallbackDiagnostics(
     iree_compiler_session_t *session,
-    iree_compiler_source_t *source_with_errors) {
+    iree_compiler_source_t *sourceWithErrors) {
   bool rc;
   printf(
       "--- INVOKING WITH CALLBACK DIAGNOSTICS (console error expected) ---\n");
@@ -101,7 +101,7 @@ static bool invokeWithCallbackDiagnostics(
   ireeCompilerInvocationEnableCallbackDiagnostics(
       inv, /*flags=*/0, callbackDiag, &callbackDiagMessage);
   // Expected to fail - testing diagnostics.
-  rc = !ireeCompilerInvocationParseSource(inv, source_with_errors);
+  rc = !ireeCompilerInvocationParseSource(inv, sourceWithErrors);
 
   if (!callbackDiagMessage) {
     printf("ERROR: Did not produce any callback diagnostics\n");
@@ -139,12 +139,11 @@ int main(int argc, char **argv) {
   iree_compiler_session_t *session = ireeCompilerSessionCreate();
 
   // Define sources that produce errors.
-  iree_compiler_source_t *source_with_errors;
-  const char source_with_errors_str[] = "}}}}FOOBAR";
+  iree_compiler_source_t *sourceWithErrors;
+  const char sourceWithErrorsStr[] = "}}}}FOOBAR\0";
   error = ireeCompilerSourceWrapBuffer(
-      session, "foobar.mlir", source_with_errors_str,
-      strlen(source_with_errors_str) + 1 /*nul terminated buffer required*/,
-      &source_with_errors);
+      session, "foobar.mlir", sourceWithErrorsStr, sizeof(sourceWithErrorsStr),
+      &sourceWithErrors);
   if (error) {
     printf("ERROR: ireeCompilerSourceWrapBuffer failed: %s\n",
            ireeCompilerErrorGetMessage(error));
@@ -155,15 +154,15 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (!invokeWithConsoleDiagnostics(session, source_with_errors)) {
+  if (!invokeWithConsoleDiagnostics(session, sourceWithErrors)) {
     return 1;
   }
 
-  if (!invokeWithCallbackDiagnostics(session, source_with_errors)) {
+  if (!invokeWithCallbackDiagnostics(session, sourceWithErrors)) {
     return 1;
   }
 
-  ireeCompilerSourceDestroy(source_with_errors);
+  ireeCompilerSourceDestroy(sourceWithErrors);
   ireeCompilerSessionDestroy(session);
 
   ireeCompilerGlobalShutdown();
