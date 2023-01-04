@@ -149,9 +149,6 @@ steps:
       # Fetch base branch for comparison.
       git fetch -v --prune --no-recurse-submodules -- origin \
         "$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-      git merge-base \
-        "origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
-        "$${BUILDKITE_COMMIT}" > "./pr-base-commit"
       # Try to download the artifacts, continuing with a message if not found.
       buildkite-agent artifact download "benchmark-results-*.json" ./ 2>&1 | tee bench-dl-log \
         || grep -q "No artifacts found" ./bench-dl-log
@@ -167,7 +164,7 @@ steps:
         --compile_stats_files="compile-stats-results-*.json" \
         --pr_number="$${BUILDKITE_PULL_REQUEST}" \
         --pr_commit="$${BUILDKITE_COMMIT}" \
-        --pr_base_commit="$(cat ./pr-base-commit)" \
+        --pr_base_branch="origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
         --build_url="$${BUILDKITE_BUILD_URL}" \
         --comment_title="Abbreviated Linux Benchmark Summary" \
         --comment_type_id="37549014-3c67-4e74-8d88-8e929231abe3" \

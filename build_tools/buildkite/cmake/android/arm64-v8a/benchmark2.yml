@@ -134,9 +134,6 @@ steps:
       # Fetch base branch for comparison.
       git fetch -v --prune --no-recurse-submodules -- origin \
         "$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-      git merge-base \
-        "origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
-        "$${BUILDKITE_COMMIT}" > "./pr-base-commit"
       buildkite-agent artifact download "benchmark-results-*.json" ./
       buildkite-agent artifact download "compile-stats-results-*.json" ./
       # The script will handle the wildcard patterns.
@@ -149,7 +146,7 @@ steps:
         --compile_stats_files="compile-stats-results-*.json" \
         --pr_number="$${BUILDKITE_PULL_REQUEST}" \
         --pr_commit="$${BUILDKITE_COMMIT}" \
-        --pr_base_commit="$(cat ./pr-base-commit)" \
+        --pr_base_branch="origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
         --build_url="$${BUILDKITE_BUILD_URL}" \
         --comment_title="Abbreviated Android Benchmark Summary" \
         --comment_type_id="bf8cdf94-a992-466d-b11c-778cbd805a22" \

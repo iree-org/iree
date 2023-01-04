@@ -37,14 +37,6 @@ TABLE_SIZE_CUT = 3
 THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
 
 
-def get_required_env_var(var: str) -> str:
-  """Gets the value for a required environment variable."""
-  value = os.getenv(var, None)
-  if value is None:
-    raise RuntimeError(f'Missing environment variable "{var}"')
-  return value
-
-
 def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
   count = benchmark_definition.execute_cmd_and_get_output(
@@ -124,6 +116,21 @@ def _find_comparable_benchmark_results(
   return None
 
 
+def _get_git_commit_hash(ref: str, verbose: bool = False) -> str:
+  """Gets the commit hash for the given commit."""
+  return benchmark_definition.execute_cmd_and_get_output(
+      ['git', 'rev-parse', ref], cwd=THIS_DIRECTORY, verbose=verbose)
+
+
+def _get_git_merge_base_commit(pr_commit: str,
+                               target_branch: str,
+                               verbose: bool = False) -> str:
+  return benchmark_definition.execute_cmd_and_get_output(
+      args=["git", "merge-base", target_branch, pr_commit],
+      cwd=THIS_DIRECTORY,
+      verbose=verbose)
+
+
 def _get_benchmark_result_markdown(
     execution_benchmarks: Dict[
         str, benchmark_presentation.AggregateBenchmarkLatency],
@@ -199,10 +206,13 @@ def parse_arguments():
             "accepts wildcards"))
   parser.add_argument("--pr_number", required=True, type=int, help="PR number")
   parser.add_argument("--pr_commit",
-                      required=True,
                       type=str,
-                      help="PR commit hash")
-  parser.add_argument("--pr_base_branch", type=str, default=None, help="TODO")
+                      default="HEAD",
+                      help="PR commit hash or ref")
+  parser.add_argument("--pr_base_branch",
+                      type=str,
+                      default=None,
+                      help="Base branch to merge the PR.")
   parser.add_argument("--comment_title",
                       default="Abbreviated Benchmark Summary",
                       help="Title of the comment")
@@ -229,13 +239,20 @@ def main(args):
   compile_stats_files = common_arguments.expand_and_check_file_paths(
       args.compile_stats_files)
 
-  pr_commit = args.pr_commit
+  pr_commit = _get_git_commit_hash(ref=args.pr_commit, verbose=args.verbose)
   execution_benchmarks = benchmark_presentation.aggregate_all_benchmarks(
       benchmark_files=benchmark_files, expected_pr_commit=pr_commit)
   compilation_metrics = benchmark_presentation.collect_all_compilation_metrics(
       compile_stats_files=compile_stats_files, expected_pr_commit=pr_commit)
 
-  pr_base_commit = args.pr_base_commit
+  if args.pr_base_branch is None:
+    pr_base_commit = None
+  else:
+    pr_base_commit = _get_git_merge_base_commit(
+        pr_commit=pr_commit,
+        target_branch=args.pr_base_branch,
+        verbose=args.verbose)
+
   if pr_base_commit is None:
     comparable_results = None
   else:
