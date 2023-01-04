@@ -20,22 +20,34 @@ set -euo pipefail
 
 commitish="${1:-HEAD}"
 
+declare -r REQUIRED_WORKFLOWS=(ci.yml)
+declare -ar QUERY_PARAMS=(
+  branch=main
+  event=push
+  status=success
+  exclude_pull_requests=true
+)
+
 function get_latest_green() {
-  local -a query_params=(
-    branch=main
-    event=push
-    status=success
-    exclude_pull_requests=true
-  )
 
   while read commit; do
-    local -a local_query_params=("${query_params[@]}" "head_sha=${commit}")
-    # String join on comma
-    query_string="$(IFS="&" ; echo "${local_query_params[*]}")"
+    local -a query_params=("${QUERY_PARAMS[@]}" "head_sha=${commit}")
+    # String join on ampersand
+    local query_string="$(IFS="&" ; echo "${query_params[*]}")"
 
-    successful_runs="$(gh api --jq '.total_count' "/repos/iree-org/iree/actions/workflows/ci.yml/runs?${query_string}")"
-
-    if (( successful_runs!=0 )); then
+    local all_passing="true"
+    for workflow in "${REQUIRED_WORKFLOWS[@]}"; do
+      local successful_run_count="$(\
+        gh api --jq '.total_count' \
+        "/repos/iree-org/iree/actions/workflows/${workflow}/runs?${query_string}" \
+      )"
+      # Any successful run of the workflow (including reruns) is OK.
+      if (( successful_run_count==0 )); then
+        all_passing="false"
+        break
+      fi
+    done
+    if [[ "${all_passing}" == true ]]; then
       echo "${commit}"
       return 0
     fi
