@@ -497,7 +497,10 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
     });
     builder.create<gpu::BarrierOp>(loc);
     // Further reduce the outputs from each warps with a single warp reduce.
-    Value loadVal = builder.create<memref::LoadOp>(loc, alloc, laneId);
+    Value memrefSize = builder.create<arith::ConstantIndexOp>(loc, numWarp - 1);
+    Value laneIdInBounds =
+        builder.create<arith::MinUIOp>(loc, laneId, memrefSize);
+    Value loadVal = builder.create<memref::LoadOp>(loc, alloc, laneIdInBounds);
     Value cstNumWarp = builder.create<arith::ConstantIndexOp>(loc, numWarp);
     if (!llvm::isPowerOf2_32(numWarp)) {
       // Pad with identity element if numel < warpSize for valid warp reduction.
