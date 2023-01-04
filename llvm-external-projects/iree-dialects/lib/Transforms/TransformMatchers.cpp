@@ -7,7 +7,6 @@
 #include "iree-dialects/Transforms/TransformMatchers.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
 using namespace mlir;
@@ -368,7 +367,6 @@ transform_ext::StructuredOpMatcher::output(int64_t position, SubsetOf subset) {
 //===---------------------------------------------------------------------===//
 // Constraints on results.
 //===---------------------------------------------------------------------===//
-
 transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::result(
     int64_t position, HasAnyUse tag, SubsetOf subset, OptionalMatch optional) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
@@ -381,28 +379,7 @@ transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::result(
         traverseSubsetsForwardAnyUse(linalgOp->getResult(transformedPosition));
     return subset.matcher.match(user) || optional.value;
   });
-  recordNestedMatcher(subset.matcher);
   return *this;
-}
-
-bool transform_ext::StructuredOpMatcher::checkAllTilableMatched(
-    Operation *parent, linalg::LinalgOp linalgOp,
-    ArrayRef<transform_ext::CapturingOpMatcher *> matchers) {
-  int64_t numTilableOps = 0;
-  if (!parent)
-    return false;
-  parent->walk([&](TilingInterface Op) { ++numTilableOps; });
-
-  llvm::SmallPtrSet<Operation *, 6> matched;
-  for (CapturingOpMatcher *nested : matchers) {
-    if (Operation *captured = nested->getCaptured()) {
-      matched.insert(captured);
-    }
-  }
-
-  // Don't forget to include the root matcher.
-  matched.insert(linalgOp);
-  return numTilableOps == matched.size();
 }
 
 //===---------------------------------------------------------------------===//
@@ -511,8 +488,7 @@ void transform_ext::makeReductionMatcher(
   // TODO: careful about multi-output and turning into a contraction.
   //
   trailing = leading;
-  reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch())
-                  .allTilableOpsCaptured<func::FuncOp>();
+  reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch());
 }
 
 void transform_ext::makeSplitReductionMatcher(
@@ -553,6 +529,5 @@ void transform_ext::makeSplitReductionMatcher(
           .output(0, SubsetOf(original_fill))
           .output(0, ElementTypeBitWidth(32))
           .output(0, SingleCombinerReduction())
-          .result(0, HasAnyUse(), SubsetOf(trailing), OptionalMatch())
-          .allTilableOpsCaptured<func::FuncOp>();
+          .result(0, HasAnyUse(), SubsetOf(trailing), OptionalMatch());
 }
