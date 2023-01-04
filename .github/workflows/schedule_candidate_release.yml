@@ -6,6 +6,9 @@ on:
 
   workflow_dispatch:
 
+  # DO NOT SUBMIT
+  pull_request:
+
 jobs:
   tag_release:
     name: "Tag candidate release"
@@ -15,8 +18,8 @@ jobs:
     steps:
       - name: Checking out repository
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-        with:
-          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+        # with:
+        #   token: ${{ secrets.WRITE_ACCESS_TOKEN }}
 
       - name: Checkout the most recent green commit
         run: |
