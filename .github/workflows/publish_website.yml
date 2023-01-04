@@ -13,6 +13,7 @@ on:
     paths:
       - "docs/website/**"
       - "build_tools/scripts/generate_release_index.py"
+      - ".github/workflows/publish_website.yml"
   # Regenerate the release pip index when a regular or pre-release is created or
   # deleted.
   release:

@@ -39,7 +39,7 @@ set(RISCV_COMPILER_FLAGS_RELEASE)
 set(RISCV_LINKER_FLAGS)
 set(RISCV_LINKER_FLAGS_EXE)
 
-if(RISCV_CPU STREQUAL "rv64")
+if(RISCV_CPU STREQUAL "linux-riscv_64")
   set(CMAKE_SYSTEM_PROCESSOR riscv64)
   set(CMAKE_SYSTEM_NAME Linux)
   set(CMAKE_SYSTEM_LIBRARY_PATH "${RISCV_TOOLCHAIN_ROOT}/sysroot/usr/lib")
@@ -56,7 +56,7 @@ if(RISCV_CPU STREQUAL "rv64")
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--riscv-v-vector-bits-min=512"
     CACHE INTERNAL "Default llvm codegen flags for testing purposes")
-elseif(RISCV_CPU STREQUAL "rv32-linux")
+elseif(RISCV_CPU STREQUAL "linux-riscv_32")
   set(CMAKE_SYSTEM_PROCESSOR riscv32)
   set(CMAKE_SYSTEM_NAME Linux)
   list(APPEND CMAKE_SYSTEM_LIBRARY_PATH
@@ -75,7 +75,7 @@ elseif(RISCV_CPU STREQUAL "rv32-linux")
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--riscv-v-vector-bits-min=512"
     CACHE INTERNAL "Default llvm codegen flags for testing purposes")
-elseif(RISCV_CPU STREQUAL "rv32-baremetal")
+elseif(RISCV_CPU STREQUAL "generic-riscv_32")
   set(CMAKE_SYSTEM_PROCESSOR riscv32)
   set(CMAKE_SYSTEM_NAME Generic)
   set(CMAKE_CROSSCOMPILING ON CACHE BOOL "")

@@ -56,9 +56,10 @@ if (( TESTING!=0 )); then
   VERSION="${VERSION}-testing"
 fi
 GITHUB_RUNNER_SCOPE=iree-org
-GITHUB_RUNNER_VERSION="2.299.1"
+GITHUB_RUNNER_VERSION="2.300.2"
 GITHUB_RUNNER_ARCHIVE_DIGEST="147c14700c6cb997421b9a239c012197f11ea9854cd901ee88ead6fe73a72c74"
 GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
+INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-zbhz5clunq-uc.a.run.app"
 
 declare -a METADATA=(
   "github-runner-version=${GITHUB_RUNNER_VERSION}"
@@ -67,6 +68,7 @@ declare -a METADATA=(
   "github-runner-config-repo=${TEMPLATE_CONFIG_REPO}"
   "github-runner-scope=${GITHUB_RUNNER_SCOPE}"
   "github-token-proxy-url=${GITHUB_TOKEN_PROXY_URL}"
+  "instance-self-deleter-url=${INSTANCE_SELF_DELETER_URL}"
 )
 
 declare -a common_args=(
@@ -79,6 +81,10 @@ declare -a common_args=(
   # Matches firewall rule for health check traffic
   --tags="allow-health-checks"
   --provisioning-model=STANDARD
+  # The instance group manager handles this for us and this is necessary to
+  # achieve better local SSD performance:
+  # https://cloud.google.com/compute/docs/disks/optimizing-local-ssd-performance#disable-automatic-restart
+  --no-restart-on-failure
   --scopes=https://www.googleapis.com/auth/cloud-platform
   --no-shielded-secure-boot
   --shielded-vtpm
@@ -124,6 +130,8 @@ function create_template() {
       --maintenance-policy=TERMINATE
       --accelerator=count=1,type=nvidia-tesla-a100
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-balanced"
+      # See comment in build_tools/github_actions/runner/config/setup.sh
+      --local-ssd=interface=NVME
     )
   elif [[ "${type}" == cpu ]]; then
     cmd+=(

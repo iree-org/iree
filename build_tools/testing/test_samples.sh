@@ -16,4 +16,3 @@ git submodule update --init
 
 ./samples/dynamic_shapes/test.sh
 ./samples/variables_and_state/test.sh
-./samples/native_training/test.sh

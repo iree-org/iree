@@ -48,7 +48,7 @@ function(iree_static_linker_test)
   endif()
 
   # See comment in iree_check_test about this condition.
-  if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BINARY_ROOT)
     return()
   endif()
 

@@ -35,7 +35,7 @@ function(iree_trace_runner_test)
   endif()
 
   # See comment in iree_check_test about this condition.
-  if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BINARY_ROOT)
     return()
   endif()
 
@@ -130,7 +130,7 @@ function(iree_single_backend_generated_trace_runner_test)
   endif()
 
   # Copied from iree_check_test. Refer to the comment there.
-  if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BINARY_ROOT)
     return()
   endif()
 

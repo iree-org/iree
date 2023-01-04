@@ -13,9 +13,8 @@ set -euo pipefail
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 source "${SCRIPT_DIR}/functions.sh"
 
-TOKEN_PROXY_URL="$(get_attribute github-token-proxy-url)"
 RUNNER_SCOPE="$(get_attribute github-runner-scope)"
-DEREGISTER_TOKEN="$(get_token remove ${RUNNER_SCOPE})"
+DEREGISTER_TOKEN="$(get_runner_token remove ${RUNNER_SCOPE})"
 
 if [ -z "${DEREGISTER_TOKEN}" ]; then
   echo "failed to get remove runner token" >&2

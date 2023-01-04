@@ -383,7 +383,7 @@ To run all the tests in `llvm-external-projects/iree-dialects`:
 cmake --build . --target check-iree-dialects
 ```
 
-To triage IREE gcc build issues, we can look into logs in `iree-build-configurations` and get the gcc version. E.g.,
+To triage IREE gcc build issues, we can look into logs in the CI gcc job and get the gcc version. E.g.,
 
 ```bash
 export CC=gcc-9
@@ -411,4 +411,3 @@ python configure_bazel.py
 cd integrations/tensorflow
 bazel test ...
 ```
-

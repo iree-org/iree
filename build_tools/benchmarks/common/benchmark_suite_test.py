@@ -159,15 +159,15 @@ class BenchmarkSuiteTest(unittest.TestCase):
         driver=iree_definitions.RuntimeDriver.LOCAL_TASK)
     device_spec_a = common_definitions.DeviceSpec(
         id="dev_a",
-        vendor_name="a",
+        device_name="a",
         architecture=common_definitions.DeviceArchitecture.RV32_GENERIC,
-        platform=common_definitions.DevicePlatform.GENERIC_LINUX,
+        host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         device_parameters=[])
     device_spec_b = common_definitions.DeviceSpec(
         id="dev_b",
-        vendor_name="b",
+        device_name="b",
         architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
-        platform=common_definitions.DevicePlatform.GENERIC_LINUX,
+        host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         device_parameters=[])
     run_config_a = iree_definitions.E2EModelRunConfig(
         module_generation_config=iree_definitions.ModuleGenerationConfig(
@@ -210,7 +210,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             BenchmarkCase(model_name=model_tflite.name,
                           model_tags=model_tflite.tags,
                           bench_mode=exec_config_a.tags,
-                          target_arch="cpu-rv32-generic",
+                          target_arch="cpu-riscv_32-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                           benchmark_tool_name="iree-benchmark-module",
                           benchmark_case_dir=None,
@@ -218,7 +218,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             BenchmarkCase(model_name=model_tflite.name,
                           model_tags=model_tflite.tags,
                           bench_mode=exec_config_b.tags,
-                          target_arch="cpu-rv64-generic",
+                          target_arch="cpu-riscv_64-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
                           benchmark_tool_name="iree-benchmark-module",
                           benchmark_case_dir=None,
@@ -227,14 +227,14 @@ class BenchmarkSuiteTest(unittest.TestCase):
     self.assertEqual(
         suite.filter_benchmarks_for_category(
             category="exported_tf",
-            cpu_target_arch_filter="cpu-rv32-generic",
+            cpu_target_arch_filter="cpu-riscv_32-generic",
             model_name_filter="model_tf.*fp32",
             mode_filter="defaults"),
         [
             BenchmarkCase(model_name=model_tf.name,
                           model_tags=model_tf.tags,
                           bench_mode=exec_config_a.tags,
-                          target_arch="cpu-rv32-generic",
+                          target_arch="cpu-riscv_32-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                           benchmark_tool_name="iree-benchmark-module",
                           benchmark_case_dir=None,
@@ -243,7 +243,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
     self.assertEqual(
         suite.filter_benchmarks_for_category(
             category="exported_tf",
-            cpu_target_arch_filter="cpu-rv32-generic",
+            cpu_target_arch_filter="cpu-riscv_32-generic",
             mode_filter="experimental"), [])
 
   @staticmethod
