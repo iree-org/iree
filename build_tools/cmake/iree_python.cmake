@@ -319,10 +319,6 @@ function(iree_build_tools_py_test)
     ${ARGN}
   )
 
-  if(NOT IREE_ENABLE_BUILD_TOOL_TESTS)
-    return()
-  endif()
-
   iree_local_py_test(
     NAME
       "${_RULE_NAME}"
