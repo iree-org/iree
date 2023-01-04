@@ -430,7 +430,8 @@ hal.executable private @simple_reduce_multi_warp  {
 //       CHECK:       memref.store %[[S9]], %[[A]][%[[WID]]] : memref<2xf32, 3>
 //       CHECK:     }
 //       CHECK:     gpu.barrier
-//       CHECK:     %[[LOAD_VAL:.*]] = memref.load %[[A]][%[[LANE_ID]]] : memref<2xf32, 3>
+//       CHECK:     %[[LANE_ID_IN_BOUNDS:.*]] = arith.minui %[[LANE_ID]]
+//       CHECK:     %[[LOAD_VAL:.*]] = memref.load %[[A]][%[[LANE_ID_IN_BOUNDS]]] : memref<2xf32, 3>
 //       CHECK:     %[[S10:.*]], %{{.*}} = gpu.shuffle  xor %[[LOAD_VAL]], %[[C1]], %[[C32]] : f32
 //       CHECK:     %[[S11:.*]] = arith.addf %[[LOAD_VAL]], %[[S10]] : f32
 //       CHECK:     %[[S12:.*]], %{{.*}} = gpu.shuffle  idx %[[S11]], %[[C0I]], %[[C32]] : f32
@@ -545,7 +546,8 @@ hal.executable private @reduce_odd_num_warp  {
 //       CHECK:   %[[LANE_ID:.+]] = arith.remui %[[ID]], %[[C32]] : index
 
 //       CHECK:   gpu.barrier
-//       CHECK:   %[[V:.+]] = memref.load %[[ALLOC]][%[[LANE_ID]]] : memref<3xf32, 3>
+//       CHECK:   %[[LANE_ID_IN_BOUNDS:.*]] = arith.minui %[[LANE_ID]]
+//       CHECK:   %[[V:.+]] = memref.load %[[ALLOC]][%[[LANE_ID_IN_BOUNDS]]] : memref<3xf32, 3>
 //       CHECK:   %[[C:.+]] = arith.cmpi sge, %[[LANE_ID]], %[[C3]] : index
 //       CHECK:   %[[SEL:.+]] = arith.select %[[C]], %[[CF]], %[[V]] : f32
 //       CHECK:   %[[S0:.+]], %{{.*}} = gpu.shuffle  xor %[[SEL]], %[[C1]], %[[C32I]] : f32
