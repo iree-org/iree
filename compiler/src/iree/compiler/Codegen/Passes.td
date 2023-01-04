@@ -509,22 +509,13 @@ def SPIRVTileAndDistribute : Pass<"iree-spirv-tile-and-distribute", "func::FuncO
   let constructor = "mlir::iree_compiler::createSPIRVTileAndDistributePass()";
 }
 
-def SPIRVTileToCooperativeOps : Pass<
-    "iree-spirv-tile-to-cooperative-ops", "func::FuncOp"> {
+def SPIRVTileAndVectorizeToCooperativeOps : Pass<
+    "iree-spirv-tile-and-vectorize-to-cooperative-ops", "func::FuncOp"> {
   let summary = "Tile Linalg ops with buffer semantics to subgroups and "
                 "vectorize to vector ops suitable for lowering to SPIR-V "
                 "cooperative ops";
   let constructor =
-    "mlir::iree_compiler::createSPIRVTileToCooperativeOpsPass()";
-}
-
-def SPIRVVectorizeToCooperativeOps : Pass<
-    "iree-spirv-vectorize-to-cooperative-ops", "func::FuncOp"> {
-  let summary = "Tile Linalg ops with buffer semantics to subgroups and "
-                "vectorize to vector ops suitable for lowering to SPIR-V "
-                "cooperative ops";
-  let constructor =
-    "mlir::iree_compiler::createSPIRVVectorizeToCooperativeOpsPass()";
+    "mlir::iree_compiler::createSPIRVTileAndVectorizeToCooperativeOpsPass()";
 }
 
 def SPIRVTileAndPromote : Pass<"iree-spirv-tile-and-promote", "func::FuncOp"> {
