@@ -86,7 +86,7 @@ static SmallVector<Binding> findCorrelatedBindings(
   for (auto dispatchOp : dispatchOps) {
     llvm::EquivalenceClasses<unsigned> ec;
     DenseMap<Value, unsigned> leaders;
-    for (auto it : llvm::enumerate(llvm::zip_equal(
+    for (auto it : llvm::enumerate(llvm::zip(
              dispatchOp.getResources(), dispatchOp.getResourceAccesses()))) {
       auto resource = std::get<0>(it.value());
 
