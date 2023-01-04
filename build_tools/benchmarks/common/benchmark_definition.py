@@ -11,13 +11,14 @@ shared between different stages of the same benchmark pipeline.
 """
 
 import json
+import os
 import pathlib
 import re
 import subprocess
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Sequence
 
 # A map from CPU ABI to IREE's benchmark target architecture.
 CPU_ABI_TO_TARGET_ARCH_MAP = {
@@ -488,10 +489,10 @@ class BenchmarkResults(object):
 @dataclass(frozen=True)
 class CompilationInfo(object):
   model_name: str
-  model_tags: Tuple[str]
+  model_tags: Sequence[str]
   model_source: str
   target_arch: str
-  compile_tags: Tuple[str]
+  compile_tags: Sequence[str]
 
   def __str__(self):
     if self.model_tags:
@@ -504,13 +505,7 @@ class CompilationInfo(object):
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return CompilationInfo(
-        model_name=json_object["model_name"],
-        model_tags=tuple(json_object["model_tags"]),
-        model_source=json_object["model_source"],
-        target_arch=json_object["target_arch"],
-        compile_tags=tuple(json_object["compile_tags"]),
-    )
+    return CompilationInfo(**json_object)
 
 
 @dataclass(frozen=True)

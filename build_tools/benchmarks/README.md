@@ -55,7 +55,6 @@ See [here](/benchmarks/README.md#collect-compile-stats) for additional build
 steps to enable compilation statistics collection.
 ```sh
 ./collect_compilation_statistics.py \
-  legacy \
   --output "compile-stats.json" \
   "${IREE_BUILD_DIR}"
 ```
