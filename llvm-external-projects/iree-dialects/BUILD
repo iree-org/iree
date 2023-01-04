@@ -525,7 +525,6 @@ cc_library(
         "@llvm-project//mlir:SCFUtils",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
-        "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TransformDialect",
         # IR
         "@llvm-project//mlir:IR",
