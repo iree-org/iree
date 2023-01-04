@@ -38,6 +38,8 @@ THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
 
 def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
+  # TODO(#11703): Should use --first-parent here. See issue for the required
+  # work.
   count = benchmark_definition.execute_cmd_and_get_output(
       ['git', 'rev-list', '--count', commit],
       cwd=THIS_DIRECTORY,
