@@ -271,6 +271,6 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     if (!processBuffer(s.source)) return 1;
   }
 
-  ireeCompileOutputKeep(s.output);
+  ireeCompilerOutputKeep(s.output);
   return 0;
 }

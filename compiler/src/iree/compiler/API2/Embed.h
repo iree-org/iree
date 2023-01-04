@@ -257,9 +257,9 @@ IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFD(
     int fd, iree_compiler_output_t **out_output);
 
 // For file or other persistent outputs, by default they will be deleted on
-// destroy. It is necessary to call |ireeCompileOutputKeep| in order to have
+// destroy. It is necessary to call |ireeCompilerOutputKeep| in order to have
 // them committed to their accessible place.
-IREE_EMBED_EXPORTED void ireeCompileOutputKeep(iree_compiler_output_t *output);
+IREE_EMBED_EXPORTED void ireeCompilerOutputKeep(iree_compiler_output_t *output);
 
 // Writes arbitrary data to the output.
 IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputWrite(

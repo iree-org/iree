@@ -664,7 +664,7 @@ iree_compiler_error_t *ireeCompilerOutputOpenFD(
   return wrap(output->openFD(fd));
 }
 
-void ireeCompileOutputKeep(iree_compiler_output_t *output) {
+void ireeCompilerOutputKeep(iree_compiler_output_t *output) {
   unwrap(output)->keep();
 }
 

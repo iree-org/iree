@@ -258,8 +258,8 @@ iree_compiler_error_t *ireeCompilerOutputOpenFD(
   return __ireeCompilerOutputOpenFD(fd, out_output);
 }
 
-void ireeCompileOutputKeep(iree_compiler_output_t *output) {
-  __ireeCompileOutputKeep(output);
+void ireeCompilerOutputKeep(iree_compiler_output_t *output) {
+  __ireeCompilerOutputKeep(output);
 }
 
 iree_compiler_error_t *ireeCompilerOutputWrite(iree_compiler_output_t *output,
