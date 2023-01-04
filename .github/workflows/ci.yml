@@ -763,40 +763,35 @@ jobs:
       matrix:
         target:
           - platform: android
-            arch: armv8.2-a
+            architecture: arm64-v8a
             abi: arm64-v8a
             docker_image: "gcr.io/iree-oss/android@sha256:e5f45760ab2dc8a1d72dc6e9d90056719bedac5678ee90e6d9f9b958172b4834"
-            build_script: "./build_tools/cmake/build_android.sh"
             # No test_script
-          - platform: linux
-            arch: riscv_64
+          - platform: riscv
+            architecture: rv64
             abi: lp64d
             docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
-            build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./build_tools/cmake/test_riscv.sh"
-          - platform: linux
-            arch: riscv_32
+          - platform: riscv
+            architecture: rv32-linux
             abi: ilp32d
             docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
-            build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./build_tools/cmake/test_riscv.sh"
-          - platform: generic
-            arch: riscv_32
+          - platform: riscv
+            architecture: rv32-baremetal
             abi: ilp32
             docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
-            build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./tests/riscv32/smoke.sh"
     env:
       PLATFORM: ${{ matrix.target.platform }}
-      ARCH: ${{ matrix.target.arch }}
+      ARCHITECTURE: ${{ matrix.target.architecture }}
+      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.architecture }}
       ABI: ${{ matrix.target.abi }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
-      BUILD_SCRIPT: ${{ matrix.target.build_script }}
       TEST_SCRIPT: ${{ matrix.target.test_script }}
       HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
       IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
     steps:
       - name: "Checking out repository"
@@ -813,24 +808,22 @@ jobs:
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=${DOCKER_IMAGE}" \
-            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
-            --env "IREE_TARGET_ARCH=${ARCH}" \
-            --env "IREE_TARGET_ABI=${ABI}" \
-            --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
+            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "${PLATFORM^^}_ABI=${ABI}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
-            "${BUILD_SCRIPT}"
+            "./build_tools/cmake/build_${PLATFORM}.sh" \
+            "${TARGET_BUILD_DIR}"
       - name: "Test cross-compiling target"
         if: ${{ matrix.target.test_script }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
-            --env "IREE_TARGET_ARCH=${ARCH}" \
-            --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
+            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
             --env "BUILD_PRESET=test" \
             "${DOCKER_IMAGE}" \
-            "${TEST_SCRIPT}"
+            "${TEST_SCRIPT}" \
+            "${TARGET_BUILD_DIR}"
 
   emscripten:
     needs: [setup, build_all]
@@ -873,27 +866,26 @@ jobs:
     strategy:
       matrix:
         target:
-          - platform: linux
-            arch: riscv_64
+          - platform: riscv
+            architecture: rv64
             docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
-          - platform: linux
-            arch: riscv_32
+          - platform: riscv
+            architecture: rv32-linux
             docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
-          - platform: linux
-            arch: x86_64
+          - platform: host
+            architecture: x86_64
             docker_image: "gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206"
-            run_scripts: "./build_tools/cmake/test_benchmark_suites_on_linux.sh"
+            run_scripts: "./build_tools/cmake/test_benchmark_suites_host.sh"
     env:
       PLATFORM: ${{ matrix.target.platform }}
-      ARCH: ${{ matrix.target.arch }}
+      ARCHITECTURE: ${{ matrix.target.architecture }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
       RUN_SCRIPTS: ${{ matrix.target.run_scripts }}
       HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
       E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
     steps:
@@ -919,9 +911,8 @@ jobs:
       - name: "Build iree-run-module and test benchmark suite modules"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
-            --env "IREE_TARGET_ARCH=${ARCH}" \
-            --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
+            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "IREE_BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
             --env "BUILD_PRESET=benchmark-suite-test" \
             --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
             --env "E2E_TEST_ARTIFACTS_DIR=${E2E_TEST_ARTIFACTS_DIR}" \
