@@ -147,8 +147,7 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass();
 // is created for each tiled loop nest.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFormDispatchRegionsPass(bool aggressiveFusion = false,
-                              bool generateWorkloadRegion = true,
-                              bool collapse = true);
+                              bool generateWorkloadRegion = true);
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)

@@ -32,9 +32,6 @@ func.func @vecadd2d() -> (!type) {
 }
 
 // RUN: iree-opt %s --iree-hal-target-backends=cuda \
-/// We must disable collapsing linalg.generic, because transform dialect maps 
-/// dimensions explicitly and is not aware of collapsing
-// RUN:     --iree-flow-form-dispatch-regions-collapse=false \
 // RUN:     --iree-abi-transformation-pipeline \
 // RUN:     --iree-flow-transformation-pipeline  \
 // RUN:     --iree-stream-transformation-pipeline \
@@ -44,7 +41,6 @@ func.func @vecadd2d() -> (!type) {
 // RUN: FileCheck %s --check-prefix=CHECK
 
 // RUN: iree-opt %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-flow-form-dispatch-regions-collapse=false \
 // RUN:     --iree-abi-transformation-pipeline \
 // RUN:     --iree-flow-transformation-pipeline  \
 // RUN:     --iree-stream-transformation-pipeline \
@@ -54,7 +50,6 @@ func.func @vecadd2d() -> (!type) {
 // RUN: FileCheck %s --check-prefix=CHECK-PARTIAL-TILE
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-flow-form-dispatch-regions-collapse=false \
 // RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
 /// Constant JIT'ing must be disabled because the transform-dialect debug
 /// flags leak to the JIT session, which doesn't know what to do with them.
