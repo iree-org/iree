@@ -157,18 +157,13 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
   // Note that the production compiler will provide hooks here that enable
   // additional, whole-program related features, whereas this pipeline will
   // only use the defaults. In practice, this means that things like const
-  // jitting are not supported by this pipeline (it would create a circular
-  // dependency at this point in the compiler to also depend on the compiler).
+  // jitting are not supported by this pipeline.
   static IREEVMPipelineHooks defaultHooks;
-
-  // Since a JIT hook cannot be provided in such a default pipeline, we
-  // force disable const eval, which relies on the JIT.
-  auto highLevelOptimizations = HighLevelOptimizationOptions::FromFlags::get();
-  highLevelOptimizations.constEval = false;
 
   buildIREEVMTransformPassPipeline(
       BindingOptions::FromFlags::get(), InputDialectOptions::FromFlags::get(),
-      highLevelOptimizations, SchedulingOptions::FromFlags::get(),
+      HighLevelOptimizationOptions::FromFlags::get(),
+      SchedulingOptions::FromFlags::get(),
       IREE::HAL::TargetOptions::FromFlags::get(),
       IREE::VM::TargetOptions::FromFlags::get(), defaultHooks, passManager);
 }
