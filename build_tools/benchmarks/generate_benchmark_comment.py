@@ -18,7 +18,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 import argparse
 import dataclasses
 import json
-import os
 from typing import Any, Dict, Optional, Set, Tuple
 
 import markdown_strings as md

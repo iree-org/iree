@@ -23,12 +23,12 @@ import pathlib
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
-from typing import Any, Optional
 import argparse
 import http.client
 import json
 import os
 import requests
+from typing import Any, Optional
 
 from reporting import benchmark_comment
 
