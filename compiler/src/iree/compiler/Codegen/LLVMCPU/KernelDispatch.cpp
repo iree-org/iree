@@ -1027,11 +1027,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 }
 
 static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
-    TilingInterface op, int64_t defaultSize) {
+    TilingInterface op) {
   unsigned numLoops = op.getLoopIteratorTypes().size();
   auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
                               .getPartitionableLoops(kNumMaxParallelDims);
-  SmallVector<int64_t> workgroupTileSizes(numLoops, defaultSize);
+  SmallVector<int64_t> workgroupTileSizes(numLoops, defaultWorkgroupTileSize);
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
   for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
@@ -1045,8 +1045,7 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    IREE::LinalgExt::PackOp op) {
-  TileSizesListType tileSizes = {
-      getLinalgExtDefaultWorkgroupTileSizes(op, defaultWorkgroupTileSize)};
+  TileSizesListType tileSizes = {getLinalgExtDefaultWorkgroupTileSizes(op)};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDataTiling);
 }
@@ -1055,17 +1054,14 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, IREE::LinalgExt::UnPackOp op,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDataTiling) {
-  // TODO(#11505): Consider multi-level tiling for handling unpack + generic
-  // cases.
-  SmallVector<int64_t> tileSizes =
-      getLinalgExtDefaultWorkgroupTileSizes(op, /*defaultSize=*/16);
+  SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(op);
 
   // Fixup for making tileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
     if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
-    tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
+    tileSizes[pos] = llvm::alignDown(tileSizes[pos], size);
   }
 
   TileSizesListType tileSizesList = {tileSizes};
@@ -1080,7 +1076,7 @@ static LogicalResult setRootConfig(
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
   SmallVector<int64_t> workgroupTileSizes =
-      getLinalgExtDefaultWorkgroupTileSizes(fftOp, defaultWorkgroupTileSize);
+      getLinalgExtDefaultWorkgroupTileSizes(fftOp);
   auto rank = fftOp.getOperandRank();
   if (workgroupTileSizes.size() >= rank && workgroupTileSizes[rank - 1] != 0) {
     APInt value;

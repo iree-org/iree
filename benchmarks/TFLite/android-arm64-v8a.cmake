@@ -252,7 +252,9 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
     ${ANDROID_CPU_COMPILATION_FLAGS}
-    "--iree-flow-enable-data-tiling"
+    # TODO(#11434): Switch to use data tiling flag after fixing the long
+    # compilation time issue.
+    "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
     "--iree-llvm-target-cpu-features=+dotprod"
   BENCHMARK_TOOL
     iree-benchmark-module
@@ -323,7 +325,9 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
     ${ANDROID_CPU_COMPILATION_FLAGS}
-    "--iree-flow-enable-data-tiling"
+    # TODO(#11434): Switch to use data tiling flag after fixing the long
+    # compilation time issue.
+    "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
     "--iree-llvm-target-cpu-features=+dotprod"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
@@ -462,7 +466,9 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
     ${ANDROID_CPU_COMPILATION_FLAGS}
-    "--iree-flow-enable-data-tiling"
+    # TODO(#11434): Switch to use data tiling flag after fixing the long
+    # compilation time issue.
+    "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
     "--iree-llvm-target-cpu-features=+dotprod"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
