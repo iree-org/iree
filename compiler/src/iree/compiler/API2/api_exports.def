@@ -186,6 +186,8 @@ EXPORTS
   mlirDenseArrayGetNumElements
   mlirDenseBoolArrayGet
   mlirDenseBoolArrayGetElement
+  mlirDenseBoolResourceElementsAttrGetValue
+  mlirDenseDoubleResourceElementsAttrGetValue
   mlirDenseElementsAttrBFloat16Get
   mlirDenseElementsAttrBoolGet
   mlirDenseElementsAttrBoolSplatGet
@@ -242,6 +244,7 @@ EXPORTS
   mlirDenseF32ArrayGetElement
   mlirDenseF64ArrayGet
   mlirDenseF64ArrayGetElement
+  mlirDenseFloatResourceElementsAttrGetValue
   mlirDenseI16ArrayGet
   mlirDenseI16ArrayGetElement
   mlirDenseI32ArrayGet
@@ -250,6 +253,14 @@ EXPORTS
   mlirDenseI64ArrayGetElement
   mlirDenseI8ArrayGet
   mlirDenseI8ArrayGetElement
+  mlirDenseInt16ResourceElementsAttrGetValue
+  mlirDenseInt32ResourceElementsAttrGetValue
+  mlirDenseInt64ResourceElementsAttrGetValue
+  mlirDenseInt8ResourceElementsAttrGetValue
+  mlirDenseUInt16ResourceElementsAttrGetValue
+  mlirDenseUInt32ResourceElementsAttrGetValue
+  mlirDenseUInt64ResourceElementsAttrGetValue
+  mlirDenseUInt8ResourceElementsAttrGetValue
   mlirDiagnosticGetLocation
   mlirDiagnosticGetNote
   mlirDiagnosticGetNumNotes
@@ -534,6 +545,17 @@ EXPORTS
   mlirTypeParseGet
   mlirTypePrint
   mlirUnitAttrGet
+  mlirUnmanagedDenseBoolResourceElementsAttrGet
+  mlirUnmanagedDenseDoubleResourceElementsAttrGet
+  mlirUnmanagedDenseFloatResourceElementsAttrGet
+  mlirUnmanagedDenseInt16ResourceElementsAttrGet
+  mlirUnmanagedDenseInt32ResourceElementsAttrGet
+  mlirUnmanagedDenseInt64ResourceElementsAttrGet
+  mlirUnmanagedDenseInt8ResourceElementsAttrGet
+  mlirUnmanagedDenseUInt16ResourceElementsAttrGet
+  mlirUnmanagedDenseUInt32ResourceElementsAttrGet
+  mlirUnmanagedDenseUInt64ResourceElementsAttrGet
+  mlirUnmanagedDenseUInt8ResourceElementsAttrGet
   mlirUnrankedMemRefTypeGet
   mlirUnrankedMemRefTypeGetChecked
   mlirUnrankedMemrefGetMemorySpace
