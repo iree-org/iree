@@ -87,7 +87,7 @@ class GithubClient(object):
                                     })
     if response.status_code != http.client.CREATED:
       raise RuntimeError(
-          f"Failed to comment on GitHub; error code: {response.status_code} - {response.text}"
+          f"Failed to create on gist; error code: {response.status_code} - {response.text}"
       )
 
     response = response.json()
