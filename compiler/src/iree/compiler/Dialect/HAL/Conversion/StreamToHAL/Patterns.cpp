@@ -140,8 +140,7 @@ static IREE::HAL::CommandCategoryBitfield deriveCommandCategories(
   auto bits = IREE::HAL::CommandCategoryBitfield::None;
   for (auto &block : region) {
     for (auto &op : block) {
-      if (isa<IREE::Stream::CmdDispatchOp>(op) ||
-          isa<IREE::Stream::CmdCollectiveOp>(op)) {
+      if (isa<IREE::Stream::CmdDispatchOp>(op)) {
         bits = bits | IREE::HAL::CommandCategoryBitfield::Dispatch;
       } else {
         bits = bits | IREE::HAL::CommandCategoryBitfield::Transfer;
