@@ -5,7 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Helpers that generates paths for IREE artifacts."""
 
-from typing import Dict, Iterable
+from typing import Iterable, OrderedDict
+import collections
 import pathlib
 
 from e2e_test_artifacts import model_artifacts
@@ -67,7 +68,8 @@ def get_module_dir_path(
 
 def get_dependent_model_map(
     module_generation_configs: Iterable[iree_definitions.ModuleGenerationConfig]
-) -> Dict[str, common_definitions.Model]:
+) -> OrderedDict[str, common_definitions.Model]:
   """Returns an ordered map of the dependent models keyed by model id."""
-  return dict((config.imported_model.model.id, config.imported_model.model)
-              for config in module_generation_configs)
+  return collections.OrderedDict(
+      (config.imported_model.model.id, config.imported_model.model)
+      for config in module_generation_configs)
