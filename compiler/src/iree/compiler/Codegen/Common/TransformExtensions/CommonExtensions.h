@@ -39,7 +39,6 @@ struct ApplyPatternsOpPatterns {
   bool bubbleCollapseExpand = false;
   bool canonicalization = false;
   bool eraseUnnecessaryTensorOperands = false;
-  bool foldMemrefAliases = false;
   bool foldReassociativeReshapes = false;
   bool promoteForeachThreadCaptureToShared = false;
   bool rankReducing = false;
