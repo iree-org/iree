@@ -22,7 +22,6 @@ iree_lit_test_suite(
             "fill.mlir",
             "from_elements.mlir",
             "insert_slice.mlir",
-            "insert.mlir",
             "reshape.mlir",
         ],
         include = ["*.mlir"],
