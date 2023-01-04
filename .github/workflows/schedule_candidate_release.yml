@@ -24,7 +24,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          latest_green="$(./build_tools/github_actions/get_latest_green.sh)"
+          latest_green="$(./build_tools/scripts/get_latest_green.sh)"
           git checkout "${latest_green}"
           echo "latest-green=${latest_green}" >> "${GITHUB_OUTPUT}"
 
