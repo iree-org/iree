@@ -55,13 +55,12 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
     }
     auto parallelOp = dyn_cast_or_null<scf::ParallelOp>(containingOp);
     if (!parallelOp) continue;
-    for (auto [index, inductionVar] :
-         llvm::enumerate(parallelOp.getInductionVars())) {
-      if (inductionVar == dim) {
+    for (auto inductionVar : llvm::enumerate(parallelOp.getInductionVars())) {
+      if (inductionVar.value() == dim) {
         iv = dim;
-        ub = parallelOp.getUpperBound()[index];
-        lb = parallelOp.getLowerBound()[index];
-        step = parallelOp.getStep()[index];
+        ub = parallelOp.getUpperBound()[inductionVar.index()];
+        lb = parallelOp.getLowerBound()[inductionVar.index()];
+        step = parallelOp.getStep()[inductionVar.index()];
         break;
       }
     }
@@ -71,11 +70,11 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
   // Calculate the affine map representing `%ub - %iv`.
   AffineExpr ivDim;
   AffineExpr ubDim;
-  for (auto [index, dim] : llvm::enumerate(minOp.getDimOperands())) {
-    if (dim == iv) {
-      ivDim = getAffineDimExpr(index, minOp.getContext());
-    } else if (dim == ub) {
-      ubDim = getAffineDimExpr(index, minOp.getContext());
+  for (auto dim : llvm::enumerate(minOp.getDimOperands())) {
+    if (dim.value() == iv) {
+      ivDim = getAffineDimExpr(dim.index(), minOp.getContext());
+    } else if (dim.value() == ub) {
+      ubDim = getAffineDimExpr(dim.index(), minOp.getContext());
     } else {
       return false;
     }
