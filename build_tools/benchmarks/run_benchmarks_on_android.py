@@ -53,7 +53,7 @@ from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
 from common.android_device_utils import (get_android_device_model,
                                          get_android_device_info,
                                          get_android_gpu_name)
-import common.common_arguments
+from common.common_arguments import build_common_argument_parser
 
 # Root directory to perform benchmarks in on the Android device.
 ANDROID_TMPDIR = pathlib.PurePosixPath("/data/local/tmp/iree-benchmarks")
@@ -411,4 +411,5 @@ def main(args):
 
 
 if __name__ == "__main__":
-  main(common.common_arguments.Parser().parse_args())
+  args = build_common_argument_parser().parse_args()
+  main(args)
