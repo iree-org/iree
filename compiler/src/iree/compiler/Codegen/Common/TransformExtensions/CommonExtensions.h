@@ -27,7 +27,6 @@ namespace transform {
 // Types needed for builders.
 struct TileSizesSpec;
 struct NumThreadsSpec;
-class TransformTypeInterface;
 }  // namespace transform
 }  // namespace mlir
 
