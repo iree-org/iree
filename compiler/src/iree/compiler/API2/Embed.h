@@ -128,8 +128,33 @@ IREE_EMBED_EXPORTED void ireeCompilerSessionGetFlags(
 // compiler.
 //===----------------------------------------------------------------------===//
 
+enum iree_compiler_diagnostic_severity_t {
+  IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE = 0,
+  IREE_COMPILER_DIAGNOSTIC_SEVERITY_WARNING = 1,
+  IREE_COMPILER_DIAGNOSTIC_SEVERITY_ERROR = 2,
+  IREE_COMPILER_DIAGNOSTIC_SEVERITY_REMARK = 3,
+};
+
 IREE_EMBED_EXPORTED iree_compiler_invocation_t *ireeCompilerInvocationCreate(
     iree_compiler_session_t *session);
+
+// Enables a callback to receive diagnostics. This is targeted at API use of
+// the compiler, allowing fine grained collection of formatted diagnostic
+// records. It is not completely identical to
+// |ireeCompilerInvocationEnableConsoleDiagnostics| which produces output
+// suitable for an interactive stream (including color detection, etc) and has
+// additional features for reading source files, etc. This implementation makes
+// no demands on the system state.
+// The |flags| parameter is reserved for the future and must be 0.
+// The |callback| may be invoked from any thread at any time prior to
+// destruction of the invocation.
+// The |message| passes to the callback is only valid for the duration of
+// the callback and the |messageSize| does not include a terminator nul.
+IREE_EMBED_EXPORTED void ireeCompilerInvocationEnableCallbackDiagnostics(
+    iree_compiler_invocation_t *inv, int flags,
+    void (*callback)(enum iree_compiler_diagnostic_severity_t severity,
+                     const char *message, size_t messageSize, void *userData),
+    void *userData);
 
 // Enables default, pretty-printed diagnostics to the console. This is usually
 // the right thing to do for command-line tools, but other mechanisms are

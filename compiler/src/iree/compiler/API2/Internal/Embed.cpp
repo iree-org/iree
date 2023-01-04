@@ -11,6 +11,7 @@
 
 #include <atomic>
 
+#include "iree/compiler/API2/Internal/Diagnostics.h"
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
@@ -309,18 +310,26 @@ struct Invocation {
 
   Session &session;
   PassManager passManager;
-  // Should be capturing the base ScopedDiagnosticHandler class so that we
-  // can parameterize what kind of handler, but this issue needs to be fixed
-  // first:
-  //   https://github.com/llvm/llvm-project/issues/59212
-  std::unique_ptr<SourceMgrDiagnosticHandler> diagnosticHandler;
+
+  // Diagnostic handlers are instantiated upon parsing the source (when we
+  // have the SrcMgr) and held for the duration of the invocation. Each will
+  // de-register upon destruction if set.
+  std::optional<SourceMgrDiagnosticHandler> consoleDiagnosticHandler;
+  std::optional<FormattingDiagnosticHandler> callbackDiagnosticHandler;
 
   OwningOpRef<Operation *> parsedModule;
 
   // Run options.
   std::string compileToPhaseName{"end"};
   bool enableVerifier = true;
+
+  // Diagnostic options.
   bool enableConsoleDiagnosticHandler = false;
+  void (*diagnosticCallback)(enum iree_compiler_diagnostic_severity_t severity,
+                             const char *message, size_t messageSize,
+                             void *userData) = nullptr;
+  void *diagnosticCallbackUserData = nullptr;
+  int diagnosticCallbackFlags = 0;
 };
 
 Invocation::Invocation(Session &session)
@@ -333,9 +342,34 @@ Invocation::Invocation(Session &session)
 }
 
 bool Invocation::parseSource(Source &source) {
-  if (enableConsoleDiagnosticHandler) {
-    diagnosticHandler = std::make_unique<SourceMgrDiagnosticHandler>(
-        source.sourceMgr, &session.context);
+  // Initialize diagnostics.
+  if (enableConsoleDiagnosticHandler && !consoleDiagnosticHandler) {
+    consoleDiagnosticHandler.emplace(source.sourceMgr, &session.context);
+  }
+  if (diagnosticCallback && !callbackDiagnosticHandler) {
+    callbackDiagnosticHandler.emplace(
+        &session.context,
+        [this](DiagnosticSeverity severity, std::string_view message) {
+          iree_compiler_diagnostic_severity_t cSeverity;
+          switch (severity) {
+            case DiagnosticSeverity::Note:
+              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE;
+              break;
+            case DiagnosticSeverity::Warning:
+              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE;
+              break;
+            case DiagnosticSeverity::Error:
+              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE;
+              break;
+            case DiagnosticSeverity::Remark:
+              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE;
+              break;
+            default:
+              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_ERROR;
+          }
+          diagnosticCallback(cSeverity, message.data(), message.size(),
+                             diagnosticCallbackUserData);
+        });
   }
 
   parsedModule =
@@ -588,6 +622,16 @@ void ireeCompilerSessionGetFlags(
 iree_compiler_invocation_t *ireeCompilerInvocationCreate(
     iree_compiler_session_t *session) {
   return wrap(new Invocation(*unwrap(session)));
+}
+
+void ireeCompilerInvocationEnableCallbackDiagnostics(
+    iree_compiler_invocation_t *inv, int flags,
+    void (*callback)(enum iree_compiler_diagnostic_severity_t severity,
+                     const char *message, size_t messageSize, void *userData),
+    void *userData) {
+  unwrap(inv)->diagnosticCallbackFlags = flags;
+  unwrap(inv)->diagnosticCallback = callback;
+  unwrap(inv)->diagnosticCallbackUserData = userData;
 }
 
 void ireeCompilerInvocationEnableConsoleDiagnostics(

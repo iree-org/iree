@@ -17,6 +17,7 @@ extern void ireeCompilerGlobalInitialize();
 extern void ireeCompilerGlobalShutdown();
 extern void ireeCompilerInvocationCreate();
 extern void ireeCompilerInvocationDestroy();
+extern void ireeCompilerInvocationEnableCallbackDiagnostics();
 extern void ireeCompilerInvocationEnableConsoleDiagnostics();
 extern void ireeCompilerInvocationOutputHALExecutable();
 extern void ireeCompilerInvocationOutputIR();
@@ -590,6 +591,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerGlobalShutdown;
   x += (uintptr_t)&ireeCompilerInvocationCreate;
   x += (uintptr_t)&ireeCompilerInvocationDestroy;
+  x += (uintptr_t)&ireeCompilerInvocationEnableCallbackDiagnostics;
   x += (uintptr_t)&ireeCompilerInvocationEnableConsoleDiagnostics;
   x += (uintptr_t)&ireeCompilerInvocationOutputHALExecutable;
   x += (uintptr_t)&ireeCompilerInvocationOutputIR;

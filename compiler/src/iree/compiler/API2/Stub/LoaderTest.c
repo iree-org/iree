@@ -6,39 +6,21 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "iree/compiler/API2/Embed.h"
 #include "iree/compiler/API2/Stub/Loader.h"
 
 static int flagCount = 0;
 
-void printFlag(const char *flag, size_t length, void *userData) {
+static void printFlag(const char *flag, size_t length, void *userData) {
   printf("  FLAG: %.*s\n", (int)length, flag);
   flagCount += 1;
 };
 
-int main(int argc, char **argv) {
+static bool manipulateFlags(iree_compiler_session_t *session) {
   iree_compiler_error_t *error;
-  if (argc < 2) {
-    printf("ERROR: Requires library path\n");
-    return 1;
-  }
-
-  if (!ireeCompilerLoadLibrary(argv[1])) {
-    printf("ERROR: Could not load library\n");
-    return 1;
-  }
-  printf("Library loaded: %s\n", argv[1]);
-
-  int version = ireeCompilerGetAPIVersion();
-  printf("Version: %d\n", version);
-
-  ireeCompilerGlobalInitialize(true);
-  printf("Initialized\n");
-
-  // Session.
-  iree_compiler_session_t *session = ireeCompilerSessionCreate();
-
   // Flags.
   printf("All flags:\n");
   ireeCompilerSessionGetFlags(session, /*nonDefaultOnly=*/false, printFlag,
@@ -78,12 +60,110 @@ int main(int argc, char **argv) {
   const char *msg = ireeCompilerErrorGetMessage(error);
   printf("EXPECTED ERROR: %s\n", msg);
   ireeCompilerErrorDestroy(error);
+  return true;
+}
 
-  // Invocation.
+static bool invokeWithConsoleDiagnostics(
+    iree_compiler_session_t *session,
+    iree_compiler_source_t *source_with_errors) {
+  bool rc;
+  printf(
+      "--- INVOKING WITH CONSOLE DIAGNOSTICS (console error expected) ---\n");
   iree_compiler_invocation_t *inv = ireeCompilerInvocationCreate(session);
   ireeCompilerInvocationEnableConsoleDiagnostics(inv);
+  // Expected to fail - testing diagnostics.
+  rc = !ireeCompilerInvocationParseSource(inv, source_with_errors);
   ireeCompilerInvocationDestroy(inv);
+  return rc;
+}
 
+static char *callbackDiagMessage = NULL;
+
+static void callbackDiag(enum iree_compiler_diagnostic_severity_t severity,
+                         const char *message, size_t messageSize,
+                         void *userData) {
+  char **messageAccum = (char **)userData;
+  printf("GOT DIAG CALLBACK: %.*s\n", (int)messageSize, message);
+  size_t currentSize = *messageAccum ? strlen(*messageAccum) : 0;
+  *messageAccum = realloc(*messageAccum, currentSize + messageSize + 2);
+  (*messageAccum)[currentSize] = '\n';
+  memcpy(*messageAccum + currentSize + 1, message, messageSize);
+  (*messageAccum)[currentSize + 1 + messageSize] = 0;
+}
+
+static bool invokeWithCallbackDiagnostics(
+    iree_compiler_session_t *session,
+    iree_compiler_source_t *source_with_errors) {
+  bool rc;
+  printf(
+      "--- INVOKING WITH CALLBACK DIAGNOSTICS (console error expected) ---\n");
+  iree_compiler_invocation_t *inv = ireeCompilerInvocationCreate(session);
+  ireeCompilerInvocationEnableCallbackDiagnostics(
+      inv, /*flags=*/0, callbackDiag, &callbackDiagMessage);
+  // Expected to fail - testing diagnostics.
+  rc = !ireeCompilerInvocationParseSource(inv, source_with_errors);
+
+  if (!callbackDiagMessage) {
+    printf("ERROR: Did not produce any callback diagnostics\n");
+    rc = false;
+  } else {
+    printf("CALLBACK MESSAGES:\n%s\n", callbackDiagMessage);
+    free(callbackDiagMessage);
+    callbackDiagMessage = NULL;
+  }
+
+  ireeCompilerInvocationDestroy(inv);
+  return rc;
+}
+
+int main(int argc, char **argv) {
+  iree_compiler_error_t *error;
+  if (argc < 2) {
+    printf("ERROR: Requires library path\n");
+    return 1;
+  }
+
+  if (!ireeCompilerLoadLibrary(argv[1])) {
+    printf("ERROR: Could not load library\n");
+    return 1;
+  }
+  printf("Library loaded: %s\n", argv[1]);
+
+  int version = ireeCompilerGetAPIVersion();
+  printf("Version: %d\n", version);
+
+  ireeCompilerGlobalInitialize(true);
+  printf("Initialized\n");
+
+  // Session.
+  iree_compiler_session_t *session = ireeCompilerSessionCreate();
+
+  // Define sources that produce errors.
+  iree_compiler_source_t *source_with_errors;
+  const char source_with_errors_str[] = "}}}}FOOBAR";
+  error = ireeCompilerSourceWrapBuffer(
+      session, "foobar.mlir", source_with_errors_str,
+      strlen(source_with_errors_str) + 1 /*nul terminated buffer required*/,
+      &source_with_errors);
+  if (error) {
+    printf("ERROR: ireeCompilerSourceWrapBuffer failed: %s\n",
+           ireeCompilerErrorGetMessage(error));
+    return 1;
+  }
+
+  if (!manipulateFlags(session)) {
+    return 1;
+  }
+
+  if (!invokeWithConsoleDiagnostics(session, source_with_errors)) {
+    return 1;
+  }
+
+  if (!invokeWithCallbackDiagnostics(session, source_with_errors)) {
+    return 1;
+  }
+
+  ireeCompilerSourceDestroy(source_with_errors);
   ireeCompilerSessionDestroy(session);
 
   ireeCompilerGlobalShutdown();

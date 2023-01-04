@@ -171,6 +171,15 @@ iree_compiler_invocation_t *ireeCompilerInvocationCreate(
   return __ireeCompilerInvocationCreate(session);
 }
 
+void ireeCompilerInvocationEnableCallbackDiagnostics(
+    iree_compiler_invocation_t *inv, int flags,
+    void (*callback)(enum iree_compiler_diagnostic_severity_t severity,
+                     const char *message, size_t messageSize, void *userData),
+    void *userData) {
+  __ireeCompilerInvocationEnableCallbackDiagnostics(inv, flags, callback,
+                                                    userData);
+}
+
 void ireeCompilerInvocationEnableConsoleDiagnostics(
     iree_compiler_invocation_t *run) {
   __ireeCompilerInvocationEnableConsoleDiagnostics(run);

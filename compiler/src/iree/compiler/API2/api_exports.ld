@@ -10,6 +10,7 @@ VER_0 {
     ireeCompilerGlobalShutdown;
     ireeCompilerInvocationCreate;
     ireeCompilerInvocationDestroy;
+    ireeCompilerInvocationEnableCallbackDiagnostics;
     ireeCompilerInvocationEnableConsoleDiagnostics;
     ireeCompilerInvocationOutputHALExecutable;
     ireeCompilerInvocationOutputIR;

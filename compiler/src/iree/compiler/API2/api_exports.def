@@ -9,6 +9,7 @@ EXPORTS
   ireeCompilerGlobalShutdown
   ireeCompilerInvocationCreate
   ireeCompilerInvocationDestroy
+  ireeCompilerInvocationEnableCallbackDiagnostics
   ireeCompilerInvocationEnableConsoleDiagnostics
   ireeCompilerInvocationOutputHALExecutable
   ireeCompilerInvocationOutputIR
