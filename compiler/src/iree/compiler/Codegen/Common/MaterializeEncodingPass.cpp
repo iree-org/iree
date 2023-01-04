@@ -15,8 +15,6 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
-#include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -41,6 +39,11 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
   auto boundTensorType =
       dispatchTensorType.getBoundType().dyn_cast<RankedTensorType>();
   if (!boundTensorType) {
+    return failure();
+  }
+
+  auto encoding = boundTensorType.getEncoding().dyn_cast<EncodingAttr>();
+  if (!encoding) {
     return failure();
   }
 
@@ -254,21 +257,12 @@ static FailureOr<MaterializeEncodingInfo> chooseEncodingInfo(
 static FailureOr<MaterializeEncodingValueInfo>
 chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
                                           OpBuilder &builder, Location loc) {
-  Optional<TensorEncoding> encoding = getEncoding(tensorType);
-  if (!encoding) return failure();
-  SmallVector<Type> tileSizesTypes(tensorType.getRank(),
-                                   builder.getIndexType());
-  Value encodingValue = builder.create<arith::ConstantIntOp>(
-      loc, static_cast<int>(*encoding), builder.getI64Type());
-  SmallVector<Value> shapeValues;
-  for (int64_t i : tensorType.getShape()) {
-    shapeValues.push_back(builder.create<arith::ConstantIndexOp>(loc, i));
-  }
-  auto op = builder.create<IREE::VMVX::QueryTileSizesOp>(
-      loc, tileSizesTypes, encodingValue, shapeValues);
-  MaterializeEncodingValueInfo result;
-  result.innerTileSizes = op.getTileSizes();
-  return result;
+  // For now just create Values equal to 1.
+  // TODO: create a new vmvx.get_tile_sizes op here.
+  MaterializeEncodingValueInfo info;
+  info.innerTileSizes = SmallVector<Value>(
+      tensorType.getRank(), builder.create<arith::ConstantIndexOp>(loc, 1));
+  return info;
 }
 
 /// Pattern to materialize the encoding for `hal.interface.binding.subspan`
@@ -427,8 +421,7 @@ struct IREEMaterializeEncodingPass
     : public IREEMaterializeEncodingBase<IREEMaterializeEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, AffineDialect, IREE::Flow::FlowDialect,
-                    IREE::LinalgExt::IREELinalgExtDialect,
-                    IREE::VMVX::VMVXDialect>();
+                    IREELinalgExtDialect>();
   }
   void runOnOperation() override;
 };
