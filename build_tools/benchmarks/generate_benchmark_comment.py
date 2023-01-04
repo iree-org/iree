@@ -72,13 +72,11 @@ BenchmarkQueryResults = Dict[str, Dict[str, Any]]
 
 
 def query_base_benchmark_results(
-    commit: str,
-    dashboard_api_url: str,
-    verbose: bool = False) -> BenchmarkQueryResults:
+    commit: str, verbose: bool = False) -> BenchmarkQueryResults:
   """Queries the benchmark results for the given commit."""
   build_id = get_git_total_commit_count(commit, verbose)
   payload = {'projectId': IREE_PROJECT_ID, 'buildId': build_id}
-  return get_from_dashboard(f'{dashboard_api_url}/getBuild',
+  return get_from_dashboard(f'{IREE_DASHBOARD_URL}/getBuild',
                             payload,
                             verbose=verbose)
 
@@ -92,7 +90,6 @@ class ComparableBenchmarkResults(object):
 def _find_comparable_benchmark_results(
     start_commit: str,
     required_benchmark_keys: Set[str],
-    dashboard_api_url: str,
     verbose: bool = False) -> Optional[ComparableBenchmarkResults]:
   cmds = [
       "git", "rev-list", "--first-parent",
@@ -105,10 +102,8 @@ def _find_comparable_benchmark_results(
   # Try to query some base benchmark to diff against, from the top of the
   # tree. Bail out if the maximal trial number is exceeded.
   for base_commit in previous_commits:
-    base_benchmarks = query_base_benchmark_results(
-        commit=base_commit,
-        dashboard_api_url=dashboard_api_url,
-        verbose=verbose)
+    base_benchmarks = query_base_benchmark_results(commit=base_commit,
+                                                   verbose=verbose)
     base_benchmark_keys = set(base_benchmarks.keys())
     if required_benchmark_keys <= base_benchmark_keys:
       return ComparableBenchmarkResults(commit_sha=base_commit,
@@ -206,7 +201,7 @@ def parse_arguments():
       help=("Paths to the JSON files containing compilation statistics, "
             "accepts wildcards"))
   parser.add_argument("--pr_number", required=True, type=int, help="PR number")
-  parser.add_argument("--pr_commit",
+  parser.add_argument("--pr_committish",
                       type=str,
                       default="HEAD",
                       help="PR commit hash or ref")
@@ -240,7 +235,7 @@ def main(args):
   compile_stats_files = common_arguments.expand_and_check_file_paths(
       args.compile_stats_files)
 
-  pr_commit = _get_git_commit_hash(ref=args.pr_commit, verbose=args.verbose)
+  pr_commit = _get_git_commit_hash(ref=args.pr_committish, verbose=args.verbose)
   execution_benchmarks = benchmark_presentation.aggregate_all_benchmarks(
       benchmark_files=benchmark_files, expected_pr_commit=pr_commit)
   compilation_metrics = benchmark_presentation.collect_all_compilation_metrics(
@@ -265,7 +260,6 @@ def main(args):
     comparable_results = _find_comparable_benchmark_results(
         start_commit=pr_base_commit,
         required_benchmark_keys=required_benchmark_keys,
-        dashboard_api_url=IREE_DASHBOARD_URL,
         verbose=args.verbose)
 
   if comparable_results is None:

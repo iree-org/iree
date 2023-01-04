@@ -163,7 +163,7 @@ steps:
         --benchmark_files="benchmark-results-*.json" \
         --compile_stats_files="compile-stats-results-*.json" \
         --pr_number="$${BUILDKITE_PULL_REQUEST}" \
-        --pr_commit="$${BUILDKITE_COMMIT}" \
+        --pr_committish="$${BUILDKITE_COMMIT}" \
         --pr_base_branch="origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
         --build_url="$${BUILDKITE_BUILD_URL}" \
         --comment_title="Abbreviated Linux Benchmark Summary" \
