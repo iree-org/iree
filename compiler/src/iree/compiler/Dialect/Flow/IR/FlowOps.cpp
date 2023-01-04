@@ -452,7 +452,7 @@ bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
     if (!unusedResults.contains(it.index()))
       yieldedValues.push_back(it.value());
   rewriter.updateRootInPlace(
-      returnOp, [&]() { returnOp.getOperandsMutable().assign(yieldedValues); });
+      returnOp, [&]() { returnOp.operandsMutable().assign(yieldedValues); });
 
   // Replace all uses of the old op.
   SmallVector<Value> replacements(regionOp->getNumResults(), nullptr);
