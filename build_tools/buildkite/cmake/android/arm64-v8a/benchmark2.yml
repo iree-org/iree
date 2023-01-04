@@ -140,6 +140,9 @@ steps:
       buildkite-agent artifact download "benchmark-results-*.json" ./
       buildkite-agent artifact download "compile-stats-results-*.json" ./
       # The script will handle the wildcard patterns.
+      # --comment_type_id is a random-generated id and shouldn't be changed (
+      # even we change the title); otherwise the script will post a new comment
+      # instead of updating the existing one.
       python3 build_tools/benchmarks/generate_benchmark_comment.py \
         --verbose \
         --benchmark_files="benchmark-results-*.json" \
