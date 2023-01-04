@@ -177,8 +177,7 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
 
   // Create new DispatchRegionOp and move over the body.
   auto newRegionOp = rewriter.create<Flow::DispatchRegionOp>(
-      regionOp->getLoc(), resultTypes, regionDynamicDims,
-      regionOp.getWorkload());
+      regionOp->getLoc(), resultTypes, regionDynamicDims);
   newRegionOp.getBody().takeBody(regionOp.getBody());
   rewriter.replaceOp(
       regionOp, newRegionOp.getResults().take_front(regionOp->getNumResults()));
@@ -194,17 +193,17 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
   return newRegionOp;
 }
 
-Flow::DispatchRegionOp Flow::makeDispatchRegionWithWorkload(
-    OpBuilder &builder, Location loc, Optional<ValueRange> workload) {
+Flow::DispatchRegionOp Flow::makeEmptyDispatchRegion(OpBuilder &builder,
+                                                     Location loc) {
   OpBuilder::InsertionGuard guard(builder);
 
   // Create RegionOp.
   auto regionOp = builder.create<Flow::DispatchRegionOp>(
-      loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange(),
-      /*workload=*/workload.value_or(ValueRange{}));
+      loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange());
   Block &body = regionOp.getBody().emplaceBlock();
   builder.setInsertionPointToStart(&body);
   builder.create<Flow::ReturnOp>(loc, ValueRange());
+
   return regionOp;
 }
 
@@ -300,31 +299,13 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
 }
 
 FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
-    RewriterBase &rewriter, Operation *op,
-    Optional<Flow::WorkloadBuilder> workloadBuilder) {
-  Optional<ValueRange> workload = llvm::None;
-  if (workloadBuilder.has_value()) workload = workloadBuilder->workload;
+    RewriterBase &rewriter, Operation *op) {
   // Make an empty dispatch region right before the op.
   rewriter.setInsertionPointAfter(op);
   Flow::DispatchRegionOp regionOp =
-      Flow::makeDispatchRegionWithWorkload(rewriter, op->getLoc(), workload);
+      Flow::makeEmptyDispatchRegion(rewriter, op->getLoc());
 
   // Move the op into the dispatch region.
   auto newRegionOp = movePrecedingOpIntoDispatchRegion(rewriter, op, regionOp);
-
-  // Generate workload_count region
-  if (succeeded(newRegionOp) && workloadBuilder.has_value()) {
-    Region &workgroupCountRegion = newRegionOp->getWorkgroupCount();
-    Block *body = rewriter.createBlock(&workgroupCountRegion);
-    SmallVector<BlockArgument> workloadArgs;
-    Location loc = newRegionOp->getLoc();
-    for (Value v : workloadBuilder->workload) {
-      workloadArgs.push_back(body->addArgument(v.getType(), loc));
-    }
-    rewriter.setInsertionPointToStart(body);
-    workloadBuilder->regionBuilder(rewriter, loc, workloadArgs);
-    ValueRange workload(workloadBuilder->workload);
-  }
-
   return newRegionOp;
 }

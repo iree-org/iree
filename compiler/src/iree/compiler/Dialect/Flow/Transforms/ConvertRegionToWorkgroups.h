@@ -45,8 +45,9 @@ struct WorkloadBuilder {
 /// If no WorkloadBuilder is provided, the WorkgroupsOp is constructed without
 /// workload operands and without a workload body.
 FailureOr<DispatchWorkgroupsOp>
-rewriteFlowDispatchRegionToFlowDispatchWorkgroups(DispatchRegionOp regionOp,
-                                                  RewriterBase &rewriter);
+rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
+    DispatchRegionOp regionOp, RewriterBase &rewriter,
+    Optional<WorkloadBuilder> workloadBuilder = llvm::None);
 
 }  // namespace Flow
 }  // namespace IREE
