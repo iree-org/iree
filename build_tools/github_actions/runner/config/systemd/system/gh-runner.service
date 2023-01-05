@@ -5,12 +5,12 @@ After=network.target
 [Service]
 User=runner
 Group=runner
-ExecStart=/runner-root/config/start.sh
+ExecStart=/runner-root/config/systemd/scripts/start_runner.sh
 Restart=no
 KillMode=process
 KillSignal=SIGTERM
 TimeoutStopSec=5min
-ExecStopPost=/runner-root/config/delete_self.sh
+ExecStopPost=/runner-root/config/systemd/scripts/delete_self.sh
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=runner-setup.target

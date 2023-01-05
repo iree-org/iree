@@ -35,6 +35,14 @@ fi
 cp -r "${SCRIPT_DIR}" /runner-root/config
 chown -R runner:runner /runner-root/
 
+echo "Installing ops agent and turning on systemd logging"
+# TODO(gcmn): This should probably be baked into the image.
+curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh
+chmod +x add-google-cloud-ops-agent-repo.sh
+./add-google-cloud-ops-agent-repo.sh --also-install
+cp /runner-root/config/google-cloud-ops-agent/config.yaml /etc/google-cloud-ops-agent/config.yaml
+service google-cloud-ops-agent restart
+
 echo "Fetching the runner archive"
 RUNNER_VERSION="$(get_attribute github-runner-version)"
 RUNNER_ARCHIVE="actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
@@ -54,23 +62,13 @@ ln -s ../config/runner.env .env
 echo "Registering the runner."
 runuser --user runner /runner-root/config/register.sh
 
-echo "Setting up the deregister service."
-cp /runner-root/config/gh-runner-deregister.service /etc/systemd/system/
-
-echo "Setting up the runner service."
-cp /runner-root/config/gh-runner.service /etc/systemd/system/
-
-echo "Setting up the health check service."
-cp /runner-root/config/health-check.service /etc/systemd/system/
-
-echo "Reloading system service files to reflect changes."
+echo "Loading systemd services"
+cp /runner-root/config/systemd/system/* /etc/systemd/system/
 systemctl daemon-reload
 
-echo "Enabling the deregister service."
-systemctl enable gh-runner-deregister
+echo "Enabling systemd services."
+find /runner-root/config/systemd/system/ -type f -printf "%f\n" \
+  | xargs systemctl enable
 
-echo "Starting the runner service."
-systemctl start gh-runner
-
-echo "Starting the health check service"
-systemctl start health-check
+echo "Starting the runner services"
+systemctl start runner-setup.target

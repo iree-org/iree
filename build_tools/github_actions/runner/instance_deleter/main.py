@@ -60,9 +60,11 @@ See https://cloud.google.com/functions/docs for more details.
 """
 
 import os
+import random
 import re
-from http.client import (BAD_REQUEST, FORBIDDEN, INTERNAL_SERVER_ERROR,
-                         NOT_FOUND, UNAUTHORIZED)
+import time
+from http.client import (BAD_REQUEST, FORBIDDEN, GATEWAY_TIMEOUT,
+                         INTERNAL_SERVER_ERROR, NOT_FOUND, UNAUTHORIZED)
 
 import flask
 import functions_framework
@@ -74,11 +76,14 @@ from google.cloud import compute
 from google.oauth2 import id_token
 
 AUTH_HEADER_PREFIX = "Bearer "
+ALLOWED_HTTP_METHODS = ["DELETE", "GET"]
 MIG_METADATA_KEY = "created-by"
 ALLOWED_MIG_PATTERN_ENV_VARIABLE = "ALLOWED_MIG_PATTERN"
+STABILIZE_TIMEOUT_SECONDS = 100
 
 instances_client = compute.InstancesClient()
 migs_client = compute.RegionInstanceGroupManagersClient()
+autoscalers_client = compute.RegionAutoscalersClient()
 session = requests.Session()
 
 print("Server started")
@@ -110,27 +115,114 @@ def _get_from_items(items: compute.Items, key: str):
   return next((item.value for item in items if item.key == key), None)
 
 
+def delete_instance_from_mig(mig_name: str, project: str, region: str,
+                             instance: compute.Instance):
+  try:
+    operation = migs_client.delete_instances(
+        instance_group_manager=mig_name,
+        project=project,
+        region=region,
+        # For some reason we can't just use a list of instance names and need to
+        # build this RhymingRythmicJavaClasses proto. Also, unlike all the other
+        # parameters, the instance has to be a fully-specified URL for the
+        # instance, not just its name.
+        region_instance_group_managers_delete_instances_request_resource=(
+            compute.RegionInstanceGroupManagersDeleteInstancesRequest(
+                instances=[instance.self_link])))
+  except (google.api_core.exceptions.Forbidden,
+          google.api_core.exceptions.Unauthorized,
+          google.api_core.exceptions.NotFound) as e:
+    print(e)
+    return flask.abort(
+        e.code, f"Error requesting that {mig_name} delete {instance.name}.")
+  except Exception as e:
+    # We'll call any other error here a server error.
+    print(e)
+    return flask.abort(
+        INTERNAL_SERVER_ERROR,
+        f"Error requesting that {mig_name} delete {instance.name}.")
+
+  try:
+    # This is actually an extended operation that you have to poll to get its
+    # status, but we just check the status once because it appears that errors
+    # always show up here and all we just want to return success in marking for
+    # deletion. We don't need to wait for the deletion to actually take place.
+    operation.result()
+  except google.api_core.exceptions.ClientError as e:
+    print(e)
+    # Unpack the actual usable error message
+    msg = (
+        f"Error requesting that {mig_name} delete {instance.name}:"
+        "\n" + "\n".join(
+            [f"{err.code}: {err.message}" for err in e.response.error.errors]))
+    print(msg)
+    # We're not actually totally sure whether this is a client or server error
+    # for the overall request, but let's call it a client error (the only client
+    # here is our VM instances, so I think we can be a bit loose).
+    return flask.abort(BAD_REQUEST, msg)
+
+  success_msg = f"{instance.name} has been marked for deletion by {mig_name}."
+  print(success_msg)
+  return success_msg
+
+
+def should_scale_down(mig_name: str, project: str, region: str):
+  start = time.time()
+  print(f"Polling {mig_name} for stability")
+  while time.time() - start < STABILIZE_TIMEOUT_SECONDS:
+    try:
+      mig = migs_client.get(project=project,
+                            region=region,
+                            instance_group_manager=mig_name)
+    except google.api_core.exceptions.NotFound as e:
+      print(e)
+      return flask.abort(
+          e.code,
+          f"Cannot find {mig_name} in region={region}, project={project}")
+    if mig.status.is_stable:
+      break
+    # We sleep for a random amount of time here to avoid synchronizing callers
+    # waiting for the MIG to be stable.
+    sleep_secs = random.randint(1, 15)
+    print(f"{mig_name} is not stable. Retrying in {sleep_secs} seconds")
+    time.sleep(sleep_secs)
+  else:
+    return flask.abort(GATEWAY_TIMEOUT,
+                       "Timed out waiting for the MIG to become stable")
+  autoscaler = autoscalers_client.get(project=project,
+                                      region=region,
+                                      autoscaler=_get_name_from_resource(
+                                          mig.status.autoscaler))
+  response = "true" if autoscaler.recommended_size < mig.target_size else "false"
+  print(
+      f"Autoscaler recommends size {autoscaler.recommended_size} and"
+      f" {mig_name} is targetting size {mig.target_size}. Sending: {response}")
+  return response
+
+
 @functions_framework.http
-def delete_self(request):
-  """HTTP Cloud Function.
+def delete_self(request: flask.Request):
+  """HTTP Cloud Function to delete the instance group making the request.
     Args:
-        request (flask.Request): The request object.
-        <https://flask.palletsprojects.com/en/1.1.x/api/#incoming-request-data>
+        request: The request object.
+        https://flask.palletsprojects.com/en/1.1.x/api/#incoming-request-data
     Returns:
         The response text, or any set of values that can be turned into a
         Response object using `make_response`
-        <https://flask.palletsprojects.com/en/1.1.x/api/#flask.make_response>.
+        https://flask.palletsprojects.com/en/1.1.x/api/#flask.make_response.
     Note:
         For more information on how Flask integrates with Cloud
         Functions, see the `Writing HTTP functions` page.
-        <https://cloud.google.com/functions/docs/writing/http#http_frameworks>
+        https://cloud.google.com/functions/docs/writing/http#http_frameworks
   """
-  if request.method != "DELETE":
+  if request.method not in ALLOWED_HTTP_METHODS:
     return flask.abort(
-        BAD_REQUEST,
-        f"Invalid method {request.method}. Only DELETE is supported.")
+        BAD_REQUEST, f"Invalid method {request.method}."
+        f" Allowed methods: {ALLOWED_HTTP_METHODS}")
 
-  # No path is needed, since the token contains all the information we need.
+  # No path is needed, since the token and method contain all the information we
+  # need. Maybe that design was a mistake, but since the resource being operated
+  # on is always the instance making the call, it seemed handy.
   if request.path != "/":
     return flask.abort(
         BAD_REQUEST,
@@ -167,8 +259,14 @@ def delete_self(request):
 
   project = compute_info["project_id"]
   zone = compute_info["zone"]
+  region = _get_region(zone)
   instance_name = compute_info["instance_name"]
-  print(f"Received request to delete {instance_name}")
+
+  if request.method == "DELETE":
+    print(f"Received request to delete {instance_name}")
+  else:
+    assert request.method == "GET"
+    print(f"Received inquiry whether to delete {instance_name}")
   try:
     instance = instances_client.get(instance=instance_name,
                                     project=project,
@@ -181,22 +279,21 @@ def delete_self(request):
         f"Cannot view {instance_name} in zone={zone}, project={project}")
 
   instance_id = int(compute_info["instance_id"])
-  # Verify it's *actually* the same instance. Names get reused, but IDs
-  # don't. For some reason you can't reference instances by their ID in any
-  # of the APIs.
+  # Verify it's *actually* the same instance. Names get reused, but IDs don't.
+  # For some reason you can't reference anything by ID in the API.
   if instance.id != instance_id:
     return flask.abort(
         BAD_REQUEST,
         f"Existing instance of the same name {instance.name} has a different"
         f" ID {instance.id} than token specifies {instance_id}.")
 
-  mig = _get_from_items(instance.metadata.items, MIG_METADATA_KEY)
+  mig_name = _get_from_items(instance.metadata.items, MIG_METADATA_KEY)
 
-  if mig is None:
+  if mig_name is None:
     return flask.abort(BAD_REQUEST,
                        (f"Instance is not part of a managed instance group."
                         f" Did not find {MIG_METADATA_KEY} in metadata."))
-  mig = _get_name_from_resource(mig)
+  mig_name = _get_name_from_resource(mig_name)
 
   # General good practice would be to compile the regex once, but the only way
   # to do that is to make it a global, which makes this difficult to test and
@@ -204,52 +301,17 @@ def delete_self(request):
   allowed_mig_pattern = os.environ.get(ALLOWED_MIG_PATTERN_ENV_VARIABLE)
   if allowed_mig_pattern is None:
     flask.abort(
-        INTERNAL_SERVER_ERROR,
-        f"Missing required environment variable {ALLOWED_MIG_PATTERN_ENV_VARIABLE}"
-    )
+        INTERNAL_SERVER_ERROR, f"Missing required environment variable"
+        f" {ALLOWED_MIG_PATTERN_ENV_VARIABLE}")
 
-  if not re.fullmatch(allowed_mig_pattern, mig):
-    return flask.abort(FORBIDDEN, f"No access to MIG {mig}")
+  if not re.fullmatch(allowed_mig_pattern, mig_name):
+    return flask.abort(FORBIDDEN, f"No access to MIG {mig_name}")
 
-  try:
-    operation = migs_client.delete_instances(
-        instance_group_manager=mig,
-        project=project,
-        region=_get_region(zone),
-        # For some reason we can't just use a list of instance names and need to
-        # build this RhymingRythmicJavaClasses proto. Also, unlike all the other
-        # parameters, the instance has to be a fully-specified URL for the
-        # instance, not just its name.
-        region_instance_group_managers_delete_instances_request_resource=(
-            compute.RegionInstanceGroupManagersDeleteInstancesRequest(
-                instances=[instance.self_link])))
-  except (google.api_core.exceptions.Forbidden,
-          google.api_core.exceptions.Unauthorized) as e:
-    print(e)
-    return flask.abort(e.code,
-                       f"Error requesting that {mig} delete {instance_name}.")
-  except Exception as e:
-    # We'll call any other error here a server error.
-    print(e)
-    return flask.abort(INTERNAL_SERVER_ERROR,
-                       f"Error requesting that {mig} delete {instance_name}.")
+  if request.method == "DELETE":
+    return delete_instance_from_mig(mig_name=mig_name,
+                                    project=project,
+                                    region=region,
+                                    instance=instance)
 
-  try:
-    # This is actually an extended operation that you have to poll to get its
-    # status, but we just check the status once because it appears that errors
-    # always show up here.
-    operation.result()
-  except google.api_core.exceptions.ClientError as e:
-    print(e)
-    # Unpack the actual usable error message
-    msg = f"Error requesting that {mig} delete {instance_name}:" "\n" + "\n".join(
-        [f"{err.code}: {err.message}" for err in e.response.error.errors])
-    print(msg)
-    # We're not actually totally sure whether this is a client or server error
-    # for the overall request, but let's call it a client error (the only client
-    # here is our VM instances, so I think we can be a bit loose).
-    return flask.abort(BAD_REQUEST, msg)
-
-  success_msg = f"{instance_name} has been marked for deletion by {mig}."
-  print(success_msg)
-  return success_msg
+  assert request.method == "GET"
+  return should_scale_down(mig_name=mig_name, project=project, region=region)

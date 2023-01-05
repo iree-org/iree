@@ -62,8 +62,16 @@ class InstanceDeleterTest(unittest.TestCase):
     os_environ_patcher = mock.patch.dict(
         "os.environ", {main.ALLOWED_MIG_PATTERN_ENV_VARIABLE: ".*"})
     self.environ = os_environ_patcher.start()
+    autoscalers_client_patcher = mock.patch("main.autoscalers_client",
+                                            autospec=True)
+    self.autoscalers_client = autoscalers_client_patcher.start()
+    time_patcher = mock.patch("time.time", autospec=True)
+    self.time = time_patcher.start()
+    self.time.return_value = 0
+    # Just noop sleep
+    mock.patch("time.sleep", autospec=True).start()
 
-  def test_happy_path(self):
+  def test_delete_happy_path(self):
     req = Request({}, populate_request=False, shallow=True)
     req.method = "DELETE"
 
@@ -92,10 +100,6 @@ class InstanceDeleterTest(unittest.TestCase):
         ]))
     self.instances_client.get.return_value = instance
 
-    ext_operation = mock.MagicMock(
-        google.api_core.extended_operation.ExtendedOperation)
-    ext_operation.result.return_value = None
-
     response = main.delete_self(req)
 
     self.assertIn(MIG_NAME, response)
@@ -108,6 +112,91 @@ class InstanceDeleterTest(unittest.TestCase):
         region_instance_group_managers_delete_instances_request_resource=compute
         .RegionInstanceGroupManagersDeleteInstancesRequest(
             instances=[instance.self_link]))
+
+  def test_get_happy_path(self):
+    req = Request({}, populate_request=False, shallow=True)
+    req.method = "GET"
+
+    token = make_token({
+        "google": {
+            "compute_engine": {
+                "project_id": PROJECT,
+                "zone": f"{REGION}-a",
+                "instance_name": INSTANCE_NAME,
+                "instance_id": str(ID1),
+            }
+        }
+    })
+
+    req.headers = {"Authorization": f"Bearer {token}"}
+
+    self_link = f"{INSTANCE_LINK_PREFIX}{INSTANCE_NAME}"
+    instance = compute.Instance(
+        id=ID1,
+        name=INSTANCE_NAME,
+        zone=ZONE,
+        self_link=self_link,
+        metadata=compute.Metadata(items=[
+            compute.Items(key=main.MIG_METADATA_KEY,
+                          value=f"{MIG_PATH_PREFIX}{MIG_NAME}")
+        ]))
+    self.instances_client.get.return_value = instance
+
+    mig = compute.InstanceGroupManager(
+        target_size=5,
+        status={
+            "is_stable": True,
+            "autoscaler": "autoscaler_link/autoscaler_name"
+        })
+    self.migs_client.get.return_value = mig
+
+    autoscaler = compute.Autoscaler(recommended_size=3)
+    self.autoscalers_client.get.return_value = autoscaler
+
+    response = main.delete_self(req)
+
+    self.assertEqual(response, "true")
+
+  def test_get_timeout(self):
+    req = Request({}, populate_request=False, shallow=True)
+    req.method = "GET"
+
+    token = make_token({
+        "google": {
+            "compute_engine": {
+                "project_id": PROJECT,
+                "zone": f"{REGION}-a",
+                "instance_name": INSTANCE_NAME,
+                "instance_id": str(ID1),
+            }
+        }
+    })
+
+    req.headers = {"Authorization": f"Bearer {token}"}
+
+    self_link = f"{INSTANCE_LINK_PREFIX}{INSTANCE_NAME}"
+    instance = compute.Instance(
+        id=ID1,
+        name=INSTANCE_NAME,
+        zone=ZONE,
+        self_link=self_link,
+        metadata=compute.Metadata(items=[
+            compute.Items(key=main.MIG_METADATA_KEY,
+                          value=f"{MIG_PATH_PREFIX}{MIG_NAME}")
+        ]))
+    self.instances_client.get.return_value = instance
+
+    mig = compute.InstanceGroupManager(
+        target_size=5,
+        status={
+            "is_stable": False,
+            "autoscaler": "autoscaler_link/autoscaler_name"
+        })
+    self.migs_client.get.return_value = mig
+    self.time.side_effect = [0, main.STABILIZE_TIMEOUT_SECONDS + 1]
+
+    with self.assertRaises(werkzeug.exceptions.GatewayTimeout):
+      main.delete_self(req)
 
   def test_narrow_allowed_migs(self):
     req = Request({}, populate_request=False, shallow=True)
@@ -159,7 +248,7 @@ class InstanceDeleterTest(unittest.TestCase):
 
   def test_bad_method(self):
     req = Request({}, populate_request=False, shallow=True)
-    req.method = "GET"
+    req.method = "POST"
 
     with self.assertRaises(werkzeug.exceptions.BadRequest) as ctx:
       main.delete_self(req)

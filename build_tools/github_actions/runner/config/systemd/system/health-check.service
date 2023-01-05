@@ -1,6 +1,6 @@
 [Unit]
 Description=Health Check Server
-After=gh-runner.target
+After=gh-runner.target network.target
 
 [Service]
 User=root
@@ -12,4 +12,4 @@ KillSignal=SIGTERM
 TimeoutStopSec=5min
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=runner-setup.target
