@@ -162,7 +162,6 @@ static MatmulTileParams chooseMatmulTileParamsAArch64(
     MatmulType type, ExecutableTargetAttr target) {
   switch (type) {
     case MatmulType::F32F32F32:
-      return {8, 32, 16};  // x86
       return {8, 1, 8};
     case MatmulType::I8I8I32:
       if (hasFeature(target, "+i8mm")) return {8, 8, 8};
@@ -217,7 +216,7 @@ static MaterializeEncodingInfo chooseEncodingInfoForMatmul(
   return encodingInfo;
 }
 
-static void AdjustTileSizesToNarrowStaticShape(
+static void adjustTileSizesToNarrowStaticShape(
     MaterializeEncodingInfo &encodingInfo, ArrayRef<int64_t> shape) {
   for (size_t i = 0; i < shape.size(); i++) {
     int64_t size = shape[encodingInfo.innerDimsPos[i]];
@@ -253,7 +252,7 @@ static FailureOr<MaterializeEncodingInfo> chooseEncodingInfo(
   } else {
     return failure();
   }
-  AdjustTileSizesToNarrowStaticShape(encodingInfo, tensorType.getShape());
+  adjustTileSizesToNarrowStaticShape(encodingInfo, tensorType.getShape());
   return encodingInfo;
 }
 

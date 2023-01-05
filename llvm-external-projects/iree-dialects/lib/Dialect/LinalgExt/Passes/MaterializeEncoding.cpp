@@ -149,7 +149,9 @@ static FailureOr<PackOp> lowerSetEncodingOpToPackOp(
                              materializeEncodingInfo->outerDimsPerm);
   auto initTensor = rewriter.create<tensor::EmptyOp>(
       loc, resultDims, resultType.getElementType());
-  Optional<Value> paddingValue = getPaddingValue(source);
+  Value paddingValue = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getZeroAttr(getElementTypeOrSelf(source.getType())));
+  //Optional<Value> paddingValue = getPaddingValue(source);
   auto packOp = rewriter.create<PackOp>(
       loc, source, initTensor, materializeEncodingInfo->innerDimsPos,
       *innerTileSizesOfr, paddingValue, materializeEncodingInfo->outerDimsPerm);
