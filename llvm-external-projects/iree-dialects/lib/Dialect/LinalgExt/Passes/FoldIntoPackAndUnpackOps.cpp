@@ -26,7 +26,8 @@ static bool areAllConstantIntValue(ArrayRef<OpFoldResult> ofrs, int64_t value) {
       ofrs, [&](OpFoldResult ofr) { return isConstantIntValue(ofr, value); });
 }
 
-/// Fold a `pad` -> `pack` into `pack` if they can have the same padding values.
+/// Fold a `pad` -> `pack` into `pack` if they have the same padding values and
+/// the pad op has zero low paddings.
 struct FoldPadWithPackOp : public OpRewritePattern<PackOp> {
   using OpRewritePattern<PackOp>::OpRewritePattern;
 
