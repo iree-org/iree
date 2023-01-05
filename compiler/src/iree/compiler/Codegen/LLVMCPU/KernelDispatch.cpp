@@ -1401,7 +1401,7 @@ static LogicalResult setRootConfig(
 }
 
 namespace {
-bool isPoolingOp(linalg::LinalgOp op) {
+bool is2DPoolingOp(linalg::LinalgOp op) {
   return isa<linalg::PoolingNhwcSumOp, linalg::PoolingNchwSumOp,
              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
@@ -1416,7 +1416,7 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
                                        int64_t vectorSize) {
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
            linalg::DepthwiseConv2DNhwcHwcOp>(convOp.getOperation()) &&
-      !isPoolingOp(convOp)) {
+      !is2DPoolingOp(convOp)) {
     return failure();
   }
 
@@ -1470,7 +1470,7 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
                                                   int64_t vectorSize) {
   bool isSupported = isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
                          linalg::DepthwiseConv2DNhwcHwcOp>(op.getOperation()) ||
-                     isPoolingOp(op);
+                     is2DPoolingOp(op);
   (void)isSupported;
   assert(isSupported && "conv op is not supported");
 
