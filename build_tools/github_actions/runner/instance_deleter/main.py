@@ -42,6 +42,7 @@ you'll get an error:
     > /tmp/token.txt
 
 To deploy:
+  # Note timeout should be greater than STABILIZE_TIMEOUT_SECONDS
   gcloud functions deploy instance-self-deleter \
     --gen2 \
     --runtime=python310 \
@@ -52,7 +53,7 @@ To deploy:
     --run-service-account=managed-instance-deleter@iree-oss.iam.gserviceaccount.com \
     --service-account=managed-instance-deleter@iree-oss.iam.gserviceaccount.com \
     --ingress-settings=internal-only \
-    --timeout=30s \
+    --timeout=120s \
     --set-env-vars ALLOWED_MIG_PATTERN='github-runner-.*'
 
 
@@ -79,6 +80,7 @@ AUTH_HEADER_PREFIX = "Bearer "
 ALLOWED_HTTP_METHODS = ["DELETE", "GET"]
 MIG_METADATA_KEY = "created-by"
 ALLOWED_MIG_PATTERN_ENV_VARIABLE = "ALLOWED_MIG_PATTERN"
+# Must be less than timeout configuration for deployment
 STABILIZE_TIMEOUT_SECONDS = 100
 
 instances_client = compute.InstancesClient()
