@@ -109,6 +109,7 @@ const IreeLibraryLoopEmscripten = {
     _iree_loop_free_scope = instance.iree_loop_free_scope.bind(instance);
     _iree_loop_command_call = instance.iree_loop_command_call.bind(instance);
   },
+  $iree_loop_emscripten_support__deps: ['$dynCall'],
 
   iree_loop_allocate_scope: function() {},
   iree_loop_allocate_scope__deps: ['$iree_loop_emscripten_support'],
