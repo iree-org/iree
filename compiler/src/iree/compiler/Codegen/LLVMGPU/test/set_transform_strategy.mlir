@@ -97,23 +97,23 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // -----
 
 
-hal.executable @group_reduction_32 {
+hal.executable @group_reduction_34 {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
-  hal.executable.export public @group_reduction_32 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+  hal.executable.export public @group_reduction_34 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
-    func.func @group_reduction_32() {
+    func.func @group_reduction_34() {
       %c0 = arith.constant 0 : index
       %cst = arith.constant -0.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<8x32xf32>>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<8x34xf32>>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<8xf32>>
-      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<8x32xf32>> -> tensor<8x32xf32>
+      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<8x34xf32>> -> tensor<8x34xf32>
       %3 = tensor.empty() : tensor<8xf32>
       %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<8xf32>) -> tensor<8xf32>
-      %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<8x32xf32>) outs(%4 : tensor<8xf32>) {
+      %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<8x34xf32>) outs(%4 : tensor<8xf32>) {
       ^bb0(%in: f32, %out: f32):
         %6 = arith.addf %in, %out : f32
         linalg.yield %6 : f32
@@ -128,11 +128,12 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Overall, the schedule is same as above, but with larger tile sizes.
 // Checking only the tile sizes.
 
-//   CHECK-LABEL: func.func @group_reduction_32
+//   CHECK-LABEL: func.func @group_reduction_34
 //         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
 //         CHECK:   transform.iree.tile_to_foreach_thread_and_workgroup_count_region %{{.*}} num_threads [] tile_sizes [64](mapping = [#gpu.block<x>])
 //         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}}   num_threads [64] tile_sizes [](mapping = [#gpu.thread<x>])
 // CHECK-COUNT-4:   transform.structured.scalarize %{{.*}}
-// CHECK-COUNT-14:   transform.structured.split %{{.*}} after 4  {dimension = 1 : i64}
+//         CHECK:   transform.structured.split %{{.*}} after 32  {dimension = 1 : i64}
+//         CHECK:   transform.structured.tile %{{.*}}[0, 4]
 //         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [64, 1, 1]}
 //     CHECK-NOT:   transform.iree.vector.to_warp_execute_on_lane_0

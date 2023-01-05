@@ -30,17 +30,18 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // Small reduction computes the whole reduction on a single thread.
 //   CHECK-LABEL: func.func @small_reduction
+//     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+//     CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
+//     CHECK-DAG: %[[C12:.*]] = arith.constant 12 : index
 //     CHECK-NOT:   memref.alloc()
 //         CHECK: gpu.thread_id  x
-//         CHECK: vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<4xf32>
-//         CHECK: vector.multi_reduction <add>, %{{.*}} : vector<4xf32> to f32
-//         CHECK: vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<4xf32>
-//         CHECK: vector.multi_reduction <add>, %{{.*}} : vector<4xf32> to f32
-//         CHECK: vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<4xf32>
-//         CHECK: vector.multi_reduction <add>, %{{.*}} : vector<4xf32> to f32
-//         CHECK: vector.broadcast {{.*}}: f32 to vector<f32>
+//         CHECK: scf.for %{{.*}} = %[[C0]] to %[[C12]] step %[[C4]] {
+//         CHECK:   vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<4xf32>
+//         CHECK:   vector.multi_reduction <add>, %{{.*}} : vector<4xf32> to f32
+//         CHECK:   vector.transfer_write {{.*}} : vector<f32>, memref<f32
+//     CHECK-NOT: gpu.barrier
+//         CHECK: vector.transfer_read {{.*}}: memref<f32{{.*}}>, vector<f32>
 //         CHECK: arith.addf %{{.*}} : f32
-//         CHECK: vector.transfer_write {{.*}} : vector<f32>, memref<f32
 
 // -----
 
