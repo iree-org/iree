@@ -13,14 +13,37 @@
 // API/ABI interop
 //===----------------------------------------------------------------------===//
 
+// Visibility controls for exported functions.
+// By default, no visibility controls are defined, but if built with
+// |IREE_API_ENABLE_VISIBILITY|, then any functions marked with IREE_API_EXPORT
+// will have their visibility set such that they will be made visible across
+// a DSO boundary. Further, on Windows, if |IREE_API_BUILDING_LIBRARY| is set,
+// then the symbols will be marked with dllexport. Otherwise, they will be
+// marked dllimport.
+#if IREE_API_ENABLE_VISIBILITY
+#if defined(_WIN32) || defined(__CYGWIN__)
+#if IREE_API_BUILDING_LIBRARY
+#define IREE_API_VISIBILITY_ATTR __declspec(dllexport)
+#else
+#define IREE_API_VISIBILITY_ATTR __declspec(dllimport)
+#endif
+#else
+// Non-windows: use visibility attributes.
+#define IREE_API_VISIBILITY_ATTR [[gnu::visibility("default")]]
+#endif
+#else
+// Visibility controls disabled.
+#define IREE_API_VISIBILITY_ATTR
+#endif
+
 // Denotes a method exported by the IREE API.
 // Any call annotated with this will be relatively stable.
 // Calls without this are considered private to the IREE implementation and
 // should not be relied upon.
 #ifdef __cplusplus
-#define IREE_API_EXPORT extern "C"
+#define IREE_API_EXPORT extern "C" IREE_API_VISIBILITY_ATTR
 #else
-#define IREE_API_EXPORT
+#define IREE_API_EXPORT IREE_API_VISIBILITY_ATTR
 #endif  // __cplusplus
 
 // Denotes a function pointer that is exposed as part of the IREE API.

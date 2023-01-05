@@ -19,10 +19,7 @@
 
 #include <stddef.h>
 
-#if (defined(_WIN32) || defined(__CYGWIN__))
-// Visibility annotations disabled.
-#define IREE_EMBED_EXPORTED
-#elif defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32) || defined(__CYGWIN__)
 // Windows visibility declarations.
 #if IREE_EMBED_BUILDING_LIBRARY
 #define IREE_EMBED_EXPORTED __declspec(dllexport)
@@ -31,7 +28,7 @@
 #endif
 #else
 // Non-windows: use visibility attributes.
-#define IREE_EMBED_EXPORTED __attribute__((visibility("default")))
+#define IREE_EMBED_EXPORTED [[gnu::visibility("default")]]
 #endif
 
 #ifdef __cplusplus
