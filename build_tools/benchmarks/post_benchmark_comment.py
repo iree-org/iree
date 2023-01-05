@@ -35,6 +35,7 @@ from reporting import benchmark_comment
 GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/iree-org/iree"
 GITHUB_GIST_API = "https://api.github.com/gists"
 GITHUB_API_VERSION = "2022-11-28"
+QUERY_COMMENT_PER_PAGE = 100
 MAX_PAGES_TO_SEARCH_PREVIOUS_COMMENT = 10
 
 
@@ -111,9 +112,9 @@ class GithubClient(object):
       response = self._requester.get(
           endpoint=f"{GITHUB_IREE_API_PREFIX}/issues/{pr_number}/comments",
           payload={
-              "per_page": 100,
+              "per_page": QUERY_COMMENT_PER_PAGE,
               "page": page,
-              "sort": "updated",
+              "sort": "created",
               "direction": "desc"
           })
       if response.status_code != http.client.OK:
@@ -130,6 +131,9 @@ class GithubClient(object):
         if (comment["user"]["login"] == gist_bot_user and
             comment_type_id in comment["body"]):
           return comment["id"]
+
+      if len(comments) < QUERY_COMMENT_PER_PAGE:
+        break
 
     return None
 
