@@ -1056,10 +1056,23 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    IREE::LinalgExt::PackOp op) {
-  TileSizesListType tileSizes = {
-      getLinalgExtDefaultWorkgroupTileSizes(op, defaultWorkgroupTileSize)};
+
+  SmallVector<int64_t> tileSizes =
+      getLinalgExtDefaultWorkgroupTileSizes(op, defaultWorkgroupTileSize);
+
+  // Fixup.
+  SmallVector<int64_t> innerTiles = op.getStaticTiles();
+  ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
+  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+    tileSizes[pos] = tileSizes[pos] / size;
+    tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
+  }
+
+  TileSizesListType tileSizesList = {tileSizes};
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDataTiling);
+      entryPointFn, op, tileSizesList,
+      DispatchLoweringPassPipeline::CPUDataTiling);
 }
 
 static LogicalResult setRootConfig(
