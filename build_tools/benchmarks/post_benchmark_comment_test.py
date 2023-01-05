@@ -90,53 +90,65 @@ class GithubClientTest(unittest.TestCase):
 
     comment_id = client.get_previous_comment_on_pr(pr_number=23,
                                                    gist_bot_user="bot",
-                                                   comment_type_id="1234")
+                                                   comment_type_id="1234",
+                                                   query_comment_per_page=2,
+                                                   max_pages_to_search=10)
 
     self.assertEqual(comment_id, 3)
+    self.assertEqual(mock_requester.get.call_count, 2)
     endpoint_url = f"{post_benchmark_comment.GITHUB_IREE_API_PREFIX}/issues/23/comments"
     mock_requester.get.assert_any_call(endpoint=endpoint_url,
                                        payload={
-                                           "per_page": 100,
+                                           "per_page": 2,
                                            "page": 1,
                                            "sort": "updated",
                                            "direction": "desc"
                                        })
     mock_requester.get.assert_any_call(endpoint=endpoint_url,
                                        payload={
-                                           "per_page": 100,
+                                           "per_page": 2,
                                            "page": 2,
                                            "sort": "updated",
                                            "direction": "desc"
                                        })
 
   def test_get_previous_comment_on_pr_not_found(self):
-    self._mock_response.status_code = http.client.OK
-    self._mock_response.json.return_value = []
-    client = post_benchmark_comment.GithubClient(self._mock_requester)
+    mock_response = mock.create_autospec(requests.Response)
+    mock_response.status_code = http.client.OK
+    mock_response.json.return_value = [{
+        "id": 1,
+        "user": {
+            "login": "bot"
+        },
+        "body": "comment id: 5678"
+    }]
+    mock_requester = mock.create_autospec(post_benchmark_comment.APIRequester)
+    mock_requester.get.side_effect = [mock_response] * 10
+    client = post_benchmark_comment.GithubClient(mock_requester)
 
     comment_id = client.get_previous_comment_on_pr(pr_number=23,
                                                    gist_bot_user="bot",
-                                                   comment_type_id="1234")
+                                                   comment_type_id="1234",
+                                                   query_comment_per_page=1,
+                                                   max_pages_to_search=10)
 
     self.assertIsNone(comment_id)
-    self._mock_requester.get.assert_any_call(
-        endpoint=
-        f"{post_benchmark_comment.GITHUB_IREE_API_PREFIX}/issues/23/comments",
-        payload={
-            "per_page": 100,
-            "page": 1,
-            "sort": "updated",
-            "direction": "desc"
-        })
-    self._mock_requester.get.assert_any_call(
-        endpoint=
-        f"{post_benchmark_comment.GITHUB_IREE_API_PREFIX}/issues/23/comments",
-        payload={
-            "per_page": 100,
-            "page": post_benchmark_comment.MAX_PAGES_TO_SEARCH_PREVIOUS_COMMENT,
-            "sort": "updated",
-            "direction": "desc"
-        })
+    self.assertEqual(mock_requester.get.call_count, 10)
+    endpoint_url = f"{post_benchmark_comment.GITHUB_IREE_API_PREFIX}/issues/23/comments"
+    mock_requester.get.assert_any_call(endpoint=endpoint_url,
+                                       payload={
+                                           "per_page": 1,
+                                           "page": 1,
+                                           "sort": "updated",
+                                           "direction": "desc"
+                                       })
+    mock_requester.get.assert_any_call(endpoint=endpoint_url,
+                                       payload={
+                                           "per_page": 1,
+                                           "page": 10,
+                                           "sort": "updated",
+                                           "direction": "desc"
+                                       })
 
   def test_update_comment_on_pr(self):
     self._mock_response.status_code = http.client.OK
