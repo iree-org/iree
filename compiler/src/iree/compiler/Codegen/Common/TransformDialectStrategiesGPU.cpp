@@ -63,6 +63,40 @@ auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
   return std::tuple_cat(a);
 }
 
+/// Compute the (splitPoint, vectorSize) pair to break [0 .. upperBound] into
+/// [0 .. splitPoint] and [splitPoint + 1 .. upperBound] such that `splitPoint`
+/// is a multiple of `minMultiple * vectorSize`.
+/// `vectorSize` is the maximal power of `2`, smaller than `maxVectorSize`, for
+/// which `splitPoint` can be computed.
+///
+/// If such a positive multiple exists:
+///   1. if it is `upperBound`, then `upperBound` is an even multiple of
+///      `minMultiple` * `vectorSize` and we can tile evenly without splitting.
+///      In this case we return (0, vectorSize).
+///   2. otherwise, it is a split point at which we can split with vectorSize
+///      to obtain the largest divisible tiling.
+///      In this case we return (splitPoint, vectorSize).
+/// Otherwise we return (0, 1) to signify no splitting and a vector size of 1.
+// TODO: support the dynamic case, taking future stride and alignment into
+// account and returning Values. The op then needs to become part of the
+// transform dialect.
+static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
+                                                     int64_t minMultiple,
+                                                     int64_t maxVectorSize) {
+  assert((maxVectorSize & (maxVectorSize - 1)) == 0 && "must be a power of 2");
+  if (ShapedType::isDynamic(upperBound)) return std::make_pair(0l, 1l);
+  for (int64_t vectorSize = maxVectorSize; vectorSize >= 1; vectorSize >>= 1) {
+    int64_t splitPoint =
+        iree_compiler::previousMultipleOf(upperBound, minMultiple * vectorSize);
+    if (splitPoint > 0) {
+      return (upperBound == splitPoint)
+                 ? std::make_pair(0l, vectorSize)
+                 : std::make_pair(splitPoint, vectorSize);
+    }
+  }
+  return std::make_pair(0l, 1l);
+}
+
 /// Post-bufferization mapping to blocks and threads.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
@@ -445,51 +479,35 @@ createReductionStrategyStagedThreadDistributionStep(
                          blockCombinerOpH);
 }
 
-/// Search for the maximal `numThreadsXInBlock` times `vectorSize` smaller than
-/// `value`; where `vectorSize` is in `{4, 2, 1}`.
-/// If such a positive multiple exists:
-///   1. if it is `value`, then value is an even multiple of
-///   `numThreadsXInBlock` * `vectorSize` and we can tile evenly without
-///   splitting.
-///   2. otherwise, it is a split point at which we can split with vectorSize
-///   to obtain the largest divisible tiling.
-/// Return splitPoint and vector size.
-static std::pair<int64_t, int64_t> computeElementwiseSplitPoint(
-    int64_t value, int numThreadsXInBlock) {
-  int64_t zero = 0;
-  if (ShapedType::isDynamic(value)) return std::make_pair(zero, 1);
-  for (int64_t vectorSize : {4, 2, 1}) {
-    int64_t splitPoint = iree_compiler::previousMultipleOf(
-        value, numThreadsXInBlock * vectorSize);
-    if (splitPoint > 0) {
-      return (value == splitPoint) ? std::make_pair(zero, vectorSize)
-                                   : std::make_pair(splitPoint, vectorSize);
-    }
-  }
-  return std::make_pair(zero, 1);
-}
-
-static void createElementwiseStrategyThreadStep(
+/// Given a handle `elementwiseH` to an elementwise op of rank `rank`, sizes
+/// `elementwiseSizes` mapped to `numThreadsXInBlock` threads along dimension x.
+/// Build a schedule that maps the most minor dimension to a scf.foreach op
+/// itself mapped to the `gpu.thread x` dimension.
+/// The schedule first performs a split of the largest possible multiple of
+/// `numThreadsXInBlock * maxVectorSize` to form a maximally divisible region
+/// Assumes the most minor dimension of the op is the last one.
+// TODO: More robustness wrt selecting the most minor dimension otherwise
+// performance may suffer.
+// TODO: Split point should be dynamic and aware of future stride / alignment
+// to also guarantee proper vector alignments.
+static void create1DSplittingStrategyWithOptionalThreadMapping(
     ImplicitLocOpBuilder &b, Value elementwiseH, int64_t rank,
-    SmallVector<int64_t> elementwiseSizes, int64_t numThreadsXInBlock) {
-  assert(rank > 0 && "nonnegative rank expected");
-  SmallVector<int64_t> trailingTileSizes(rank, 0);
-  // The following assumes we only want to tile the most-minor dimension of the
-  // trailing operation. This may be a completely wrong choice.
-  // TODO: More robustness to permutations of most-minor dimensions.
-  // TODO: Split point should be aware of future stride / alignment.
+    SmallVector<int64_t> elementwiseSizes, int64_t numThreads,
+    int64_t maxVectorSize = 4) {
+  if (rank == 0) return;
+
   int64_t mostMinorDim = rank - 1;
   int64_t mostMinorSize = elementwiseSizes[mostMinorDim];
   auto [splitPoint, vectorSize] =
-      computeElementwiseSplitPoint(mostMinorSize, numThreadsXInBlock);
+      computeSplitPoint(mostMinorSize, numThreads, maxVectorSize);
 
-  SmallVector<int64_t> scfForTileSizes = trailingTileSizes,
-                       foreachTileSizes = trailingTileSizes;
-  scfForTileSizes[mostMinorDim] = numThreadsXInBlock * vectorSize;
-  foreachTileSizes[mostMinorDim] = numThreadsXInBlock;
+  SmallVector<int64_t> scfForTileSizes(rank, 0), foreachTileSizes(rank, 0);
+  scfForTileSizes[mostMinorDim] = numThreads * vectorSize;
+  foreachTileSizes[mostMinorDim] = numThreads;
 
   auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
                                                       mlir::gpu::Threads::DimX);
+  // Split, tile and map the most minor dimension to `gpu.thread x`.
   if (splitPoint > 0) {
     auto pdlOperation = pdl::OperationType::get(b.getContext());
     auto split =
@@ -497,23 +515,33 @@ static void createElementwiseStrategyThreadStep(
                                      b.getI64IntegerAttr(mostMinorDim), Value(),
                                      b.getI64IntegerAttr(splitPoint));
     elementwiseH = split.getFirst();
+    if (vectorSize > 1) {
+      auto res = iree_compiler::buildTileFuseToScfFor(
+          b, elementwiseH, {},
+          getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
+      elementwiseH = res.tiledOpH;
+    }
+    if (numThreads > 1) {
+      iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
+          b, elementwiseH, {},
+          getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
+          b.getArrayAttr({threadX}));
+    }
+    elementwiseH = split.getSecond();
+  }
+  // Tile and map the most minor dimension of the remainder to `gpu.thread x`.
+  if (vectorSize > 1) {
     auto res = iree_compiler::buildTileFuseToScfFor(
         b, elementwiseH, {},
         getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
+    elementwiseH = res.tiledOpH;
+  }
+  if (numThreads > 1) {
     iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
-        b, res.tiledOpH, {},
+        b, elementwiseH, {},
         getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
         b.getArrayAttr({threadX}));
-    elementwiseH = split.getSecond();
   }
-
-  auto res = iree_compiler::buildTileFuseToScfFor(
-      b, elementwiseH, {},
-      getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
-  iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
-      b, res.tiledOpH, {},
-      getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
-      b.getArrayAttr({threadX}));
 }
 
 static void createReductionStrategyStagedThreadDistribution(
@@ -523,7 +551,7 @@ static void createReductionStrategyStagedThreadDistribution(
   // Map the potential maybeTiledLeadingH.
   // TODO: Consider fusing leading elementwise into threads.
   if (strategy.captures.maybeLeadingRank > 0) {
-    createElementwiseStrategyThreadStep(
+    create1DSplittingStrategyWithOptionalThreadMapping(
         b, maybeTiledLeadingH, strategy.captures.maybeLeadingRank,
         strategy.captures.leadingOpSizes, strategy.getNumThreadsXInBlock());
   }
@@ -545,7 +573,7 @@ static void createReductionStrategyStagedThreadDistribution(
 
   // Map the potential maybeTiledTrailingH.
   if (strategy.captures.maybeTrailingRank > 0) {
-    createElementwiseStrategyThreadStep(
+    create1DSplittingStrategyWithOptionalThreadMapping(
         b, maybeTiledTrailingH, strategy.captures.maybeTrailingRank,
         strategy.captures.trailingOpSizes, strategy.getNumThreadsXInBlock());
   }
@@ -632,34 +660,29 @@ static void createSmallReductionStrategyThreadDistribution(
   maybeLeadingH =
       b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.foreachThreadH);
 
-  // Scalarize all ops to ensure vectorization.
+  // 1. Scalarize all ops to ensure vectorization.
   auto pdlOperation = pdl::OperationType::get(b.getContext());
   fillH = b.create<ScalarizeOp>(pdlOperation, fillH);
   maybeLeadingH = b.create<ScalarizeOp>(pdlOperation, maybeLeadingH);
   Value tiledH = b.create<ScalarizeOp>(pdlOperation, tileResult.tiledOpH);
   Value fusedH = b.create<ScalarizeOp>(
       pdlOperation, tileResult.resultingFusedOpsHandles.front());
-
   auto [blockReductionH, maybeBlockTrailingH] =
       iree_compiler::buildSelectFirstNonEmpty(b, fusedH, tiledH);
 
-  // Splitting into explicit vector<4> helps a lot on alignment.
-  // TODO: first split should be dynamic and based on the future stride.
-  int64_t reductionDimensionSize = strategy.captures.reductionOpSizes.back();
-  if (ShapedType::isDynamic(reductionDimensionSize)) return;
+  // 2. Apply the 1d splitting strategy to the reduction part while specifying
+  // a single thread. This triggers the splitting but not the thread mapping
+  // part.
+  create1DSplittingStrategyWithOptionalThreadMapping(
+      b, blockReductionH, strategy.captures.reductionRank,
+      strategy.captures.reductionOpSizes,
+      /*numThreads=*/1);
 
-  for (int64_t i = 0, e = (reductionDimensionSize - 1) / 4; i < e; ++i) {
-    auto split = b.create<transform::SplitOp>(
-        pdlOperation, pdlOperation, blockReductionH,
-        b.getI64IntegerAttr(strategy.captures.reductionRank - 1), Value(),
-        b.getI64IntegerAttr(4));
-    blockReductionH = split.getSecond();
-    auto split2 = b.create<transform::SplitOp>(
-        pdlOperation, pdlOperation, maybeBlockTrailingH,
-        b.getI64IntegerAttr(strategy.captures.reductionRank - 1), Value(),
-        b.getI64IntegerAttr(4));
-    maybeBlockTrailingH = split2.getSecond();
-  }
+  // 3. apply the 1d splitting strategy to the trailing elementwise.
+  create1DSplittingStrategyWithOptionalThreadMapping(
+      b, maybeBlockTrailingH, strategy.captures.maybeTrailingRank,
+      strategy.captures.trailingOpSizes,
+      strategy.getNumThreadsInBlock().back());
 }
 
 /// Builds the transform IR tiling reductions for CUDA targets. Supports
@@ -687,7 +710,7 @@ static void createCudaSmallReductionStrategy(
       b, maybeLeadingHBlock, gridFillH, gridReductionH,
       maybeTiledTrailingHBlock, strategy);
 
-  // Step 4-6. Common trailing steps.
+  // Step 4-5. Common trailing steps.
   createCommonTrailingStrategy(b, variantH, strategy);
 }
 
