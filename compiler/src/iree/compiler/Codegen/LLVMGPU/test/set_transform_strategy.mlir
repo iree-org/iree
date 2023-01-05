@@ -35,7 +35,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   transform.iree.tile_to_foreach_thread_and_workgroup_count_region {{.*}} tile_sizes [1](mapping = [#gpu.block<x>])
 // CHECK-COUNT-2:   transform.structured.fuse_into_containing_op
 //         CHECK:   transform.iree.take_first
-//         CHECK:   tile_reduction_using_foreach_thread {{.*}} by num_threads = [0, 32], tile_sizes = [0, 4], mapping = [#gpu.thread<x>]
+//         CHECK:   tile_reduction_using_foreach_thread {{.*}} by num_threads = [0, 64], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
 //         CHECK:   transform.structured.fuse_into_containing_op
 //         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}} tile_sizes [1](mapping = [#gpu.thread<y>])
 //         CHECK:   transform.structured.match ops{["func.func"]} in %arg0
@@ -45,11 +45,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   transform.iree.erase_hal_descriptor_type_from_memref
 //         CHECK:   transform.structured.match ops{["func.func"]} in %{{.*}}
 //         CHECK:   transform.iree.foreach_thread_to_workgroup
-//         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [32, 1, 1]}
+//         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [64, 1, 1]}
 //         CHECK:   transform.iree.apply_patterns %{{.*}} {fold_memref_aliases, rank_reducing}
 //         CHECK:   transform.structured.match ops{["scf.if"]} in %{{.*}}
 //         CHECK:   sequence {{.*}} failures(suppress) {
-//         CHECK:     transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 32 : i64}
+//         CHECK:     transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 64 : i64}
 //         CHECK:   }
 //         CHECK:   transform.iree.vector.warp_distribute
 
@@ -90,8 +90,9 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 //   CHECK-LABEL: func.func @group_reduction_128
 //         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
-//         CHECK:   transform.structured.tile_reduction_using_foreach_thread %{{.*}} by num_threads = [0, 64], tile_sizes = [0, 4], mapping = [#gpu.thread<x>]
-//         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [64, 1, 1]}
+//         CHECK:   transform.structured.tile_reduction_using_foreach_thread %{{.*}} by num_threads = [0, 128], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
+//         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [128, 1, 1]}
+//         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 128 : i64}
 
 // -----
 
@@ -129,8 +130,9 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 //   CHECK-LABEL: func.func @group_reduction_32
 //         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
-//         CHECK:   transform.iree.tile_to_foreach_thread_and_workgroup_count_region %{{.*}} num_threads [] tile_sizes [32](mapping = [#gpu.block<x>])
-//         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}}   num_threads [32] tile_sizes [](mapping = [#gpu.thread<x>])
+//         CHECK:   transform.iree.tile_to_foreach_thread_and_workgroup_count_region %{{.*}} num_threads [] tile_sizes [64](mapping = [#gpu.block<x>])
+//         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}}   num_threads [64] tile_sizes [](mapping = [#gpu.thread<x>])
 // CHECK-COUNT-4:   transform.structured.scalarize %{{.*}}
 // CHECK-COUNT-14:   transform.structured.split %{{.*}} after 4  {dimension = 1 : i64}
-//         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [32, 1, 1]}
+//         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [64, 1, 1]}
+//     CHECK-NOT:   transform.iree.vector.to_warp_execute_on_lane_0

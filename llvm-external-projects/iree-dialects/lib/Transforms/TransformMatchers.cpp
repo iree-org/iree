@@ -129,7 +129,7 @@ transform_ext::StructuredOpMatcher::dim(SmallVector<int64_t> &&dimensions,
     LLVM_DEBUG(DBGS() << "dimensions [";
                llvm::interleaveComma(dimensions, llvm::dbgs());
                llvm::dbgs() << "] are " << utils::stringifyIteratorType(kind));
-    unsigned rank = linalgOp.getNumLoops();
+    int64_t rank = linalgOp.getNumLoops();
     for (auto dimension : dimensions) {
       int64_t transformedDimension =
           dimension >= 0 ? dimension : rank + dimension;
@@ -183,7 +183,7 @@ transform_ext::StructuredOpMatcher::dim(int64_t dimension,
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "dimension " << dimension << " is divisible by "
                       << divisibleBy.value);
-    unsigned rank = linalgOp.getNumLoops();
+    int64_t rank = linalgOp.getNumLoops();
     int64_t transformedDimension =
         dimension >= 0 ? dimension : rank + dimension;
     if (transformedDimension >= rank)
@@ -199,7 +199,7 @@ transform_ext::StructuredOpMatcher::dim(int64_t dimension,
 // Capture directives.
 //===---------------------------------------------------------------------===//
 transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::rank(CaptureStaticValue<int64_t> capture) {
+transform_ext::StructuredOpMatcher::rank(CaptureRank capture) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "capture rank");
     capture.value = linalgOp.getNumLoops();
@@ -209,17 +209,26 @@ transform_ext::StructuredOpMatcher::rank(CaptureStaticValue<int64_t> capture) {
 }
 
 transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::dim(int64_t dimension,
-                                        CaptureStaticValue<int64_t> capture) {
+transform_ext::StructuredOpMatcher::dim(int64_t dimension, CaptureDim capture) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "capture dimension");
-    unsigned rank = linalgOp.getNumLoops();
+    int64_t rank = linalgOp.getNumLoops();
     int64_t transformedDimension =
         dimension >= 0 ? dimension : rank + dimension;
     if (transformedDimension >= rank)
       return false;
 
     capture.value = linalgOp.getStaticLoopRanges()[transformedDimension];
+    return true;
+  });
+  return *this;
+}
+
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::dim(AllDims tag, CaptureDims captures) {
+  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+    LLVM_DEBUG(DBGS() << "capture all dimensions");
+    captures.value = linalgOp.getStaticLoopRanges();
     return true;
   });
   return *this;
@@ -583,10 +592,10 @@ bool transform_ext::StructuredOpMatcher::checkAllTilableMatched(
 //===---------------------------------------------------------------------===//
 
 ArrayRef<Operation *>
-transform_ext::MatchCallbackResult::getPayloadGroup(unsigned position) const {
+transform_ext::MatchCallbackResult::getPayloadGroup(int64_t position) const {
   assert(position < payloadGroupLengths.size());
   int64_t start = 0;
-  for (unsigned i = 0; i < position; ++i) {
+  for (int64_t i = 0; i < position; ++i) {
     start += payloadGroupLengths[i];
   }
   return llvm::makeArrayRef(payloadOperations)
@@ -597,7 +606,7 @@ transform_ext::MatchCallbackResult::getPayloadGroup(unsigned position) const {
 // Case-specific matcher builders.
 //===---------------------------------------------------------------------===//
 
-static constexpr unsigned kCudaWarpSize = 32;
+static constexpr int64_t kCudaWarpSize = 32;
 
 void transform_ext::makeReductionMatcher(
     transform_ext::StructuredOpMatcher &reduction,
@@ -614,12 +623,11 @@ void transform_ext::makeReductionMatcher(
           //
           .rank(NumGreaterEqualTo(2))
           .rank(NumLowerEqualTo(4))
-          .rank(CaptureStaticValue<int64_t>(captures.reductionRank))
-          // Op has a single most-minor reduction that we capture.
+          .rank(CaptureRank(captures.reductionRank))
+          // Op has a single most-minor reduction.
           .dim(-1, utils::IteratorType::reduction)
-          .dim(-2, CaptureStaticValue<int64_t>(
-                       captures.mostMinorParallelDimensionSize))
-          .dim(-1, CaptureStaticValue<int64_t>(captures.reductionDimensionSize))
+          // Capture op sizes.
+          .dim(AllDims(), CaptureDims(captures.reductionOpSizes))
           // All other dimensions are parallel.
           .dim(AllDimsExcept({-1}), utils::IteratorType::parallel)
           // Single input for now, can be arbitrary projected permutations.
@@ -652,7 +660,7 @@ void transform_ext::makeReductionMatcher(
   fill = m_StructuredOp<linalg::FillOp>();
   reduction = reduction.output(NumEqualsTo(1)).output(0, fill);
 
-  // Optional leading or trailign op can be any map, transpose, broadcast but
+  // Optional leading or trailing op can be any map, transpose, broadcast but
   // not reduce or windowing operation for now.
   // It must create the unique input for the reduction.
   // TODO: match more optional leading ops, one per input of the reduction.
@@ -677,8 +685,10 @@ void transform_ext::makeReductionMatcher(
   // TODO: match more optional leading ops, one per input of the reduction.
   // TODO: careful about multi-output and turning into a contraction.
   //
-  leading = commonLeadingOrTrailing.rank(
-      CaptureStaticValue<int64_t>(captures.maybeLeadingRank));
+  leading = commonLeadingOrTrailing
+                .rank(CaptureRank(captures.maybeLeadingRank))
+                // Capture op sizes.
+                .dim(AllDims(), CaptureDims(captures.leadingOpSizes));
   reduction = reduction.input(0, leading, OptionalMatch());
 
   // Optional trailing can be any map, transpose, broadcast but not reduce or
@@ -687,8 +697,10 @@ void transform_ext::makeReductionMatcher(
   // TODO: match more optional leading ops, one per input of the reduction.
   // TODO: careful about multi-output and turning into a contraction.
   //
-  trailing = commonLeadingOrTrailing.rank(
-      CaptureStaticValue<int64_t>(captures.maybeTrailingRank));
+  trailing = commonLeadingOrTrailing
+                 .rank(CaptureRank(captures.maybeTrailingRank))
+                 // Capture op sizes.
+                 .dim(AllDims(), CaptureDims(captures.trailingOpSizes));
   reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch())
                   .allTilableOpsCaptured<func::FuncOp>();
 }
