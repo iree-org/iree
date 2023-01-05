@@ -24,6 +24,11 @@
                              apply_to = function)
 #endif
 
+static inline int32_t vm_ext_i8i32u(int32_t);
+static inline int32_t vm_ext_i8i32s(int32_t);
+static inline int32_t vm_ext_i16i32u(int32_t);
+static inline int32_t vm_ext_i16i32s(int32_t);
+
 //===------------------------------------------------------------------===//
 // Globals
 //===------------------------------------------------------------------===//
@@ -37,6 +42,130 @@ static inline void vm_global_store_i32(uint8_t* base, uint32_t byte_offset,
                                        int32_t value) {
   int32_t* global_ptr = (int32_t*)(base + byte_offset);
   *global_ptr = value;
+}
+
+//===------------------------------------------------------------------===//
+// Buffers
+//===------------------------------------------------------------------===//
+
+static inline iree_status_t vm_buffer_compare(
+    const iree_vm_buffer_t* lhs_buffer, uint32_t lhs_offset,
+    const iree_vm_buffer_t* rhs_buffer, uint32_t rhs_offset, uint32_t length,
+    int32_t* result) {
+  bool bool_result = false;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_compare_bytes(
+      lhs_buffer, lhs_offset, rhs_buffer, rhs_offset, length, &bool_result));
+  *result = bool_result ? 1 : 0;
+  return iree_ok_status();
+}
+
+static inline iree_status_t vm_buffer_fill_i8(iree_vm_buffer_t* buffer,
+                                              uint32_t offset, uint32_t length,
+                                              uint8_t value) {
+  return iree_vm_buffer_fill_elements(buffer, offset, length / sizeof(value),
+                                      sizeof(value), &value);
+}
+
+static inline iree_status_t vm_buffer_fill_i16(iree_vm_buffer_t* buffer,
+                                               uint32_t offset, uint32_t length,
+                                               uint16_t value) {
+  return iree_vm_buffer_fill_elements(buffer, offset, length / sizeof(value),
+                                      sizeof(value), &value);
+}
+
+static inline iree_status_t vm_buffer_fill_i32(iree_vm_buffer_t* buffer,
+                                               uint32_t offset, uint32_t length,
+                                               uint32_t value) {
+  return iree_vm_buffer_fill_elements(buffer, offset, length / sizeof(value),
+                                      sizeof(value), &value);
+}
+
+static inline iree_status_t vm_buffer_fill_i64(iree_vm_buffer_t* buffer,
+                                               uint32_t offset, uint32_t length,
+                                               uint64_t value) {
+  return iree_vm_buffer_fill_elements(buffer, offset, length / sizeof(value),
+                                      sizeof(value), &value);
+}
+
+static inline iree_status_t vm_buffer_load_i8u(iree_vm_buffer_t* buffer,
+                                               uint32_t offset,
+                                               int32_t* result) {
+  uint8_t result_x8 = 0;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(buffer, offset, &result_x8,
+                                                    1, sizeof(result_x8)));
+  *result = vm_ext_i8i32u(result_x8);
+  return iree_ok_status();
+}
+
+static inline iree_status_t vm_buffer_load_i8s(iree_vm_buffer_t* buffer,
+                                               uint32_t offset,
+                                               int32_t* result) {
+  int8_t result_x8 = 0;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(buffer, offset, &result_x8,
+                                                    1, sizeof(result_x8)));
+  *result = vm_ext_i8i32s(result_x8);
+  return iree_ok_status();
+}
+
+static inline iree_status_t vm_buffer_load_i16u(iree_vm_buffer_t* buffer,
+                                                uint32_t offset,
+                                                int32_t* result) {
+  uint16_t result_x16 = 0;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
+      buffer, offset * sizeof(result_x16), &result_x16, 1, sizeof(result_x16)));
+  *result = vm_ext_i16i32u(result_x16);
+  return iree_ok_status();
+}
+
+static inline iree_status_t vm_buffer_load_i16s(iree_vm_buffer_t* buffer,
+                                                uint32_t offset,
+                                                int32_t* result) {
+  int16_t result_x16 = 0;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
+      buffer, offset * sizeof(result_x16), &result_x16, 1, sizeof(result_x16)));
+  *result = vm_ext_i16i32s(result_x16);
+  return iree_ok_status();
+}
+
+static inline iree_status_t vm_buffer_load_i32(iree_vm_buffer_t* buffer,
+                                               uint32_t offset,
+                                               int32_t* result) {
+  return iree_vm_buffer_read_elements(buffer, offset * sizeof(*result), result,
+                                      1, sizeof(*result));
+}
+
+static inline iree_status_t vm_buffer_load_i64(iree_vm_buffer_t* buffer,
+                                               uint32_t offset,
+                                               int64_t* result) {
+  return iree_vm_buffer_read_elements(buffer, offset * sizeof(*result), result,
+                                      1, sizeof(*result));
+}
+
+static inline iree_status_t vm_buffer_store_i8(iree_vm_buffer_t* buffer,
+                                               uint32_t offset, uint8_t value) {
+  return iree_vm_buffer_write_elements(&value, buffer, offset * sizeof(value),
+                                       1, sizeof(value));
+}
+
+static inline iree_status_t vm_buffer_store_i16(iree_vm_buffer_t* buffer,
+                                                uint32_t offset,
+                                                uint16_t value) {
+  return iree_vm_buffer_write_elements(&value, buffer, offset * sizeof(value),
+                                       1, sizeof(value));
+}
+
+static inline iree_status_t vm_buffer_store_i32(iree_vm_buffer_t* buffer,
+                                                uint32_t offset,
+                                                uint32_t value) {
+  return iree_vm_buffer_write_elements(&value, buffer, offset * sizeof(value),
+                                       1, sizeof(value));
+}
+
+static inline iree_status_t vm_buffer_store_i64(iree_vm_buffer_t* buffer,
+                                                uint32_t offset,
+                                                uint64_t value) {
+  return iree_vm_buffer_write_elements(&value, buffer, offset * sizeof(value),
+                                       1, sizeof(value));
 }
 
 //===------------------------------------------------------------------===//
@@ -271,6 +400,29 @@ static inline void vm_global_store_f32(uint8_t* base, uint32_t byte_offset,
                                        float value) {
   float* global_ptr = (float*)(base + byte_offset);
   *global_ptr = value;
+}
+
+//===------------------------------------------------------------------===//
+// ExtF32: Buffers
+//===------------------------------------------------------------------===//
+
+static inline iree_status_t vm_buffer_fill_f32(iree_vm_buffer_t* buffer,
+                                               uint32_t offset, uint32_t length,
+                                               float value) {
+  return iree_vm_buffer_fill_elements(buffer, offset, length / sizeof(value),
+                                      sizeof(value), &value);
+}
+
+static inline iree_status_t vm_buffer_load_f32(iree_vm_buffer_t* buffer,
+                                               uint32_t offset, float* result) {
+  return iree_vm_buffer_read_elements(buffer, offset * sizeof(*result), result,
+                                      1, sizeof(*result));
+}
+
+static inline iree_status_t vm_buffer_store_f32(iree_vm_buffer_t* buffer,
+                                                uint32_t offset, float value) {
+  return iree_vm_buffer_write_elements(&value, buffer, offset * sizeof(value),
+                                       1, sizeof(value));
 }
 
 //===------------------------------------------------------------------===//
