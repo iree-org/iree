@@ -11,20 +11,20 @@
 //   * https://github.com/evanw/emscripten-library-generator
 //   * https://github.com/emscripten-core/emscripten/tree/main/src
 
-const LibraryLoopEmscripten = {
-  $loop_emscripten_support__postset: 'loop_emscripten_support();',
-  $loop_emscripten_support: function() {
+const IreeLibraryLoopEmscripten = {
+  $iree_loop_emscripten_support__postset: 'iree_loop_emscripten_support();',
+  $iree_loop_emscripten_support: function() {
     const IREE_STATUS_OK = 0;
     const IREE_STATUS_CODE_MASK = 0x1F;
     const IREE_STATUS_ABORTED = 10 & IREE_STATUS_CODE_MASK;
     const IREE_STATUS_OUT_OF_RANGE = 11 & IREE_STATUS_CODE_MASK;
 
-    class LoopOperation {
+    class LoopCommand {
       abort() {}
     }
 
     // IREE_LOOP_COMMAND_CALL
-    class LoopOperationCall extends LoopOperation {
+    class LoopCommandCall extends LoopCommand {
       constructor(scope, operationId, callback, user_data, loop) {
         super();
 
@@ -36,6 +36,7 @@ const LibraryLoopEmscripten = {
           Module['dynCall'](
               'iiii', this.callback, this.user_data, this.loop, IREE_STATUS_OK);
           // TODO(scotttodd): handle the returned status (sticky failure state?)
+          //     at least free the status so it doesn't leak
           delete scope.pendingOperations[operationId];
         }, 0);
       }
@@ -52,7 +53,7 @@ const LibraryLoopEmscripten = {
       constructor() {
         this.nextOperationId = 0;
 
-        // Dictionary of operationIds -> LoopOperations.
+        // Dictionary of operationIds -> LoopCommands.
         this.pendingOperations = {};
       }
 
@@ -67,7 +68,7 @@ const LibraryLoopEmscripten = {
         // TODO(scotttodd): assert not destroyed to avoid reentrant queueing?
         const operationId = this.nextOperationId++;
         this.pendingOperations[operationId] =
-            new LoopOperationCall(this, operationId, callback, user_data, loop);
+            new LoopCommandCall(this, operationId, callback, user_data, loop);
         return IREE_STATUS_OK;
       }
     }
@@ -80,13 +81,13 @@ const LibraryLoopEmscripten = {
         this.scopes = {};
       }
 
-      loop_allocate_scope() {
+      iree_loop_allocate_scope() {
         const scopeHandle = this.nextScopeHandle++;
         this.scopes[scopeHandle] = new LoopEmscriptenScope();
         return scopeHandle;
       }
 
-      loop_free_scope(scope_handle) {
+      iree_loop_free_scope(scope_handle) {
         if (!(scope_handle in this.scopes)) return;
 
         const scope = this.scopes[scope_handle];
@@ -94,7 +95,7 @@ const LibraryLoopEmscripten = {
         delete this.scopes[scope_handle];
       }
 
-      loop_command_call(scope_handle, callback, user_data, loop) {
+      iree_loop_command_call(scope_handle, callback, user_data, loop) {
         if (!(scope_handle in this.scopes)) return IREE_STATUS_OUT_OF_RANGE;
 
         const scope = this.scopes[scope_handle];
@@ -103,17 +104,18 @@ const LibraryLoopEmscripten = {
     }
 
     const instance = new LoopEmscripten();
-    _loop_allocate_scope = instance.loop_allocate_scope.bind(instance);
-    _loop_free_scope = instance.loop_free_scope.bind(instance);
-    _loop_command_call = instance.loop_command_call.bind(instance);
+    _iree_loop_allocate_scope =
+        instance.iree_loop_allocate_scope.bind(instance);
+    _iree_loop_free_scope = instance.iree_loop_free_scope.bind(instance);
+    _iree_loop_command_call = instance.iree_loop_command_call.bind(instance);
   },
 
-  loop_allocate_scope: function() {},
-  loop_allocate_scope__deps: ['$loop_emscripten_support'],
-  loop_free_scope: function() {},
-  loop_free_scope__deps: ['$loop_emscripten_support'],
-  loop_command_call: function() {},
-  loop_command_call__deps: ['$loop_emscripten_support'],
+  iree_loop_allocate_scope: function() {},
+  iree_loop_allocate_scope__deps: ['$iree_loop_emscripten_support'],
+  iree_loop_free_scope: function() {},
+  iree_loop_free_scope__deps: ['$iree_loop_emscripten_support'],
+  iree_loop_command_call: function() {},
+  iree_loop_command_call__deps: ['$iree_loop_emscripten_support'],
 }
 
-mergeInto(LibraryManager.library, LibraryLoopEmscripten);
+mergeInto(LibraryManager.library, IreeLibraryLoopEmscripten);
