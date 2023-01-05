@@ -166,8 +166,7 @@ steps:
         --pr_committish="$${BUILDKITE_COMMIT}" \
         --pr_base_branch="origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
         --build_url="$${BUILDKITE_BUILD_URL}" \
-        --comment_title="Abbreviated Linux Benchmark Summary" \
-        --comment_type_id="37549014-3c67-4e74-8d88-8e929231abe3" \
+        --comment_type="linux-benchmark-summary" \
         --output="benchmark-comment.json"
       export GIST_BOT_USER="iree-github-actions-bot"
       export GIST_BOT_TOKEN="$${GITHUB_TOKEN}"

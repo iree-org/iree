@@ -36,6 +36,23 @@ TABLE_SIZE_CUT = 3
 THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
 
 
+@dataclasses.dataclass(frozen=True)
+class CommentDef(object):
+  title: str
+  type_id: str
+
+
+# Map from comment type to comment definition.
+COMMENT_DEF_MAP = {
+    "android-benchmark-summary":
+        CommentDef(title="Abbreviated Android Benchmark Summary",
+                   type_id="bf8cdf94-a992-466d-b11c-778cbd805a22"),
+    "linux-benchmark-summary":
+        CommentDef(title="Abbreviated Linux Benchmark Summary",
+                   type_id="37549014-3c67-4e74-8d88-8e929231abe3")
+}
+
+
 def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
   # TODO(#11703): Should use --first-parent here. See issue for the required
@@ -131,7 +148,7 @@ def _get_benchmark_result_markdown(
     execution_benchmarks: Dict[
         str, benchmark_presentation.AggregateBenchmarkLatency],
     compilation_metrics: Dict[str, benchmark_presentation.CompilationMetrics],
-    pr_url: str, build_url: str, comment_title: str, comment_type_id: str,
+    pr_url: str, build_url: str, comment_def: CommentDef,
     commit_info_md: str) -> Tuple[str, str]:
   """Gets the full/abbreviated markdown summary of all benchmarks in files."""
 
@@ -151,7 +168,7 @@ def _get_benchmark_result_markdown(
           compilation_metrics))
 
   # Compose the abbreviated benchmark tables.
-  abbr_table = [md.header(comment_title, 2)]
+  abbr_table = [md.header(comment_def.title, 2)]
   abbr_table.append(commit_info_md)
 
   abbr_benchmarks_tables = benchmark_presentation.categorize_benchmarks_into_tables(
@@ -177,7 +194,7 @@ def _get_benchmark_result_markdown(
 
   # Append the unique comment type id to help identify and update the existing
   # comment.
-  abbr_table.append(f"<!--Comment type id: {comment_type_id}-->")
+  abbr_table.append(f"<!--Comment type id: {comment_def.type_id}-->")
 
   return "\n\n".join(full_table), "\n\n".join(abbr_table)
 
@@ -209,14 +226,10 @@ def parse_arguments():
                       type=str,
                       default=None,
                       help="Base branch to merge the PR.")
-  parser.add_argument("--comment_title",
-                      default="Abbreviated Benchmark Summary",
-                      help="Title of the comment")
-  parser.add_argument(
-      "--comment_type_id",
-      default="abbr-benchmark-summary",
-      help="Unique id to identify the previous comment and update the one "
-      "with the same id when posting")
+  parser.add_argument("--comment_type",
+                      required=True,
+                      choices=COMMENT_DEF_MAP.keys(),
+                      help="Type of summary comment")
   parser.add_argument("--build_url",
                       required=True,
                       type=str,
@@ -296,17 +309,16 @@ def main(args):
   elif pr_base_commit is not None:
     commit_info_md += " (no previous benchmark results to compare)"
 
-  comment_type_id = args.comment_type_id
+  comment_def = COMMENT_DEF_MAP[args.comment_type]
   full_md, abbr_md = _get_benchmark_result_markdown(
       execution_benchmarks=execution_benchmarks,
       compilation_metrics=compilation_metrics,
       pr_url=f"{GITHUB_IREE_REPO_PREFIX}/pull/{args.pr_number}",
       build_url=args.build_url,
-      comment_title=args.comment_title,
-      comment_type_id=comment_type_id,
+      comment_def=comment_def,
       commit_info_md=commit_info_md)
 
-  comment_data = benchmark_comment.CommentData(type_id=comment_type_id,
+  comment_data = benchmark_comment.CommentData(type_id=comment_def.type_id,
                                                abbr_md=abbr_md,
                                                full_md=full_md)
   comment_json_data = json.dumps(dataclasses.asdict(comment_data), indent=2)
