@@ -162,6 +162,7 @@ static MatmulTileParams chooseMatmulTileParamsAArch64(
     MatmulType type, ExecutableTargetAttr target) {
   switch (type) {
     case MatmulType::F32F32F32:
+      return {8, 32, 16};  // x86
       return {8, 1, 8};
     case MatmulType::I8I8I32:
       if (hasFeature(target, "+i8mm")) return {8, 8, 8};
@@ -172,6 +173,8 @@ static MatmulTileParams chooseMatmulTileParamsAArch64(
       return {};
   }
 }
+
+static MatmulTileParams chooseMatmulTileParamsX86() { return {8, 32, 16}; }
 
 static MatmulTileParams chooseMatmulTileParamsVMVXMicrokernels() {
   return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
@@ -184,6 +187,9 @@ static MatmulTileParams chooseMatmulTileParams(MatmulType type,
   }
   if (isAArch64(target)) {
     return chooseMatmulTileParamsAArch64(type, target);
+  }
+  if (isX86(target)) {
+    return chooseMatmulTileParamsX86();
   }
   return chooseMatmulTileParamsGeneric();
 }
