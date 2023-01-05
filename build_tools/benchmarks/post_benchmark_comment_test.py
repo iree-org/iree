@@ -84,16 +84,8 @@ class GithubClientTest(unittest.TestCase):
         },
         "body": "comment id: 1234"
     }]
-
-    def _handle_get(endpoint: str, payload: Any):
-      if payload["page"] == 1:
-        return first_mock_response
-      if payload["page"] == 2:
-        return second_mock_response
-      raise ValueError("Unexpected page")
-
     mock_requester = mock.create_autospec(post_benchmark_comment.APIRequester)
-    mock_requester.get.side_effect = _handle_get
+    mock_requester.get.side_effect = [first_mock_response, second_mock_response]
     client = post_benchmark_comment.GithubClient(mock_requester)
 
     comment_id = client.get_previous_comment_on_pr(pr_number=23,
