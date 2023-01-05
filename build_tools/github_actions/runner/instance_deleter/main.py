@@ -63,8 +63,8 @@ import os
 import random
 import re
 import time
-from http.client import (BAD_REQUEST, FORBIDDEN, INTERNAL_SERVER_ERROR,
-                         NOT_FOUND, UNAUTHORIZED)
+from http.client import (BAD_REQUEST, FORBIDDEN, GATEWAY_TIMEOUT,
+                         INTERNAL_SERVER_ERROR, NOT_FOUND, UNAUTHORIZED)
 
 import flask
 import functions_framework
@@ -168,28 +168,32 @@ def delete_instance_from_mig(mig_name: str, project: str, region: str,
 
 def should_scale_down(mig_name: str, project: str, region: str):
   start = time.time()
-  try:
-    print(f"Polling {mig_name} for stability")
-    while time.time() - start < STABILIZE_TIMEOUT_SECONDS:
+  print(f"Polling {mig_name} for stability")
+  while time.time() - start < STABILIZE_TIMEOUT_SECONDS:
+    try:
       mig = migs_client.get(project=project,
                             region=region,
                             instance_group_manager=mig_name)
-      if mig.status.is_stable:
-        break
-      # We sleep for a random amount of time here to avoid synchronizing callers
-      # waiting for the MIG to be stable.
-      sleep_secs = random.randint(1, 15)
-      print(f"{mig_name} is not stable. Retrying in {sleep_secs} seconds")
-      time.sleep(sleep_secs)
-  except google.api_core.exceptions.NotFound as e:
-    print(e)
-    return flask.abort(
-        e.code, f"Cannot view {mig_name} in region={region}, project={project}")
+    except google.api_core.exceptions.NotFound as e:
+      print(e)
+      return flask.abort(
+          e.code,
+          f"Cannot find {mig_name} in region={region}, project={project}")
+    if mig.status.is_stable:
+      break
+    # We sleep for a random amount of time here to avoid synchronizing callers
+    # waiting for the MIG to be stable.
+    sleep_secs = random.randint(1, 15)
+    print(f"{mig_name} is not stable. Retrying in {sleep_secs} seconds")
+    time.sleep(sleep_secs)
+  else:
+    return flask.abort(GATEWAY_TIMEOUT,
+                       "Timed out waiting for the MIG to become stable")
   autoscaler = autoscalers_client.get(project=project,
                                       region=region,
                                       autoscaler=_get_name_from_resource(
                                           mig.status.autoscaler))
-  response = str(autoscaler.recommended_size < mig.target_size).lower()
+  response = "true" if autoscaler.recommended_size < mig.target_size else "false"
   print(
       f"Autoscaler recommends size {autoscaler.recommended_size} and"
       f" {mig_name} is targetting size {mig.target_size}. Sending: {response}")

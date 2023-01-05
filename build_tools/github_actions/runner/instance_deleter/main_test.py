@@ -68,6 +68,8 @@ class InstanceDeleterTest(unittest.TestCase):
     time_patcher = mock.patch("time.time", autospec=True)
     self.time = time_patcher.start()
     self.time.return_value = 0
+    # Just noop sleep
+    mock.patch("time.sleep", autospec=True).start()
 
   def test_delete_happy_path(self):
     req = Request({}, populate_request=False, shallow=True)
@@ -154,6 +156,47 @@ class InstanceDeleterTest(unittest.TestCase):
     response = main.delete_self(req)
 
     self.assertEqual(response, "true")
+
+  def test_get_timeout(self):
+    req = Request({}, populate_request=False, shallow=True)
+    req.method = "GET"
+
+    token = make_token({
+        "google": {
+            "compute_engine": {
+                "project_id": PROJECT,
+                "zone": f"{REGION}-a",
+                "instance_name": INSTANCE_NAME,
+                "instance_id": str(ID1),
+            }
+        }
+    })
+
+    req.headers = {"Authorization": f"Bearer {token}"}
+
+    self_link = f"{INSTANCE_LINK_PREFIX}{INSTANCE_NAME}"
+    instance = compute.Instance(
+        id=ID1,
+        name=INSTANCE_NAME,
+        zone=ZONE,
+        self_link=self_link,
+        metadata=compute.Metadata(items=[
+            compute.Items(key=main.MIG_METADATA_KEY,
+                          value=f"{MIG_PATH_PREFIX}{MIG_NAME}")
+        ]))
+    self.instances_client.get.return_value = instance
+
+    mig = compute.InstanceGroupManager(
+        target_size=5,
+        status={
+            "is_stable": False,
+            "autoscaler": "autoscaler_link/autoscaler_name"
+        })
+    self.migs_client.get.return_value = mig
+    self.time.side_effect = [0, main.STABILIZE_TIMEOUT_SECONDS + 1]
+
+    with self.assertRaises(werkzeug.exceptions.GatewayTimeout):
+      main.delete_self(req)
 
   def test_narrow_allowed_migs(self):
     req = Request({}, populate_request=False, shallow=True)
