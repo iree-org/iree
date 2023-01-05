@@ -452,18 +452,54 @@ createReductionStrategyBlockDistribution(ImplicitLocOpBuilder &b,
 
 static std::tuple<Value, Value, Value>
 createReductionStrategyStagedThreadDistributionStep(
-    ImplicitLocOpBuilder &b, Value gridReductionH, int64_t reductionRank,
-    int64_t reductionTileSizeStage, int64_t reductionVectorSize) {
+    ImplicitLocOpBuilder &b, Value gridReductionH, int64_t rank,
+    const SmallVector<int64_t> &opSizes, int64_t reductionTileSizeStage,
+    int64_t maxVectorSize = 4) {
   auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
                                                       mlir::gpu::Threads::DimX);
+
+  int64_t mostMinorDim = rank - 1;
+  int64_t mostMinorSize = opSizes[mostMinorDim];
+
+  auto [splitPoint, vectorSize] =
+      computeSplitPoint(mostMinorSize, reductionTileSizeStage, maxVectorSize);
+
+  // Split, tile and map the most minor dimension to `gpu.thread x`.
+  if (splitPoint > 0 && vectorSize > 1) {
+    auto pdlOperation = pdl::OperationType::get(b.getContext());
+    auto split =
+        b.create<transform::SplitOp>(pdlOperation, pdlOperation, gridReductionH,
+                                     b.getI64IntegerAttr(mostMinorDim), Value(),
+                                     b.getI64IntegerAttr(splitPoint));
+    gridReductionH = split.getFirst();
+    // Split the reduction into a parallel and combiner part, then tile the
+    // parallel part and map it to `reductionTileSizeStage` threads, each
+    // working on `reductionVectorSize`.
+    SmallVector<int64_t> numThreads(rank, 0), tileSizes(rank, 0);
+    numThreads[mostMinorDim] = reductionTileSizeStage;
+    tileSizes[mostMinorDim] = maxVectorSize;
+    auto tileReduction = b.create<transform::TileReductionUsingForeachThreadOp>(
+        /*target=*/gridReductionH,
+        /*numThreads=*/numThreads,
+        /*tileSizes=*/tileSizes,
+        /*threadDimMapping=*/b.getArrayAttr(threadX));
+    Value blockParallelForeachThreadOp = tileReduction.getForeachThreadOp();
+    Value blockParallelFillH = tileReduction.getFillOp();
+    // Fuse the fill and pointwise to privatize them.
+    blockParallelFillH = b.create<FuseIntoContainingOp>(
+        blockParallelFillH, blockParallelForeachThreadOp);
+
+    // Prepare for the second part.
+    gridReductionH = split.getSecond();
+    vectorSize = 1;
+  }
+
   // Split the reduction into a parallel and combiner part, then tile the
   // parallel part and map it to `reductionTileSizeStage` threads, each working
   // on `reductionVectorSize`.
-  SmallVector<int64_t> leadingParallelDims(reductionRank - 1, 0);
-  SmallVector<int64_t> numThreads = leadingParallelDims;
-  numThreads.push_back(reductionTileSizeStage);
-  SmallVector<int64_t> tileSizes = leadingParallelDims;
-  tileSizes.push_back(reductionVectorSize);
+  SmallVector<int64_t> numThreads(rank, 0), tileSizes(rank, 0);
+  numThreads[mostMinorDim] = reductionTileSizeStage;
+  tileSizes[mostMinorDim] = maxVectorSize;
   auto tileReduction = b.create<transform::TileReductionUsingForeachThreadOp>(
       /*target=*/gridReductionH,
       /*numThreads=*/numThreads,
@@ -480,7 +516,7 @@ createReductionStrategyStagedThreadDistributionStep(
 }
 
 /// Given a handle `elementwiseH` to an elementwise op of rank `rank`, sizes
-/// `elementwiseSizes` mapped to `numThreadsXInBlock` threads along dimension x.
+/// `opSizes` mapped to `numThreadsXInBlock` threads along dimension x.
 /// Build a schedule that maps the most minor dimension to a scf.foreach op
 /// itself mapped to the `gpu.thread x` dimension.
 /// The schedule first performs a split of the largest possible multiple of
@@ -492,21 +528,21 @@ createReductionStrategyStagedThreadDistributionStep(
 // to also guarantee proper vector alignments.
 static void create1DSplittingStrategyWithOptionalThreadMapping(
     ImplicitLocOpBuilder &b, Value elementwiseH, int64_t rank,
-    SmallVector<int64_t> elementwiseSizes, int64_t numThreads,
+    const SmallVector<int64_t> &opSizes, int64_t numThreads,
     int64_t maxVectorSize = 4) {
   if (rank == 0) return;
 
+  auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
+                                                      mlir::gpu::Threads::DimX);
+
   int64_t mostMinorDim = rank - 1;
-  int64_t mostMinorSize = elementwiseSizes[mostMinorDim];
+  int64_t mostMinorSize = opSizes[mostMinorDim];
   auto [splitPoint, vectorSize] =
       computeSplitPoint(mostMinorSize, numThreads, maxVectorSize);
 
   SmallVector<int64_t> scfForTileSizes(rank, 0), foreachTileSizes(rank, 0);
   scfForTileSizes[mostMinorDim] = numThreads * vectorSize;
   foreachTileSizes[mostMinorDim] = numThreads;
-
-  auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
-                                                      mlir::gpu::Threads::DimX);
   // Split, tile and map the most minor dimension to `gpu.thread x`.
   if (splitPoint > 0) {
     auto pdlOperation = pdl::OperationType::get(b.getContext());
@@ -560,7 +596,8 @@ static void createReductionStrategyStagedThreadDistribution(
   auto [blockParallelForeachThreadOp, blockParallelFillH, blockCombinerOpH] =
       createReductionStrategyStagedThreadDistributionStep(
           b, gridReductionH, strategy.captures.reductionRank,
-          strategy.getNumThreadsXInBlock(), strategy.getVectorSize());
+          strategy.captures.reductionOpSizes, strategy.getNumThreadsXInBlock());
+  // strategy.getVectorSize());
 
   // Staged reduction step 2: multi-warp shuffle reduce.
   // Map the combiner reduction to one thread along y so it can be mapped
