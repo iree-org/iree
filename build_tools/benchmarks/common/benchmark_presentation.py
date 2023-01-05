@@ -15,7 +15,7 @@ import markdown_strings as md
 import math
 
 from common.benchmark_definition import BenchmarkResults, CompilationInfo, CompilationResults
-from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, COMPILATION_TIME_THRESHOLDS, TOTAL_DISPATCH_SIZE_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
+from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, COMPILATION_TIME_THRESHOLDS, TOTAL_ARTIFACT_SIZE_THRESHOLDS, TOTAL_DISPATCH_SIZE_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
 
 GetMetricFunc = Callable[[Any], Tuple[int, Optional[int]]]
 GetTableRowFunc = Callable[[str, Any], Tuple]
@@ -29,6 +29,7 @@ BENCHMARK_RESULTS_HEADERS = [
 ]
 COMPILATION_TIME_SERIES_SUFFIX = "compilation:module:compilation-time"
 TOTAL_DISPATCH_SIZE_SERIES_SUFFIX = "compilation:module:component-size:total-dispatch-size"
+TOTAL_ARTIFACT_SIZE_SERIES_SUFFIX = "compilation:module:total-artifact-size"
 
 
 @dataclass
@@ -47,7 +48,9 @@ class CompilationMetrics:
   compilation_info: CompilationInfo
   compilation_time_ms: int
   total_dispatch_component_bytes: int
+  total_artifact_bytes: int
   base_compilation_time_ms: Optional[int] = None
+  base_total_artifact_bytes: Optional[int] = None
   base_total_dispatch_component_bytes: Optional[int] = None
 
 
@@ -160,10 +163,42 @@ class TotalDispatchSizeToTable(MetricsToTableMapper[CompilationMetrics]):
     return "Total Dispatch Sizes"
 
 
+class TotalArtifactSizeToTable(MetricsToTableMapper[CompilationMetrics]):
+  """Helper to map CompilationMetrics to total artifact size column."""
+
+  def update_base_value(self, compile_metrics: CompilationMetrics,
+                        base_value: Any) -> CompilationMetrics:
+    return dataclasses.replace(compile_metrics,
+                               base_total_artifact_bytes=base_value)
+
+  def get_current_and_base_value(
+      self, compile_metrics: CompilationMetrics) -> Tuple[int, Optional[int]]:
+    return (compile_metrics.total_artifact_bytes,
+            compile_metrics.base_total_artifact_bytes)
+
+  def get_series_name(self, name: str) -> str:
+    return f"{name} [{TOTAL_ARTIFACT_SIZE_SERIES_SUFFIX}]"
+
+  def get_unit(self) -> str:
+    return "bytes"
+
+  def get_table_header(self) -> str:
+    return f"Total Artifact Size ({self.get_unit()})"
+
+  @staticmethod
+  def get_metric_thresholds() -> Sequence[BenchmarkThreshold]:
+    return TOTAL_ARTIFACT_SIZE_THRESHOLDS
+
+  @staticmethod
+  def get_table_title() -> str:
+    return "Total Artifact Sizes"
+
+
 COMPILATION_METRICS_TO_TABLE_MAPPERS: List[
     MetricsToTableMapper[CompilationMetrics]] = [
         CompilationTimeToTable(),
         TotalDispatchSizeToTable(),
+        TotalArtifactSizeToTable(),
     ]
 
 
@@ -239,6 +274,7 @@ def collect_all_compilation_metrics(
       compile_metrics[name] = CompilationMetrics(
           compilation_info=compile_stats.compilation_info,
           compilation_time_ms=compile_stats.compilation_time_ms,
+          total_artifact_bytes=component_sizes.file_bytes,
           total_dispatch_component_bytes=component_sizes.
           total_dispatch_component_bytes)
 

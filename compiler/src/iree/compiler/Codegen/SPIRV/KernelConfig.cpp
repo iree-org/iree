@@ -13,21 +13,18 @@
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -668,7 +665,7 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
     return setOpConfigAndEntryPointFnTranslation(
         op->getParentOfType<func::FuncOp>(), op, tileSizes,
         CodeGenPipeline::SPIRVMatmulPromoteVectorize, workgroupSize,
-        /*subgroupSize=*/llvm::None, pipelineDepth, storeStage);
+        /*subgroupSize=*/std::nullopt, pipelineDepth, storeStage);
   }
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -788,7 +785,7 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
                                  mWarpCount, nWarpCount, mTileCount,
                                  nTileCount, kTileCount};
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 namespace detail {
@@ -890,6 +887,14 @@ LogicalResult setCooperativeMatrixConfig(
   tileSizes.push_back(reductionTileSizes);
   tileSizes.push_back(vectorSizes);
 
+  // Don't do multibuffering if the inner reduction loop is folded out.
+  auto pipelineDepth = softwarePipelineDepth;
+  auto storeStage = softwarePipelineStoreStage;
+  if (coopMatSize->kTileCount <= 1) {
+    pipelineDepth = 0;
+    storeStage = 0;
+  }
+
   // Check if the C matrix will be promoted for computing shared memory usage.
   auto matmulResult = op.getDpsInitOperand(0)->get();
   bool promoteC =
@@ -897,8 +902,6 @@ LogicalResult setCooperativeMatrixConfig(
       !isa<IREE::Flow::DispatchTensorStoreOp>(*matmulResult.getUsers().begin());
 
   // Decrease pipeline depth until it fits in shared memory.
-  auto pipelineDepth = softwarePipelineDepth;
-  auto storeStage = softwarePipelineStoreStage;
   const int maxBytes = limits.getMaxComputeSharedMemorySize();
   auto usedBytes =
       getTileBytes(workgroupTileSizes[mIndex], workgroupTileSizes[nIndex],
@@ -936,9 +939,9 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
 
   // Tiling along partitioned loops with size 1.
-  for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
-    if (iteratorType.value() == utils::IteratorType::parallel) {
-      workgroupTileSize[iteratorType.index()] = 1;
+  for (auto [index, iteratorType] : llvm::enumerate(loopIteratorTypes)) {
+    if (iteratorType == utils::IteratorType::parallel) {
+      workgroupTileSize[index] = 1;
     }
   }
   auto rank = op.getOperandRank();
@@ -1059,10 +1062,22 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   tileSizes.emplace_back(std::move(reductionTileSizes));  // reduction level
+  if (failed(setOpConfigAndEntryPointFnTranslation(
+          op->getParentOfType<func::FuncOp>(), op, tileSizes,
+          CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize))) {
+    return failure();
+  }
 
-  return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<func::FuncOp>(), op, tileSizes,
-      CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize);
+  // Set lowering configuration to drive tiling for fused ops too---the pipeline
+  // expects it.
+  tileSizes[0] = {};  // We only need the reduction level tile sizes.
+  for (Operation *userOp : op->getUsers()) {
+    if (auto fusedOp = dyn_cast<linalg::LinalgOp>(userOp)) {
+      setLoweringConfig(fusedOp, IREE::Codegen::LoweringConfigAttr::get(
+                                     fusedOp.getContext(), tileSizes));
+    }
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1157,7 +1172,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
   // Distribute workload to the given `numThreads` by allowing a potental loss.
   auto distributeToThreads = [&](int64_t numThreads,
-                                 Optional<int64_t> lossFactor = llvm::None) {
+                                 Optional<int64_t> lossFactor = std::nullopt) {
     LLVM_DEBUG(llvm::dbgs() << "\nLoss factor: " << lossFactor << "\n");
     initConfiguration();
     // If there are more than 3 parallel dim try to tile the extra higher level
@@ -1271,12 +1286,11 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     // vector later. Similarly, also try to tile other untiled parallel
     // dimensions by 4 to avoid instruction bloat.
     SmallVector<int64_t> loopTileSizes(linalgOp.getNumLoops(), 0);
-    for (const auto &it : llvm::enumerate(linalgOp.getIteratorTypesArray())) {
-      auto i = it.index();
+    for (const auto &[i, iter] :
+         llvm::enumerate(linalgOp.getIteratorTypesArray())) {
       if (loopBounds[i] % 4 != 0) continue;
-      if (linalg::isReductionIterator(it.value()) ||
-          workgroupTileSizes[i] == 0) {
-        loopTileSizes[it.index()] = 4;
+      if (linalg::isReductionIterator(iter) || workgroupTileSizes[i] == 0) {
+        loopTileSizes[i] = 4;
       }
     }
     if (llvm::any_of(loopTileSizes, [](int64_t s) { return s != 0; })) {
@@ -1432,11 +1446,10 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       // Check if the op configuration was set.
       if (!getLoweringConfig(computeOp)) continue;
 
-      if (rootOperation) {
-        return computeOp->emitOpError(
-            "unhandled multiple roots in dispatch region");
-      }
       rootOperation = computeOp;
+      // Break after finding the first one--following ops may still use the same
+      // attribute for other purposes.
+      break;
     }
 
     if (!rootOperation) {

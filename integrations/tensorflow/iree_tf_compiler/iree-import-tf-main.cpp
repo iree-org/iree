@@ -129,6 +129,9 @@ static OwningOpRef<mlir::ModuleOp> importSavedModelV1(
 
 int main(int argc, char **argv) {
   tensorflow::InitMlir y(&argc, &argv);
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/iree-org/iree/issues and "
+      "include the crash backtrace.\n");
 
   static cl::opt<std::string> inputPath(
       cl::Positional, cl::desc("<saved model directory>"), cl::Required);

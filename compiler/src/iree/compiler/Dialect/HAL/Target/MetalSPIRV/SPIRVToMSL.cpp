@@ -136,7 +136,7 @@ llvm::Optional<MetalShader> crossCompileSPIRVToMSL(
   auto workgroupSize =
       spvCrossCompiler.getWorkgroupSizeForEntryPoint(entryPoint);
   if (!workgroupSize.x || !workgroupSize.y || !workgroupSize.z) {
-    return llvm::None;
+    return std::nullopt;
   }
   return MetalShader{std::move(mslSource), workgroupSize};
 }

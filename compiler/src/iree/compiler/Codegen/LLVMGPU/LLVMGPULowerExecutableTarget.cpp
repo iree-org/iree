@@ -96,8 +96,8 @@ static LogicalResult verifyEntryPoint(
 
   if (workgroupSizeAttr.has_value()) {
     std::array<int64_t, 3> workgroupSizes;
-    for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
-      workgroupSizes[it.index()] = it.value().cast<IntegerAttr>().getInt();
+    for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
+      workgroupSizes[index] = attr.cast<IntegerAttr>().getInt();
     }
 
     switch (translationInfo.getDispatchLoweringPassPipeline()) {
@@ -181,13 +181,8 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
         addGPUWarpReductionPassPipeline(executableLoweringPipeline);
         break;
       // Transform-dialect pipelines.
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          TransformDialectInterpreterCodegen:
-        addGPUTransformDialectInterpreterPasses(executableLoweringPipeline);
-        break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          TransformDialectJitterCodegen:
-        addGPUTransformDialectJitterPasses(executableLoweringPipeline);
+      case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
+        addGPUTransformDialectPasses(executableLoweringPipeline);
         break;
       default:
         variantOp.emitOpError("Unsupported pipeline on GPU target.");

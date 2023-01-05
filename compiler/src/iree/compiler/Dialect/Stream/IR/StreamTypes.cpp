@@ -287,7 +287,7 @@ static llvm::Optional<Lifetime> parseLifetime(StringRef str) {
   } else if (str == "constant") {
     return Lifetime::Constant;
   } else {
-    return llvm::None;
+    return std::nullopt;
   }
 }
 

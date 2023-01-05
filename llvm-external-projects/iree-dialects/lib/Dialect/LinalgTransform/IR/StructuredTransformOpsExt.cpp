@@ -39,6 +39,7 @@
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
@@ -46,6 +47,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -59,8 +61,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
-#include <mlir/Dialect/Transform/IR/TransformDialect.h>
-#include <mlir/IR/MLIRContext.h>
 
 #define DEBUG_TYPE "transform-ops-ext"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
@@ -497,7 +497,7 @@ void ::transform_ext::CanonicalizedSequenceOp::build(
     OpBuilder &builder, OperationState &state,
     transform::FailurePropagationMode failurePropagationMode,
     ::transform_ext::CanonicalizedSequenceOp::BodyBuilderFn bodyBuilder) {
-  assert(state.name.isRegistered() && "not registered!!");
+  assert(state.name.isRegistered() && "not registered!");
   assert(bodyBuilder && "requires a body builder");
   MLIRContext *ctx = builder.getContext();
   state.addAttribute(
@@ -1231,22 +1231,35 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
            << "expected one handle to one operation";
   }
 
-  transform_ext::StructuredOpMatcher pattern, fill, leadingEltwise,
-      trailingEltwise;
-  makeReductionMatcher(pattern, fill, leadingEltwise, trailingEltwise);
+  transform_ext::StructuredOpMatcher pattern, fill, leading, trailing;
+  transform_ext::MatchedReductionCaptures ignore;
+  makeReductionMatcher(pattern, fill, leading, trailing, ignore);
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
   Operation *root = state.getPayloadOps(handles[0])[0];
+
   WalkResult walkResult = root->walk([&](Operation *op) {
     pattern.resetCapture();
     if (!matchPattern(op, pattern))
       return WalkResult::advance();
 
-    res.addPotentiallyEmptyPayloadGroup(leadingEltwise.getCaptured());
+    // TODO: notify properly.
+    LLVM_DEBUG({
+      DBGS() << "leading:\n";
+      if (leading.getCaptured())
+        DBGS() << leading.getCaptured() << "\n";
+      DBGS() << "fill: " << fill.getCaptured() << "\n";
+      DBGS() << "pattern: " << pattern.getCaptured() << "\n";
+      DBGS() << "trailing:\n";
+      if (trailing.getCaptured())
+        DBGS() << trailing.getCaptured() << "\n";
+    });
+
+    res.addPotentiallyEmptyPayloadGroup(leading.getCaptured());
     res.addPayloadGroup({fill.getCaptured()});
     res.addPayloadGroup({pattern.getCaptured()});
-    res.addPotentiallyEmptyPayloadGroup(trailingEltwise.getCaptured());
+    res.addPotentiallyEmptyPayloadGroup(trailing.getCaptured());
     return WalkResult::interrupt();
   });
 
@@ -1288,10 +1301,27 @@ splitReductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
   Operation *root = state.getPayloadOps(handles[0])[0];
+
   WalkResult walkResult = root->walk([&](Operation *op) {
     combiner_reduction.resetCapture();
     if (!matchPattern(op, combiner_reduction))
       return WalkResult::advance();
+
+    // TODO: notify properly.
+    LLVM_DEBUG({
+      DBGS() << "leading:\n";
+      if (leading.getCaptured())
+        DBGS() << leading.getCaptured() << "\n";
+      DBGS() << "original_fill: " << original_fill.getCaptured() << "\n";
+      DBGS() << "parallel_fill: " << parallel_fill.getCaptured() << "\n";
+      DBGS() << "parallel_reduction: " << parallel_reduction.getCaptured()
+             << "\n";
+      DBGS() << "combiner_reduction: " << combiner_reduction.getCaptured()
+             << "\n";
+      DBGS() << "trailing:\n";
+      if (trailing.getCaptured())
+        DBGS() << trailing.getCaptured() << "\n";
+    });
 
     res.addPotentiallyEmptyPayloadGroup(leading.getCaptured());
     res.addPayloadGroup({original_fill.getCaptured()});
@@ -1356,4 +1386,23 @@ void transform_ext::TakeFirstOp::getEffects(
   mlir::transform::onlyReadsHandle(getInputs(), effects);
   mlir::transform::producesHandle(getFirst(), effects);
   mlir::transform::producesHandle(getRest(), effects);
+}
+
+//===---------------------------------------------------------------------===//
+// EmitRemarkOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_ext::EmitRemarkOp::applyToOne(
+    Operation *target, SmallVectorImpl<::mlir::Operation *> &results,
+    mlir::transform::TransformState &state) {
+  for (Operation *payload : state.getPayloadOps(getHandle())) {
+    payload->emitRemark(getMessage());
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_ext::EmitRemarkOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  mlir::transform::onlyReadsHandle(getHandle(), effects);
+  mlir::transform::onlyReadsPayload(effects);
 }

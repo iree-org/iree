@@ -18,8 +18,8 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
-    name = "exported_flag_bits",
-    hdrs = ["exported_flag_bits.h"],
+    name = "exported_bits",
+    hdrs = ["exported_bits.h"],
     deps = [":static_assert"],
 )
 
@@ -35,7 +35,7 @@ iree_runtime_cc_library(
         "unpack_types.h",
     ],
     deps = [
-        ":exported_flag_bits",
+        ":exported_bits",
         ":static_assert",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/builtins/ukernel/arch:config",

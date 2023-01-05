@@ -6,8 +6,7 @@
 """Helpers to serialize/deserialize objects."""
 
 from enum import Enum
-from typing import Any, Dict, Optional, OrderedDict, Sequence, Tuple, Type, TypeVar, Union
-import collections
+from typing import Any, Dict, Optional, Sequence, Tuple, Type, TypeVar, Union
 import dataclasses
 import typing
 
@@ -37,7 +36,7 @@ def serialize_and_pack(obj,
     raise ValueError(
         f"root_obj and keyed_obj_map can't have the same field name.")
 
-  keyed_obj_map = collections.OrderedDict()
+  keyed_obj_map = {}
   root_obj = _serialize(obj=obj, keyed_obj_map=keyed_obj_map)
   return {
       root_obj_field_name: root_obj,
@@ -68,7 +67,7 @@ def unpack_and_deserialize(data,
   return typing.cast(root_type, obj)
 
 
-def _serialize(obj, keyed_obj_map: OrderedDict[str, Any]):
+def _serialize(obj, keyed_obj_map: Dict[str, Any]):
   """Converts the object into a serializable object.
   
   Args:
@@ -88,9 +87,8 @@ def _serialize(obj, keyed_obj_map: OrderedDict[str, Any]):
   elif isinstance(obj, Enum):
     return obj.name
 
-  elif isinstance(obj, collections.OrderedDict):
-    # Only supports OrderedDict as it provides the clear deterministic semantic.
-    result_dict = collections.OrderedDict()
+  elif isinstance(obj, dict):
+    result_dict = {}
     for key, value in obj.items():
       if type(key) not in SUPPORTED_DICT_KEY_TYPES:
         raise ValueError(f"Unsupported key {key} in the dict {obj}.")
@@ -127,12 +125,10 @@ def _deserialize(data,
         _deserialize(item, subtype, keyed_obj_map, obj_cache) for item in data
     ]
 
-  elif _get_type_origin(obj_type) == collections.OrderedDict:
-    # Only supports OrderedDict as it provides the clear deterministic semantic.
+  elif _get_type_origin(obj_type) == dict:
     _, value_type = _get_type_args(obj_type)
-    return collections.OrderedDict(
-        (key, _deserialize(value, value_type, keyed_obj_map, obj_cache))
-        for key, value in data.items())
+    return dict((key, _deserialize(value, value_type, keyed_obj_map, obj_cache))
+                for key, value in data.items())
 
   elif _get_type_origin(obj_type) == Union:
     subtypes = _get_type_args(obj_type)
@@ -202,7 +198,7 @@ def serializable(cls=None,
     if type_key is not None and all(field.name != id_field for field in fields):
       raise ValueError(f'Id field "{id_field}" not found in the class {cls}.')
 
-    def serialize(self, keyed_obj_map: OrderedDict[str, Any]):
+    def serialize(self, keyed_obj_map: Dict[str, Any]):
       if type_key is None:
         return _fields_to_dict(self, fields, keyed_obj_map)
 
@@ -251,12 +247,10 @@ def serializable(cls=None,
   return wrap(cls)
 
 
-def _fields_to_dict(
-    obj, fields: Sequence[dataclasses.Field],
-    keyed_obj_map: OrderedDict[str, Any]) -> OrderedDict[str, Any]:
-  return collections.OrderedDict(
-      (field.name, _serialize(getattr(obj, field.name), keyed_obj_map))
-      for field in fields)
+def _fields_to_dict(obj, fields: Sequence[dataclasses.Field],
+                    keyed_obj_map: Dict[str, Any]) -> Dict[str, Any]:
+  return dict((field.name, _serialize(getattr(obj, field.name), keyed_obj_map))
+              for field in fields)
 
 
 def _dict_to_fields(obj_dict, fields: Sequence[dataclasses.Field],

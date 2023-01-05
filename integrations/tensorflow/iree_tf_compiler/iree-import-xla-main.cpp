@@ -103,6 +103,9 @@ LogicalResult ReadHloTextFormatFromStream(std::istream *in,
 }  // namespace
 
 int main(int argc, char **argv) {
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/iree-org/iree/issues and "
+      "include the crash backtrace.\n");
   llvm::InitLLVM y(argc, argv);
 
   static cl::opt<std::string> inputPath(
@@ -154,7 +157,7 @@ int main(int argc, char **argv) {
       fileInputStream->open(inputPath, std::ios::in | std::ios::binary);
       if (!fileInputStream->is_open()) {
         llvm::errs() << "Unable to open input file " << inputPath << "\n";
-        return llvm::None;
+        return std::nullopt;
       }
       inputStream = fileInputStream.get();
     }

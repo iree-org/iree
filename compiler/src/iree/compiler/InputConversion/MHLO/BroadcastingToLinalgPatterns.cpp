@@ -156,7 +156,7 @@ Optional<Extent> computeBinaryResultExtent(OpBuilder &builder, Location loc,
       emitError(loc) << "cannot broadcast extents of differing size unless "
                         "if one of them is 1 (got "
                      << lhsDim.getStatic() << ", " << rhsDim.getStatic() << ")";
-      return llvm::None;
+      return std::nullopt;
     }
 
     // Static expansions.
@@ -266,7 +266,7 @@ Optional<Extent> computeTernaryResultExtent(OpBuilder &builder, Location loc,
                           "if one of them is 1 (got "
                        << cmpLhs.getStatic() << ", " << cmpRhs.getStatic()
                        << ")";
-        return llvm::None;
+        return std::nullopt;
       }
       continue;
     }
@@ -570,7 +570,8 @@ struct ConvertTrivialNonBroadcastBinaryOp : public ConversionPattern {
     if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape())
       return rewriter.notifyMatchFailure(op, "not static shapes");
 
-    for (auto extents : llvm::zip(lhsType.getShape(), rhsType.getShape())) {
+    for (auto extents :
+         llvm::zip_equal(lhsType.getShape(), rhsType.getShape())) {
       auto lhs_extent = std::get<0>(extents);
       auto rhs_extent = std::get<1>(extents);
       if (lhs_extent != rhs_extent) {

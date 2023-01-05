@@ -550,7 +550,7 @@ static bool applyCallChanges(FuncAnalysis &analysis, func::CallOp callOp) {
 
   // Remap live old results -> new results.
   for (auto [oldValue, newValue] :
-       llvm::zip(newResults, newCallOp.getResults())) {
+       llvm::zip_equal(newResults, newCallOp.getResults())) {
     oldValue.replaceAllUsesWith(newValue);
   }
 

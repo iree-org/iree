@@ -12,6 +12,16 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    EmbedHeaders
+  HDRS
+    "Embed.h"
+  DEPS
+
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     Headers
   HDRS
     "Embed.h"

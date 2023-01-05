@@ -146,12 +146,14 @@ function(iree_cc_binary)
             RENAME ${_RULE_NAME}
             COMPONENT ${_RULE_NAME}
             RUNTIME DESTINATION bin
+            BUNDLE DESTINATION bin
             EXCLUDE_FROM_ALL)
   else()
     install(TARGETS ${_NAME}
       RENAME ${_RULE_NAME}
       COMPONENT ${_RULE_NAME}
-      RUNTIME DESTINATION bin)
+      RUNTIME DESTINATION bin
+      BUNDLE DESTINATION bin)
   endif()
 
   # Setup RPATH if on a Unix-like system. We have two use cases that we are

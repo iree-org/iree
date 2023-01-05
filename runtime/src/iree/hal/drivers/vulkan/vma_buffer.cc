@@ -14,6 +14,10 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+static const char* IREE_HAL_VULKAN_VMA_ALLOCATOR_ID = "Vulkan/VMA";
+#endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+
 typedef struct iree_hal_vulkan_vma_buffer_t {
   iree_hal_buffer_t base;
 
@@ -46,6 +50,7 @@ iree_status_t iree_hal_vulkan_vma_buffer_wrap(
   IREE_ASSERT_ARGUMENT(allocation);
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)allocation_size);
 
   iree_allocator_t host_allocator =
       iree_hal_allocator_host_allocator(allocator);
@@ -66,9 +71,8 @@ iree_status_t iree_hal_vulkan_vma_buffer_wrap(
     //     VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT flag.
     vmaSetAllocationUserData(buffer->vma, buffer->allocation, buffer);
 
-    // TODO(benvanik): figure out why this is not working - has unbalanced
-    // allocs in the tracy UI even though they are definitely balanced here.
-    // IREE_TRACE_ALLOC_NAMED("VMA", (void*)buffer->handle, byte_length);
+    IREE_TRACE_ALLOC_NAMED(IREE_HAL_VULKAN_VMA_ALLOCATOR_ID,
+                           (void*)buffer->handle, byte_length);
 
     *out_buffer = &buffer->base;
   } else {
@@ -84,8 +88,11 @@ static void iree_hal_vulkan_vma_buffer_destroy(iree_hal_buffer_t* base_buffer) {
       iree_hal_vulkan_vma_buffer_cast(base_buffer);
   iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(
+      z0, (int64_t)iree_hal_buffer_allocation_size(base_buffer));
 
-  // IREE_TRACE_FREE_NAMED("VMA", (void*)buffer->handle);
+  IREE_TRACE_FREE_NAMED(IREE_HAL_VULKAN_VMA_ALLOCATOR_ID,
+                        (void*)buffer->handle);
 
   vmaDestroyBuffer(buffer->vma, buffer->handle, buffer->allocation);
   iree_allocator_free(host_allocator, buffer);

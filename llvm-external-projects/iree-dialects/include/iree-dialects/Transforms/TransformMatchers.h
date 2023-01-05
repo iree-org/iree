@@ -12,10 +12,9 @@
 #include <functional>
 
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Matchers.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 
 namespace mlir {
@@ -36,9 +35,47 @@ enum class ShapeKind { Static, Dynamic };
 /// for all dimensions.
 struct AllDims {};
 
+/// A predicate indicating the structured op matcher to check the predicate for
+/// all dimensions except the specified ones.
+struct AllDimsExcept {
+  explicit AllDimsExcept(std::initializer_list<int64_t> range) {
+    llvm::append_range(exceptions, range);
+  }
+  ArrayRef<int64_t> getExcluded() const {
+    return llvm::makeArrayRef(exceptions);
+  }
+
+private:
+  SmallVector<int64_t> exceptions;
+};
+
 /// A placeholder indicating the structured op matcher to check the predicate
 /// for all operands of the relevant kind.
 struct AllOperands {};
+
+/// Base class for single-value captures. Concrete captures should inherit this
+/// and forward the constructor via `using Base::Base`.
+template <typename T>
+struct CaptureStaticValue {
+  using Base = CaptureStaticValue<T>;
+  explicit CaptureStaticValue(T &value) : value(value) {}
+  T &value;
+};
+
+/// Captures the (static) size of the dimension.
+struct CaptureDim : public CaptureStaticValue<int64_t> {
+  using Base::Base;
+};
+
+/// Captures the (static) sizes of multiple dimensions.
+struct CaptureDims : public CaptureStaticValue<SmallVector<int64_t>> {
+  using Base::Base;
+};
+
+/// Captures the rank of the operation.
+struct CaptureRank : public CaptureStaticValue<int64_t> {
+  using Base::Base;
+};
 
 /// A tag indicating to look for any user of the operation's result that would
 /// satisfy the predicate.
@@ -64,6 +101,16 @@ struct NumEqualsTo : public SingleValuePredicateParam<size_t> {
   using Base::Base;
 };
 
+/// Indicates that the number of entities must be greater than the given value.
+struct NumGreaterEqualTo : public SingleValuePredicateParam<size_t> {
+  using Base::Base;
+};
+
+/// Indicates that the number of entities must be greater than the given value.
+struct NumLowerEqualTo : public SingleValuePredicateParam<size_t> {
+  using Base::Base;
+};
+
 /// Indicates that the bit width of the elemental type must be equal to the give
 /// value.
 struct ElementTypeBitWidth : public SingleValuePredicateParam<size_t> {
@@ -72,6 +119,9 @@ struct ElementTypeBitWidth : public SingleValuePredicateParam<size_t> {
 
 /// Predicate tag indicating that the affine map is a permutation.
 struct IsPermutation {};
+
+/// Predicate tag indicating that the affine map is a projected permutation.
+struct IsProjectedPermutation {};
 
 /// Indicates that the match optional. The matcher is still expected to run and
 /// capture if successful. The parameter can be set to false
@@ -94,7 +144,22 @@ struct SubsetOf {
 namespace detail {
 template <typename T>
 using has_reset_capture_t = decltype(std::declval<T>().resetCapture());
+template <typename T>
+using has_get_capture_t = decltype(std::declval<T>().getCaptured());
 } // namespace detail
+
+/// Base class for op matchers that capture the matched operation. It doesn't
+/// specify how exactly the capture happens.
+class CapturingOpMatcher {
+public:
+  virtual ~CapturingOpMatcher() = default;
+
+  /// Resets the state of the matcher to not having captured anything.
+  virtual void resetCapture() = 0;
+
+  /// Returns the captured operation.
+  virtual Operation *getCaptured() const = 0;
+};
 
 /// Structured op matcher with additional predicates attachable through the
 /// fluent, a.k.a. chainable, API. Note that public API must *not* accept
@@ -103,10 +168,11 @@ using has_reset_capture_t = decltype(std::declval<T>().resetCapture());
 /// increases readability, it also allows us to port the matcher to a
 /// declarative format using PDL and/or Transform dialect in the future. The
 /// latter will become impossible with arbitrary C++ callbacks.
-class StructuredOpMatcher {
+class StructuredOpMatcher : public CapturingOpMatcher {
   friend StructuredOpMatcher m_StructuredOp();
   using PredicateFn = std::function<bool(linalg::LinalgOp)>;
   using CaptureResetFn = std::function<void()>;
+  using GetCapturedFn = std::function<Operation *()>;
 
   /// Matches a structured operation if the given predicate is satisfied.
   StructuredOpMatcher(PredicateFn &&firstPredicate) {
@@ -120,22 +186,36 @@ public:
   /// Creates a matcher for a structured operation with one of the given types.
   template <typename... OpType>
   static StructuredOpMatcher create() {
-    return StructuredOpMatcher(
-        [](linalg::LinalgOp op) { return isa<OpType...>(op.getOperation()); });
+    return StructuredOpMatcher([](linalg::LinalgOp op) {
+      debugOutputForCreate(ArrayRef<StringRef>{OpType::getOperationName()...});
+      return isa<OpType...>(op.getOperation());
+    });
   }
 
   /// Returns the matched operation if the match was successful.
-  linalg::LinalgOp getCaptured() const { return captured; }
+  Operation *getCaptured() const override { return captured; }
 
   /// Matches the given operation, hook for `matchPattern`.
   bool match(Operation *op);
+
+  //===-------------------------------------------------------------------===//
+  // Constraints on op rank and dims.
+  //===-------------------------------------------------------------------===//
+  /// Adds a predicate checking that the given rank must be greater than some
+  /// constant value.
+  // TODO: Base class, derived class and proper API.
+  StructuredOpMatcher &rank(NumGreaterEqualTo minRank);
+  StructuredOpMatcher &rank(NumLowerEqualTo maxRank);
 
   /// Adds a predicate checking that the given iteration space dimension is
   /// static/dynamic. The dimension index may be negative, in which case
   /// dimensions are counted from the last one (i.e. Python-style), or be an
   /// AllDims tag, in which case all dimensions are checked. This may be
   /// eventually extended to slices and/or lists of dimensions.
-  StructuredOpMatcher &dim(int64_t dimension, ShapeKind kind);
+  StructuredOpMatcher &dim(int64_t dimension, ShapeKind kind) {
+    return dim(SmallVector<int64_t>{dimension}, kind);
+  }
+  StructuredOpMatcher &dim(SmallVector<int64_t> &&dimensions, ShapeKind kind);
   StructuredOpMatcher &dim(AllDims tag, ShapeKind kind);
 
   /// Adds a predicate checking that the given iteration space dimension has the
@@ -144,8 +224,15 @@ public:
   /// (i.e. Python-style), or be an AllDims tag, in which case all dimensions
   /// are checked. This may be eventually extended to slices and/or lists of
   /// dimensions.
-  StructuredOpMatcher &dim(int64_t dimension, utils::IteratorType kind);
+  StructuredOpMatcher &dim(int64_t dimension, utils::IteratorType kind) {
+    return dim(SmallVector<int64_t>{dimension}, kind);
+  }
+  // Ownership may get tricky here so we wrap in an explicit vector.
+  StructuredOpMatcher &dim(SmallVector<int64_t> &&dimensions,
+                           utils::IteratorType kind);
   StructuredOpMatcher &dim(AllDims tag, utils::IteratorType kind);
+  StructuredOpMatcher &dim(AllDimsExcept &&dimensions,
+                           utils::IteratorType kind);
 
   /// Adds a predicate checking that the given iteration space dimension is
   /// statically known to be divisible by the given value. The dimension index
@@ -153,14 +240,19 @@ public:
   /// (i.e. Python-style).
   StructuredOpMatcher &dim(int64_t dimension, DivisibleBy divisibleBy);
 
+  //===-------------------------------------------------------------------===//
+  // Capture directives.
+  //===-------------------------------------------------------------------===//
+  StructuredOpMatcher &rank(CaptureRank capture);
+  StructuredOpMatcher &dim(int64_t dimension, CaptureDim capture);
+  StructuredOpMatcher &dim(AllDims tag, CaptureDims captures);
+
+  //===-------------------------------------------------------------------===//
+  // Constraints on input operands.
+  //===-------------------------------------------------------------------===//
   /// Adds a predicate checking that the structured op has the given number of
   /// inputs.
-  StructuredOpMatcher &input(NumEqualsTo num) {
-    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-      return linalgOp.getNumDpsInputs() == num.value;
-    });
-    return *this;
-  }
+  StructuredOpMatcher &input(NumEqualsTo num);
 
   /// Adds a predicate that recursively applies other predicates to the
   /// operation defining the `position`-th operand. The position may be
@@ -175,24 +267,10 @@ public:
       StructuredOpMatcher &>
   input(int64_t position, T &operandMatcher,
         OptionalMatch optional = OptionalMatch(false)) {
-    predicates.push_back([position, optional,
-                          &operandMatcher](linalg::LinalgOp linalgOp) -> bool {
-      int64_t transformedPosition =
-          position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
-      if (transformedPosition >= linalgOp.getNumDpsInputs())
-        return false;
-
-      Operation *definingOp = linalgOp.getDpsInputOperand(transformedPosition)
-                                  ->get()
-                                  .getDefiningOp();
-      if (!definingOp)
-        return optional.value;
-      // We MUST run the matcher at this point, even if the match is optional,
-      // to allow for capture.
-      if (operandMatcher.match(definingOp))
-        return true;
-      return optional.value;
-    });
+    addInputMatcher(
+        position,
+        [&operandMatcher](Operation *op) { return operandMatcher.match(op); },
+        optional);
     recordNestedMatcher(operandMatcher);
     return *this;
   }
@@ -201,10 +279,37 @@ public:
   /// have a permutation indexing map.
   StructuredOpMatcher &input(AllOperands tag, IsPermutation);
 
+  /// Adds a predicate checking that all input operands of the structured op
+  /// have a projected permutation indexing map.
+  StructuredOpMatcher &input(AllOperands tag, IsProjectedPermutation);
+
   /// Adds a predicate that recursively applies another predicate to the
   /// operation defining the `position`-th input operand, looking through any
   /// "subsetting" operation such as "tensor.extract_slice".
   StructuredOpMatcher &input(int64_t position, SubsetOf subset);
+
+  //===-------------------------------------------------------------------===//
+  // Constraints on adjacent ops.
+  //===-------------------------------------------------------------------===//
+
+  /// Adds a predicate checking that all ops implementing TilingInterface in the
+  /// parent of the given type (e.g., a function or a module) were matched by
+  /// this or nested matchers. This is useful to ensure that the matcher covered
+  /// the entire parent region, not just a parent of it. This predicate **must**
+  /// be added *after* all the other predicates that capture.
+  template <typename OpTy>
+  StructuredOpMatcher &allTilableOpsCaptured() {
+    SmallVector<CapturingOpMatcher *> copy = nestedCapturingMatchers;
+    predicates.push_back([copy = std::move(copy)](linalg::LinalgOp linalgOp) {
+      Operation *parent = linalgOp->getParentOfType<OpTy>();
+      return checkAllTilableMatched(parent, linalgOp, copy);
+    });
+    return *this;
+  }
+
+  //===-------------------------------------------------------------------===//
+  // Constraints on output operands.
+  //===-------------------------------------------------------------------===//
 
   /// Adds a predicate that recursively applies another predicate to the
   /// operation defining the `position`-th output operand, looking through any
@@ -213,16 +318,15 @@ public:
 
   /// Adds a predicate checking that the structured op has the given number of
   /// outputs.
-  StructuredOpMatcher &output(NumEqualsTo num) {
-    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-      return linalgOp.getNumDpsInits() == num.value;
-    });
-    return *this;
-  }
+  StructuredOpMatcher &output(NumEqualsTo num);
 
   /// Adds a predicate checking that all output operands of the structured op
   /// have a permutation indexing map.
   StructuredOpMatcher &output(AllOperands tag, IsPermutation);
+
+  /// Adds a predicate checking that all output operands of the structured op
+  /// have a projected permutation indexing map.
+  StructuredOpMatcher &output(AllOperands tag, IsProjectedPermutation);
 
   /// Adds a predicate checking that the bit width of the elemental type of the
   /// structured op output at the given position is equal to the given value.
@@ -246,27 +350,17 @@ public:
       StructuredOpMatcher &>
   output(int64_t position, T &operandMatcher,
          OptionalMatch optional = OptionalMatch(false)) {
-    predicates.push_back([position, optional,
-                          &operandMatcher](linalg::LinalgOp linalgOp) -> bool {
-      int64_t transformedPosition =
-          position >= 0 ? position : linalgOp.getNumDpsInits() + position;
-      if (transformedPosition >= linalgOp.getNumDpsInits())
-        return false;
-
-      Operation *definingOp = linalgOp.getDpsInitOperand(transformedPosition)
-                                  ->get()
-                                  .getDefiningOp();
-      if (!definingOp)
-        return optional.value;
-      // We MUST run the matcher at this point, even if the match is optional,
-      // to allow for capture.
-      if (operandMatcher.match(definingOp))
-        return true;
-      return optional.value;
-    });
+    addOutputMatcher(
+        position,
+        [&operandMatcher](Operation *op) { return operandMatcher.match(op); },
+        optional);
     recordNestedMatcher(operandMatcher);
     return *this;
   }
+
+  //===-------------------------------------------------------------------===//
+  // Constraints on results.
+  //===-------------------------------------------------------------------===//
 
   /// Adds a predicate that recursively applies to users of the `position`-th
   /// result of the structured op. Succeeds if any user matches the predicate.
@@ -279,23 +373,12 @@ public:
       StructuredOpMatcher &>
   result(int64_t position, HasAnyUse tag, T &resultUserMatcher,
          OptionalMatch optional = OptionalMatch(false)) {
-    predicates.push_back([&resultUserMatcher, optional,
-                          position](linalg::LinalgOp linalgOp) -> bool {
-      int64_t transformedPosition =
-          position >= 0 ? position : linalgOp->getNumResults() + position;
-      if (transformedPosition >= linalgOp->getNumResults())
-        return false;
-
-      // We MUST run the matcher at this point, even if the match is optional,
-      // to allow for capture.
-      if (llvm::any_of(linalgOp->getResult(transformedPosition).getUsers(),
-                       [&resultUserMatcher](Operation *op) {
-                         return resultUserMatcher.match(op);
-                       })) {
-        return true;
-      }
-      return optional.value;
-    });
+    addResultMatcher(
+        position, tag,
+        [&resultUserMatcher](Operation *op) {
+          return resultUserMatcher.match(op);
+        },
+        optional);
     recordNestedMatcher(resultUserMatcher);
     return *this;
   }
@@ -311,29 +394,51 @@ public:
   /// Resets the captured value to null. This should be called if the same
   /// pattern needs to be applied more than once as it may keep captured values
   /// for optional nested predicates from the previous application.
-  void resetCapture() {
+  void resetCapture() override {
     captured = nullptr;
-    for (const CaptureResetFn &fn : captureResetFns)
-      fn();
+    for (CapturingOpMatcher *nested : nestedCapturingMatchers)
+      nested->resetCapture();
   }
 
 private:
   /// Informs the matcher that it has another, nested matcher. Practically,
   /// records the captured value cleanup function so it runs when required.
   template <typename T>
-  std::enable_if_t<llvm::is_detected<detail::has_reset_capture_t, T>::value>
-  recordNestedMatcher(T &nested) {
-    captureResetFns.push_back([&nested] { nested.resetCapture(); });
+  void recordNestedMatcher(T &nested) {
+    nestedCapturingMatchers.push_back(&nested);
+    if constexpr (std::is_base_of_v<StructuredOpMatcher, T>) {
+      llvm::append_range(nestedCapturingMatchers,
+                         nested.nestedCapturingMatchers);
+    }
   }
-  template <typename T>
-  std::enable_if_t<!llvm::is_detected<detail::has_reset_capture_t, T>::value>
-  recordNestedMatcher(T &nested) {}
+
+  /// Checks that `matchers` captured all tilable ops nested in `parent` except
+  /// for `linalgOp`. This is an implementation detail of allTilableOpsCaptured.
+  static bool checkAllTilableMatched(Operation *parent,
+                                     linalg::LinalgOp linalgOp,
+                                     ArrayRef<CapturingOpMatcher *> matchers);
+
+  /// Produce the debug output for `create` method in a non-templated way.
+  static void debugOutputForCreate(ArrayRef<StringRef> opNames);
+
+  /// Non-template implementations of nested predicate builders for inputs,
+  /// outputs and results. Should not be called directly.
+  void addInputMatcher(int64_t position,
+                       std::function<bool(Operation *)> matcher,
+                       OptionalMatch optional);
+  void addOutputMatcher(int64_t position,
+                        std::function<bool(Operation *)> matcher,
+                        OptionalMatch optional);
+  void addResultMatcher(int64_t position, HasAnyUse tag,
+                        std::function<bool(Operation *)> matcher,
+                        OptionalMatch optional);
 
   /// Additional predicates to be checked on the structured op.
   SmallVector<PredicateFn> predicates;
 
-  /// Callbacks to reset captures of nested matchers.
-  SmallVector<CaptureResetFn> captureResetFns;
+  /// A list of (recursively) nested capturing matchers that should be reset
+  /// when the current matcher is.
+  SmallVector<CapturingOpMatcher *> nestedCapturingMatchers;
 
   /// Matched value.
   linalg::LinalgOp captured = nullptr;
@@ -359,15 +464,15 @@ inline StructuredOpMatcher m_StructuredOp() {
 class MatchCallbackResult {
 public:
   /// Returns the number of lists of payload operations.
-  unsigned getNumPayloadGroups() const { return payloadGroupLengths.size(); }
+  int64_t getNumPayloadGroups() const { return payloadGroupLengths.size(); }
 
   /// Returns the `position`-th list of payload operations.
-  ArrayRef<Operation *> getPayloadGroup(unsigned position) const;
+  ArrayRef<Operation *> getPayloadGroup(int64_t position) const;
 
   /// Adds a new list of payload operations to the list of lists. The new list
   /// must not contain null operations.
   template <typename Range>
-  unsigned addPayloadGroup(Range operations) {
+  int64_t addPayloadGroup(Range operations) {
     int64_t originalLength = payloadOperations.size();
     assert(llvm::all_of(operations, [](Operation *op) -> bool { return op; }) &&
            "null operation");
@@ -436,6 +541,15 @@ private:
 // Case-specific matcher builders.
 //===---------------------------------------------------------------------===//
 
+struct MatchedReductionCaptures {
+  int64_t reductionRank = 0;
+  SmallVector<int64_t> leadingOpSizes = {};
+  SmallVector<int64_t> reductionOpSizes = {};
+  SmallVector<int64_t> trailingOpSizes = {};
+  int64_t maybeLeadingRank = 0;
+  int64_t maybeTrailingRank = 0;
+};
+
 /// Creates a group of matchers for:
 ///
 ///     trailing(reduction(leading(), fill()))
@@ -445,7 +559,8 @@ private:
 void makeReductionMatcher(StructuredOpMatcher &reduction,
                           StructuredOpMatcher &fill,
                           StructuredOpMatcher &leading,
-                          StructuredOpMatcher &trailing);
+                          StructuredOpMatcher &trailing,
+                          MatchedReductionCaptures &captures);
 
 /// Creates a group of matchers for:
 ///

@@ -42,11 +42,17 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
 
-llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes(
-    "iree-codegen-llvmgpu-workgroup-tile-sizes",
-    llvm::cl::desc("Fixed tile sizes when using the transform dialect starting "
-                   "from IR already workgroup distributed"),
-    llvm::cl::CommaSeparated);
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag(
+    "iree-codegen-llvmgpu-transform-dialect-debug-payload-tag",
+    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
+                   "payload root operation"),
+    llvm::cl::init(""));
+
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
+    "iree-codegen-llvmgpu-transform-dialect-debug-transform-tag",
+    llvm::cl::desc(
+        "tag attribute value for the transform dialect transform op container"),
+    llvm::cl::init(""));
 }  // namespace iree_compiler
 }  // namespace mlir
 
@@ -82,6 +88,7 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}}));
 
+  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}}));
@@ -179,6 +186,14 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
 static LogicalResult setContractConfig(func::FuncOp entryPoint,
                                        linalg::LinalgOp op,
                                        const TargetInfo &targetInfo) {
+  if (!linalg::isaContractionOpInterface(op) || op.getNumParallelLoops() < 2)
+    return failure();
+  // Don't consider operations that don't have a broadcast, those should go
+  // through reductions.
+  if (llvm::any_of(op.getIndexingMapsArray(),
+                   [](AffineMap m) { return m.isPermutation(); }))
+    return failure();
+
   auto setMatmulConfig =
       [&entryPoint, &op](int64_t tileX, int64_t tileY, int64_t tileK,
                          llvm::ArrayRef<int64_t> workgroupSize,
@@ -206,7 +221,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
             std::move(workgroupTileSizes));  // Workgroup level.
         return setOpConfigAndEntryPointFnTranslation(
             entryPoint, op, tileSizes, pipeline, workgroupSize,
-            /*subgroupSize=*/llvm::None, softwarePipelineDepth);
+            /*subgroupSize=*/std::nullopt, softwarePipelineDepth);
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =
@@ -284,7 +299,8 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
     // Pick the best configuration where the original shape is aligned on the
     // tile size.
     for (TileWorkgroupSizePair &config : tileSizeConfig) {
-      if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
+      if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0 &&
+          sizeK % config.tileSize[2] == 0) {
         return setMatmulConfig(
             config.tileSize[0], config.tileSize[1], config.tileSize[2],
             config.workgroupSize, softwarePipelineDepthSimt,
@@ -301,7 +317,13 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   const TileWorkgroupSizePair &config = tileSizeConfig[configIndex];
   const int64_t tileX = config.tileSize[0];
   const int64_t tileY = config.tileSize[1];
-  const int64_t tileK = config.tileSize[2];
+  int64_t tileK = config.tileSize[2];
+  // Since specialization doesn't work for K loop and peeling is not enabled yet
+  // we pick a tileK size that is aligned on the K size.
+  if (ShapedType::isDynamic(sizeK)) tileK = 1;
+  while (sizeK % tileK != 0) {
+    tileK >>= 1;
+  }
   const std::array<int64_t, 3> workgroupSize{config.workgroupSize[0],
                                              config.workgroupSize[1],
                                              config.workgroupSize[2]};
@@ -386,7 +408,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
-  auto partitionedLoops = interfaceOp.getPartitionableLoops(llvm::None);
+  auto partitionedLoops = interfaceOp.getPartitionableLoops(std::nullopt);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
@@ -408,14 +430,15 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   }
 
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    for (auto outputOperand : enumerate(genericOp.getDpsInitOperands())) {
-      if (!genericOp.getMatchingIndexingMap(outputOperand.value())
+    for (auto [index, outputOperand] :
+         llvm::enumerate(genericOp.getDpsInitOperands())) {
+      if (!genericOp.getMatchingIndexingMap(outputOperand)
                .isProjectedPermutation()) {
         vectorSize = 1;
         break;
       }
       ArrayRef<int64_t> shape = cast<linalg::LinalgOp>(op)
-                                    .getDpsInitOperand(outputOperand.index())
+                                    .getDpsInitOperand(index)
                                     ->get()
                                     .getType()
                                     .cast<ShapedType>()
@@ -479,33 +502,48 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
 // function currently only support the case where all the dimensions are static
 // while we want to support dynamic shapes.
 static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
-  for (auto map : llvm::enumerate(op.getIndexingMapsArray())) {
-    for (auto dim : llvm::enumerate(map.value().getResults())) {
-      auto expr = dim.value().dyn_cast<AffineDimExpr>();
+  for (auto [mapIdx, map] : llvm::enumerate(op.getIndexingMapsArray())) {
+    for (auto [dimIdx, dim] : llvm::enumerate(map.getResults())) {
+      auto expr = dim.dyn_cast<AffineDimExpr>();
       if (expr && expr.getPosition() == d) {
-        auto type = op->getOperand(map.index()).getType().cast<ShapedType>();
-        if (type.isDynamicDim(dim.index())) return llvm::None;
-        return type.getDimSize(dim.index());
+        auto type = op->getOperand(mapIdx).getType().cast<ShapedType>();
+        if (type.isDynamicDim(dimIdx)) return std::nullopt;
+        return type.getDimSize(dimIdx);
       }
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Set configuration for reduction transform dialect based strategy.
-static LogicalResult setReductionTransformJitConfig(
+static LogicalResult setReductionTransformDialectConfig(
     func::FuncOp entryPoint, linalg::LinalgOp op,
     const TargetInfo &targetInfo) {
-  if (!clGPUEnableTransformDialectJit) return failure();
+  if (!clGPUCodegenTransformDialectFileName.empty() &&
+      clGPUEnableTransformDialectJit) {
+    return entryPoint.emitError()
+           << "option clash in transform dialect lowering config: the filename "
+              "cannot be provided when the jit option is set";
+  }
+
+  if (!clGPUEnableTransformDialectJit &&
+      clGPUCodegenTransformDialectFileName.empty()) {
+    return failure();
+  }
   if (!targetInfo.hasWarpShuffle) return failure();
+
+  // Transform script file provided, use it.
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPoint.getContext(),
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
+  if (!clGPUCodegenTransformDialectFileName.empty()) {
+    return setTranslationInfo(entryPoint, translationInfo);
+  }
+
   if (failed(matchAndSetGPUReductionTransformStrategy(entryPoint, op)))
     return failure();
 
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPoint->getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                    TransformDialectJitterCodegen);
-  if (failed(setTranslationInfo(entryPoint, translationInfo))) return failure();
-  return success();
+  return setTranslationInfo(entryPoint, translationInfo);
 }
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
@@ -801,17 +839,6 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
-  if (!clGPUCodegenTransformDialectTileSizes.empty()) {
-    SmallVector<int64_t, 4> workgroupTileSizes(
-        clGPUCodegenTransformDialectTileSizes.begin(),
-        clGPUCodegenTransformDialectTileSizes.end());
-    TileSizesListType tileSizes;
-    tileSizes.emplace_back(std::move(workgroupTileSizes));
-    auto config = IREE::Codegen::LoweringConfigAttr::get(
-        computeOp->getContext(), tileSizes);
-    setLoweringConfig(computeOp, config);
-    return success();
-  }
   TargetInfo targetInfo = getTargetInfo(entryPointFn);
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(computeOp)) {
@@ -820,12 +847,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     return setUserConfig(entryPointFn, computeOp, compilationInfo);
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
-    if (linalg::isaContractionOpInterface(linalgOp) &&
-        linalgOp.getNumParallelLoops() >= 2) {
-      return setContractConfig(entryPointFn, linalgOp, targetInfo);
+    if (succeeded(setReductionTransformDialectConfig(entryPointFn, linalgOp,
+                                                     targetInfo))) {
+      return success();
     }
-    if (succeeded(setReductionTransformJitConfig(entryPointFn, linalgOp,
-                                                 targetInfo))) {
+    if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
       return success();
     }
     if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp, targetInfo))) {
@@ -839,6 +865,18 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       return success();
     }
   }
+
+  // If using the transform dialect, call the proper pipeline.
+  assert((clGPUCodegenTransformDialectFileName.empty() ||
+          !clGPUEnableTransformDialectJit) &&
+         "Can't use both transform dialect interpreted and jitted modes");
+  if (clGPUCodegenTransformDialectFileName.size() > 0) {
+    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+        entryPointFn.getContext(),
+        IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
+    return setTranslationInfo(entryPointFn, translationInfo);
+  }
+
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);
   }
@@ -862,18 +900,6 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     SmallVector<Operation *> computeOps;
     if (failed(getComputeOps(funcOp, computeOps))) {
       return funcOp.emitOpError("failed to get compute ops");
-    }
-
-    // If using the transform dialect, call the proper pipeline.
-    assert((clGPUCodegenTransformDialectFileName.empty() ||
-            !clGPUEnableTransformDialectJit) &&
-           "Can't use both transform dialect interpreted and jitted modes");
-    if (clGPUCodegenTransformDialectFileName.size() > 0) {
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectInterpreterCodegen);
-      if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
-      if (clGPUCodegenTransformDialectTileSizes.empty()) continue;
     }
 
     Operation *rootOperation = nullptr;

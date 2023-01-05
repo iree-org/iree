@@ -692,3 +692,33 @@ func.func @illegal_winograd_output_shape(%arg0: tensor<8x8x1x2x2x32xf32>) -> ten
 }
 
 // -----
+
+func.func @illegal_winograd_input_shape_nchw(%arg0: tensor<1x32x10x10xf32>) -> tensor<8x8x1x32x6x6xf32> {
+  %0 = tensor.empty() : tensor<8x8x1x32x6x6xf32>
+  // expected-error @+1 {{incompatible output shape}}
+  %1 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([2, 3])
+    ins(%arg0 : tensor<1x32x10x10xf32>) outs(%0 : tensor<8x8x1x32x6x6xf32>) -> tensor<8x8x1x32x6x6xf32>
+  return %1 : tensor<8x8x1x32x6x6xf32>
+}
+
+// -----
+
+func.func @illegal_winograd_input_image_dimensions(%arg0: tensor<1x1280x10x10xf32>) -> tensor<8x8x1x2x2x1280xf32> {
+  %0 = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
+  // expected-error @+1 {{expect image dimensions to be either [1, 2] or [2, 3]}}
+  %1 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([0, 3])
+    ins(%arg0 : tensor<1x1280x10x10xf32>) outs(%0 : tensor<8x8x1x2x2x1280xf32>) -> tensor<8x8x1x2x2x1280xf32>
+  return %1 : tensor<8x8x1x2x2x1280xf32>
+}
+
+// -----
+
+func.func @illegal_winograd_output_image_dimensions(%arg0: tensor<8x8x1x2x2x32xf32>) -> tensor<1x32x12x12xf32> {
+  %0 = tensor.empty() : tensor<1x32x12x12xf32>
+  // expected-error @+1 {{expect image dimensions to be either [1, 2] or [2, 3]}}
+  %1 = iree_linalg_ext.winograd.output_transform output_tile_size(6) kernel_size(3) image_dimensions([0, 3])
+        ins(%arg0 : tensor<8x8x1x2x2x32xf32>) outs(%0 : tensor<1x32x12x12xf32>) -> tensor<1x32x12x12xf32>
+  return %1 : tensor<1x32x12x12xf32>
+}
+
+// -----

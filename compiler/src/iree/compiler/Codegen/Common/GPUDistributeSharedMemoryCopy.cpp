@@ -121,9 +121,9 @@ static Optional<SmallVector<int64_t>> getTileToDistributableSize(
   SmallVector<int64_t> unroll;
   assert(shape.back() % targetVectorSize == 0);
   int64_t threadsAvailable = flatWorkgroupSize;
-  for (auto &dim : llvm::enumerate(llvm::reverse(shape))) {
-    int64_t numElementPerThread = dim.index() == 0 ? targetVectorSize : 1;
-    int64_t numThreads = dim.value() / numElementPerThread;
+  for (auto [index, dim] : llvm::enumerate(llvm::reverse(shape))) {
+    int64_t numElementPerThread = index == 0 ? targetVectorSize : 1;
+    int64_t numThreads = dim / numElementPerThread;
     numThreads = std::min(numThreads, threadsAvailable);
     unroll.push_back(numThreads * numElementPerThread);
     assert(threadsAvailable % numThreads == 0);
@@ -256,7 +256,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
                     {StringAttr::get(patterns.getContext(),
                                      getCopyToWorkgroupMemoryMarker()),
                      StringAttr::get(patterns.getContext(), kCopyDistributed)},
-                    llvm::None));
+                    std::nullopt));
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.

@@ -95,6 +95,17 @@ llvm::cl::opt<bool> clCPUEnableTransformDialectJit(
     "iree-codegen-llvmcpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
+llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugPayloadTag(
+    "iree-codegen-llvmcpu-transform-dialect-debug-payload-tag",
+    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
+                   "payload root operation"),
+    llvm::cl::init(""));
+
+llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugTransformTag(
+    "iree-codegen-llvmcpu-transform-dialect-debug-transform-tag",
+    llvm::cl::desc(
+        "tag attribute value for the transform dialect transform op container"),
+    llvm::cl::init(""));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -202,9 +213,9 @@ static Optional<int64_t> getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   auto nativeVectorSizeAttr =
       getConfigIntegerAttr(targetAttr, "native_vector_size");
-  if (!nativeVectorSizeAttr) return llvm::None;
+  if (!nativeVectorSizeAttr) return std::nullopt;
   int64_t nativeVectorSizeVal = nativeVectorSizeAttr->getInt();
-  if (!nativeVectorSizeVal) return llvm::None;
+  if (!nativeVectorSizeVal) return std::nullopt;
   return nativeVectorSizeVal;
 }
 
@@ -238,18 +249,18 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op->getOpOperands();
 
-  for (auto map : llvm::enumerate(op.getIndexingMapsArray())) {
+  for (auto [index, map] : llvm::enumerate(op.getIndexingMapsArray())) {
     // Check the fastest varying dimension of the operand. Set the vector size
     // of the corresponding loop to the vector size.
-    if (map.value().getNumResults() == 0) continue;
+    if (map.getNumResults() == 0) continue;
     auto fastestVaryingDimExpr =
-        map.value().getResults().back().dyn_cast<AffineDimExpr>();
+        map.getResults().back().dyn_cast<AffineDimExpr>();
     if (!fastestVaryingDimExpr) continue;
     unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
 
     // If the indexing map has result it has to be a shaped type.
     auto operandType =
-        inputOutputOpOperands[map.index()].get().getType().cast<ShapedType>();
+        inputOutputOpOperands[index].get().getType().cast<ShapedType>();
     int64_t tileSize = getVectorSize(entryPointFn, operandType);
 
     minTileSizes[fastestVaryingDim] =
@@ -537,7 +548,7 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
                                     SmallVectorImpl<int64_t> &reductionSizes) {
   SmallVector<int64_t, 4> staticLoopRanges = op.getStaticLoopRanges();
   for (auto [index, valuePair] : llvm::enumerate(
-           llvm::zip(staticLoopRanges, op.getIteratorTypesArray()))) {
+           llvm::zip_equal(staticLoopRanges, op.getIteratorTypesArray()))) {
     auto [size, iterType] = valuePair;
     if (!ShapedType::isDynamic(size)) continue;
     if (iterType == utils::IteratorType::parallel) {
@@ -729,13 +740,12 @@ static LogicalResult setMatmulNoPadRootConfig(
   // the sizes of the iteration space.
   for (auto tileSizeTuple :
        llvm::make_range(inputTileSizes.begin(), inputTileSizes.end() - 1)) {
-    for (auto &en : llvm::enumerate(tileSizeTuple)) {
+    for (const auto &[idx, tileSize] : llvm::enumerate(tileSizeTuple)) {
       // Quantized cases are not fully evaluated yet, so it might go with NoPad
       // approach.
-      int idx = en.index();
-      if (en.value() == 0 || shape[idx] == ShapedType::kDynamic) continue;
-      assert(shape[idx] % en.value() == 0);
-      shape[idx] = en.value();
+      if (tileSize == 0 || shape[idx] == ShapedType::kDynamic) continue;
+      assert(shape[idx] % tileSize == 0);
+      shape[idx] = tileSize;
     }
   }
 
@@ -743,10 +753,10 @@ static LogicalResult setMatmulNoPadRootConfig(
   // The tiling for parallel dims and reduction dims should be separated.
   const SmallVectorImpl<int64_t> &workgroupTileSizes = inputTileSizes.back();
   SmallVector<int64_t> parallelTileSizes;
-  for (auto en : llvm::enumerate(workgroupTileSizes)) {
-    int64_t sz = en.value();
+  for (auto [index, tileSize] : llvm::enumerate(workgroupTileSizes)) {
+    int64_t sz = tileSize;
     if (sz != 0) {
-      sz = getMaxTileSize(/*lb=*/0, /*ub=*/shape[en.index()],
+      sz = getMaxTileSize(/*lb=*/0, /*ub=*/shape[index],
                           /*maxTileSize=*/sz, vectorSize,
                           /*allowIncompleteTile=*/vecPreProcStrategy ==
                               VectorPreProcStrategy::Peeling);
@@ -784,10 +794,10 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
   assert(flowTileSizes.size() == workgroupTileSizes.size());
   SmallVector<int64_t> parallelTileSizes;
   auto shape = cast<linalg::LinalgOp>(op.getOperation()).getStaticLoopRanges();
-  for (auto en : llvm::enumerate(flowTileSizes.drop_back())) {
+  for (auto [index, tileSize] : llvm::enumerate(flowTileSizes.drop_back())) {
     parallelTileSizes.push_back(
-        getMaxTileSize(0, en.value() ? en.value() : shape[en.index()],
-                       workgroupTileSizes[en.index()], vectorSize));
+        getMaxTileSize(0, tileSize ? tileSize : shape[index],
+                       workgroupTileSizes[index], vectorSize));
   }
 
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
@@ -1028,11 +1038,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 }
 
 static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
-    TilingInterface op) {
+    TilingInterface op, int64_t defaultSize) {
   unsigned numLoops = op.getLoopIteratorTypes().size();
   auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
                               .getPartitionableLoops(kNumMaxParallelDims);
-  SmallVector<int64_t> workgroupTileSizes(numLoops, defaultWorkgroupTileSize);
+  SmallVector<int64_t> workgroupTileSizes(numLoops, defaultSize);
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
   for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
@@ -1046,7 +1056,8 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    IREE::LinalgExt::PackOp op) {
-  TileSizesListType tileSizes = {getLinalgExtDefaultWorkgroupTileSizes(op)};
+  TileSizesListType tileSizes = {
+      getLinalgExtDefaultWorkgroupTileSizes(op, defaultWorkgroupTileSize)};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDataTiling);
 }
@@ -1055,16 +1066,17 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, IREE::LinalgExt::UnPackOp op,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDataTiling) {
-  SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(op);
+  // TODO(#11505): Consider multi-level tiling for handling unpack + generic
+  // cases.
+  SmallVector<int64_t> tileSizes =
+      getLinalgExtDefaultWorkgroupTileSizes(op, /*defaultSize=*/16);
 
   // Fixup for making tileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
-  for (auto it : llvm::zip(dimPos, innerTiles)) {
-    int64_t pos = std::get<0>(it);
-    int64_t size = std::get<1>(it);
+  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
     if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
-    tileSizes[pos] = llvm::alignDown(tileSizes[pos], size);
+    tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
   }
 
   TileSizesListType tileSizesList = {tileSizes};
@@ -1079,7 +1091,7 @@ static LogicalResult setRootConfig(
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
   SmallVector<int64_t> workgroupTileSizes =
-      getLinalgExtDefaultWorkgroupTileSizes(fftOp);
+      getLinalgExtDefaultWorkgroupTileSizes(fftOp, defaultWorkgroupTileSize);
   auto rank = fftOp.getOperandRank();
   if (workgroupTileSizes.size() >= rank && workgroupTileSizes[rank - 1] != 0) {
     APInt value;
@@ -1218,8 +1230,8 @@ static LogicalResult setTransformStrategyRootConfig(
   if (failed(matchAndSetCPUReductionTransformStrategy(entryPointFn, genericOp)))
     return success();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                      TransformDialectJitterCodegen);
+      entryPointFn->getContext(),
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
   if (failed(setTranslationInfo(entryPointFn, translationInfo)))
     return failure();
   return success();
@@ -1322,17 +1334,12 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   constexpr int64_t kMinimumWorkload = 4096;
   auto shape = genericOp.getStaticLoopRanges();
   int64_t numWorkload = 1;
-  for (auto en : llvm::enumerate(shape)) {
-    int64_t size = en.value();
+  for (const auto &[index, size] : llvm::enumerate(shape)) {
     if (size == ShapedType::kDynamic) {
       numWorkload = ShapedType::kDynamic;
       break;
     }
-    int index = en.index();
-    if (flowTileSizes[index]) {
-      size = flowTileSizes[index];
-    }
-    numWorkload *= size;
+    numWorkload *= flowTileSizes[index] ? flowTileSizes[index] : size;
   }
   for (unsigned currDim = 0;
        numWorkload < kMinimumWorkload && currDim < numLoops;) {
@@ -1741,17 +1748,11 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     assert((clCPUCodegenTransformDialectFileName.empty() ||
             !clCPUEnableTransformDialectJit) &&
            "Can't use both transform dialect interpreted and jitted modes");
-    if (!clCPUCodegenTransformDialectFileName.empty()) {
+    if (!clCPUCodegenTransformDialectFileName.empty() ||
+        clCPUEnableTransformDialectJit) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectInterpreterCodegen);
-      if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
-      continue;
-    }
-    if (clCPUEnableTransformDialectJit) {
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectJitterCodegen);
+          moduleOp.getContext(),
+          IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
       if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
       continue;
     }

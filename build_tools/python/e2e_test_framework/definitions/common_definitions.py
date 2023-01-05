@@ -40,8 +40,8 @@ class DeviceArchitecture(_ArchitectureInfo, Enum):
   ARMV9_A_GENERIC = (ArchitectureType.CPU, "armv9-a", "generic")
 
   # RISC-V CPUs
-  RV64_GENERIC = (ArchitectureType.CPU, "rv64", "generic")
-  RV32_GENERIC = (ArchitectureType.CPU, "rv32", "generic")
+  RV64_GENERIC = (ArchitectureType.CPU, "riscv_64", "generic")
+  RV32_GENERIC = (ArchitectureType.CPU, "riscv_32", "generic")
 
   # Mobile GPUs
   MALI_VALHALL = (ArchitectureType.GPU, "mali", "valhall")
@@ -103,8 +103,8 @@ class DeviceSpec(object):
   """Benchmark device specification."""
   id: str
 
-  # Device vendor name. E.g., Pixel-6.
-  vendor_name: str
+  # Device name. E.g., Pixel-6.
+  device_name: str
 
   # Host environment where the IREE runtime is running. For CPU device type,
   # this is usually the same as the device that workloads are dispatched to.

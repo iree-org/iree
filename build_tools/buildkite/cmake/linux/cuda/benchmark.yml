@@ -21,7 +21,7 @@ steps:
         --driver_filter_regex=cuda \
         -o "benchmark-results-gcp-gpu-a100-$${BUILDKITE_BUILD_NUMBER}.json" \
         --verbose \
-        build-linux
+        build-targets/linux-cuda
     agents:
       - "gcp:machine-type=a2-highgpu-1g"
       - "queue=benchmark-cuda"

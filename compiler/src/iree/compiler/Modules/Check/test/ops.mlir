@@ -67,8 +67,6 @@ func.func @expect_eq_tensor(%lhs : tensor<2x2xi32>, %rhs : tensor<2x2xi32>) {
 // CHECK-LABEL: @expect_eq_const
 // CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
 func.func @expect_eq_const(%lhs : tensor<2x2xi32>) {
-  // TODO(b/146898896) The attribute type should get elided, but the declarative
-  // parser type inference doesn't support this yet.
   // CHECK: check.expect_eq_const(%[[LHS]], dense<1> : tensor<2x2xi32>) : tensor<2x2xi32>
   check.expect_eq_const(%lhs, dense<1> : tensor<2x2xi32>) : tensor<2x2xi32>
   return
@@ -101,8 +99,6 @@ func.func @expect_almost_eq_tensor(%lhs : tensor<2x2xf32>, %rhs : tensor<2x2xf32
 // CHECK-LABEL: @expect_almost_eq_const
 // CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
 func.func @expect_almost_eq_const(%lhs : tensor<2x2xf32>) {
-  // TODO(b/146898896) The attribute type should get elided, but the declarative
-  // parser type inference doesn't support this yet.
   // CHECK: check.expect_almost_eq_const(%[[LHS]], dense<1.000000e+00> : tensor<2x2xf32>) : tensor<2x2xf32>
   check.expect_almost_eq_const(%lhs, dense<1.0> : tensor<2x2xf32>) : tensor<2x2xf32>
   return

@@ -52,11 +52,11 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
       for (OpOperand &operand : sourceOp->getOpOperands()) {
         if (operand.get().getDefiningOp() == op) numUsesOfOp++;
       }
-      if (numUsesOfOp != 1) return llvm::None;
+      if (numUsesOfOp != 1) return std::nullopt;
       return &source;
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Check if the producer generic op is fusable with the consumer generic op.
@@ -274,7 +274,7 @@ struct FusionOfTensorOpsPass
       memref::populateResolveRankedShapeTypeResultDimsPatterns(fusionPatterns);
 
       GreedyRewriteConfig rewriteConfig;
-      rewriteConfig.maxIterations = GreedyRewriteConfig::kNoIterationLimit;
+      rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
       if (failed(applyPatternsAndFoldGreedily(funcOp->getRegions(),
                                               std::move(fusionPatterns),
                                               rewriteConfig))) {

@@ -95,22 +95,23 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
                                        TypeRange bufferTypes,
                                        ValueRange bufferOffsets,
                                        ValueRange bufferLengths) {
-  llvm::interleaveComma(
-      llvm::zip(ordinals, buffers, bufferTypes, bufferOffsets, bufferLengths),
-      p, [&](std::tuple<Value, Value, Type, Value, Value> it) {
-        p.printNewline();
-        p << "  ";
-        p.printOperand(std::get<0>(it));
-        p << " = (";
-        p.printOperand(std::get<1>(it));
-        p << " : ";
-        p.printType(std::get<2>(it));
-        p << ")[";
-        p.printOperand(std::get<3>(it));
-        p << ", ";
-        p.printOperand(std::get<4>(it));
-        p << "]";
-      });
+  llvm::interleaveComma(llvm::zip_equal(ordinals, buffers, bufferTypes,
+                                        bufferOffsets, bufferLengths),
+                        p,
+                        [&](std::tuple<Value, Value, Type, Value, Value> it) {
+                          p.printNewline();
+                          p << "  ";
+                          p.printOperand(std::get<0>(it));
+                          p << " = (";
+                          p.printOperand(std::get<1>(it));
+                          p << " : ";
+                          p.printType(std::get<2>(it));
+                          p << ")[";
+                          p.printOperand(std::get<3>(it));
+                          p << ", ";
+                          p.printOperand(std::get<4>(it));
+                          p << "]";
+                        });
   p.printNewline();
 }
 
@@ -140,7 +141,7 @@ LogicalResult ReturnOp::verify() {
                               << expectedTypes.size() << ")";
     }
     for (auto pair :
-         llvm::enumerate(llvm::zip(op.getOperands(), expectedTypes))) {
+         llvm::enumerate(llvm::zip_equal(op.getOperands(), expectedTypes))) {
       auto operand = std::get<0>(pair.value());
       auto expectedType = std::get<1>(pair.value());
       if (operand.getType() != expectedType) {
@@ -582,7 +583,7 @@ void DeviceSwitchOp::print(OpAsmPrinter &p) {
   p << "\n";
   p.getStream().indent(4);
   interleave(
-      llvm::zip(getConditions(), getConditionRegions()),
+      llvm::zip_equal(getConditions(), getConditionRegions()),
       [&](std::tuple<Attribute, Region &> it) {
         auto &conditionAttr = std::get<0>(it);
         auto &conditionRegion = std::get<1>(it);
@@ -910,8 +911,9 @@ ParseResult ExecutableConstantBlockOp::parse(OpAsmParser &parser,
   }
   SmallVector<Type> argTypes;
   for (auto &arg : entryArgs) argTypes.push_back(arg.type);
-  result.addAttribute("function_type", TypeAttr::get(builder.getFunctionType(
-                                           argTypes, resultTypes)));
+  auto fnType = builder.getFunctionType(argTypes, resultTypes);
+  result.addAttribute(getFunctionTypeAttrName(result.name),
+                      TypeAttr::get(fnType));
 
   // Parse the keys used for each yielded constant value.
   // There must be one key per result. Note that we support omitted parens when
@@ -946,8 +948,9 @@ ParseResult ExecutableConstantBlockOp::parse(OpAsmParser &parser,
 
   // Add the attributes to the function arguments.
   assert(resultAttrs.size() == resultTypes.size());
-  mlir::function_interface_impl::addArgAndResultAttrs(builder, result,
-                                                      entryArgs, resultAttrs);
+  mlir::function_interface_impl::addArgAndResultAttrs(
+      builder, result, entryArgs, resultAttrs, getArgAttrsAttrName(result.name),
+      getResAttrsAttrName(result.name));
 
   // Parse the optional function body. The printer will not print the body if
   // its empty, so disallow parsing of empty body in the parser.
@@ -977,7 +980,7 @@ void ExecutableConstantBlockOp::print(OpAsmPrinter &p) {
                         [&](Attribute attr) { p << attr; });
   if (resultTypes.size() != 1) p << ')';
   mlir::function_interface_impl::printFunctionAttributes(
-      p, op, argTypes.size(), resultTypes.size(), {"keys"});
+      p, op, {getFunctionTypeAttrName(), getKeysAttrName()});
   p << " ";
   p.printRegion(getBody(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
@@ -1097,7 +1100,7 @@ static llvm::Optional<APInt> lookupValueOrAlignment(Value value) {
   }
 
   // TODO(benvanik): more searching.
-  return llvm::None;
+  return std::nullopt;
 }
 
 llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {

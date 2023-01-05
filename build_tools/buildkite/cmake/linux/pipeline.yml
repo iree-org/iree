@@ -125,6 +125,7 @@ steps:
         tar -xzvf "{}"
       ls build-targets | xargs -I "{target}" -- \
         python3 build_tools/benchmarks/collect_compilation_statistics.py \
+          legacy \
           --verbose \
           --output "compile-stats-results-{target}-$${BUILDKITE_BUILD_NUMBER}.json" \
           "build-targets/{target}"

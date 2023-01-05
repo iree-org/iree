@@ -96,8 +96,8 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
 
   funcBuilder.setInsertionPoint(beforeBlock, beforeBlock->end());
   for (auto condition :
-       llvm::enumerate(llvm::zip(switchOp.getConditions().getValue(),
-                                 switchOp.getConditionRegions()))) {
+       llvm::enumerate(llvm::zip_equal(switchOp.getConditions().getValue(),
+                                       switchOp.getConditionRegions()))) {
     auto conditionAttr =
         std::get<0>(condition.value()).cast<IREE::HAL::MatchAttrInterface>();
     auto &conditionRegion = std::get<1>(condition.value());

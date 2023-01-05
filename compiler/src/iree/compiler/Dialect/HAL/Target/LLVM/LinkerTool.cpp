@@ -65,7 +65,7 @@ Optional<std::vector<int8_t>> Artifact::read() const {
   auto fileData = llvm::MemoryBuffer::getFile(path);
   if (!fileData) {
     llvm::errs() << "failed to load library output file '" << path << "'";
-    return llvm::None;
+    return std::nullopt;
   }
   auto sourceBuffer = fileData.get()->getBuffer();
   std::vector<int8_t> resultBuffer(sourceBuffer.size());

@@ -1,5 +1,50 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))" --iree-codegen-llvmgpu-enable-transform-dialect-jit %s | FileCheck %s
 
+hal.executable @small_reduction {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
+  hal.executable.export public @small_reduction ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @small_reduction() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant -0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1024x13xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1024xf32>>
+      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1024, 13], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x13xf32>> -> tensor<1024x13xf32>
+      %3 = tensor.empty() : tensor<1024xf32>
+      %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<1024xf32>) -> tensor<1024xf32>
+      %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<1024x13xf32>) outs(%4 : tensor<1024xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %6 = arith.addf %in, %out : f32
+        linalg.yield %6 : f32
+      } -> tensor<1024xf32>
+      flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [1024], strides = [1] : tensor<1024xf32> -> !flow.dispatch.tensor<writeonly:tensor<1024xf32>>
+      return
+    }
+  }
+}
+}
+
+// Small reduction computes the whole reduction on a single thread.
+//   CHECK-LABEL: func.func @small_reduction
+//     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+//     CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
+//     CHECK-DAG: %[[C12:.*]] = arith.constant 12 : index
+//     CHECK-NOT:   memref.alloc()
+//         CHECK: gpu.thread_id  x
+//         CHECK: scf.for %{{.*}} = %[[C0]] to %[[C12]] step %[[C4]] {
+//         CHECK:   vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<4xf32>
+//         CHECK:   vector.multi_reduction <add>, %{{.*}} : vector<4xf32> to f32
+//         CHECK:   vector.transfer_write {{.*}} : vector<f32>, memref<f32
+//     CHECK-NOT: gpu.barrier
+//         CHECK: vector.transfer_read {{.*}}: memref<f32{{.*}}>, vector<f32>
+//         CHECK: arith.addf %{{.*}} : f32
+
+// -----
+
 hal.executable @group_reduction {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
   hal.executable.export public @group_reduction ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
@@ -27,175 +72,43 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   }
 }
 }
+
 //   CHECK-LABEL: func.func @group_reduction
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
-//     CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : index
-//     CHECK-DAG:   %[[F0:.*]] = arith.constant dense<0.000000e+00> : vector<f32>
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 128 : i64} : memref<1x2xf32, 3>
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, 3>
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
-//     CHECK-DAG:   %[[TIDY:.]] = gpu.thread_id  y
-//     CHECK-DAG:   %[[TIDZ:.]] = gpu.thread_id  z
-//         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]{{.*}}to memref<f32, {{.*}}, 3>
 
-// Distributed reduction: everyone loads then 5 xor + addf expected
-//         CHECK:   vector.transfer_read %{{.*}}[%[[TIDZ]], %[[TIDY]], %[[TIDX]]]
-// CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
-//         CHECK:   %[[RES:.*]] = arith.addf %{{.*}}
-//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
-//         CHECK:   %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
-//         CHECK:   scf.if %[[CONDXIS0]]
-//         CHECK:     vector.transfer_write %[[RES_VEC]], %[[SHMEM_VIEW_EXPANDED]][]
+// Fusion occurred, no barrier before the loop
+//     CHECK-NOT: gpu.barrier
+// Local per-thread scf.for-based reduction.
+//         CHECK: scf.for
+//         CHECK:   vector.transfer_read {{.*}} memref<8x64xf32>, vector<f32>
+//         CHECK:   vector.transfer_read {{.*}} memref<1x64xf32, 3>, vector<f32>
+//         CHECK:   arith.addf {{.*}} : f32
+//         CHECK:   vector.transfer_write {{.*}} vector<f32>
+// No barrier within the loop.
+//     CHECK-NOT:   gpu.barrier
+//         CHECK:   }
+// Barrier after the loop.
 //         CHECK:   gpu.barrier
 
-// Last part is not distributed atm and is only ran by threadIdx.x == 0 and threadIdx.y == 0.
-//         CHECK:   %[[CONDYIS0:.*]] = arith.cmpi ult, %[[TIDY]], %[[C1]] : index
-//          TODO: cond eq 0 and cond ult 1 do not CSE atm.
-//         CHECK:   %[[CONXANDYARE0:.*]] = arith.andi %{{.*}}, %[[CONDYIS0]] : i1
-//         CHECK:   scf.if %[[CONXANDYARE0]] {
-//         CHECK:     vector.transfer_read
-//         CHECK:     vector.reduction <add>
-//         CHECK:     vector.transfer_write
-//         CHECK:   gpu.barrier
-//         CHECK:   memref.dealloc %[[SHMEM_ALLOC]] : memref<1x2xf32, 3>
-
-// -----
-
-hal.executable @group_reduction_elementwise {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
-  hal.executable.export public @group_reduction_elementwise ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
-  ^bb0(%arg0: !hal.device, %arg1: index):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
-    hal.return %x, %y, %z : index, index, index
-  }
-  builtin.module {
-    func.func @group_reduction_elementwise() {
-      %c0 = arith.constant 0 : index
-      %cst = arith.constant -0.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<8x64xf32>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<8xf32>>
-      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<8x64xf32>> -> tensor<8x64xf32>
-      %3 = tensor.empty() : tensor<8xf32>
-      %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<8xf32>) -> tensor<8xf32>
-      %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<8x64xf32>) outs(%4 : tensor<8xf32>) {
-      ^bb0(%in: f32, %out: f32):
-        %7 = arith.addf %in, %out : f32
-        linalg.yield %7 : f32
-      } -> tensor<8xf32>
-      %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%5 : tensor<8xf32>) outs(%3 : tensor<8xf32>) {
-      ^bb0(%in: f32, %out: f32):
-        %7 = math.sqrt %in : f32
-        linalg.yield %7 : f32
-      } -> tensor<8xf32>
-      flow.dispatch.tensor.store %6, %1, offsets = [0], sizes = [8], strides = [1] : tensor<8xf32> -> !flow.dispatch.tensor<writeonly:tensor<8xf32>>
-      return
-    }
-  }
-}
-}
-
-//   CHECK-LABEL: func.func @group_reduction_elementwise
-//     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
-//     CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : index
-//     CHECK-DAG:   %[[F0:.*]] = arith.constant dense<0.000000e+00> : vector<f32>
-//     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 128 : i64} : memref<1x2xf32, 3>
-//     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
-//     CHECK-DAG:   %[[TIDY:.]] = gpu.thread_id  y
-//     CHECK-DAG:   %[[TIDZ:.]] = gpu.thread_id  z
-//         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]{{.*}}to memref<f32, {{.*}}, 3>
-
-// Distributed reduction: everyone loads then 5 xor + addf expected
-//         CHECK:   vector.transfer_read %{{.*}}[%[[TIDZ]], %[[TIDY]], %[[TIDX]]]
-// CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
-//         CHECK:   %[[RES:.*]] = arith.addf %{{.*}}
-//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
-//         CHECK:   %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
-//         CHECK:   scf.if %[[CONDXIS0]]
-//         CHECK:     vector.transfer_write %[[RES_VEC]], %[[SHMEM_VIEW_EXPANDED]][]
-//         CHECK:   gpu.barrier
-
-// Last part is not distributed atm and is only ran by threadIdx.x == 0 and threadIdx.y == 0.
-// It should contain the fused elementwise operation.
-//         CHECK:   %[[CONDYIS0:.*]] = arith.cmpi ult, %[[TIDY]], %[[C1]] : index
-//          TODO:   cond eq 0 and cond ult 1 do not CSE atm.
-//         CHECK:   %[[CONXANDYARE0:.*]] = arith.andi %{{.*}}, %[[CONDYIS0]] : i1
-//         CHECK:   scf.if %[[CONXANDYARE0]] {
-//         CHECK:     vector.transfer_read
-//         CHECK:     vector.reduction <add>
-//         CHECK:     math.sqrt
-//         CHECK:     vector.transfer_write
-//         CHECK:   gpu.barrier
-//         CHECK:   memref.dealloc %[[SHMEM_ALLOC]] : memref<1x2xf32, 3>
-
-// -----
-
-hal.executable @group_elementwise_reduction {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
-  hal.executable.export public @group_elementwise_reduction ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
-  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
-    hal.return %x, %y, %z : index, index, index
-  }
-  builtin.module {
-    func.func @group_elementwise_reduction() {
-      %c0 = arith.constant 0 : index
-      %cst = arith.constant -0.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<8x64xf32>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<8xf32>>
-      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<8x64xf32>> -> tensor<8x64xf32>
-      %3 = tensor.empty() : tensor<8xf32>
-      %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<8xf32>) -> tensor<8xf32>
-      %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<8x64xf32>) outs(%4 : tensor<8xf32>) {
-      ^bb0(%in: f32, %out: f32):
-        %6 = arith.addf %in, %in : f32
-        %7 = arith.addf %6, %6 : f32
-        %8 = arith.addf %7, %out : f32
-        linalg.yield %8 : f32
-      } -> tensor<8xf32>
-      flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [8], strides = [1] : tensor<8xf32> -> !flow.dispatch.tensor<writeonly:tensor<8xf32>>
-      return
-    }
-  }
-}
-}
-
-//   CHECK-LABEL: func.func @group_elementwise_reduction
-//     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
-//     CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : index
-//     CHECK-DAG:   %[[F0:.*]] = arith.constant dense<0.000000e+00> : vector<f32>
-//     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 128 : i64} : memref<1x2xf32, 3>
-//     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
-//     CHECK-DAG:   %[[TIDY:.]] = gpu.thread_id  y
-//     CHECK-DAG:   %[[TIDZ:.]] = gpu.thread_id  z
-
-//         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]{{.*}}to memref<f32, {{.*}}, 3>
-
-// Distributed reduction: everyone loads, does the elementwise then 5 xor + addf expected
-//         CHECK:   vector.transfer_read %{{.*}}[%[[TIDZ]], %[[TIDY]], %[[TIDX]]]
-//         CHECK:   arith.addf
-//         CHECK:   arith.addf
+// Distributed reduction: everyone loads then 5 xor + addf expected.
+//         CHECK: vector.transfer_read %{{.*}} memref<8xf32>, vector<f32>
+//         CHECK: vector.transfer_read %{{.*}} memref<1x64xf32, 3>, vector<1xf32>
 // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
-//         CHECK:   %[[RES:.*]] = arith.addf %{{.*}}
-
-//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
+//         CHECK: arith.minui
+//         CHECK: memref.load
+//         CHECK: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
+//         CHECK: gpu.shuffle  idx
+//         CHECK:   %[[RES:.*]] = arith.addf %{{.*}} : f32
+//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %{{.*}} : f32 to vector<f32>
 //         CHECK:   %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
 //         CHECK:   scf.if %[[CONDXIS0]]
-//         CHECK:     vector.transfer_write %[[RES_VEC]], %[[SHMEM_VIEW_EXPANDED]][]
+//         CHECK:     vector.transfer_write %[[RES_VEC]]
 //         CHECK:   gpu.barrier
-
-// Last part is not distributed atm and is only ran by threadIdx.x == 0 and threadIdx.y == 0.
-//         CHECK:   %[[CONDYIS0:.*]] = arith.cmpi ult, %[[TIDY]], %[[C1]] : index
-//          TODO: cond eq 0 and cond ult 1 do not CSE atm.
-//         CHECK:   %[[CONXANDYARE0:.*]] = arith.andi %{{.*}}, %[[CONDYIS0]] : i1
-//         CHECK:   scf.if %[[CONXANDYARE0]] {
-//         CHECK:     vector.transfer_read
-//         CHECK:     vector.reduction <add>
-//         CHECK:     vector.transfer_write
-//         CHECK:   gpu.barrier
-//         CHECK:   memref.dealloc %[[SHMEM_ALLOC]] : memref<1x2xf32, 3>
+//         CHECK:   memref.dealloc %[[SHMEM_ALLOC]]
 
 // -----
 
@@ -236,38 +149,184 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 //   CHECK-LABEL: func.func @group_elementwise_reduction_elementwise
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
-//     CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : index
-//     CHECK-DAG:   %[[F0:.*]] = arith.constant dense<0.000000e+00> : vector<f32>
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 128 : i64} : memref<1x2xf32, 3>
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, 3>
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
-//     CHECK-DAG:   %[[TIDY:.]] = gpu.thread_id  y
-//     CHECK-DAG:   %[[TIDZ:.]] = gpu.thread_id  z
 
-//         CHECK:   %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]{{.*}}to memref<f32, {{.*}}, 3>
+// Fusion occurred, no barrier before the loop
+//     CHECK-NOT: gpu.barrier
+// Local per-thread scf.for-based reduction.
+//         CHECK: scf.for
+//         CHECK:   vector.transfer_read {{.*}} vector<f32>
+//         CHECK:   vector.transfer_read {{.*}} vector<f32>
+//         CHECK:   arith.addf{{.*}} : f32
+//         CHECK:   arith.addf{{.*}} : f32
+//         CHECK:   arith.addf{{.*}} : f32
+//         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
+//         CHECK:   vector.transfer_write {{.*}} vector<f32>
+// No barrier within the loop
+//     CHECK-NOT:   gpu.barrier
+//         CHECK: }
+// Barrier after the loop
+//         CHECK:   gpu.barrier
 
-// Distributed reduction: everyone loads, does the elementwise then 5 xor + addf expected
-//         CHECK:   vector.transfer_read %{{.*}}[%[[TIDZ]], %[[TIDY]], %[[TIDX]]]
-//         CHECK:   arith.addf
-//         CHECK:   arith.addf
+// Distributed reduction: everyone loads then 5 xor + addf expected.
+//         CHECK: vector.transfer_read %{{.*}} memref<1xf32, 3>, vector<f32>
+//         CHECK: vector.transfer_read %{{.*}} memref<1x64xf32, 3>, vector<1xf32>
 // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
-//         CHECK:   %[[RES:.*]] = arith.addf %{{.*}}
+//         CHECK: arith.minui
+//         CHECK: memref.load
+//         CHECK: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
+//         CHECK: gpu.shuffle  idx
+//         CHECK:   %[[PARTIAL:.*]] = arith.addf %{{.*}}
+//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[PARTIAL]] : f32 to vector<f32>
+//         CHECK:   %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
+//         CHECK:   scf.if %[[CONDXIS0]]
+//         CHECK:     vector.transfer_write %[[RES_VEC]]
 
+//         CHECK:   gpu.barrier
+//         CHECK:   math.sqrt
+//         CHECK:   gpu.barrier
+//         CHECK:   memref.dealloc %[[SHMEM_ALLOC]]
+
+// -----
+
+hal.executable @group_reduction_larger {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
+  hal.executable.export public @group_reduction_larger ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @group_reduction_larger() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant -0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<33x1024xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<33xf32>>
+      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [33, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<33x1024xf32>> -> tensor<33x1024xf32>
+      %3 = tensor.empty() : tensor<33xf32>
+      %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<33xf32>) -> tensor<33xf32>
+      %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<33x1024xf32>) outs(%4 : tensor<33xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %6 = arith.addf %in, %out : f32
+        linalg.yield %6 : f32
+      } -> tensor<33xf32>
+      flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [8], strides = [1] : tensor<33xf32> -> !flow.dispatch.tensor<writeonly:tensor<33xf32>>
+      return
+    }
+  }
+}
+}
+
+//   CHECK-LABEL: func.func @group_reduction_larger
+//     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
+//     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x256xf32, 3>
+//     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
+
+// Fusion occurred, no barrier before the loop
+//     CHECK-NOT: gpu.barrier
+// Local per-thread scf.for-based reduction.
+//         CHECK: scf.for
+//         CHECK:   vector.transfer_read
+//         CHECK:   vector.transfer_read {{.*}} vector<f32>
+//         CHECK:   vector.reduction <add>{{.*}} : vector<4xf32> into f32
+//         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
+// No barrier within the loop
+//     CHECK-NOT:   gpu.barrier
+//         CHECK:   vector.transfer_write {{.*}} vector<f32>
+
+//     CHECK-DAG:   %[[TIDY:.]] = gpu.thread_id  y
+// Distributed reduction: everyone loads then 5 xor + addf expected.
+//         CHECK: vector.transfer_read %{{.*}} memref<33xf32>, vector<f32>
+//         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %[[TIDX]]]{{.*}} memref<1x256xf32, 3>, vector<1xf32>
+// CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
+
+//         CHECK: arith.minui
+//         CHECK: memref.load
+// CHECK-COUNT-3: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
+//         CHECK: gpu.shuffle  idx
+//         CHECK:   %[[RES:.*]] = arith.addf %{{.*}}
 //         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
 //         CHECK:   %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
 //         CHECK:   scf.if %[[CONDXIS0]]
-//         CHECK:     vector.transfer_write %[[RES_VEC]], %[[SHMEM_VIEW_EXPANDED]][]
+//         CHECK:     vector.transfer_write %[[RES_VEC]]
 //         CHECK:   gpu.barrier
+//         CHECK:   memref.dealloc %[[SHMEM_ALLOC]]
 
-// Last part is not distributed atm and is only ran by threadIdx.x == 0 and threadIdx.y == 0.
-//         CHECK:   %[[CONDYIS0:.*]] = arith.cmpi ult, %[[TIDY]], %[[C1]] : index
-//          TODO: cond eq 0 and cond ult 1 do not CSE atm.
-//         CHECK:   %[[CONXANDYARE0:.*]] = arith.andi %{{.*}}, %[[CONDYIS0]] : i1
-//         CHECK:   scf.if %[[CONXANDYARE0]] {
-//         CHECK:     vector.transfer_read
-//         CHECK:     vector.reduction <add>
-//         CHECK:     math.sqrt
-//         CHECK:     vector.transfer_write
-//         CHECK:   gpu.barrier
-//         CHECK:   memref.dealloc %[[SHMEM_ALLOC]] : memref<1x2xf32, 3>
+// -----
+
+hal.executable @group_reduction_1d {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
+  hal.executable.export public @group_reduction_1d ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @group_reduction_1d() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant -0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<64xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<f32>>
+      %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [64], strides = [1] : !flow.dispatch.tensor<readonly:tensor<64xf32>> -> tensor<64xf32>
+      %3 = tensor.empty() : tensor<f32>
+      %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<f32>) -> tensor<f32>
+      %5 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%2 : tensor<64xf32>) outs(%4 : tensor<f32>) {
+      ^bb0(%in: f32, %out: f32):
+        %6 = arith.addf %in, %out : f32
+        linalg.yield %6 : f32
+      } -> tensor<f32>
+      flow.dispatch.tensor.store %5, %1, offsets = [], sizes = [], strides = [] : tensor<f32> -> !flow.dispatch.tensor<writeonly:tensor<f32>>
+      return
+    }
+  }
+}
+}
+
+//   CHECK-LABEL: func.func @group_reduction_1d
+// CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
+
+// -----
+
+hal.executable @group_elementwise_reduction_elementwise_4d {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
+  hal.executable.export public @group_elementwise_reduction_elementwise_4d ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @group_elementwise_reduction_elementwise_4d() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant -0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<2x4x8x64xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<2x4x8xf32>>
+      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 4, 8, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x4x8x64xf32>> -> tensor<2x4x8x64xf32>
+      %3 = tensor.empty() : tensor<2x4x8xf32>
+      %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<2x4x8xf32>) -> tensor<2x4x8xf32>
+      %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], 
+                           iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%2 : tensor<2x4x8x64xf32>) outs(%4 : tensor<2x4x8xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %7 = arith.addf %in, %in : f32
+        %8 = arith.addf %7, %7 : f32
+        %9 = arith.addf %8, %out : f32
+        linalg.yield %9 : f32
+      } -> tensor<2x4x8xf32>
+      %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], 
+                           iterator_types = ["parallel", "parallel", "parallel"]} ins(%5 : tensor<2x4x8xf32>) outs(%3 : tensor<2x4x8xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %7 = math.sqrt %in : f32
+        linalg.yield %7 : f32
+      } -> tensor<2x4x8xf32>
+      flow.dispatch.tensor.store %6, %1, offsets = [0, 0, 0], sizes = [2, 4, 8], strides = [1, 1, 1] : tensor<2x4x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x4x8xf32>>
+      return
+    }
+  }
+}
+}
+
+//   CHECK-LABEL: func.func @group_elementwise_reduction_elementwise_4d
+// CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf

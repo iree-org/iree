@@ -11,7 +11,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
                      affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]}
     ins(%arg : !in_tensor_t) outs(%1 : !out_tensor_t) {
-      ^bb0(%arg3: f32, %arg4: f32):
+      ^bb0(%arg3: f32, %arg4: f32): 
         %3 = arith.addf %arg3, %arg4 : f32
         linalg.yield %3 : f32
       } -> !out_tensor_t
@@ -32,22 +32,27 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="33x1024xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
+// RUN: iree-compile %s --iree-hal-target-backends=cuda \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit | \
+// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="33x1024xf32=1" |\
+// RUN: FileCheck %s --check-prefix=EXEC
+
+
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   //     CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
   //     CHECK-DAG: %[[F0:.*]] = arith.constant dense<0.000000e+00> : vector<4xf32>
   //     CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 128 : i64} : memref<1x128xf32, 3>
+  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x128xf32, 3>
   
   //         CHECK: %[[TIDX:.]] = gpu.thread_id  x
   //         CHECK: %[[IDX:.*]] = affine.apply{{.*}}%[[TIDX]]
-  //         CHECK: %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][0, %[[IDX]]]{{.*}}to memref<4xf32, strided<[1], offset: ?>, 3>
   //         CHECK: gpu.barrier
   // Local per-thread scf.for-based reduction.
   //         CHECK: scf.for
   //         CHECK:   vector.transfer_read 
-  //         CHECK:   vector.transfer_read 
+  //         CHECK:   vector.transfer_read %[[SHMEM_ALLOC]][%[[C0]], %[[IDX]]]
   //         CHECK:   arith.addf %{{.*}}, %{{.*}} : vector<4xf32>
-  //         CHECK:   vector.transfer_write
+  //         CHECK:   vector.transfer_write %{{.*}}, %[[SHMEM_ALLOC]][%[[C0]], %[[IDX]]]
   // TODO: remote unnecessary barrier within the loop
   //         CHECK:   gpu.barrier
 

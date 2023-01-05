@@ -9,6 +9,7 @@
 
 #include <memory>
 
+#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
@@ -44,9 +45,10 @@ void addIREEPostBufferizationPasses(OpPassManager &passManager);
 using bufferization::BufferizationOptions;
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
-    Optional<BufferizationOptions::AllocationFn> allocationFn = None,
-    Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,
-    Optional<BufferizationOptions::MemCpyFn> memCpyFn = None);
+    Optional<BufferizationOptions::AllocationFn> allocationFn = std::nullopt,
+    Optional<BufferizationOptions::DeallocationFn> deallocationFn =
+        std::nullopt,
+    Optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -94,9 +96,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
 /// with the allocated MemRefType having no stride map (i.e. default row-major
 /// striding) and default memory space.
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    Optional<BufferizationOptions::AllocationFn> allocationFn = None,
-    Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,
-    Optional<BufferizationOptions::MemCpyFn> memCpyFn = None);
+    Optional<BufferizationOptions::AllocationFn> allocationFn = std::nullopt,
+    Optional<BufferizationOptions::DeallocationFn> deallocationFn =
+        std::nullopt,
+    Optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
 /// Creates a pass to remove single iteration distributed loops.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -168,8 +171,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
 /// Create an IREE-specific Transform dialect interpreter pass with all
 /// registrations necessary for IREE.
 std::unique_ptr<Pass> createTransformDialectInterpreterPass(
-    llvm::StringRef transformFileName = llvm::StringRef());
-std::unique_ptr<Pass> createTransformDialectJitterPass();
+    llvm::StringRef transformFileName = llvm::StringRef(),
+    llvm::StringRef debugPayloadRootTag = llvm::StringRef(),
+    llvm::StringRef debugTransformRootTag = llvm::StringRef());
 
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
@@ -194,6 +198,9 @@ createFuseTensorPadWithConsumerPass();
 /// OffsetSizeAndStrideOpInterface. For example, pad(extract_slice).
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConcretizePadResultShapePass();
+
+IREE::LinalgExt::MaterializeEncodingValueFn getMaterializeEncodingValueFn(
+    IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Materialize the encoding of operations. The layout to use for the encoded
 /// operations are backend specific.
@@ -303,7 +310,8 @@ void addCPUDataTilingPipeline(OpPassManager &passManager);
 
 /// Populates the passes to lower to tiled/distributed/bufferized ops,
 /// suitable for library call dispatch and lowering to loops.
-void addVMVXDefaultPassPipeline(OpPassManager &passManager);
+void addVMVXDefaultPassPipeline(OpPassManager &passManager,
+                                bool enableMicrokernels);
 
 /// Populates the passes to lower linalg ops on buffers. Currenly this
 /// pipeline is only used for dispatches that just copy data from input
@@ -338,11 +346,8 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     ArrayRef<int64_t> workgroupSize = {});
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager);
 
-/// Populates the passes from Sandbox for testing transformations from
-/// sandbox. Unlike other pipelines this pass mangaer is nested at the
-/// `hal.executable.variant` op.
-void addTransformDialectInterpreterPasses(OpPassManager &passManager);
-void addTransformDialectJitterPasses(OpPassManager &passManager);
+/// Transform dialect-based common.
+void addTransformDialectPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
@@ -410,9 +415,8 @@ void addGPUTransposePassPipeline(OpPassManager &pm);
 /// Lowering reductions to warp reductions.
 void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 
-/// Experimental path for transform dialect.
-void addGPUTransformDialectInterpreterPasses(OpPassManager &pm);
-void addGPUTransformDialectJitterPasses(OpPassManager &pm);
+/// Transform dialect-based path.
+void addGPUTransformDialectPasses(OpPassManager &pm);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a

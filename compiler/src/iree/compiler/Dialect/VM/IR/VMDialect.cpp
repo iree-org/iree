@@ -286,7 +286,7 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
   } else if (type.isa<IREE::VM::RefType>()) {
     // The only constant type we support for refs is null so we can just
     // emit that here.
-    // TODO(b/144027097): relace unit attr with a proper null ref attr.
+    // TODO(benvanik): relace unit attr with a proper null ref attr.
     return builder.create<VM::ConstRefZeroOp>(loc, type);
   }
   // TODO(benvanik): handle other constant value types.

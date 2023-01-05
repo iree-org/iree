@@ -109,7 +109,7 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
 
   FailureOr<linalg::TileLoopNest> loopNest =
       IREE::LinalgExt::tileConsumerAndFuseProducers(
-          builder, consumerOp, tileSizes, identityLoopOrder, llvm::None);
+          builder, consumerOp, tileSizes, identityLoopOrder, std::nullopt);
   if (failed(loopNest)) {
     return consumerOp.emitOpError("failed tiling and fusing producers");
   }
@@ -145,7 +145,7 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns,
                            .setTileSizeComputationFunction(getTileSizeFn);
   auto marker = StringAttr::get(context, getTileReductionMarker());
   auto filter =
-      IREE::LinalgExt::LinalgTransformationFilter({marker}, llvm::None);
+      IREE::LinalgExt::LinalgTransformationFilter({marker}, std::nullopt);
 
   TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNchwFchwOp,
                  linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
@@ -232,7 +232,7 @@ static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp,
 
     FailureOr<linalg::TileLoopNest> loopNest =
         IREE::LinalgExt::tileConsumerAndFuseProducers(
-            builder, consumerOp, tileSizes, identityLoopOrder, llvm::None);
+            builder, consumerOp, tileSizes, identityLoopOrder, std::nullopt);
     if (failed(loopNest)) {
       return consumerOp.emitOpError("failed tiling and fusing producers");
     }

@@ -9,11 +9,11 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
-#include "iree/compiler/Dialect/HAL/Target/CUDA/cuda_libdevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"
+#include "iree_cuda/libdevice_embedded.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/Constants.h"
@@ -103,8 +103,8 @@ static void linkModule(llvm::Module &module) {
   llvm::Linker linker(module);
 
   llvm::MemoryBufferRef bitcodeBufferRef(
-      llvm::StringRef(cuda_libdevice_create()->data,
-                      cuda_libdevice_create()->size),
+      llvm::StringRef(libdevice_embedded_create()->data,
+                      libdevice_embedded_create()->size),
       "libdevice bitcode");
   auto bitcodeModuleValue =
       llvm::parseBitcodeFile(bitcodeBufferRef, module.getContext());
@@ -155,7 +155,7 @@ static void linkAndOptimize(llvm::Module &module,
   llvm::StandardInstrumentations si(module.getContext(), false);
   si.registerCallbacks(pic, &fam);
 
-  llvm::PassBuilder pb(&targetMachine, pto, llvm::None, &pic);
+  llvm::PassBuilder pb(&targetMachine, pto, std::nullopt, &pic);
   pb.registerModuleAnalyses(mam);
   pb.registerCGSCCAnalyses(cgam);
   pb.registerFunctionAnalyses(fam);
@@ -300,8 +300,8 @@ class CUDATargetBackend final : public TargetBackend {
       }
 
       for (auto [exportOp, workgroupSize] :
-           llvm::zip(variantOp.getOps<IREE::HAL::ExecutableExportOp>(),
-                     workgroupSizes)) {
+           llvm::zip_equal(variantOp.getOps<IREE::HAL::ExecutableExportOp>(),
+                           workgroupSizes)) {
         auto *llvmFunc = llvmModule->getFunction(exportOp.getName());
         if (llvmFunc->isDeclaration()) continue;
 

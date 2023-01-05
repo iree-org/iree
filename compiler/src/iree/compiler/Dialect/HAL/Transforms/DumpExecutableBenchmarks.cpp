@@ -84,7 +84,8 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       }
 
       SmallVector<Binding> bindings;
-      for (auto it : llvm::zip(bindingAttrs, dispatchOp.getResourceLengths())) {
+      for (auto it :
+           llvm::zip_equal(bindingAttrs, dispatchOp.getResourceLengths())) {
         auto bindingAttr =
             std::get<0>(it).cast<IREE::HAL::InterfaceBindingAttr>();
         APInt resourceLength;

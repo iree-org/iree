@@ -372,7 +372,7 @@ OpFoldResult ConstF64ZeroOp::fold(ArrayRef<Attribute> operands) {
 }
 
 OpFoldResult ConstRefZeroOp::fold(ArrayRef<Attribute> operands) {
-  // TODO(b/144027097): relace unit attr with a proper null ref attr.
+  // TODO(benvanik): relace unit attr with a proper null ref attr.
   return UnitAttr::get(getContext());
 }
 

@@ -569,6 +569,10 @@ struct LinalgStrategyEnablePass
         linalg::getLinalgTilingCanonicalizationPatterns(context);
     scf::populateSCFForLoopCanonicalizationPatterns(patterns);
     tensor::populateFoldTensorEmptyPatterns(patterns);
+    // Pull in tensor dialect canonicalization patterns to fold tensor.cast
+    // into producers when possible.
+    context->getLoadedDialect<tensor::TensorDialect>()
+        ->getCanonicalizationPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns))))
       return signalPassFailure();
 
@@ -1033,10 +1037,9 @@ struct LinalgExtVectorizationPass
       vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
+      // TODO(hanchung): Capture the failure after the vectorization pattern
+      // rewrite converges.
+      (void)(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)));
     }
   }
 };

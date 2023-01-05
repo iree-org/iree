@@ -38,9 +38,9 @@ struct MemRefTypeConverter final : public TypeConverter {
     addConversion([](BaseMemRefType memRefType) -> Optional<Type> {
       // Expect #hal.descriptor_type memory spaces.
       Attribute spaceAttr = memRefType.getMemorySpace();
-      if (!spaceAttr) return llvm::None;
+      if (!spaceAttr) return std::nullopt;
       auto dtAttr = spaceAttr.dyn_cast<IREE::HAL::DescriptorTypeAttr>();
-      if (!dtAttr) return llvm::None;
+      if (!dtAttr) return std::nullopt;
 
       // Erase the #hal.descriptor_type memory space.
       if (auto rankedType = memRefType.dyn_cast<MemRefType>()) {

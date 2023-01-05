@@ -21,7 +21,7 @@ function update_autoscaling() {
     --min-num-replicas="${min_size}"
     --max-num-replicas="${max_size}"
     --mode=only-scale-out
-    --target-cpu-utilization=0.6
+    --target-cpu-utilization=0.2
   )
 
   (set -x; gcloud beta compute instance-groups managed set-autoscaling "${autoscaling_args[@]}")

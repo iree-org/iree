@@ -75,7 +75,6 @@ def CHECK_ExpectAllTrueOp : Op<CHECK_Dialect, "expect_all_true"> {
   let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
 }
 
-// TODO(b/146898896): Consider a cmp op instead.
 def CHECK_ExpectEqOp : Op<CHECK_Dialect, "expect_eq", [SameTypeOperands]> {
   let summary = [{Checks that the tensor or buffer view operands are equal}];
   let description = [{

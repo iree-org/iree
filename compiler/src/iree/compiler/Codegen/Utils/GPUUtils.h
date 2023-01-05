@@ -9,7 +9,7 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 namespace mlir {
 namespace iree_compiler {
 
@@ -71,6 +71,11 @@ void propagateSharedMemoryCopy(func::FuncOp funcOp);
 
 /// Inserts barriers before and after shared memory copy.
 void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp);
+
+/// Emit reduction across a group for a given input.
+Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
+                            vector::CombiningKind kind, uint32_t size,
+                            const int warpSize);
 
 }  // namespace iree_compiler
 }  // namespace mlir

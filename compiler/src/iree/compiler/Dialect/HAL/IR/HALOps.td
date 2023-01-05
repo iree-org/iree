@@ -1341,7 +1341,7 @@ def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
   let builders = [
     OpBuilder<(ins),
     [{
-      build($_builder, $_state, llvm::None);
+      build($_builder, $_state, std::nullopt);
     }]>,
   ];
 
@@ -1830,7 +1830,9 @@ def HAL_ExecutableConstantBlockOp :
 
   let arguments = (ins
     TypeAttrOf<FunctionType>:$function_type,
-    ArrayAttr:$keys
+    ArrayAttr:$keys,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
 
   let regions = (region AnyRegion:$body);

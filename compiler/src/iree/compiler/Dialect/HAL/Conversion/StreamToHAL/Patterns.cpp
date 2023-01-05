@@ -297,7 +297,8 @@ struct ResourceAllocOpPattern
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
     SmallVector<Value> results;
-    for (auto it : llvm::zip(allocOp.getResults(), allocOp.getStorageSizes())) {
+    for (auto it :
+         llvm::zip_equal(allocOp.getResults(), allocOp.getStorageSizes())) {
       auto resourceResult = std::get<0>(it);
       auto resourceType =
           resourceResult.getType().cast<IREE::Stream::ResourceType>();
@@ -748,7 +749,7 @@ static IREE::HAL::CollectiveAttr convertCollectiveAttr(
     IREE::Stream::CollectiveAttr sourceAttr) {
   auto convertReductionOp = [](Optional<IREE::Stream::CollectiveReductionOp> op)
       -> Optional<IREE::HAL::CollectiveReductionOp> {
-    if (!op.has_value()) return llvm::None;
+    if (!op.has_value()) return std::nullopt;
     return static_cast<IREE::HAL::CollectiveReductionOp>(op.value());
   };
   return IREE::HAL::CollectiveAttr::get(
@@ -1268,7 +1269,7 @@ struct GlobalTimepointConversionPattern
     auto initialValue = op.getInitialValue();
     if (!initialValue.has_value()) return failure();
     if (!initialValue->isa<IREE::Stream::TimepointAttr>()) return failure();
-    rewriter.updateRootInPlace(op, [&]() { op.removeInitial_valueAttr(); });
+    rewriter.updateRootInPlace(op, [&]() { op.removeInitialValueAttr(); });
     return success();
   }
 };

@@ -20,6 +20,7 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/TilingInterface.h"
@@ -38,9 +39,10 @@ static bool isZero(Value val) {
 
 /// Helper method to adjust the interchange vector to match the iteration
 /// domain.
-static SmallVector<unsigned> fillInterchangeVector(
+static SmallVector<int64_t> fillInterchangeVector(
     ArrayRef<unsigned> interchangeVector, size_t iterationDomainSize) {
-  SmallVector<unsigned> filledVector = llvm::to_vector(interchangeVector);
+  SmallVector<int64_t> filledVector;
+  for (auto v : interchangeVector) filledVector.push_back(v);
   if (filledVector.size() < iterationDomainSize) {
     auto range = llvm::seq<unsigned>(filledVector.size(), iterationDomainSize);
     filledVector.append(range.begin(), range.end());
@@ -48,33 +50,6 @@ static SmallVector<unsigned> fillInterchangeVector(
   if (filledVector.size() > iterationDomainSize)
     filledVector.resize(iterationDomainSize);
   return filledVector;
-}
-
-/// Helper method to apply permutation to a vector
-template <typename T>
-static SmallVector<T> applyPermutationToVector(const SmallVector<T> &vector,
-                                               ArrayRef<unsigned> interchange) {
-  assert(interchange.size() == vector.size());
-  return llvm::to_vector(
-      llvm::map_range(interchange, [&](unsigned val) { return vector[val]; }));
-}
-/// Helper method to apply to invert a permutation.
-static SmallVector<unsigned> invertPermutationVector(
-    ArrayRef<unsigned> interchange) {
-  SmallVector<unsigned> inversion(interchange.size());
-  for (auto pos : llvm::enumerate(interchange)) {
-    inversion[pos.value()] = pos.index();
-  }
-  return inversion;
-}
-/// Method to check if an interchange vector is a permutation.
-static bool isPermutation(ArrayRef<unsigned> interchange) {
-  llvm::SmallDenseSet<unsigned, 4> seenVals;
-  for (auto val : interchange) {
-    if (seenVals.count(val)) return false;
-    seenVals.insert(val);
-  }
-  return seenVals.size() == interchange.size();
 }
 
 /// Given the `lb` and `step` of a loop, return the lower bound and step to use
@@ -157,10 +132,12 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
   };
 
   unsigned procDim = 0;
-  for (auto loopRange : llvm::enumerate(loopRanges)) {
-    auto index = loopRange.index();
-    Value lb = loopRange.value().offset;
-    Value ub = loopRange.value().size;
+  for (auto [idx, loopRange] : llvm::enumerate(loopRanges)) {
+    // Capturing structured bindings in lambdas is a c++20 feature, so we have
+    // to declare a local variable for it.
+    int index = idx;
+    Value lb = loopRange.offset;
+    Value ub = loopRange.size;
     Value step = tileSizeVals[index];
 
     // No loops if tile size is zero. Set offset and size to the loop
@@ -250,19 +227,18 @@ static LogicalResult replaceAllStoresWithTiledVersion(
     RewriterBase &rewriter, TilingInterface untiledOp,
     ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
     Operation *tiledOp) {
-  for (auto result : llvm::enumerate(untiledOp->getResults())) {
+  for (auto [index, result] : llvm::enumerate(untiledOp->getResults())) {
     SmallVector<OpFoldResult> resultOffsets, resultSizes;
-    if (failed(untiledOp.getResultTilePosition(rewriter, result.index(),
-                                               offsets, sizes, resultOffsets,
-                                               resultSizes))) {
+    if (failed(untiledOp.getResultTilePosition(rewriter, index, offsets, sizes,
+                                               resultOffsets, resultSizes))) {
       return rewriter.notifyMatchFailure(
           untiledOp, "failed to rewrite destructive update");
     }
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(tiledOp->getBlock()->getTerminator());
     if (failed(replaceStoreWithTiledVersion(
-            rewriter, result.value().cast<OpResult>(),
-            tiledOp->getResult(result.index()).cast<OpResult>(), resultOffsets,
+            rewriter, result.cast<OpResult>(),
+            tiledOp->getResult(index).cast<OpResult>(), resultOffsets,
             resultSizes))) {
       return failure();
     }
@@ -367,9 +343,9 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
 
   TilingResult tilingResult;
   tilingResult.tiledLoops.resize(numLoops, false);
-  for (auto tileSize : llvm::enumerate(tileSizeVector)) {
-    if (!isZero(tileSize.value())) {
-      tilingResult.tiledLoops.set(tileSize.index());
+  for (auto [index, tileSize] : llvm::enumerate(tileSizeVector)) {
+    if (!isZero(tileSize)) {
+      tilingResult.tiledLoops.set(index);
     }
   }
 
@@ -384,23 +360,21 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
     SmallVector<OpFoldResult> offsets, sizes;
     // If there is an interchange specified, permute the iteration domain and
     // the tile sizes.
-    SmallVector<unsigned> interchangeVector;
+    SmallVector<int64_t> interchangeVector;
     if (!options.interchangeVector.empty()) {
       interchangeVector = fillInterchangeVector(options.interchangeVector,
                                                 iterationDomain.size());
     }
     if (!interchangeVector.empty()) {
-      if (!isPermutation(interchangeVector)) {
+      if (!isPermutationVector(interchangeVector)) {
         return rewriter.notifyMatchFailure(
             op,
             "invalid intechange vector, not a permutation of the entire "
             "iteration space");
       }
 
-      iterationDomain =
-          applyPermutationToVector(iterationDomain, interchangeVector);
-      tileSizeVector =
-          applyPermutationToVector(tileSizeVector, interchangeVector);
+      applyPermutationToVector(iterationDomain, interchangeVector);
+      applyPermutationToVector(tileSizeVector, interchangeVector);
     }
 
     // If there is distribution specified, adjust the loop ranges. Note that
@@ -415,12 +389,11 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
       // The parallel loops that are tiled are partitionable loops.
       SmallVector<Range> parallelLoopRanges;
       SmallVector<unsigned> partitionedLoopIds;
-      for (auto iteratorType : llvm::enumerate(iteratorTypes)) {
-        if (iteratorType.value() == utils::IteratorType::parallel &&
-            !isZero(tileSizeVector[iteratorType.index()])) {
-          parallelLoopRanges.push_back(
-              iterationDomainOfr[iteratorType.index()]);
-          partitionedLoopIds.push_back(iteratorType.index());
+      for (auto [index, iteratorType] : llvm::enumerate(iteratorTypes)) {
+        if (iteratorType == utils::IteratorType::parallel &&
+            !isZero(tileSizeVector[index])) {
+          parallelLoopRanges.push_back(iterationDomainOfr[index]);
+          partitionedLoopIds.push_back(index);
         }
       }
 
@@ -428,9 +401,8 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
       procInfo =
           options.distribution->procInfo(rewriter, loc, parallelLoopRanges);
 
-      for (auto it : llvm::enumerate(partitionedLoopIds)) {
-        distributionMethods[it.value()] =
-            procInfo[it.index()].distributionMethod;
+      for (auto [index, loopIdx] : llvm::enumerate(partitionedLoopIds)) {
+        distributionMethods[loopIdx] = procInfo[index].distributionMethod;
       }
     }
 
@@ -443,8 +415,8 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
 
     if (!interchangeVector.empty()) {
       auto inversePermutation = invertPermutationVector(interchangeVector);
-      offsets = applyPermutationToVector(offsets, inversePermutation);
-      sizes = applyPermutationToVector(sizes, inversePermutation);
+      applyPermutationToVector(offsets, inversePermutation);
+      applyPermutationToVector(sizes, inversePermutation);
     }
 
     LLVM_DEBUG({
@@ -641,14 +613,14 @@ TileAndFuseDispatchUsingSCFForOp::returningMatchAndRewrite(
     SmallVector<OpFoldResult> producerOffset, producerSizes;
     SmallVector<Range> producerIterationDomain =
         fusableProducer.getIterationDomain(rewriter);
-    for (auto range : llvm::enumerate(producerIterationDomain)) {
-      if (range.index() < tilingResult->tiledLoops.size() &&
-          tilingResult->tiledLoops.test(range.index())) {
-        producerOffset.push_back(tilingResult->tileOffsets[range.index()]);
-        producerSizes.push_back(tilingResult->tileSizes[range.index()]);
+    for (auto [index, range] : llvm::enumerate(producerIterationDomain)) {
+      if (index < tilingResult->tiledLoops.size() &&
+          tilingResult->tiledLoops.test(index)) {
+        producerOffset.push_back(tilingResult->tileOffsets[index]);
+        producerSizes.push_back(tilingResult->tileSizes[index]);
       } else {
-        producerOffset.push_back(range.value().offset);
-        producerSizes.push_back(range.value().size);
+        producerOffset.push_back(range.offset);
+        producerSizes.push_back(range.size);
       }
     }
 
@@ -755,9 +727,9 @@ struct SwapExtractSliceWithInitTensor
       SmallVector<OpFoldResult> rankReducedMixedSizes;
       rankReducedMixedSizes.reserve(sliceOp.getType().getRank());
       auto droppedDims = sliceOp.getDroppedDims();
-      for (auto size : llvm::enumerate(mixedSizes)) {
-        if (droppedDims.test(size.index())) continue;
-        rankReducedMixedSizes.push_back(size.value());
+      for (auto [index, size] : llvm::enumerate(mixedSizes)) {
+        if (droppedDims.test(index)) continue;
+        rankReducedMixedSizes.push_back(size);
       }
       std::swap(mixedSizes, rankReducedMixedSizes);
     }

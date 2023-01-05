@@ -1,0 +1,56 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+# Variables and string substitutions don't work here because of course they don't
+load("%IREE_REPO_ALIAS%//build_tools/embed_data:build_defs.bzl", "c_embed_data")
+
+package(default_visibility = ["//visibility:public"])
+
+# The repository rule will perform some substitutions that we use to
+# customize the build based on the actually found toolkit.
+ENABLED = %ENABLED%
+LIBDEVICE_REL_PATH = "%LIBDEVICE_REL_PATH%"
+
+# Note that this BUILD file is overlaid on top of a partial CUDA SDK directory
+# as symlinked by the cuda_auto_configure repository rule in
+# build_tools/bazel/workspace.bzl
+
+# This flag will be True if the workspace repository rules detected a usable
+# SDK. config_settings in the project can join over this in order to
+# conditionally enable CUDA features based on pressence of the SDK.
+bool_flag(
+    name = "enabled",
+    build_setting_default = ENABLED,
+)
+
+# If the SDK was not found, these targets will be missing inputs and will
+# error if used. This will happen if someone tries to build them directly
+# or transitively.
+
+cc_library(
+    name = "headers",
+    hdrs = glob([
+        "include/**/*.h",
+        "include/**/*.hpp",
+    ]),
+    includes = ["include"],
+)
+
+c_embed_data(
+    name = "libdevice_embedded",
+    srcs = [
+        LIBDEVICE_REL_PATH,
+    ],
+    c_file_output = "iree_cuda/libdevice_embedded.c",
+    flatten = True,
+    generator = "%IREE_REPO_ALIAS%//build_tools/embed_data:generate_embed_data",
+    h_file_output = "iree_cuda/libdevice_embedded.h",
+    includes = [
+        "iree_cuda",
+    ],
+)

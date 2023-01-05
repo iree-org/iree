@@ -206,7 +206,7 @@ ParseResult parseRangeList(
 
 void printRangeList(OpAsmPrinter &p, Operation *op, OperandRange offsets,
                     OperandRange lengths) {
-  llvm::interleaveComma(llvm::zip(offsets, lengths), p, [&](auto it) {
+  llvm::interleaveComma(llvm::zip_equal(offsets, lengths), p, [&](auto it) {
     auto offset = std::get<0>(it);
     auto length = std::get<1>(it);
     p << "[";
@@ -761,13 +761,6 @@ static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
 }
 
 void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
-                     bool isMutable, Type type, TypedAttr initialValue,
-                     ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type,
-        Optional<TypedAttr>(initialValue), attrs);
-}
-
-void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      bool isMutable, Type type,
                      Optional<TypedAttr> initialValue,
                      ArrayRef<NamedAttribute> attrs) {
@@ -786,7 +779,7 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      bool isMutable, Type type,
                      ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type, llvm::None, attrs);
+  build(builder, result, name, isMutable, type, std::nullopt, attrs);
 }
 
 void GlobalAddressOp::getAsmResultNames(

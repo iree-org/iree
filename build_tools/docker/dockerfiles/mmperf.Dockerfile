@@ -13,7 +13,7 @@
 # mmperf repo. Later versions of Clang, LLVM, Python and Ubuntu are needed
 # to satisfy the dependency requirements of the backends.
 
-FROM gcr.io/iree-oss/perf@sha256:d9ba4befb943c11671747a76bee8f9afd286d88254e9f5c9da905b00bd2a8404
+FROM gcr.io/iree-oss/perf@sha256:db6b44ab3706c3b9ff189001fe4bb8b7ebc8fc4f84dd9a1d710920bef908b181
 
 ######## CUDA ########
 RUN apt-get update \
@@ -61,7 +61,7 @@ ENV BLIS_DIR="/opt/blis"
 ######## MMPERF ########
 COPY build_tools/docker/context/setup_mmperf.sh /usr/local/bin
 
-ARG MMPERF_SHA="ae523a31449a58ef39592c6b8cf9c042e0a55a1f"
+ARG MMPERF_SHA="8032334e77a2153bee42ead2ef181d58cdf28d7c"
 
 # Generate a version of mmperf for CPU.
 RUN mkdir -p "/usr/local/src/mmperf" \

@@ -393,7 +393,9 @@ def Util_InitializerOp : Util_Op<"initializer", [
   }];
 
   let arguments = (ins
-    TypeAttrOf<FunctionType>:$function_type
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs    
   );
 
   let regions = (region AnyRegion:$body);
@@ -475,13 +477,6 @@ def Util_GlobalOp : Util_Op<"global", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins
-      "StringRef":$name,
-      "bool":$isMutable,
-      "Type":$type,
-      "TypedAttr":$initialValue,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
-    )>,
     OpBuilder<(ins
       "StringRef":$name,
       "bool":$isMutable,

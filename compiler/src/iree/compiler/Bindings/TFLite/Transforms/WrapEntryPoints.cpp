@@ -159,8 +159,8 @@ class WrapEntryPointsPass
     }
 
     SmallVector<DynamicDims> inputDynamicDims;
-    for (auto input :
-         llvm::zip(funcOp.getArguments(), inputNames, funcType.getInputs())) {
+    for (auto input : llvm::zip_equal(funcOp.getArguments(), inputNames,
+                                      funcType.getInputs())) {
       auto argLoc = std::get<0>(input).getLoc();
       auto name = (namePrefix + "_" + std::get<1>(input) + "_shape").str();
       auto type = std::get<2>(input);
@@ -170,7 +170,7 @@ class WrapEntryPointsPass
           createDynamicDimGlobals(argLoc, name, tensorType, moduleBuilder));
     }
     SmallVector<DynamicDims> outputDynamicDims;
-    for (auto output : llvm::zip(outputNames, funcType.getResults())) {
+    for (auto output : llvm::zip_equal(outputNames, funcType.getResults())) {
       auto name = (namePrefix + "_" + std::get<0>(output) + "_shape").str();
       auto type = std::get<1>(output);
       auto tensorType = type.dyn_cast<TensorType>();
@@ -220,7 +220,7 @@ class WrapEntryPointsPass
         recalculateBuilder.getFunctionType(/*inputs=*/TypeRange{},
                                            /*outputs=*/TypeRange{}));
     for (auto inputValueDims :
-         llvm::zip(entryBlock.getArguments(), inputDynamicDims)) {
+         llvm::zip_equal(entryBlock.getArguments(), inputDynamicDims)) {
       auto inputValue = std::get<0>(inputValueDims);
       auto inputDynamicDims = std::get<1>(inputValueDims);
       auto inputPlaceholder =
@@ -248,7 +248,7 @@ class WrapEntryPointsPass
       // We do this per exit-site so that if the function has multiple code
       // paths that may return different shape sizes we capture them all.
       for (auto outputValueDims :
-           llvm::zip(returnOp.getOperands(), outputDynamicDims)) {
+           llvm::zip_equal(returnOp.getOperands(), outputDynamicDims)) {
         auto outputValue = std::get<0>(outputValueDims);
         auto outputDynamicDims = std::get<1>(outputValueDims);
         SmallVector<Value> dynamicDims;
@@ -515,7 +515,8 @@ class WrapEntryPointsPass
     auto *entryBlock = wrapperFuncOp.addEntryBlock();
     auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
     SmallVector<Value> callOperands;
-    for (auto input : llvm::zip(entryBlock->getArguments(), inputDynamicDims)) {
+    for (auto input :
+         llvm::zip_equal(entryBlock->getArguments(), inputDynamicDims)) {
       auto arg = std::get<0>(input);
       auto inputDynamicDims = std::get<1>(input);
       SmallVector<Value> dynamicDims;
@@ -531,7 +532,8 @@ class WrapEntryPointsPass
     auto callOp = entryBuilder.create<mlir::func::CallOp>(
         entryFuncOp.getLoc(), entryFuncOp, callOperands);
     SmallVector<Value> callResults;
-    for (auto output : llvm::zip(callOp.getResults(), outputDynamicDims)) {
+    for (auto output :
+         llvm::zip_equal(callOp.getResults(), outputDynamicDims)) {
       auto result = std::get<0>(output);
       auto outputDynamicDims = std::get<1>(output);
       SmallVector<Value> dynamicDims;
@@ -544,7 +546,8 @@ class WrapEntryPointsPass
       callResults.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
           result.getLoc(), bufferType, result, outputDynamicDims.tensorType,
           dynamicDims, /*target_storage=*/nullptr));
-      for (auto it : llvm::zip(dynamicDims, outputDynamicDims.globalOps)) {
+      for (auto it :
+           llvm::zip_equal(dynamicDims, outputDynamicDims.globalOps)) {
         auto dynamicDim = std::get<0>(it);
         auto globalOp = std::get<1>(it);
         entryBuilder.create<IREE::Util::GlobalStoreOp>(

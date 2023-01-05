@@ -597,7 +597,7 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
   };
 };
 
-/// Returns the number of bytes of the given `type`. Returns llvm::None if
+/// Returns the number of bytes of the given `type`. Returns std::nullopt if
 /// cannot deduce.
 ///
 /// Note that this should be kept consistent with how the byte offset was
@@ -606,10 +606,10 @@ Optional<int64_t> getNumBytes(Type type) {
   if (type.isIntOrFloat()) return IREE::Util::getRoundedElementByteWidth(type);
   if (auto vectorType = type.dyn_cast<VectorType>()) {
     auto elementBytes = getNumBytes(vectorType.getElementType());
-    if (!elementBytes) return llvm::None;
+    if (!elementBytes) return std::nullopt;
     return elementBytes.value() * vectorType.getNumElements();
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Folds the byte offset on subspan ops into the consumer load/store ops.
@@ -627,6 +627,10 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
       memref = op.getDstMemref();
     } else {
       memref = op.getMemref();
+    }
+    // Look through memref cast ops. They can be generated during conversions.
+    while (auto castOp = memref.getDefiningOp<memref::CastOp>()) {
+      memref = castOp.getSource();
     }
     auto memrefType = memref.getType().template cast<MemRefType>();
     if (!isRankOneMemRef(memrefType)) {
@@ -771,7 +775,7 @@ struct FlattenMemRefSubspanPass
       if (isRankOneMemRef(type)) return type;
 
       // Fall back to the default conversion flow.
-      return llvm::None;
+      return std::nullopt;
     });
     flattenPatterns
         .add<FlattenAlloc<memref::AllocaOp>, FlattenAlloc<memref::AllocOp>,

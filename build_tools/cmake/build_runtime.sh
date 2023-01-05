@@ -9,13 +9,13 @@
 #
 # Designed for CI, but can be run locally. The desired build directory can be
 # passed as the first argument. Otherwise, it uses the environment variable
-# IREE_RUNTIME_BUILD_DIR, defaulting to "build-runtime". It reuses the build
+# IREE_TARGET_BUILD_DIR, defaulting to "build-runtime". It reuses the build
 # directory if it already exists. Expects to be run from the root of the IREE
 # repository.
 
 set -xeuo pipefail
 
-BUILD_DIR="${1:-${IREE_RUNTIME_BUILD_DIR:-build-runtime}}"
+BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-runtime}}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
 source build_tools/cmake/setup_build.sh
@@ -25,8 +25,10 @@ declare -a args
 args=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DIREE_BUILD_COMPILER=OFF
+  "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+  "-DIREE_BUILD_COMPILER=OFF"
 )
 
 case "${BUILD_PRESET}" in

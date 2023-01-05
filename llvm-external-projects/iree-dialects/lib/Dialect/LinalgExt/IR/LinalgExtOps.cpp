@@ -1564,8 +1564,7 @@ static SmallVector<int64_t> getStaticTiles(OpTy op) {
                 "applies to only pack or unpack operations");
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
-  dispatchIndexOpFoldResults(op.getMixedTiles(), dynamicTiles, staticTiles,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(op.getMixedTiles(), dynamicTiles, staticTiles);
   return staticTiles;
 }
 
@@ -1704,8 +1703,7 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
          "original dimensions to be tiled");
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
-  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
   build(builder, state, output.getType(), source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getDenseI64ArrayAttr(outerDimsPerm),
@@ -1747,6 +1745,32 @@ SmallVector<int64_t> PackOp::getStaticTiles() {
   return ::getStaticTiles(*this);
 }
 
+// Helper for PackOp::{getResultShape,getPackedType}. Returns the shape of the
+// packed type. Having a shared helper helps implement these two methods in a
+// way that ensures that they agree on which dimensions are dynamic.
+static SmallVector<int64_t> getPackOpResultTypeShape(
+    ArrayRef<int64_t> sourceShape, ArrayRef<int64_t> innerTileSizes,
+    ArrayRef<int64_t> innerDimsPos, ArrayRef<int64_t> outerDimsPerm) {
+  SmallVector<int64_t> resultShape = llvm::to_vector(sourceShape);
+  for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
+    if (ShapedType::isDynamic(resultShape[tiledDim.value()]))
+      continue;
+    if (ShapedType::isDynamic(innerTileSizes[tiledDim.index()])) {
+      resultShape[tiledDim.value()] = ShapedType::kDynamic;
+      continue;
+    }
+    resultShape[tiledDim.value()] = ceilDiv(resultShape[tiledDim.value()],
+                                            innerTileSizes[tiledDim.index()]);
+  }
+
+  // Swap tile loops if outer_dims_perm is available.
+  resultShape = interchange<int64_t>(resultShape, outerDimsPerm, /*offset=*/0);
+
+  // Append the inner tile dimensions.
+  resultShape.append(innerTileSizes.begin(), innerTileSizes.end());
+  return resultShape;
+}
+
 SmallVector<OpFoldResult> PackOp::getResultShape(
     OpBuilder &builder, Location loc, ArrayRef<OpFoldResult> sourceDims,
     ArrayRef<OpFoldResult> innerTileSizes, ArrayRef<int64_t> innerDimsPos,
@@ -1766,6 +1790,23 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
         interchange<OpFoldResult>(resultDims, outerDimsPerm, /*offset=*/0);
   }
   resultDims.append(innerTileSizes.begin(), innerTileSizes.end());
+
+  SmallVector<int64_t> resultTypeShape =
+      getPackOpResultTypeShape(asShapeWithAnyValueAsDynamic(sourceDims),
+                               asShapeWithAnyValueAsDynamic(innerTileSizes),
+                               innerDimsPos, outerDimsPerm);
+
+  // Fix-up `resultDims` to ensure that they are Value's if and only if the
+  // result type shape says it's a dynamic dim. This is needed as callers may
+  // use dispatchIndexOpFoldResults on the result, and rely on exact number of
+  // dynamic dims returned by that.
+  for (unsigned i = 0; i < resultDims.size(); ++i) {
+    if (!ShapedType::isDynamic(resultTypeShape[i]))
+      continue;
+    resultDims[i] =
+        getValueOrCreateConstantIndexOp(builder, loc, resultDims[i]);
+  }
+
   return resultDims;
 }
 
@@ -1777,29 +1818,16 @@ ShapedType PackOp::getPackedType(ShapedType sourceType,
                                  ArrayRef<int64_t> innerTileSizes,
                                  ArrayRef<int64_t> innerDimsPos,
                                  ArrayRef<int64_t> outerDimsPerm) {
-  SmallVector<int64_t> resultShape = llvm::to_vector(sourceType.getShape());
-  for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
-    if (ShapedType::isDynamic(resultShape[tiledDim.value()]))
-      continue;
-    if (ShapedType::isDynamic(innerTileSizes[tiledDim.index()])) {
-      resultShape[tiledDim.value()] = ShapedType::kDynamic;
-      continue;
-    }
-    resultShape[tiledDim.value()] = ceilDiv(resultShape[tiledDim.value()],
-                                            innerTileSizes[tiledDim.index()]);
-  }
+  SmallVector<int64_t> resultTypeShape = getPackOpResultTypeShape(
+      sourceType.getShape(), innerTileSizes, innerDimsPos, outerDimsPerm);
 
-  // Swap tile loops if outer_dims_perm is available.
-  resultShape = interchange<int64_t>(resultShape, outerDimsPerm, /*offset=*/0);
-
-  // Append the inner tile dimensions.
-  resultShape.append(innerTileSizes.begin(), innerTileSizes.end());
   return TypeSwitch<ShapedType, ShapedType>(sourceType)
       .Case<RankedTensorType>([&](auto shapedType) {
-        return RankedTensorType::get(resultShape, shapedType.getElementType());
+        return RankedTensorType::get(resultTypeShape,
+                                     shapedType.getElementType());
       })
       .Case<MemRefType>([&](auto shapedType) {
-        return MemRefType::get(resultShape, shapedType.getElementType());
+        return MemRefType::get(resultTypeShape, shapedType.getElementType());
       })
       .Default([&](Type t) {
         assert(false && "unexpected type");
@@ -2097,8 +2125,7 @@ void UnPackOp::build(OpBuilder &builder, OperationState &state, Value source,
                      ArrayRef<int64_t> outerDimsPerm) {
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
-  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
   build(builder, state, output.getType(), source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getDenseI64ArrayAttr(outerDimsPerm),
@@ -2190,6 +2217,19 @@ SmallVector<Operation *>
 UnPackOp::getTiledImplementation(OpBuilder &builder,
                                  ArrayRef<OpFoldResult> offsets,
                                  ArrayRef<OpFoldResult> sizes) {
+  Operation *unpackOp = *this;
+  // Dynamic inner tile sizes currently trigger infinite application of
+  // tile-and-distribute on the unpack op, each tile calling
+  // getTiledImplementation -> getSlice creating more and more extract_slice.
+  // As a temporary work-around, we annotate unpack ops with a custom
+  // already_tiled attribute to keep track of what's already been tiled.
+  // For some reason this causes errors in non-dynamic-shape cases, but it's
+  // not needed there anyway, so we simply check for dynamic inner tiles before
+  // applying this tweak.
+  if (ShapedType::isDynamicShape(getStaticInnerTiles())) {
+    if (unpackOp->hasAttr("already_tiled"))
+      return {unpackOp};
+  }
   // TODO(hanchung): Extend it to handle memref version.
   // Tiling on buffers needs extra buffer because tiled unpack op could produce
   // more data for incomplete tiles. Tiling on tensors satisfies IREE's needs.
@@ -2332,11 +2372,17 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
     tiledOperands.push_back(empty.getResult());
   }
 
+  for (auto tile : getInnerTiles()) {
+    tiledOperands.push_back(tile);
+  }
+
   SmallVector<Type, 4> tiledResultTypes;
   tiledResultTypes.push_back(tiledOperands[1].getType());
 
   Operation *tiledUnpackOp =
       mlir::clone(builder, getOperation(), tiledResultTypes, tiledOperands);
+  tiledUnpackOp->setAttr(StringAttr::get(getContext(), "already_tiled"),
+                         BoolAttr::get(getContext(), true));
 
   if (isPerfectTilingCase)
     return {tiledUnpackOp};
@@ -2412,11 +2458,9 @@ LogicalResult WinogradInputTransformOp::verify() {
   if (imageDims.size() != 2) {
     return op->emitOpError("expected only 2 image dimensions");
   }
-  for (auto dim : imageDims) {
-    if ((dim < 0) || (dim > 3)) {
-      return op->emitOpError(
-          "expect image dimensions to be in the range: [0, 3]");
-    }
+  if (!isNchw() && !isNhwc()) {
+    return op->emitOpError(
+        "expect image dimensions to be either [1, 2] or [2, 3]");
   }
   const int64_t outputTileSize = getOutputTileSize();
   const int64_t kernelSize = getKernelSize();
@@ -2436,6 +2480,9 @@ LogicalResult WinogradInputTransformOp::verify() {
       expectedOutputShape[outputIndex] =
           std::ceil((float)(inputShape[i] - kernelSize + 1) / outputTileSize);
     }
+  }
+  if (isNchw()) {
+    permute<Permutation::TTNCHW_TO_TTNHWC>(expectedOutputShape);
   }
   if (!areShapesCompatible(expectedOutputShape, outputShape)) {
     return op->emitOpError("incompatible output shape");
@@ -2480,12 +2527,13 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   Location loc = getLoc();
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
+  const int cDim = channelDim();
 
   assert(offsets.size() == 2);
   SmallVector<OpFoldResult> inputOffsets(getInputOperandRank(), zero);
   SmallVector<OpFoldResult> outputOffsets(getOutputOperandRank(), zero);
   outputOffsets[2] = inputOffsets[0] = offsets[0];
-  outputOffsets[5] = inputOffsets[3] = offsets[1];
+  outputOffsets[5] = inputOffsets[cDim] = offsets[1];
 
   SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
   SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
@@ -2498,7 +2546,7 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> outputSizes =
       getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
   outputSizes[2] = inputSizes[0] = sizes[0];
-  outputSizes[5] = inputSizes[3] = sizes[1];
+  outputSizes[5] = inputSizes[cDim] = sizes[1];
 
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(
@@ -2560,7 +2608,7 @@ LogicalResult WinogradOutputTransformOp::verify() {
   }
   auto inputType = input().getType().cast<ShapedType>();
   auto outputType = output().getType().cast<ShapedType>();
-  ArrayRef<int64_t> inputShape = inputType.getShape();
+  SmallVector<int64_t> inputShape(inputType.getShape());
   if (inputShape.size() != 6) {
     return op->emitOpError("expected input operand to have rank 6");
   }
@@ -2580,11 +2628,12 @@ LogicalResult WinogradOutputTransformOp::verify() {
   if (imageDims.size() != 2) {
     return op->emitOpError("expected only 2 image dimensions");
   }
-  for (auto dim : imageDims) {
-    if ((dim < 0) || (dim > 3)) {
-      return op->emitOpError(
-          "expect image dimensions to be in the range: [0, 3]");
-    }
+  if (!isNchw() && !isNhwc()) {
+    return op->emitOpError(
+        "expect image dimensions to be either [1, 2] or [2, 3]");
+  }
+  if (isNchw()) {
+    permute<Permutation::TTNHWC_TO_TTNCHW>(inputShape);
   }
   const int64_t outputTileSize = getOutputTileSize();
   SmallVector<int64_t> expectedOutputShape(getOutputOperandRank(), 1);
@@ -2639,12 +2688,13 @@ SmallVector<Operation *> WinogradOutputTransformOp::getTiledImplementation(
   Location loc = getLoc();
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
+  const int cDim = channelDim();
 
   assert(offsets.size() == 2);
   SmallVector<OpFoldResult> inputOffsets(getInputOperandRank(), zero);
   SmallVector<OpFoldResult> outputOffsets(getOutputOperandRank(), zero);
   inputOffsets[2] = outputOffsets[0] = offsets[0];
-  inputOffsets[5] = outputOffsets[3] = offsets[1];
+  inputOffsets[5] = outputOffsets[cDim] = offsets[1];
 
   SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
   SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
@@ -2657,7 +2707,7 @@ SmallVector<Operation *> WinogradOutputTransformOp::getTiledImplementation(
   SmallVector<OpFoldResult> outputSizes =
       getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
   inputSizes[2] = outputSizes[0] = sizes[0];
-  inputSizes[5] = outputSizes[3] = sizes[1];
+  inputSizes[5] = outputSizes[cDim] = sizes[1];
 
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(
@@ -2685,10 +2735,11 @@ LogicalResult WinogradOutputTransformOp::getResultTilePosition(
     resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
     resultOffsets = SmallVector<OpFoldResult>(getOutputOperandRank(),
                                               builder.getIndexAttr(0));
+    const int cDim = channelDim();
     resultOffsets[0] = offsets[0];
-    resultOffsets[3] = offsets[1];
+    resultOffsets[cDim] = offsets[1];
     resultSizes[0] = sizes[0];
-    resultSizes[3] = sizes[1];
+    resultSizes[cDim] = sizes[1];
     return success();
   }
   return failure();

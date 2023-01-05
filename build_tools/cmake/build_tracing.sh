@@ -22,6 +22,8 @@ source build_tools/cmake/setup_ccache.sh
 # MLIR threading enabled, which crashes with compiler tracing enabled.
 "${CMAKE_BIN?}" -B "${BUILD_DIR}" \
   -G Ninja . \
+  -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_ENABLE_RUNTIME_TRACING=ON \
   -DIREE_BUILD_COMPILER=OFF

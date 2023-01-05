@@ -1,4 +1,4 @@
-// RUN: iree-opt --allow-unregistered-dialect --iree-convert-to-llvm --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-convert-to-llvm --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: llvm.func @constant_values
 func.func @constant_values() {

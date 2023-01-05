@@ -81,6 +81,7 @@ class StructuredTransformOpsExtension
 public:
   StructuredTransformOpsExtension();
 };
+
 } // namespace transform_ext
 } // namespace mlir
 

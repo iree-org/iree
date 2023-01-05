@@ -14,7 +14,7 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       %cst = arith.constant 0.000000e+00 : f32
       %5 = linalg.fill ins(%cst : f32) outs(%50 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
 
-      //      CHECK: memref.alloc() {alignment = 128 : i64} : memref<250x1020xf32, 3>
+      //      CHECK: memref.alloc() {alignment = 64 : i64} : memref<250x1020xf32, 3>
       // CHECK-NEXT: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32, 3>)
       // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32>, memref<500x1020xf32>) outs(%{{.*}} : memref<250x1020xf32, 3>)
       // CHECK-NEXT: bufferization.to_tensor %{{.*}} : memref<250x1020xf32, 3>
@@ -29,8 +29,9 @@ hal.executable private @pad_matmul_static_dispatch_0  {
 
   transform.structured.canonicalized_sequence failures(propagate) {
   ^bb1(%variant_op: !pdl.operation):
-    %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
-    %func = transform.structured.match ops{["func.func"]} in %variant_op_2
+    %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
+    %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op_2
+    %func = transform.structured.match ops{["func.func"]} in %variant_op_3
     transform.iree.erase_hal_descriptor_type_from_memref %func
   }
 }

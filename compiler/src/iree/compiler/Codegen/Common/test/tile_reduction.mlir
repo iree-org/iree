@@ -66,7 +66,7 @@ func.func @warp_reduction_broadcast_dispatch() {
     indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>],
     iterator_types = ["parallel", "parallel"]}
     ins(%5 : tensor<1xf32>) outs(%2 : tensor<1x10240xf32>)
-    attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2048]]>} {
+    attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [0, 2048]]>} {
   ^bb0(%in: f32, %out: f32):
     %6 = arith.addf %in, %in : f32
     linalg.yield %6 : f32

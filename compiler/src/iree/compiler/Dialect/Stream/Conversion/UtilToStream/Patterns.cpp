@@ -94,7 +94,7 @@ struct GlobalOpExpansion
         globalOp, globalOp.getName(), globalOp.getIsMutable(), resourceType,
         initialValue && !tensorInitializerRequired
             ? llvm::Optional<TypedAttr>{initialValue}
-            : llvm::None);
+            : std::nullopt);
     resourceOp.setVisibility(globalOp.getVisibility());
 
     // NOTE: we ignore noinline here, possibly to our peril. In earlier dialects

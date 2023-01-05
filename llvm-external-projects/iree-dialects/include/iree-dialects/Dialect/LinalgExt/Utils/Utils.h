@@ -59,6 +59,62 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
 Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
                                 Location loc, PatternRewriter &rewriter);
 
+// Converts OpFoldResults to int64_t shape entries, unconditionally mapping all
+// Value's to kDynamic, even if they are arith.constant values.
+SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs);
+
+enum class Permutation {
+  NCHW_TO_NHWC,
+  NHWC_TO_NCHW,
+  TTNHWC_TO_TTNCHW,
+  TTNCHW_TO_TTNHWC,
+};
+
+// Permutes the elements of a SmallVector depending on the permutation specified
+template <Permutation P, typename T>
+static void permute(SmallVectorImpl<T> &vector) {
+  switch (P) {
+  case Permutation::NCHW_TO_NHWC:
+    std::rotate(vector.begin() + 1, vector.begin() + 2, vector.end());
+    break;
+  case Permutation::NHWC_TO_NCHW:
+    std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 1);
+    break;
+  case Permutation::TTNCHW_TO_TTNHWC:
+    std::rotate(vector.begin() + 3, vector.begin() + 4, vector.end());
+    break;
+  case Permutation::TTNHWC_TO_TTNCHW:
+    std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 3);
+    break;
+  default:
+    break;
+  }
+}
+/// Container of information needed to materialize the pack operation.
+struct MaterializeEncodingInfo {
+  SmallVector<int64_t> innerDimsPos;
+  SmallVector<int64_t> innerTileSizes;
+  SmallVector<int64_t> outerDimsPerm;
+  unsigned srcRank = 0;
+};
+
+using MaterializeEncodingFn =
+    std::function<FailureOr<MaterializeEncodingInfo>(RankedTensorType)>;
+
+struct MaterializeEncodingValueInfo {
+  SmallVector<Value> innerTileSizes;
+};
+
+using MaterializeEncodingValueFn =
+    std::function<FailureOr<MaterializeEncodingValueInfo>(
+        RankedTensorType, OpBuilder &, Location)>;
+
+FailureOr<SmallVector<OpFoldResult>>
+getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
+                     RankedTensorType tensorType,
+                     const MaterializeEncodingInfo &materializeEncodingInfo,
+                     MaterializeEncodingValueFn materializeEncodingValueFn);
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

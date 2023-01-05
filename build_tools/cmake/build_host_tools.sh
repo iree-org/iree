@@ -17,7 +17,6 @@ set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_HOST_BUILD_DIR:-build-host}}"
 INSTALL_DIR="${INSTALL_DIR:-${BUILD_DIR}/install}"
-CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-OFF}"
 
 source build_tools/cmake/setup_build.sh
@@ -28,6 +27,8 @@ mkdir -p "${INSTALL_DIR}"
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
+  "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
   "-DCMAKE_INSTALL_PREFIX=$(realpath ${INSTALL_DIR})"
   "-DIREE_ENABLE_LLD=ON"

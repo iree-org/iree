@@ -52,6 +52,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREEInputDialect
+    LLVMSupport
     MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
