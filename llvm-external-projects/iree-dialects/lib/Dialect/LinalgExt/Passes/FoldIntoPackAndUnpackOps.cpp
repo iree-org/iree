@@ -26,6 +26,33 @@ static bool areAllConstantIntValue(ArrayRef<OpFoldResult> ofrs, int64_t value) {
       ofrs, [&](OpFoldResult ofr) { return isConstantIntValue(ofr, value); });
 }
 
+/// Fold a `pad` -> `pack` into `pack` if they can have the same padding values.
+struct FoldPadWithPackOp : public OpRewritePattern<PackOp> {
+  using OpRewritePattern<PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(PackOp packOp,
+                                PatternRewriter &rewriter) const override {
+    auto padOp = packOp.getInput().getDefiningOp<tensor::PadOp>();
+
+    if (!padOp || padOp.getNofold() || !padOp.hasZeroLowPad())
+      return failure();
+
+    Value constantPaddingValue = padOp.getConstantPaddingValue();
+    if (!constantPaddingValue)
+      return failure();
+
+    if (auto paddingValue = packOp.getPaddingValue())
+      if (!isEqualConstantIntOrValue(paddingValue, constantPaddingValue))
+        return failure();
+
+    rewriter.replaceOpWithNewOp<PackOp>(
+        packOp, padOp.getSource(), packOp.getOutput(), packOp.getInnerDimsPos(),
+        packOp.getMixedTiles(), constantPaddingValue,
+        packOp.getOuterDimsPerm());
+    return success();
+  }
+};
+
 /// Fold a `unpack` -> `extract_slice` into the `unpack` since it already
 /// has extract_slice semantics.
 struct FoldUnpackWithExtractSliceOp
@@ -89,7 +116,8 @@ namespace IREE {
 namespace LinalgExt {
 
 void populateFoldIntoPackAndUnpackOpsPatterns(RewritePatternSet &patterns) {
-  patterns.insert<FoldUnpackWithExtractSliceOp>(patterns.getContext());
+  patterns.insert<FoldUnpackWithExtractSliceOp, FoldPadWithPackOp>(
+      patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> createFoldIntoPackAndUnpackOps() {
