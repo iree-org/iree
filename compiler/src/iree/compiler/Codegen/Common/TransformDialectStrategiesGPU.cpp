@@ -66,7 +66,7 @@ auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
 /// Return max(1, (value * 32) / bitwidth).
 static int64_t scaleUpByBitWidth(int64_t value, int64_t bitWidth) {
   assert((bitWidth & bitWidth - 1) == 0 && "bitWidth must be a power of 2");
-  return std::max((value * 32) / bitWidth, 1l);
+  return std::max((value * 32) / bitWidth, int64_t(1));
 }
 
 /// Adjust the number of warps to use to benefit from packing multiple smaller
@@ -80,7 +80,7 @@ static int64_t adjustNumberOfWarpsForBlockShuffle(int64_t numWarpsToUse,
     if (numWarpsToUse % factor == 0) break;
   numWarpsToUse /= factor;
   // Try to scale to using 128b elements in warp shuffles.
-  return std::max(numWarpsToUse / 4, 1l);
+  return std::max(numWarpsToUse / 4, int64_t(1));
 }
 
 /// Compute the (splitPoint, vectorSize) pair to break [0 .. upperBound] into
