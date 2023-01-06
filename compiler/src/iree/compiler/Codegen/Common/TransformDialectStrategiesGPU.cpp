@@ -90,7 +90,7 @@ static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
         iree_compiler::previousMultipleOf(upperBound, minMultiple * vectorSize);
     if (splitPoint > 0) {
       return (upperBound == splitPoint)
-                 ? std::make_pair(0l, vectorSize)
+                 ? std::make_pair(int64_t(0), vectorSize)
                  : std::make_pair(splitPoint, vectorSize);
     }
   }
