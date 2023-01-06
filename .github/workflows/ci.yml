@@ -960,7 +960,6 @@ jobs:
 
   generate_benchmark_report:
     needs: [setup, compilation_benchmarks, execution_benchmarks]
-    # TODO(#11076): Temporarily disabled until we migrate the database.
     # execution_benchmarks is the optional dependency and skipped in presubmit
     # if no benchmark is specified to run.
     if: |
@@ -998,14 +997,15 @@ jobs:
             "${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/benchmark-results-*.json" \
             "${EXECUTION_BENCHMARK_RESULTS_DIR}"
           echo "execution-benchmark-results-pattern=${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-*.json" >> "${GITHUB_OUTPUT}"
-      - name: Generating report
+      - name: Generating comment
+        id: generate-comment
         env:
           # Wildcard pattern to match all execution benchmark results. Empty if
           # execution_benchmarks is skipped, which results in no match.
           EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
           IREE_BUILD_URL: https://github.com/iree-org/iree/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          BENCHMARK_COMMENT_JSON: benchmark-comment.json
+          BENCHMARK_COMMENT_ARTIFACT: benchmark-comment.json
         run: |
           build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
@@ -1018,7 +1018,16 @@ jobs:
               --build_url="${IREE_BUILD_URL}" \
               --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
               --compile_stats_files="${COMPILE_STATS_RESULTS}"
-              --output="${BENCHMARK_COMMENT_JSON}"
+              --output="${BENCHMARK_COMMENT_ARTIFACT}"
+          echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+      - name: Uploading report
+        env:
+          BENCHMARK_COMMENT_ARTIFACT: ${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
+          BENCHMARK_COMMENT_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
+        run: |
+          gcloud alpha storage cp \
+            "${BENCHMARK_COMMENT_ARTIFACT}" \
+            "${BENCHMARK_COMMENT_GCS_ARTIFACT}"
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
