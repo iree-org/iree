@@ -178,8 +178,7 @@ jobs:
         id: upload
         env:
           BENCHMARK_RESULTS: ${{ steps.run.outputs.benchmark-results }}
-          BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/${{ env.BENCHMARK_RESULTS_DIR }}
         run: |
           gcloud alpha storage cp \
             "${BENCHMARK_RESULTS}" \
-            "${BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/${BENCHMARK_RESULTS}"
+            "${GCS_DIR}/${BENCHMARK_RESULTS}"
