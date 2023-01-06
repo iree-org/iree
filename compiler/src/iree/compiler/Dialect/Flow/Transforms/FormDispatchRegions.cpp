@@ -266,7 +266,16 @@ static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
 
 /// Returns a bit vector of size number of loops of the `interfaceOp` with
 /// the bits corresponding to outer parallel loops set to `true`.
-static llvm::SmallBitVector getOuterParallelLoops(TilingInterface interfaceOp) {
+static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
+  if (auto setEncodingOp = dyn_cast<IREE::LinalgExt::SetEncodingOp>(op)) {
+    return llvm::SmallBitVector(setEncodingOp.getResultType().getRank(), true);
+  }
+
+  auto interfaceOp = dyn_cast<TilingInterface>(op);
+  if (!interfaceOp) {
+    // For ops that dont implement the `TilingInterface` just return empty.
+    return llvm::SmallBitVector{};
+  }
   SmallVector<utils::IteratorType> loopIteratorTypes =
       interfaceOp.getLoopIteratorTypes();
   llvm::SmallBitVector parallelLoops(loopIteratorTypes.size());
@@ -346,10 +355,33 @@ static bool isInsOperandBufferizable(OpOperand *insOperand,
   return llvm::any_of(linalgOp.getDpsInitOperands(), canTieWithOutsOperand);
 }
 
+static bool matchIteratorTypes(
+    const llvm::SmallBitVector &rootOuterParallelLoop,
+    const llvm::SmallBitVector &candidateOuterParallelLoop) {
+  // If the candidate is not all parallel, then its loop configuration should be
+  // the same as the root.
+  if (candidateOuterParallelLoop.size() != candidateOuterParallelLoop.count()) {
+    return rootOuterParallelLoop == candidateOuterParallelLoop;
+  }
+
+  // If the candidate is all parallel, then it should be at least as parallel as
+  // the root.
+  for (int pos : llvm::seq<int>(0, rootOuterParallelLoop.size())) {
+    // If we reach the end of the outer loops of the root, break out of the
+    // loop.
+    if (!rootOuterParallelLoop.test(pos)) break;
+    // If the root loop is parallel, the candidate loop should also be parallel.
+    if (pos >= candidateOuterParallelLoop.size() ||
+        !candidateOuterParallelLoop.test(pos))
+      return false;
+  }
+  return true;
+}
+
 /// Method to check if two `linalg.generic` op with producer-consumer
 /// relationship through `operand` have compatible outer-parallel loops.
 static bool hasCompatibleOuterParallelLoops(
-    OpOperand &operand, bool allowConsumerParallelismPessimization) {
+    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops) {
   auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
   auto consumer = dyn_cast<linalg::LinalgOp>(operand.getOwner());
   if (!producer || !consumer) return false;
@@ -359,10 +391,8 @@ static bool hasCompatibleOuterParallelLoops(
   llvm::SmallBitVector consumerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(consumer.getOperation()));
 
-  if (allowConsumerParallelismPessimization) {
-    if (producerParallelLoops.count() > consumerParallelLoops.count())
-      return false;
-  } else if (producerParallelLoops.count() != consumerParallelLoops.count()) {
+  if (!matchIteratorTypes(rootOuterParallelLoops, producerParallelLoops) ||
+      !matchIteratorTypes(rootOuterParallelLoops, consumerParallelLoops)) {
     return false;
   }
 
@@ -375,12 +405,12 @@ static bool hasCompatibleOuterParallelLoops(
   }
 
   /// Project out the non-parallel dimensions.
-  llvm::SmallBitVector producerProjectedDims(producerParallelLoops);
+  llvm::SmallBitVector producerProjectedDims(rootOuterParallelLoops);
   producerProjectedDims.flip();
   auto projectedProducerMap =
       getProjectedMap(producerIndexingMap, producerProjectedDims);
 
-  llvm::SmallBitVector consumerProjectedDims(producerParallelLoops);
+  llvm::SmallBitVector consumerProjectedDims(rootOuterParallelLoops);
   consumerProjectedDims.flip();
   consumerProjectedDims.resize(consumer.getNumLoops(), true);
   auto projectedConsumerMap =
@@ -409,9 +439,9 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
 
 /// Returns true if the operands are fusable under the aggressive fusion
 /// heuristics.
-static bool areOpsAggresiveFusable(Operation *producer, Operation *consumer,
-                                   bool allowConsumerParallelismPessimization,
-                                   bool aggressiveFusion) {
+static bool areOpsAggresiveFusable(
+    Operation *producer, Operation *consumer,
+    const llvm::SmallBitVector &rootOuterParallelLoops, bool aggressiveFusion) {
   // Collect all the uses from producer to consumer.
   SmallVector<OpOperand *> allUses;
   for (OpOperand &producerUse : producer->getUses()) {
@@ -421,8 +451,8 @@ static bool areOpsAggresiveFusable(Operation *producer, Operation *consumer,
 
   // Check that the consumer and producer have compatible outer parallel loops.
   if (!llvm::all_of(allUses, [&](OpOperand *operand) {
-        return hasCompatibleOuterParallelLoops(
-            *operand, allowConsumerParallelismPessimization);
+        return hasCompatibleOuterParallelLoops(*operand,
+                                               rootOuterParallelLoops);
       })) {
     return false;
   }
@@ -436,8 +466,9 @@ static bool areOpsAggresiveFusable(Operation *producer, Operation *consumer,
 
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
-static bool isFusableWithConsumer(OpOperand &fusedOperand,
-                                  bool aggressiveFusion) {
+static bool isFusableWithConsumer(
+    OpOperand &fusedOperand, const llvm::SmallBitVector &rootOuterParallelLoops,
+    bool aggressiveFusion) {
   // Logics with aggressive fusion heuristics.
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
@@ -470,8 +501,7 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
-  if (!areOpsAggresiveFusable(producer, consumer,
-                              /*allowConsumerParallelismPessimization=*/true,
+  if (!areOpsAggresiveFusable(producer, consumer, rootOuterParallelLoops,
                               aggressiveFusion)) {
     return false;
   }
@@ -494,42 +524,49 @@ static void fuseRootsWithConsumers(MLIRContext *context,
                                    ArrayRef<Operation *> roots,
                                    DominanceInfo const &dominanceInfo,
                                    bool aggressiveFusion) {
-  SmallVector<Operation *> workList(roots.begin(), roots.end());
   // Fuse with consumers where possible.
-  while (!workList.empty()) {
-    Operation *currRoot = workList.pop_back_val();
-    assert(hasRootOpAttribute(currRoot) &&
-           "unexpected non-root op in worklist");
+  for (Operation *root : roots) {
+    SmallVector<Operation *> workList;
+    llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
+    workList.push_back(root);
+    while (!workList.empty()) {
+      Operation *currRoot = workList.pop_back_val();
+      assert(hasRootOpAttribute(currRoot) &&
+             "unexpected non-root op in worklist");
 
-    // Helper function to make the consumer the root instead of the producer
-    // when they are to be fused.
-    auto updateRootTo = [&context, &currRoot](Operation *newRoot) {
-      int64_t rootNumber = getRootNumber(currRoot);
-      setRootAttribute(context, newRoot, rootNumber);
-      removeRootOpAttribute(currRoot);
-      appendToFusionGroup(currRoot, rootNumber);
-    };
+      // Helper function to make the consumer the root instead of the producer
+      // when they are to be fused.
+      auto updateRootTo = [&context, &currRoot](Operation *newRoot) {
+        int64_t rootNumber = getRootNumber(currRoot);
+        setRootAttribute(context, newRoot, rootNumber);
+        removeRootOpAttribute(currRoot);
+        appendToFusionGroup(currRoot, rootNumber);
+      };
 
-    Optional<OpOperand *> fusableUse = getFusableUse(
-        currRoot, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
-    if (!fusableUse) continue;
+      Optional<OpOperand *> fusableUse = getFusableUse(
+          currRoot, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
+      if (!fusableUse) continue;
 
-    // Analyse the use to see if it is fusable.
-    Operation *consumerOp = fusableUse.value()->getOwner();
-    if (hasRootOpAttribute(consumerOp) ||
-        hasFusionGroupsAttribute(consumerOp)) {
-      continue;
-    }
+      // Analyse the use to see if it is fusable.
+      Operation *consumerOp = fusableUse.value()->getOwner();
+      if (hasRootOpAttribute(consumerOp) ||
+          hasFusionGroupsAttribute(consumerOp)) {
+        continue;
+      }
 
-    if (isFusableWithConsumer(*(fusableUse.value()), aggressiveFusion)) {
-      updateRootTo(consumerOp);
-      workList.push_back(consumerOp);
+      if (isFusableWithConsumer(*(fusableUse.value()), rootOuterParallelLoops,
+                                aggressiveFusion)) {
+        updateRootTo(consumerOp);
+        workList.push_back(consumerOp);
+      }
     }
   }
 }
 
 /// Method to check if the consumer of a use can be fused with its producer.
-static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
+static bool isFusableWithProducer(
+    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops,
+    bool aggressiveFusion) {
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
@@ -556,8 +593,7 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
     return false;
   }
 
-  return areOpsAggresiveFusable(producer, consumer,
-                                /*allowConsumerParallelismPessimization=*/false,
+  return areOpsAggresiveFusable(producer, consumer, rootOuterParallelLoops,
                                 aggressiveFusion);
 }
 
@@ -569,7 +605,7 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
                                    bool aggressiveFusion) {
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
-
+  llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
   while (!worklist.empty()) {
     Operation *candidate = worklist.pop_back_val();
     for (OpOperand &operand : candidate->getOpOperands()) {
@@ -584,7 +620,10 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
           producer, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
       if (!fusableUse || fusableUse.value()->getOwner() != candidate) continue;
 
-      if (!isFusableWithProducer(operand, aggressiveFusion)) continue;
+      if (!isFusableWithProducer(operand, rootOuterParallelLoops,
+                                 aggressiveFusion)) {
+        continue;
+      }
 
       appendToFusionGroup(producer, groupNum);
       worklist.push_back(producer);
