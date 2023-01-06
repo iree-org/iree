@@ -78,13 +78,13 @@ jobs:
       - name: "Building mmperf for CPU"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:49a9ec86ae31b3879a15cf0d7b9d67afb3f0823471231f10d33ad46d6d94157a \
+            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
           ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cpu" "${IREE_SHA}"
       - name: "Running mmperf on CPU"
         run: |
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:49a9ec86ae31b3879a15cf0d7b9d67afb3f0823471231f10d33ad46d6d94157a \
+            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
           ./build_tools/benchmarks/mmperf/run_mmperf.sh "${BUILD_DIR}" "${RESULTS_DIR}"
       - name: "Uploading results"
         run: |
@@ -113,7 +113,7 @@ jobs:
       - name: "Building mmperf for CUDA"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:49a9ec86ae31b3879a15cf0d7b9d67afb3f0823471231f10d33ad46d6d94157a \
+            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
           ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cuda" "${IREE_SHA}"
       - name: "Removing unused files"
         run: |
@@ -165,7 +165,7 @@ jobs:
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
           --gpus all \
-            gcr.io/iree-oss/mmperf@sha256:49a9ec86ae31b3879a15cf0d7b9d67afb3f0823471231f10d33ad46d6d94157a \
+            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
           ./build_tools/benchmarks/mmperf/run_mmperf.sh "${BUILD_DIR}" "${RESULTS_DIR}"
       - name: "Uploading results"
         run: |

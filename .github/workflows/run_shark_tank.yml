@@ -74,7 +74,7 @@ jobs:
         # Only Tensorflow is working at the moment so limit benchmarking to TF models.
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/shark@sha256:764dd0af58955eaa46f785bac84c9dbc0f4301fa2cd2fc84c1a23996090b539a \
+            gcr.io/iree-oss/shark@sha256:1fa2d51110c47ac12826754b66d95e3d68336a8ecf141db8be1eec74f39c42e2 \
           ./build_tools/benchmarks/shark/run_shark.sh "${SHARK_SHA}" "cpu" "cpu" "${SHARK_OUTPUT_DIR}"
       - name: "Uploading artifacts"
         run: |
@@ -103,7 +103,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --gpus all \
-            gcr.io/iree-oss/shark@sha256:764dd0af58955eaa46f785bac84c9dbc0f4301fa2cd2fc84c1a23996090b539a \
+            gcr.io/iree-oss/shark@sha256:1fa2d51110c47ac12826754b66d95e3d68336a8ecf141db8be1eec74f39c42e2 \
           ./build_tools/benchmarks/shark/run_shark.sh "${SHARK_SHA}" "cuda" "cuda" "${SHARK_OUTPUT_DIR}"
       - name: "Uploading artifacts"
         run: |
@@ -138,7 +138,7 @@ jobs:
       - name: "Generating report"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/shark@sha256:764dd0af58955eaa46f785bac84c9dbc0f4301fa2cd2fc84c1a23996090b539a \
+            gcr.io/iree-oss/shark@sha256:1fa2d51110c47ac12826754b66d95e3d68336a8ecf141db8be1eec74f39c42e2 \
           ./build_tools/benchmarks/shark/run_report.sh "${BENCHMARK_RESULTS_DIR}" \
             "${BENCHMARK_RESULTS_DIR}/cpu_baseline.csv" \
             "${BENCHMARK_RESULTS_DIR}/cuda_baseline.csv" \
