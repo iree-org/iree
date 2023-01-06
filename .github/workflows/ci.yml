@@ -942,7 +942,7 @@ jobs:
           gcloud alpha storage cp \
             "${COMPILE_STATS_RESULTS}" \
             "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
-          echo "compile-stats-results-gcs-artifact=${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
+          echo "compile-stats-results-gcs-artifact=${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
   execution_benchmarks:
     needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
@@ -957,6 +957,68 @@ jobs:
       e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
       benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
       benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
+
+  generate_benchmark_report:
+    needs: [setup, compilation_benchmarks, execution_benchmarks]
+    # TODO(#11076): Temporarily disabled until we migrate the database.
+    # execution_benchmarks is the optional dependency and skipped in presubmit
+    # if no benchmark is specified to run.
+    if: |
+      always() &&
+      needs.setup.outputs.should-run == 'true' &&
+      needs.compilation_benchmarks.result == 'success' &&
+      (needs.execution_benchmarks.result == 'success' || needs.execution_benchmarks.result == 'skipped')
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      COMPILE_STATS_RESULTS: ${{ needs.compilation_benchmarks.outputs.compile-stats-results }}
+      COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
+      EXECUTION_BENCHMARK_RESULTS_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-dir }}
+      EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          # We need the full history (and main branch) to generate the report.
+          fetch-depth: 0
+      - name: Downloading compilation benchmark results
+        run: |
+          gcloud alpha storage cp \
+            "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" \
+            "${COMPILE_STATS_RESULTS}"
+      - name: Downloading execution benchmark results
+        id: download-execution-results
+        if: needs.execution_benchmarks.result == 'success'
+        run: |
+          gcloud alpha storage cp -r \
+            "${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/benchmark-results-*.json" \
+            "${EXECUTION_BENCHMARK_RESULTS_DIR}"
+          echo "execution-benchmark-results-pattern=${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-*.json" >> "${GITHUB_OUTPUT}"
+      - name: Generating report
+        env:
+          # Wildcard pattern to match all execution benchmark results. Empty if
+          # execution_benchmarks is skipped, which results in no match.
+          EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
+          IREE_BUILD_URL: https://github.com/iree-org/iree/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BENCHMARK_COMMENT_JSON: benchmark-comment.json
+        run: |
+          build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
+            ./build_tools/benchmarks/generate_benchmark_comment.py \
+              --verbose \
+              --pr_number="${PR_NUMBER}" \
+              --pr_committish="${GITHUB_SHA}" \
+              --pr_base_branch="origin/${GITHUB_BASE_REF}" \
+              --comment_type="benchmark-summary" \
+              --build_url="${IREE_BUILD_URL}" \
+              --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
+              --compile_stats_files="${COMPILE_STATS_RESULTS}"
+              --output="${BENCHMARK_COMMENT_JSON}"
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
@@ -1197,6 +1259,7 @@ jobs:
       # Benchmark pipeline
       - compilation_benchmarks
       - execution_benchmarks
+      - generate_benchmark_report
     steps:
       - name: Getting failed jobs
         id: failed_jobs
