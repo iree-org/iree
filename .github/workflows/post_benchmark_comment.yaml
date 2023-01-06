@@ -25,7 +25,8 @@ env:
 
 jobs:
   setup:
-    if: env.PR_CI_STAGE == 'presubmit'
+    # Only run the workflow if it's triggered from a pull request.
+    if: github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-20.04
     outputs:
       should-run: ${{ steps.configure.outputs.should-run }}
@@ -69,30 +70,27 @@ jobs:
 
   post_benchmark_comment:
     needs: [setup, check_benchmark_job]
-    # TODO(#11076): Temporarily disabled until we migrate the database.
-    if: true &&
+    if: |
       needs.setup.outputs.should-run == 'true' &&
       needs.check_benchmark_job.outputs.job-conclusion == 'success'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
+    runs-on: ubuntu-20.04
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Downloading artifacts"
         id: download
         env:
-          PR_CI_GCS_DIR: gs://iree-github-actions-${{ env.PR_CI_STAGE }}-artifacts/${{ env.PR_CI_RUN_ID }}/${{ env.PR_CI_RUN_ATTEMPT }}
+          # Currently GitHub managed runner doesn't have GCP credential. Fetch
+          # from public URL directly.
+          PR_CI_GCS_URL: https://storage.googleapis.com/iree-github-actions-${{ env.PR_CI_STAGE }}-artifacts/${{ env.PR_CI_RUN_ID }}/${{ env.PR_CI_RUN_ATTEMPT }}
           BENCHMARK_COMMENT_ARTIFACT: benchmark-comment.json
         run: |
-          gcloud alpha storage cp \
-            "${PR_CI_GCS_DIR}/${BENCHMARK_COMMENT_ARTIFACT}" \
-            "${BENCHMARK_COMMENT_ARTIFACT}"
+          wget -O "${BENCHMARK_COMMENT_ARTIFACT}" \
+            "${PR_CI_GCS_URL}/${BENCHMARK_COMMENT_ARTIFACT}"
           echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
       - name: Posting comments
+        # TODO(#11076): Temporarily disabled until we migrate the database.
+        if: false
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
           GIST_BOT_USER: github-actions-bot
