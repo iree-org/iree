@@ -103,9 +103,7 @@ struct FoldAffineMinOverDistributedLoopInductionVariable final
       return success();
     };
 
-    return scf::canonicalizeMinMaxOpInLoop(
-        rewriter, minOp, minOp.getAffineMap(), minOp.getOperands(),
-        /*isMin=*/true, loopMatcher);
+    return scf::canonicalizeMinMaxOpInLoop(rewriter, minOp, loopMatcher);
   }
 };
 
