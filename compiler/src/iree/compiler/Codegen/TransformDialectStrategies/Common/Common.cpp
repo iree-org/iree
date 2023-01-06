@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/TransformDialectStrategies/Common/TransformDialectStrategies.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
@@ -312,7 +312,7 @@ static ReductionSplitResult createExpansionBubbleUp(
 
 /// Distribute to blocks using the current IREE lowering config.
 // TODO: consider passing a problem-specific struct to control information.
-Value mlir::iree_compiler::createReductionStrategyBlockDistributionPart(
+Value mlir::iree_compiler::buildReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
     Value reductionH, Value optionalFusionRootH,
     ArrayRef<OpFoldResult> tileSizes0Generic, bool hasLeadingEltwise,

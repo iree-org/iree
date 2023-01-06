@@ -15,10 +15,10 @@ package(
 iree_compiler_cc_library(
     name = "TransformDialectStrategies",
     srcs = [
-        "TransformDialectStrategies.cpp",
+        "Common.cpp",
     ],
     hdrs = [
-        "TransformDialectStrategies.h",
+        "Common.h",
     ],
     deps = [
         # Dialects

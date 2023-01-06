@@ -13,7 +13,7 @@
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/LLVMGPU/TransformDialectStrategiesGPU.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -540,7 +540,8 @@ static LogicalResult setReductionTransformDialectConfig(
     return setTranslationInfo(entryPoint, translationInfo);
   }
 
-  if (failed(matchAndSetGPUReductionTransformStrategy(entryPoint, op)))
+  if (failed(iree_compiler::gpu::matchAndSetGPUReductionTransformStrategy(
+          entryPoint, op)))
     return failure();
 
   return setTranslationInfo(entryPoint, translationInfo);

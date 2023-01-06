@@ -14,9 +14,9 @@ iree_cc_library(
   NAME
     TransformDialectStrategies
   HDRS
-    "TransformDialectStrategies.h"
+    "Common.h"
   SRCS
-    "TransformDialectStrategies.cpp"
+    "Common.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtTransformOps

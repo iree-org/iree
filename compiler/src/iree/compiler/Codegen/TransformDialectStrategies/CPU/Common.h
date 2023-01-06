@@ -4,7 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_COMMON_TRANSFORMDIALECT_STRATEGIES_CPU_H_
+#ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_COMMON_H_
+#define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_COMMON_H_
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -12,12 +13,14 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace cpu {
 /// Return success if the IR matches what the GPU reduction strategy can handle.
 /// If it is success it will append the transform dialect after the entry point
 /// module.
-LogicalResult matchAndSetCPUReductionTransformStrategy(func::FuncOp entryPoint,
-                                                       linalg::LinalgOp op);
+LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
+                                           linalg::LinalgOp op);
+}  // namespace cpu
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMDIALECT_STRATEGIES_CPU_H_
+#endif  // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_COMMON_H_

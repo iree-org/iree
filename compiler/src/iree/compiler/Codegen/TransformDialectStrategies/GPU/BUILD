@@ -15,14 +15,18 @@ package(
 iree_compiler_cc_library(
     name = "TransformDialectStrategies",
     srcs = [
-        "TransformDialectStrategiesCPU.cpp",
+        "Common.cpp",
+        "SmallReductionStrategy.cpp",
+        "StagedReductionStrategy.cpp",
     ],
     hdrs = [
-        "TransformDialectStrategiesCPU.h",
+        "AbstractReductionStrategy.h",
+        "Common.h",
+        "SmallReductionStrategy.h",
+        "StagedReductionStrategy.h",
     ],
     deps = [
         # Dialects
-        "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
@@ -50,13 +54,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Rewrite",
-        # Interfaces
-        # Transforms (needed mostly for the BufferizableOpInterfaceImpl)
-        "@llvm-project//mlir:ArithTransforms",
-        "@llvm-project//mlir:LinalgTransforms",
-        "@llvm-project//mlir:SCFTransforms",
-        "@llvm-project//mlir:TensorTransforms",
-        "@llvm-project//mlir:VectorTransforms",
         # Other Stuff
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "@llvm-project//llvm:Support",
@@ -66,7 +63,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/TransformDialectStrategies/Common:TransformDialectStrategies",
         # TransformExtensions
         "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
-        "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
         "@llvm-project//mlir:LinalgTransformOps",
         # TransformMatchers and other stuff
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
