@@ -1024,7 +1024,7 @@ jobs:
       - name: Uploading comment artifact
         # Due to security reasons, instead of posting the comment to PR, we only
         # upload the comment data in presubmit workflow and trigger the posting
-        # workflow on the main branch.
+        # workflow on the main branch. See post_benchmark_comment.yaml
         if: needs.setup.outputs.ci-stage == 'presubmit'
         env:
           BENCHMARK_COMMENT_ARTIFACT: ${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
