@@ -958,7 +958,7 @@ jobs:
       benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
       benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
 
-  generate_benchmark_report:
+  process_benchmark_results:
     needs: [setup, compilation_benchmarks, execution_benchmarks]
     # execution_benchmarks is the optional dependency and skipped in presubmit
     # if no benchmark is specified to run.
@@ -998,6 +998,7 @@ jobs:
             "${EXECUTION_BENCHMARK_RESULTS_DIR}"
           echo "execution-benchmark-results-pattern=${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-*.json" >> "${GITHUB_OUTPUT}"
       - name: Generating comment
+        if: needs.setup.outputs.ci-stage == 'presubmit'
         id: generate-comment
         env:
           # Wildcard pattern to match all execution benchmark results. Empty if
@@ -1020,7 +1021,11 @@ jobs:
               --compile_stats_files="${COMPILE_STATS_RESULTS}"
               --output="${BENCHMARK_COMMENT_ARTIFACT}"
           echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
-      - name: Uploading report
+      - name: Uploading comment artifact
+        # Due to security reasons, instead of posting the comment to PR, we only
+        # upload the comment data in presubmit workflow and trigger the posting
+        # workflow on the main branch.
+        if: needs.setup.outputs.ci-stage == 'presubmit'
         env:
           BENCHMARK_COMMENT_ARTIFACT: ${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
           BENCHMARK_COMMENT_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
@@ -1268,7 +1273,7 @@ jobs:
       # Benchmark pipeline
       - compilation_benchmarks
       - execution_benchmarks
-      - generate_benchmark_report
+      - process_benchmark_results
     steps:
       - name: Getting failed jobs
         id: failed_jobs
