@@ -1018,7 +1018,7 @@ jobs:
               --comment_type="benchmark-summary" \
               --build_url="${IREE_BUILD_URL}" \
               --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
-              --compile_stats_files="${COMPILE_STATS_RESULTS}"
+              --compile_stats_files="${COMPILE_STATS_RESULTS}" \
               --output="${BENCHMARK_COMMENT_ARTIFACT}"
           echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
       - name: Uploading comment artifact
