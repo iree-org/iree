@@ -164,6 +164,7 @@ hal.executable @reduction_dispatch {
 // CHECK-SAME:   lowering_config = #[[CONFIG]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
