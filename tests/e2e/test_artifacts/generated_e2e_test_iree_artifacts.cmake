@@ -169,7 +169,6 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
-    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -413,7 +412,6 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
-    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -967,7 +965,6 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -1719,7 +1716,6 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
-    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1993,7 +1989,6 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
-    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2613,7 +2608,6 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
