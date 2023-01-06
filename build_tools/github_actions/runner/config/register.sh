@@ -12,8 +12,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
-source "${SCRIPT_DIR}/functions.sh"
+source /runner-root/config/functions.sh
 
 # These use OS inventory management to fetch information about the VM operating
 # system (https://cloud.google.com/compute/docs/instances/os-inventory-management).
@@ -101,7 +100,7 @@ GOOGLE_CLOUD_PROJECT="$(get_metadata project/project-id)"
 
 GOOGLE_CLOUD_RUN_ID_TOKEN="$(get_metadata "instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}")"
 
-REGISTER_TOKEN="$(get_token register ${RUNNER_SCOPE})"
+REGISTER_TOKEN="$(get_runner_token register ${RUNNER_SCOPE})"
 
 if [ -z "${REGISTER_TOKEN}" ]; then
   echo "failed to get registration runner token" >&2

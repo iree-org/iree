@@ -298,8 +298,8 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
   auto &expandedGlobal = globalMap[op.getGlobal()];
   builder.create<IREE::Util::GlobalStoreOp>(op.getLoc(), expandedValue.tensor,
                                             expandedGlobal.tensorOp.getName());
-  for (auto it :
-       llvm::zip(expandedValue.dynamicDims, expandedGlobal.dynamicDimOps)) {
+  for (auto it : llvm::zip_equal(expandedValue.dynamicDims,
+                                 expandedGlobal.dynamicDimOps)) {
     builder.create<IREE::Util::GlobalStoreOp>(op.getLoc(), std::get<0>(it),
                                               std::get<1>(it).getName());
   }
@@ -458,7 +458,8 @@ static void expandSelectOp(mlir::arith::SelectOp op, IndexSet &indexSet,
       op.getLoc(), op.getCondition(), op.getTrueValue(), op.getFalseValue());
 
   SmallVector<Value> selectedDims;
-  for (auto it : llvm::zip(trueValue.dynamicDims, falseValue.dynamicDims)) {
+  for (auto it :
+       llvm::zip_equal(trueValue.dynamicDims, falseValue.dynamicDims)) {
     selectedDims.push_back(
         builder
             .create<arith::SelectOp>(op.getLoc(), op.getCondition(),

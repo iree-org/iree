@@ -167,7 +167,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
     staticLoopRanges.resize(workloadValues.size(), ShapedType::kDynamic);
     Location loc = workgroupCountOp.getLoc();
     auto numTiles = llvm::to_vector(llvm::map_range(
-        llvm::zip(workloadValues, staticLoopRanges, tileSizes),
+        llvm::zip_equal(workloadValues, staticLoopRanges, tileSizes),
         [&](std::tuple<Value, int64_t, OpFoldResult> p) -> OpFoldResult {
           auto tileSize = std::get<2>(p);
           if (isConstantIntValue(tileSize, 0)) {
@@ -188,9 +188,8 @@ struct LowerDispatchWorkgroupCountForDagRootOp
     // If there is interchange, first apply interchange on the number of tiles.
     if (!givenInterchange.empty()) {
       SmallVector<OpFoldResult> interchangedNumTiles = numTiles;
-      for (auto interchangedLoop : llvm::enumerate(givenInterchange)) {
-        interchangedNumTiles[interchangedLoop.value()] =
-            numTiles[interchangedLoop.index()];
+      for (auto [index, loop] : llvm::enumerate(givenInterchange)) {
+        interchangedNumTiles[loop] = numTiles[index];
       }
       numTiles = interchangedNumTiles;
     }
@@ -248,9 +247,12 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
   LowerDispatchWorkgroupCountFromSetEncodingOp(
       MLIRContext *context,
       IREE::LinalgExt::MaterializeEncodingInfo encodingInfo,
-      PatternBenefit benefit = 1)
+      IREE::LinalgExt::MaterializeEncodingValueFn materializeEncodingValueFn,
+      RankedTensorType inputType, PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
-        materializeEncodingInfo(std::move(encodingInfo)) {}
+        materializeEncodingInfo(std::move(encodingInfo)),
+        materializeEncodingValueFn(materializeEncodingValueFn),
+        inputType(inputType) {}
 
   LogicalResult matchAndRewrite(
       IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp workgroupCountOp,
@@ -258,15 +260,14 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
     ValueRange workload = workgroupCountOp.getOperands();
     // The workload represents the unpacked shape. Get the workload of the
     // packed shape.
-    auto getAsOpFoldResults = [&](ArrayRef<int64_t> intVals) {
-      return llvm::to_vector(llvm::map_range(
-          intVals,
-          [&](int64_t i) -> OpFoldResult { return rewriter.getIndexAttr(i); }));
-    };
+    Location loc = workgroupCountOp.getLoc();
+    auto innerTileSizes =
+        getInnerTileSizesOfr(rewriter, loc, inputType, materializeEncodingInfo,
+                             materializeEncodingValueFn);
+    if (failed(innerTileSizes)) return failure();
     SmallVector<OpFoldResult> resultShape =
         IREE::LinalgExt::PackOp::getResultShape(
-            rewriter, workgroupCountOp.getLoc(), getAsOpFoldResult(workload),
-            getAsOpFoldResults(materializeEncodingInfo.innerTileSizes),
+            rewriter, loc, getAsOpFoldResult(workload), *innerTileSizes,
             materializeEncodingInfo.innerDimsPos,
             materializeEncodingInfo.outerDimsPerm);
     resultShape.resize(materializeEncodingInfo.srcRank);
@@ -274,13 +275,14 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
     rewriter
         .replaceOpWithNewOp<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(
             workgroupCountOp,
-            getValueOrCreateConstantIndexOp(rewriter, workgroupCountOp.getLoc(),
-                                            resultShape));
+            getValueOrCreateConstantIndexOp(rewriter, loc, resultShape));
     return success();
   }
 
  private:
   IREE::LinalgExt::MaterializeEncodingInfo materializeEncodingInfo;
+  IREE::LinalgExt::MaterializeEncodingValueFn materializeEncodingValueFn;
+  RankedTensorType inputType;
 };
 
 //===---------------------------------------------------------------------===//
@@ -346,8 +348,29 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         if (failed(encodingInfo)) {
           return signalPassFailure();
         }
+        auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(packRootOp);
+        auto materializeEncodingValueFn =
+            getMaterializeEncodingValueFn(targetAttr);
+        auto tensorType = packRootOp.getInputType().cast<RankedTensorType>();
+        // The LowerDispatchWorkgroupCountFromSetEncodingOp pattern is going to
+        // call materializeEncodingValueFn, passing it a tensor type, expecting
+        // that tensor type to have a TensorEncodingAttr. The problem is that
+        // MaterializeEncoding has already run, rewriting the SetEncoding op
+        // and its result tensor, which used to hold the TensorEncodingAttr,
+        // into a pack op, whose new result tensor does not anymore have a
+        // TensorEncodingAttr. As a work-around for that, we made
+        // MaterializeEncoding preserve the TensorEncodingAttr as an attr on the
+        // pack op itself, so the present code can read it and reconstruct a
+        // tensorTypeWithEncoding, so
+        // LowerDispatchWorkgroupCountFromSetEncodingOp can call
+        // materializeEncodingValueFn.
+        Attribute encodingAttr =
+            packRootOp->getAttr(StringAttr::get(context, "encoding"));
+        auto tensorTypeWithEncoding = RankedTensorType::Builder(
+            tensorType.getShape(), tensorType.getElementType(), encodingAttr);
         patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
-            context, encodingInfo.value());
+            context, encodingInfo.value(), materializeEncodingValueFn,
+            tensorTypeWithEncoding);
       }
       if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
         exportOp.emitOpError("failed to lower number of workgroups");

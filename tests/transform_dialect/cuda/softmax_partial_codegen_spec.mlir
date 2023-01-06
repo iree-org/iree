@@ -74,7 +74,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   // ===================================================================
   %end_func = transform.structured.match ops{["func.func"]} in %variant_op_3
-  %end_func_2 = transform.iree.apply_patterns %end_func { rank_reducing }
+  %end_func_2 = transform.iree.apply_patterns %end_func { rank_reducing, fold_memref_aliases }
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
   transform.iree.vector.warp_distribute %end_func_2

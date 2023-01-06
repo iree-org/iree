@@ -1153,7 +1153,7 @@ func.func @NCnc_to_NC(%input: tensor<8x8x32x16xf32>, %output: tensor<256x128xf32
 // CHECK-SAME:        : tensor<8x8x32x16xf32> to tensor<?x?x32x16xf32>
 // CHECK:             %[[EMPTY:.+]] = tensor.empty
 // CHECK:             %[[UNPACK:.+]] = iree_linalg_ext.unpack
-// CHECK-SAME:          {__internal_linalg_transform__ = "tiling_pack_output"}
+// CHECK-SAME:          {__internal_linalg_transform__ = "tiling_pack_output"
 // CHECK-SAME:          %[[SLICE]] inner_dims_pos = [0, 1] inner_tiles = [32, 16]
 // CHECK-SAME:          into %[[EMPTY]]
 // CHECK:             %[[UNPACK_SLICE:.+]] = tensor.extract_slice %[[UNPACK]]

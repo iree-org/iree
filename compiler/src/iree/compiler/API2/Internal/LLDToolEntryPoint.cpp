@@ -69,6 +69,9 @@ static Flavor parseFlavor(std::vector<const char *> &v) {
 }
 
 int ireeCompilerRunLldMain(int argc, char **argv) {
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/iree-org/iree/issues and "
+      "include the crash backtrace.\n");
   InitLLVM x(argc, argv);
   sys::Process::UseANSIEscapeCodes(true);
   bool exitEarly = true;

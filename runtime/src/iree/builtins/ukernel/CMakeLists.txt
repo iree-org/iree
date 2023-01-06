@@ -22,9 +22,9 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    exported_flag_bits
+    exported_bits
   HDRS
-    "exported_flag_bits.h"
+    "exported_bits.h"
   DEPS
     ::static_assert
   PUBLIC
@@ -41,7 +41,7 @@ iree_cc_library(
   SRCS
     "common.c"
   DEPS
-    ::exported_flag_bits
+    ::exported_bits
     ::static_assert
     iree::base::core_headers
     iree::builtins::ukernel::arch::config

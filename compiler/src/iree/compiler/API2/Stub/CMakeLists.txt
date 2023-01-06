@@ -20,7 +20,7 @@ iree_cc_library(
     "Loader.cpp"
   DEPS
     ${CMAKE_DL_LIBS}
-    iree::compiler::API2::Headers
+    iree::compiler::API2::EmbedHeaders
   PUBLIC
 )
 
@@ -32,7 +32,7 @@ iree_cc_test(
   NAME
     LoaderTest
   SRCS
-    "LoaderTest.cpp"
+    "LoaderTest.c"
   ARGS
     "$<TARGET_FILE:iree::compiler::API2::SharedImpl>"
   DEPS

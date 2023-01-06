@@ -933,6 +933,23 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_i32i32, unpack, v) {
 }
 
 //===----------------------------------------------------------------------===//
+// Exported query_tile_sizes function definitions
+//===----------------------------------------------------------------------===//
+
+IREE_VMVX_ABI_FIXED_STRUCT(query_tile_sizes_2d, III, {
+  int64_t encoding;
+  int64_t size0;
+  int64_t size1;
+});
+IREE_VMVX_ABI_DEFINE_SHIM(query_tile_sizes_2d, II);
+
+IREE_VMVX_ABI_EXPORT(iree_vmvx_query_tile_sizes_2d, query_tile_sizes_2d, II) {
+  rets->i0 = 1;
+  rets->i1 = 1;
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
 // VM module interface implementation
 //===----------------------------------------------------------------------===//
 

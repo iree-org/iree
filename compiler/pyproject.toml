@@ -9,7 +9,8 @@ requires = [
     # MLIR build depends.
     "numpy",
     "packaging",
-    "pybind11>=2.8.0",
+    "pybind11>=2.10.1",
     "PyYAML",
+    "requests",
 ]
 build-backend = "setuptools.build_meta"

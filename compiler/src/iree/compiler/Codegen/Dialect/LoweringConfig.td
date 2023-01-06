@@ -53,10 +53,8 @@ def SPIRV_WinogradVectorize
 def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 21>;
 
 
-def Linalg_TransformInterpCodegen
-    : I32EnumAttrCase<"TransformDialectInterpreterCodegen", 100>;
-def Linalg_TransformJitCodegen
-    : I32EnumAttrCase<"TransformDialectJitterCodegen", 101>;
+def Linalg_TransformDialectCodegen
+    : I32EnumAttrCase<"TransformDialectCodegen", 100>;
 
 def None : I32EnumAttrCase<"None", 0xff>;
 
@@ -77,8 +75,7 @@ def DispatchLoweringPassPipelineEnum
                     SPIRV_SubgroupReduce, SPIRV_WinogradVectorize,
                     VMVX_Default,
                     // Transform dialect based codegen
-                    Linalg_TransformInterpCodegen,
-                    Linalg_TransformJitCodegen,
+                    Linalg_TransformDialectCodegen,
                     None
                   ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";

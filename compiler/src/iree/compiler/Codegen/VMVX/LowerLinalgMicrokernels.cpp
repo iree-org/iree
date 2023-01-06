@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/builtins/ukernel/exported_flag_bits.h"
+#include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -818,9 +818,8 @@ struct LinalgTrivialGenericConversion
     // Presumed to be a yield terminator: configure the emitter.
     CopyEmitter emitter;
     Operation &yieldOp = children.front();
-    for (auto it : llvm::enumerate(yieldOp.getOperands())) {
-      unsigned outputIndex = it.index();
-      Value yieldOperand = it.value();
+    for (auto [outputIndex, yieldOperand] :
+         llvm::enumerate(yieldOp.getOperands())) {
       if (auto blockArg = yieldOperand.dyn_cast<BlockArgument>()) {
         unsigned inputIndex = blockArg.getArgNumber();
         OpOperand *input = op.getDpsInputOperand(inputIndex);

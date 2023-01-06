@@ -549,7 +549,7 @@ Attribute ExecutableObjectsAttr::parse(AsmParser &p, Type type) {
 void ExecutableObjectsAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<{";
-  llvm::interleaveComma(llvm::zip(getTargets(), getTargetObjects()), os,
+  llvm::interleaveComma(llvm::zip_equal(getTargets(), getTargetObjects()), os,
                         [&](std::tuple<Attribute, Attribute> keyValue) {
                           p.printAttribute(std::get<0>(keyValue));
                           os << " = ";
@@ -562,7 +562,7 @@ Optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
     IREE::HAL::ExecutableTargetAttr specificTargetAttr) {
   SmallVector<Attribute> allObjectAttrs;
   for (auto [targetAttr, objectsAttr] :
-       llvm::zip(getTargets(), getTargetObjects())) {
+       llvm::zip_equal(getTargets(), getTargetObjects())) {
     auto genericTargetAttr = targetAttr.cast<IREE::HAL::ExecutableTargetAttr>();
     if (genericTargetAttr.isGenericOf(specificTargetAttr)) {
       auto objectsArrayAttr = objectsAttr.cast<ArrayAttr>();

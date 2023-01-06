@@ -70,6 +70,7 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
   ADD_PATTERN(eraseUnnecessaryTensorOperands,
               getEraseUnnecessaryTensorOperandsAttrName)
+  ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(promoteForeachThreadCaptureToShared,
               getPromoteForeachThreadCaptureToSharedAttrName)
@@ -162,6 +163,10 @@ struct PromoteCaptureToSharedOut
 };
 }  // namespace
 
+static void addFoldMemrefAliasPatterns(RewritePatternSet &patterns) {
+  memref::populateFoldMemRefAliasOpPatterns(patterns);
+}
+
 static void addForeachThreadCapturePromotionPatterns(
     RewritePatternSet &patterns) {
   patterns.add<PromoteCaptureToSharedOut>(patterns.getContext());
@@ -224,6 +229,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
   if (getEraseUnnecessaryTensorOperands())
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
+  if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getPromoteForeachThreadCaptureToShared())
     addForeachThreadCapturePromotionPatterns(patterns);
@@ -503,8 +509,7 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   assert(result.name.isRegistered() && "not registered!!");
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
-  dispatchIndexOpFoldResults(mixedTileSizes, dynamicTileSizes, staticTileSizes,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(mixedTileSizes, dynamicTileSizes, staticTileSizes);
   // Call the default builder which sets up the proper operands segment sizes
   // attributes for multiple variadic operands. In the absence of this, horrible
   // bugs ensue.
@@ -541,7 +546,7 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   SmallVector<int64_t> staticNumThreads;
   SmallVector<Value> dynamicNumThreads;
   dispatchIndexOpFoldResults(mixedNumThreads, dynamicNumThreads,
-                             staticNumThreads, ShapedType::kDynamic);
+                             staticNumThreads);
   // Call the default builder which sets up the proper operands segment sizes
   // attributes for multiple variadic operands. In the absence of this, horrible
   // bugs ensue.
@@ -750,10 +755,21 @@ using mlir::bufferization::OneShotBufferizationOptions;
 
 void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
                                                OperationState &result,
-                                               Value target, bool targetGpu) {
+                                               Value target, bool targetGpu,
+                                               bool testAnalysisOnly,
+                                               bool printConflicts) {
   result.addOperands(target);
   if (targetGpu) {
     result.addAttribute(IREEBufferizeOp::getTargetGpuAttrName(result.name),
+                        builder.getUnitAttr());
+  }
+  if (testAnalysisOnly) {
+    result.addAttribute(
+        IREEBufferizeOp::getTestAnalysisOnlyAttrName(result.name),
+        builder.getUnitAttr());
+  }
+  if (printConflicts) {
+    result.addAttribute(IREEBufferizeOp::getPrintConflictsAttrName(result.name),
                         builder.getUnitAttr());
   }
   MLIRContext *ctx = builder.getContext();
@@ -934,6 +950,12 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   });
   if (res.wasInterrupted())
     return DiagnosedSilenceableFailure::definiteFailure();
+
+  // Early exit if test_analysis_only is set.
+  if (getTestAnalysisOnly()) {
+    results.set(getOperation()->getOpResult(0), payload.front());
+    return DiagnosedSilenceableFailure::success();
+  }
 
   //   3. Post-bufferization passes are fine.
   PassManager pm(getContext());

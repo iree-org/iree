@@ -24,6 +24,8 @@ source build_tools/cmake/setup_ccache.sh
 
 CMAKE_ARGS=(
   "-G" "Ninja"
+  "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
   # The debug information will help get more helpful TSan reports (stacks).
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"

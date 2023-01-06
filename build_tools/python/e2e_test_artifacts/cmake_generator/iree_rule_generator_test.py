@@ -106,6 +106,13 @@ class IreeRuleBuilderTest(unittest.TestCase):
                      f"iree-module-{model_a.id}-{compile_config_a.id}")
     self.assertEqual(rule.output_module_path, output_file_path)
 
+  def test_build_target_path(self):
+    builder = iree_rule_generator.IreeRuleBuilder(package_name="xyz")
+
+    path = builder.build_target_path("target-abc")
+
+    self.assertEqual(path, f"xyz_target-abc")
+
 
 class IreeGeneratorTest(unittest.TestCase):
 

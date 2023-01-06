@@ -6,44 +6,20 @@
 
 #include "iree/compiler/Codegen/Common/TransformDialectStrategies.h"
 
-#include <numeric>
-#include <type_traits>
-
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
-#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
-#include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+// Needed because we only have gpu::GPUBlockMappingAttr available atm.
+// TODO: IREE should have its own attributes.
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
-#include "mlir/IR/Location.h"
-#include "mlir/IR/Matchers.h"
-#include "mlir/IR/Types.h"
-#include "mlir/IR/Value.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassRegistry.h"
 
 using namespace mlir;
 
@@ -53,18 +29,13 @@ using namespace mlir;
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
-using iree_compiler::IREE::transform_dialect::ConfigExtractPart;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
     IREEEraseHALDescriptorTypeFromMemRefOp;
 using iree_compiler::IREE::transform_dialect::
-    MapNestedForeachThreadToGpuThreadsOp;
-using iree_compiler::IREE::transform_dialect::
     TileToForeachThreadAndWorkgroupCountRegionOp;
-using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
-using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
 using transform::FuseIntoContainingOp;
 using transform::MatchOp;
 using transform::MergeHandlesOp;
@@ -74,12 +45,7 @@ using transform::SplitHandlesOp;
 using transform::SplitReductionOp;
 using transform::TileToForeachThreadOp;
 using transform::VectorizeOp;
-using transform_ext::AllDims;
-using transform_ext::IsPermutation;
-using transform_ext::m_StructuredOp;
-using transform_ext::NumEqualsTo;
-using transform_ext::ShapeKind;
-using transform_ext::StructuredOpMatcher;
+using transform_ext::TakeFirstOp;
 
 /// Matches `args` within `targetH` and unpacks a number of handles `N`.
 /// Assumes there are exactly `N` matched ops (but could be relaxed).
@@ -96,6 +62,31 @@ auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
   return std::tuple_cat(a);
 }
 
+int64_t mlir::iree_compiler::previousMultipleOf(int64_t val, int64_t multiple) {
+  assert(val > 0 && "expected nonnegative val");
+  assert(multiple > 0 && "expected nonnegative multiple");
+  return (val / multiple) * multiple;
+}
+
+int64_t mlir::iree_compiler::nextMultipleOf(int64_t val, int64_t multiple) {
+  assert(val > 0 && "expected nonnegative val");
+  assert(multiple > 0 && "expected nonnegative multiple");
+  return ((val + multiple - 1) / multiple) * multiple;
+}
+
+FailureOr<int64_t> mlir::iree_compiler::maxDivisorOfValueBelowLimit(
+    int64_t value, int64_t limit) {
+  // Conservatively return failure when `limit` is greater than 1024 to avoid
+  // prohibitively long compile time overheads.
+  // TODO: approximate with a faster implementation based on a few desirable
+  // primes.
+  if (limit > 1024) return failure();
+  // If either value or limit is <= 0, the loop is skipped and we fail.
+  for (int64_t i = std::min(value, limit); i > 1; --i)
+    if (value % i == 0) return i;
+  return failure();
+}
+
 //===----------------------------------------------------------------------===//
 // Low-level reusable builder APIs, these should follow MLIR-style builders.
 //===----------------------------------------------------------------------===//
@@ -105,6 +96,34 @@ void mlir::iree_compiler::buildPrint(ImplicitLocOpBuilder &b,
                                      ValueRange handles) {
   if (handles.empty()) b.create<PrintOp>();
   for (auto h : handles) b.create<PrintOp>(h);
+}
+
+/// Dynamically selects the first non-empty handle; i.e. if (h1, h2) is:
+///   - (non-empty, non-empty), returns (h1, h2)
+///   - (empty, non-empty), returns (h2, empty)
+///   - (non-empty, empty), returns (h1, empty)
+///   - (empty, empty), returns (empty, empty)
+/// This is used as a normalization operation that replaces conditionals, either
+/// in C++ or in transform IR.
+/// This can be thought of as a control-flow -> data-dependent conversion.
+std::pair<Value, Value> mlir::iree_compiler::buildSelectFirstNonEmpty(
+    ImplicitLocOpBuilder &b, Value handle1, Value handle2) {
+  auto pdlOperation = pdl::OperationType::get(b.getContext());
+  auto selector = b.create<TakeFirstOp>(pdlOperation, pdlOperation,
+                                        ArrayRef<Value>{handle1, handle2});
+  return std::make_pair(selector.getFirst(), selector.getRest());
+}
+
+mlir::iree_compiler::TileToScfForAndFuseResult
+mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b, Value rootH,
+                                           ValueRange opsHToFuse,
+                                           ArrayRef<OpFoldResult> tileSizes) {
+  assert(opsHToFuse.empty() && "No fusion supported yet");
+  iree_compiler::TileToScfForAndFuseResult result;
+  auto tiletoScfForOp = b.create<transform::TileOp>(rootH, tileSizes);
+  result.forLoops = tiletoScfForOp.getLoops();
+  result.tiledOpH = tiletoScfForOp.getTiledLinalgOp();
+  return result;
 }
 
 /// Performs the following transformations:
@@ -128,12 +147,12 @@ void mlir::iree_compiler::buildPrint(ImplicitLocOpBuilder &b,
 /// appended in order.
 // TODO: apply forwarding pattern.
 template <typename TilingTransformOp, typename TileOrNumThreadSpec>
-static iree_compiler::TileAndFuseAndDistributeResult
+static iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
 buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b, Value rootH,
                                   ValueRange opsHToFuse,
                                   ArrayRef<OpFoldResult> tileSizesOrNumThreads,
                                   ArrayAttr threadDimMapping) {
-  iree_compiler::TileAndFuseAndDistributeResult result;
+  iree_compiler::TileToForeachThreadAndFuseAndDistributeResult result;
   auto tileToForeachOp = b.create<TilingTransformOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
   result.foreachThreadH = tileToForeachOp.getForeachThreadOp();
@@ -155,7 +174,7 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b, Value rootH,
 // TODO: if someone knows how to properly export templates go for it ..
 // sigh.
 template <typename TilingTransformOp>
-static iree_compiler::TileAndFuseAndDistributeResult
+static iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
 buildTileFuseDistWithTileSizes(ImplicitLocOpBuilder &b, Value rootH,
                                ValueRange opsHToFuse,
                                ArrayRef<OpFoldResult> tileSizes,
@@ -164,15 +183,16 @@ buildTileFuseDistWithTileSizes(ImplicitLocOpBuilder &b, Value rootH,
                                            transform::TileSizesSpec>(
       b, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
-iree_compiler::TileAndFuseAndDistributeResult
+iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
 mlir::iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
   return buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(
       b, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
-iree_compiler::TileAndFuseAndDistributeResult mlir::iree_compiler::
-    buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
+iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
+mlir::iree_compiler::
+    buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
         ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
         ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
   return buildTileFuseDistWithTileSizes<
@@ -184,7 +204,7 @@ iree_compiler::TileAndFuseAndDistributeResult mlir::iree_compiler::
 // TODO: if someone knows how to properly export templates go for it ..
 // sigh.
 template <typename TilingTransformOp>
-static iree_compiler::TileAndFuseAndDistributeResult
+static iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
 buildTileFuseDistWithNumThreads(ImplicitLocOpBuilder &b, Value rootH,
                                 ValueRange opsHToFuse,
                                 ArrayRef<OpFoldResult> numThreads,
@@ -193,14 +213,15 @@ buildTileFuseDistWithNumThreads(ImplicitLocOpBuilder &b, Value rootH,
                                            transform::NumThreadsSpec>(
       b, rootH, opsHToFuse, numThreads, threadDimMapping);
 }
-iree_compiler::TileAndFuseAndDistributeResult
+iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
 mlir::iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
   return buildTileFuseDistWithNumThreads<TileToForeachThreadOp>(
       b, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
-iree_compiler::TileAndFuseAndDistributeResult mlir::iree_compiler::
+iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
+mlir::iree_compiler::
     buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
         ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
         ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
@@ -234,42 +255,6 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
       b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   b.create<IREEEraseHALDescriptorTypeFromMemRefOp>(memrefFunc);
   return variantH;
-}
-
-/// Post-bufferization mapping to blocks and threads.
-/// Takes a handle to a func.func and returns an updated handle to a
-/// func.func.
-Value mlir::iree_compiler::buildMapToBlockAndThreads(
-    ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize) {
-  funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
-  return b.create<MapNestedForeachThreadToGpuThreadsOp>(funcH, blockSize);
-}
-
-static constexpr unsigned kCudaWarpSize = 32;
-
-/// Post-bufferization vector distribution with rank-reduction.
-/// Takes a handle to a func.func and returns an updated handle to a
-/// func.func.
-Value mlir::iree_compiler::buildDistributeVectors(ImplicitLocOpBuilder &b,
-                                                  Value variantH, Value funcH,
-                                                  int64_t warpSize) {
-  ApplyPatternsOpPatterns patterns;
-  patterns.rankReducing = true;
-  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
-  Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
-  // Locally suppress failures for this op only because it doesn't cover the
-  // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.
-  auto sequence = b.create<SequenceOp>(
-      TypeRange(), transform::FailurePropagationMode::Suppress, variantH);
-  {
-    OpBuilder::InsertionGuard guard(b);
-    b.createBlock(&sequence.getBody(), sequence.getBody().begin(),
-                  pdl::OperationType::get(b.getContext()), b.getLoc());
-    ifH = b.create<VectorToWarpExecuteOnLane0Op>(ifH, warpSize);
-    b.create<transform::YieldOp>();
-  }
-  b.create<VectorWarpDistributionOp>(funcH);
-  return funcH;
 }
 
 namespace {
@@ -376,7 +361,7 @@ Value mlir::iree_compiler::createReductionStrategyBlockDistributionPart(
         b.getArrayAttr({x}));
   } else {
     iree_compiler::
-        buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
+        buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
             b, optionalFusionRootH, opsHToFuse, tileSizes0Generic,
             b.getArrayAttr({x}));
   }

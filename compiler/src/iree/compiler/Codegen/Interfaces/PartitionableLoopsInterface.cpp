@@ -95,12 +95,12 @@ struct OuterParallelAsPartitionableLoops
     // loops.
     SmallVector<unsigned> partitionableLoops;
     auto interfaceOp = cast<OpTy>(op);
-    for (auto iteratorType :
+    for (auto [index, iteratorType] :
          llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
-      if (iteratorType.value() != utils::IteratorType::parallel) {
+      if (iteratorType != utils::IteratorType::parallel) {
         break;
       }
-      partitionableLoops.push_back(iteratorType.index());
+      partitionableLoops.push_back(index);
     }
     if (!maxNumPartitionedLoops.has_value() ||
         partitionableLoops.size() <= maxNumPartitionedLoops.value()) {

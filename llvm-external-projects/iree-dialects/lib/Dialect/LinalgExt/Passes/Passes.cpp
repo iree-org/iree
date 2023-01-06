@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"

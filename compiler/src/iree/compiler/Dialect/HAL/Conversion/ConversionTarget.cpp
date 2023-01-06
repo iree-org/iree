@@ -50,7 +50,7 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
   OperationState state{srcOp->getLoc(), dstOpName};
   state.addAttributes(srcOp->getAttrs());
 
-  for (auto srcDstOperand : llvm::zip(srcOp->getOperands(), operands)) {
+  for (auto srcDstOperand : llvm::zip_equal(srcOp->getOperands(), operands)) {
     auto dstOperand = std::get<1>(srcDstOperand);
 
     // Check that any type that should have been mapped to buffer view was.

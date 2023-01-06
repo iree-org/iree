@@ -72,13 +72,13 @@ Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
   } else if (auto vtOp = dyn_cast<VectorTransferOpInterface>(op)) {
     auto vecType = vtOp.getVectorType();
     SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
-    for (const auto &dim :
+    for (const auto &[index, dim] :
          llvm::enumerate(vtOp.permutation_map().getResults())) {
-      if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
+      if (auto dimExpr = dim.dyn_cast<AffineDimExpr>()) {
         if (dimExpr.getPosition() == vtOp.permutation_map().getNumDims() - 1) {
-          nativeSize[dim.index()] =
+          nativeSize[index] =
               getMemoryVectorSize(vtOp.source(), vecType.getElementType(),
-                                  vecType.getShape()[dim.index()]);
+                                  vecType.getShape()[index]);
         }
       }
     }

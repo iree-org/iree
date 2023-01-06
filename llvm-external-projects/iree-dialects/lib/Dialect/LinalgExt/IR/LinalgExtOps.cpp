@@ -1564,8 +1564,7 @@ static SmallVector<int64_t> getStaticTiles(OpTy op) {
                 "applies to only pack or unpack operations");
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
-  dispatchIndexOpFoldResults(op.getMixedTiles(), dynamicTiles, staticTiles,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(op.getMixedTiles(), dynamicTiles, staticTiles);
   return staticTiles;
 }
 
@@ -1704,8 +1703,7 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
          "original dimensions to be tiled");
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
-  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
   build(builder, state, output.getType(), source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getDenseI64ArrayAttr(outerDimsPerm),
@@ -2127,8 +2125,7 @@ void UnPackOp::build(OpBuilder &builder, OperationState &state, Value source,
                      ArrayRef<int64_t> outerDimsPerm) {
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
-  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
-                             ShapedType::kDynamic);
+  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
   build(builder, state, output.getType(), source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getDenseI64ArrayAttr(outerDimsPerm),
@@ -2220,6 +2217,19 @@ SmallVector<Operation *>
 UnPackOp::getTiledImplementation(OpBuilder &builder,
                                  ArrayRef<OpFoldResult> offsets,
                                  ArrayRef<OpFoldResult> sizes) {
+  Operation *unpackOp = *this;
+  // Dynamic inner tile sizes currently trigger infinite application of
+  // tile-and-distribute on the unpack op, each tile calling
+  // getTiledImplementation -> getSlice creating more and more extract_slice.
+  // As a temporary work-around, we annotate unpack ops with a custom
+  // already_tiled attribute to keep track of what's already been tiled.
+  // For some reason this causes errors in non-dynamic-shape cases, but it's
+  // not needed there anyway, so we simply check for dynamic inner tiles before
+  // applying this tweak.
+  if (ShapedType::isDynamicShape(getStaticInnerTiles())) {
+    if (unpackOp->hasAttr("already_tiled"))
+      return {unpackOp};
+  }
   // TODO(hanchung): Extend it to handle memref version.
   // Tiling on buffers needs extra buffer because tiled unpack op could produce
   // more data for incomplete tiles. Tiling on tensors satisfies IREE's needs.
@@ -2371,6 +2381,8 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledUnpackOp =
       mlir::clone(builder, getOperation(), tiledResultTypes, tiledOperands);
+  tiledUnpackOp->setAttr(StringAttr::get(getContext(), "already_tiled"),
+                         BoolAttr::get(getContext(), true));
 
   if (isPerfectTilingCase)
     return {tiledUnpackOp};

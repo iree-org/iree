@@ -142,7 +142,7 @@ struct GenericResourcePattern : public ConversionPattern {
     SmallVector<Value> newOperands;
     newOperands.reserve(op->getNumOperands());
     rewriter.setInsertionPoint(op);
-    for (auto it : llvm::zip(op->getOperands(), operands)) {
+    for (auto it : llvm::zip_equal(op->getOperands(), operands)) {
       auto oldOperand = std::get<0>(it);
       auto newOperand = std::get<1>(it);
       if (!newOperand.getType().isa<IREE::Stream::ResourceType>() &&

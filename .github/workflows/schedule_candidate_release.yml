@@ -10,24 +10,26 @@ jobs:
   tag_release:
     name: "Tag candidate release"
     runs-on: ubuntu-20.04
-    # Don't run this in everyone's forks.
-    if: github.repository == 'iree-org/iree'
+    # Don't run the cron in everyone's forks
+    if: github.event_name != 'schedule' || github.repository == 'iree-org/iree'
     steps:
-      - name: Get the last green commit
-        id: last_green_commit
-        uses: talentpair/last-green-commit-action@8b4b3bcd4ab5d9ab16875ce20ae012c4ce47ae68
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Checking out repository
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          ref: ${{ steps.last_green_commit.outputs.result }}
+          fetch-depth: 0
+
+      - name: Checkout the most recent green commit
+        id: last_green_commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest_green="$(./build_tools/scripts/get_latest_green.sh)"
+          git checkout "${latest_green}"
+          echo "latest-green=${latest_green}" >> "${GITHUB_OUTPUT}"
 
       - name: Compute version
         run: |
-          git fetch --depth=1 origin +refs/tags/*:refs/tags/*
           package_version="$(printf '%(%Y%m%d)T.${{ github.run_number }}')"
           tag_name="candidate-${package_version}"
           echo "package_version=${package_version}" >> $GITHUB_ENV
@@ -48,7 +50,7 @@ jobs:
         with:
           tag_name: ${{ env.tag_name }}
           release_name: iree candidate ${{ env.tag_name }}
-          commitish: ${{ steps.last_green_commit.outputs.result }}
+          commitish: ${{ steps.last_green_commit.outputs.latest-green }}
           body: |
             Automatic candidate release of iree.
           draft: true
@@ -60,4 +62,10 @@ jobs:
           workflow: Build Native Release Packages
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: "${{ env.tag_name }}"
-          inputs: '{"package_suffix": "", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}", "commit": "${{ steps.last_green_commit.outputs.result }}"}'
+          inputs: |
+            {
+              "package_suffix": "",
+              "package_version": "${{ env.package_version }}",
+              "release_id": "${{ steps.create_release.outputs.id }}",
+              "commit": "${{ steps.last_green_commit.outputs.latest-green }}"
+            }

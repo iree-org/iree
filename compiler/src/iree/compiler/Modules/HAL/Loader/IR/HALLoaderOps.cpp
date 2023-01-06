@@ -65,7 +65,7 @@ static void printDispatchBindings(OpAsmPrinter &p, Operation *op,
                                   ValueRange bufferOffsets,
                                   ValueRange bufferLengths) {
   llvm::interleaveComma(
-      llvm::zip(buffers, bufferTypes, bufferOffsets, bufferLengths), p,
+      llvm::zip_equal(buffers, bufferTypes, bufferOffsets, bufferLengths), p,
       [&](std::tuple<Value, Type, Value, Value> it) {
         p.printNewline();
         p << "  ";
@@ -165,7 +165,7 @@ struct FoldBindingSubspansIntoDispatchOp
     SmallVector<Value> bindingOffsets;
     SmallVector<Value> bindingLengths;
     for (auto [bindingBuffer, bindingOffset] :
-         llvm::zip(op.getBindingBuffers(), op.getBindingOffsets())) {
+         llvm::zip_equal(op.getBindingBuffers(), op.getBindingOffsets())) {
       auto subspanOp =
           IREE::Util::BufferSubspanOp::findSubspanOp(bindingBuffer);
       if (!subspanOp) {

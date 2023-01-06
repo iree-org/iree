@@ -183,5 +183,5 @@ hal.executable private @apply_scale_zve32x {
 // the LLVM backend.
 // CHECK-LABEL: llvm.func @apply_scale_zve32x
 //       CHECK:   %[[MUL:.*]] = llvm.mul %{{.*}}, %{{.*}} : vector<2xi64>
-//  CHECK-NEXT:   %[[SHR:.*]] = llvm.lshr %{{.*}}, %{{.*}} : vector<2xi64>
+//       CHECK:   %[[SHR:.*]] = llvm.lshr %{{.*}}, %{{.*}} : vector<2xi64>
 //  CHECK-NEXT:   llvm.trunc %[[SHR]] : vector<2xi64> to vector<2xi32>

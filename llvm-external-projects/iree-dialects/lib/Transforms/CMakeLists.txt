@@ -4,11 +4,12 @@ add_mlir_library(IREEDialectsTransforms
   ListenerCSE.cpp
   ListenerGreedyPatternRewriteDriver.cpp
   TransformMatchers.cpp
-  
+
   LINK_LIBS PRIVATE
   # TODO: break dialect dependency by implementing the transformation separately
   # and registering it.
   MLIRAsyncDialect
+  MLIRFuncDialect
   MLIRLinalgDialect
   MLIRLinalgTransforms
 
