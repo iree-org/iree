@@ -89,7 +89,7 @@ class GithubClientTest(unittest.TestCase):
     client = post_benchmark_comment.GithubClient(mock_requester)
 
     comment_id = client.get_previous_comment_on_pr(pr_number=23,
-                                                   gist_bot_user="bot",
+                                                   comment_bot_user="bot",
                                                    comment_type_id="1234",
                                                    query_comment_per_page=2,
                                                    max_pages_to_search=10)
@@ -127,7 +127,7 @@ class GithubClientTest(unittest.TestCase):
     client = post_benchmark_comment.GithubClient(mock_requester)
 
     comment_id = client.get_previous_comment_on_pr(pr_number=23,
-                                                   gist_bot_user="bot",
+                                                   comment_bot_user="bot",
                                                    comment_type_id="1234",
                                                    query_comment_per_page=1,
                                                    max_pages_to_search=10)

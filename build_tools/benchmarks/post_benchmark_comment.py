@@ -11,7 +11,8 @@ Requires the environment variables:
 
 - GITHUB_TOKEN: token from GitHub action that has write access on issues. See
   https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
-- GIST_BOT_USER: user name that posts the gist.
+- COMMENT_BOT_USER: user name that posts the comment. Note this can be different
+    from the user creates the gist.
 - GIST_BOT_TOKEN: token that has write access to gist. Gist will be posted as
   the owner of the token. See
   https://docs.github.com/en/rest/overview/permissions-required-for-fine-grained-personal-access-tokens#gists
@@ -101,7 +102,7 @@ class GithubClient(object):
 
   def get_previous_comment_on_pr(self,
                                  pr_number: int,
-                                 gist_bot_user: str,
+                                 comment_bot_user: str,
                                  comment_type_id: str,
                                  query_comment_per_page: int = 100,
                                  max_pages_to_search: int = 10,
@@ -128,7 +129,7 @@ class GithubClient(object):
 
       # Find the most recently updated comment that matches.
       for comment in comments:
-        if (comment["user"]["login"] == gist_bot_user and
+        if (comment["user"]["login"] == comment_bot_user and
             comment_type_id in comment["body"]):
           return comment["id"]
 
@@ -173,9 +174,9 @@ def main(args: argparse.Namespace):
   if github_token is None:
     raise ValueError("GITHUB_TOKEN must be set.")
 
-  gist_bot_user = os.environ.get("GIST_BOT_USER")
-  if gist_bot_user is None:
-    raise ValueError("GIST_BOT_USER must be set.")
+  comment_bot_user = os.environ.get("COMMENT_BOT_USER")
+  if comment_bot_user is None:
+    raise ValueError("COMMENT_BOT_USER must be set.")
 
   gist_bot_token = os.environ.get("GIST_BOT_TOKEN")
   if gist_bot_token is None:
@@ -195,7 +196,7 @@ def main(args: argparse.Namespace):
   pr_client = GithubClient(requester=APIRequester(github_token=github_token))
   previous_comment_id = pr_client.get_previous_comment_on_pr(
       pr_number=pr_number,
-      gist_bot_user=gist_bot_user,
+      comment_bot_user=comment_bot_user,
       comment_type_id=comment_data.type_id,
       verbose=args.verbose)
 
