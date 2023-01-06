@@ -79,7 +79,7 @@ jobs:
         run: |
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/convperf@sha256:02fbafb293b0f9b0bec46ffab0b34678fb7306ee869142316a1750d9c973517f \
+            gcr.io/iree-oss/convperf@sha256:8a32b97be7c8817aa12bf669fce4dd1f20d0b01b7aa6f4dbb618e27541d1231d \
           ./build_tools/benchmarks/convperf/build_and_run_convperf.sh "${BUILD_DIR}" "${RESULTS_DIR}" "${IREE_SHA}"
       - name: "Uploading results"
         run: |
