@@ -192,7 +192,7 @@ mlir::iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
 }
 iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
 mlir::iree_compiler::
-    buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
+    buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
         ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
         ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
   return buildTileFuseDistWithTileSizes<
@@ -361,7 +361,7 @@ Value mlir::iree_compiler::createReductionStrategyBlockDistributionPart(
         b.getArrayAttr({x}));
   } else {
     iree_compiler::
-        buildTileFuseDistToForeachThreadAndWorgroupCountWithTileSizes(
+        buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
             b, optionalFusionRootH, opsHToFuse, tileSizes0Generic,
             b.getArrayAttr({x}));
   }
