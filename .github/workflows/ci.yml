@@ -331,6 +331,8 @@ jobs:
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Configuring MSVC"
         uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
+      - name: "Installing Python requirements"
+        run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: "Building runtime"
         env:
           BUILD_PRESET: "test"
