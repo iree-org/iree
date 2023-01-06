@@ -93,8 +93,8 @@ jobs:
         if: false
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          COMMENT_BOT_USER: github-actions-bot
           GIST_BOT_TOKEN: ${{ secrets.GIST_BOT_TOKEN }}
+          COMMENT_BOT_USER: github-actions[bot]
           # Get PR number from the event instead of the untrusted comment
           # artifact, to make sure we won't incorrectly update other PRs.
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
