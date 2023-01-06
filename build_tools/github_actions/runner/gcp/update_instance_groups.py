@@ -72,7 +72,7 @@ class MigFetcher():
     regions = [r.name for r in self._regions_client.list(request)]
 
     if type == "all":
-      type = r"\w+"
+      type = r"[-\w]+"
 
     if group == "all":
       group = r"\w+"
@@ -80,6 +80,7 @@ class MigFetcher():
     for region in regions:
       filter_parts = [p for p in [prefix, modifier, group, type, region] if p]
       filter = f"name eq '{'-'.join(filter_parts)}'"
+      print(filter)
       list_mig_request = compute.ListRegionInstanceGroupManagersRequest(
           project=self._project,
           region=region,
