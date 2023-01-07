@@ -483,6 +483,12 @@ def LLVMGPUTensorPad :
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorPadPass()";
 }
 
+def LLVMGPUMergeParallelOps :
+    Pass<"iree-llvmgpu-merge-parallel-ops", "func::FuncOp"> {
+  let summary = "Pass to merge parallel ops to avoid creating temporary allocs.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUMergeParallelOpsPass()";
+}
+
 //------------------------------------------------------------------------------
 // SPIR-V
 //------------------------------------------------------------------------------
