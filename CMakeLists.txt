@@ -69,6 +69,8 @@ set(IREE_RELEASE_VERSION "0.1a1" CACHE STRING "Version to embed in distributed p
 set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision information to embed in distributed packages")
 option(IREE_EMBED_RELEASE_INFO "Embed the IREE version information in built artifacts." OFF)
 
+set(IREE_HOST_BINARY_ROOT "" CACHE STRING "Path to installed IREE tools, to use instead of building them from source")
+
 option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
@@ -370,6 +372,7 @@ include(iree_copts)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
+include(iree_import_binary)
 include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
@@ -612,19 +615,11 @@ if(IREE_ENABLE_THREADING)
   endif()
 endif()
 
-add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
+# This defines the iree-flatcc-cli target, so we don't use EXCLUDE_FROM_ALL.
+add_subdirectory(build_tools/third_party/flatcc)
 
 if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
-endif()
-
-# TODO(scotttodd): Iterate some more and find a better place for this.
-if(NOT CMAKE_CROSSCOMPILING)
-  install(
-    TARGETS iree-flatcc-cli
-    COMPONENT iree-flatcc-cli
-    RUNTIME DESTINATION bin
-  )
 endif()
 
 if(IREE_BUILD_COMPILER)

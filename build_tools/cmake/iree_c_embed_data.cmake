@@ -70,12 +70,10 @@ function(iree_c_embed_data)
     list(APPEND _ARGS "${_SRC}")
   endforeach(_SRC)
 
-  iree_get_executable_path(_EXE_PATH generate_embed_data)
-
   add_custom_command(
     OUTPUT "${_RULE_H_FILE_OUTPUT}" "${_RULE_C_FILE_OUTPUT}"
-    COMMAND ${_EXE_PATH} ${_ARGS}
-    DEPENDS ${_EXE_PATH} ${_RULE_SRCS} ${_RULE_GENERATED_SRCS}
+    COMMAND generate_embed_data ${_ARGS}
+    DEPENDS generate_embed_data ${_RULE_SRCS} ${_RULE_GENERATED_SRCS}
   )
 
   if(_RULE_TESTONLY)

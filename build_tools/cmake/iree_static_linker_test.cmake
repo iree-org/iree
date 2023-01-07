@@ -52,7 +52,7 @@ function(iree_static_linker_test)
     return()
   endif()
 
-  if(NOT (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT) OR
+  if(NOT (IREE_TARGET_BACKEND_LLVM_CPU OR IREE_HOST_BINARY_ROOT) OR
      NOT IREE_HAL_DRIVER_LOCAL_SYNC)
     return()
   endif()
@@ -66,11 +66,9 @@ function(iree_static_linker_test)
   )
 
   if(_RULE_EMITC AND
-     NOT (IREE_OUTPUT_FORMAT_C OR DEFINED IREE_HOST_BINARY_ROOT))
+     NOT (IREE_OUTPUT_FORMAT_C OR IREE_HOST_BINARY_ROOT))
     return()
   endif()
-
-  iree_get_executable_path(_COMPILER_TOOL "iree-compile")
 
   iree_package_name(_PACKAGE_NAME)
   iree_package_ns(_PACKAGE_NS)
