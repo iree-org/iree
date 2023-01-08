@@ -87,8 +87,8 @@ std::tuple<Value, Value, Value, Value> buildReductionStrategyBlockDistribution(
 /// Return success if the IR matches what the GPU reduction strategy can
 /// handle. If it is success it will append the transform dialect after the
 /// entry point module.
-LogicalResult matchAndSetGPUReductionTransformStrategy(func::FuncOp entryPoint,
-                                                       linalg::LinalgOp op);
+LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
+                                           linalg::LinalgOp op);
 
 }  // namespace gpu
 }  // namespace iree_compiler

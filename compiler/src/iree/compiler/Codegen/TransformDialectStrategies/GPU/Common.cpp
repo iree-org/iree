@@ -275,8 +275,7 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
 /// Return success if the IR matches what the GPU reduction strategy can
 /// handle. If it is success it will append the transform dialect after the
 /// entry point module.
-LogicalResult
-mlir::iree_compiler::gpu::matchAndSetGPUReductionTransformStrategy(
+LogicalResult mlir::iree_compiler::gpu::matchAndSetReductionStrategy(
     func::FuncOp entryPoint, linalg::LinalgOp op) {
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher reduction, fill, leading, trailing;
