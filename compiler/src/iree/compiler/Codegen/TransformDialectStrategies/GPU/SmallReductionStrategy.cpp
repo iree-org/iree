@@ -49,23 +49,6 @@ using iree_compiler::gpu::ReductionConfig;
 using iree_compiler::gpu::scaleUpByBitWidth;
 using iree_compiler::gpu::SmallReductionStrategy;
 
-/// Matches a C++ callback previously registered under `callbackName` and
-/// taking arguments `args`.
-/// Unpacks a number of handles `N` (asserts there are exactly `N` matched
-/// ops but this could be relaxed if needed). Returns the tuple of handles.
-template <int N, typename... MatchingArgs>
-auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
-                                   StringRef callbackName,
-                                   MatchingArgs... args) {
-  SmallVector<Type> matchedTypes(N, pdl::OperationType::get(b.getContext()));
-  auto matchOp = b.create<MatchCallbackOp>(
-      matchedTypes, callbackName, std::forward<decltype(args)>(args)...);
-  assert(matchOp->getNumResults() == N && "Unexpected number of results");
-  std::array<Value, N> a;
-  for (int64_t i = 0; i < N; ++i) a[i] = matchOp->getResult(i);
-  return std::tuple_cat(a);
-}
-
 FailureOr<SmallReductionStrategy>
 mlir::iree_compiler::gpu::SmallReductionStrategy::create(
     MLIRContext *context,

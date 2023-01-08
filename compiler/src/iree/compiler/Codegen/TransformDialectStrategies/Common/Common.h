@@ -14,6 +14,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+//===----------------------------------------------------------------------===//
+// General helpers.
+//===----------------------------------------------------------------------===//
+
 /// Return the greatest value smaller or equal to `val` that is a multiple of
 /// `multiple`. Asserts that all quantities are nonnegative.
 /// I.e. returns `(val / multiple) * multiple`
@@ -130,7 +134,7 @@ buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
 /// func.func.
 Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH);
 
-/// Bufferize and drop HAL decriptor from memref ops.
+/// Bufferize and drop HAL descriptor from memref ops.
 /// Takes a handle variantOp and returns a handle to the same variant op.
 Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH,
                      bool targetGpu = false);
@@ -144,8 +148,8 @@ void createTransformRegion(func::FuncOp entryPoint,
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.
 //===----------------------------------------------------------------------===//
-/// Distribute to blocks using the current IREE lowering config.
-// TODO: consider passing a problem-specific struct to control information.
+/// Distribute the reduction referred to by `reductionH` to blocks using the
+/// current IREE lowering config.
 Value buildReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
     Value reductionH, Value optionalFusionRootH,
