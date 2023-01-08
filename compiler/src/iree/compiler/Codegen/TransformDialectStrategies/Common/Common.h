@@ -14,14 +14,15 @@
 namespace mlir {
 namespace iree_compiler {
 
+class AbstractReductionStrategy;
+
 //===----------------------------------------------------------------------===//
 // General helpers.
 //===----------------------------------------------------------------------===//
 
-/// Return the greatest value smaller or equal to `val` that is a multiple of
-/// `multiple`. Asserts that all quantities are nonnegative.
-/// I.e. returns `(val / multiple) * multiple`
-///        a.k.a `floordiv(val, multiple) * multiple`.
+/// Return the greatest value smaller or equal to `val` that is a multiple
+/// of `multiple`. Asserts that all quantities are nonnegative. I.e. returns
+/// `(val / multiple) * multiple` a.k.a `floordiv(val, multiple) * multiple`.
 int64_t previousMultipleOf(int64_t val, int64_t multiple);
 
 /// Return the smallest value greater or equal to `val` that is a multiple of
@@ -37,6 +38,15 @@ int64_t nextMultipleOf(int64_t val, int64_t multiple);
 // TODO: approximate with a faster implementation based on a few desirable
 // primes.
 FailureOr<int64_t> maxDivisorOfValueBelowLimit(int64_t value, int64_t limit);
+
+using StrategyBuilderFn = std::function<void(ImplicitLocOpBuilder &, Value)>;
+
+/// Use `buildStrategy` to build a ModuleOp containing transform dialect IR,
+/// right after func::FuncOp `entryPoint`.
+/// This embed the transform into the IR and allows applying it either in debug
+/// mode or within the IREE pipeline.
+void createTransformRegion(func::FuncOp entryPoint,
+                           StrategyBuilderFn buildStrategy);
 
 //===----------------------------------------------------------------------===//
 // Low-level reusable builder APIs, these should follow MLIR-style builders.
@@ -114,6 +124,7 @@ buildTileFuseDistToForeachThreadWithTileSizes(ImplicitLocOpBuilder &b,
                                               ValueRange opsHToFuse,
                                               ArrayRef<OpFoldResult> tileSizes,
                                               ArrayAttr threadDimMapping);
+
 TileToForeachThreadAndFuseAndDistributeResult
 buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
@@ -124,6 +135,7 @@ TileToForeachThreadAndFuseAndDistributeResult
 buildTileFuseDistToForeachThreadWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
+
 TileToForeachThreadAndFuseAndDistributeResult
 buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
@@ -139,10 +151,18 @@ Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH);
 Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH,
                      bool targetGpu = false);
 
-using StrategyBuilderFn = std::function<void(ImplicitLocOpBuilder &, Value)>;
-
-void createTransformRegion(func::FuncOp entryPoint,
-                           StrategyBuilderFn buildStrategy);
+/// Uses TileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes to create a
+/// top-level `scf.foreach_thread` tiled by `strategy.workgroupTileSizes`. All
+/// of `maybeLeadingH`, `fillH`, `reductionH` and `maybeTrailingH` are fused
+/// into the top-level `scf.foreach_thread`.
+/// Handles are returned to the fused versions of `maybeLeadingH`, `fillH`,
+/// `reductionH` and `maybeTrailingH` that are all tiled and distributed
+/// accordingly.
+/// The mapping of the `scf.foreach_thread` dimensions is to the first
+/// dimensions of `strategy.allBlockAttrs`.
+std::tuple<Value, Value, Value, Value> buildReductionStrategyBlockDistribution(
+    ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
+    Value maybeTrailingH, const AbstractReductionStrategy &strategy);
 
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor

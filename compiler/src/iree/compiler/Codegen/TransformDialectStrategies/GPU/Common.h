@@ -76,10 +76,6 @@ void build1DSplittingStrategyWithOptionalThreadMapping(
     SmallVector<int64_t> elementwiseSizes, int64_t numThreads,
     int64_t maxVectorSize = 4);
 
-std::tuple<Value, Value, Value, Value> buildReductionStrategyBlockDistribution(
-    ImplicitLocOpBuilder& b, Value maybeLeadingH, Value fillH, Value reductionH,
-    Value maybeTrailingH, const AbstractReductionStrategy& strategy);
-
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.

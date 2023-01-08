@@ -45,13 +45,13 @@ using transform_ext::MatchCallbackOp;
 using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::StructuredOpMatcher;
 
+using iree_compiler::buildReductionStrategyBlockDistribution;
 using iree_compiler::maxDivisorOfValueBelowLimit;
 using iree_compiler::gpu::AbstractReductionStrategy;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
 using iree_compiler::gpu::buildCommonTrailingStrategy;
 using iree_compiler::gpu::buildGpuSmallReductionStrategy;
 using iree_compiler::gpu::buildMapToBlockAndThreads;
-using iree_compiler::gpu::buildReductionStrategyBlockDistribution;
 using iree_compiler::gpu::buildStagedReductionStrategy;
 using iree_compiler::gpu::getSmallReductionConfig;
 using iree_compiler::gpu::kCudaMaxNumThreads;
@@ -157,35 +157,6 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
   }
   b.create<VectorWarpDistributionOp>(funcH);
   return funcH;
-}
-
-std::tuple<Value, Value, Value, Value>
-mlir::iree_compiler::gpu::buildReductionStrategyBlockDistribution(
-    ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
-    Value maybeTrailingH, const AbstractReductionStrategy &strategy) {
-  auto [fusionTargetH, fusionGroupH] =
-      iree_compiler::buildSelectFirstNonEmpty(b, maybeTrailingH, reductionH);
-  ArrayRef<Attribute> allBlocksRef(strategy.allBlockAttrs);
-  iree_compiler::TileToForeachThreadAndFuseAndDistributeResult tileResult =
-      iree_compiler::
-          buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
-              /*builder=*/b,
-              /*rootH=*/fusionTargetH,
-              /*opsToFuseH=*/fusionGroupH,
-              /*tileSizes=*/
-              getAsOpFoldResult(b.getI64ArrayAttr(strategy.workgroupTileSizes)),
-              /*threadDimMapping=*/
-              b.getArrayAttr(allBlocksRef.take_front(
-                  strategy.captures.reductionRank - 1)));
-  fillH = b.create<FuseIntoContainingOp>(fillH, tileResult.foreachThreadH);
-  maybeLeadingH =
-      b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.foreachThreadH);
-
-  auto [gridReductionH, maybeGridTrailingH] =
-      iree_compiler::buildSelectFirstNonEmpty(
-          b, tileResult.resultingFusedOpsHandles.front(), tileResult.tiledOpH);
-  return std::make_tuple(maybeLeadingH, fillH, gridReductionH,
-                         maybeGridTrailingH);
 }
 
 //===----------------------------------------------------------------------===//

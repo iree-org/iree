@@ -18,6 +18,7 @@ iree_compiler_cc_library(
         "Common.cpp",
     ],
     hdrs = [
+        "AbstractReductionStrategy.h",
         "Common.h",
     ],
     deps = [

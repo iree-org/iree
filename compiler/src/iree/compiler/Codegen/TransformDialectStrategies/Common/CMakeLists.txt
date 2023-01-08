@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     TransformDialectStrategies
   HDRS
+    "AbstractReductionStrategy.h"
     "Common.h"
   SRCS
     "Common.cpp"

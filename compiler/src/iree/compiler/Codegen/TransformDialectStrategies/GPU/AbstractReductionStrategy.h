@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_ABSTRACT_REDUCTION_STRATEGY_H_
 
 #include "iree-dialects/Transforms/TransformMatchers.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 namespace mlir {
@@ -27,18 +28,11 @@ struct ReductionConfig {
 };
 
 /// Structure to hold the parameters that control the reduction strategy.
-struct AbstractReductionStrategy {
+struct AbstractReductionStrategy : iree_compiler::AbstractReductionStrategy {
   AbstractReductionStrategy(
       MLIRContext *context,
       const transform_ext::MatchedReductionCaptures &captures)
-      : context(context), captures(captures) {
-    auto blockX =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimX);
-    auto blockY =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimY);
-    auto blockZ =
-        mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimZ);
-    allBlockAttrs = SmallVector<Attribute>{blockX, blockY, blockZ};
+      : iree_compiler::AbstractReductionStrategy(context, captures) {
     auto threadX =
         mlir::gpu::GPUThreadMappingAttr::get(context, mlir::gpu::Threads::DimX);
     auto threadY =
@@ -53,17 +47,8 @@ struct AbstractReductionStrategy {
   virtual bool isProfitable() = 0;
   virtual std::array<int64_t, 3> getNumThreadsInBlock() const = 0;
 
-  /// Constructor quantities.
-  MLIRContext *context;
-  transform_ext::MatchedReductionCaptures captures;
-
   /// Derived quantities.
-  SmallVector<Attribute> allBlockAttrs;
   SmallVector<Attribute> allThreadAttrs;
-
-  /// Tile sizes for the workgroup / determines grid size for all known
-  /// reduction strategies.
-  SmallVector<int64_t> workgroupTileSizes;
 };
 
 }  // namespace gpu
