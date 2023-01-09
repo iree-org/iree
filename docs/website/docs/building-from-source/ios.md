@@ -11,8 +11,9 @@ Cross-compilation for iOS consists of the two steps below.
 
 ### Install Xcode and iOS SDK
 
-For cross-compilation, you need Xcode. It comes with the SDKs for iOS
-devices and the simulator, as well as the `simctl` tool for
+For cross-compilation, you need
+[Xcode](https://developer.apple.com/xcode/). It comes with the SDKs
+for iOS devices and the simulator, as well as the `simctl` tool for
 controlling the simulator from the command line.
 
 ### Host environment setup
