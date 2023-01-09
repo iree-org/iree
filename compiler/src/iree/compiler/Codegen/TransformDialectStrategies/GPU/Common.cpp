@@ -69,7 +69,7 @@ using iree_compiler::gpu::StagedReductionStrategy;
 int64_t mlir::iree_compiler::gpu::scaleUpByBitWidth(int64_t value,
                                                     int64_t bitWidth) {
   assert((bitWidth & bitWidth - 1) == 0 && "bitWidth must be a power of 2");
-  return std::max((value * 32) / bitWidth, 1l);
+  return std::max((value * 32) / bitWidth, int64_t(1));
 }
 
 /// Adjust the number of warps to use to benefit from packing multiple smaller
@@ -83,7 +83,7 @@ int64_t mlir::iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle(
     if (numWarpsToUse % factor == 0) break;
   numWarpsToUse /= factor;
   // Try to scale to using 128b elements in warp shuffles.
-  return std::max(numWarpsToUse / 4, 1l);
+  return std::max(numWarpsToUse / 4, int64_t(1));
 }
 
 /// Compute the (splitPoint, vectorSize) pair to break [0 .. upperBound] into
@@ -107,7 +107,9 @@ static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
                                                      int64_t minMultiple,
                                                      int64_t maxVectorSize) {
   assert((maxVectorSize & (maxVectorSize - 1)) == 0 && "must be a power of 2");
-  if (ShapedType::isDynamic(upperBound)) return std::make_pair(0l, 1l);
+  if (ShapedType::isDynamic(upperBound)) {
+    return std::make_pair(int64_t(0), int64_t(1));
+  }
   for (int64_t vectorSize = maxVectorSize; vectorSize >= 1; vectorSize >>= 1) {
     int64_t splitPoint =
         iree_compiler::previousMultipleOf(upperBound, minMultiple * vectorSize);
@@ -117,7 +119,7 @@ static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
                  : std::make_pair(splitPoint, vectorSize);
     }
   }
-  return std::make_pair(0l, 1l);
+  return std::make_pair(int64_t(0), int64_t(1));
 }
 
 //===----------------------------------------------------------------------===//
