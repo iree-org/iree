@@ -22,15 +22,8 @@ iree_tablegen_library(
 iree_cc_library(
   NAME
     TransformDialectInterpreterPass
-  HDRS
-    "TransformDialectStrategies.h"
-    "TransformDialectStrategiesCPU.h"
-    "TransformDialectStrategiesGPU.h"
   SRCS
     "TransformDialectInterpreterPass.cpp"
-    "TransformDialectStrategies.cpp"
-    "TransformDialectStrategiesCPU.cpp"
-    "TransformDialectStrategiesGPU.cpp"
   DEPS
     IREEDialectsTransforms
     IREELinalgExtDialect
@@ -71,6 +64,7 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::TransformDialectStrategies::Common::TransformDialectStrategies
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
   PUBLIC
@@ -164,7 +158,6 @@ iree_cc_library(
   HDRS
     "GPUPatterns.h"
     "LinalgOpInfo.h"
-    "TransformDialectStrategies.h"
     "UserConfig.h"
   SRCS
     "DecomposeLinalgGeneric.cpp"

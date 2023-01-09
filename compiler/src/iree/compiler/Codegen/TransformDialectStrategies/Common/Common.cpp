@@ -4,18 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/TransformDialectStrategies.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
-#include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-// Needed because we only have gpu::GPUBlockMappingAttr available atm.
-// TODO: IREE should have its own attributes.
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -85,6 +81,29 @@ FailureOr<int64_t> mlir::iree_compiler::maxDivisorOfValueBelowLimit(
   for (int64_t i = std::min(value, limit); i > 1; --i)
     if (value % i == 0) return i;
   return failure();
+}
+
+void mlir::iree_compiler::createTransformRegion(
+    func::FuncOp entryPoint, StrategyBuilderFn buildStrategy) {
+  MLIRContext *ctx = entryPoint.getContext();
+  Location loc = entryPoint.getLoc();
+  OpBuilder b(ctx);
+  b.setInsertionPointAfter(entryPoint);
+  auto topLevelTransformModule = b.create<ModuleOp>(loc);
+  Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
+  b.setInsertionPointToStart(&topLevelTransformRegion.front());
+  auto sequence = b.create<::transform_ext::CanonicalizedSequenceOp>(
+      loc, transform::FailurePropagationMode::Propagate,
+      [&](OpBuilder &b, Location loc, Value variantH) {
+        ImplicitLocOpBuilder ib(loc, b);
+        buildStrategy(ib, variantH);
+        b.create<transform::YieldOp>(loc);
+      });
+  (void)sequence;
+  LLVM_DEBUG(DBGS() << "transformation script:\n");
+  LLVM_DEBUG(DBGS() << "verification: " << sequence.verify().succeeded()
+                    << "\n");
+  LLVM_DEBUG(sequence.print(DBGS()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -314,7 +333,7 @@ static ReductionSplitResult createExpansionBubbleUp(
 
 /// Distribute to blocks using the current IREE lowering config.
 // TODO: consider passing a problem-specific struct to control information.
-Value mlir::iree_compiler::createReductionStrategyBlockDistributionPart(
+Value mlir::iree_compiler::buildReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
     Value reductionH, Value optionalFusionRootH,
     ArrayRef<OpFoldResult> tileSizes0Generic, bool hasLeadingEltwise,
@@ -335,6 +354,7 @@ Value mlir::iree_compiler::createReductionStrategyBlockDistributionPart(
   // number of mapping dims to the number of sizes.
   auto x = mlir::gpu::GPUBlockMappingAttr::get(b.getContext(),
                                                ::mlir::gpu::Blocks::DimX);
+
   // Step 2. First level of tiling + fusion parallelizes to blocks using
   // `tileSizes`. If the fusion root was the reduction op, update it to be
   // the combiner op. Otherwise, fuse the combiner op into root.
@@ -369,25 +389,29 @@ Value mlir::iree_compiler::createReductionStrategyBlockDistributionPart(
   return variantH;
 }
 
-void mlir::iree_compiler::createTransformRegion(
-    func::FuncOp entryPoint, StrategyBuilderFn buildStrategy) {
-  MLIRContext *ctx = entryPoint.getContext();
-  Location loc = entryPoint.getLoc();
-  OpBuilder b(ctx);
-  b.setInsertionPointAfter(entryPoint);
-  auto topLevelTransformModule = b.create<ModuleOp>(loc);
-  Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
-  b.setInsertionPointToStart(&topLevelTransformRegion.front());
-  auto sequence = b.create<::transform_ext::CanonicalizedSequenceOp>(
-      loc, transform::FailurePropagationMode::Propagate,
-      [&](OpBuilder &b, Location loc, Value variantH) {
-        ImplicitLocOpBuilder ib(loc, b);
-        buildStrategy(ib, variantH);
-        b.create<transform::YieldOp>(loc);
-      });
-  (void)sequence;
-  LLVM_DEBUG(DBGS() << "transformation script:\n");
-  LLVM_DEBUG(DBGS() << "verification: " << sequence.verify().succeeded()
-                    << "\n");
-  LLVM_DEBUG(sequence.print(DBGS()));
+std::tuple<Value, Value, Value, Value>
+mlir::iree_compiler::buildReductionStrategyBlockDistribution(
+    ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
+    Value maybeTrailingH, const AbstractReductionStrategy &strategy) {
+  auto [fusionTargetH, fusionGroupH] =
+      buildSelectFirstNonEmpty(b, maybeTrailingH, reductionH);
+  ArrayRef<Attribute> allBlocksRef(strategy.allBlockAttrs);
+  TileToForeachThreadAndFuseAndDistributeResult tileResult =
+      buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
+          /*builder=*/b,
+          /*rootH=*/fusionTargetH,
+          /*opsToFuseH=*/fusionGroupH,
+          /*tileSizes=*/
+          getAsOpFoldResult(b.getI64ArrayAttr(strategy.workgroupTileSizes)),
+          /*threadDimMapping=*/
+          b.getArrayAttr(
+              allBlocksRef.take_front(strategy.captures.reductionRank - 1)));
+  fillH = b.create<FuseIntoContainingOp>(fillH, tileResult.foreachThreadH);
+  maybeLeadingH =
+      b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.foreachThreadH);
+
+  auto [gridReductionH, maybeGridTrailingH] = buildSelectFirstNonEmpty(
+      b, tileResult.resultingFusedOpsHandles.front(), tileResult.tiledOpH);
+  return std::make_tuple(maybeLeadingH, fillH, gridReductionH,
+                         maybeGridTrailingH);
 }
