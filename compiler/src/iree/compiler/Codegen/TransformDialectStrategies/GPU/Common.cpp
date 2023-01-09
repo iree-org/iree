@@ -69,7 +69,7 @@ using iree_compiler::gpu::StagedReductionStrategy;
 int64_t mlir::iree_compiler::gpu::scaleUpByBitWidth(int64_t value,
                                                     int64_t bitWidth) {
   assert((bitWidth & bitWidth - 1) == 0 && "bitWidth must be a power of 2");
-  return std::max((value * 32) / bitWidth, 1l);
+  return std::max((value * 32) / bitWidth, 1ll);
 }
 
 /// Adjust the number of warps to use to benefit from packing multiple smaller
@@ -83,7 +83,7 @@ int64_t mlir::iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle(
     if (numWarpsToUse % factor == 0) break;
   numWarpsToUse /= factor;
   // Try to scale to using 128b elements in warp shuffles.
-  return std::max(numWarpsToUse / 4, 1l);
+  return std::max(numWarpsToUse / 4, 1ll);
 }
 
 /// Compute the (splitPoint, vectorSize) pair to break [0 .. upperBound] into
@@ -117,7 +117,7 @@ static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
                  : std::make_pair(splitPoint, vectorSize);
     }
   }
-  return std::make_pair(0l, 1l);
+  return std::make_pair(0ll, 1ll);
 }
 
 //===----------------------------------------------------------------------===//
