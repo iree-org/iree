@@ -173,6 +173,9 @@ jobs:
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
         with:
           submodules: false
+      # Update submodules directly using our preferred options. Fetching git
+      # history and source files for large dependencies is particularly slow on
+      # Windows, so we'd rather not rely on the 'checkout' action for this.
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
       - name: "Setting up Python"
