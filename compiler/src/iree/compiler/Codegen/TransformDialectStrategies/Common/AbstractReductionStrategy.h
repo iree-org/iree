@@ -21,6 +21,8 @@ struct AbstractReductionStrategy {
       MLIRContext *context,
       const transform_ext::MatchedReductionCaptures &captures)
       : context(context), captures(captures) {
+    // Needed until IREE builds its own gpu::GPUBlockMappingAttr / gpu::Blocks
+    // attributes that are reusable across all targets.
     auto blockX =
         mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimX);
     auto blockY =
