@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/TransformDialectStrategiesCPU.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/CPU/Common.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
-#include "iree/compiler/Codegen/Common/TransformDialectStrategies.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -82,7 +82,7 @@ static void createReductionCpuStrategy(ImplicitLocOpBuilder &b, Value variantH,
       b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
 
   // Step 1: Distribute to blocks using the current IREE lowering config.
-  variantH = iree_compiler::createReductionStrategyBlockDistributionPart(
+  variantH = iree_compiler::buildReductionStrategyBlockDistributionPart(
       b, variantH, originalFillH, originalGenericH, Value(),
       getAsOpFoldResult(b.getI64ArrayAttr(info.tileSizes)));
 
@@ -101,7 +101,7 @@ static void createReductionCpuStrategy(ImplicitLocOpBuilder &b, Value variantH,
   funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
 }
 
-LogicalResult iree_compiler::matchAndSetCPUReductionTransformStrategy(
+LogicalResult iree_compiler::cpu::matchAndSetReductionStrategy(
     func::FuncOp entryPoint, linalg::LinalgOp op) {
   // 1. Match
   CPUReductionStrategyInfos infos;

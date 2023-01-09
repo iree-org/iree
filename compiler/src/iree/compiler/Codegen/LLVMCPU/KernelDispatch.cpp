@@ -10,9 +10,9 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
-#include "iree/compiler/Codegen/Common/TransformDialectStrategiesCPU.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/CPU/Common.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -1227,7 +1227,7 @@ static LogicalResult setTransformStrategyRootConfig(
   if (getLoweringConfig(genericOp)) {
     return success();
   }
-  if (failed(matchAndSetCPUReductionTransformStrategy(entryPointFn, genericOp)))
+  if (failed(cpu::matchAndSetReductionStrategy(entryPointFn, genericOp)))
     return success();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn->getContext(),

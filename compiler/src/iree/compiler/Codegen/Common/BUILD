@@ -45,14 +45,6 @@ iree_compiler_cc_library(
     name = "TransformDialectInterpreterPass",
     srcs = [
         "TransformDialectInterpreterPass.cpp",
-        "TransformDialectStrategies.cpp",
-        "TransformDialectStrategiesCPU.cpp",
-        "TransformDialectStrategiesGPU.cpp",
-    ],
-    hdrs = [
-        "TransformDialectStrategies.h",
-        "TransformDialectStrategiesCPU.h",
-        "TransformDialectStrategiesGPU.h",
     ],
     deps = [
         # Dialects
@@ -96,7 +88,9 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:DialectUtils",
-        # TransformExtensions
+        # TransformDialectStrategies
+        "//compiler/src/iree/compiler/Codegen/TransformDialectStrategies/Common:TransformDialectStrategies",
+        # TransformExtensions (needed for registration in the pass)
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
         "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
@@ -216,7 +210,6 @@ iree_compiler_cc_library(
     hdrs = [
         "GPUPatterns.h",
         "LinalgOpInfo.h",
-        "TransformDialectStrategies.h",
         "UserConfig.h",
     ],
     deps = [
