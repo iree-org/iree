@@ -198,7 +198,7 @@ function(iree_cc_binary)
   if (APPLE_BUNDLE)
     set_target_properties(${_NAME} PROPERTIES
       MACOSX_BUNDLE_BUNDLE_NAME "${_RULE_NAME}"
-      MACOSX_BUNDLE_GUI_IDENTIFIER "com.google.iree.${_RULE_NAME}"
+      MACOSX_BUNDLE_GUI_IDENTIFIER "dev.iree.${_RULE_NAME}"
       MACOSX_BUNDLE_COPYRIGHT "Copyright © 2023 The IREE Authors"
       # These are just placeholder version numbers until we define proper
       # version scheme and support.

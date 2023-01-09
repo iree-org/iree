@@ -9,7 +9,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           android:versionCode="1"
           android:versionName="1.0"
-          package="com.google.iree.run_module">
+          package="dev.iree.run_module">
   <!-- Vulkan 1.1 is introduced in Android 9 (API level 28) so we can support
        that as a minimum. -->
   <uses-sdk android:minSdkVersion="28"

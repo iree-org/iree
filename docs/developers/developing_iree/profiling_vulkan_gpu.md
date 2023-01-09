@@ -100,7 +100,7 @@ how to use it. In general the steps are:
 
 * Install the latest AGI from https://github.com/google/agi/releases and launch.
 * Fill in the "Application" field by searching the app. The line should read
-  like `android.intent.action.MAIN:com.google.iree.run_module/android.app.NativeActivity`.
+  like `android.intent.action.MAIN:dev.iree.run_module/android.app.NativeActivity`.
 * Select start at beginning and choose a proper duration.
 * Configure system profile to include all GPU counters.
 * Start capture.
