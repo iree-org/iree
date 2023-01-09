@@ -35,6 +35,14 @@ class Linux_x86_64_Benchmarks(object):
           "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
           "--iree-llvmcpu-enable-pad-consumer-fusion"
       ])
+  CASCADELAKE_AGGRESSIVE_FUSION_COMPILE_CONFIG = iree_definitions.CompileConfig(
+      id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_AGGRESSIVE_FUSION,
+      tags=["experimental-flags", "aggressive-fusion"],
+      compile_targets=[CASCADELAKE_CPU_TARGET],
+      extra_flags=[
+          "--iree-flow-enable-aggressive-fusion",
+          "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
+      ])
 
   def generate(
       self
@@ -45,6 +53,12 @@ class Linux_x86_64_Benchmarks(object):
     gen_configs = [
         iree_definitions.ModuleGenerationConfig(
             compile_config=self.CASCADELAKE_COMPILE_CONFIG,
+            imported_model=iree_definitions.ImportedModel.from_model(model))
+        for model in model_groups.SMALL + model_groups.LARGE
+    ]
+    gen_configs += [
+        iree_definitions.ModuleGenerationConfig(
+            compile_config=self.CASCADELAKE_AGGRESSIVE_FUSION_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in model_groups.SMALL + model_groups.LARGE
     ]
