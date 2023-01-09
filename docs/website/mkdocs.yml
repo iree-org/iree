@@ -112,6 +112,7 @@ nav:
       - "building-from-source/python-bindings-and-importers.md"
       - "building-from-source/android.md"
       - "building-from-source/riscv.md"
+      - "building-from-source/ios.md"
   - "Bindings":
       - "bindings/index.md"
       - C API: "bindings/c-api.md"

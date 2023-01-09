@@ -1,4 +1,4 @@
-# Cross-compilation for iOS
+# iOS cross-compilation
 
 Cross-compilation for iOS consists of the two steps below.
 
@@ -49,7 +49,8 @@ cmake -S . -B ../build-ios-sim -GNinja \
   -DCMAKE_IOS_INSTALL_COMBINED=YES \
   -DIREE_HOST_BINARY_ROOT=$PWD/../iree-build/install \
   -DCMAKE_INSTALL_PREFIX=../build-ios-sim/install \
-  -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=OFF -DIREE_BUILD_SAMPLES=OFF
+  -DIREE_BUILD_COMPILER=OFF \
+  -DIREE_BUILD_TESTS=OFF -DIREE_BUILD_SAMPLES=OFF
 
 cmake --build ../build-ios-sim --config Release --target install
 ```
@@ -72,8 +73,19 @@ Run the IREE compiler on the host to generate a module.
   -o /tmp/simple_abs_vmvx.vmfb
 ```
 
-Copy the vmfb file that was generated into the `iree-run-module` iOS
-app bundle.
+We could test the generated module by running the macOS version of
+`iree-run-module` on the host.
+
+```shell
+../iree-build/install/bin/iree-run-module \
+  --module_file=/tmp/simple_abs_vmvx.vmfb \
+  --device=local-task \
+  --entry_function=abs \
+  --function_input="f32=-5"
+```
+
+To run it on the iOS simulator, we need to copy the vmfb file into the
+`iree-run-module` iOS app bundle.
 
 ```
 cp /tmp/simple_abs_vmvx.vmfb \
@@ -86,7 +98,7 @@ Open the iOS Simulator Manager on the host.
 open -a Simulator
 ```
 
-After createing and booting a simulator in this app, you can list it
+After creating and booting a simulator in this app, you can list it
 from the command-line.
 
 ```shell
@@ -96,11 +108,11 @@ xcrun simctl list devices | grep Booted
 This is what should come out of the command:
 
 ```
-    iPhone 14 Pro (50831FFA-58C6-4575-B410-5F4FD7A2DFAA) (Booted)
+    iPhone 14 Pro (12341234-ABCD-ABCD-ABCD-123412341234) (Booted)
 ```
 
 where `iPhone 14 Pro` is the device being simulated and
-`50831FFA-58C6-4575-B410-5F4FD7A2DFAA` is the simulator's _unique
+`12341234-ABCD-ABCD-ABCD-123412341234` is the simulator's _unique
 device ID_ (UDID).
 
 Install the app `iree-run-module` on the simulator, given its UDID.
@@ -113,18 +125,23 @@ Check the path to the installed bundle, where the
 `simple_abs_vmvx.vmfb` module should be found.
 
 ```shell
-ls $(xcrun simctl get_app_container <UDID> dev.iree.runmodule)
+ls $(xcrun simctl get_app_container <UDID> dev.iree.iree-run-module)
 ```
+
+The string `dev.iree.iree-run-module` is the _bundle identifier_ of
+the iOS app.  The CMake building process generates it and saves it in
+the _property list_ (plist) file
+`../build-ios-sim/install/bin/iree-run-module.app/Info.plist`.
 
 Launch the `iree-run-module` app on the simulator to run the IREE
 module `simple_abs_vmvx.vmfb`.
 
 ```shell
 xcrun simctl launch --console \
-  50831FFA-58C6-4575-B410-5F4FD7A2DFAA \
+  <UDID> \
   dev.iree.runmodule \
   --device=local-task \
   --entry_function=abs \
   --function_input="f32=-5" \
-  --module_file=$(xcrun simctl get_app_container 50831FFA-58C6-4575-B410-5F4FD7A2DFAA dev.iree.runmodule)/simple_abs_vmvx.vmfb
+  --module_file=$(xcrun simctl get_app_container <UDID> dev.iree.iree-run-module)/simple_abs_vmvx.vmfb
 ```
