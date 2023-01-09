@@ -74,6 +74,8 @@ jobs:
       needs.setup.outputs.should-run == 'true' &&
       needs.check_benchmark_job.outputs.job-conclusion == 'success'
     runs-on: ubuntu-20.04
+    permissions:
+      issues: write
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -92,9 +94,9 @@ jobs:
         # TODO(#11076): Temporarily disabled until we migrate the database.
         if: false
         env:
-          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIST_BOT_TOKEN: ${{ secrets.GIST_BOT_TOKEN }}
-          COMMENT_BOT_USER: github-actions[bot]
+          COMMENT_BOT_USER: iree-github-actions-bot
           # Get PR number from the event instead of the untrusted comment
           # artifact, to make sure we won't incorrectly update other PRs.
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
