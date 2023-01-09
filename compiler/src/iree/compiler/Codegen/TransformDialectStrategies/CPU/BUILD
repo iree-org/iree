@@ -16,9 +16,11 @@ iree_compiler_cc_library(
     name = "TransformDialectStrategies",
     srcs = [
         "Common.cpp",
+        "ReductionStrategy.cpp",
     ],
     hdrs = [
         "Common.h",
+        "ReductionStrategy.h",
     ],
     deps = [
         # Dialects
@@ -68,6 +70,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
         "@llvm-project//mlir:LinalgTransformOps",
+        "@llvm-project//mlir:VectorTransformOps",
         # TransformMatchers and other stuff
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
     ],

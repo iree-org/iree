@@ -1223,12 +1223,10 @@ static LogicalResult setTransformStrategyRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  if (!clCPUEnableTransformDialectJit) return success();
-  if (getLoweringConfig(genericOp)) {
-    return success();
-  }
+  if (!clCPUEnableTransformDialectJit) return failure();
+  if (getLoweringConfig(genericOp)) return failure();
   if (failed(cpu::matchAndSetReductionStrategy(entryPointFn, genericOp)))
-    return success();
+    return failure();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn->getContext(),
       IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
@@ -1387,9 +1385,11 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  if (failed(setTransformStrategyRootConfig(entryPointFn, genericOp,
-                                            linalgOpInfo, targetMLTransInfo)) ||
-      failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp, linalgOpInfo,
+  // First, try to apply the transform dialect strategy, if defined.
+  if (succeeded(setTransformStrategyRootConfig(
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo)))
+    return success();
+  if (failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp, linalgOpInfo,
                                           targetMLTransInfo)) ||
       failed(setElementwiseGenericOpRootConfig(
           entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo)) ||
@@ -1809,12 +1809,10 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     if (!exportOp) continue;
     if (getTranslationInfo(exportOp)) continue;
 
-    // If using the transform dialect, call the proper pipeline.
-    assert((clCPUCodegenTransformDialectFileName.empty() ||
-            !clCPUEnableTransformDialectJit) &&
-           "Can't use both transform dialect interpreted and jitted modes");
-    if (!clCPUCodegenTransformDialectFileName.empty() ||
-        clCPUEnableTransformDialectJit) {
+    // If using the transform dialect with a script file, intercept early.
+    if (!clCPUCodegenTransformDialectFileName.empty()) {
+      assert(!clCPUEnableTransformDialectJit &&
+             "Can't use both transform dialect interpreted and jitted modes");
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(),
           IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
@@ -1834,7 +1832,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     }
   }
 
-  // The root confguration setting introduces `tensor.dim` operations. Resolve
+  // The root configuration setting introduces `tensor.dim` operations. Resolve
   // those away.
   RewritePatternSet patterns(moduleOp.getContext());
   memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);

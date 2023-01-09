@@ -14,9 +14,13 @@
 namespace mlir {
 namespace iree_compiler {
 namespace cpu {
-/// Return success if the IR matches what the GPU reduction strategy can handle.
-/// If it is success it will append the transform dialect after the entry point
-/// module.
+
+std::pair<Value, Value> buildCommonTrailingStrategy(ImplicitLocOpBuilder &b,
+                                                    Value variantH);
+
+/// Return success if the IR matches what the GPU reduction strategy can
+/// handle. If it is success it will append the transform dialect after the
+/// entry point module.
 LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
                                            linalg::LinalgOp op);
 }  // namespace cpu
