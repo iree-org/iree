@@ -1569,6 +1569,22 @@ void ChannelRankOp::getAsmResultNames(
   setNameFn(getResult(), "channel_rank");
 }
 
+//===----------------------------------------------------------------------===//
+// flow.allreduce
+//===----------------------------------------------------------------------===//
+Value AllReduceOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
+}
+
+::llvm::Optional<unsigned> AllReduceOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // target
+}
+
+SmallVector<int64_t, 4> AllReduceOp::getTiedResultOperandIndices() {
+  return {0};  // target
+}
+
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

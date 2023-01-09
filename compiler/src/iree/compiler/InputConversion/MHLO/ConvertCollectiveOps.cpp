@@ -41,6 +41,68 @@ namespace MHLO {
 // mode combinations for cross-replica and cross partition communication. See
 // the stablehlo specification for more details about the different modes.
 
+namespace {
+
+static std::optional<IREE::Flow::CollectiveElementType>
+convertToFlowCollectiveElementType(Type type) {
+  if (type.isF32()) return IREE::Flow::CollectiveElementType::Float32;
+
+  if (type.isInteger(32)) {
+    if (type.isSignedInteger())
+      return IREE::Flow::CollectiveElementType::Sint32;
+    else
+      return IREE::Flow::CollectiveElementType::Uint32;
+  }
+
+  if (type.isF16()) return IREE::Flow::CollectiveElementType::Float16;
+
+  if (type.isInteger(8)) {
+    if (type.isSignedInteger())
+      return IREE::Flow::CollectiveElementType::Sint8;
+    else
+      return IREE::Flow::CollectiveElementType::Uint8;
+  }
+
+  if (type.isInteger(16)) {
+    if (type.isSignedInteger())
+      return IREE::Flow::CollectiveElementType::Sint16;
+    else
+      return IREE::Flow::CollectiveElementType::Uint16;
+  }
+
+  if (type.isBF16()) return IREE::Flow::CollectiveElementType::BFloat16;
+
+  if (type.isF64()) return IREE::Flow::CollectiveElementType::Float64;
+
+  if (type.isInteger(64)) {
+    if (type.isSignedInteger())
+      return IREE::Flow::CollectiveElementType::Sint64;
+    else
+      return IREE::Flow::CollectiveElementType::Uint64;
+  }
+
+  return std::nullopt;
+}
+
+static std::optional<IREE::Flow::CollectiveReductionOp>
+convertToFlowCollectiveReductionOp(const Operation &op) {
+  if (isa<mhlo::AddOp>(op)) {
+    return IREE::Flow::CollectiveReductionOp::ReductionSum;
+  } else if (isa<mhlo::MulOp>(op)) {
+    return IREE::Flow::CollectiveReductionOp::ReductionProduct;
+  } else if (isa<mhlo::MinOp>(op)) {
+    return IREE::Flow::CollectiveReductionOp::ReductionMinimum;
+  } else if (isa<mhlo::MaxOp>(op)) {
+    return IREE::Flow::CollectiveReductionOp::ReductionMaximum;
+  } else {
+    // TODO: we may be able to detect an average operation and convert it
+    // into IREE::Flow::CollectiveReductionOp::ReductionAverage.
+    return std::nullopt;
+  }
+}
+
+}  // namespace
+
 /// Converts mhlo.replica_id to flow.channel.default + flow.channel.rank.
 /// TODO: this assumes that there is no partition so that there is a 1:1 mapping
 /// between the replica ID and the process ID.
@@ -65,11 +127,88 @@ struct ReplicaIdOpConversion : public OpConversionPattern<mhlo::ReplicaIdOp> {
   }
 };
 
+struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
+  using OpConversionPattern<mhlo::AllReduceOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::AllReduceOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+
+    if (!op.getUseGlobalDeviceIds())
+      return rewriter.notifyMatchFailure(op, "must use global device IDs");
+
+    // Check there is only one group in the replica_groups
+    ShapedType replicaGroupType = op.getReplicaGroups().getType();
+    if (replicaGroupType.getRank() != 2 ||
+        replicaGroupType.getDimSize(0) != 1) {
+      return rewriter.notifyMatchFailure(op,
+                                         "must have a single replica group");
+    }
+
+    // Only single elementwise op is supported.
+    Block &block = op.getComputation().front();
+
+    if (block.empty() || llvm::hasSingleElement(block) ||
+        std::next(block.begin(), 2) != block.end())
+      return rewriter.notifyMatchFailure(op, "must have two ops in the block");
+
+    if (block.getNumArguments() != 2)
+      return rewriter.notifyMatchFailure(op, "must have two block args");
+
+    Operation &op1 = block.front();
+    Operation &op2 = *(++block.begin());
+
+    if (op1.getNumResults() != 1 ||
+        !op1.hasTrait<::mlir::OpTrait::Elementwise>())
+      return rewriter.notifyMatchFailure(op, "must have elementwise trait");
+
+    // Convert mhlo reduction op into flow reduction op.
+    std::optional<IREE::Flow::CollectiveReductionOp> redOp =
+        convertToFlowCollectiveReductionOp(op1);
+    if (!redOp)
+      return rewriter.notifyMatchFailure(op, "unsupported operation.");
+
+    if (!op2.mightHaveTrait<OpTrait::IsTerminator>())
+      return rewriter.notifyMatchFailure(op,
+                                         "the second op must be a terminator");
+
+    // Currently only the default channel is used.
+
+    // Create a default channel.
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
+
+    // Convert mhlo reduction op into flow reduction op
+    auto reductionOpAttr =
+        IREE::Flow::CollectiveReductionOpAttr::get(op.getContext(), *redOp);
+
+    // Create an empty tensor for the result
+    auto inputType = op.getOperand().getType().cast<RankedTensorType>();
+    ArrayRef<int64_t> inputShape = inputType.getShape();
+    auto inputElemType = inputType.getElementType();
+    // Get the element type
+    std::optional<IREE::Flow::CollectiveElementType> elemType =
+        convertToFlowCollectiveElementType(inputElemType);
+    if (!elemType)
+      return rewriter.notifyMatchFailure(op, "unsupported input type");
+    auto elementTypeAttr =
+        IREE::Flow::CollectiveElementTypeAttr::get(op.getContext(), *elemType);
+    Value target = rewriter.create<tensor::EmptyOp>(loc, inputShape,
+                                                    inputType.getElementType());
+    auto allReduceOp = rewriter.create<IREE::Flow::AllReduceOp>(
+        op.getLoc(), reductionOpAttr, elementTypeAttr, target, op.getOperand(),
+        channel);
+    rewriter.replaceOp(op, allReduceOp.getResult());
+    return success();
+  }
+};
+
 void populateMHLOCollectiveOpsConversionPatterns(MLIRContext *context,
                                                  TypeConverter &typeConverter,
                                                  RewritePatternSet &patterns) {
   // Convert mhlo.replica_id
   patterns.insert<ReplicaIdOpConversion>(typeConverter, context);
+  patterns.insert<AllReduceOpConversion>(typeConverter, context);
 }
 
 }  // namespace MHLO

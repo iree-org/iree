@@ -157,6 +157,40 @@ def FLOW_Dummy1 : AttrDef<Flow_Dialect, "Dummy", []> {
 }
 
 //===----------------------------------------------------------------------===//
+// Flow enums
+//===----------------------------------------------------------------------===//
+
+def FLOW_CollectiveElementType_Sint8 : I32EnumAttrCase<"Sint8", 0, "si8">;
+def FLOW_CollectiveElementType_Uint8 : I32EnumAttrCase<"Uint8", 1, "ui8">;
+def FLOW_CollectiveElementType_Sint16 : I32EnumAttrCase<"Sint16", 2, "si16">;
+def FLOW_CollectiveElementType_Uint16 : I32EnumAttrCase<"Uint16", 3, "ui16">;
+def FLOW_CollectiveElementType_Sint32 : I32EnumAttrCase<"Sint32", 4, "si32">;
+def FLOW_CollectiveElementType_Uint32 : I32EnumAttrCase<"Uint32", 5, "ui32">;
+def FLOW_CollectiveElementType_Sint64 : I32EnumAttrCase<"Sint64", 6, "si64">;
+def FLOW_CollectiveElementType_Uint64 : I32EnumAttrCase<"Uint64", 7, "ui64">;
+def FLOW_CollectiveElementType_Float16 : I32EnumAttrCase<"Float16", 8, "f16">;
+def FLOW_CollectiveElementType_Float32 : I32EnumAttrCase<"Float32", 9, "f32">;
+def FLOW_CollectiveElementType_Float64 : I32EnumAttrCase<"Float64", 10, "f64">;
+def FLOW_CollectiveElementType_BFloat16 : I32EnumAttrCase<"BFloat16", 11, "bf16">;
+def FLOW_CollectiveElementTypeAttr :
+    I32EnumAttr<"CollectiveElementType", "valid CollectiveElementType", [
+      FLOW_CollectiveElementType_Sint8,
+      FLOW_CollectiveElementType_Uint8,
+      FLOW_CollectiveElementType_Sint16,
+      FLOW_CollectiveElementType_Uint16,
+      FLOW_CollectiveElementType_Sint32,
+      FLOW_CollectiveElementType_Uint32,
+      FLOW_CollectiveElementType_Sint64,
+      FLOW_CollectiveElementType_Uint64,
+      FLOW_CollectiveElementType_Float16,
+      FLOW_CollectiveElementType_Float32,
+      FLOW_CollectiveElementType_Float64,
+      FLOW_CollectiveElementType_BFloat16,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Flow";
+}
+
+//===----------------------------------------------------------------------===//
 // Flow channel type
 //===----------------------------------------------------------------------===//
 
@@ -173,6 +207,28 @@ def FLOW_Channel : TypeDef<Flow_Dialect, "Channel", []> {
     to reference it. In programs that model SPMD behavior internally channels
     can be created or provided by hosting applications.
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// Flow collective reduction op
+//===----------------------------------------------------------------------===//
+
+def FLOW_CollectiveReductionOp_None             : I32EnumAttrCase<"None", 0, "none">;
+def FLOW_CollectiveReductionOp_ReductionSum     : I32EnumAttrCase<"ReductionSum", 1, "sum">;
+def FLOW_CollectiveReductionOp_ReductionProduct : I32EnumAttrCase<"ReductionProduct", 2, "product">;
+def FLOW_CollectiveReductionOp_ReductionMinimum : I32EnumAttrCase<"ReductionMinimum", 3, "minimum">;
+def FLOW_CollectiveReductionOp_ReductionMaximum : I32EnumAttrCase<"ReductionMaximum", 4, "maximum">;
+def FLOW_CollectiveReductionOp_ReductionAverage : I32EnumAttrCase<"ReductionAverage", 5, "average">;
+def FLOW_CollectiveReductionOpAttr :
+    I32EnumAttr<"CollectiveReductionOp", "valid CollectiveReductionOp", [
+      FLOW_CollectiveReductionOp_None,
+      FLOW_CollectiveReductionOp_ReductionSum,
+      FLOW_CollectiveReductionOp_ReductionProduct,
+      FLOW_CollectiveReductionOp_ReductionMinimum,
+      FLOW_CollectiveReductionOp_ReductionMaximum,
+      FLOW_CollectiveReductionOp_ReductionAverage,
+    ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::Flow";
 }
 
 #endif  // IREE_DIALECT_FLOW_BASE

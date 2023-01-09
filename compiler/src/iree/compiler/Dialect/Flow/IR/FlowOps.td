@@ -1369,4 +1369,25 @@ def FLOW_ChannelCountOp : FLOW_Op<"channel.count", [
   }];
 }
 
+def FLOW_AllReduceOp : FLOW_Op<"allreduce", [
+  AllTypesMatch<["source", "target", "result"]>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let arguments = (ins
+    FLOW_CollectiveReductionOpAttr:$reduction_op,
+    FLOW_CollectiveElementTypeAttr:$element_type,
+    AnyTypeOf<[AnyTensor, AnyMemRef]>:$target,
+    AnyTypeOf<[AnyTensor, AnyMemRef]>:$source,
+    FLOW_Channel:$channel
+  );
+  let results = (outs
+    AnyTypeOf<[AnyTensor, AnyMemRef]>:$result
+  );
+  let assemblyFormat = "$reduction_op `,` $element_type `,` operands attr-dict `:` functional-type(operands, results)";
+}
+
 #endif  // IREE_DIALECT_FLOW_OPS
