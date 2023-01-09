@@ -354,17 +354,17 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
       %4 = tensor.empty() : tensor<8xi8>
       %5 = linalg.fill ins(%cst : i8) outs(%4 : tensor<8xi8>) -> tensor<8xi8>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], 
-                           iterator_types = ["parallel", "reduction"]} 
+                          iterator_types = ["parallel", "reduction"]} 
         ins(%2 : tensor<8x12345xi8>)
-       outs(%5 : tensor<8xi8>) {
+      outs(%5 : tensor<8xi8>) {
       ^bb0(%in: i8, %out: i8):
         %6 = arith.addi %in, %out : i8
         linalg.yield %6 : i8
       } -> tensor<8xi8>
       %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], 
-                           iterator_types = ["parallel", "parallel"]}
+                          iterator_types = ["parallel", "parallel"]}
         ins(%2, %6 : tensor<8x12345xi8>, tensor<8xi8>)
-       outs(%3 : tensor<8x12345xi8>) {
+      outs(%3 : tensor<8x12345xi8>) {
       ^bb0(%in: i8, %in_0: i8, %out: i8):
         %8 = arith.divui %in, %in_0 : i8
         linalg.yield %8 : i8
