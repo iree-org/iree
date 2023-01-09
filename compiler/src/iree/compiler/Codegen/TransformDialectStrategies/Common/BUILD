@@ -65,5 +65,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:DialectUtils",
         # TransformExtensions
         "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
+        # TransformMatchers and other stuff
+        "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
     ],
 )

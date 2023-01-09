@@ -19,6 +19,7 @@ iree_cc_library(
   SRCS
     "Common.cpp"
   DEPS
+    IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
