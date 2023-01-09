@@ -147,7 +147,7 @@ static SmallVector<int64_t> getVectorSizes(
     return {};
   }
 
-  // TODO: Not easy to infer the tiles sizes for an op that is not the root op.
+  // TODO: Infer the tiles sizes for an op that is not the root op.
   if (*rootOp != linalgOp.getOperation()) {
     return {};
   }
