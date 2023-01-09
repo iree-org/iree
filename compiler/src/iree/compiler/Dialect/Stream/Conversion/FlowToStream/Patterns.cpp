@@ -482,6 +482,47 @@ struct ConvertReturnOp : public OpConversionPattern<IREE::Flow::ReturnOp> {
   }
 };
 
+//-------------------------------------------
+// Collective Ops
+//-------------------------------------------
+
+struct ConvertChannelDefaultOp
+    : public OpConversionPattern<IREE::Flow::ChannelDefaultOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::ChannelDefaultOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    IREE::Stream::AffinityAttr affinityAttr;
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelDefaultOp>(op,
+                                                                affinityAttr);
+    return success();
+  }
+};
+
+struct ConvertChannelCountOp
+    : public OpConversionPattern<IREE::Flow::ChannelCountOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::ChannelCountOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelCountOp>(
+        op, adaptor.getOperands());
+    return success();
+  }
+};
+
+struct ConvertChannelRankOp
+    : public OpConversionPattern<IREE::Flow::ChannelRankOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::ChannelRankOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelRankOp>(
+        op, adaptor.getOperands());
+    return success();
+  }
+};
+
 }  // namespace
 
 void populateFlowToStreamConversionPatterns(MLIRContext *context,
@@ -495,6 +536,8 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
   patterns.insert<ConvertDispatchOp>(typeConverter, context);
   patterns.insert<ConvertExecutableOp>(typeConverter, context);
   patterns.insert<ConvertReturnOp>(typeConverter, context);
+  patterns.insert<ConvertChannelDefaultOp, ConvertChannelCountOp,
+                  ConvertChannelRankOp>(typeConverter, context);
 }
 
 void populateFlowToStreamConversionPatterns(MLIRContext *context,
