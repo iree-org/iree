@@ -121,6 +121,7 @@ iree_compiler_cc_library(
         "FuseTensorPadWithConsumer.cpp",
         "IREEComprehensiveBufferizePass.cpp",
         "MaterializeEncodingPass.cpp",
+        "MergeParallelOps.cpp",
         "OptimizeVectorTransferPass.cpp",
         "PolynomialApproximationPass.cpp",
         "SplitFullPartialTransferPass.cpp",

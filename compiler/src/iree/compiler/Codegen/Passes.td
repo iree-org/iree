@@ -310,6 +310,12 @@ def EraseHALDescriptorTypeFromMemRef :
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
 }
 
+def MergeParallelOps :
+    Pass<"iree-codegen-merge-parallel-ops", "func::FuncOp"> {
+  let summary = "Pass to merge parallel ops to avoid creating temporary allocs.";
+  let constructor = "mlir::iree_compiler::createMergeParallelOpsPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -481,12 +487,6 @@ def LLVMGPUTensorPad :
     Pass<"iree-llvmgpu-tensor-pad", "func::FuncOp"> {
   let summary = "Pass to pad out tensors up to static dimensions.";
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorPadPass()";
-}
-
-def LLVMGPUMergeParallelOps :
-    Pass<"iree-llvmgpu-merge-parallel-ops", "func::FuncOp"> {
-  let summary = "Pass to merge parallel ops to avoid creating temporary allocs.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUMergeParallelOpsPass()";
 }
 
 //------------------------------------------------------------------------------

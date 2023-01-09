@@ -4,17 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-llvmgpu-merge-parallel-ops"
+#define DEBUG_TYPE "iree-codegen-merge-parallel-ops"
 
 namespace mlir {
 namespace iree_compiler {
@@ -48,8 +45,8 @@ struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-struct LLVMGPUMergeParallelOpsPass
-    : public LLVMGPUMergeParallelOpsBase<LLVMGPUMergeParallelOpsPass> {
+struct MergeParallelOpsPass
+    : public MergeParallelOpsBase<MergeParallelOpsPass> {
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     RewritePatternSet fusionPatterns(funcOp.getContext());
@@ -63,9 +60,8 @@ struct LLVMGPUMergeParallelOpsPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUMergeParallelOpsPass() {
-  return std::make_unique<LLVMGPUMergeParallelOpsPass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createMergeParallelOpsPass() {
+  return std::make_unique<MergeParallelOpsPass>();
 }
 
 }  // namespace iree_compiler

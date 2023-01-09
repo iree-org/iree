@@ -23,7 +23,6 @@ iree_lit_test_suite(
     "illegal_configuration.mlir"
     "legalize.mlir"
     "linalg_transform.mlir"
-    "merge_parallel_ops.mlir"
     "nvvm_pipeline_test.mlir"
     "reduction_pipeline.mlir"
     "reduction_pipeline_transform.mlir"

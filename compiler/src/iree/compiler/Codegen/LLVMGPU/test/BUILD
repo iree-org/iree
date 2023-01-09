@@ -24,7 +24,6 @@ iree_lit_test_suite(
             "distribute_to_thread.mlir",
             "distribute_foreach.mlir",
             "gpu_set_num_workgroups.mlir",
-            "merge_parallel_ops.mlir",
             "nvvm_pipeline_test.mlir",
             "reduction_pipeline_transform.mlir",
             "reduction_pipeline.mlir",

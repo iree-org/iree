@@ -212,6 +212,9 @@ LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createEraseHALDescriptorTypeFromMemRefPass();
 
+/// Pass to merge parallel linalg operations.
+std::unique_ptr<OperationPass<func::FuncOp>> createMergeParallelOpsPass();
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
@@ -468,10 +471,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
 
 //. Pass to pad out tensors up to static dimensions.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
-
-/// Pass to merge parallel linalg operations.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUMergeParallelOpsPass();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes

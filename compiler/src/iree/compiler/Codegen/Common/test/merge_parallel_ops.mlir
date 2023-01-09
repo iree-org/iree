@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-llvmgpu-merge-parallel-ops %s | FileCheck %s
+// RUN: iree-opt -iree-codegen-merge-parallel-ops %s | FileCheck %s
 
 func.func @merged_reduction_parallel(%0: tensor<1x40960xf32>, %1: tensor<1xf32>, %7: tensor<1xf32>)
   -> tensor<1x40960xf32> {
