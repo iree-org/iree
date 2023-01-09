@@ -49,8 +49,7 @@ cmake -S . -B ../build-ios-sim -GNinja \
   -DCMAKE_IOS_INSTALL_COMBINED=YES \
   -DIREE_HOST_BINARY_ROOT=$PWD/../iree-build/install \
   -DCMAKE_INSTALL_PREFIX=../build-ios-sim/install \
-  -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_BUILD_TESTS=OFF -DIREE_BUILD_SAMPLES=OFF
+  -DIREE_BUILD_COMPILER=OFF
 
 cmake --build ../build-ios-sim --config Release --target install
 ```
