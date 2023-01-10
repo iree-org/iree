@@ -51,14 +51,13 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   //     CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
-  //     CHECK-DAG: %[[F0:.*]] = arith.constant dense<0.000000e+00> : vector<f32>
   //     CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
   //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x2xf32, 3>
   //     CHECK-DAG: %[[TIDX:.]] = gpu.thread_id  x
   //     CHECK-DAG: %[[TIDY:.]] = gpu.thread_id  y
   //     CHECK-DAG: %[[TIDZ:.]] = gpu.thread_id  z
-
-  //         CHECK: %[[ADDED:.*]] = arith.addi %[[TIDZ]], %[[workgroup_id_x]]
+  //     CHECK-DAG: %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
+  //     CHECK-DAG: %[[ADDED:.*]] = arith.addi %[[TIDZ]], %[[workgroup_id_x]]
 
   // Distributed reduction: everyone loads then 5 xor + addf expected
   //         CHECK: vector.transfer_read %{{.*}}[%[[ADDED]], %[[TIDY]], %[[TIDX]]]
@@ -67,7 +66,6 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //         CHECK: %[[RES:.*]] = arith.addf %{{.*}}
 
   //         CHECK: %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
-  //         CHECK: %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
   //         CHECK: scf.if %[[CONDXIS0]]
   //         CHECK:   vector.transfer_write %[[RES_VEC]], %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]
   //         CHECK: gpu.barrier

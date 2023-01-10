@@ -184,7 +184,7 @@ static void addEraseUnnecessaryTensorOperandsPatterns(
 static void addRankReducingPatterns(RewritePatternSet &patterns) {
   populateReshapeToInterfaceTensorPatterns(patterns);
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
 }
 
 static void addSwappingPatterns(RewritePatternSet &patterns,
@@ -207,12 +207,6 @@ static void addAllRegisteredCanonicalizationPatterns(
     dialect->getCanonicalizationPatterns(patterns);
   for (RegisteredOperationName op : ctx->getRegisteredOperations())
     op.getCanonicalizationPatterns(patterns, ctx);
-}
-
-static void addConverToDPSPatterns(RewritePatternSet &patterns) {
-  populateReshapeToInterfaceTensorPatterns(patterns);
-  vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
 }
 
 DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(

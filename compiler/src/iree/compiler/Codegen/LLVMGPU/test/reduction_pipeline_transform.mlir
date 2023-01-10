@@ -35,13 +35,15 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG: %[[C12:.*]] = arith.constant 12 : index
 //     CHECK-NOT:   memref.alloc()
 //         CHECK: gpu.thread_id  x
-//         CHECK: scf.for %{{.*}} = %[[C0]] to %[[C12]] step %[[C4]] {
+//         CHECK: %[[v:.*]] = scf.for %{{.*}} = %[[C0]] to %[[C12]] step %[[C4]] {{.*}} -> (vector<f32>) {
 //         CHECK:   vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<4xf32>
 //         CHECK:   vector.multi_reduction <add>, %{{.*}} : vector<4xf32> to f32
-//         CHECK:   vector.transfer_write {{.*}} : vector<f32>, memref<f32
+//         CHECK: }
 //     CHECK-NOT: gpu.barrier
-//         CHECK: vector.transfer_read {{.*}}: memref<f32{{.*}}>, vector<f32>
-//         CHECK: arith.addf %{{.*}} : f32
+//         CHECK: %[[r:.*]] = vector.transfer_read {{.*}}: memref<f32{{.*}}>, vector<f32>
+//     CHECK-DAG: %[[s0:.*]] = vector.extractelement %[[r]]
+//     CHECK-DAG: %[[s1:.*]] = vector.extractelement %[[v]]
+//         CHECK: arith.addf %[[s0]], %[[s1]] : f32
 
 // -----
 
@@ -83,14 +85,13 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
 // Local per-thread scf.for-based reduction.
-//         CHECK: scf.for
+//         CHECK: %[[v:.*]] = scf.for {{.*}} -> (vector<f32>) {
 //         CHECK:   vector.transfer_read {{.*}} memref<8x64xf32>, vector<f32>
-//         CHECK:   vector.transfer_read {{.*}} memref<1x64xf32, 3>, vector<f32>
 //         CHECK:   arith.addf {{.*}} : f32
-//         CHECK:   vector.transfer_write {{.*}} vector<f32>
 // No barrier within the loop.
 //     CHECK-NOT:   gpu.barrier
 //         CHECK:   }
+//         CHECK:   vector.transfer_write %[[v]]{{.*}} vector<f32>
 // Barrier after the loop.
 //         CHECK:   gpu.barrier
 
@@ -156,16 +157,16 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
 // Local per-thread scf.for-based reduction.
-//         CHECK: scf.for
-//         CHECK:   vector.transfer_read {{.*}} vector<f32>
+//         CHECK: %[[v:.*]] = scf.for {{.*}} -> (vector<f32>)
 //         CHECK:   vector.transfer_read {{.*}} vector<f32>
 //         CHECK:   arith.addf{{.*}} : f32
 //         CHECK:   arith.addf{{.*}} : f32
 //         CHECK:   arith.addf{{.*}} : f32
 //         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
-//         CHECK:   vector.transfer_write {{.*}} vector<f32>
 // No barrier within the loop
 //     CHECK-NOT:   gpu.barrier
+//         CHECK: }
+//         CHECK: vector.transfer_write %[[v]]{{.*}} vector<f32>
 //         CHECK: }
 // Barrier after the loop
 //         CHECK:   gpu.barrier
@@ -229,14 +230,14 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
 // Local per-thread scf.for-based reduction.
-//         CHECK: scf.for
-//         CHECK:   vector.transfer_read
-//         CHECK:   vector.transfer_read {{.*}} vector<f32>
+//         CHECK: scf.for {{.*}} -> (vector<f32>) {
+//         CHECK:   vector.transfer_read {{.*}} vector<4xf32>
 //         CHECK:   vector.reduction <add>{{.*}} : vector<4xf32> into f32
 //         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
 // No barrier within the loop
 //     CHECK-NOT:   gpu.barrier
-//         CHECK:   vector.transfer_write {{.*}} vector<f32>
+//         CHECK: }
+//         CHECK: vector.transfer_write {{.*}} vector<f32>
 
 //     CHECK-DAG:   %[[TIDY:.]] = gpu.thread_id  y
 //         CHECK: %[[FIRST_64_TIDX:.*]] = arith.cmpi ult, %[[TIDX]], %[[C64]] : index
@@ -384,15 +385,15 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
 
 // Local per-thread scf.for-based reduction.
-//         CHECK: scf.for
-//         CHECK:   vector.transfer_read {{.*}} vector<i8>
+//         CHECK: scf.for {{.*}} -> (vector<i8>)
 //         CHECK:   vector.transfer_read {{.*}} vector<i8>
 //         CHECK:   arith.addi{{.*}} : i8
 //         CHECK:   vector.broadcast {{.*}} : i8 to vector<i8>
-//         CHECK:   vector.transfer_write {{.*}} vector<i8>
+//     CHECK-NOT:   vector.transfer_write {{.*}} vector<i8>
 // No barrier within the loop
 //     CHECK-NOT:   gpu.barrier
 //         CHECK: }
+//         CHECK: vector.transfer_write {{.*}} vector<i8>
 // Barrier after the loop
 //         CHECK:   gpu.barrier
 
