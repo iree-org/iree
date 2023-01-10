@@ -38,6 +38,12 @@ name: CI
 on:
   workflow_dispatch:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
   push:
     branches:
       - main
