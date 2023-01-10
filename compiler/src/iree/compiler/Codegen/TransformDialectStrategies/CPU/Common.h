@@ -15,6 +15,11 @@ namespace mlir {
 namespace iree_compiler {
 namespace cpu {
 
+/// Take care of the last common steps in a CPU strategy (i.e. vectorize,
+/// bufferize, maps to blocks/workgroups and lower vectors).
+/// Return the handles to the updated variant and the func::FuncOp ops under
+/// the variant op.
+// TODO: pass control to LowerVectorsOp once the builder allows it.
 std::pair<Value, Value> buildCommonTrailingStrategy(ImplicitLocOpBuilder &b,
                                                     Value variantH);
 

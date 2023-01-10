@@ -47,9 +47,7 @@ void mlir::iree_compiler::cpu::ReductionStrategy::configure(
     const ReductionConfig &config) {
   // Block-level
   // ===========
-  // Tile all the parallel dimensions to 1 and create many blocks.
-  // TODO: Investigate taking some sizes that divide the dimensions and make
-  // the kernel meatier.
+  // Tile all the parallel dimensions to 8 for now.
   int64_t numParallelLoops = captures.reductionRank - 1;
   workgroupTileSizes.append(numParallelLoops, 8);
   vectorSize = config.vectorSize;
