@@ -321,9 +321,11 @@ def main(args):
       comment_def=comment_def,
       commit_info_md=commit_info_md)
 
-  comment_data = benchmark_comment.CommentData(type_id=comment_def.type_id,
-                                               abbr_md=abbr_md,
-                                               full_md=full_md)
+  comment_data = benchmark_comment.CommentData(
+      type_id=comment_def.type_id,
+      abbr_md=abbr_md,
+      full_md=full_md,
+      unverified_pr_number=args.pr_number)
   comment_json_data = json.dumps(dataclasses.asdict(comment_data), indent=2)
   if args.output is None:
     print(comment_json_data)

@@ -160,12 +160,26 @@ class GithubClient(object):
           f"Failed to comment on GitHub; error code: {response.status_code} - {response.text}"
       )
 
+  def get_pull_request_author_id(self, pr_number: int) -> int:
+    """Get pull request information."""
+
+    response = self._requester.get(
+        endpoint=f"{GITHUB_IREE_API_PREFIX}/pulls/{pr_number}",
+        payload={},
+    )
+    if response.status_code != http.client.OK:
+      raise RuntimeError(
+          f"Failed to fetch the pull request: {pr_number}; "
+          f"error code: {response.status_code} - {response.text}")
+
+    return response.json()["user"]["id"]
+
 
 def _parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("comment_json", type=pathlib.Path)
   parser.add_argument("--verbose", action="store_true")
-  parser.add_argument("--pr_number", required=True, type=int)
+  parser.add_argument("--github_event_json", required=True, type=pathlib.Path)
   return parser.parse_args()
 
 
@@ -182,9 +196,25 @@ def main(args: argparse.Namespace):
   if gist_bot_token is None:
     raise ValueError("GIST_BOT_TOKEN must be set.")
 
-  pr_number = args.pr_number
+  github_event = json.loads(args.github_event_json.read_text())
+
   comment_data = benchmark_comment.CommentData(
       **json.loads(args.comment_json.read_text()))
+  # Sanitize the pr number to make sure it is an integer.
+  pr_number = int(comment_data.unverified_pr_number)
+
+  pr_client = GithubClient(requester=APIRequester(github_token=github_token))
+  pr_author_id = pr_client.get_pull_request_author_id(pr_number=pr_number)
+  workflow_run_actor_id = github_event["workflow_run"]["actor"]["id"]
+  # We can't get the trusted PR number of a workflow run from Github API. So we
+  # take the untrusted PR number from presubmit workflow and verify if the PR
+  # author is the same user who initiates the workflow run. This at least makes
+  # sure malicious presubmit run won't be post comment to other users' PRs.
+  if pr_author_id != workflow_run_actor_id:
+    raise ValueError(
+        f"Workflow run and PR author mismatched. "
+        f"Workflow run actor id: {workflow_run_actor_id} != PR author id: {pr_author_id}"
+    )
 
   gist_client = GithubClient(requester=APIRequester(
       github_token=gist_bot_token))
@@ -193,7 +223,6 @@ def main(args: argparse.Namespace):
       content=comment_data.full_md,
       verbose=args.verbose)
 
-  pr_client = GithubClient(requester=APIRequester(github_token=github_token))
   previous_comment_id = pr_client.get_previous_comment_on_pr(
       pr_number=pr_number,
       comment_bot_user=comment_bot_user,
