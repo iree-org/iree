@@ -52,6 +52,8 @@ jobs:
     needs: setup
     if: needs.setup.outputs.should-run == 'true'
     runs-on: ubuntu-20.04
+    permissions:
+      issues: write
     outputs:
       job-conclusion: ${{ steps.check.outputs.job-conclusion }}
     steps:
@@ -61,26 +63,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BENCHMARK_PROCESS_JOB: process_benchmark_results
         run: |
-          gh api \
-            -H "Accept: application/vnd.github+json" \
-"/repos/${GITHUB_REPOSITORY}/actions/runs/${PR_CI_RUN_ID}/attempts/${PR_CI_RUN_ATTEMPT}/jobs" \
-  | jq --arg job "${BENCHMARK_PROCESS_JOB}" \
-  '.jobs | map(select(.name=="$job"))[0] | .conclusion'
-            > conclusion
-          echo "job-conclusion=$(cat conclusion)" >> "${GITHUB_OUTPUT}"
-
-  post_benchmark_comment:
-    needs: [setup, check_benchmark_job]
-    if: |
-      needs.setup.outputs.should-run == 'true' &&
-      needs.check_benchmark_job.outputs.job-conclusion == 'success'
-    runs-on: ubuntu-20.04
-    permissions:
-      issues: write
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+          export CONCLUSION=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs/${PR_CI_RUN_ID}/attempts/${PR_CI_RUN_ATTEMPT}/jobs" \
+            | jq --arg job "${BENCHMARK_PROCESS_JOB}" \
+              '.jobs | map(select(.name=="$job"))[0] | .conclusion')
+          echo "job-conclusion=${CONCLUSION}" >> "${GITHUB_OUTPUT}"
       - name: "Downloading artifacts"
+        if: steps.check.job-conclusion == 'success'
         id: download
         env:
           # Currently GitHub managed runner doesn't have GCP credential. Fetch
@@ -93,7 +82,7 @@ jobs:
           echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
       - name: Posting comments
         # TODO(#11076): Temporarily disabled until we migrate the database.
-        if: false
+        if: false && steps.check.job-conclusion == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIST_BOT_TOKEN: ${{ secrets.GIST_BOT_TOKEN }}
