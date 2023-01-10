@@ -83,15 +83,13 @@ std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
 static FailureOr<ReductionConfig> applyKnownGoodReductionConfigurations(
     const transform_ext::MatchedReductionCaptures &captures,
     const CPUModel &cpuModel) {
-  std::optional<int64_t> vectorSize;
   int64_t reductionSize = captures.reductionOpSizes.back();
   if (cpuModel.model == CPUModel::kDefaultCPU) {
     if (captures.reductionOutputElementalTypeBitWidth == 32) {
-      if (reductionSize == 32) vectorSize = 32;
+      if (reductionSize == 32) return ReductionConfig{/*vectorSize=*/32};
     }
   }
-  if (!vectorSize.has_value()) return failure();
-  return ReductionConfig{vectorSize.value()};
+  return failure();
 }
 
 static ReductionConfig getReductionConfig(

@@ -258,9 +258,12 @@ static FailureOr<ReductionConfig> applyKnownGoodReductionConfigurations(
   int64_t reductionSize = captures.reductionOpSizes.back();
   if (gpuModel.model == GPUModel::kDefaultGPU) {
     if (captures.reductionOutputElementalTypeBitWidth == 32) {
-      if (reductionSize == 64) return ReductionConfig{64, 1, staged};
-      if (reductionSize == 128) return ReductionConfig{32, 4, staged};
-      if (reductionSize == 512) return ReductionConfig{256, 2, staged};
+      if (reductionSize == 64)
+        return ReductionConfig{/*maxNumThreads=*/64, /*vectorSize=*/1, staged};
+      if (reductionSize == 128)
+        return ReductionConfig{/*maxNumThreads=*/32, /*vectorSize=*/4, staged};
+      if (reductionSize == 512)
+        return ReductionConfig{/*maxNumThreads=*/256, /*vectorSize=*/2, staged};
     }
   }
   return failure();
