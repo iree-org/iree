@@ -45,14 +45,6 @@ iree_compiler_cc_library(
     name = "TransformDialectInterpreterPass",
     srcs = [
         "TransformDialectInterpreterPass.cpp",
-        "TransformDialectStrategies.cpp",
-        "TransformDialectStrategiesCPU.cpp",
-        "TransformDialectStrategiesGPU.cpp",
-    ],
-    hdrs = [
-        "TransformDialectStrategies.h",
-        "TransformDialectStrategiesCPU.h",
-        "TransformDialectStrategiesGPU.h",
     ],
     deps = [
         # Dialects
@@ -96,13 +88,20 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:DialectUtils",
-        # TransformExtensions
+        # TransformDialectStrategies
+        "//compiler/src/iree/compiler/Codegen/TransformDialectStrategies/Common:TransformDialectStrategies",
+        # TransformExtensions (needed for registration in the pass)
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
         "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
+        "@llvm-project//mlir:AffineTransformOps",
+        "@llvm-project//mlir:GPUTransformOps",
         "@llvm-project//mlir:LinalgTransformOps",
+        "@llvm-project//mlir:MemRefTransformOps",
+        "@llvm-project//mlir:SCFTransformOps",
+        "@llvm-project//mlir:VectorTransformOps",
     ],
 )
 
@@ -123,6 +122,7 @@ iree_compiler_cc_library(
         "MaterializeEncodingPass.cpp",
         "OptimizeVectorTransferPass.cpp",
         "PolynomialApproximationPass.cpp",
+        "RematerializeParallelOps.cpp",
         "SplitFullPartialTransferPass.cpp",
         "TestPartitionableLoopsInterface.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
@@ -216,7 +216,6 @@ iree_compiler_cc_library(
     hdrs = [
         "GPUPatterns.h",
         "LinalgOpInfo.h",
-        "TransformDialectStrategies.h",
         "UserConfig.h",
     ],
     deps = [

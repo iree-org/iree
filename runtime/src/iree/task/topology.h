@@ -19,6 +19,28 @@
 extern "C" {
 #endif  // __cplusplus
 
+//===----------------------------------------------------------------------===//
+// NUMA queries
+//===----------------------------------------------------------------------===//
+
+// A NUMA node or processor group ordinal.
+typedef uint32_t iree_task_topology_node_id_t;
+
+// Use any NUMA node (usually the first).
+#define IREE_TASK_TOPOLOGY_NODE_ID_ANY ((iree_task_topology_node_id_t)-1)
+
+// Returns the total number of NUMA nodes in the system or 1 if the query is
+// not available on the platform.
+iree_host_size_t iree_task_topology_query_node_count(void);
+
+// Returns the NUMA node ID of the currently executing thread or 0 if the query
+// is not available on the platform.
+iree_task_topology_node_id_t iree_task_topology_query_current_node(void);
+
+//===----------------------------------------------------------------------===//
+// Topology group (worker thread(s) assigned to a processor)
+//===----------------------------------------------------------------------===//
+
 // A bitmask indicating which other groups from 0 to N may constructively share
 // caches. For example, a value of 0b1100 indicates that group 2 and 3 share.
 typedef uint64_t iree_task_topology_group_mask_t;
@@ -57,6 +79,10 @@ typedef struct iree_task_topology_group_t {
 // Initializes |out_group| with a |group_index| derived name.
 void iree_task_topology_group_initialize(uint8_t group_index,
                                          iree_task_topology_group_t* out_group);
+
+//===----------------------------------------------------------------------===//
+// Topology
+//===----------------------------------------------------------------------===//
 
 // Task system topology information used to define the workers within an
 // executor.
@@ -113,6 +139,10 @@ const iree_task_topology_group_t* iree_task_topology_get_group(
 iree_status_t iree_task_topology_push_group(
     iree_task_topology_t* topology, const iree_task_topology_group_t* group);
 
+//===----------------------------------------------------------------------===//
+// Topology initialization helpers
+//===----------------------------------------------------------------------===//
+
 // Initializes a topology with the specified number of groups.
 // 0 is a valid value, indicating that only donated threads will be used to
 // perform work. Groups will have no specific affinity and rely on the OS
@@ -122,9 +152,12 @@ iree_status_t iree_task_topology_push_group(
 void iree_task_topology_initialize_from_group_count(
     iree_host_size_t group_count, iree_task_topology_t* out_topology);
 
-// Initializes a topology with one group for each physical core in the machine.
+// Initializes a topology with one group for each physical core with the given
+// NUMA node ID (usually package or cluster). Up to |max_core_count| physical
+// cores will be selected from the node.
 void iree_task_topology_initialize_from_physical_cores(
-    iree_host_size_t max_core_count, iree_task_topology_t* out_topology);
+    iree_task_topology_node_id_t node_id, iree_host_size_t max_core_count,
+    iree_task_topology_t* out_topology);
 
 #ifdef __cplusplus
 }  // extern "C"

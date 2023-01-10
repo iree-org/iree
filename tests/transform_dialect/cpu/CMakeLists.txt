@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "eltwise_reduction_eltwise.mlir"
     "matmul.mlir"
   TOOLS
     ${IREE_LLD_TARGET}

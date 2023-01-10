@@ -55,7 +55,7 @@ LinalgExt::FuseProducersOp::apply(transform::TransformResults &transformResults,
     FailureOr<LinalgExt::FusionResult> result =
         pattern.returningMatchAndRewrite(target, rewriter);
     if (failed(result))
-      return DiagnosedSilenceableFailure::definiteFailure();
+      return emitDefaultDefiniteFailure(target);
 
     // Update the fused operations.
     transformedOps.push_back(result->consumerOp);
@@ -124,7 +124,7 @@ void LinalgExt::FuseProducersOp::print(OpAsmPrinter &p) {
 
 DiagnosedSilenceableFailure
 LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
-    scf::ForeachThreadOp target, SmallVectorImpl<Operation *> &results,
+    scf::ForeachThreadOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   LinalgExt::ForeachThreadOpToAsyncRewriter pattern(this->getContext());
   SimplePatternRewriter rewriter(target);
@@ -132,13 +132,13 @@ LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
       pattern.returningMatchAndRewrite(target, rewriter);
   if (failed(result))
     return emitDefaultDefiniteFailure(target);
-  results.assign({*result});
+  results.push_back(*result);
   return DiagnosedSilenceableFailure::success();
 }
 
 DiagnosedSilenceableFailure
 LinalgExt::RewriteForeachThreadToScfForOp::applyToOne(
-    scf::ForeachThreadOp target, SmallVectorImpl<Operation *> &results,
+    scf::ForeachThreadOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   LinalgExt::ForeachThreadOpToScfForRewriter pattern(this->getContext());
   SimplePatternRewriter rewriter(target);
@@ -146,7 +146,7 @@ LinalgExt::RewriteForeachThreadToScfForOp::applyToOne(
       pattern.returningMatchAndRewrite(target, rewriter);
   if (failed(result))
     return emitDefaultDefiniteFailure(target);
-  results.assign({*result});
+  results.push_back(*result);
   return DiagnosedSilenceableFailure::success();
 }
 

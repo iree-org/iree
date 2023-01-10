@@ -34,6 +34,7 @@ iree_lit_test_suite(
     "pad_dynamic_alloc.mlir"
     "reduce_bank_conflicts.mlir"
     "reductions.mlir"
+    "rematerialize_parallel_ops.mlir"
     "remove_dead_allocs.mlir"
     "remove_trivial_loops.mlir"
     "swizzle_workgroup.mlir"

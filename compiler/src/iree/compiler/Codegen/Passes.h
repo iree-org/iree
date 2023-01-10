@@ -212,6 +212,10 @@ LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createEraseHALDescriptorTypeFromMemRefPass();
 
+/// Pass to merge parallel linalg operations.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createRematerializeParallelOpsPass();
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//

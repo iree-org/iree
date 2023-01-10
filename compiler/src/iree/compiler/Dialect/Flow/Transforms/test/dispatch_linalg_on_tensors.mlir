@@ -2079,3 +2079,65 @@ func.func @clone_fill_ops(%arg0 : tensor<128x256xf32>, %arg1 : tensor<256x512xf3
 //       CHECK:     tensor.empty()
 //       CHECK:     linalg.fill
 //       CHECK:     linalg.matmul
+
+// -----
+
+func.func @softmax(%source : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
+  %cst = arith.constant 1.000000e+00 : f32
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %cst_1 = arith.constant -3.40282347E+38 : f32
+  %1 = tensor.empty() : tensor<12x128xf32>
+  %2 = linalg.fill ins(%cst_1 : f32) outs(%1 : tensor<12x128xf32>) -> tensor<12x128xf32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%source : tensor<12x128x128xf32>) outs(%2 : tensor<12x128xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %9 = arith.maxf %in, %out : f32
+    linalg.yield %9 : f32
+  } -> tensor<12x128xf32>
+  %4 = tensor.empty() : tensor<12x128x128xf32>
+  %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%source, %3 : tensor<12x128x128xf32>, tensor<12x128xf32>) outs(%4 : tensor<12x128x128xf32>) {
+  ^bb0(%in: f32, %in_4: f32, %out: f32):
+    %9 = arith.subf %in, %in_4 : f32
+    %10 = math.exp %9 : f32
+    linalg.yield %10 : f32
+  } -> tensor<12x128x128xf32>
+  %6 = linalg.fill ins(%cst_0 : f32) outs(%1 : tensor<12x128xf32>) -> tensor<12x128xf32>
+  %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%5 : tensor<12x128x128xf32>) outs(%6 : tensor<12x128xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %9 = arith.addf %in, %out : f32
+    linalg.yield %9 : f32
+  } -> tensor<12x128xf32>
+  %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%5, %7 : tensor<12x128x128xf32>, tensor<12x128xf32>) outs(%4 : tensor<12x128x128xf32>) {
+  ^bb0(%in: f32, %in_4: f32, %out: f32):
+    %9 = arith.divf %cst, %in_4 : f32
+    %10 = arith.mulf %in, %9 : f32
+    linalg.yield %10 : f32
+  } -> tensor<12x128x128xf32>
+  return %8 : tensor<12x128x128xf32>
+}
+// CHECK-LABEL: func @softmax(
+//  CHECK-SAME:     %[[INPUT:.+]]: tensor<12x128x128xf32>)
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
+//  CHECK-SAME:       (%[[INPUT]])
+//  CHECK-NEXT:     (%[[ARG0:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128x128xf32>>,
+//  CHECK-SAME:      %[[ARG1:.+]]: !flow.dispatch.tensor<writeonly:tensor<12x128x128xf32>>)
+//   CHECK-DAG:     %[[CST1:.+]] = arith.constant -3.4
+//   CHECK-DAG:     %[[CST2:.+]] = arith.constant 0.0
+//       CHECK:     %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
+//   CHECK-DAG:     %[[EMPTY0:.+]] = tensor.empty() : tensor<12x128xf32>
+//   CHECK-DAG:     %[[EMPTY1:.+]] = tensor.empty() : tensor<12x128x128xf32>
+//       CHECK:     %[[FILL0:.+]] = linalg.fill ins(%[[CST1]] : f32) outs(%[[EMPTY0]] :
+//       CHECK:     %[[FILL1:.+]] = linalg.fill ins(%[[CST2]] : f32) outs(%[[EMPTY0]] :
+//       CHECK:     %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[SOURCE]] :
+//  CHECK-SAME:         outs(%[[FILL0]] :
+//       CHECK:     %[[GENERIC2:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[SOURCE]], %[[GENERIC1]] :
+//  CHECK-SAME:         outs(%[[EMPTY1]] :
+//       CHECK:     %[[GENERIC3:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[GENERIC2]] :
+//  CHECK-SAME:         outs(%[[FILL1]] :
+//       CHECK:     %[[GENERIC4:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[GENERIC2]], %[[GENERIC3]] :
+//  CHECK-SAME:         outs(%[[EMPTY1]] :
+//       CHECK:     flow.dispatch.tensor.store %[[GENERIC4]], %[[ARG1]]
+//       CHECK:   return %[[RESULT]]

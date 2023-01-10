@@ -1393,7 +1393,7 @@ void transform_ext::TakeFirstOp::getEffects(
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_ext::EmitRemarkOp::applyToOne(
-    Operation *target, SmallVectorImpl<::mlir::Operation *> &results,
+    Operation *target, mlir::transform::ApplyToEachResultList &results,
     mlir::transform::TransformState &state) {
   for (Operation *payload : state.getPayloadOps(getHandle())) {
     payload->emitRemark(getMessage());

@@ -65,7 +65,7 @@ extra:
 extra_css:
   - assets/stylesheets/extra.css
 
-copyright: Copyright &copy; 2022 The IREE Authors
+copyright: Copyright &copy; 2023 The IREE Authors
 
 markdown_extensions:
   - abbr
@@ -111,6 +111,7 @@ nav:
       - "building-from-source/getting-started.md"
       - "building-from-source/python-bindings-and-importers.md"
       - "building-from-source/android.md"
+      - "building-from-source/ios.md"
       - "building-from-source/riscv.md"
   - "Bindings":
       - "bindings/index.md"

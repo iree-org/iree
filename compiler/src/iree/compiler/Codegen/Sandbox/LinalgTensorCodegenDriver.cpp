@@ -34,6 +34,7 @@ using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgPeelOptions;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgTransformationFilter;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgTransforms;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationOptions;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorLoweringOptions;
 
 #define DEBUG_TYPE "iree-linalg-tensor-codegen-driver"
@@ -94,6 +95,79 @@ static bool getTilingOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel,
     return true;
   }
   return false;
+}
+
+/// Computes the canonical shape used to vectorize this dispatch. Retrieves
+/// the vectorization tile sizes (parallel and reduction levels) out of the
+/// lowering config and adjusts them to the format expected by the Linalg
+/// vectorizer.
+static SmallVector<int64_t> getCanonicalVectorShape(func::FuncOp funcOp) {
+  FailureOr<Operation *> rootOp = getRootOp(funcOp);
+  if (failed(rootOp)) {
+    return {};
+  }
+
+  unsigned numTileLevels =
+      mlir::iree_compiler::getNumTileLevels(rootOp.value());
+  if (numTileLevels < 3) {
+    return {};
+  }
+
+  // Retrieve the tile sizes from the last two tiling levels (parallel and
+  // reduction) used for vectorization.
+  SmallVector<int64_t> canonicalVectorShape =
+      mlir::iree_compiler::getTileSizes(rootOp.value(), numTileLevels - 2);
+  SmallVector<int64_t> reductionTileSizes =
+      mlir::iree_compiler::getTileSizes(rootOp.value(), numTileLevels - 1);
+
+  if (!reductionTileSizes.empty()) {
+    assert(canonicalVectorShape.size() == reductionTileSizes.size() &&
+           "Unexpected tile sizes");
+
+    // Combine the reduction tile sizes with the parallel tile sizes already in
+    // the canonical vector shape.
+    for (int i = 0, end = canonicalVectorShape.size(); i < end; ++i) {
+      if (reductionTileSizes[i] > 0)
+        canonicalVectorShape[i] = reductionTileSizes[i];
+    }
+  }
+
+  // Replace zeros in canonical vector shape to turn it into a valid shape.
+  std::replace(canonicalVectorShape.begin(), canonicalVectorShape.end(), 0, 1);
+  return canonicalVectorShape;
+}
+
+// Give the canonical vector shape of a dispatch, returns the vector sizes for a
+// particular linalg op within that dispatch.
+static SmallVector<int64_t> getVectorSizes(
+    linalg::LinalgOp linalgOp, ArrayRef<int64_t> canonicalVectorShape) {
+  FailureOr<Operation *> rootOp =
+      getRootOp(linalgOp->getParentOfType<func::FuncOp>());
+  if (failed(rootOp)) {
+    return {};
+  }
+
+  // TODO: Infer the tiles sizes for an op that is not the root op.
+  if (*rootOp != linalgOp.getOperation()) {
+    return {};
+  }
+
+  // TODO: Masking is only supported for dynamic shapes.
+  if (!linalgOp.hasDynamicShape()) {
+    return {};
+  }
+
+  if (canonicalVectorShape.empty()) {
+    return {};
+  }
+
+  assert(canonicalVectorShape.size() >= linalgOp.getNumLoops() &&
+         "Unexpected canonical vector shape or number of loops");
+
+  // Return the canonical vector shape subset based on the number of loops of
+  // the linalg op.
+  return {canonicalVectorShape.begin(),
+          std::next(canonicalVectorShape.begin(), linalgOp.getNumLoops())};
 }
 
 /// Constructs padding attributes for given anchor op. Returns failure if there
@@ -447,11 +521,14 @@ void LinalgFusePass::runOnOperation() {
       SmallVector<int64_t>{hoistPaddings.begin(), hoistPaddings.end()});
   paddingOptions.setTransposePaddings(transposePaddingVectors);
 
+  LinalgVectorizationOptions vectorizationOptions;
+  vectorizationOptions.setVectorizePadding(vectorizePadding);
+
   CodegenStrategy strategy;
   strategy.tileAndFuseIf(doTileAndFuse, anchorOpName, tileAndFuseOptions)
       .tileIf(doTiling, anchorOpName, tilingOptions)
       .padIf(pad, anchorOpName, paddingOptions)
-      .vectorizeIf(vectorize, "", nullptr, vectorizePadding);
+      .vectorizeIf(vectorize, "", vectorizationOptions);
 
   // Created a nested OpPassManager and run.
   OpPassManager dynamicPM(func::FuncOp::getOperationName());
@@ -679,6 +756,11 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
         std::reverse(loopsToPeel.begin(), loopsToPeel.end());
       };
 
+  LinalgVectorizationOptions vectorizationOptions;
+  vectorizationOptions.setVectorizePadding(vectorizePadding);
+  vectorizationOptions.setCanonicalVectorSizes(getCanonicalVectorShape(funcOp));
+  vectorizationOptions.setVectorSizeComputationFunction(getVectorSizes);
+
   CodegenStrategy strategy;
   StringRef genericOpName = linalg::GenericOp::getOperationName();
   strategy.tileIf(doTiling, anchorOpName, tilingOptions)
@@ -686,7 +768,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
       .decomposeIf(decomposeToLowerDimOp)
       .peelIf(peel, generalize ? genericOpName : anchorOpName, peelingOptions)
       .vectorizeIf(vectorize, generalize ? genericOpName : anchorOpName,
-                   nullptr, vectorizePadding);
+                   vectorizationOptions);
 
   // Created a nested OpPassManager and run.
   OpPassManager dynamicPM(func::FuncOp::getOperationName());

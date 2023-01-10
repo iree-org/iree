@@ -10,10 +10,10 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
-#include "iree/compiler/Codegen/Common/TransformDialectStrategiesGPU.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -540,7 +540,9 @@ static LogicalResult setReductionTransformDialectConfig(
     return setTranslationInfo(entryPoint, translationInfo);
   }
 
-  if (failed(matchAndSetGPUReductionTransformStrategy(entryPoint, op)))
+  iree_compiler::gpu::GPUModel gpuModel;
+  if (failed(iree_compiler::gpu::matchAndSetReductionStrategy(entryPoint, op,
+                                                              gpuModel)))
     return failure();
 
   return setTranslationInfo(entryPoint, translationInfo);
@@ -553,7 +555,11 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   if (!targetInfo.hasWarpShuffle) return failure();
   if (!isa<linalg::GenericOp>(op)) return failure();
   // TODO(thomasraoux): Enable dynamic shape.
-  if (op.hasDynamicShape()) return failure();
+  bool hasDynamicShape = false;
+  entryPoint.walk([&hasDynamicShape](linalg::LinalgOp op) {
+    if (op.hasDynamicShape()) hasDynamicShape = true;
+  });
+  if (hasDynamicShape) return failure();
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
   if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
@@ -567,11 +573,21 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
       }))
     return failure();
 
-  // Only single combiner operations are supported for now.
-  SmallVector<Operation *, 4> combinerOps;
-  if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
-      combinerOps.size() != 1)
-    return failure();
+  bool foundSingleReductionOutput = false;
+  for (int64_t i = 0, e = op.getDpsInitOperands().size(); i < e; i++) {
+    // Only single combiner operations are supported for now.
+    SmallVector<Operation *, 4> combinerOps;
+    if (matchReduction(op.getRegionOutputArgs(), i, combinerOps) &&
+        combinerOps.size() == 1) {
+      if (foundSingleReductionOutput) return failure();
+      foundSingleReductionOutput = true;
+      continue;
+    }
+    if (!op.getMatchingIndexingMap(op.getDpsInitOperand(i)).isIdentity())
+      return failure();
+  }
+  if (!foundSingleReductionOutput) return failure();
+
   Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
 
