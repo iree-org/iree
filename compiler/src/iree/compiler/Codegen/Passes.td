@@ -310,6 +310,13 @@ def EraseHALDescriptorTypeFromMemRef :
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
 }
 
+def RematerializeParallelOps :
+    Pass<"iree-codegen-rematerialize-parallel-ops", "func::FuncOp"> {
+  let summary = "Pass to rematerialize and merge parallel ops to avoid"
+                "creating temporary allocs.";
+  let constructor = "mlir::iree_compiler::createRematerializeParallelOpsPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------

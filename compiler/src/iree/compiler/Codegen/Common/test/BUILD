@@ -36,6 +36,7 @@ iree_lit_test_suite(
             "iree_comprehensive_bufferize.mlir",
             "pad_dynamic_alloc.mlir",
             "materialize_encoding.mlir",
+            "rematerialize_parallel_ops.mlir",
             "reduce_bank_conflicts.mlir",
             "reductions.mlir",
             "remove_dead_allocs.mlir",
