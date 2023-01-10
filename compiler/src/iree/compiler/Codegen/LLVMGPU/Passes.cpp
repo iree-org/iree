@@ -308,7 +308,8 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
 void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(createMergeParallelOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());

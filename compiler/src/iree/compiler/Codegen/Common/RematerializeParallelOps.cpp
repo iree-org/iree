@@ -11,7 +11,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-codegen-merge-parallel-ops"
+#define DEBUG_TYPE "iree-codegen-rematerialize-parallel-ops"
 
 namespace mlir {
 namespace iree_compiler {
@@ -45,8 +45,8 @@ struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-struct MergeParallelOpsPass
-    : public MergeParallelOpsBase<MergeParallelOpsPass> {
+struct RematerializeParallelOpsPass
+    : public RematerializeParallelOpsBase<RematerializeParallelOpsPass> {
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     RewritePatternSet fusionPatterns(funcOp.getContext());
@@ -60,8 +60,9 @@ struct MergeParallelOpsPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createMergeParallelOpsPass() {
-  return std::make_unique<MergeParallelOpsPass>();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createRematerializeParallelOpsPass() {
+  return std::make_unique<RematerializeParallelOpsPass>();
 }
 
 }  // namespace iree_compiler
