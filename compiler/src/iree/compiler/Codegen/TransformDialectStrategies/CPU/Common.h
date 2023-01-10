@@ -34,8 +34,8 @@ std::pair<Value, Value> buildCommonTrailingStrategy(ImplicitLocOpBuilder& b,
 /// to configure the reduction strategy. In the future, this will need to be
 /// driven by some contract with the runtime.
 struct CPUModel {
-  static constexpr StringLiteral kXeonGold6154 = "Intel-Xeon-Gold-6154-3GHz";
-  StringRef model = kXeonGold6154;
+  static constexpr StringLiteral kDefaultCPU = "DefaultCPU";
+  StringRef model = kDefaultCPU;
 };
 
 /// Map an N-D parallel, 1-D reduction operation with optional leading and

@@ -85,7 +85,7 @@ static FailureOr<ReductionConfig> applyKnownGoodReductionConfigurations(
     const CPUModel &cpuModel) {
   std::optional<int64_t> vectorSize;
   int64_t reductionSize = captures.reductionOpSizes.back();
-  if (cpuModel.model == CPUModel::kXeonGold6154) {
+  if (cpuModel.model == CPUModel::kDefaultCPU) {
     if (captures.reductionOutputElementalTypeBitWidth == 32) {
       if (reductionSize == 32) vectorSize = 32;
     }

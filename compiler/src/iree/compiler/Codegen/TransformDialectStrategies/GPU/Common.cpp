@@ -256,7 +256,7 @@ static FailureOr<ReductionConfig> applyKnownGoodReductionConfigurations(
     const GPUModel &gpuModel) {
   auto staged = ReductionStrategy::Staged;
   int64_t reductionSize = captures.reductionOpSizes.back();
-  if (gpuModel.model == GPUModel::kNvidiaRtx2080Ti12GB) {
+  if (gpuModel.model == GPUModel::kDefaultGPU) {
     if (captures.reductionOutputElementalTypeBitWidth == 32) {
       if (reductionSize == 64) return ReductionConfig{64, 1, staged};
       if (reductionSize == 128) return ReductionConfig{32, 4, staged};
