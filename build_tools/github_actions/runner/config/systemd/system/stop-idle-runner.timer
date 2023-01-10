@@ -10,4 +10,6 @@ OnActiveSec=30m
 OnUnitInactiveSec=15m
 
 [Install]
-WantedBy=timers.target runner-setup.target
+WantedBy=timers.target
+# TODO(gcmn): Re-enable once we've debugged this causing actions failures.
+# runner-setup.target
