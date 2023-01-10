@@ -40,7 +40,7 @@ namespace {
 // We should add native VM ops for supporting them.
 template <typename OpTy, arith::CmpIPredicate pred>
 struct MaxMinIOpConverter : public OpRewritePattern<OpTy> {
-public:
+ public:
   using OpRewritePattern<OpTy>::OpRewritePattern;
   LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const final {
