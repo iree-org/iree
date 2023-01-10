@@ -229,15 +229,13 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
   // Step N-1. Bufferize and drop HAL descriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = iree_compiler::buildVectorize(b, funcH);
-  variantH = iree_compiler::buildBufferize(b, variantH,
-                                           /*targetGpu=*/true);
+  variantH = iree_compiler::buildBufferize(b, variantH, /*targetGpu=*/true);
 
   // Step N. Post-bufferization mapping to blocks and threads.
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = buildMapToBlockAndThreads(b, funcH, strategy.getNumThreadsInBlock());
-
   return std::make_pair(variantH, funcH);
 }
 

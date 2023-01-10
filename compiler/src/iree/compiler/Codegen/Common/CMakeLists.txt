@@ -31,6 +31,7 @@ iree_cc_library(
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
+    MLIRAffineTransformOps
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
@@ -41,17 +42,20 @@ iree_cc_library(
     MLIRBufferizationTransforms
     MLIRFuncDialect
     MLIRGPUOps
+    MLIRGPUTransformOps
     MLIRIR
     MLIRLLVMDialect
     MLIRLinalgDialect
     MLIRLinalgTransformOps
     MLIRLinalgTransforms
+    MLIRMemRefTransformOps
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRParser
     MLIRPass
     MLIRRewrite
     MLIRSCFDialect
+    MLIRSCFTransformOps
     MLIRSCFTransforms
     MLIRSCFUtils
     MLIRSupport
@@ -59,6 +63,7 @@ iree_cc_library(
     MLIRTensorTransforms
     MLIRTransformDialect
     MLIRVectorDialect
+    MLIRVectorTransformOps
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions

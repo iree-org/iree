@@ -53,16 +53,22 @@ FailureOr<SmallReductionStrategy>
 mlir::iree_compiler::gpu::SmallReductionStrategy::create(
     MLIRContext *context,
     const transform_ext::MatchedReductionCaptures &captures) {
-  ReductionConfig gpuReductionConfig = getSmallReductionConfig(captures);
-  SmallReductionStrategy strategy(context, captures,
-                                  gpuReductionConfig.maxNumThreads);
+  ReductionConfig reductionConfig = getSmallReductionConfig(captures);
+  SmallReductionStrategy strategy(context, captures);
+  strategy.configure(reductionConfig);
   if (!strategy.isProfitable()) return failure();
-  LLVM_DEBUG(DBGS() << "use small reduction strategy\n");
+  LLVM_DEBUG(DBGS() << "use GPU small reduction strategy\n");
   return strategy;
 }
 
-void mlir::iree_compiler::gpu::SmallReductionStrategy::compute(
-    int64_t maxNumThreadsToUse, bool hasTrailingElementwise) {
+void mlir::iree_compiler::gpu::SmallReductionStrategy::configure(
+    const ReductionConfig &reductionConfig) {
+  int64_t maxNumThreadsToUse = reductionConfig.maxNumThreads;
+  // `hasTrailingElementwise` is currently used to guard
+  // against pathological cases where IREE can't bound a buffer and
+  // crashes.
+  // TODO: Fix IREE's codegen/Common/PadDynamicAlloc.cpp.
+  bool hasTrailingElementwise = (captures.maybeTrailingRank > 0);
   assert(maxNumThreadsToUse > 0 && "maxNumThreadsToUse must be > 0");
   assert(maxNumThreadsToUse >= kCudaWarpSize && "not even a warp?");
 

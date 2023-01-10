@@ -71,24 +71,20 @@ class StagedReductionStrategy : public AbstractReductionStrategy {
  private:
   StagedReductionStrategy(
       MLIRContext *context,
-      const transform_ext::MatchedReductionCaptures &captures,
-      int64_t maxNumThreadsToUse, int64_t vectorSize)
-      : AbstractReductionStrategy(context, captures) {
-    compute(maxNumThreadsToUse, vectorSize);
-  }
+      const transform_ext::MatchedReductionCaptures &captures)
+      : AbstractReductionStrategy(context, captures) {}
 
   /// Compute the staged strategy based on the reductionDimensionSize, the
   /// `maxNumThreadsToUse` and the `vectorSize`.
   /// The latter 2 numbers control the tradeoff between parallelism and shared
   /// memory consumption.
   // TODO: Characterize shared memory consumption and limit for good occupancy.
-  // TODO: Support various elemental types.
-  void compute(int64_t maxNumThreadsToUse, int64_t maxVectorSize);
+  void configure(const ReductionConfig &reductionConfig);
 
   /// Maximal vector size (among {1, 2, 4}) that divides the
   /// `reductionDimensionSize` and is used for vector transfers in Stage 1.
-
   int64_t vectorSize;
+
   /// Maximal "k-warp" size within the limits of the `maxNumThreadsToUse` and
   /// `reductionDimensionSize` parameters.
   /// This is also the blockDim.x of the kernel.
@@ -110,8 +106,8 @@ ReductionConfig getStagedReductionConfig(
 
 /// Entry point to build the transform IR corresponding to a staged reduction
 /// strategy.
-/// This is used for mapping a N-D parallel, 1-D reduction operation. The 1-D
-/// reduction dimensions must be in the most minor dimension.
+/// This is used for mapping a N-D parallel, 1-D reduction operation.
+/// The 1-D reduction dimensions must be in the most minor dimension.
 /// Supports an optional leading and an optional trailing elementwise operation.
 void buildStagedReductionStrategy(ImplicitLocOpBuilder &b, Value variantH,
                                   const StagedReductionStrategy &strategy);

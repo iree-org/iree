@@ -96,7 +96,12 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
+        "@llvm-project//mlir:AffineTransformOps",
+        "@llvm-project//mlir:GPUTransformOps",
         "@llvm-project//mlir:LinalgTransformOps",
+        "@llvm-project//mlir:MemRefTransformOps",
+        "@llvm-project//mlir:SCFTransformOps",
+        "@llvm-project//mlir:VectorTransformOps",
     ],
 )
 

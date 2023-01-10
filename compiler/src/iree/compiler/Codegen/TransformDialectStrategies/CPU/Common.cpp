@@ -11,12 +11,15 @@
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/CPU/ReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 
@@ -26,90 +29,65 @@ using namespace mlir;
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 // TODO: significantly better namespacing.
+using iree_compiler::cpu::ReductionStrategy;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
+using transform::LowerVectorsOp;
 using transform::MatchOp;
 using transform::SplitHandlesOp;
 using transform_ext::AllDims;
 using transform_ext::m_StructuredOp;
 using transform_ext::NumEqualsTo;
+using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::ShapeKind;
+using transform_ext::StructuredOpMatcher;
 
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.
 //===----------------------------------------------------------------------===//
 
-// TODO: consider lifting and exposing.
-
-/// Structure to hold the parameters related to GPU reduction strategy.
-struct CPUReductionStrategyInfos {
-  int64_t workgroupSize;
-  SmallVector<int64_t> tileSizes;
-};
-
-static bool matchCPUReduction(linalg::LinalgOp op,
-                              CPUReductionStrategyInfos &infos) {
-  // TODO: match the sequence the strategy supports.
-  auto fill = m_StructuredOp<linalg::FillOp>();
-  auto pattern = m_StructuredOp()
-                     .dim(AllDims(), ShapeKind::Static)
-                     .dim(-1, utils::IteratorType::reduction)
-                     .output(NumEqualsTo(1))
-                     .output(0, fill);
-
-  // TODO: set the right config as expected by the strategy.
-  infos.workgroupSize = 1;
-  SmallVector<unsigned> partitionedLoops =
-      cast<iree_compiler::PartitionableLoopsInterface>(op.getOperation())
-          .getPartitionableLoops(iree_compiler::kNumMaxParallelDims);
-  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
-  // Tile all the parallel dimension to 1.
-  infos.tileSizes.append(numLoops, 1);
-  return true;
-}
-
-// TODO: generalize and automate over and over.
-// TODO: significantly shrink this down.
-static void createReductionCpuStrategy(ImplicitLocOpBuilder &b, Value variantH,
-                                       const CPUReductionStrategyInfos &info) {
-  // Step 0. Fetch transform information from the config and materialize it in
-  // the payload IR.
-  // TODO: this still requires specific knowledge of ops present in the IR
-  // and is very brittle.
-  Value originalFillH =
-      b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
-  Value originalGenericH =
-      b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
-
-  // Step 1: Distribute to blocks using the current IREE lowering config.
-  variantH = iree_compiler::buildReductionStrategyBlockDistributionPart(
-      b, variantH, originalFillH, originalGenericH, Value(),
-      getAsOpFoldResult(b.getI64ArrayAttr(info.tileSizes)));
-
-  // Step 2. Rank-reduce and buildVectorize.
-  // TODO: assumes a single func::FuncOp to transform, may need hardening.
+/// Take care of the last common steps in a CPU strategy (i.e. vectorize,
+/// bufferize and map to blocks).
+/// Return the handles to the updated variant and the func::FuncOp ops under
+/// the variant op.
+std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
+    ImplicitLocOpBuilder &b, Value variantH) {
+  // Step N-2. Bufferize and drop HAL descriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = iree_compiler::buildVectorize(b, funcH);
+  variantH = iree_compiler::buildBufferize(b, variantH);
 
-  // Step 3. Bufferize and drop HAL descriptor from memref ops.
-  variantH = iree_compiler::buildBufferize(b, variantH, /*targetGpu=*/true);
-
-  // Step 4. Post-bufferization mapping to blocks only.
+  // Step N-1. Post-bufferization mapping to blocks only.
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
+  auto pdlOperation = pdl::OperationType::get(b.getContext());
+
+  // Step N. Lower vectors.
+  // TODO: Control the lowering to vectors.
+  funcH = b.create<LowerVectorsOp>(pdlOperation, funcH);
+  return std::make_pair(variantH, funcH);
 }
 
 LogicalResult iree_compiler::cpu::matchAndSetReductionStrategy(
     func::FuncOp entryPoint, linalg::LinalgOp op) {
-  // 1. Match
-  CPUReductionStrategyInfos infos;
-  if (!matchCPUReduction(op, infos)) return failure();
+  // 1. Match a reduction and surrounding ops.
+  StructuredOpMatcher reduction, fill, leading, trailing;
+  transform_ext::MatchedReductionCaptures captures;
+  makeReductionMatcher(reduction, fill, leading, trailing, captures);
+  if (!matchPattern(op, reduction)) return failure();
+
+  // 2. Construct the configuration and the strategy builder.
+  // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    return createReductionCpuStrategy(b, variant, infos);
+    // Otherwise, always fallback to the staged strategy.
+    auto strategy = ReductionStrategy::create(op->getContext(), captures);
+    return buildReductionStrategy(b, variant, strategy);
   };
-  // 2. Add the strategy.
+
+  // 3. Build strategy embedded into the IR.
   createTransformRegion(entryPoint, strategyBuilder);
+
   return success();
 }
