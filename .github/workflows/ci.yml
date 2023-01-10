@@ -966,7 +966,7 @@ jobs:
       always() &&
       needs.setup.outputs.should-run == 'true' &&
       needs.compilation_benchmarks.result == 'success' &&
-      contains(['success', 'skipped'], needs.execution_benchmarks.result)
+      contains(fromJSON('["success", "skipped"]'), needs.execution_benchmarks.result)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
