@@ -63,8 +63,9 @@ jobs:
         run: |
           gh api \
             -H "Accept: application/vnd.github+json" \
-            --jq ".jobs | map(select(.name==\"${BENCHMARK_PROCESS_JOB}\"))[0] | .conclusion" \
-            "/repos/${GITHUB_REPOSITORY}/actions/runs/${PR_CI_RUN_ID}/attempts/${PR_CI_RUN_ATTEMPT}/jobs" \
+"/repos/${GITHUB_REPOSITORY}/actions/runs/${PR_CI_RUN_ID}/attempts/${PR_CI_RUN_ATTEMPT}/jobs" \
+  | jq --arg job "${BENCHMARK_PROCESS_JOB}" \
+  '.jobs | map(select(.name=="$job"))[0] | .conclusion'
             > conclusion
           echo "job-conclusion=$(cat conclusion)" >> "${GITHUB_OUTPUT}"
 
