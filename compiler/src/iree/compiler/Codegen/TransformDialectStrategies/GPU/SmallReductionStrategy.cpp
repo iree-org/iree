@@ -49,14 +49,12 @@ using iree_compiler::gpu::ReductionConfig;
 using iree_compiler::gpu::scaleUpByBitWidth;
 using iree_compiler::gpu::SmallReductionStrategy;
 
-FailureOr<SmallReductionStrategy>
-mlir::iree_compiler::gpu::SmallReductionStrategy::create(
+SmallReductionStrategy mlir::iree_compiler::gpu::SmallReductionStrategy::create(
     MLIRContext *context,
-    const transform_ext::MatchedReductionCaptures &captures) {
-  ReductionConfig reductionConfig = getSmallReductionConfig(captures);
+    const transform_ext::MatchedReductionCaptures &captures,
+    const ReductionConfig &reductionConfig) {
   SmallReductionStrategy strategy(context, captures);
   strategy.configure(reductionConfig);
-  if (!strategy.isProfitable()) return failure();
   LLVM_DEBUG(DBGS() << "use GPU small reduction strategy\n");
   return strategy;
 }
@@ -64,11 +62,6 @@ mlir::iree_compiler::gpu::SmallReductionStrategy::create(
 void mlir::iree_compiler::gpu::SmallReductionStrategy::configure(
     const ReductionConfig &reductionConfig) {
   int64_t maxNumThreadsToUse = reductionConfig.maxNumThreads;
-  // `hasTrailingElementwise` is currently used to guard
-  // against pathological cases where IREE can't bound a buffer and
-  // crashes.
-  // TODO: Fix IREE's codegen/Common/PadDynamicAlloc.cpp.
-  bool hasTrailingElementwise = (captures.maybeTrailingRank > 0);
   assert(maxNumThreadsToUse > 0 && "maxNumThreadsToUse must be > 0");
   assert(maxNumThreadsToUse >= kCudaWarpSize && "not even a warp?");
 
@@ -84,26 +77,9 @@ void mlir::iree_compiler::gpu::SmallReductionStrategy::configure(
   // Trailing elementwise unaligned tiling created bounded local buffers that
   // are dynamic. Attempting to bound them in Common/PadDynamicAlloc.cpp results
   // in a crash in the associated upstream util.
-  // TODO: Capture static parallel dimensions and allow if workgroupTileSizes
-  // divides the parallel dimension evenly.
   // TODO: More generally fix PadDynamicAlloc and the associated upstream util.
-  if (failed(maybeDivisor) && hasTrailingElementwise) return;
-
-  // Dynamic reductions are never supported by default because we can never
-  // know offhand whether we are in a small-reduction regime mode. Since this
-  // mode does not coalesce reads, perf will suffer catastrophically on larger
-  // runtime reduction.
-  // TODO: explicit hint from above that we really want to do that.
-  // TODO: evolve towards expressing this constraint with a perf-directed
-  // matcher that composes with the existing structural matchers.
-  int64_t reductionDimensionSize = captures.reductionOpSizes.back();
-  if (ShapedType::isDynamic(reductionDimensionSize)) return;
-
-  // Otherwise, still only support the small cases for now and fall back to
-  // other strategies otherwise.
-  // TODO: evolve towards expressing this constraint with a perf-directed
-  // matcher that composes with the existing structural matchers.
-  if (reductionDimensionSize >= 2 * kCudaWarpSize) return;
+  bool hasTrailingElementwise = (captures.maybeTrailingRank > 0);
+  if (failed(maybeDivisor) && hasTrailingElementwise) maybeDivisor = 1;
 
   // If the captured dimension has no satisfactory divisor, just tile the last
   // parallel dimension by 2 * kCudaWarpSize.
@@ -118,8 +94,6 @@ void mlir::iree_compiler::gpu::SmallReductionStrategy::configure(
   // ============
   // Just running sequentially on each thread and relying on cache for
   // locality.
-  // TODO: evolve towards expressing constraints with perf-directed matchers.
-  profitable = true;
 }
 
 static void buildSmallReductionStrategyThreadDistribution(
@@ -167,7 +141,7 @@ static void buildSmallReductionStrategyThreadDistribution(
       strategy.getNumThreadsInBlock().back());
 }
 
-void mlir::iree_compiler::gpu::buildGpuSmallReductionStrategy(
+void mlir::iree_compiler::gpu::buildSmallReductionStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const SmallReductionStrategy &strategy) {
   // Step 1. Call the matcher. Note that this is the same matcher as used to
@@ -191,20 +165,4 @@ void mlir::iree_compiler::gpu::buildGpuSmallReductionStrategy(
 
   // Step 4-5. Common trailing steps.
   buildCommonTrailingStrategy(b, variantH, strategy);
-}
-
-/// The configuration below has been determined empirically by performing a
-/// manual tradeoff between problem size, amount of parallelism and vector size
-/// on a particular NVIDIA RTX2080Ti 12GB card.
-/// This is a coarse tradeoff that should generally give reasonably good results
-/// but that begs to be complemented by hardcoded known good configurations and
-/// ultimately a database and/or a random forest compression of configurations
-/// with guaranteed performance.
-// TODO: Lift some of the strategy sizing logic as hints and/or heuristics to
-// also work properly in the dynamic case.
-// TODO: Support more HW configs and make it more pluggable.
-ReductionConfig mlir::iree_compiler::gpu::getSmallReductionConfig(
-    const transform_ext::MatchedReductionCaptures &captures) {
-  int64_t maxNumThreads = 4 * kCudaWarpSize;
-  return ReductionConfig{maxNumThreads, 0};
 }

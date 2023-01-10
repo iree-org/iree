@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/SmallReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/StagedReductionStrategy.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -50,14 +51,16 @@ using iree_compiler::maxDivisorOfValueBelowLimit;
 using iree_compiler::gpu::AbstractReductionStrategy;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
 using iree_compiler::gpu::buildCommonTrailingStrategy;
-using iree_compiler::gpu::buildGpuSmallReductionStrategy;
 using iree_compiler::gpu::buildMapToBlockAndThreads;
+using iree_compiler::gpu::buildSmallReductionStrategy;
 using iree_compiler::gpu::buildStagedReductionStrategy;
-using iree_compiler::gpu::getSmallReductionConfig;
+using iree_compiler::gpu::GPUModel;
 using iree_compiler::gpu::kCudaMaxNumThreads;
 using iree_compiler::gpu::kCudaMaxVectorLoadBitWidth;
 using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::ReductionConfig;
+using iree_compiler::gpu::ReductionStrategy;
+using iree_compiler::gpu::scaleUpByBitWidth;
 using iree_compiler::gpu::SmallReductionStrategy;
 using iree_compiler::gpu::StagedReductionStrategy;
 
@@ -243,11 +246,104 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.
 //===----------------------------------------------------------------------===//
-/// Return success if the IR matches what the GPU reduction strategy can
-/// handle. If it is success it will append the transform dialect after the
-/// entry point module.
+
+/// Placeholder to encode fixed reductions that should take finer-grained
+/// precedence over other heuristics. In the future, this could be lifted to
+/// e.g. `gpuModel` or higher up in some transform dialect database summary of
+/// "known good things".
+static FailureOr<ReductionConfig> applyKnownGoodReductionConfigurations(
+    const transform_ext::MatchedReductionCaptures &captures,
+    const GPUModel &gpuModel) {
+  auto staged = ReductionStrategy::Staged;
+  int64_t reductionSize = captures.reductionOpSizes.back();
+  if (gpuModel.model == GPUModel::kDefaultGPU) {
+    if (captures.reductionOutputElementalTypeBitWidth == 32) {
+      if (reductionSize == 64) return ReductionConfig{64, 1, staged};
+      if (reductionSize == 128) return ReductionConfig{32, 4, staged};
+      if (reductionSize == 512) return ReductionConfig{256, 2, staged};
+    }
+  }
+  return failure();
+}
+
+/// The configurations below have been determined empirically by performing a
+/// manual tradeoff between problem size, amount of parallelism and vector
+/// size on a particular NVIDIA RTX2080Ti 12GB card. This is a coarse tradeoff
+/// that should generally give reasonably good results but that begs to be
+/// complemented by hardcoded known good configurations and ultimately a
+/// database and/or a random forest compression of configurations with
+/// guaranteed performance.
+// TODO: Lift some of the strategy sizing logic as hints and/or heuristics to
+// also work properly in the dynamic case.
+// TODO: Support more HW configs and make it more pluggable.
+static ReductionConfig getReductionConfig(
+    const transform_ext::MatchedReductionCaptures &captures,
+    const GPUModel &gpuModel) {
+  auto maybeHardcodedConfiguration =
+      applyKnownGoodReductionConfigurations(captures, gpuModel);
+  if (succeeded(maybeHardcodedConfiguration))
+    return *maybeHardcodedConfiguration;
+
+  //===--------------------------------------------------------------------===//
+  // Small reduction strategy.
+  //===--------------------------------------------------------------------===//
+  // Dynamic reductions are never supported by default because we can
+  // never know offhand whether we are in a small-reduction regime mode.
+  // Since this mode does not coalesce reads, perf will suffer
+  // catastrophically on larger runtime reduction.
+  // TODO: explicit hint from above that we really want to do that.
+  int64_t reductionDimensionSize = captures.reductionOpSizes.back();
+  bool isDynamicReduction = ShapedType::isDynamic(reductionDimensionSize);
+  // Otherwise, still only support the small cases for now and fall back to
+  // other strategies otherwise.
+  bool isSmallReduction = (reductionDimensionSize < 2 * kCudaWarpSize);
+  if (!isDynamicReduction && isSmallReduction) {
+    int64_t maxNumThreads = 4 * kCudaWarpSize;
+    return ReductionConfig{maxNumThreads, 0, ReductionStrategy::Small};
+  }
+  //===--------------------------------------------------------------------===//
+  // Staged reduction strategy.
+  //===--------------------------------------------------------------------===//
+  int64_t bitWidth = captures.reductionOutputElementalTypeBitWidth;
+  int64_t vectorSize = scaleUpByBitWidth(4, bitWidth);
+  int64_t maxNumThreads = 8 * kCudaWarpSize;
+  // No adjustments in the dynamic case, we need extra information to make a
+  // good decision.
+  int64_t redSize = captures.reductionOpSizes.back();
+  if (ShapedType::isDynamic(redSize))
+    return ReductionConfig{maxNumThreads, vectorSize};
+  // Scale down to smaller sizes (4, 8, 16)-warps.
+  if (scaleUpByBitWidth(redSize, bitWidth) <= 4 * kCudaWarpSize) {
+    vectorSize = scaleUpByBitWidth(1, bitWidth);
+    maxNumThreads = 4 * kCudaWarpSize;
+  } else if (scaleUpByBitWidth(redSize, bitWidth) <= 8 * kCudaWarpSize) {
+    vectorSize = scaleUpByBitWidth(2, bitWidth);
+    maxNumThreads = 4 * kCudaWarpSize;
+  } else if (scaleUpByBitWidth(redSize, bitWidth) <= 8 * 2 * kCudaWarpSize) {
+    vectorSize = scaleUpByBitWidth(4, bitWidth);
+    maxNumThreads = 4 * kCudaWarpSize;
+  }
+  // Scale up to larger sizes (32, 64, 128+)-warps, using vector-4.
+  if (!captures.trailingOpSizes.empty()) {
+    if (scaleUpByBitWidth(redSize, bitWidth) >= 128 * 4 * kCudaWarpSize) {
+      vectorSize = scaleUpByBitWidth(4, bitWidth);
+      maxNumThreads = 32 * kCudaWarpSize;
+    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 64 * 4 * kCudaWarpSize) {
+      vectorSize = scaleUpByBitWidth(4, bitWidth);
+      maxNumThreads = 16 * kCudaWarpSize;
+    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 32 * 4 * kCudaWarpSize) {
+      vectorSize = scaleUpByBitWidth(4, bitWidth);
+      maxNumThreads = 8 * kCudaWarpSize;
+    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 16 * 4 * kCudaWarpSize) {
+      vectorSize = scaleUpByBitWidth(4, bitWidth);
+      maxNumThreads = 4 * kCudaWarpSize;
+    }
+  }
+  return ReductionConfig{maxNumThreads, vectorSize, ReductionStrategy::Staged};
+}
+
 LogicalResult mlir::iree_compiler::gpu::matchAndSetReductionStrategy(
-    func::FuncOp entryPoint, linalg::LinalgOp op) {
+    func::FuncOp entryPoint, linalg::LinalgOp op, const GPUModel &gpuModel) {
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher reduction, fill, leading, trailing;
   transform_ext::MatchedReductionCaptures captures;
@@ -257,14 +353,19 @@ LogicalResult mlir::iree_compiler::gpu::matchAndSetReductionStrategy(
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    // Take the small strategy if it is deemed profitable.
-    auto maybeSmallStrategy =
-        SmallReductionStrategy::create(op->getContext(), captures);
-    if (succeeded(maybeSmallStrategy))
-      return buildGpuSmallReductionStrategy(b, variant, *maybeSmallStrategy);
-    // Otherwise, always fallback to the staged strategy.
-    auto strategy = StagedReductionStrategy::create(op->getContext(), captures);
-    return buildStagedReductionStrategy(b, variant, strategy);
+    ReductionConfig reductionConfig = getReductionConfig(captures, gpuModel);
+    if (reductionConfig.strategy == ReductionStrategy::Small) {
+      auto strategy = SmallReductionStrategy::create(op->getContext(), captures,
+                                                     reductionConfig);
+      return buildSmallReductionStrategy(b, variant, strategy);
+    } else if (reductionConfig.strategy == ReductionStrategy::Staged) {
+      // Otherwise, always fallback to the staged strategy.
+      auto strategy = StagedReductionStrategy::create(
+          op->getContext(), captures, reductionConfig);
+      return buildStagedReductionStrategy(b, variant, strategy);
+    } else {
+      return llvm_unreachable("Unknown strategy");
+    }
   };
 
   // 3. Build strategy embedded into the IR.

@@ -1225,7 +1225,9 @@ static LogicalResult setTransformStrategyRootConfig(
     const TargetMLTransformInfo &targetMLTransInfo) {
   if (!clCPUEnableTransformDialectJit) return failure();
   if (getLoweringConfig(genericOp)) return failure();
-  if (failed(cpu::matchAndSetReductionStrategy(entryPointFn, genericOp)))
+  cpu::CPUModel cpuModel;
+  if (failed(
+          cpu::matchAndSetReductionStrategy(entryPointFn, genericOp, cpuModel)))
     return failure();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn->getContext(),
