@@ -486,6 +486,41 @@ struct ConvertReturnOp : public OpConversionPattern<IREE::Flow::ReturnOp> {
 // Collective Ops
 //-------------------------------------------
 
+struct ConvertAllReduceOp
+    : public OpConversionPattern<IREE::Flow::AllReduceOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::AllReduceOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto shape = op.getType().cast<ShapedType>();
+    auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
+        op.getContext(), IREE::Stream::CollectiveKind::AllReduce,
+        static_cast<IREE::Stream::CollectiveReductionOp>(op.getReductionOp()),
+        static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
+
+    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+    auto elementCount = rewriter.create<arith::ConstantIndexOp>(
+        op.getLoc(), shape.getNumElements());
+    auto newTargetCast =
+        consumeTensorOperand(op.getLoc(), adaptor.getTarget(), rewriter);
+    auto newSourceCast =
+        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
+
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncCollectiveOp>(
+        op, collectiveAttr, adaptor.getTarget(),
+        /*target_size=*/newTargetCast.resourceSize,
+        /*target_offset=*/zeroOffset,
+        /*target_end=*/newTargetCast.resourceSize,
+        /*target_length=*/newTargetCast.resourceSize, adaptor.getSource(),
+        /*source_size=*/newSourceCast.resourceSize,
+        /*source_offset=*/zeroOffset, /*source_end=*/newSourceCast.resourceSize,
+        /*source_length=*/newSourceCast.resourceSize, elementCount,
+        adaptor.getChannel(),
+        /*param=*/mlir::Value(), getAffinityFor(op));
+    return success();
+  }
+};
+
 struct ConvertChannelDefaultOp
     : public OpConversionPattern<IREE::Flow::ChannelDefaultOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -536,8 +571,9 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
   patterns.insert<ConvertDispatchOp>(typeConverter, context);
   patterns.insert<ConvertExecutableOp>(typeConverter, context);
   patterns.insert<ConvertReturnOp>(typeConverter, context);
-  patterns.insert<ConvertChannelDefaultOp, ConvertChannelCountOp,
-                  ConvertChannelRankOp>(typeConverter, context);
+  patterns.insert<ConvertAllReduceOp, ConvertChannelDefaultOp,
+                  ConvertChannelCountOp, ConvertChannelRankOp>(typeConverter,
+                                                               context);
 }
 
 void populateFlowToStreamConversionPatterns(MLIRContext *context,

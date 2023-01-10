@@ -21,3 +21,18 @@ func.func @channel_rank() -> index {
   %rank = flow.channel.rank %channel_default : index
   return %rank : index
 }
+
+//-----
+
+// CHECK-LABEL: @all_reduce_sum
+func.func @all_reduce_sum(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
+  // CHECK: stream.channel.default
+  // CHECK: stream.tensor.empty : tensor<2304xf32>
+  // CHECK: stream.async.collective<all_reduce with sum : f32>
+  %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<2304xf32>
+  %channel_default = flow.channel.default : !flow.channel
+  %1 = flow.tensor.empty : tensor<2304xf32>
+  %2 = flow.allreduce sum, f32, %1, %0, %channel_default : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> tensor<2304xf32>
+  %3 = hal.tensor.export %2 : tensor<2304xf32> -> !hal.buffer_view
+  return %3 : !hal.buffer_view
+}
