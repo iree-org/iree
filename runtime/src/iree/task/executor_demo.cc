@@ -46,6 +46,7 @@ extern "C" int main(int argc, char* argv) {
   iree_task_topology_t topology;
 #if 1
   iree_task_topology_initialize_from_physical_cores(
+      IREE_TASK_TOPOLOGY_NODE_ID_ANY,
       /*max_core_count=*/6, &topology);
 #else
   iree_task_topology_initialize_from_group_count(/*group_count=*/6, &topology);
