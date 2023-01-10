@@ -731,147 +731,12 @@ FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
   return result;
 }
 
-/// Searches the same sequence in all the affine maps and collapses these
-/// dimensions. It only applies these to "parallel" loops without mixing them
-/// with "reduction" types.
-static SmallVector<ReassociationIndices> getCollapsibleLoops(
-    linalg::GenericOp genericOp) {
-  SmallVector<ReassociationIndices> contiguousLoops;
-
-  SmallVector<unsigned> pDims;
-  genericOp.getParallelDims(pDims);
-  if (pDims.size() < 2) return contiguousLoops;
-
-  llvm::SmallDenseSet<unsigned> pLoops(pDims.begin(), pDims.end());
-
-  auto hasAllMapsSameSequence = [&](AffineExpr preExpr, AffineExpr nextExpr) {
-    for (AffineMap map : genericOp.getIndexingMapsArray()) {
-      bool foundSeq = false;
-      for (auto [index, resultExpr] : llvm::enumerate(map.getResults())) {
-        if (resultExpr == nextExpr) {
-          foundSeq = (index > 0 && preExpr == map.getResult(index - 1));
-          break;
-        }
-      }
-      if (!foundSeq) return false;
-    }
-    return true;
-  };
-
-  ReassociationIndices range;
-  AffineExpr preExpr;
-  for (auto nextExpr : genericOp.getIndexingMapsArray().front().getResults()) {
-    unsigned pos = nextExpr.cast<AffineDimExpr>().getPosition();
-    if (!range.empty()) {
-      if (!hasAllMapsSameSequence(preExpr, nextExpr) || !pLoops.count(pos)) {
-        if (range.size() > 1)
-          contiguousLoops.push_back({range.begin(), range.end()});
-        range.clear();
-      }
-    }
-    preExpr = nextExpr;
-    if (pLoops.count(pos)) range.push_back(pos);
-  }
-  if (range.size() > 1) contiguousLoops.push_back(range);
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "Collapsing dimensions if possible: ";
-    for (auto indices : contiguousLoops) {
-      llvm::dbgs() << "[";
-      for (auto idx : indices) llvm::dbgs() << idx << ",";
-      llvm::dbgs() << "]\t";
-    }
-    llvm::dbgs() << "\n";
-  });
-
-  return contiguousLoops;
-}
-
-/// Collapse possible dimension of the given linalg.generic and return the
-/// new one
-static FailureOr<linalg::GenericOp> collapseLinalgGeneric(
-    TensorDimTrackingRewriter &rewriter, linalg::GenericOp genericOp) {
-  SmallVector<ReassociationIndices> collapseIndices =
-      getCollapsibleLoops(genericOp);
-
-  if (collapseIndices.empty()) return genericOp;
-
-  rewriter.setInsertionPoint(genericOp);
-  FailureOr<SmallVector<Value>> replacements =
-      mlir::linalg::collapseGenericOpIterationDims(genericOp, collapseIndices,
-                                                   rewriter);
-  if (failed(replacements) || replacements->empty()) {
-    return rewriter.notifyMatchFailure(genericOp,
-                                       "failed to collapse dimensions");
-  }
-
-  // Find and return collapsed linalg.generic
-  auto expandshapeOp =
-      replacements->front().getDefiningOp<tensor::ExpandShapeOp>();
-  if (!expandshapeOp) return failure();
-
-  auto newGenericOp =
-      expandshapeOp.getOperand().getDefiningOp<linalg::GenericOp>();
-  if (!newGenericOp) return failure();
-
-  rewriter.replaceOp(genericOp, *replacements);
-  return newGenericOp;
-}
-
-/// Returns true if the given op is collapsable.
-static bool isEligibleForCollapse(Operation *op,
-                                  ArrayRef<Operation *> producers) {
-  if (!producers.empty()) return false;
-
-  auto genericOp = dyn_cast<linalg::GenericOp>(op);
-  if (!genericOp) return false;
-
-  // TODO(guray) There is no mechanism to tell the collapsed indexes to
-  // `tensor.expand_shape`. Once we have this support in MLIR, we can enable
-  // dynamic tensor shapes.
-  if (genericOp.hasDynamicShape()) return false;
-
-  // TODO(guray) Currently we can only collapse when result of all the
-  // AffineMaps are dimensions. Possible to collapse cases like
-  // affine_map<d0, d1+d2> with affine_map<d0, d1+d2>, however, this is not
-  // supported in collapsing mechanism in MLIR. Once we have this support,
-  // we can remove this if statement.
-  if (llvm::any_of(genericOp.getIndexingMapsArray(), [](AffineMap map) {
-        return !map.isProjectedPermutation();
-      })) {
-    return false;
-  }
-
-  // IndexOp allows accesing induction variables. Collapsing might cause
-  // performance regression, so we disable it.
-  if (genericOp.hasIndexSemantics()) return false;
-
-  return true;
-}
-
-/// Traverses all the ops in `roots`; collapse the ops if they are eligible
-/// ops.
-static LogicalResult collapseDimensions(
-    TensorDimTrackingRewriter &rewriter, SmallVectorImpl<Operation *> &roots,
-    DenseMap<unsigned, SmallVector<Operation *>> &producers) {
-  for (auto [index, op] : llvm::enumerate(roots)) {
-    if (!isEligibleForCollapse(op, producers[index])) continue;
-
-    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-      auto maybeLinalgGeneric = collapseLinalgGeneric(rewriter, genericOp);
-      if (failed(maybeLinalgGeneric)) return failure();
-      roots[index] = *maybeLinalgGeneric;
-    }
-  }
-  return success();
-}
-
 /// Create Flow::DispatchGroupsOps based on a fusion heuristic.
 static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
                                         FunctionOpInterface funcOp,
                                         DominanceInfo const &dominanceInfo,
                                         bool generateWorkloadRegion,
-                                        bool aggressiveFusion, bool collapse) {
+                                        bool aggressiveFusion) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
   // attribute
   unsigned numRoots =
@@ -898,17 +763,6 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
       removeFusionGroupsAttribute(op);
     }
   });
-
-  // TODO(guray): This can be extracted to a pass.
-  if (collapse) {
-    if (failed(collapseDimensions(rewriter, roots, producers)))
-      return failure();
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After Collapsing dimension ---\n";
-      funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
 
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
@@ -972,15 +826,13 @@ struct FormDispatchRegionsPass
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
                 scf::SCFDialect, tensor::TensorDialect>();
   }
-  FormDispatchRegionsPass(bool aggressiveFusion, bool generateWorkloadRegion,
-                          bool collapse) {
+  FormDispatchRegionsPass(bool aggressiveFusion, bool generateWorkloadRegion) {
     this->aggressiveFusion = aggressiveFusion;
     this->generateWorkloadRegion = generateWorkloadRegion;
-    this->collapse = collapse;
   }
   FormDispatchRegionsPass(const FormDispatchRegionsPass &pass)
       : FormDispatchRegionsPass(pass.aggressiveFusion,
-                                pass.generateWorkloadRegion, pass.collapse) {}
+                                pass.generateWorkloadRegion) {}
   void runOnOperation() override;
 };
 }  // namespace
@@ -991,16 +843,15 @@ void FormDispatchRegionsPass::runOnOperation() {
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo,
-                                generateWorkloadRegion, aggressiveFusion,
-                                collapse)))
+                                generateWorkloadRegion, aggressiveFusion)))
     return signalPassFailure();
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFormDispatchRegionsPass(bool aggressiveFusion,
-                              bool generateWorkloadRegion, bool collapse) {
-  return std::make_unique<FormDispatchRegionsPass>(
-      aggressiveFusion, generateWorkloadRegion, collapse);
+                              bool generateWorkloadRegion) {
+  return std::make_unique<FormDispatchRegionsPass>(aggressiveFusion,
+                                                   generateWorkloadRegion);
 }
 }  // namespace Flow
 }  // namespace IREE

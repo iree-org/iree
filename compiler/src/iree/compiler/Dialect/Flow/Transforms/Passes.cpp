@@ -101,10 +101,6 @@ static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
     llvm::cl::desc("Generate the workload region"), llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clCollapseDimensions(
-    "iree-flow-form-dispatch-regions-collapse",
-    llvm::cl::desc("Collapse dimensions"), llvm::cl::init(true));
-
 static llvm::cl::opt<bool> clEnableDataTiling(
     "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path"),
     llvm::cl::init(false));
@@ -296,9 +292,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // the FormDispatchRegions handle the rest.
       .addPass([&]() {
         return createFormDispatchRegionsPass(clEnableAggressiveFusion,
-                                             clDispatchGenerateWorkloadRegion,
-                                             clCollapseDimensions);
+                                             clDispatchGenerateWorkloadRegion);
       })
+      // Collapse dimensions of linalg Ops.
+      .addPass(createCollapseDimensionsPass)
       // Form dispatch region into dispatch workgroups
       .addPass([&]() {
         return createFormDispatchWorkgroupsPass(
