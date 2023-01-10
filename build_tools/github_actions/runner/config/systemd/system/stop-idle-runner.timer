@@ -10,4 +10,8 @@ OnActiveSec=30m
 OnUnitInactiveSec=15m
 
 [Install]
-WantedBy=timers.target runner-setup.target
+# TODO(gcmn): Re-enable once we've debugged this causing actions failures.
+# WantedBy=timers.target runner-setup.target
+# This install command just exists to make it possible to call enable on this
+# without an error (effectively a noop)
+Also=stop-idle-runner.service
