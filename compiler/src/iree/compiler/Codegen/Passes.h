@@ -132,8 +132,13 @@ std::unique_ptr<OperationPass<void>>
 createTestPartitionableLoopsInterfacePass();
 
 /// Pass to tile and distribute to workgroups.
+using CustomTileAndDistributePatternsFn =
+    std::function<void(RewritePatternSet &, Operation *)>;
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass();
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createTileAndDistributeToWorkgroupsPass(
+    CustomTileAndDistributePatternsFn const &fn);
 
 /// Pass to specialize workgroup distribution loops
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -199,14 +204,6 @@ createFuseTensorPadWithConsumerPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConcretizePadResultShapePass();
 
-IREE::LinalgExt::MaterializeEncodingValueFn getMaterializeEncodingValueFn(
-    IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Materialize the encoding of operations. The layout to use for the encoded
-/// operations are backend specific.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createIREEMaterializeEncodingPass();
-
 /// Erases #hal.descriptor_type as MemRef memory space.
 LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp);
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -269,6 +266,11 @@ createLLVMCPUCheckIRBeforeLLVMConversionPass();
 /// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass();
+
+/// Materialize the encoding of operations. The layout to use for the encoded
+/// operations are backend specific.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUMaterializeEncodingPass();
 
 /// Synchronizes LLVM linkage with MLIR symbol visibility.
 std::unique_ptr<OperationPass<ModuleOp>>
@@ -639,6 +641,9 @@ createWGSLReplacePushConstantsPass();
 //------------------------------------------------------------------------------
 // Test passes
 //------------------------------------------------------------------------------
+
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createTestLLVMCPUMaterializeDispatchWorkgroupCountPass();
 
 std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass();
 

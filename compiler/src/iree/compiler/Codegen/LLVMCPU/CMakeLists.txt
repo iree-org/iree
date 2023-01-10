@@ -14,10 +14,12 @@ iree_cc_library(
   NAME
     LLVMCPU
   HDRS
+    "EncodingInfo.h"
     "KernelDispatch.h"
     "TargetMLTransformInfo.h"
   SRCS
     "ConvertToLLVM.cpp"
+    "EncodingInfo.cpp"
     "KernelDispatch.cpp"
     "LLVMCPUAArch64VectorLowering.cpp"
     "LLVMCPUAssignConstantOrdinals.cpp"
@@ -26,6 +28,7 @@ iree_cc_library(
     "LLVMCPUEmitVectorizationRemarks.cpp"
     "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
+    "LLVMCPUMaterializeEncodingPass.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"

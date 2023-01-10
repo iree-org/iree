@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
+#include "iree/compiler/Codegen/LLVMCPU/EncodingInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
@@ -126,7 +127,8 @@ static void addBufferizePasses(OpPassManager &passManager) {
 
 static void addTileAndDistributePasses(
     OpPassManager &pm, bool useFuseTensorPadWithConsumerPass = true) {
-  pm.addPass(createTileAndDistributeToWorkgroupsPass());
+  pm.addPass(createTileAndDistributeToWorkgroupsPass(
+      populateLLVMCPUDispatchWorkgroupCountPatterns));
   auto &nestedModulePM = pm.nest<ModuleOp>();
   if (clEnablePadConsumerFusion && useFuseTensorPadWithConsumerPass) {
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -720,7 +722,7 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createTypePropagationPass());
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createIREEMaterializeEncodingPass());
+      createLLVMCPUMaterializeEncodingPass());
   passManager.addNestedPass<ModuleOp>(createBufferizeCopyOnlyDispatchesPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.

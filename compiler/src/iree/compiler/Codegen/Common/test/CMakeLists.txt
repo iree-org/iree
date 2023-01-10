@@ -30,7 +30,6 @@ iree_lit_test_suite(
     "gpu_pipeline.mlir"
     "gpu_vectorization.mlir"
     "iree_comprehensive_bufferize.mlir"
-    "materialize_encoding.mlir"
     "pad_dynamic_alloc.mlir"
     "reduce_bank_conflicts.mlir"
     "reductions.mlir"

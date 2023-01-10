@@ -16,6 +16,7 @@ iree_compiler_cc_library(
     name = "LLVMCPU",
     srcs = [
         "ConvertToLLVM.cpp",
+        "EncodingInfo.cpp",
         "KernelDispatch.cpp",
         "LLVMCPUAArch64VectorLowering.cpp",
         "LLVMCPUAssignConstantOrdinals.cpp",
@@ -24,6 +25,7 @@ iree_compiler_cc_library(
         "LLVMCPUEmitVectorizationRemarks.cpp",
         "LLVMCPULinkExecutables.cpp",
         "LLVMCPULowerExecutableTarget.cpp",
+        "LLVMCPUMaterializeEncodingPass.cpp",
         "LLVMCPUSynchronizeSymbolVisibility.cpp",
         "LLVMCPUUnfuseFMAOps.cpp",
         "Passes.cpp",
@@ -32,6 +34,7 @@ iree_compiler_cc_library(
         "VerifyLinalgTransformLegality.cpp",
     ],
     hdrs = [
+        "EncodingInfo.h",
         "KernelDispatch.h",
         "TargetMLTransformInfo.h",
     ],

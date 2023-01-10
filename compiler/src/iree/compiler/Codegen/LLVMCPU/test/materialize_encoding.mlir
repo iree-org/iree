@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-materialize-encoding --canonicalize --cse --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-llvmcpu-materialize-encoding --canonicalize --cse --split-input-file %s | FileCheck %s
 
 func.func @set_encoding_op() {
   %c0 = arith.constant 0 : index

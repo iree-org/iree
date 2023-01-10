@@ -10,8 +10,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/EncodingInfo.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -423,8 +423,8 @@ struct MaterializeFlowDispatchTensorStoreOp
   }
 };
 
-struct IREEMaterializeEncodingPass
-    : public IREEMaterializeEncodingBase<IREEMaterializeEncodingPass> {
+struct LLVMCPUMaterializeEncodingPass
+    : public LLVMCPUMaterializeEncodingBase<LLVMCPUMaterializeEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, AffineDialect, IREE::Flow::FlowDialect,
                     IREE::LinalgExt::IREELinalgExtDialect,
@@ -435,7 +435,7 @@ struct IREEMaterializeEncodingPass
 
 }  // namespace
 
-void IREEMaterializeEncodingPass::runOnOperation() {
+void LLVMCPUMaterializeEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto operation = getOperation();
 
@@ -507,8 +507,8 @@ MaterializeEncodingValueFn getMaterializeEncodingValueFn(
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createIREEMaterializeEncodingPass() {
-  return std::make_unique<IREEMaterializeEncodingPass>();
+createLLVMCPUMaterializeEncodingPass() {
+  return std::make_unique<LLVMCPUMaterializeEncodingPass>();
 }
 
 }  // namespace iree_compiler
