@@ -27,4 +27,4 @@ steps:
       - "queue=benchmark-x86_64"
     artifact_paths:
       - "benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json"
-    timeout_in_minutes: "20"
+    timeout_in_minutes: "60"
