@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_
 
+#include <iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h>
+
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -81,19 +83,26 @@ void build1DSplittingStrategyWithOptionalThreadMapping(
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.
 //===----------------------------------------------------------------------===//
+/// Placeholder for some hardware model proxy that contains relevant information
+/// to configure the reduction strategy. In the future, this will need to be
+/// driven by some contract with the runtime.
+struct GPUModel {
+  StringRef model = "NVIDIA-RTX-2080Ti-12GB";
+};
+
 /// Map an N-D parallel, 1-D reduction operation with optional leading and
 /// optional trailing elementwise operations.
 /// The 1-D reduction dimension must be in the most minor dimension.
-/// The innermost dimensions of the leading and trailing operations must be most
-/// minor along all accesses.
-/// Return failure if matching fails.
-/// On a successful match, configure a reduction strategy based on a proxy model
-/// of the hardware and construct transform dialect IR that implements the
+/// The innermost dimensions of the leading and trailing operations must be
+/// most minor along all accesses. Return failure if matching fails. On a
+/// successful match, configure a reduction strategy based on a proxy model of
+/// the hardware and construct transform dialect IR that implements the
 /// reduction strategy. The transform dialect IR is added using
 /// `createTransformRegion`, which creates a top-level ModuleOp after the
 /// `entryPoint` func::FuncOp.
 LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
-                                           linalg::LinalgOp op);
+                                           linalg::LinalgOp op,
+                                           const GPUModel& gpuModel);
 
 }  // namespace gpu
 }  // namespace iree_compiler

@@ -15,6 +15,9 @@ namespace mlir {
 namespace iree_compiler {
 namespace cpu {
 
+//===----------------------------------------------------------------------===//
+// Mid-level problem-specific strategy builder APIs, follow MLIR-style builders.
+//===----------------------------------------------------------------------===//
 /// Take care of the last common steps in a CPU strategy (i.e. vectorize,
 /// bufferize, maps to blocks/workgroups and lower vectors).
 /// Return the handles to the updated variant and the func::FuncOp ops under
@@ -27,6 +30,13 @@ std::pair<Value, Value> buildCommonTrailingStrategy(ImplicitLocOpBuilder& b,
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.
 //===----------------------------------------------------------------------===//
+/// Placeholder for some hardware model proxy that contains relevant information
+/// to configure the reduction strategy. In the future, this will need to be
+/// driven by some contract with the runtime.
+struct CPUModel {
+  StringRef model = "Intel-Xeon-Gold-6154-3GHz";
+};
+
 /// Map an N-D parallel, 1-D reduction operation with optional leading and
 /// optional trailing elementwise operations.
 /// The 1-D reduction dimension must be in the most minor dimension.
@@ -39,7 +49,8 @@ std::pair<Value, Value> buildCommonTrailingStrategy(ImplicitLocOpBuilder& b,
 /// `createTransformRegion`, which creates a top-level ModuleOp after the
 /// `entryPoint` func::FuncOp.
 LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
-                                           linalg::LinalgOp op);
+                                           linalg::LinalgOp op,
+                                           const CPUModel& cpuModel);
 }  // namespace cpu
 }  // namespace iree_compiler
 }  // namespace mlir

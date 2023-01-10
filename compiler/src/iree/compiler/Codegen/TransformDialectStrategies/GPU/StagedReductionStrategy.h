@@ -13,6 +13,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace gpu {
 
+struct GPUModel;
+
 /// Encode a 3-staged strategy for a 1-d reduction mapped to a block.
 ///
 /// This happens in a staged fashion to encode good tradeoffs between amount
@@ -50,7 +52,8 @@ class StagedReductionStrategy : public AbstractReductionStrategy {
  public:
   static StagedReductionStrategy create(
       MLIRContext *context,
-      const transform_ext::MatchedReductionCaptures &captures);
+      const transform_ext::MatchedReductionCaptures &captures,
+      const ReductionConfig &reductionConfig);
 
   StagedReductionStrategy(const StagedReductionStrategy &) = default;
   StagedReductionStrategy &operator=(const StagedReductionStrategy &) = default;
@@ -62,9 +65,6 @@ class StagedReductionStrategy : public AbstractReductionStrategy {
     return {getNumThreadsXInBlock(), getNumThreadsYInBlock(),
             getNumThreadsZInBlock()};
   }
-
-  // Always profitable.
-  bool isProfitable() override { return true; }
 
   int64_t getVectorSize() const { return vectorSize; }
 
@@ -90,19 +90,6 @@ class StagedReductionStrategy : public AbstractReductionStrategy {
   /// This is also the blockDim.x of the kernel.
   int64_t numThreadsXInBlock;
 };
-
-/// The configuration below has been determined empirically by performing a
-/// manual tradeoff between problem size, amount of parallelism and vector size
-/// on a particular NVIDIA RTX2080Ti 12GB card.
-/// This is a coarse tradeoff that should generally give reasonably good results
-/// but that begs to be complemented by hardcoded known good configurations and
-/// ultimately a database and/or a random forest compression of configurations
-/// with guaranteed performance.
-// TODO: Lift some of the strategy sizing logic as hints and/or heuristics to
-// also work properly in the dynamic case.
-// TODO: Support more HW configs and make it more pluggable.
-ReductionConfig getStagedReductionConfig(
-    const transform_ext::MatchedReductionCaptures &captures);
 
 /// Entry point to build the transform IR corresponding to a staged reduction
 /// strategy.

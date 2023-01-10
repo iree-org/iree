@@ -29,6 +29,8 @@ using namespace mlir;
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 // TODO: significantly better namespacing.
+using iree_compiler::cpu::CPUModel;
+using iree_compiler::cpu::ReductionConfig;
 using iree_compiler::cpu::ReductionStrategy;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
 using transform::LowerVectorsOp;
@@ -42,8 +44,7 @@ using transform_ext::ShapeKind;
 using transform_ext::StructuredOpMatcher;
 
 //===----------------------------------------------------------------------===//
-// Higher-level problem-specific strategy creation APIs, these should favor
-// user-friendliness.
+// Mid-level problem-specific strategy builder APIs, follow MLIR-style builders.
 //===----------------------------------------------------------------------===//
 
 /// Take care of the last common steps in a CPU strategy (i.e. vectorize,
@@ -70,8 +71,19 @@ std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
   return std::make_pair(variantH, funcH);
 }
 
+//===----------------------------------------------------------------------===//
+// Higher-level problem-specific strategy creation APIs, these should favor
+// user-friendliness.
+//===----------------------------------------------------------------------===//
+
+static ReductionConfig getReductionConfig(
+    const transform_ext::MatchedReductionCaptures &captures,
+    const CPUModel &cpuModel) {
+  return ReductionConfig{16};
+}
+
 LogicalResult iree_compiler::cpu::matchAndSetReductionStrategy(
-    func::FuncOp entryPoint, linalg::LinalgOp op) {
+    func::FuncOp entryPoint, linalg::LinalgOp op, const CPUModel &cpuModel) {
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher reduction, fill, leading, trailing;
   transform_ext::MatchedReductionCaptures captures;
@@ -81,8 +93,9 @@ LogicalResult iree_compiler::cpu::matchAndSetReductionStrategy(
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    // Otherwise, always fallback to the staged strategy.
-    auto strategy = ReductionStrategy::create(op->getContext(), captures);
+    ReductionConfig reductionConfig = getReductionConfig(captures, cpuModel);
+    auto strategy =
+        ReductionStrategy::create(op->getContext(), captures, reductionConfig);
     return buildReductionStrategy(b, variant, strategy);
   };
 

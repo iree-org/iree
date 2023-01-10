@@ -53,8 +53,8 @@ using iree_compiler::gpu::StagedReductionStrategy;
 StagedReductionStrategy
 mlir::iree_compiler::gpu::StagedReductionStrategy::create(
     MLIRContext *context,
-    const transform_ext::MatchedReductionCaptures &captures) {
-  ReductionConfig reductionConfig = getStagedReductionConfig(captures);
+    const transform_ext::MatchedReductionCaptures &captures,
+    const ReductionConfig &reductionConfig) {
   StagedReductionStrategy strategy(context, captures);
   strategy.configure(reductionConfig);
   LLVM_DEBUG(DBGS() << "use GPU staged reduction strategy\n");
@@ -198,54 +198,4 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
   int64_t bitWidth = strategy.captures.reductionOutputElementalTypeBitWidth;
   numWarpsToUse = adjustNumberOfWarpsForBlockShuffle(numWarpsToUse, bitWidth);
   buildDistributeVectors(b, variantH2, funcH, numWarpsToUse * kCudaWarpSize);
-}
-
-/// The configuration below has been determined empirically by performing a
-/// manual tradeoff between problem size, amount of parallelism and vector size
-/// on a particular NVIDIA RTX2080Ti 12GB card.
-/// This is a coarse tradeoff that should generally give reasonably good results
-/// but that begs to be complemented by hardcoded known good configurations and
-/// ultimately a database and/or a random forest compression of configurations
-/// with guaranteed performance.
-// TODO: Lift some of the strategy sizing logic as hints and/or heuristics to
-// also work properly in the dynamic case.
-// TODO: Support more HW configs and make it more pluggable.
-ReductionConfig mlir::iree_compiler::gpu::getStagedReductionConfig(
-    const transform_ext::MatchedReductionCaptures &captures) {
-  int64_t bitWidth = captures.reductionOutputElementalTypeBitWidth;
-  int64_t vectorSize = scaleUpByBitWidth(4, bitWidth);
-  int64_t maxNumThreads = 8 * kCudaWarpSize;
-  // No adjustments in the dynamic case, we need extra information to make a
-  // good decision.
-  int64_t redSize = captures.reductionOpSizes.back();
-  if (ShapedType::isDynamic(redSize))
-    return ReductionConfig{maxNumThreads, vectorSize};
-  // Scale down to smaller sizes (4, 8, 16)-warps.
-  if (scaleUpByBitWidth(redSize, bitWidth) <= 4 * kCudaWarpSize) {
-    vectorSize = scaleUpByBitWidth(1, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
-  } else if (scaleUpByBitWidth(redSize, bitWidth) <= 8 * kCudaWarpSize) {
-    vectorSize = scaleUpByBitWidth(2, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
-  } else if (scaleUpByBitWidth(redSize, bitWidth) <= 8 * 2 * kCudaWarpSize) {
-    vectorSize = scaleUpByBitWidth(4, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
-  }
-  // Scale up to larger sizes (32, 64, 128+)-warps, using vector-4.
-  if (!captures.trailingOpSizes.empty()) {
-    if (scaleUpByBitWidth(redSize, bitWidth) >= 128 * 4 * kCudaWarpSize) {
-      vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 32 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 64 * 4 * kCudaWarpSize) {
-      vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 16 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 32 * 4 * kCudaWarpSize) {
-      vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 8 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 16 * 4 * kCudaWarpSize) {
-      vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 4 * kCudaWarpSize;
-    }
-  }
-  return ReductionConfig{maxNumThreads, vectorSize};
 }
