@@ -24,8 +24,10 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
@@ -39,6 +41,7 @@
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-flow-form-dispatch-regions"
@@ -843,8 +846,20 @@ void FormDispatchRegionsPass::runOnOperation() {
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo,
-                                generateWorkloadRegion, aggressiveFusion)))
+                                generateWorkloadRegion, aggressiveFusion))) {
+    funcOp->emitOpError("failed to create fusion groups");
     return signalPassFailure();
+  }
+
+  RewritePatternSet canonicalizationPatterns(&getContext());
+  memref::populateResolveRankedShapeTypeResultDimsPatterns(
+      canonicalizationPatterns);
+  tensor::populateFoldTensorEmptyPatterns(canonicalizationPatterns);
+  if (failed(applyPatternsAndFoldGreedily(
+          funcOp, std::move(canonicalizationPatterns)))) {
+    funcOp->emitOpError("failed to apply cleanup patterns");
+    return signalPassFailure();
+  }
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
