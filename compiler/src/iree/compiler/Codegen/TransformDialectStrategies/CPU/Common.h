@@ -34,7 +34,7 @@ std::pair<Value, Value> buildCommonTrailingStrategy(ImplicitLocOpBuilder& b,
 /// to configure the reduction strategy. In the future, this will need to be
 /// driven by some contract with the runtime.
 struct CPUModel {
-  static constexpr StringRef kXeonGold6154 = "Intel-Xeon-Gold-6154-3GHz";
+  static constexpr StringLiteral kXeonGold6154 = "Intel-Xeon-Gold-6154-3GHz";
   StringRef model = kXeonGold6154;
 };
 
@@ -46,9 +46,8 @@ struct CPUModel {
 /// Return failure if matching fails.
 /// On a successful match, configure a reduction strategy based on a proxy model
 /// of the hardware and construct transform dialect IR that implements the
-/// reduction strategy. The transform dialect IR is added using
-/// `createTransformRegion`, which creates a top-level ModuleOp after the
-/// `entryPoint` func::FuncOp.
+/// reduction strategy. The transform dialect IR is added in a top-level
+/// ModuleOp after the `entryPoint` func::FuncOp.
 LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
                                            linalg::LinalgOp op,
                                            const CPUModel& cpuModel);

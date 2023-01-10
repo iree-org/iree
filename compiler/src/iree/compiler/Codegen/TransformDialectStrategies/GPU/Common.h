@@ -7,8 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_
 
-#include <iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h>
-
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -87,7 +86,8 @@ void build1DSplittingStrategyWithOptionalThreadMapping(
 /// to configure the reduction strategy. In the future, this will need to be
 /// driven by some contract with the runtime.
 struct GPUModel {
-  static constexpr StringRef kNvidiaRtx2080Ti12GB = "NVIDIA-RTX-2080Ti-12GB";
+  static constexpr StringLiteral kNvidiaRtx2080Ti12GB =
+      "NVIDIA-RTX-2080Ti-12GB";
   StringRef model = kNvidiaRtx2080Ti12GB;
 };
 
@@ -98,9 +98,8 @@ struct GPUModel {
 /// most minor along all accesses. Return failure if matching fails. On a
 /// successful match, configure a reduction strategy based on a proxy model of
 /// the hardware and construct transform dialect IR that implements the
-/// reduction strategy. The transform dialect IR is added using
-/// `createTransformRegion`, which creates a top-level ModuleOp after the
-/// `entryPoint` func::FuncOp.
+/// reduction strategy. The transform dialect IR is added in a top-level
+/// ModuleOp after the `entryPoint` func::FuncOp.
 LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
                                            linalg::LinalgOp op,
                                            const GPUModel& gpuModel);
