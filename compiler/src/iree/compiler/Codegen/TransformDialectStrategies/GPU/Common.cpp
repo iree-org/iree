@@ -247,6 +247,25 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
 // user-friendliness.
 //===----------------------------------------------------------------------===//
 
+/// Placeholder to encode fixed reductions that should take finer-grained
+/// precedence over other heuristics. In the future, this could be lifted to
+/// e.g. `gpuModel` or higher up in some transform dialect database summary of
+/// "known good things".
+static FailureOr<ReductionConfig> applyKnownGoodReductionConfigurations(
+    const transform_ext::MatchedReductionCaptures &captures,
+    const GPUModel &gpuModel) {
+  auto staged = ReductionStrategy::Staged;
+  int64_t reductionSize = captures.reductionOpSizes.back();
+  if (gpuModel.model == GPUModel::kNvidiaRtx2080Ti12GB) {
+    if (captures.reductionOutputElementalTypeBitWidth == 32) {
+      if (reductionSize == 64) return ReductionConfig{64, 1, staged};
+      if (reductionSize == 128) return ReductionConfig{32, 4, staged};
+      if (reductionSize == 512) return ReductionConfig{256, 2, staged};
+    }
+  }
+  return failure();
+}
+
 /// The configurations below have been determined empirically by performing a
 /// manual tradeoff between problem size, amount of parallelism and vector
 /// size on a particular NVIDIA RTX2080Ti 12GB card. This is a coarse tradeoff
@@ -260,25 +279,31 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
 static ReductionConfig getReductionConfig(
     const transform_ext::MatchedReductionCaptures &captures,
     const GPUModel &gpuModel) {
-  // Dynamic reductions are never supported by default because we can never
-  // know offhand whether we are in a small-reduction regime mode. Since this
-  // mode does not coalesce reads, perf will suffer catastrophically on larger
-  // runtime reduction.
+  auto maybeHardcodedConfiguration =
+      applyKnownGoodReductionConfigurations(captures, gpuModel);
+  if (succeeded(maybeHardcodedConfiguration))
+    return *maybeHardcodedConfiguration;
+
+  //===--------------------------------------------------------------------===//
+  // Small reduction strategy.
+  //===--------------------------------------------------------------------===//
+  // Dynamic reductions are never supported by default because we can
+  // never know offhand whether we are in a small-reduction regime mode.
+  // Since this mode does not coalesce reads, perf will suffer
+  // catastrophically on larger runtime reduction.
   // TODO: explicit hint from above that we really want to do that.
-  // TODO: evolve towards expressing this constraint with a perf-directed
-  // matcher that composes with the existing structural matchers.
   int64_t reductionDimensionSize = captures.reductionOpSizes.back();
   bool isDynamicReduction = ShapedType::isDynamic(reductionDimensionSize);
   // Otherwise, still only support the small cases for now and fall back to
   // other strategies otherwise.
-  // TODO: evolve towards expressing this constraint with a perf-directed
-  // matcher that composes with the existing structural matchers.
   bool isSmallReduction = (reductionDimensionSize < 2 * kCudaWarpSize);
-  if (isDynamicReduction && isSmallReduction) {
+  if (!isDynamicReduction && isSmallReduction) {
     int64_t maxNumThreads = 4 * kCudaWarpSize;
     return ReductionConfig{maxNumThreads, 0, ReductionStrategy::Small};
   }
-
+  //===--------------------------------------------------------------------===//
+  // Staged reduction strategy.
+  //===--------------------------------------------------------------------===//
   int64_t bitWidth = captures.reductionOutputElementalTypeBitWidth;
   int64_t vectorSize = scaleUpByBitWidth(4, bitWidth);
   int64_t maxNumThreads = 8 * kCudaWarpSize;

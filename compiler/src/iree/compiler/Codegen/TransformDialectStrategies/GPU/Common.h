@@ -87,7 +87,8 @@ void build1DSplittingStrategyWithOptionalThreadMapping(
 /// to configure the reduction strategy. In the future, this will need to be
 /// driven by some contract with the runtime.
 struct GPUModel {
-  StringRef model = "NVIDIA-RTX-2080Ti-12GB";
+  static constexpr StringRef kNvidiaRtx2080Ti12GB = "NVIDIA-RTX-2080Ti-12GB";
+  StringRef model = kNvidiaRtx2080Ti12GB;
 };
 
 /// Map an N-D parallel, 1-D reduction operation with optional leading and
