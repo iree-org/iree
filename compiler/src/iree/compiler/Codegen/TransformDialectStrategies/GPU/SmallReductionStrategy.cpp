@@ -130,15 +130,24 @@ static void buildSmallReductionStrategyThreadDistribution(
   // a single thread. This triggers the splitting but not the thread mapping
   // part.
   build1DSplittingStrategyWithOptionalThreadMapping(
-      b, blockReductionH, strategy.captures.reductionRank,
-      strategy.captures.reductionOpSizes,
+      /*b=*/b,
+      /*opH=*/blockReductionH,
+      /*rank=*/strategy.captures.reductionRank,
+      // TODO: capture and generalize mostMinorDim.
+      /*mostMinorDim=*/strategy.captures.reductionRank - 1,
+      /*opSizes=*/strategy.captures.reductionOpSizes,
       /*numThreads=*/1);
 
   // 3. apply the 1d splitting strategy to the trailing elementwise.
   build1DSplittingStrategyWithOptionalThreadMapping(
-      b, maybeBlockTrailingH, strategy.captures.maybeTrailingRank,
-      strategy.captures.trailingOpSizes,
-      strategy.getNumThreadsInBlock().back());
+      /*b=*/b,
+      /*opH=*/maybeBlockTrailingH,
+      /*rank=*/strategy.captures.maybeTrailingRank,
+      // TODO: capture and generalize mostMinorDim.
+      /*mostMinorDim=*/strategy.captures.maybeTrailingRank - 1,
+      /*opSizes=*/strategy.captures.trailingOpSizes,
+      /*numThreads=*/strategy.getNumThreadsXInBlock(),
+      /*mappingAttr=*/strategy.allThreadAttrs.front());
 }
 
 void mlir::iree_compiler::gpu::buildSmallReductionStrategy(

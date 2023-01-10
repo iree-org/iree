@@ -125,9 +125,15 @@ static void buildStagedReductionStrategyFindBetterName(
         strategy.captures.maybeLeadingOutputElementalTypeBitWidth;
     assert((vectorSize & (vectorSize - 1)) == 0 && "size must be power of 2");
     build1DSplittingStrategyWithOptionalThreadMapping(
-        b, maybeTiledLeadingH, strategy.captures.maybeLeadingRank,
-        strategy.captures.leadingOpSizes, strategy.getNumThreadsXInBlock(),
-        vectorSize);
+        /*b=*/b,
+        /*opH=*/maybeTiledLeadingH,
+        /*rank=*/strategy.captures.maybeLeadingRank,
+        // TODO: capture and generalize mostMinorDim.
+        /*mostMinorDim=*/strategy.captures.maybeLeadingRank - 1,
+        /*opSizes=*/strategy.captures.leadingOpSizes,
+        /*numThreads=*/strategy.getNumThreadsXInBlock(),
+        /*mappingAttr=*/strategy.allThreadAttrs.front(),
+        /*maxVectorSize=*/vectorSize);
   }
 
   // Staged reduction step 1: break gridReductionH apart.
@@ -150,11 +156,18 @@ static void buildStagedReductionStrategyFindBetterName(
   // Map the potential maybeTiledTrailingH.
   if (strategy.captures.maybeTrailingRank > 0) {
     int64_t vectorSize =
-        (4 * 32) / strategy.captures.maybeTrailingOutputElementalTypeBitWidth;
+        iree_compiler::gpu::kCudaMaxVectorLoadBitWidth /
+        strategy.captures.maybeTrailingOutputElementalTypeBitWidth;
     build1DSplittingStrategyWithOptionalThreadMapping(
-        b, maybeTiledTrailingH, strategy.captures.maybeTrailingRank,
-        strategy.captures.trailingOpSizes, strategy.getNumThreadsXInBlock(),
-        vectorSize);
+        /*b=*/b,
+        /*opH=*/maybeTiledTrailingH,
+        /*rank=*/strategy.captures.maybeTrailingRank,
+        // TODO: capture and generalize mostMinorDim.
+        /*mostMinorDim=*/strategy.captures.maybeTrailingRank - 1,
+        /*opSizes=*/strategy.captures.trailingOpSizes,
+        /*numThreads=*/strategy.getNumThreadsXInBlock(),
+        /*mappingAttr=*/strategy.allThreadAttrs.front(),
+        /*maxVectorSize=*/vectorSize);
   }
 }
 
