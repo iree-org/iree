@@ -55,7 +55,7 @@ LinalgExt::FuseProducersOp::apply(transform::TransformResults &transformResults,
     FailureOr<LinalgExt::FusionResult> result =
         pattern.returningMatchAndRewrite(target, rewriter);
     if (failed(result))
-      return DiagnosedSilenceableFailure::definiteFailure();
+      return emitDefaultDefiniteFailure(target);
 
     // Update the fused operations.
     transformedOps.push_back(result->consumerOp);
