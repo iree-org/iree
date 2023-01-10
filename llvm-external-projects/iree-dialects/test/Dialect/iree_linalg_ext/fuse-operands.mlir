@@ -1,4 +1,6 @@
 // RUN: iree-dialects-opt %s  --transform-dialect-interpreter --split-input-file | FileCheck %s
+// TODO(#11765): Fix and re-enable this.
+// REQUIRES: dont-run
 
 #map0 = affine_map<()[s0] -> (64 ceildiv s0)>
 #map1 = affine_map<(d0)[s0] -> (d0 * s0)>

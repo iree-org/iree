@@ -58,7 +58,7 @@ void transform_dialect::MapNestedForeachThreadToGpuThreadsOp::build(
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
 transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
-    func::FuncOp target, SmallVectorImpl<Operation *> &results,
+    func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     state.getTopLevel()->emitOpError(
@@ -100,7 +100,7 @@ transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
     // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
     exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
   }
-  results.assign({target});
+  results.push_back(target);
   return diag;
 }
 
@@ -267,7 +267,7 @@ static HAL::ExecutableExportOp getExecutableExportOpForFunc(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
-    scf::IfOp target, SmallVectorImpl<Operation *> &results,
+    scf::IfOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     results.assign(1, nullptr);
@@ -322,7 +322,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
            << "scf::ifOp needs to be predicated on threadIdx.x == 0 --- the "
               "transform is not applied";
   }
-  results.assign({vectorDistributionResult->warpOp});
+  results.push_back(vectorDistributionResult->warpOp);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -549,7 +549,7 @@ static void populateWarpExecuteOnLane0ToScf(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorWarpDistributionOp::applyToOne(
-    Operation *target, SmallVectorImpl<Operation *> &results,
+    Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     target->emitOpError(

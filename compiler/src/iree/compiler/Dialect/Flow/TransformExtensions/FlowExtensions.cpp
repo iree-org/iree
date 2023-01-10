@@ -460,7 +460,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
 
 DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
-    scf::ForeachThreadOp target, SmallVectorImpl<Operation *> &results,
+    scf::ForeachThreadOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &) {
   SimplePatternRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
@@ -478,7 +478,7 @@ void transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::getEffects(
 }
 
 DiagnosedSilenceableFailure transform_dialect::RegionToWorkgroupsOp::applyToOne(
-    Flow::DispatchRegionOp target, SmallVectorImpl<Operation *> &results,
+    Flow::DispatchRegionOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &) {
   IRRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
@@ -827,7 +827,7 @@ void transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::WrapInDispatchRegionOp::applyToOne(
-    Operation *target, SmallVectorImpl<Operation *> &results,
+    Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   IRRewriter rewriter(target->getContext());
   Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
