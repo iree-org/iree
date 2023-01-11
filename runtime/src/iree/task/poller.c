@@ -217,14 +217,10 @@ typedef uint32_t iree_task_poller_prepare_result_t;
 // The task will be checked for completion or failure such as deadline exceeded
 // and removed from the wait list if resolved. If unresolved the wait will be
 // prepared for the system wait by ensuring a wait handle is available.
-//
-// When the task is retiring because it has been completed (or cancelled) the
-// |out_retire_status| status will be set to the value callers must pass to
-// iree_task_wait_retire.
 static iree_task_poller_prepare_result_t iree_task_poller_prepare_task(
     iree_task_poller_t* poller, iree_task_wait_t* task,
     iree_task_submission_t* pending_submission, iree_time_t now_ns,
-    iree_time_t* earliest_deadline_ns, iree_status_t* out_retire_status) {
+    iree_time_t* earliest_deadline_ns) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Status of the preparation - failures propagate to the task scope.
@@ -342,11 +338,7 @@ static iree_task_poller_prepare_result_t iree_task_poller_prepare_task(
       status = iree_status_from_code(wait_status_code);
     }
   }
-
-  // The caller must make the iree_task_wait_retire call with this status.
-  // If we were to do that here we'd be freeing the task that may still exist
-  // in the caller's working set.
-  *out_retire_status = status;
+  iree_task_wait_retire(task, pending_submission, status);
 
   IREE_TRACE_ZONE_END(z0);
   return result;
@@ -381,10 +373,9 @@ static void iree_task_poller_prepare_wait(
     while (task != NULL) {
       iree_task_t* next_task = task->next_task;
 
-      iree_status_t retire_status = iree_ok_status();
       iree_task_poller_prepare_result_t result = iree_task_poller_prepare_task(
           poller, (iree_task_wait_t*)task, pending_submission, now_ns,
-          out_earliest_deadline_ns, &retire_status);
+          out_earliest_deadline_ns);
       if (iree_all_bits_set(result, IREE_TASK_POLLER_PREPARE_CANCELLED)) {
         // A task was cancelled; we'll need to retry the scan to clean up any
         // waits we may have already checked.
@@ -394,9 +385,6 @@ static void iree_task_poller_prepare_wait(
       if (iree_all_bits_set(result, IREE_TASK_POLLER_PREPARE_RETIRED)) {
         // Erase the retired task from the wait list.
         iree_task_list_erase(&poller->wait_list, prev_task, task);
-        iree_task_wait_retire((iree_task_wait_t*)task, pending_submission,
-                              retire_status);
-        task = NULL;  // task memory is now invalid
       } else {
         prev_task = task;
       }
