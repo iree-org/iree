@@ -14,16 +14,12 @@
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"
-#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/MC/TargetRegistry.h"
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO.h"
@@ -54,11 +50,6 @@ static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
     llvm::cl::init("sm_35"));
 
-namespace llvm {
-class FunctionPass;
-FunctionPass *createNVVMIntrRangePass(unsigned int SmVersion);
-FunctionPass *createNVVMReflectPass(unsigned int SmVersion);
-}  // namespace llvm
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -133,43 +124,25 @@ static void linkAndOptimize(llvm::Module &module,
                             llvm::TargetMachine &targetMachine) {
   if (requiresDeviceLib(module)) linkModule(module);
 
-  // Workaround run those passed ahead as they are temporarily disabled in NVPTX
-  // target.
-  llvm::legacy::PassManager legacyPM;
-  legacyPM.add(llvm::createNVVMIntrRangePass(35));
-  legacyPM.add(llvm::createNVVMReflectPass(35));
-  legacyPM.run(module);
+  llvm::legacy::FunctionPassManager FPM(&module);
+  llvm::legacy::PassManager MPM;
+  llvm::PassManagerBuilder builder;
+  builder.OptLevel = 2;
+  builder.SizeLevel = 0;
+  builder.Inliner = llvm::createFunctionInliningPass();
+  builder.LoopVectorize = false;
 
-  llvm::LoopAnalysisManager lam;
-  llvm::FunctionAnalysisManager fam;
-  llvm::CGSCCAnalysisManager cgam;
-  llvm::ModuleAnalysisManager mam;
+  targetMachine.adjustPassManager(builder);
 
-  fam.registerPass([&] { return targetMachine.getTargetIRAnalysis(); });
+  builder.populateFunctionPassManager(FPM);
+  builder.populateModulePassManager(MPM);
 
-  llvm::PipelineTuningOptions pto;
-  pto.SLPVectorization = false;
-
-  llvm::PassInstrumentationCallbacks pic;
-
-  llvm::StandardInstrumentations si(false);
-  si.registerCallbacks(pic, &fam);
-
-  llvm::PassBuilder pb(&targetMachine, pto, llvm::None, &pic);
-  pb.registerModuleAnalyses(mam);
-  pb.registerCGSCCAnalyses(cgam);
-  pb.registerFunctionAnalyses(fam);
-  pb.registerLoopAnalyses(lam);
-  pb.crossRegisterProxies(lam, fam, cgam, mam);
-
-  llvm::OptimizationLevel ol = llvm::OptimizationLevel::O2;
-
-  llvm::ModulePassManager mpm;
-  mpm.addPass(llvm::VerifierPass());
-  mpm.addPass(pb.buildPerModuleDefaultPipeline(ol));
-  mpm.addPass(llvm::VerifierPass());
-
-  mpm.run(module, mam);
+  FPM.doInitialization();
+  for (llvm::Function &func : module) {
+    FPM.run(func);
+  }
+  FPM.doFinalization();
+  MPM.run(module);
 }
 
 class CUDATargetBackend final : public TargetBackend {
