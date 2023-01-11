@@ -3,7 +3,7 @@
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[128, 256], [16, 16]]>,
     translation_info = <SPIRVBaseVectorize>,
-    workgroup_size = [16, 8, 1], subgroup_size = 64>
+    workgroup_size = [16, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -47,7 +47,6 @@ hal.executable public @user_config {
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256], [16, 16]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @matmul_128x1024x256
-// CHECK-SAME:     subgroup_size = 64 : index
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [16 : index, 8 : index, 1 : index]
 //      CHECK: linalg.matmul

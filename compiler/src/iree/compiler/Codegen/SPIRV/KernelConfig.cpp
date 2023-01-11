@@ -666,7 +666,7 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
     return setOpConfigAndEntryPointFnTranslation(
         op->getParentOfType<func::FuncOp>(), op, tileSizes,
         CodeGenPipeline::SPIRVMatmulPromoteVectorize, workgroupSize,
-        /*subgroupSize=*/llvm::None, pipelineDepth, storeStage);
+        pipelineDepth, storeStage);
   }
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -834,9 +834,9 @@ LogicalResult setCooperativeMatrixConfig(
     return v.getType().cast<ShapedType>().getElementType();
   };
 
-  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
+  spirv::ResourceLimitsAttr resourceLimits = targetEnv.getResourceLimits();
   Optional<CooperativeMatrixSize> coopMatSize = getCooperativeMatrixSize(
-      limits, numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
+      resourceLimits, numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
       getElementType(lhs), getElementType(rhs), getElementType(init), dimM,
       dimN, dimK);
   if (!coopMatSize) return success();
@@ -845,7 +845,7 @@ LogicalResult setCooperativeMatrixConfig(
       SPIRVCooperativeMatrixVectorize;
 
   std::array<int64_t, 3> workgroupSize{
-      coopMatSize->nWarpCount * limits.getSubgroupSize(),
+      coopMatSize->nWarpCount * resourceLimits.getSubgroupSize(),
       coopMatSize->mWarpCount, 1};
 
   SmallVector<int64_t> vectorSizes(kIndex + 1, 0);
@@ -880,11 +880,9 @@ LogicalResult setCooperativeMatrixConfig(
   tileSizes.push_back(reductionTileSizes);
   tileSizes.push_back(vectorSizes);
 
-  Optional<int64_t> subgroupSize = limits.getSubgroupSize();
-
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
-      workgroupSize, subgroupSize);
+      workgroupSize);
 }
 
 }  // namespace detail

@@ -1589,7 +1589,6 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     OptionalAttr<HAL_OrdinalAttr>:$ordinal,
     HAL_PipelineLayoutAttr:$layout,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
-    OptionalAttr<HAL_SubgroupSizeAttr>:$subgroup_size,
     OptionalAttr<IndexAttr>:$workgroup_local_memory
   );
 
@@ -1601,11 +1600,10 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
       "::mlir::IntegerAttr":$ordinal,
       "IREE::HAL::PipelineLayoutAttr":$layout,
       "::mlir::ArrayAttr":$workgroup_size,
-      "::mlir::IntegerAttr":$subgroup_size,
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
       build($_builder, $_state, nullptr, sym_name, ordinal, layout,
-            workgroup_size, subgroup_size, workgroup_local_memory);
+            workgroup_size, workgroup_local_memory);
     }]>,
   ];
 

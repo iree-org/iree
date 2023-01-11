@@ -64,15 +64,11 @@ inline IREE::Codegen::TranslationInfoAttr getTranslationInfo(
 /// Returns the workgroup size specified on the `exportOp`.
 SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp);
 
-/// Returns the subgroup size specified on the `exportOp`.
-llvm::Optional<int64_t> getSubgroupSize(IREE::HAL::ExecutableExportOp exportOp);
-
-/// Sets and overwrites the dispatch workgroup/subgroup size for the given entry
-/// point function. Returns failure if the given entry point is not exported via
+/// Sets and overwrites the dispatch workgroup size for the given entry point
+/// function. Returns failure if the given entry point is not exported via
 /// hal.executable.export.
-LogicalResult setDispatchConfig(func::FuncOp entryPoint,
-                                ArrayRef<int64_t> workgroupSize,
-                                llvm::Optional<int64_t> subgroupSize);
+LogicalResult setWorkgroupSize(func::FuncOp entryPoint,
+                               ArrayRef<int64_t> workgroupSize);
 
 /// Sets and overwites the translate executable info for the given entry point.
 /// Returns failure if the given entry point is not exported via
@@ -137,15 +133,12 @@ void setLoweringConfig(Operation *op, IREE::Codegen::LoweringConfigAttr config);
 inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     func::FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize = {},
-    llvm::Optional<int64_t> subgroupSize = {},
-    unsigned softwarePipelineDepth = 0,
+    ArrayRef<int64_t> workgroupSize = {}, unsigned softwarePipelineDepth = 0,
     unsigned softwarePipelineStoreStage = 1) {
   MLIRContext *context = entryPointFn.getContext();
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
   setLoweringConfig(op, config);
-  if (failed(setDispatchConfig(entryPointFn, workgroupSize, subgroupSize)))
-    return failure();
+  if (failed(setWorkgroupSize(entryPointFn, workgroupSize))) return failure();
   return setTranslationInfo(entryPointFn, passPipeline, softwarePipelineDepth,
                             softwarePipelineStoreStage);
 }

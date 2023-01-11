@@ -77,7 +77,6 @@ hal.executable public @matmul_256x1024x128_div_add {
 //  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [32, 32], [0, 0, 32], [16, 16, 16]{{\]}}>
 //  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 //CHECK-LABEL: hal.executable.export public @matmul_256x1024x128_div_add
-// CHECK-SAME:   subgroup_size = 32 : index
 // CHECK-SAME:   translation_info = #[[$TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [64 : index, 2 : index, 1 : index]
 //      CHECK: func.func @matmul_256x1024x128_div_add()
@@ -152,7 +151,6 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 //  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64], [1, 32, 32], [0, 0, 0, 32], [1, 16, 16, 16]{{\]}}>
 //  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 //CHECK-LABEL: hal.executable.export public @batch_matmul_16x128x256x512_div
-// CHECK-SAME:   subgroup_size = 32 : index
 // CHECK-SAME:   translation_info = #[[$TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [64 : index, 2 : index, 1 : index]
 //      CHECK: func.func @batch_matmul_16x128x256x512_div()
@@ -225,7 +223,6 @@ hal.executable @generic_batch_matmul_32x8x512x64 {
 //  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64], [1, 32, 32], [0, 0, 0, 32], [1, 16, 16, 16]{{\]}}>
 //  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 //CHECK-LABEL: hal.executable.export public @generic_batch_matmul_32x8x512x64
-// CHECK-SAME:   subgroup_size = 32 : index
 // CHECK-SAME:   translation_info = #[[$TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [64 : index, 2 : index, 1 : index]
 //      CHECK: func.func @generic_batch_matmul_32x8x512x64()
@@ -292,7 +289,6 @@ hal.executable public @batch_matmul_16x1024x1024x80 {
 //  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64], [1, 32, 32], [0, 0, 0, 16], [1, 16, 16, 16]{{\]}}>
 //  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 //CHECK-LABEL: hal.executable.export public @batch_matmul_16x1024x1024x80
-// CHECK-SAME:   subgroup_size = 32 : index
 // CHECK-SAME:   translation_info = #[[$TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [64 : index, 2 : index, 1 : index]
 //      CHECK: func.func @batch_matmul_16x1024x1024x80()
@@ -359,6 +355,4 @@ hal.executable public @matmul_256x1024x8 {
 
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize pipeline_depth = 1>
 // CHECK-LABEL: hal.executable.export public @matmul_256x1024x8
-//   CHECK-NOT:   subgroup_size =
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
-//   CHECK-NOT:   subgroup_size =

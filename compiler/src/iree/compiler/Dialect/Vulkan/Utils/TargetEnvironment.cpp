@@ -69,9 +69,6 @@ void convertExtensions(Vulkan::TargetEnvAttr vkTargetEnv,
       case Extension::VK_KHR_variable_pointers:
         extensions.push_back(spirv::Extension::SPV_KHR_variable_pointers);
         break;
-      case Extension::VK_EXT_subgroup_size_control:
-        // This extension allows specifying min/max subgroup size.
-        break;
       case Extension::VK_NV_cooperative_matrix:
         extensions.push_back(spirv::Extension::SPV_NV_cooperative_matrix);
         break;
@@ -174,7 +171,7 @@ spirv::ResourceLimitsAttr convertResourceLimits(
       context, vkCapabilities.getMaxComputeSharedMemorySize(),
       vkCapabilities.getMaxComputeWorkGroupInvocations(),
       builder.getI64ArrayAttr(sizes), vkCapabilities.getSubgroupSize(),
-      vkCapabilities.getMinSubgroupSize(), vkCapabilities.getMaxSubgroupSize(),
+      /*min_subgroup_size=*/llvm::None, /*max_subgroup_size=*/llvm::None,
       ArrayAttr::get(context, spvAttrs));
 }
 }  // anonymous namespace

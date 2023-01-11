@@ -34,7 +34,6 @@ hal.executable @ex_with_workgroup_count_region {
   // CHECK: hal.executable.variant public @backend, target = #executable_target_format
   hal.executable.variant @backend, target = #executable_target_format {
     // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout) attributes {
-    // CHECK-SAME:     subgroup_size = 64 : index
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
     hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
       #hal.descriptor_set.layout<0, bindings = [
@@ -42,7 +41,6 @@ hal.executable @ex_with_workgroup_count_region {
         #hal.descriptor_set.binding<1, storage_buffer>
       ]>
     ]>) attributes {
-      subgroup_size = 64 : index,
       workgroup_size = [4 : index, 1 : index, 1 : index]
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):

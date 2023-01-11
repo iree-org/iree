@@ -412,8 +412,6 @@ def HAL_WorkgroupSizeAttr : TypedArrayAttrBase<
   let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
 }
 
-def HAL_SubgroupSizeAttr : Util_IndexAttrBase<"size_t">;
-
 // A bitmask defining which queues an operation is allowed to execute on.
 // The selection is wrapped to the total number of available queues, so 0b0101
 // would enable queues 0 and 2 if there were four queues or queue 0 if there

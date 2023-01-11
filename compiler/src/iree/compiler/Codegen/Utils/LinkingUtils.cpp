@@ -235,9 +235,7 @@ LogicalResult linkExecutablesInto(
             linkedTargetBuilder.create<IREE::HAL::ExecutableExportOp>(
                 exportOp.getLoc(), exportOp.getSymNameAttr(),
                 builder.getIndexAttr(nextEntryPointOrdinal++),
-                exportOp.getLayout(), /*workgroup_size=*/ArrayAttr{},
-                /*subgroup_size=*/IntegerAttr{},
-                /*workgroup_local_memory=*/IntegerAttr{});
+                exportOp.getLayout(), ArrayAttr{}, IntegerAttr{});
         newExportOp->setDialectAttrs(exportOp->getDialectAttrs());
 
         // Add to replacement table for fixing up dispatch calls referencing

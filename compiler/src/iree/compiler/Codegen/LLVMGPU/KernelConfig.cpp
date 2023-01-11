@@ -171,9 +171,9 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
 
         tileSizes.emplace_back(
             std::move(workgroupTileSizes));  // Workgroup level.
-        return setOpConfigAndEntryPointFnTranslation(
-            entryPoint, op, tileSizes, pipeline, workgroupSize,
-            /*subgroupSize=*/llvm::None, softwarePipelineDepth);
+        return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                                     pipeline, workgroupSize,
+                                                     softwarePipelineDepth);
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =

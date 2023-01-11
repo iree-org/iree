@@ -73,13 +73,6 @@ def VK_CapabilitiesAttr : VK_Attr<"Capabilities", "caps"> {
     "::mlir::iree_compiler::IREE::Vulkan::SubgroupFeatureAttr":$subgroupFeatures,
     "int":$subgroupSize,
 
-    // VK_EXT_subgroup_size_control features.
-    //
-    // This corresponds to the `VkPhysicalDeviceSubgroupSizeControlProperties` structure:
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSubgroupSizeControlPropertiesEXT.html
-    OptionalParameter<"::llvm::Optional<int>">:$minSubgroupSize,
-    OptionalParameter<"::llvm::Optional<int>">:$maxSubgroupSize,
-
     // VK_KHR_16bit_storage features.
     //
     // This corresponds to the `VkPhysicalDevice16BitStorageFeatures` structure:

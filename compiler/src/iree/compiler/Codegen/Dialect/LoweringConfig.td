@@ -218,24 +218,19 @@ def IREECodegen_CompilationInfoAttr :
     AttrParameter<"LoweringConfigAttr", "">:$loweringConfig,
     AttrParameter<"TranslationInfoAttr", "">:$translationInfo,
     DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
-        "The workgroup size to use during translation.">:$workgroupSize,
-    OptionalParameter<"llvm::Optional<int64_t>",
-        "The subgroup size to use during translation.">:$subgroupSize
+        "The workgroup size to use during translation.">:$workgroupSize
   );
 
   let assemblyFormat = [{
     `<` `lowering_config` `=` $loweringConfig `,` `translation_info` `=` $translationInfo
-    (`,` `workgroup_size` `=` $workgroupSize^)?
-    (`,` `subgroup_size` `=` $subgroupSize^)? `>`
+    (`,` `workgroup_size` `=` $workgroupSize^)? `>`
   }];
 
   // The builder is externally for auto-tuner to generate the attributes.
   let builders = [
     AttrBuilder<(ins "LoweringConfigAttr":$configAttr,
       "TranslationInfoAttr":$translationInfo,
-      "ArrayRef<int64_t>":$workgroupSize,
-      "llvm::Optional<int64_t>":$subgroupSize
-      )>,
+      "ArrayRef<int64_t>":$workgroupSize)>,
   ];
   let extraClassDeclaration = [{
     SmallVector<int64_t> getWorkgroupSizeVals();

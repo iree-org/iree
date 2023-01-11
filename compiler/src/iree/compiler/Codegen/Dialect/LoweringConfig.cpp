@@ -190,17 +190,15 @@ LogicalResult LoweringConfigAttr::verify(
 
 CompilationInfoAttr CompilationInfoAttr::get(
     MLIRContext *context, LoweringConfigAttr configAttr,
-    TranslationInfoAttr translationInfo, ArrayRef<int64_t> workgroupSize,
-    llvm::Optional<int64_t> subgroupSize) {
+    TranslationInfoAttr translationInfo, ArrayRef<int64_t> workgroupSize) {
   ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
-  return get(context, configAttr, translationInfo, workgroupSizeAttr,
-             subgroupSize);
+  return get(context, configAttr, translationInfo, workgroupSizeAttr);
 }
 
 LogicalResult CompilationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     LoweringConfigAttr loweringConfig, TranslationInfoAttr translationInfo,
-    ArrayAttr workgroupSize, llvm::Optional<int64_t> subgroupSize) {
+    ArrayAttr workgroupSize) {
   if (!loweringConfig) {
     return emitError() << "missing lowering config";
   }
@@ -265,27 +263,13 @@ SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
   return {};
 }
 
-llvm::Optional<int64_t> getSubgroupSize(
-    IREE::HAL::ExecutableExportOp exportOp) {
-  if (IntegerAttr attr = exportOp.getSubgroupSizeAttr()) {
-    return attr.getValue().getSExtValue();
-  }
-  return {};
-}
-
-LogicalResult setDispatchConfig(func::FuncOp entryPoint,
-                                ArrayRef<int64_t> workgroupSize,
-                                llvm::Optional<int64_t> subgroupSize) {
+LogicalResult setWorkgroupSize(func::FuncOp entryPoint,
+                               ArrayRef<int64_t> workgroupSize) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
   if (failed(exportOp)) return failure();
-  MLIRContext *context = exportOp->getContext();
-  if (!workgroupSize.empty()) {
-    auto attr = getIndexIntegerArrayAttr(context, workgroupSize);
-    exportOp->setWorkgroupSizeAttr(attr);
-  }
-  if (subgroupSize) {
-    exportOp->setSubgroupSizeAttr(Builder(context).getIndexAttr(*subgroupSize));
-  }
+  if (workgroupSize.empty()) return success();
+  auto attr = getIndexIntegerArrayAttr(exportOp->getContext(), workgroupSize);
+  exportOp->setWorkgroupSizeAttr(attr);
   return success();
 }
 
