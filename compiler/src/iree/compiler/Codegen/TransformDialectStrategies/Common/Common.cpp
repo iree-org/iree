@@ -331,64 +331,6 @@ static ReductionSplitResult createExpansionBubbleUp(
   return result;
 }
 
-/// Distribute to blocks using the current IREE lowering config.
-// TODO: consider passing a problem-specific struct to control information.
-Value mlir::iree_compiler::buildReductionStrategyBlockDistributionPart(
-    ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
-    Value reductionH, Value optionalFusionRootH,
-    ArrayRef<OpFoldResult> tileSizes0Generic, bool hasLeadingEltwise,
-    bool hasTrailingEltwise) {
-  // Step 1. Split the reduction to get meatier parallelism.
-  // TODO: use a scf.foreach_thread for this.
-  auto splitReductionTransformOp =
-      b.create<SplitReductionOp>(reductionH,
-                                 /*splitFactor=*/2,
-                                 /*insertSplitDimension=*/1);
-  ReductionSplitResult rs =
-      createExpansionBubbleUp(b, variantH, splitReductionTransformOp,
-                              hasLeadingEltwise, hasTrailingEltwise);
-
-  // TODO: IREE needs own workgroup mapping attribute.
-  // TODO: num of GPU block mapping attr is statically known here which is
-  // brittle. In the future, the builder of scf.foreach_thread can trim the
-  // number of mapping dims to the number of sizes.
-  auto x = mlir::gpu::GPUBlockMappingAttr::get(b.getContext(),
-                                               ::mlir::gpu::Blocks::DimX);
-
-  // Step 2. First level of tiling + fusion parallelizes to blocks using
-  // `tileSizes`. If the fusion root was the reduction op, update it to be
-  // the combiner op. Otherwise, fuse the combiner op into root.
-  SmallVector<Value> opsHToFuse(
-      {rs.originalFillH ? rs.originalFillH : originalFillH, rs.splitFillH,
-       rs.splitLinalgH});
-  if (!optionalFusionRootH) {
-    optionalFusionRootH = rs.combinerH;
-  } else {
-    optionalFusionRootH =
-        rs.trailingEltwiseH ? rs.trailingEltwiseH : optionalFusionRootH;
-    opsHToFuse.push_back(rs.combinerH);
-  }
-  if (rs.leadingEltwiseH) {
-    opsHToFuse.push_back(rs.leadingEltwiseH);
-  }
-
-  // The presence of leading elementwise operation implies that dispatch
-  // region formation happened using another transform dialect script and
-  // doesn't need the workgroup count part.
-  if (hasLeadingEltwise) {
-    iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
-        b, optionalFusionRootH, opsHToFuse, tileSizes0Generic,
-        b.getArrayAttr({x}));
-  } else {
-    iree_compiler::
-        buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
-            b, optionalFusionRootH, opsHToFuse, tileSizes0Generic,
-            b.getArrayAttr({x}));
-  }
-
-  return variantH;
-}
-
 /// Build transform IR to split the reduction into a parallel and combiner part.
 /// Then tile the parallel part and map it to `tileSize` threads, each reducing
 /// on `vectorSize` elements.

@@ -178,13 +178,6 @@ std::tuple<Value, Value, Value, Value> buildReductionStrategyBlockDistribution(
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.
 //===----------------------------------------------------------------------===//
-/// Distribute the reduction referred to by `reductionH` to blocks using the
-/// current IREE lowering config.
-Value buildReductionStrategyBlockDistributionPart(
-    ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
-    Value reductionH, Value optionalFusionRootH,
-    ArrayRef<OpFoldResult> tileSizes0Generic, bool hasLeadingEltwise = false,
-    bool hasTrailingEltwise = false);
 
 }  // namespace iree_compiler
 }  // namespace mlir
