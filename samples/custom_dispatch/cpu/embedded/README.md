@@ -123,15 +123,20 @@ for instructions for CMake setup and building from source.
     be used. Note that specific flags are required when producing the object
     files.
 
-2. Compile the [example module](./example.mlir) to a .vmfb file and pass the
-   path to the build directory so the .spv files can be found:
+2. Compile the [example module](./example_stream.mlir) to a .vmfb file and pass
+   the path to the build directory so the .spv files can be found:
 
     ```
     iree-compile \
         --iree-hal-executable-object-search-path=../iree-build/ \
-        samples/custom_dispatch/cpu/embedded/example.mlir \
+        samples/custom_dispatch/cpu/embedded/example_stream.mlir \
         -o=/tmp/example.vmfb
     ```
+
+    [example_stream.mlir](./example_stream.mlir) demonstrates a high-level
+    approach without needing to specify too much information while
+    [example_hal.mlir](./example_hal.mlir) shows the lower-level representation
+    it gets expanded into.
 
 3. Run the example program using the custom functions:
 
