@@ -12,7 +12,8 @@ these artifacts, modify the related python modules and regenerate the CMake
 files with the command below:
 
 ```sh
-build_tools/scripts/generate_cmake_files.sh
+build_tools/testing/generate_cmake_e2e_test_artifacts_suite.py \
+  --output_dir tests/e2e/test_artifacts
 ```
 
 Here are the places to find the definitions of the artifacts:

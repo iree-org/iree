@@ -142,12 +142,16 @@ jobs:
     steps:
       - name: Checking out repository
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-      - name: Generating CMake files
+      - name: Generates E2E test artifacts cmake files
         run: |
-          ./build_tools/scripts/generate_cmake_files.sh
+          ./build_tools/testing/generate_cmake_e2e_test_artifacts_suite.py \
+            --output_dir ./tests/e2e/test_artifacts
+      - name: Generates E2E model test cmake files
+        run: |
+          ./build_tools/testing/generate_cmake_e2e_model_tests.py \
+            --output ./tests/e2e/models/generated_e2e_model_tests.cmake
       - name: Checking Diff
         run: |
-          # Make sure to run build_tools/scripts/generate_cmake_files.sh and
-          # pick up new files that have been added.
+          # Make sure to pick up new files that have been added.
           git add -A
           git diff HEAD --exit-code

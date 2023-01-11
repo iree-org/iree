@@ -123,11 +123,6 @@ fi
 echo "***** Path Lengths *****"
 ./build_tools/scripts/check_path_lengths.py
 
-echo "***** Generates CMake files *****"
-./build_tools/scripts/generate_cmake_files.sh
-git add -A
-git diff HEAD --exit-code
-
 if (( "${FINAL_RET}" != 0 )); then
   echo "Encountered failures. Check error messages and changes to the working" \
        "directory and git index (which may contain fixes) and try again."
