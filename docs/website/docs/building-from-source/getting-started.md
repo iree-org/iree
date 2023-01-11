@@ -4,8 +4,7 @@
 
 You will need to install [CMake](https://cmake.org/), the
 [Ninja](https://ninja-build.org/) CMake generator, and the clang or MSVC C/C++
-compilers. The tests also requires [Python3](https://www.python.org/) and the
-python package [requests](https://requests.readthedocs.io/en/latest/) to run.
+compilers:
 
 ???+ Note
     You are welcome to try different CMake generators and compilers, but IREE
