@@ -38,12 +38,6 @@ if(IREE_TARGET_BACKEND_ROCM)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_ROCM_TARGET")
 endif()
 
-set(IREE_VERSION_TARGET_COPTS "")
-if(IREE_EMBEDDED_RELEASE_INFO)
-  list(APPEND IREE_VERSION_TARGET_COPTS "-DIREE_RELEASE_REVISION=\"${IREE_RELEASE_REVISION}\"")
-  list(APPEND IREE_VERSION_TARGET_COPTS "-DIREE_RELEASE_VERSION=\"${IREE_RELEASE_VERSION}\"")
-endif()
-
 # Enable input dialects based on options.
 set(IREE_INPUT_DEPS "")
 if(IREE_INPUT_MHLO)
@@ -74,19 +68,6 @@ iree_cc_library(
   DEPS
     ${IREE_INPUT_DEPS}
     iree::compiler::InputConversion::Common
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    init_iree
-  HDRS
-    "init_iree.h"
-  SRCS
-    "init_iree.cc"
-  DEPS
-    ::version
-    LLVMSupport
   PUBLIC
 )
 
@@ -228,22 +209,9 @@ iree_cc_library(
   SRCS
     "iree_compile_lib.cc"
   DEPS
-    ::init_iree
     LLVMSupport
     iree::compiler::API2::Headers
     iree::compiler::API2::Internal::Embed
     iree::compiler::Pipelines
   PUBLIC
 )
-
-iree_cc_library(
-  NAME
-    version
-  HDRS
-    "version.h"
-  SRCS
-    "version.cc"
-  COPTS
-    ${IREE_VERSION_TARGET_COPTS}
-)
-
