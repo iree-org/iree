@@ -843,10 +843,8 @@ void FormDispatchRegionsPass::runOnOperation() {
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo,
-                                generateWorkloadRegion, aggressiveFusion))) {
-    funcOp->emitOpError("failed to create fusion groups");
+                                generateWorkloadRegion, aggressiveFusion)))
     return signalPassFailure();
-  }
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
