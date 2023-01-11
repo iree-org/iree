@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_SAMPLES_CUSTOM_MODULE_BASIC_MODULE_H_
-#define IREE_SAMPLES_CUSTOM_MODULE_BASIC_MODULE_H_
+#ifndef IREE_SAMPLES_CUSTOM_MODULE_MODULE_H_
+#define IREE_SAMPLES_CUSTOM_MODULE_MODULE_H_
 
 #include <stdint.h>
 
@@ -31,20 +31,19 @@ iree_status_t iree_custom_string_create(iree_string_view_t value,
                                         iree_custom_string_t** out_string);
 
 // Registers types provided by the custom module.
-iree_status_t iree_custom_module_basic_register_types(
-    iree_vm_instance_t* instance);
+iree_status_t iree_custom_module_register_types(iree_vm_instance_t* instance);
 
 // Creates a native custom module that can be reused in multiple contexts.
 // The module itself may hold state that can be shared by all instantiated
 // copies but it will require the module to provide synchronization; usually
 // it's safer to just treat the module as immutable and keep state within the
 // instantiated module states instead.
-iree_status_t iree_custom_module_basic_create(iree_vm_instance_t* instance,
-                                              iree_allocator_t allocator,
-                                              iree_vm_module_t** out_module);
+iree_status_t iree_custom_module_create(iree_vm_instance_t* instance,
+                                        iree_allocator_t allocator,
+                                        iree_vm_module_t** out_module);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_SAMPLES_CUSTOM_MODULE_BASIC_MODULE_H_
+#endif  // IREE_SAMPLES_CUSTOM_MODULE_MODULE_H_

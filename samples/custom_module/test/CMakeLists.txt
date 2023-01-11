@@ -12,7 +12,7 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-compile
-    iree_samples_custom_module_basic_run
+    iree_samples_custom_module_run
   LABELS
     "hostonly"
 )

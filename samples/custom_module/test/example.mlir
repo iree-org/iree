@@ -1,4 +1,4 @@
-// RUN: iree-compile %s --iree-execution-model=host-only | custom-module-basic-run - example.main | FileCheck %s
+// RUN: iree-compile %s --iree-execution-model=host-only | custom-module-run - example.main | FileCheck %s
 
 module @example {
   //===--------------------------------------------------------------------===//

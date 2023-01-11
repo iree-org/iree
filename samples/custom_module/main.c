@@ -29,11 +29,10 @@
 // solar flares, etc).
 int main(int argc, char** argv) {
   if (argc != 3) {
-    fprintf(
-        stderr,
-        "Usage:\n"
-        "  custom-module-basic-run - <entry.point> # read from stdin\n"
-        "  custom-module-basic-run </path/to/say_hello.vmfb> <entry.point>\n");
+    fprintf(stderr,
+            "Usage:\n"
+            "  custom-module-run - <entry.point> # read from stdin\n"
+            "  custom-module-run </path/to/say_hello.vmfb> <entry.point>\n");
     fprintf(stderr, "  (See the README for this sample for details)\n ");
     return -1;
   }
@@ -49,12 +48,11 @@ int main(int argc, char** argv) {
 
   // Ensure custom types are registered before loading modules that use them.
   // This only needs to be done once.
-  IREE_CHECK_OK(iree_custom_module_basic_register_types(instance));
+  IREE_CHECK_OK(iree_custom_module_register_types(instance));
 
   // Create the custom module that can be reused across contexts.
   iree_vm_module_t* custom_module = NULL;
-  IREE_CHECK_OK(
-      iree_custom_module_basic_create(instance, allocator, &custom_module));
+  IREE_CHECK_OK(iree_custom_module_create(instance, allocator, &custom_module));
 
   // Load the module from stdin or a file on disk.
   // Applications can ship and load modules however they want (such as mapping
