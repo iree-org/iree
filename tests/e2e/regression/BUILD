@@ -144,16 +144,3 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
-
-iree_check_single_backend_test_suite(
-    name = "aggressive_fusion_test",
-    srcs = [
-        "softmax.mlir",
-    ],
-    compiler_flags = [
-        "--iree-flow-enable-aggressive-fusion",
-        "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false",
-    ],
-    driver = "local-task",
-    target_backend = "llvm-cpu",
-)

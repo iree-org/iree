@@ -17,8 +17,8 @@ static llvm::cl::opt<int> clMaxAllocationSizeInBytes(
     "iree-llvmcpu-stack-allocation-limit",
     llvm::cl::desc("maximum allowed stack allocation size in bytes"),
     llvm::cl::init(32768));
-static llvm::cl::opt<bool> clFailOnOutOfBoundsStackAllocation(
-    "iree-llvmcpu-fail-on-out-of-bounds-stack-allocation",
+static llvm::cl::opt<bool> clFailUnboundDynamicStackAllocation(
+    "iree-llvmcpu-fail-unbound-dynamic-stack-allocation",
     llvm::cl::desc("fail if the upper bound of dynamic stack allocation cannot "
                    "be solved"),
     llvm::cl::init(true));
@@ -45,7 +45,7 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
       auto ub = linalg::getConstantUpperBoundForIndex(operand);
       if (succeeded(ub)) {
         size *= *ub;
-      } else if (clFailOnOutOfBoundsStackAllocation) {
+      } else if (clFailUnboundDynamicStackAllocation) {
         return allocaOp.emitOpError(
             "expected no stack allocations without upper bound shapes");
       }
@@ -62,8 +62,7 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
     return signalPassFailure();
   }
   int maxAllocationSizeInBits = clMaxAllocationSizeInBytes * 8;
-  if (clFailOnOutOfBoundsStackAllocation &&
-      totalBits > maxAllocationSizeInBits) {
+  if (totalBits > maxAllocationSizeInBits) {
     moduleOp.emitOpError(
         "expected total size of stack allocation is not greater than ")
         << clMaxAllocationSizeInBytes.getValue() << " bytes, but got "
