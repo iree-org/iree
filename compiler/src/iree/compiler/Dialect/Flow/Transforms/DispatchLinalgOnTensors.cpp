@@ -619,6 +619,14 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
+  auto linalgProducerOp = dyn_cast<linalg::LinalgOp>(producer);
+  auto setEncodingOp = dyn_cast<IREE::LinalgExt::SetEncodingOp>(consumer);
+  if (linalgProducerOp && setEncodingOp) {
+    return linalg::isElementwise(linalgProducerOp) &&
+           linalgProducerOp.getNumLoops() ==
+               setEncodingOp.getSourceType().getRank();
+  }
+
   if (!isa<linalg::LinalgOp>(consumer) || !isa<linalg::LinalgOp>(producer)) {
     return false;
   }
