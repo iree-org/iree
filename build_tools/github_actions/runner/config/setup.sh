@@ -38,7 +38,7 @@ RUNNER_ARCHIVE_DIGEST="$(get_attribute github-runner-archive-digest)"
 cd /runner-root
 mkdir actions-runner
 cd actions-runner
-nice_curl \
+curl --silent --fail --show-error --location \
   "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${RUNNER_ARCHIVE}" \
   -o "${RUNNER_ARCHIVE}"
 
