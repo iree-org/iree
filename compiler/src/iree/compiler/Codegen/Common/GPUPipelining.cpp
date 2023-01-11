@@ -23,9 +23,7 @@ namespace mlir {
 namespace iree_compiler {
 
 static const StringLiteral kPipeliningLoopMarker = "__pipelining_K_loop__";
-static const StringLiteral kPipeliningFirstStage = "__pipelining_first_stage__";
-static const StringLiteral kPipeliningExtraBarrier =
-    "__pipelining_extra_barrier__";
+static const StringLiteral kPipeliningGlobalLoad = "__pipelining_global_load__";
 
 /// Returns true if the given `memrefType` has the default numeric address space
 /// 0 or a HAL descriptor type address space.
@@ -115,18 +113,17 @@ static void addDepOps(llvm::SmallDenseSet<Operation*>& dep, Operation* op,
   }
 }
 
-/// Assign stages to the loop ops. Simple logic by default, put load from global
-/// memory in stage 0 and the rest in stage 1. If store_stage = 0 then put store
-/// to shared memory in stage 0 as well.
+/// Assign stages to the loop ops. Simple logic for now, put load from global
+/// memory in stage 0 and the rest in stage 1.
 static void getPipelineStages(scf::ForOp forOp,
                               std::vector<std::pair<Operation*, unsigned>>& ops,
                               unsigned depth) {
   if (!forOp->hasAttr(kPipeliningLoopMarker)) return;
 
-  // Track dependencies of stage 0 ops.
+  // Track dependencies of the global memory load.
   llvm::SmallDenseSet<Operation*> loadDep;
   for (Operation& op : forOp.getBody()->getOperations()) {
-    if (op.hasAttr(kPipeliningFirstStage)) {
+    if (op.hasAttr(kPipeliningGlobalLoad)) {
       addDepOps(loadDep, &op, forOp.getBody());
     }
   }
@@ -145,47 +142,35 @@ static void getPipelineStages(scf::ForOp forOp,
 
 static void setAsyncAnnotations(Operation* op,
                                 scf::PipeliningOption::PipelinerPart part,
-                                unsigned iteration, unsigned depth,
-                                unsigned store_stage) {
-  if (auto waitOp = dyn_cast<nvgpu::DeviceAsyncWaitOp>(op)) {
-    if (waitOp.getNumGroups()) return;
-    int numGroupInFlight = 0;
-    if (part == scf::PipeliningOption::PipelinerPart::Kernel) {
-      numGroupInFlight = depth - 1;
-    } else {
-      // By construction there should be no wait op in the prologue as all the
-      // wait should be in the last stage.
-      assert(part == scf::PipeliningOption::PipelinerPart::Epilogue);
-      // Based on the schedule we pick we know how many groups are in flight for
-      // each iteration of the epilogue.
-      numGroupInFlight = depth - 1 - iteration;
-    }
-    OpBuilder b(op);
-    waitOp->setAttr(waitOp.getNumGroupsAttrName(),
-                    b.getI32IntegerAttr(numGroupInFlight));
-  } else if (auto barrierOp = dyn_cast<gpu::BarrierOp>(op)) {
-    if (store_stage != 0 ||
-        part != mlir::scf::PipeliningOption::PipelinerPart::Prologue ||
-        iteration >= depth - 1)
-      return;
-    OpBuilder b(op);
-    barrierOp->setAttr(kPipeliningExtraBarrier, b.getUnitAttr());
+                                unsigned iteration, unsigned depth) {
+  auto waitOp = dyn_cast<nvgpu::DeviceAsyncWaitOp>(op);
+  if (!waitOp || waitOp.getNumGroups()) return;
+  int numGroupInFlight = 0;
+  if (part == scf::PipeliningOption::PipelinerPart::Kernel) {
+    numGroupInFlight = depth - 1;
+  } else {
+    // By construction there should be no wait op in the prologue as all the
+    // wait should be in the last stage.
+    assert(part == scf::PipeliningOption::PipelinerPart::Epilogue);
+    // Based on the schedule we pick we know how many groups are in flight for
+    // each iteration of the epilogue.
+    numGroupInFlight = depth - 1 - iteration;
   }
+  OpBuilder b(op);
+  waitOp->setAttr(waitOp.getNumGroupsAttrName(),
+                  b.getI32IntegerAttr(numGroupInFlight));
 }
 
 namespace {
 struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
-  GPUPipeliningPass(bool epiloguePeeling, unsigned depth, unsigned storeStage)
-      : depth(depth), storeStage(storeStage) {
+  GPUPipeliningPass(bool epiloguePeeling, unsigned depth) : depth(depth) {
     this->epiloguePeeling = epiloguePeeling;
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext* context = &getContext();
-
-    unsigned pipelineStoreStage = storeStage;
     // Mark the loop with shared memory copy for pipelining.
-    funcOp.walk([pipelineStoreStage](scf::ForOp forOp) {
+    funcOp.walk([](scf::ForOp forOp) {
       bool copyToWorkgroupMemory = false;
       OpBuilder builder(forOp.getContext());
       SmallVector<Operation*> barriers;
@@ -194,16 +179,14 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
         if (op.getNumRegions() > 0) return;
         if (isa<gpu::BarrierOp>(op)) {
           barriers.push_back(&op);
-          if (pipelineStoreStage == 0)
-            op.setAttr(kPipeliningFirstStage, builder.getUnitAttr());
         }
         if (isa<nvgpu::DeviceAsyncCopyOp, nvgpu::DeviceAsyncCreateGroupOp>(
                 op)) {
           copyToWorkgroupMemory = true;
-          op.setAttr(kPipeliningFirstStage, builder.getUnitAttr());
+          op.setAttr(kPipeliningGlobalLoad, builder.getUnitAttr());
           // async copy ops need to be moved along with previous barrier.
           for (Operation* barrier : barriers) {
-            barrier->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
+            barrier->setAttr(kPipeliningGlobalLoad, builder.getUnitAttr());
           }
           barriers.clear();
           continue;
@@ -219,15 +202,10 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
         auto stSrcType = st.getSource().getType().cast<MemRefType>();
         if (!hasSharedMemoryAddressSpace(stSrcType)) continue;
         copyToWorkgroupMemory = true;
-        ld->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
-        if (pipelineStoreStage == 0)
-          st->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
+        ld->setAttr(kPipeliningGlobalLoad, builder.getUnitAttr());
       }
       if (copyToWorkgroupMemory) {
         forOp->setAttr(kPipeliningLoopMarker, builder.getUnitAttr());
-        if (pipelineStoreStage == 0 && !barriers.empty()) {
-          barriers.front()->erase();
-        }
       }
     });
     scf::PipeliningOption options;
@@ -237,12 +215,10 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
                            std::vector<std::pair<Operation*, unsigned>>& ops) {
       return getPipelineStages(forOp, ops, maxDepth);
     };
-    auto setAnnotation = [maxDepth, pipelineStoreStage](
-                             Operation* op,
-                             scf::PipeliningOption::PipelinerPart part,
-                             unsigned iteration) {
-      return setAsyncAnnotations(op, part, iteration, maxDepth,
-                                 pipelineStoreStage);
+    auto setAnnotation = [maxDepth](Operation* op,
+                                    scf::PipeliningOption::PipelinerPart part,
+                                    unsigned iteration) {
+      return setAsyncAnnotations(op, part, iteration, maxDepth);
     };
     options.getScheduleFn = getSchedule;
     options.annotateFn = setAnnotation;
@@ -263,17 +239,10 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
                                             std::move(pipeliningPatterns)))) {
       return signalPassFailure();
     }
-
-    // Remove extra barriers from the prologue assuming appropriate
-    // multi-buffering.
-    funcOp.walk([](gpu::BarrierOp barrierOp) {
-      if (barrierOp->hasAttr(kPipeliningExtraBarrier)) barrierOp->erase();
-    });
   }
 
  private:
   unsigned depth;
-  unsigned storeStage;
 };
 }  // namespace
 
@@ -283,9 +252,8 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
 /// false : Try and use unpeeled epilogue (check if predication is supported is
 /// avialable)
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
-    bool epiloguePeeling, unsigned depth, unsigned storeStage) {
-  return std::make_unique<GPUPipeliningPass>(epiloguePeeling, depth,
-                                             storeStage);
+    bool epiloguePeeling, unsigned depth) {
+  return std::make_unique<GPUPipeliningPass>(epiloguePeeling, depth);
 }
 
 }  // namespace iree_compiler

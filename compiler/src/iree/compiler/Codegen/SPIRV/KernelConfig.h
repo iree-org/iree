@@ -26,7 +26,6 @@ namespace iree_compiler {
 
 /// By default don't do any pipelining.
 constexpr unsigned defaultSoftwarePipelineDepth = 1;
-constexpr unsigned defaultSoftwarePipelineStoreStage = 1;
 
 /// Computes the total number of bytes if promoting both matmul LHS and RHS with
 /// the tiven tile sizes.
@@ -34,8 +33,7 @@ int64_t getTileBytes(int64_t mTileSize, int64_t nTileSize, int64_t kTileSize,
                      int64_t elementBits);
 
 /// Adjusts the shared memory usage based on the pipelining depth.
-int64_t getMultiBufferMemoryUsage(int64_t usedBytes, unsigned depth,
-                                  unsigned storeStage);
+int64_t getMultiBufferMemoryUsage(int64_t singleBufferBytes, unsigned depth);
 
 namespace detail {
 
@@ -54,8 +52,7 @@ LogicalResult setMatmulOpConfig(
     spirv::ResourceLimitsAttr limits, linalg::LinalgOp linalgOp,
     std::array<int64_t, 2> bestWorkgroupSizeXY,
     std::array<int64_t, 3> bestThreadTileSizeMNK, bool enablePromotion = false,
-    unsigned softwarePipelineDepth = defaultSoftwarePipelineDepth,
-    unsigned softwarePipelineStoreStage = defaultSoftwarePipelineStoreStage);
+    unsigned softwarePipelineDepth = defaultSoftwarePipelineDepth);
 
 /// Sets CodeGen configurations via attributes to the given matmul `linalgOp`
 /// with tile sizes for cooperative matrix, if possible for the given matmul

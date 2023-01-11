@@ -169,8 +169,7 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
       case IREE::Codegen::DispatchLoweringPassPipeline::
           SPIRVMatmulPromoteVectorize:
         addSPIRVMatmulPromoteVectorizePassPipeline(
-            pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-            translationInfo.value().getSoftwarePipelineStoreStage());
+            pipeline, translationInfo.value().getSoftwarePipelineDepth());
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVSubgroupReduce:
         addSPIRVSubgroupReducePassPipeline(pipeline);

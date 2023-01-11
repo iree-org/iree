@@ -75,11 +75,10 @@ namespace Codegen {
 
 TranslationInfoAttr TranslationInfoAttr::get(
     MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage) {
+    unsigned softwarePipelineDepth) {
   auto pipelineAttr =
       DispatchLoweringPassPipelineAttr::get(context, passPipeline);
-  return get(context, pipelineAttr, softwarePipelineDepth,
-             softwarePipelineStoreStage);
+  return get(context, pipelineAttr, softwarePipelineDepth);
 }
 
 DispatchLoweringPassPipeline
@@ -90,7 +89,7 @@ TranslationInfoAttr::getDispatchLoweringPassPipeline() {
 LogicalResult TranslationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     IREE::Codegen::DispatchLoweringPassPipelineAttr passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage) {
+    unsigned softwarePipelineDepth) {
   if (!passPipeline) {
     return emitError() << "missing pass pipeline specification";
   }
@@ -213,8 +212,7 @@ LogicalResult CompilationInfoAttr::verify(
   }
   if (failed(TranslationInfoAttr::verify(
           emitError, translationInfo.getPassPipeline(),
-          translationInfo.getSoftwarePipelineDepth(),
-          translationInfo.getSoftwarePipelineStoreStage()))) {
+          translationInfo.getSoftwarePipelineDepth()))) {
     return failure();
   }
   if (workgroupSize) {
