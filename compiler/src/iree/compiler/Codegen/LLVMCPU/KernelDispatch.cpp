@@ -1728,10 +1728,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   }
 
   if (!getTranslationInfo(entryPointFn)) {
-    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
     // Fall back, just set the translation to CPUDefault.
-    if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
+    if (failed(setTranslationInfo(entryPointFn,
+                                  DispatchLoweringPassPipeline::CPUDefault))) {
       return failure();
     }
   }

@@ -81,6 +81,17 @@ LogicalResult setTranslationInfo(
     func::FuncOp entryPoint,
     IREE::Codegen::TranslationInfoAttr translationInfo);
 
+inline LogicalResult setTranslationInfo(
+    func::FuncOp entryPoint,
+    IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
+    unsigned softwarePipelineDepth = 0,
+    unsigned softwarePipelineStoreStage = 1) {
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPoint.getContext(), passPipeline, softwarePipelineDepth,
+      softwarePipelineStoreStage);
+  return setTranslationInfo(entryPoint, translationInfo);
+}
+
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting `iree_codegen.lowering_config` attribute on root
 // operations.
@@ -135,10 +146,8 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
   setLoweringConfig(op, config);
   if (failed(setDispatchConfig(entryPointFn, workgroupSize, subgroupSize)))
     return failure();
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn.getContext(), passPipeline, softwarePipelineDepth,
-      softwarePipelineStoreStage);
-  return setTranslationInfo(entryPointFn, translationInfo);
+  return setTranslationInfo(entryPointFn, passPipeline, softwarePipelineDepth,
+                            softwarePipelineStoreStage);
 }
 
 //===----------------------------------------------------------------------===//
