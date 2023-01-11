@@ -116,10 +116,7 @@ engineering effort required on both sides and lead to an easier to maintain
 solution even if lower-level extension is required.
 
 A large majority of classic ML "custom ops" can be accomplished with this
-approach. When bringing up projects built on IREE it's best to concisely
-describe the operation in more elemental mathematical representations and then
-add optimizations where required knowing that things will still work even if
-those optimizations never happen.
+approach.
 
 #### Pros
 
@@ -170,23 +167,14 @@ system.
 ```mlir
 // Main user module compiled by IREE:
 module @model {
-  // Declare a synchronous external function:
-  func.func private @my_custom_module.sync_func(%input: tensor<?xf32>) -> i32
-  // Declare an asynchronous external function:
-  func.func private @my_custom_module.async_func(%input: tensor<?xf32>) -> tensor<?xf32> attributes {
-    iree.abi.model = "coarse-fences",
-    nosideeffects
-  }
   func.func @predict() {
-    ...
-    // Call a synchronous/blocking external function:
-    %sync_result = call @my_custom_module.sync_func(%sync_input) : (tensor<?xf32>) -> i32
-    ...
-    ...
-    // Call an asynchronous/non-blocking external function:
-    %async_result = call @my_custom_module.async_func(%async_input) : (tensor<?xf32>) -> tensor<?xf32>
+    %4 = call @my_custom_module::@some_func(%3) : (tensor<?xf32>) -> i32
     ...
   }
+}
+// External module that will be available at runtime:
+module @my_custom_module {
+  func.func @some_func(%input: tensor<?xf32>) -> i32  // note empty for extern
 }
 ```
 
@@ -209,9 +197,6 @@ within should perform a large amount of work to hide overheads involved in the
 cross-module calls and users must be aware that the compiler cannot optimize
 across the call boundaries.
 
-See the [synchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples/custom_module/sync/)
-and [asynchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples/custom_module/async/) samples.
-
 #### Pros
 
 * No IREE compiler code changes required.
@@ -221,6 +206,8 @@ and [asynchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples
 
 #### Cons
 
+* _(Today)_ no asynchronous scheduling or pipelining.
+    * Future improvements will enable pipelining of host calls.
 * Custom modules must be registered at runtime by the user.
 * The VM custom module ABI goo must be authored by the user (such as with JNI or
   pybind to move between java/python and C).
@@ -235,9 +222,16 @@ and [asynchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples
 * :material-check: Interactions with large libraries or system calls.
 * :material-check: Performance-sensitive host code that cannot easily be
   represented as device code (like UTF-8 string transformation using libicu).
+* :material-close: _(Today)_ Pipelining or asynchronous execution are required.
 * :material-close: Extensively using tensor resources.
 
 ### Implementation
+
+The current implementation of this requires conversion goo in the compiler to
+properly setup the VM interface. Future improvements will make the compiler
+portion automatic such that in the common case no additional compiler code is
+required beyond inserting the calls into the external modules which can even
+happen before passing the input into the IREE compiler.
 
 The runtime portion requires that the code be exported to the VM system by way
 of an `iree_vm_module_t` interface. A low-level native interface exists with
@@ -245,15 +239,8 @@ minimal overhead and is used for example [by the IREE HAL itself](https://github
 There is also a C++ wrapper that is significantly easier to work with however it
 needs some performance improvements.
 
-Full end-to-end examples can be found under [`samples/custom_modules/`](https://github.com/iree-org/iree/tree/main/samples/custom_modules):
-
-* The [basic](https://github.com/iree-org/iree/tree/main/samples/custom_module/basic/)
-sample shows how to add VM modules with custom types and take advantage of ABI
-features like fallback functions and optional imports.
-* The [synchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples/custom_module/sync/)
-sample shows a call taking and returning a tensor and performing blocking work.
-* The [asynchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples/custom_module/async/)
-sample shows the same thing but with fences for asynchronous scheduling.
+A full end-to-end example can be found under [`samples/custom_modules/`](https://github.com/iree-org/iree/tree/main/samples/custom_modules),
+though it should not currently be considered representative of best practices.
 
 ## 3. Extend target-specific device conversion patterns
 
