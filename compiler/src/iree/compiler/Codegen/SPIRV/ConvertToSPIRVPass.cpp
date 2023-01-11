@@ -337,9 +337,8 @@ void ConvertToSPIRVPass::runOnOperation() {
     }
     auto workgroupSize32 = llvm::to_vector<4>(llvm::map_range(
         workgroupSize, [](int64_t v) { return static_cast<int32_t>(v); }));
-    funcOp->setAttr(
-        spirv::getEntryPointABIAttrName(),
-        spirv::getEntryPointABIAttr(context, workgroupSize32, llvm::None));
+    funcOp->setAttr(spirv::getEntryPointABIAttrName(),
+                    spirv::getEntryPointABIAttr(workgroupSize32, context));
   }
 
   spirv::TargetEnvAttr targetAttr = getSPIRVTargetEnvAttr(moduleOp);
