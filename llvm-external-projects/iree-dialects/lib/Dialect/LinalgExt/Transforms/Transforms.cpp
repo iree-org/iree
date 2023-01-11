@@ -817,11 +817,6 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
       return rewriter.notifyMatchFailure(
           packOp, "require the outer dimension of the result are all 1s");
     }
-    if (llvm::any_of(packOp.getMixedTiles(),
-                     [](OpFoldResult tile) { return tile.is<Value>(); })) {
-      return rewriter.notifyMatchFailure(
-          packOp, "require inner tile sizes being static");
-    }
 
     Value input = getInputOrPaddedInput(rewriter, packOp);
 
@@ -959,17 +954,9 @@ struct LinalgExtVectorizationPass
       SimpleRewriter rewriter(ctx);
       auto packOptions = scf::SCFTileAndFuseOptions().setTilingOptions(
           scf::SCFTilingOptions().setTileSizeComputationFunction(
-              [](OpBuilder &builder, Operation *op) -> SmallVector<Value> {
+              [](OpBuilder &builder, Operation *op) {
                 Location loc = op->getLoc();
-                auto packOp = cast<PackOp>(op);
-
-                // Do nothing if any of inner tile sizes is dynamic.
-                if (llvm::any_of(packOp.getMixedTiles(), [](OpFoldResult tile) {
-                      return tile.is<Value>();
-                    }))
-                  return {};
-
-                int inputRank = packOp.getInputRank();
+                int inputRank = cast<PackOp>(op).getInputRank();
                 SmallVector<Value> tileSizes(
                     inputRank, builder.create<arith::ConstantIndexOp>(loc, 1));
                 return tileSizes;
