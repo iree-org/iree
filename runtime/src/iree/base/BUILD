@@ -168,10 +168,8 @@ iree_runtime_cc_test(
 
 iree_runtime_cc_library(
     name = "tracing",
-    srcs = ["tracing.cc"],
     hdrs = ["tracing.h"],
     deps = [
         ":core_headers",
-        "@tracy_client//:runtime_impl",
     ],
 )
