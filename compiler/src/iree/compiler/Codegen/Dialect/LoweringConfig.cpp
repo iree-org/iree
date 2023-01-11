@@ -263,23 +263,16 @@ SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
   return {};
 }
 
-LogicalResult setWorkgroupSize(func::FuncOp entryPoint,
-                               ArrayRef<int64_t> workgroupSize) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
-  if (failed(exportOp)) return failure();
-  if (workgroupSize.empty()) return success();
-  auto attr = getIndexIntegerArrayAttr(exportOp->getContext(), workgroupSize);
-  exportOp->setWorkgroupSizeAttr(attr);
-  return success();
-}
-
-LogicalResult setTranslationInfo(
-    func::FuncOp entryPoint,
-    IREE::Codegen::TranslationInfoAttr translationInfo) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
-  if (failed(exportOp)) return failure();
-  exportOp.value()->setAttr(kTranslationInfoAttrName, translationInfo);
-  return success();
+void setTranslationInfo(IREE::HAL::ExecutableExportOp exportOp,
+                        IREE::Codegen::TranslationInfoAttr translationInfo,
+                        ArrayRef<int64_t> workgroupSize) {
+  exportOp->setAttr(kTranslationInfoAttrName, translationInfo);
+  // The workgroup size is set on the entry point op directly.
+  if (!workgroupSize.empty()) {
+    MLIRContext *context = exportOp->getContext();
+    auto attrs = getIndexIntegerArrayAttr(context, workgroupSize);
+    exportOp.setWorkgroupSizeAttr(attrs);
+  }
 }
 
 //===----------------------------------------------------------------------===//

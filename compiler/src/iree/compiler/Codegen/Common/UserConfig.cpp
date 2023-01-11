@@ -19,11 +19,9 @@ LogicalResult setUserConfig(
         "info");
   }
 
-  auto info = compilationInfo.getTranslationInfo();
-  if (failed(setTranslationInfo(entryPointFn, info))) return failure();
-
   SmallVector<int64_t> workgroupSize = compilationInfo.getWorkgroupSizeVals();
-  if (failed(setWorkgroupSize(entryPointFn, workgroupSize))) return failure();
+  setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
+                     workgroupSize);
 
   setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
   eraseCompilationInfo(computeOp);
