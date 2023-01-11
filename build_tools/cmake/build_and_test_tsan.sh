@@ -20,7 +20,6 @@ set -euo pipefail
 BUILD_DIR="${1:-${IREE_TSAN_BUILD_DIR:-build-tsan}}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
 
 CMAKE_ARGS=(
   "-G" "Ninja"
@@ -65,10 +64,6 @@ echo "------------"
 echo "Building test deps"
 echo "------------------"
 "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
-
-if (( IREE_READ_REMOTE_CCACHE == 1 )); then
-  ccache --show-stats
-fi
 
 # Disable actually running GPU tests. This tends to yield TSan reports that are
 # specific to one's particular GPU driver and therefore hard to reproduce across

@@ -11,10 +11,11 @@
 
 set -xeuo pipefail
 
+ROOT_DIR=$(git rev-parse --show-toplevel)
 BUILD_DIR="${1:-${IREE_RUNTIME_SMALL_BUILD_DIR:-build-runtime-small}}"
 
-source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
+cd "${ROOT_DIR}"
+source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
 
 "${CMAKE_BIN?}" -B "${BUILD_DIR}" \
   -G Ninja . \
@@ -22,7 +23,3 @@ source build_tools/cmake/setup_ccache.sh
   -DIREE_SIZE_OPTIMIZED=ON \
   -DIREE_BUILD_COMPILER=OFF
 "${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0
-
-if (( IREE_READ_REMOTE_CCACHE == 1 )); then
-  ccache --show-stats
-fi

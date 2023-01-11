@@ -18,13 +18,8 @@ set -xeuo pipefail
 BUILD_DIR="${1:-${IREE_RUNTIME_BUILD_DIR:-build-runtime}}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
 
 "${CMAKE_BIN}" -B "${BUILD_DIR}" -G Ninja . \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_BUILD_COMPILER=OFF
 "${CMAKE_BIN}" --build "${BUILD_DIR}" -- -k 0
-
-if (( IREE_READ_REMOTE_CCACHE == 1 )); then
-  ccache --show-stats
-fi

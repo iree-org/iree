@@ -96,8 +96,8 @@ jobs:
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            --env "IREE_BUILD_BENCHMARKS_DIR=${BENCHMARKS_OUTPUT_DIR}" \
-            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
+            --env "BUILD_BENCHMARKS_DIR=${BENCHMARKS_OUTPUT_DIR}" \
+            gcr.io/iree-oss/base@sha256:22c43975179265296e016d15eb6f65d18abd5f9d4d3a5fa5e478ca4862bb61c4 \
             build_tools/cmake/build_benchmarks.sh
           echo "::set-output name=benchmarks-dir::${BENCHMARKS_OUTPUT_DIR}"
       - name: "Creating archive of benchmarks"
@@ -135,7 +135,7 @@ jobs:
         target:
           - platform: "riscv"
             architecture: "rv64"
-            docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:e11710158fd09a04ae7accc275a38c95cd59f83fd15a0630a083eb5623807451"
     outputs:
       benchmark-tools-gcs-artifacts: ${{ toJSON(steps.upload.outputs) }}
     env:

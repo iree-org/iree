@@ -21,11 +21,12 @@ then
     exit 1
 fi
 
+ROOT_DIR=$(git rev-parse --show-toplevel)
 BUILD_DIR="build-emscripten"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 
-source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
+cd "${ROOT_DIR}"
+source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
 
 cd "${BUILD_DIR}"
 
@@ -47,7 +48,3 @@ echo "------------------------"
 echo "Building test deps"
 echo "------------------"
 "${CMAKE_BIN?}" --build . --target iree-test-deps -- -k 0
-
-if (( IREE_READ_REMOTE_CCACHE == 1 )); then
-  ccache --show-stats
-fi

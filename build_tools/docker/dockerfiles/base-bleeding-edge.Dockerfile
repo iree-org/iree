@@ -44,13 +44,6 @@ RUN echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main" >> /etc/apt/
   && ./install_iree_deps.sh "${LLVM_VERSION}" \
   && rm -rf /install-basics
 
-######## ccache ########
-
-WORKDIR /install-ccache
-
-COPY build_tools/docker/context/install_ccache.sh ./
-RUN ./install_ccache.sh && rm -rf /install-ccache
-
 ######## CMake ########
 WORKDIR /install-cmake
 

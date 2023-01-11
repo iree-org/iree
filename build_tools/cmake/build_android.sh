@@ -29,7 +29,6 @@ BUILD_BENCHMARK_SUITE_DIR="${BUILD_BENCHMARK_SUITE_DIR:-build-benchmarks/benchma
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
 
 declare -a args=(
   -G Ninja
@@ -86,7 +85,3 @@ echo "------------"
 echo "Building test deps for device"
 echo "------------------"
 "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
-
-if (( IREE_READ_REMOTE_CCACHE == 1 )); then
-  ccache --show-stats
-fi

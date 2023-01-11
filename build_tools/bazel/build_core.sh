@@ -23,12 +23,12 @@
 set -xeuo pipefail
 
 
-IREE_READ_REMOTE_BAZEL_CACHE="${IREE_READ_REMOTE_BAZEL_CACHE:-1}"
-IREE_WRITE_REMOTE_BAZEL_CACHE="${IREE_WRITE_REMOTE_BAZEL_CACHE:-0}"
+IREE_BAZEL_READ_REMOTE_CACHE="${IREE_BAZEL_READ_REMOTE_CACHE:-1}"
+IREE_BAZEL_WRITE_REMOTE_CACHE="${IREE_BAZEL_WRITE_REMOTE_CACHE:-0}"
 BAZEL_BIN="${BAZEL_BIN:-$(which bazel)}"
 
-if (( ${IREE_WRITE_REMOTE_BAZEL_CACHE} == 1 && ${IREE_READ_REMOTE_BAZEL_CACHE} != 1 )); then
-  echo "Can't have 'IREE_WRITE_REMOTE_BAZEL_CACHE' (${IREE_WRITE_REMOTE_BAZEL_CACHE}) set without 'IREE_READ_REMOTE_BAZEL_CACHE' (${IREE_READ_REMOTE_BAZEL_CACHE})"
+if (( ${IREE_BAZEL_WRITE_REMOTE_CACHE} == 1 && ${IREE_BAZEL_READ_REMOTE_CACHE} != 1 )); then
+  echo "Can't have 'IREE_BAZEL_WRITE_REMOTE_CACHE' (${IREE_BAZEL_WRITE_REMOTE_CACHE}) set without 'IREE_BAZEL_READ_REMOTE_CACHE' (${IREE_BAZEL_READ_REMOTE_CACHE})"
 fi
 
 # Use user-environment variables if set, otherwise use CI-friendly defaults.
@@ -101,11 +101,11 @@ if [[ ! -z "${SANDBOX_BASE}" ]]; then
   BAZEL_TEST_CMD+=(--sandbox_base="${SANDBOX_BASE}")
 fi
 
-if (( IREE_READ_REMOTE_BAZEL_CACHE == 1 )); then
+if (( IREE_BAZEL_READ_REMOTE_CACHE == 1 )); then
   BAZEL_TEST_CMD+=(--config=remote_cache_bazel_ci)
 fi
 
-if (( IREE_WRITE_REMOTE_BAZEL_CACHE != 1 )); then
+if (( IREE_BAZEL_WRITE_REMOTE_CACHE != 1 )); then
   BAZEL_TEST_CMD+=(--noremote_upload_local_results)
 fi
 

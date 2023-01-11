@@ -24,7 +24,6 @@ function docker_run() {
     DOCKER_RUN_ARGS=(
       --mount="type=bind,source=${DOCKER_HOST_WORKDIR},dst=${DOCKER_CONTAINER_WORKDIR}"
       --workdir="${DOCKER_CONTAINER_WORKDIR}"
-      --env "CCACHE_BASE_DIR=${DOCKER_CONTAINER_WORKDIR}"
     )
 
     # Delete the container after the run is complete.
@@ -34,9 +33,6 @@ function docker_run() {
     # Run as the current user and group. If only it were this simple...
     DOCKER_RUN_ARGS+=(--user="$(id -u):$(id -g)")
 
-    # Use the host network stack. Improves network performance and makes it
-    # possible for the container to talk to localhost.
-    DOCKER_RUN_ARGS+=(--network="host")
 
     # The Docker container doesn't know about the users and groups of the host
     # system. We have to tell it. This is just a mapping of IDs to names though.
@@ -101,9 +97,7 @@ function docker_run() {
     fi
 
     # Give the container a ramdisk and set the Bazel sandbox base to point to
-    # it. This helps a lot with Bazel getting IO bound. Note that SANDBOX_BASE
-    # is a custom environment variable we translate into the corresponding Bazel
-    # option.
+    # it. This helps a lot with Bazel getting IO bound.
     DOCKER_RUN_ARGS+=(
       --mount="type=tmpfs,dst=/dev/shm"
       --env SANDBOX_BASE=/dev/shm
