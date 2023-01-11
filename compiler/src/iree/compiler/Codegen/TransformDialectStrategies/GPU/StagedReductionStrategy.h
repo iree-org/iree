@@ -58,12 +58,8 @@ class StagedReductionStrategy : public AbstractReductionStrategy {
   StagedReductionStrategy(const StagedReductionStrategy &) = default;
   StagedReductionStrategy &operator=(const StagedReductionStrategy &) = default;
 
-  int64_t getNumThreadsXInBlock() const { return numThreadsXInBlock; }
-  int64_t getNumThreadsYInBlock() const { return 1; }
-  int64_t getNumThreadsZInBlock() const { return 1; }
   std::array<int64_t, 3> getNumThreadsInBlock() const override {
-    return {getNumThreadsXInBlock(), getNumThreadsYInBlock(),
-            getNumThreadsZInBlock()};
+    return {numThreadsXInBlock, 1, 1};
   }
 
   int64_t getVectorSize() const { return vectorSize; }
