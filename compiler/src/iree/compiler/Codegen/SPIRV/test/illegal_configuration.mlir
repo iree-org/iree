@@ -1,9 +1,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' --verify-diagnostics --split-input-file %s
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = []>,
-    translation_info = <SPIRVMatmulPromoteVectorize>,
-    workgroup_size = [16, 8, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = []>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -19,7 +17,10 @@ hal.executable private @matmul_tensors {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [16 : index, 8 : index, 1 : index]
+    }
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -27,7 +28,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<4x16xf32>
         // expected-error @+1 {{expected 3 levels of tiling sizes, got 0}}
-        linalg.matmul {compilation_info = #compilation} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
           outs(%result: memref<4x16xf32>)
         return
       }
@@ -37,10 +38,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize>,
-    workgroup_size = []>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -56,7 +55,10 @@ hal.executable private @matmul_tensors {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = []
+    }
     // expected-error @+1 {{expected workgroup size to have three dimensions for SPIR-V pipelines}}
     builtin.module {
       func.func @illegal() {
@@ -64,7 +66,7 @@ hal.executable private @matmul_tensors {
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
-        linalg.matmul {compilation_info = #compilation} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
           outs(%result: memref<64x128xf32>)
         return
       }
@@ -74,10 +76,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize>,
-    workgroup_size = [16, 8, 128]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -93,7 +93,10 @@ hal.executable private @matmul_tensors {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [16 : index, 8 : index, 128 : index]
+    }
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -101,7 +104,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
         // expected-error @+1 {{expected workgroup size dimensions not exceeding [128, 128, 64]}}
-        linalg.matmul {compilation_info = #compilation} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
           outs(%result: memref<64x128xf32>)
         return
       }
@@ -111,10 +114,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 256], [8, 8], [0, 0, 32]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize pipeline_depth = 2>,
-    workgroup_size = [32, 8, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 256], [8, 8], [0, 0, 32]]>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize pipeline_depth = 2>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -130,7 +131,10 @@ hal.executable private @matmul_tensors {
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [32 : index, 8 : index, 1 : index]
+    }
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -143,7 +147,7 @@ hal.executable private @matmul_tensors {
         %5 = tensor.empty() : tensor<64x1280xf16>
         %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x1280xf16>) -> tensor<64x1280xf16>
         // expected-error @+1 {{expected shared memory usage <= 32768, got 51200}}
-        %7 = linalg.matmul {compilation_info = #compilation} ins(%3, %4 : tensor<64x320xf16>, tensor<320x1280xf16>) outs(%6 : tensor<64x1280xf16>) -> tensor<64x1280xf16>
+        %7 = linalg.matmul {lowering_config = #config} ins(%3, %4 : tensor<64x320xf16>, tensor<320x1280xf16>) outs(%6 : tensor<64x1280xf16>) -> tensor<64x1280xf16>
         flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 1280], strides = [1, 1] : tensor<64x1280xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x1280xf16>>
         return
       }
@@ -153,10 +157,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 2], [0, 0, 4]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize>,
-    workgroup_size = [32, 8, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 2], [0, 0, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -172,7 +174,10 @@ hal.executable private @matmul_tensors {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [32 : index, 8 : index, 1 : index]
+    }
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -180,7 +185,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
         // expected-error @+1 {{expected total invocation count in workgroup to be <= 128}}
-        linalg.matmul {compilation_info = #compilation} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
           outs(%result: memref<64x128xf32>)
         return
       }
@@ -190,10 +195,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [16, 8], [0, 0, 4]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize>,
-    workgroup_size = [8, 2, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [16, 8], [0, 0, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -209,7 +212,10 @@ hal.executable private @matmul_tensors {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [8 : index, 2 : index, 1 : index]
+    }
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -217,7 +223,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
         // expected-error @+1 {{expected total workgroup size to be multiple of 32}}
-        linalg.matmul {compilation_info = #compilation} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
           outs(%result: memref<64x128xf32>)
         return
       }
@@ -227,10 +233,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize>,
-    workgroup_size = [32, 8, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -246,7 +250,10 @@ hal.executable private @matmul_tensors {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [32 : index, 8 : index, 1 : index]
+    }
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -254,7 +261,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
         // expected-error @+1 {{expected workgroup tile sizes to be the product of thread tile sizes and workgroup sizes}}
-        linalg.matmul {compilation_info = #compilation} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
           outs(%result: memref<64x128xf32>)
         return
       }
@@ -264,10 +271,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 60], [4, 4], [0, 0, 4]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize>,
-    workgroup_size = [15, 8, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 60], [4, 4], [0, 0, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -283,7 +288,10 @@ hal.executable private @matmul_tensors {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [15 : index, 8 : index, 1 : index]
+    }
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -291,7 +299,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x128xf32>
         // expected-error @+1 {{expected each workgroup size dimension to be power of two}}
-        linalg.matmul {compilation_info = #compilation} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x128xf32>)
           outs(%result: memref<64x128xf32>)
         return
       }
@@ -301,10 +309,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize>,
-    workgroup_size = [16, 8, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -320,7 +326,10 @@ hal.executable private @matmul_tensors {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [16 : index, 8 : index, 1 : index]
+    }
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -328,7 +337,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x128xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<48x128xf32>
         // expected-error @+1 {{LHS shape is indivisible by first level tile size}}
-        linalg.matmul {compilation_info = #compilation} ins(%lhs, %rhs : memref<48x16xf32>, memref<16x128xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<48x16xf32>, memref<16x128xf32>)
           outs(%result: memref<48x128xf32>)
         return
       }
@@ -338,10 +347,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize>,
-    workgroup_size = [16, 8, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -357,7 +364,10 @@ hal.executable private @matmul_tensors {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [16 : index, 8 : index, 1 : index]
+    }
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -365,7 +375,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x80xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<64x80xf32>
         // expected-error @+1 {{RHS shape is indivisible by first level tile size}}
-        linalg.matmul {compilation_info = #compilation} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x80xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<64x16xf32>, memref<16x80xf32>)
           outs(%result: memref<64x80xf32>)
         return
       }
@@ -375,10 +385,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16]]>,
-    translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [128, 2, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16]]>
+#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -403,7 +411,10 @@ hal.executable public @matmul_tensor {
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
        >}> {
-    hal.executable.export public @matmul_tensor layout(#pipeline_layout)
+    hal.executable.export public @matmul_256x1024x32 layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [128 : index, 2 : index, 1 : index]
+    }
     builtin.module {
       func.func @matmul_tensor() {
         %c0 = arith.constant 0 : index
@@ -416,7 +427,7 @@ hal.executable public @matmul_tensor {
         %15 = tensor.empty() : tensor<64x128xf16>
         %16 = linalg.fill ins(%cst : f16) outs(%15 : tensor<64x128xf16>) -> tensor<64x128xf16>
         // expected-error @+1 {{expected 4 levels of tiling sizes, got 3}}
-        %17 = linalg.matmul {compilation_info = #compilation}
+        %17 = linalg.matmul {lowering_config = #config}
             ins(%8, %10 : tensor<64x32xf16>, tensor<32x128xf16>) outs(%16 : tensor<64x128xf16>) -> tensor<64x128xf16>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1]
             : tensor<64x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
@@ -428,10 +439,8 @@ hal.executable public @matmul_tensor {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [8, 8, 8]]>,
-    translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [128, 2, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [8, 8, 8]]>
+#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -456,7 +465,10 @@ hal.executable public @matmul_tensor {
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
        >}> {
-    hal.executable.export public @matmul_tensor layout(#pipeline_layout)
+    hal.executable.export public @matmul_256x1024x32 layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [128 : index, 2 : index, 1 : index]
+    }
     builtin.module {
       func.func @matmul_tensor() {
         %c0 = arith.constant 0 : index
@@ -469,7 +481,7 @@ hal.executable public @matmul_tensor {
         %15 = tensor.empty() : tensor<64x128xf16>
         %16 = linalg.fill ins(%cst : f16) outs(%15 : tensor<64x128xf16>) -> tensor<64x128xf16>
         // expected-error @+1 {{expected the fourth level tile sizes to match cooperative matrix sizes}}
-        %17 = linalg.matmul {compilation_info = #compilation}
+        %17 = linalg.matmul {lowering_config = #config}
             ins(%8, %10 : tensor<64x32xf16>, tensor<32x128xf16>) outs(%16 : tensor<64x128xf16>) -> tensor<64x128xf16>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1]
             : tensor<64x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
@@ -481,10 +493,8 @@ hal.executable public @matmul_tensor {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 32], [8, 8], [0, 0, 4], [16, 16, 16]]>,
-    translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [256, 4, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [8, 8], [0, 0, 4], [16, 16, 16]]>
+#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -509,7 +519,10 @@ hal.executable public @matmul_tensor {
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
        >}> {
-    hal.executable.export public @matmul_tensor layout(#pipeline_layout)
+    hal.executable.export public @matmul_256x1024x32 layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [256 : index, 4 : index, 1 : index]
+    }
     builtin.module {
       func.func @matmul_tensor() {
         %c0 = arith.constant 0 : index
@@ -522,7 +535,7 @@ hal.executable public @matmul_tensor {
         %15 = tensor.empty() : tensor<64x128xf16>
         %16 = linalg.fill ins(%cst : f16) outs(%15 : tensor<64x128xf16>) -> tensor<64x128xf16>
         // expected-error @+1 {{expected subgroup tile sizes to be multiple of [16, 16, 16]}}
-        %17 = linalg.matmul {compilation_info = #compilation}
+        %17 = linalg.matmul {lowering_config = #config}
             ins(%8, %10 : tensor<64x32xf16>, tensor<32x128xf16>) outs(%16 : tensor<64x128xf16>) -> tensor<64x128xf16>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1]
             : tensor<64x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
@@ -534,10 +547,8 @@ hal.executable public @matmul_tensor {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>,
-    translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [64, 2, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>
+#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -562,7 +573,10 @@ hal.executable public @matmul_tensor {
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
        >}> {
-    hal.executable.export public @matmul_tensor layout(#pipeline_layout)
+    hal.executable.export public @matmul_256x1024x32 layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [64 : index, 2 : index, 1 : index]
+    }
     builtin.module {
       func.func @matmul_tensor() {
         %c0 = arith.constant 0 : index
@@ -575,7 +589,7 @@ hal.executable public @matmul_tensor {
         %15 = tensor.empty() : tensor<64x128xf16>
         %16 = linalg.fill ins(%cst : f16) outs(%15 : tensor<64x128xf16>) -> tensor<64x128xf16>
         // expected-error @+1 {{expected workgroup x component equals to (warp_size * wg_tile_n / subgroup_tile_n)}}
-        %17 = linalg.matmul {compilation_info = #compilation}
+        %17 = linalg.matmul {lowering_config = #config}
             ins(%8, %10 : tensor<64x32xf16>, tensor<32x128xf16>) outs(%16 : tensor<64x128xf16>) -> tensor<64x128xf16>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1]
             : tensor<64x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
@@ -587,10 +601,8 @@ hal.executable public @matmul_tensor {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>,
-    translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [128, 4, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>
+#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -615,7 +627,10 @@ hal.executable public @matmul_tensor {
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
        >}> {
-    hal.executable.export public @matmul_tensor layout(#pipeline_layout)
+    hal.executable.export public @matmul_256x1024x32 layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [128 : index, 4 : index, 1 : index]
+    }
     builtin.module {
       func.func @matmul_tensor() {
         %c0 = arith.constant 0 : index
@@ -628,7 +643,7 @@ hal.executable public @matmul_tensor {
         %15 = tensor.empty() : tensor<64x128xf16>
         %16 = linalg.fill ins(%cst : f16) outs(%15 : tensor<64x128xf16>) -> tensor<64x128xf16>
         // expected-error @+1 {{expected workgroup y component equals to (wg_tile_m / subgroup_tile_m)}}
-        %17 = linalg.matmul {compilation_info = #compilation}
+        %17 = linalg.matmul {lowering_config = #config}
             ins(%8, %10 : tensor<64x32xf16>, tensor<32x128xf16>) outs(%16 : tensor<64x128xf16>) -> tensor<64x128xf16>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1]
             : tensor<64x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
@@ -640,10 +655,8 @@ hal.executable public @matmul_tensor {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 32], [32, 32], [0, 0, 16], [16, 16, 16]]>,
-    translation_info = <SPIRVCooperativeMatrixVectorize>,
-    workgroup_size = [64, 1, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [32, 32], [0, 0, 16], [16, 16, 16]]>
+#translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -668,7 +681,10 @@ hal.executable public @matmul_tensor {
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
        >}> {
-    hal.executable.export public @matmul_tensor layout(#pipeline_layout)
+    hal.executable.export public @matmul_256x1024x32 layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [64 : index, 1 : index, 1 : index]
+    }
     builtin.module {
       func.func @matmul_tensor() {
         %c0 = arith.constant 0 : index
@@ -681,7 +697,7 @@ hal.executable public @matmul_tensor {
         %15 = tensor.empty() : tensor<64x128xf16>
         %16 = linalg.fill ins(%cst : f16) outs(%15 : tensor<64x128xf16>) -> tensor<64x128xf16>
         // expected-error @+1 {{expected total workgroup size to be >= 128}}
-        %17 = linalg.matmul {compilation_info = #compilation}
+        %17 = linalg.matmul {lowering_config = #config}
             ins(%8, %10 : tensor<64x32xf16>, tensor<32x128xf16>) outs(%16 : tensor<64x128xf16>) -> tensor<64x128xf16>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1]
             : tensor<64x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
@@ -693,10 +709,8 @@ hal.executable public @matmul_tensor {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 2], [0, 0, 0, 0, 1, 1, 4]]>,
-    translation_info = <SPIRVBaseVectorize>,
-    workgroup_size = [8, 2, 2]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 2], [0, 0, 0, 0, 1, 1, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -712,7 +726,10 @@ hal.executable private @conv_2d_nhwc_hwcf {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      workgroup_size = [8: index, 2: index, 2: index],
+      translation_info = #translation
+    }
     builtin.module  {
       func.func @illegal() {
         %c112 = arith.constant 112 : index
@@ -744,7 +761,7 @@ hal.executable private @conv_2d_nhwc_hwcf {
               %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
               %14 = linalg.fill ins(%cst : f32) outs(%9 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
               // expected-error @+1 {{expected 4 levels of tiling sizes, got 3}}
-              %15 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, compilation_info = #compilation, strides = dense<2> : tensor<2xi64>}
+              %15 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<2> : tensor<2xi64>}
                       ins(%12, %13 : tensor<1x9x9x8xf32>, tensor<3x3x8x16xf32>)
                       outs(%14 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
               flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
@@ -759,10 +776,8 @@ hal.executable private @conv_2d_nhwc_hwcf {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[0, 6, 6, 16], [0, 3, 3, 2], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>,
-    translation_info = <SPIRVBaseVectorize>,
-    workgroup_size = [8, 2, 2]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 6, 6, 16], [0, 3, 3, 2], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -778,7 +793,10 @@ hal.executable private @conv_2d_nhwc_hwcf {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      workgroup_size = [8: index, 2: index, 2: index],
+      translation_info = #translation
+    }
     builtin.module  {
       func.func @illegal() {
         %c112 = arith.constant 112 : index
@@ -810,7 +828,7 @@ hal.executable private @conv_2d_nhwc_hwcf {
               %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
               %14 = linalg.fill ins(%cst : f32) outs(%9 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
               // expected-error @+1 {{expected first level tile size divides the output size [OH, OW, OC]}}
-              %15 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, compilation_info = #compilation, strides = dense<2> : tensor<2xi64>}
+              %15 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<2> : tensor<2xi64>}
                       ins(%12, %13 : tensor<1x9x9x8xf32>, tensor<3x3x8x16xf32>)
                       outs(%14 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
               flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
@@ -825,10 +843,8 @@ hal.executable private @conv_2d_nhwc_hwcf {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>,
-    translation_info = <SPIRVBaseVectorize>,
-    workgroup_size = [8, 2, 2]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -844,7 +860,10 @@ hal.executable private @conv_2d_nhwc_hwcf {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      workgroup_size = [8: index, 2: index, 2: index],
+      translation_info = #translation
+    }
     builtin.module  {
       func.func @illegal() {
         %c112 = arith.constant 112 : index
@@ -876,7 +895,7 @@ hal.executable private @conv_2d_nhwc_hwcf {
               %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
               %14 = linalg.fill ins(%cst : f32) outs(%9 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
               // expected-error @+1 {{expected workgroup tile sizes to be the product of thread tile size and workgroup size}}
-              %15 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, compilation_info = #compilation, strides = dense<2> : tensor<2xi64>}
+              %15 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<2> : tensor<2xi64>}
                       ins(%12, %13 : tensor<1x9x9x8xf32>, tensor<3x3x8x16xf32>)
                       outs(%14 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
               flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
@@ -891,10 +910,8 @@ hal.executable private @conv_2d_nhwc_hwcf {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 5, 5], [0, 1, 0, 0]]>,
-    translation_info = <SPIRVBaseVectorize>,
-    workgroup_size = [32, 1, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 5, 5], [0, 1, 0, 0]]>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -910,7 +927,9 @@ hal.executable private @depthwise_conv_2d_nhwc_hwc {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+    workgroup_size = [32: index, 1: index, 1: index],
+    translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -918,7 +937,7 @@ hal.executable private @depthwise_conv_2d_nhwc_hwc {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<5x5x576xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<1x7x7x576xf32>
         // expected-error @+1 {{expected tile sizes for KH and KW to be 1}}
-        linalg.depthwise_conv_2d_nhwc_hwc {compilation_info = #compilation}
+        linalg.depthwise_conv_2d_nhwc_hwc {lowering_config = #config}
           ins(%lhs, %rhs : memref<1x11x11x576xf32>, memref<5x5x576xf32>)
           outs(%result: memref<1x7x7x576xf32>)
         return
@@ -929,10 +948,8 @@ hal.executable private @depthwise_conv_2d_nhwc_hwc {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 1, 1], [0, 0, 1, 1]]>,
-    translation_info = <SPIRVBaseVectorize>,
-    workgroup_size = [32, 1, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 1, 1], [0, 0, 1, 1]]>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -948,7 +965,9 @@ hal.executable private @depthwise_conv_2d_nhwc_hwc {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @illegal layout(#pipeline_layout)
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+    workgroup_size = [32: index, 1: index, 1: index],
+    translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -956,7 +975,7 @@ hal.executable private @depthwise_conv_2d_nhwc_hwc {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<5x5x576xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<1x7x7x576xf32>
         // expected-error @+1 {{expected the fourth level of tile size to be [0, 1, 0, 0]}}
-        linalg.depthwise_conv_2d_nhwc_hwc {compilation_info = #compilation}
+        linalg.depthwise_conv_2d_nhwc_hwc {lowering_config = #config}
           ins(%lhs, %rhs : memref<1x11x11x576xf32>, memref<5x5x576xf32>)
           outs(%result: memref<1x7x7x576xf32>)
         return

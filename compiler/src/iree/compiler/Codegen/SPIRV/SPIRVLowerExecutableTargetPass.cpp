@@ -79,7 +79,7 @@ static LogicalResult verifyEntryPoint(
     IREE::HAL::ExecutableExportOp exportOp) {
   Optional<mlir::ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize();
 
-  if (!workgroupSizeAttr || workgroupSizeAttr->size() != 3) {
+  if (workgroupSizeAttr->size() != 3) {
     return moduleOp.emitError(
         "expected workgroup size to have three dimensions for SPIR-V "
         "pipelines");
