@@ -540,9 +540,7 @@ static LogicalResult setReductionTransformDialectConfig(
     return setTranslationInfo(entryPoint, translationInfo);
   }
 
-  iree_compiler::gpu::GPUModel gpuModel;
-  if (failed(iree_compiler::gpu::matchAndSetReductionStrategy(entryPoint, op,
-                                                              gpuModel)))
+  if (failed(iree_compiler::gpu::matchAndSetReductionStrategy(entryPoint, op)))
     return failure();
 
   return setTranslationInfo(entryPoint, translationInfo);

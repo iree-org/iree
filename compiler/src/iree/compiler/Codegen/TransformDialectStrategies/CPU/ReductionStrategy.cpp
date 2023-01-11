@@ -35,8 +35,8 @@ using transform_ext::RegisterMatchCallbacksOp;
 
 ReductionStrategy mlir::iree_compiler::cpu::ReductionStrategy::create(
     MLIRContext *context,
-    const transform_ext::MatchedReductionCaptures &captures,
-    const ReductionConfig &reductionConfig) {
+    const transform_ext::MatchedReductionCaptures &captures) {
+  ReductionConfig reductionConfig = getReductionConfig(captures);
   ReductionStrategy strategy(context, captures);
   strategy.configure(reductionConfig);
   LLVM_DEBUG(DBGS() << "use CPU reduction strategy\n");
@@ -67,7 +67,8 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
           b, "reduction", transform::FailurePropagationMode::Propagate,
           variantH);
 
-  // Step 2. Tiling to the block/workgroup level. Keep everything fused.
+  // Step 2. Use tiling to introduce a single-iteration loop mapped to a
+  // single block/workgroup. Keep everything fused.
   auto [maybeLeadingHBlock, gridFillH, gridReductionH,
         maybeTiledTrailingHBlock] =
       buildReductionStrategyBlockDistribution(
@@ -88,4 +89,9 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
 
   // Step 4-6. Common trailing steps.
   buildCommonTrailingStrategy(b, variantH);
+}
+
+ReductionConfig mlir::iree_compiler::cpu::getReductionConfig(
+    const transform_ext::MatchedReductionCaptures &captures) {
+  return ReductionConfig{16};
 }
