@@ -221,10 +221,10 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
     llvm::SMLoc errorloc;
     StringRef errorKeyword;
 
-    MLIRContext *context = parser.getContext();
     auto processExtension = [&](llvm::SMLoc loc, StringRef extension) {
-      if (Optional<Extension> symbol = symbolizeExtension(extension)) {
-        extensions.push_back(ExtensionAttr::get(context, *symbol));
+      if (auto symbol = symbolizeExtension(extension)) {
+        extensions.push_back(
+            builder.getI32IntegerAttr(static_cast<uint32_t>(symbol.value())));
         return success();
       }
       return errorloc = loc, errorKeyword = extension, failure();
@@ -315,8 +315,10 @@ void print(TargetEnvAttr targetEnv, DialectAsmPrinter &printer) {
   printer << TargetEnvAttr::getKindName() << "<"
           << stringifyVersion(targetEnv.getVersion()) << ", r("
           << targetEnv.getRevision() << "), [";
-  interleaveComma(targetEnv.getExtensions(), os,
-                  [&](Extension ext) { os << stringifyExtension(ext); });
+  interleaveComma(targetEnv.getExtensionsAttr(), os, [&](Attribute attr) {
+    os << stringifyExtension(
+        *symbolizeExtension(attr.cast<IntegerAttr>().getInt()));
+  });
   printer << "], " << spirv::stringifyVendor(targetEnv.getVendorID());
   printer << ":" << spirv::stringifyDeviceType(targetEnv.getDeviceType());
   auto deviceID = targetEnv.getDeviceID();
