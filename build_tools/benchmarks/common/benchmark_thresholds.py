@@ -88,8 +88,3 @@ TOTAL_DISPATCH_SIZE_THRESHOLDS = [
     # Default threshold: 5%.
     BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
 ]
-
-TOTAL_ARTIFACT_SIZE_THRESHOLDS = [
-    # Default threshold: 5%.
-    BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
-]
