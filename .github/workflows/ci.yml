@@ -152,10 +152,9 @@ jobs:
           gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
           echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
 
-  # TODO(#11350): re-enable this job when it works again
   build_test_all_windows:
     needs: setup
-    if: false && needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
     runs-on: managed-windows-cpu
     defaults:
       run:
