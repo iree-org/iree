@@ -172,6 +172,18 @@ class GithubClientTest(unittest.TestCase):
         f"{post_benchmark_comment.GITHUB_IREE_API_PREFIX}/issues/1234/comments",
         payload={"body": "xyz"})
 
+  def test_get_pull_request_head_commit(self):
+    self._mock_response.status_code = http.client.OK
+    self._mock_response.json.return_value = {"head": {"sha": "sha123"}}
+    client = post_benchmark_comment.GithubClient(self._mock_requester)
+
+    commit_sha = client.get_pull_request_head_commit(pr_number=123)
+
+    self.assertEqual(commit_sha, "sha123")
+    self._mock_requester.get.assert_called_once_with(
+        endpoint=f"{post_benchmark_comment.GITHUB_IREE_API_PREFIX}/pulls/123",
+        payload={})
+
 
 if __name__ == "__main__":
   unittest.main()
