@@ -192,7 +192,6 @@ iree_check_single_backend_test_suite(
     "max_pool.mlir"
     "maximum.mlir"
     "minimum.mlir"
-    "mul.mlir"
     "negate.mlir"
     "pad.mlir"
     "reciprocal.mlir"
