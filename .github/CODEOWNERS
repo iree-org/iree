@@ -65,7 +65,7 @@
 /compiler/src/iree/compiler/Codegen/Sandbox/ @dcaballe @hanhanW @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar
 /compiler/src/iree/compiler/ConstEval/ @stellaraccident
-/compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar
+/compiler/src/iree/compiler/Dialect/Flow/ @MaheshRavishankar
 /compiler/src/iree/compiler/Dialect/Vulkan/ @antiagainst
 /compiler/src/iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
 /compiler/src/iree/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar @rsuderman
