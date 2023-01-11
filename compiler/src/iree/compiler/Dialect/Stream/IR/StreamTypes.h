@@ -25,35 +25,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamEnums.h.inc"  // IWYU pragma: export
 // clang-format on
 
-// It's unfortunate this is required.
-namespace mlir {
-
-template <>
-struct FieldParser<
-    mlir::Optional<mlir::iree_compiler::IREE::Stream::CollectiveReductionOp>> {
-  static FailureOr<mlir::iree_compiler::IREE::Stream::CollectiveReductionOp>
-  parse(AsmParser &parser) {
-    std::string value;
-    if (parser.parseKeywordOrString(&value)) return failure();
-    auto result = mlir::iree_compiler::IREE::Stream::symbolizeEnum<
-        mlir::iree_compiler::IREE::Stream::CollectiveReductionOp>(value);
-    if (!result.has_value()) return failure();
-    return result.value();
-  }
-};
-static inline AsmPrinter &operator<<(
-    AsmPrinter &printer,
-    mlir::Optional<mlir::iree_compiler::IREE::Stream::CollectiveReductionOp>
-        param) {
-  printer << (param.has_value()
-                  ? mlir::iree_compiler::IREE::Stream::stringifyEnum(
-                        param.value())
-                  : StringRef{""});
-  return printer;
-}
-
-}  // namespace mlir
-
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/Stream/IR/StreamAttrs.h.inc"  // IWYU pragma: keep

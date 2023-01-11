@@ -109,7 +109,6 @@ struct Statistics {
   // TODO(benvanik): add fill/copy sizes (when possible).
   size_t fillCount = 0;
   size_t copyCount = 0;
-  size_t collectiveCount = 0;
   size_t dispatchCount = 0;
 
   // Executables:
@@ -152,8 +151,6 @@ struct Statistics {
         TypeSwitch<Operation *>(op)
             .Case<IREE::Stream::CmdFillOp>([&](auto op) { ++fillCount; })
             .Case<IREE::Stream::CmdCopyOp>([&](auto op) { ++copyCount; })
-            .Case<IREE::Stream::CmdCollectiveOp>(
-                [&](auto op) { ++collectiveCount; })
             .Case<IREE::Stream::CmdDispatchOp>(
                 [&](auto op) { ++dispatchCount; });
       });
@@ -229,7 +226,6 @@ static void prettyPrintStatistics(const UsageInfo &usageInfo,
 
   os << llvm::formatv("//   DMA Fills: {0}\n", stats.fillCount);
   os << llvm::formatv("//  DMA Copies: {0}\n", stats.copyCount);
-  os << llvm::formatv("// Collectives: {0}\n", stats.collectiveCount);
   os << llvm::formatv("//  Dispatches: {0}\n", stats.dispatchCount);
 
   os << llvm::formatv(

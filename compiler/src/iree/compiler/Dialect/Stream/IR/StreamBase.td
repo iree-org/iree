@@ -148,95 +148,6 @@ def Stream_GlobalPtr : Util_AnyPtrOf<[Stream_Tensor, Stream_PrimitiveType]>;
 // Stream attributes
 //===----------------------------------------------------------------------===//
 
-// NOTE: the collective attributes here are replicated from the HAL layer as
-// the HAL values are stable across the runtime ABI and a (potential) subset of
-// what we may be able to model in the stream dialect for other targets.
-
-def Stream_CollectiveKind_AllGather : I32EnumAttrCase<"AllGather", 0, "all_gather">;
-def Stream_CollectiveKind_AllReduce : I32EnumAttrCase<"AllReduce", 1, "all_reduce">;
-def Stream_CollectiveKind_Broadcast : I32EnumAttrCase<"Broadcast", 2, "broadcast">;
-def Stream_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 3, "reduce">;
-def Stream_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 4, "reduce_scatter">;
-def Stream_CollectiveKind_Send : I32EnumAttrCase<"Send", 5, "send">;
-def Stream_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 6, "recv">;
-def Stream_CollectiveKindAttr :
-    I32EnumAttr<"CollectiveKind", "valid CollectiveKind", [
-      Stream_CollectiveKind_AllGather,
-      Stream_CollectiveKind_AllReduce,
-      Stream_CollectiveKind_Broadcast,
-      Stream_CollectiveKind_Reduce,
-      Stream_CollectiveKind_ReduceScatter,
-      Stream_CollectiveKind_Send,
-      Stream_CollectiveKind_Recv,
-    ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
-}
-
-def Stream_CollectiveReductionOp_None : I32EnumAttrCase<"None", 0, "none">;
-def Stream_CollectiveReductionOp_ReductionSum : I32EnumAttrCase<"ReductionSum", 1, "sum">;
-def Stream_CollectiveReductionOp_ReductionProduct : I32EnumAttrCase<"ReductionProduct", 2, "product">;
-def Stream_CollectiveReductionOp_ReductionMinimum : I32EnumAttrCase<"ReductionMinimum", 3, "minimum">;
-def Stream_CollectiveReductionOp_ReductionMaximum : I32EnumAttrCase<"ReductionMaximum", 4, "maximum">;
-def Stream_CollectiveReductionOp_ReductionAverage : I32EnumAttrCase<"ReductionAverage", 5, "average">;
-def Stream_CollectiveReductionOpAttr :
-    I32EnumAttr<"CollectiveReductionOp", "valid CollectiveReductionOp", [
-      Stream_CollectiveReductionOp_None,
-      Stream_CollectiveReductionOp_ReductionSum,
-      Stream_CollectiveReductionOp_ReductionProduct,
-      Stream_CollectiveReductionOp_ReductionMinimum,
-      Stream_CollectiveReductionOp_ReductionMaximum,
-      Stream_CollectiveReductionOp_ReductionAverage,
-    ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::Stream";
-}
-
-def Stream_CollectiveElementType_Sint8 : I32EnumAttrCase<"Sint8", 0, "si8">;
-def Stream_CollectiveElementType_Uint8 : I32EnumAttrCase<"Uint8", 1, "ui8">;
-def Stream_CollectiveElementType_Sint16 : I32EnumAttrCase<"Sint16", 2, "si16">;
-def Stream_CollectiveElementType_Uint16 : I32EnumAttrCase<"Uint16", 3, "ui16">;
-def Stream_CollectiveElementType_Sint32 : I32EnumAttrCase<"Sint32", 4, "si32">;
-def Stream_CollectiveElementType_Uint32 : I32EnumAttrCase<"Uint32", 5, "ui32">;
-def Stream_CollectiveElementType_Sint64 : I32EnumAttrCase<"Sint64", 6, "si64">;
-def Stream_CollectiveElementType_Uint64 : I32EnumAttrCase<"Uint64", 7, "ui64">;
-def Stream_CollectiveElementType_Float16 : I32EnumAttrCase<"Float16", 8, "f16">;
-def Stream_CollectiveElementType_Float32 : I32EnumAttrCase<"Float32", 9, "f32">;
-def Stream_CollectiveElementType_Float64 : I32EnumAttrCase<"Float64", 10, "f64">;
-def Stream_CollectiveElementType_BFloat16 : I32EnumAttrCase<"BFloat16", 11, "bf16">;
-def Stream_CollectiveElementTypeAttr :
-    I32EnumAttr<"CollectiveElementType", "valid CollectiveElementType", [
-      Stream_CollectiveElementType_Sint8,
-      Stream_CollectiveElementType_Uint8,
-      Stream_CollectiveElementType_Sint16,
-      Stream_CollectiveElementType_Uint16,
-      Stream_CollectiveElementType_Sint32,
-      Stream_CollectiveElementType_Uint32,
-      Stream_CollectiveElementType_Sint64,
-      Stream_CollectiveElementType_Uint64,
-      Stream_CollectiveElementType_Float16,
-      Stream_CollectiveElementType_Float32,
-      Stream_CollectiveElementType_Float64,
-      Stream_CollectiveElementType_BFloat16,
-    ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
-}
-
-def Stream_CollectiveAttr :
-    AttrDef<Stream_Dialect, "Collective", []> {
-  let mnemonic = "collective";
-  let summary = [{collective operation and specification}];
-  let description = [{
-    Specifies the collective operation to perform and any mode bits required.
-  }];
-  let parameters = (ins
-    AttrParameter<"CollectiveKind", "">:$kind,
-    OptionalParameter<"mlir::Optional<CollectiveReductionOp>">:$reduction,
-    AttrParameter<"CollectiveElementType", "">:$element_type
-  );
-  let assemblyFormat = [{
-    `<` $kind (`with` $reduction^)? `:` $element_type `>`
-  }];
-}
-
 def Stream_Favor_Debug : I32EnumAttrCase<"Debug", 0, "debug">;
 def Stream_Favor_MinPeakMemory : I32EnumAttrCase<"MinPeakMemory", 1, "min-peak-memory">;
 def Stream_Favor_MaxConcurrency : I32EnumAttrCase<"MaxConcurrency", 2, "max-concurrency">;
@@ -431,27 +342,6 @@ def Stream_TransferType : AnyTypeOf<[
   Stream_Tensor,
   Stream_PrimitiveType,
 ]>;
-
-def Stream_Channel : TypeDef<Stream_Dialect, "Channel", [
-  Util_ReferenceType
-]> {
-  let mnemonic = "channel";
-
-  let summary = [{a collective communication channel}];
-  let description = [{
-    Represents a single participant in a collective clique. Multiple channels
-    may exist within the same program to allow for partial operations or
-    hierarchical operations.
-
-    In programs that have already been partitioned prior to being compiled there
-    will often exist only one channel and `stream.channel.default` can be used
-    to reference it. In programs that model SPMD behavior internally channels
-    can be created or provided by hosting applications. For example, the program
-    could expose a `@set_channels(!util.list<!stream.channel>)` method that
-    stores the channels in globals for use throughout the program allowing for
-    application-controlled channel configuration.
-  }];
-}
 
 def Stream_Resource : TypeDef<Stream_Dialect, "Resource", [
   Util_ReferenceType,

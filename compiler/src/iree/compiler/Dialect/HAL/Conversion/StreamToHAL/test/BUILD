@@ -16,7 +16,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "channel_ops.mlir",
             "cmd_ops.mlir",
             "resource_ops.mlir",
             "timepoint_ops.mlir",

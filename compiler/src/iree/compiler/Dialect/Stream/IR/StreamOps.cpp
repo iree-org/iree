@@ -1952,61 +1952,6 @@ LogicalResult CmdCopyOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// stream.cmd.collective
-//===----------------------------------------------------------------------===//
-
-LogicalResult CmdCollectiveOp::verify() {
-  CmdCollectiveOp op = *this;
-  size_t resourceCount = op.getResources().size();
-  if (op.getResourceSizes().size() != resourceCount ||
-      op.getResourceOffsets().size() != resourceCount ||
-      op.getResourceLengths().size() != resourceCount ||
-      op.getResourceAccesses().size() != resourceCount) {
-    return op->emitOpError() << "with " << resourceCount
-                             << " resources has mismatched associated ranges";
-  }
-
-  size_t requiredCount = 0;
-  IREE::Stream::ResourceAccessBitfield requiredAccess[2] = {
-      IREE::Stream::ResourceAccessBitfield::None,
-      IREE::Stream::ResourceAccessBitfield::None,
-  };
-  switch (getOp().getKind()) {
-    default:
-      requiredCount = 2;  // send & recv
-      requiredAccess[0] = IREE::Stream::ResourceAccessBitfield::Read;
-      requiredAccess[1] = IREE::Stream::ResourceAccessBitfield::Write;
-      break;
-    case IREE::Stream::CollectiveKind::Send:
-      requiredCount = 1;  // send
-      requiredAccess[0] = IREE::Stream::ResourceAccessBitfield::Read;
-      break;
-    case IREE::Stream::CollectiveKind::Recv:
-      requiredCount = 1;  // recv
-      requiredAccess[0] = IREE::Stream::ResourceAccessBitfield::Write;
-      break;
-  }
-  if (resourceCount != requiredCount) {
-    return op->emitOpError()
-           << "requires " << requiredCount << " resources but " << resourceCount
-           << " provided";
-  }
-  for (size_t i = 0; i < requiredCount; ++i) {
-    auto declaredAccess = op.getResourceAccesses()[i]
-                              .cast<IREE::Stream::ResourceAccessBitfieldAttr>()
-                              .getValue();
-    if (!bitEnumContainsAll(declaredAccess, requiredAccess[i])) {
-      return op->emitOpError()
-             << "resource " << i << " requires access "
-             << stringifyEnum(requiredAccess[i]) << " but is declared as "
-             << stringifyEnum(declaredAccess);
-    }
-  }
-
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // stream.cmd.dispatch
 //===----------------------------------------------------------------------===//
 
@@ -2200,9 +2145,15 @@ void CmdExecuteOp::build(OpBuilder &builder, OperationState &state,
 // Returns success if the given op is a known valid stream.cmd.* op for use
 // within an execution region.
 static LogicalResult verifyCmdOp(Operation *op) {
-  if (!op->hasTrait<OpTrait::IREE::Stream::CmdPhaseOp>() &&
-      !isa<IREE::Stream::StreamableOpInterface>(op) &&
-      !isa<IREE::Stream::YieldOp>(op)) {
+  // TODO(benvanik): add a trait that lets us avoid this switch.
+  if (!TypeSwitch<Operation *, bool>(op)
+           .Case<IREE::Stream::CmdFlushOp, IREE::Stream::CmdInvalidateOp,
+                 IREE::Stream::CmdDiscardOp, IREE::Stream::CmdFillOp,
+                 IREE::Stream::CmdCopyOp, IREE::Stream::CmdDispatchOp,
+                 IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp>(
+               [](auto op) { return true; })
+           .Case<IREE::Stream::YieldOp>([](auto op) { return true; })
+           .Default(false)) {
     return op->emitOpError()
            << "explicit execution regions must only contain explicit ops";
   }
@@ -2418,42 +2369,6 @@ LogicalResult TimepointAwaitOp::verify() {
 SmallVector<int64_t, 4> TimepointAwaitOp::getTiedResultOperandIndices() {
   return llvm::to_vector<4>(
       llvm::seq<int64_t>(0, getResourceOperands().size()));
-}
-
-//===----------------------------------------------------------------------===//
-// stream.channel.default
-//===----------------------------------------------------------------------===//
-
-void ChannelDefaultOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "channel");
-}
-
-//===----------------------------------------------------------------------===//
-// stream.channel.create
-//===----------------------------------------------------------------------===//
-
-void ChannelCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "channel");
-}
-
-//===----------------------------------------------------------------------===//
-// stream.channel.rank
-//===----------------------------------------------------------------------===//
-
-void ChannelRankOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "ccl_rank");
-}
-
-//===----------------------------------------------------------------------===//
-// stream.channel.count
-//===----------------------------------------------------------------------===//
-
-void ChannelCountOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "ccl_count");
 }
 
 //===----------------------------------------------------------------------===//

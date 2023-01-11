@@ -2341,58 +2341,6 @@ def Stream_CmdCopyOp : Stream_Op<"cmd.copy", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_CmdCollectiveOp : Stream_Op<"cmd.collective", [
-  AttrSizedOperandSegments,
-  Stream_CmdPhaseOp,
-  Stream_StreamableOp,
-  Stream_SubviewEffectOp,
-  Util_SizeAwareOp,
-]> {
-  let summary = [{dispatches a collective operation}];
-  let description = [{
-    Dispatches a collective operation specified against the device. If grouped
-    with other collectives in a `stream.cmd.concurrent` region the collective
-    operations may fuse and execute more efficiently.
-  }];
-
-  let arguments = (ins
-    Stream_CollectiveAttr:$op,
-    Stream_Channel:$channel,
-    Stream_Size:$element_count,
-    Optional<I32>:$param,
-    Variadic<Stream_AnyStreamResource>:$resources,
-    Variadic<Stream_Size>:$resource_sizes,
-    Variadic<Stream_Offset>:$resource_offsets,
-    Variadic<Stream_Size>:$resource_lengths,
-    Stream_ResourceAccessArrayAttr:$resource_accesses
-  );
-  let results = (outs);
-
-  let assemblyFormat = [{
-    `` $op `` `[` $element_count `]`
-    `channel` `(` $channel `)`
-    (`param` `(` $param^ `:` type($param) `)`)? `{`
-    custom<DispatchResources>($resources, type($resources), $resource_sizes,
-                              $resource_offsets, $resource_lengths,
-                              $resource_accesses)
-    `\n` `}`
-    attr-dict-with-keyword
-  }];
-
-  let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(
-          idx - getODSOperandIndexAndLength(4).first,
-          getResources(), getResourceSizes());
-    }
-    Value getResultSize(unsigned idx) { return {}; }
-  }];
-
-  let hasVerifier = 1;
-
-  let hasCanonicalizer = 1;
-}
-
 def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
@@ -2526,6 +2474,7 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   let hasCanonicalizer = 1;
 }
 
+// TODO(benvanik): stream.cmd.serial for serialized execution.
 def Stream_CmdSerialOp : Stream_Op<"cmd.serial", [
   ParentOneOf<[
     "IREE::Stream::CmdExecuteOp",
@@ -2926,112 +2875,6 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
-}
-
-//===----------------------------------------------------------------------===//
-// Channels
-//===----------------------------------------------------------------------===//
-
-def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  Stream_AffinityOp,
-]> {
-  let summary = [{returns a default collective communication channel}];
-  let description = [{
-    Returns a channel initialized using the runtime environment for the
-    particular affinity.
-  }];
-
-  let arguments = (ins
-    // TODO(benvanik): optional discriminator for groupings.
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_Channel:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
-  AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  Stream_AffinityOp,
-]> {
-  let summary = [{creates a new channel for collective communication}];
-  let description = [{
-    Returns a new channel with the given rank associated with the specified
-    affinity. Collective operations using this channel must only be submitted on
-    compatible affinities.
-
-    The rank can be omitted to indicate a default inherited from the environment
-    or device configuration at runtime.
-  }];
-
-  let arguments = (ins
-    // TODO(benvanik): optional discriminator for groupings.
-    Optional<Index>:$rank,
-    Optional<Index>:$count,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_Channel:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    (`rank` `(` $rank^ `)`)?
-    (`count` `(` $count^ `)`)?
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-]> {
-  let summary = [{returns the rank of the local participant in the group}];
-  let description = [{
-    Returns the rank the channel represents as a participant in a collective
-    group in `[0, count)`.
-  }];
-
-  let arguments = (ins
-    Stream_Channel:$channel
-  );
-  let results = (outs
-    Index:$result
-  );
-
-  let assemblyFormat = [{
-     $channel `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-]> {
-  let summary = [{returns the total number of participants in the group}];
-  let description = [{
-    Returns the total participant count in the collective communicator group.
-  }];
-
-  let arguments = (ins
-    Stream_Channel:$channel
-  );
-  let results = (outs
-    Index:$result
-  );
-
-  let assemblyFormat = [{
-    $channel `:` type($result)
-    attr-dict-with-keyword
-  }];
 }
 
 //===----------------------------------------------------------------------===//

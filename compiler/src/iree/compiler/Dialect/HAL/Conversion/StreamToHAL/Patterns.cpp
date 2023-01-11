@@ -743,69 +743,6 @@ struct CmdCopyOpPattern
   }
 };
 
-// NOTE: this relies on the enums being the same today. Ew.
-static IREE::HAL::CollectiveAttr convertCollectiveAttr(
-    IREE::Stream::CollectiveAttr sourceAttr) {
-  auto convertReductionOp = [](Optional<IREE::Stream::CollectiveReductionOp> op)
-      -> Optional<IREE::HAL::CollectiveReductionOp> {
-    if (!op.has_value()) return llvm::None;
-    return static_cast<IREE::HAL::CollectiveReductionOp>(op.value());
-  };
-  return IREE::HAL::CollectiveAttr::get(
-      sourceAttr.getContext(),
-      static_cast<IREE::HAL::CollectiveKind>(sourceAttr.getKind()),
-      convertReductionOp(sourceAttr.getReduction()),
-      static_cast<IREE::HAL::CollectiveElementType>(
-          sourceAttr.getElementType()));
-}
-
-struct CmdCollectiveOpPattern
-    : public StreamConversionPattern<IREE::Stream::CmdCollectiveOp> {
-  using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::CmdCollectiveOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto commandBuffer = mapping->lookupCommandBufferFor(op);
-
-    Value sendBuffer;
-    Value sendOffset;
-    Value sendLength;
-    Value recvBuffer;
-    Value recvOffset;
-    Value recvLength;
-    switch (adaptor.getOp().getKind()) {
-      default:
-        assert(adaptor.getResources().size() == 2 && "should have verified");
-        sendBuffer = adaptor.getResources()[0];
-        sendOffset = adaptor.getResourceOffsets()[0];
-        sendLength = adaptor.getResourceLengths()[0];
-        recvBuffer = adaptor.getResources()[1];
-        recvOffset = adaptor.getResourceOffsets()[1];
-        recvLength = adaptor.getResourceLengths()[1];
-        break;
-      case IREE::Stream::CollectiveKind::Send:
-        assert(adaptor.getResources().size() == 1 && "should have verified");
-        sendBuffer = adaptor.getResources()[0];
-        sendOffset = adaptor.getResourceOffsets()[0];
-        sendLength = adaptor.getResourceLengths()[0];
-        break;
-      case IREE::Stream::CollectiveKind::Recv:
-        assert(adaptor.getResources().size() == 1 && "should have verified");
-        recvBuffer = adaptor.getResources()[0];
-        recvOffset = adaptor.getResourceOffsets()[0];
-        recvLength = adaptor.getResourceLengths()[0];
-        break;
-    }
-
-    rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferCollectiveOp>(
-        op, commandBuffer, adaptor.getChannel(),
-        convertCollectiveAttr(adaptor.getOp()), adaptor.getElementCount(),
-        adaptor.getParam(), sendBuffer, sendOffset, sendLength, recvBuffer,
-        recvOffset, recvLength);
-    return success();
-  }
-};
-
 struct CmdDispatchOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdDispatchOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -1181,71 +1118,6 @@ struct TimepointAwaitOpPattern
   }
 };
 
-struct ChannelCreateOpPattern
-    : public StreamConversionPattern<IREE::Stream::ChannelCreateOp> {
-  using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ChannelCreateOp createOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto [device, queueAffinity] =
-        lookupDeviceAndQueueAffinityFor(createOp, rewriter);
-    Value neg1I32;
-    auto getDefault = [&]() {
-      if (!neg1I32) {
-        neg1I32 =
-            rewriter.create<arith::ConstantIntOp>(createOp.getLoc(), -1, 32);
-      }
-      return neg1I32;
-    };
-    Value rank =
-        adaptor.getRank()
-            ? rewriter.create<arith::IndexCastOp>(
-                  createOp.getLoc(), rewriter.getI32Type(), adaptor.getRank())
-            : getDefault();
-    Value count =
-        adaptor.getRank()
-            ? rewriter.create<arith::IndexCastOp>(
-                  createOp.getLoc(), rewriter.getI32Type(), adaptor.getCount())
-            : getDefault();
-    rewriter.replaceOpWithNewOp<IREE::HAL::ChannelCreateOp>(
-        createOp, rewriter.getType<IREE::HAL::ChannelType>(), device,
-        queueAffinity, rank, count);
-    return success();
-  }
-};
-
-struct ChannelRankOpPattern
-    : public StreamConversionPattern<IREE::Stream::ChannelRankOp> {
-  using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ChannelRankOp rankOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto newOp = rewriter.create<IREE::HAL::ChannelRankAndCountOp>(
-        rankOp.getLoc(), rewriter.getI32Type(), rewriter.getI32Type(),
-        adaptor.getChannel());
-    Value indexRank = rewriter.create<arith::IndexCastOp>(
-        rankOp.getLoc(), rewriter.getIndexType(), newOp.getRank());
-    rewriter.replaceOp(rankOp, indexRank);
-    return success();
-  }
-};
-
-struct ChannelCountOpPattern
-    : public StreamConversionPattern<IREE::Stream::ChannelCountOp> {
-  using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ChannelCountOp countOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto newOp = rewriter.create<IREE::HAL::ChannelRankAndCountOp>(
-        countOp.getLoc(), rewriter.getI32Type(), rewriter.getI32Type(),
-        adaptor.getChannel());
-    Value indexCount = rewriter.create<arith::IndexCastOp>(
-        countOp.getLoc(), rewriter.getIndexType(), newOp.getCount());
-    rewriter.replaceOp(countOp, indexCount);
-    return success();
-  }
-};
-
 struct ElideYieldOpPattern
     : public StreamConversionPattern<IREE::Stream::YieldOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -1282,13 +1154,6 @@ void populateStreamToHALPatterns(MLIRContext *context,
   conversionTarget.addIllegalDialect<IREE::Stream::StreamDialect>();
 
   typeConverter.addConversion(
-      [=](IREE::Stream::ChannelType type, SmallVectorImpl<Type> &results) {
-        // Collective channels are 1:1.
-        results.push_back(IREE::HAL::ChannelType::get(context));
-        return success();
-      });
-
-  typeConverter.addConversion(
       [=](IREE::Stream::ResourceType type, SmallVectorImpl<Type> &results) {
         // Resources are just buffers (no shape/encoding/etc).
         results.push_back(IREE::HAL::BufferType::get(context));
@@ -1315,15 +1180,13 @@ void populateStreamToHALPatterns(MLIRContext *context,
                   TensorTraceOpPattern>(mapping, typeConverter, context);
   patterns
       .insert<CmdFlushOpPattern, CmdInvalidateOpPattern, CmdDiscardOpPattern,
-              CmdFillOpPattern, CmdCopyOpPattern, CmdCollectiveOpPattern,
-              CmdDispatchOpPattern, CmdExecuteOpPattern, CmdSerialOpPattern,
-              CmdConcurrentOpPattern>(mapping, typeConverter, context);
+              CmdFillOpPattern, CmdCopyOpPattern, CmdDispatchOpPattern,
+              CmdExecuteOpPattern, CmdSerialOpPattern, CmdConcurrentOpPattern>(
+          mapping, typeConverter, context);
   patterns.insert<TimepointImmediateOpPattern, TimepointImportOpPattern,
                   TimepointExportOpPattern, TimepointChainExternalOpPattern,
                   TimepointJoinOpPattern, TimepointBarrierOpPattern,
                   TimepointAwaitOpPattern>(mapping, typeConverter, context);
-  patterns.insert<ChannelCreateOpPattern, ChannelRankOpPattern,
-                  ChannelCountOpPattern>(mapping, typeConverter, context);
   patterns.insert<ElideYieldOpPattern>(mapping, typeConverter, context);
 }
 
