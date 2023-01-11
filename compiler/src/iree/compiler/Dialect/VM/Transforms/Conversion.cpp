@@ -35,6 +35,25 @@ namespace IREE {
 namespace VM {
 namespace {
 
+// TODO#(11786): The expansions of integer min and max ops were removed in
+// llvm-project@e502f4fc2e25. They are added here for moving integrate forward.
+// We should add native VM ops for supporting them.
+template <typename OpTy, arith::CmpIPredicate pred>
+struct MaxMinIOpConverter : public OpRewritePattern<OpTy> {
+ public:
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+  LogicalResult matchAndRewrite(OpTy op,
+                                PatternRewriter &rewriter) const final {
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    Location loc = op.getLoc();
+    Value cmp = rewriter.create<arith::CmpIOp>(loc, pred, lhs, rhs);
+    rewriter.replaceOpWithNewOp<arith::SelectOp>(op, cmp, lhs, rhs);
+    return success();
+  }
+};
+
 // Returns a stably sorted list of dialect interfaces of T for all dialects used
 // within the given module.
 template <typename T>
@@ -121,6 +140,11 @@ class ConversionPass
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,
                              patterns);
     arith::populateArithExpandOpsPatterns(patterns);
+    patterns.add<MaxMinIOpConverter<arith::MaxSIOp, arith::CmpIPredicate::sgt>,
+                 MaxMinIOpConverter<arith::MaxUIOp, arith::CmpIPredicate::ugt>,
+                 MaxMinIOpConverter<arith::MinSIOp, arith::CmpIPredicate::slt>,
+                 MaxMinIOpConverter<arith::MinUIOp, arith::CmpIPredicate::ult>>(
+        context);
     populateStandardToVMPatterns(context, typeConverter, patterns);
     populateMathToVMPatterns(context, typeConverter, patterns);
     populateAffineToStdConversionPatterns(patterns);

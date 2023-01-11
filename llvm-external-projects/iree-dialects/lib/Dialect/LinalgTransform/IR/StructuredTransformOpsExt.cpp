@@ -354,12 +354,13 @@ static linalg::LinalgOp findSingleLinalgOpDefiningAll(ValueRange range) {
     // operands may be coming from a Linalg op. Or a completely different
     // mechanism of tracking op replacement at creation, or even different
     // patterns that identify the "main" result of a transformation.
-    while (isa<tensor::CastOp, tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
-        value.getDefiningOp())) {
+    while (isa<tensor::CastOp, tensor::CollapseShapeOp, tensor::ExpandShapeOp,
+               tensor::InsertSliceOp>(value.getDefiningOp())) {
       value = llvm::TypeSwitch<Operation *, Value>(value.getDefiningOp())
                   .Case([](tensor::CastOp op) { return op.getSource(); })
                   .Case([](tensor::CollapseShapeOp op) { return op.getSrc(); })
                   .Case([](tensor::ExpandShapeOp op) { return op.getSrc(); })
+                  .Case([](tensor::InsertSliceOp op) { return op.getSource(); })
                   .Default([](Operation *) {
                     llvm_unreachable("Wrong op type");
                     return Value();
