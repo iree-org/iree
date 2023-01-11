@@ -1048,7 +1048,7 @@ jobs:
 
   emscripten:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
