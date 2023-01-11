@@ -31,7 +31,6 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -277,6 +276,18 @@ static LogicalResult duplicateInitTensorOps(OpBuilder &b,
   return success();
 }
 
+static SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
+  auto opAttributes = op.getAttributeNames();
+  llvm::StringSet<> elidedAttrs;
+  elidedAttrs.insert(opAttributes.begin(), opAttributes.end());
+  SmallVector<NamedAttribute> preservedAttrs;
+  for (auto attr : op->getAttrs()) {
+    if (elidedAttrs.count(attr.getName())) continue;
+    preservedAttrs.push_back(attr);
+  }
+  return preservedAttrs;
+}
+
 // Checks if the `inOperand` can be used in place of the `outOperand`
 // to mimic in-place update behavior for parallel elementwise ops.
 static bool canUseInOperandAsOutOperand(
@@ -357,7 +368,7 @@ struct AdaptLinalgInputOperandToOutputOperand
                                                utils::IteratorType::parallel);
     auto newOp = rewriter.create<linalg::GenericOp>(
         loc, op.getResultTypes(), newOperands, operand->get(), maps, iterTypes,
-        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(op));
+        /*bodyBuild=*/nullptr, PruneAttributeList(op));
     rewriter.inlineRegionBefore(op.getRegion(), newOp.getRegion(),
                                 newOp.getRegion().begin());
 
