@@ -124,12 +124,6 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
                    spirv::GlobalVariableOp>
         resourceVars;
 
-    // We are using a none type for creating the global variable. It's fine.
-    // The correctness boundary is the pass. We will fix it up during
-    // conversion so it won't leak.
-    auto placeholderType = spirv::PointerType::get(
-        NoneType::get(module.getContext()), spirv::StorageClass::StorageBuffer);
-
     for (int i = subspanOps.size() - 1; i >= 0; --i) {
       auto subspanOp = subspanOps[i];
       const auto &setBinding = setBindings[i];
@@ -143,7 +137,10 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
         // need to have alias decoration.
         bool alias = setBindingTypes[setBindings[i]].size() > 1;
 
-        var = createResourceVariable(subspanOp.getLoc(), placeholderType,
+        // We are using the interface op's type for creating the global
+        // variable. It's fine. The correctness boundary is the pass.
+        // We will fix it up during conversion so it won't leak.
+        var = createResourceVariable(subspanOp.getLoc(), subspanOp.getType(),
                                      setBinding.first, setBinding.second, alias,
                                      module, &symbolTable);
         resourceVars[key] = var;
