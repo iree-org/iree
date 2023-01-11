@@ -20,4 +20,4 @@ class CommentData(object):
   # Abbreviated markdown to post on gist.
   full_md: str
   # Unverified PR number.
-  unverified_pr_number: str
+  unverified_pr_number: int
