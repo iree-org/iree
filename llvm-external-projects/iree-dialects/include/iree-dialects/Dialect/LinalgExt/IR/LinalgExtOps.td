@@ -1005,7 +1005,7 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
                        Variadic<AnyShaped>:$outputs,
                        I64Attr:$output_tile_size,
                        I64Attr:$kernel_size,
-                       DenseI64ArrayAttr:$image_dimensions
+                       I64ArrayAttr:$image_dimensions
   );
 
   let builders = [
@@ -1040,7 +1040,7 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
       return output().getType().cast<ShapedType>();
     }
     SmallVector<int64_t> imageDimensions() {
-      return llvm::to_vector(getImageDimensions());
+      return extractFromI64ArrayAttr(getImageDimensions());
     }
     int64_t getInputOperandRank() {
       return getInputOperandType().getRank();

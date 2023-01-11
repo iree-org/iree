@@ -90,13 +90,6 @@ def TileAndDecomposeWinogradTransform :
                     "createTileAndDecomposeWinogradTransformPass()";
 }
 
-def ConvertConv2DToWinograd :
-    Pass<"iree-linalg-ext-convert-conv2d-to-winograd", ""> {
-  let summary = "Convert linalg convolution ops to winograd based implementation";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createConvertConv2DToWinogradPass()";
-}
-
-
 //===---------------------------------------------------------------------====//
 // Codegen Strategy passes moved into IREE
 // TODO: Deprecate all this.

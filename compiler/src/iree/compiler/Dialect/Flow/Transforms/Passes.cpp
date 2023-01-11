@@ -8,7 +8,6 @@
 
 #include <memory>
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -59,11 +58,6 @@ static llvm::cl::opt<bool> clDemoteF64ToF32(
 static llvm::cl::opt<bool> clEnableConvToImg2Col(
     "iree-flow-enable-conv-img2col-transform",
     llvm::cl::desc("Enable converting convolution ops to img2col form."),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnableConvToWinograd(
-    "iree-flow-enable-conv-winograd-transform",
-    llvm::cl::desc("Enable converting convolution ops to winograd form."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
@@ -193,8 +187,6 @@ void buildGlobalOptimizationPassPipeline(
 /// uses case.
 static void buildOptionalPreprocessingPassPipeline(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
-      .addPredicatedPass(clEnableConvToWinograd,
-                         IREE::LinalgExt::createConvertConv2DToWinogradPass)
       .addPredicatedPass(clEnableConvToImg2Col,
                          IREE::Flow::createConvertConv2DToImg2ColPass)
       .addPredicatedPass(

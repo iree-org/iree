@@ -167,11 +167,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtVectorizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createTileAndDecomposeWinogradTransformPass();
 
-// Creates a pass to convert linalg convolution ops into a sequence of
-// linalg_ext.winograd.* ops and linalg.batch_matmul ops using the winograd
-// tranformation.
-std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
-
 // Marker used as attribute the depth of the split reduction transformations.
 const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 
