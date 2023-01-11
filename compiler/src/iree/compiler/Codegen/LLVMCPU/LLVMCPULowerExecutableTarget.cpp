@@ -184,9 +184,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
         return signalPassFailure();
       }
 
-      auto target = variantOp.getTarget();
-      bool lowerToAVX2 = hasAVX2Feature(target);
-      bool enableMicrokernels = hasMicrokernels(target);
+      bool lowerToAVX2 = hasAVX2Feature(variantOp.getTarget());
       if (!testLoweringConfiguration) {
         switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
@@ -236,8 +234,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addCPUDataTilingPipeline(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
-            addVMVXDefaultPassPipeline(executableLoweringPipeline,
-                                       enableMicrokernels);
+            addVMVXDefaultPassPipeline(executableLoweringPipeline);
             break;
           // Transform-dialect pipelines.
           case IREE::Codegen::DispatchLoweringPassPipeline::

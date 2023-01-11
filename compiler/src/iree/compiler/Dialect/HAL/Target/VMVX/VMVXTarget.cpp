@@ -29,21 +29,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-static llvm::cl::opt<bool> clEnableMicrokernels(
-    "iree-vmvx-enable-microkernels",
-    llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"),
-    llvm::cl::init(false));
-
-static IREE::HAL::ExecutableTargetAttr getVMVXExecutableTarget(
-    MLIRContext *context, StringRef backend, StringRef format) {
-  SmallVector<NamedAttribute> config;
-  config.emplace_back(StringAttr::get(context, "ukernels"),
-                      BoolAttr::get(context, clEnableMicrokernels));
-  return IREE::HAL::ExecutableTargetAttr::get(
-      context, StringAttr::get(context, backend),
-      StringAttr::get(context, format), DictionaryAttr::get(context, config));
-}
-
 class VMVXTargetBackend final : public TargetBackend {
  public:
   VMVXTargetBackend() = default;
@@ -139,9 +124,14 @@ class VMVXTargetBackend final : public TargetBackend {
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // This is where we would multiversion.
-    targetAttrs.push_back(
-        getVMVXExecutableTarget(context, "vmvx", "vmvx-bytecode-fb"));
+    targetAttrs.push_back(getExecutableTarget(context));
     return ArrayAttr::get(context, targetAttrs);
+  }
+
+  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
+      MLIRContext *context) const {
+    return IREE::HAL::ExecutableTargetAttr::get(context, "vmvx",
+                                                "vmvx-bytecode-fb");
   }
 };
 
@@ -178,9 +168,14 @@ class VMVXInlineTargetBackend final : public TargetBackend {
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // This is where we would multiversion.
-    targetAttrs.push_back(
-        getVMVXExecutableTarget(context, "vmvx-inline", "vmvx-ir"));
+    targetAttrs.push_back(getExecutableTarget(context));
     return ArrayAttr::get(context, targetAttrs);
+  }
+
+  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
+      MLIRContext *context) const {
+    return IREE::HAL::ExecutableTargetAttr::get(context, "vmvx-inline",
+                                                "vmvx-ir");
   }
 };
 
