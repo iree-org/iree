@@ -39,7 +39,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x1024xf32, 3>
   
   //         CHECK: %[[TIDX:.]] = gpu.thread_id  x
-  //         CHECK: %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][0, %[[TIDX]]]{{.*}}to memref<1x1xf32, strided<[1024, 1], offset: ?>, 3>
+  //         CHECK: %[[SHMEM_VIEW_EXPANDED:.*]] = memref.subview %[[SHMEM_ALLOC]][0, %[[TIDX]]]{{.*}}to memref<f32, strided<[], offset: ?>, 3>
   // Local per-thread scf.for-based reduction.
   //         CHECK: scf.for
   //         CHECK:   vector.transfer_read %{{.*}} : memref<f32, strided<[], offset: ?>>, vector<f32>
