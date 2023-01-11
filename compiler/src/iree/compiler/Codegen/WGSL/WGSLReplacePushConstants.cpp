@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
@@ -25,7 +24,7 @@ namespace {
 #define IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX 0
 
 static Value convertOpTypeFromI32(IREE::HAL::InterfaceConstantLoadOp loadOp,
-                                  vector::ExtractElementOp extractElementOp) {
+                                  tensor::ExtractOp extractOp) {
   OpBuilder builder(loadOp);
 
   auto loc = loadOp.getLoc();
@@ -33,7 +32,7 @@ static Value convertOpTypeFromI32(IREE::HAL::InterfaceConstantLoadOp loadOp,
 
   // Index
   if (opType.isIndex()) {
-    return builder.create<arith::IndexCastOp>(loc, opType, extractElementOp);
+    return builder.create<arith::IndexCastOp>(loc, opType, extractOp);
   }
 
   unsigned sourceBitWidth = 32;
@@ -42,20 +41,20 @@ static Value convertOpTypeFromI32(IREE::HAL::InterfaceConstantLoadOp loadOp,
   // AnySignlessInteger
   if (opType.isa<IntegerType>()) {
     if (sourceBitWidth > destBitWidth) {
-      return builder.create<arith::TruncIOp>(loc, opType, extractElementOp);
+      return builder.create<arith::TruncIOp>(loc, opType, extractOp);
     } else if (sourceBitWidth < destBitWidth) {
-      return builder.create<arith::ExtUIOp>(loc, opType, extractElementOp);
+      return builder.create<arith::ExtUIOp>(loc, opType, extractOp);
     } else {
-      return extractElementOp.getResult();
+      return extractOp.getResult();
     }
   }
 
   // AnyFloat
-  Value resizedValue = extractElementOp.getResult();
+  Value resizedValue = extractOp.getResult();
   if (sourceBitWidth > destBitWidth) {
-    return builder.create<arith::TruncFOp>(loc, opType, extractElementOp);
+    return builder.create<arith::TruncFOp>(loc, opType, extractOp);
   } else if (sourceBitWidth < destBitWidth) {
-    return builder.create<arith::ExtFOp>(loc, opType, extractElementOp);
+    return builder.create<arith::ExtFOp>(loc, opType, extractOp);
   }
   return builder.create<arith::BitcastOp>(loc, opType, resizedValue);
 }
@@ -64,22 +63,14 @@ static void replaceConstantLoadOp(IREE::Flow::DispatchTensorLoadOp loadOp,
                                   IREE::HAL::InterfaceConstantLoadOp op) {
   OpBuilder builder(op);
 
-  // tensor.extract -> vector<4xi32>
-  uint64_t vec4Index = op.getIndex().getZExtValue() / 4;
-  auto tensorOffsetValue =
-      builder.createOrFold<arith::ConstantIndexOp>(op.getLoc(), vec4Index);
-  auto tensorExtractOp = builder.createOrFold<tensor::ExtractOp>(
-      op.getLoc(), loadOp, tensorOffsetValue);
-
-  // vector<4xi32> -> i32
-  uint64_t elementIndex = op.getIndex().getZExtValue() % 4;
-  auto vectorOffsetValue =
-      builder.createOrFold<arith::ConstantIndexOp>(op.getLoc(), elementIndex);
-  auto vectorExtractElementOp = builder.create<vector::ExtractElementOp>(
-      op.getLoc(), tensorExtractOp, vectorOffsetValue);
+  // tensor.extract -> i32
+  auto offsetValue = builder.createOrFold<arith::ConstantIndexOp>(
+      op.getLoc(), op.getIndex().getZExtValue());
+  auto extractOp =
+      builder.create<tensor::ExtractOp>(op.getLoc(), loadOp, offsetValue);
 
   // i32 -> original type
-  auto convertedTypeResult = convertOpTypeFromI32(op, vectorExtractElementOp);
+  auto convertedTypeResult = convertOpTypeFromI32(op, extractOp);
   op.replaceAllUsesWith(convertedTypeResult);
 
   op.erase();
@@ -89,8 +80,8 @@ class WGSLReplacePushConstantsPass
     : public WGSLReplacePushConstantsBase<WGSLReplacePushConstantsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithDialect, mlir::func::FuncDialect,
-                    mlir::tensor::TensorDialect, mlir::vector::VectorDialect,
-                    IREE::Flow::FlowDialect, IREE::HAL::HALDialect>();
+                    mlir::tensor::TensorDialect, IREE::Flow::FlowDialect,
+                    IREE::HAL::HALDialect>();
   }
 
   void runOnOperation() override {
@@ -133,22 +124,13 @@ class WGSLReplacePushConstantsPass
       alignmentAttr = constantLoadOps[0].getAlignmentAttr();
     }
 
-    // We could store into a tensor<Nxi32>, but vec4s are better supported, so
-    // we'll use tensor<Nxvector<4xi32>> instead.
-    // Compute how many vec4s to use, i.e.
-    //   max index 0 -> 1 vec4
-    //   max index 3 -> 1 vec4
-    //   max index 4 -> 2 vec4s
-    uint64_t numberOfVec4s = maxConstantIndex / 4 + 1;
-
     // hal.interface.binding.subspan ->
-    // !flow.dispatch.tensor<readonly:tensor<Nxvector<4xi32>>>
-    //   * Group all push constants into a single tensor<Nxvector<4xi32>>
+    // !flow.dispatch.tensor<readonly:tensor<Nxi32>>
+    //   * Group all push constants into a single tensor<Nxi32>
     //   * If individual data types differ, they'll be bitcast when extracted
-    auto v4i32Type = VectorType::get({4}, builder.getI32Type());
     auto dispatchTensorType = IREE::Flow::DispatchTensorType::get(
         IREE::Flow::TensorAccess::ReadOnly,
-        {static_cast<int64_t>(numberOfVec4s)}, v4i32Type);
+        {static_cast<int64_t>(maxConstantIndex + 1)}, builder.getI32Type());
     SmallVector<Value> dynamicDims;
     // Note: we're ignoring all potential 'values' hints (if provided) on ops -
     // InterfaceBindingSubspanOp has no matching concept and we assume that any
@@ -157,12 +139,12 @@ class WGSLReplacePushConstantsPass
         loc, dispatchTensorType,
         /*set=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX),
         /*binding=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX),
-        IREE::HAL::DescriptorType::UniformBuffer,
-        /*byte_offset=*/maxConstantValue, dynamicDims, alignmentAttr);
+        IREE::HAL::DescriptorType::StorageBuffer, maxConstantValue, dynamicDims,
+        alignmentAttr);
 
-    // flow.dispatch.tensor.load -> tensor<Nxvector<4xi32>>
-    auto tensorType =
-        RankedTensorType::get({(int64_t)numberOfVec4s}, v4i32Type);
+    // flow.dispatch.tensor.load -> tensor<Nxi32>
+    auto tensorType = RankedTensorType::get({(int64_t)maxConstantIndex + 1},
+                                            builder.getI32Type());
     auto loadOp = builder.create<IREE::Flow::DispatchTensorLoadOp>(
         loc, tensorType, subspanOp, dynamicDims);
 
