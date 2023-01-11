@@ -25,9 +25,11 @@ export SHARK_OUTPUT_DIR=`pwd`/$4
 
 mkdir "${SHARK_OUTPUT_DIR}"
 
-git clone https://github.com/nod-ai/SHARK.git
+#git clone https://github.com/nod-ai/SHARK.git
+git clone https://github.com/mariecwhite/SHARK.git
 cd SHARK
-git reset --hard ${SHARK_SHA}
+#git reset --hard ${SHARK_SHA}
+git checkout torch-inductor-fix
 
 # Remove existing data.
 rm -rf ./shark_tmp
