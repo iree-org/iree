@@ -25,13 +25,19 @@ class DeviceSetupTest(unittest.TestCase):
       print(f"DeviceInfos: {device_infos}")
       if driver_name == "local-sync":
         # We happen to know that this should have one device_info
-        self.assertEqual(device_infos, [{"device_id":0, "path":"", "name":"default"}])
+        self.assertEqual(device_infos, [{
+            "device_id": 0,
+            "path": "",
+            "name": "default"
+        }])
 
   def testCreateBadDeviceId(self):
     driver = ss.get_driver("local-sync")
     with self.assertRaises(
         ValueError,
-        msg="Device id 5555 not found. Available devices: [{ device_id:0, path:'', name:'default'}]"):
+        msg=
+        "Device id 5555 not found. Available devices: [{ device_id:0, path:'', name:'default'}]"
+    ):
       _ = driver.create_device(5555)
 
   def testCreateDevice(self):
