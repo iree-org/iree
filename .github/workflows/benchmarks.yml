@@ -77,7 +77,7 @@ jobs:
       benchmarks-gcs-artifact: ${{ steps.upload.outputs.benchmarks-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
@@ -148,7 +148,7 @@ jobs:
       BUILD_DIR_GCS_ARTIFACT: ${{ inputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"

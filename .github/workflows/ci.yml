@@ -73,7 +73,7 @@ jobs:
       write-caches: ${{ steps.configure.outputs.write-caches }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           # We need the parent commit to do a diff
           fetch-depth: 2
@@ -111,7 +111,7 @@ jobs:
       build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Building IREE"
@@ -170,11 +170,11 @@ jobs:
       IREE_VULKAN_DISABLE: 1
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Setting up Python"
-        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
+        uses: actions/setup-python@7f80679172b057fc5e90d70d197929d454754a5a # v2
         with:
           python-version: "3.10"  # Needs pybind >= 2.10.1 for Python >= 3.11
       - name: "Installing Python packages"
@@ -200,7 +200,7 @@ jobs:
       - os-family=Linux
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Building with Bazel"
@@ -227,7 +227,7 @@ jobs:
       BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Downloading build dir archive"
@@ -257,7 +257,7 @@ jobs:
       BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: Querying GPU information
@@ -293,7 +293,7 @@ jobs:
       BUILD_DIR: build-runtime
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Building runtime"
@@ -324,7 +324,7 @@ jobs:
       IREE_VULKAN_DISABLE: 1
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Configuring MSVC"
@@ -352,7 +352,7 @@ jobs:
       binaries-gcs-artifact: ${{ steps.upload.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Building TF binaries"
@@ -402,7 +402,7 @@ jobs:
       TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Downloading TF binaries archive"
@@ -441,7 +441,7 @@ jobs:
       TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Downloading TF binaries archive"
@@ -489,7 +489,7 @@ jobs:
       TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           submodules: true
       - name: "Downloading TF binaries archive"
@@ -505,7 +505,7 @@ jobs:
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Downloading SHARK"
         id: download_shark
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           repository: nod-ai/SHARK
           path: ${{ github.workspace }}/SHARK
@@ -539,7 +539,7 @@ jobs:
       - os-family=Linux
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Building and testing with AddressSanitizer"
@@ -567,7 +567,7 @@ jobs:
       - os-family=Linux
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Building and testing with ThreadSanitizer"
@@ -618,7 +618,7 @@ jobs:
       e2e-test-artifacts-gcs-artifact-dir: ${{ steps.upload.outputs.e2e-test-artifacts-gcs-artifact-dir }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
@@ -706,7 +706,7 @@ jobs:
       IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
@@ -751,7 +751,7 @@ jobs:
       HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
@@ -804,7 +804,7 @@ jobs:
       BENCHMARKS_GCS_ARTIFACT: ${{ needs.benchmarks.outputs.benchmarks-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
