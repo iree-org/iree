@@ -8,7 +8,6 @@
 
 #include <numeric>
 #include <type_traits>
-#include <utility>
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
@@ -28,7 +27,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -99,116 +97,19 @@ auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
   return std::tuple_cat(a);
 }
 
-/// Matches a C++ callback previously registered under `callbackName` and
-/// taking arguments `args`.
-/// Unpacks a number of handles `N` (asserts there are exactly `N` matched ops
-/// but this could be relaxed if needed).
-/// Returns the tuple of handles.
-template <int N, typename... MatchingArgs>
-auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
-                                   StringRef callbackName,
-                                   MatchingArgs... args) {
-  SmallVector<Type> matchedTypes(N, pdl::OperationType::get(b.getContext()));
-  auto matchOp = b.create<MatchCallbackOp>(
-      matchedTypes, callbackName, std::forward<decltype(args)>(args)...);
-  assert(matchOp->getNumResults() == N && "Unexpected number of results");
-  std::array<Value, N> a;
-  for (int64_t i = 0; i < N; ++i) a[i] = matchOp->getResult(i);
-  return std::tuple_cat(a);
-}
-
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-/// Compute good tile and vector sizes for the reduction dimension of a 1-D
-/// reduction dimension for a TileReductionUsingForeachThreadOp strategy.
-///
-/// Dynamic case: use as many threads as allowed along threadIdx.x with vector
-/// size of 1 (i.e. coalesced accesses).
-/// This can be further refined with splitting or vector masking when
-/// available.
-///
-/// Static case: perfectly tile by:
-///   - 128 to obtain 32*k threads working on vector<4xf32> with k as high as
-///   possible within the limits of maxNumThreadsToUse, when possible;
-///   - 64 to obtain 32*k threads working on vector<2xf32> with k as high as
-///   possible within the limits of maxNumThreadsToUse, when possible;
-///   - reductionDimensionSize within the limits of maxNumThreadsToUse,
-///   otherwise.
-// TODO: refine even further based on mod 2 and mod 4 only + min
-// canonicalizations.
-// TODO: refine sizes based on the bitwidth of the elemental type.
-class ReductionStrategyThreadDistributionSizes {
- public:
-  ReductionStrategyThreadDistributionSizes(
-      int64_t reductionDimensionSize = 0,
-      int64_t maxNumThreadsToUse = iree_compiler::kCudaMaxNumThreads)
-      : reductionDimensionSize(reductionDimensionSize),
-        maxNumThreadsToUse(maxNumThreadsToUse) {
-    computeStrategy();
-  }
-  ReductionStrategyThreadDistributionSizes(
-      const ReductionStrategyThreadDistributionSizes &) = default;
-
-  ReductionStrategyThreadDistributionSizes &operator=(
-      const ReductionStrategyThreadDistributionSizes &) = default;
-
-  int64_t reductionTileSize;
-  int64_t vectorTileSize;
-
- private:
-  void computeStrategy();
-
-  int64_t reductionDimensionSize;
-  // TODO: Characterize shared memory consumption of this strategy and limit
-  // accordingly for good occupancy.
-  int64_t maxNumThreadsToUse;
-};
-
-void ReductionStrategyThreadDistributionSizes::computeStrategy() {
-  vectorTileSize = 1;
-  reductionTileSize = maxNumThreadsToUse;
-  if (reductionDimensionSize <= 0) return;
-
-  // TODO: refine even further based on mod 2 and mod 4 only + min
-  // canonicalizations.
-  int64_t warpVector4Size = 4 * iree_compiler::kCudaWarpSize;
-  int64_t warpVector2Size = 2 * iree_compiler::kCudaWarpSize;
-  if (reductionDimensionSize % warpVector4Size == 0) {
-    int64_t f1 = reductionDimensionSize / warpVector4Size;
-    int64_t f2 = maxNumThreadsToUse / warpVector4Size;
-    reductionTileSize = std::min(f1, f2) * iree_compiler::kCudaWarpSize;
-    vectorTileSize = 4;
-  } else if (reductionDimensionSize % warpVector2Size == 0) {
-    int64_t f1 = reductionDimensionSize / warpVector2Size;
-    int64_t f2 = maxNumThreadsToUse / warpVector2Size;
-    reductionTileSize = std::min(f1, f2) * iree_compiler::kCudaWarpSize;
-    vectorTileSize = 2;
-  } else {
-    reductionTileSize = std::min(maxNumThreadsToUse, reductionDimensionSize);
-    vectorTileSize = 1;
-  }
-}
-
 /// Structure to hold the parameters related to GPU reduction strategy.
 struct GPUReductionStrategyInfos {
-  explicit GPUReductionStrategyInfos(int64_t reductionDimensionSize)
-      : reductionDimensionSize(reductionDimensionSize),
-        threadDistributionSizes(
-            ReductionStrategyThreadDistributionSizes(reductionDimensionSize)) {}
-  int64_t reductionDimensionSize;
-  ReductionStrategyThreadDistributionSizes threadDistributionSizes;
-
   std::array<int64_t, 3> workgroupSize;
   SmallVector<int64_t> workgroupTileSizes;
   SmallVector<int64_t> fillSecondTileSizes;
   SmallVector<int64_t> genericSecondTileSizes;
+  int64_t reductionDimensionSize;
 };
-}  // namespace
 
 static std::pair<Value, Value> createReductionStrategyBlockDistribution(
     ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
@@ -239,7 +140,22 @@ static std::pair<Value, Value> createReductionStrategyBlockDistribution(
 
 static void createReductionStrategyThreadDistribution(
     ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledTrailingH,
-    const ReductionStrategyThreadDistributionSizes &sizes) {
+    int64_t reductionDimensionSize) {
+  // Select tile sizes. Perfectly tile by:
+  //   - 128 to obtain 32 threads working on vector<4xf32> when possible;
+  //   - 64 to obtain 32 threads working on vector<2xf32> when possible;
+  //   - 32 otherwise.
+  // TODO: refine sizes based on the bitwidth of the elemental type.
+  int64_t firstReductionSize = iree_compiler::kCudaWarpSize;
+  int64_t vectorTileSize = 1;
+  if (reductionDimensionSize % (4 * iree_compiler::kCudaWarpSize) == 0) {
+    firstReductionSize = 4 * iree_compiler::kCudaWarpSize;
+    vectorTileSize = 4;
+  } else if (reductionDimensionSize % (2 * iree_compiler::kCudaWarpSize) == 0) {
+    firstReductionSize = 2 * iree_compiler::kCudaWarpSize;
+    vectorTileSize = 2;
+  }
+
   auto pdlOperation = pdl::OperationType::get(b.getContext());
   auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
                                                       mlir::gpu::Threads::DimX);
@@ -248,22 +164,26 @@ static void createReductionStrategyThreadDistribution(
 
   // Split the reduction into a parallel and combiner part, then tile the
   // parallel part and map it to a full warp so it works on vectors.
-  auto tileReduction = b.create<transform::TileReductionUsingForeachThreadOp>(
-      /*target=*/gridReductionH,
-      /*numThreads=*/ArrayRef<int64_t>{0, sizes.reductionTileSize},
-      /*tileSizes=*/ArrayRef<int64_t>{0, sizes.vectorTileSize},
-      /*threadDimMapping=*/b.getArrayAttr(threadX));
-  Value blockParallelForeachThreadOp = tileReduction.getForeachThreadOp();
+  auto tileReduction = b.create<transform::TileReductionUsingScfOp>(
+      gridReductionH, ArrayRef<int64_t>({0, firstReductionSize}));
   Value blockParallelFillH = tileReduction.getFillOp();
+  Value blockParallelOpH = tileReduction.getSplitLinalgOp();
   Value blockCombinerOpH = tileReduction.getCombiningLinalgOp();
+  iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
+      b, blockParallelOpH, {},
+      getAsOpFoldResult(b.getI64ArrayAttr({0, iree_compiler::kCudaWarpSize})),
+      b.getArrayAttr(threadX));
 
-  // Fuse the fill and pointwise to privatize them.
-  blockParallelFillH = b.create<FuseIntoContainingOp>(
-      blockParallelFillH, blockParallelForeachThreadOp);
+  // Tile the fill so it maps to vectors.
+  // TODO: fuse once the support is available
+  // (https://reviews.llvm.org/D139844).
+  iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
+      b, blockParallelFillH, {},
+      getAsOpFoldResult(b.getI64ArrayAttr({0, vectorTileSize})),
+      b.getArrayAttr(threadX));
 
   // Map the combiner reduction to one thread along y so it can be mapped
-  // further via predication. Fuse it into the trailing elementwise if
-  // present.
+  // further via predication. Fuse it into the trailing elementwise if present.
   auto selector = b.create<TakeFirstOp>(
       pdlOperation, pdlOperation,
       ArrayRef<Value>({maybeTiledTrailingH, blockCombinerOpH}));
@@ -275,30 +195,33 @@ static void createReductionStrategyThreadDistribution(
 }
 
 /// Builds the transform IR tiling reductions for CUDA targets. Supports
-/// reductions in the last dimension, with optional leading and trailing
-/// elementwise operations.
+/// reductions in the last dimension with static shape divisible by 32 (CUDA
+/// warp size), with optional leading and trailing elementwise operations.
 static void createReductionCudaStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const GPUReductionStrategyInfos &infos) {
   // Step 1. Call the matcher. Note that this is the same matcher as used to
   // trigger this compilation path, so it must always apply.
   b.create<RegisterMatchCallbacksOp>();
-  auto [maybeLeadingH, fillH, reductionH, maybeTrailingH] =
-      unpackRegisteredMatchCallback<4>(
-          b, "reduction", transform::FailurePropagationMode::Propagate,
-          variantH);
+  SmallVector<Type> matchedTypes(4, pdl::OperationType::get(b.getContext()));
+  auto match = b.create<MatchCallbackOp>(
+      matchedTypes, "reduction", transform::FailurePropagationMode::Propagate,
+      variantH);
+  Value maybeLeadingH = match.getResult(0);
+  Value fillH = match.getResult(1);
+  Value reductionH = match.getResult(2);
+  Value maybeTrailingH = match.getResult(3);
 
-  // Step 2. Use tiling to introduce a single-iteration loop mapped to a
-  // single block/workgroup. Keep everything fused.
+  // Step 2. Use tiling to introduce a single-iteration loop mapped to a single
+  // block/workgroup. Keep everything fused.
   auto [gridReductionH, maybeTiledTrailingH] =
       createReductionStrategyBlockDistribution(b, maybeLeadingH, fillH,
                                                reductionH, maybeTrailingH);
 
   // Step 3. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
-  ReductionStrategyThreadDistributionSizes sizes(infos.reductionDimensionSize);
-  createReductionStrategyThreadDistribution(b, gridReductionH,
-                                            maybeTiledTrailingH, sizes);
+  createReductionStrategyThreadDistribution(
+      b, gridReductionH, maybeTiledTrailingH, infos.reductionDimensionSize);
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
@@ -316,13 +239,14 @@ static void createReductionCudaStrategy(
   iree_compiler::buildDistributeVectors(b, variantH, funcH);
 }
 
-static FailureOr<GPUReductionStrategyInfos> matchGPUReduction(
-    linalg::LinalgOp op) {
+// TODO: consider passing a problem-specific struct to control information.
+static bool matchGPUReduction(linalg::LinalgOp op,
+                              GPUReductionStrategyInfos &info) {
+  // TODO: match the sequence the strategy supports.
   StructuredOpMatcher reduction, fill, leading, trailing;
-  int64_t reductionDimensionSize;
   makeReductionMatcher(reduction, fill, leading, trailing,
-                       reductionDimensionSize);
-  if (!matchPattern(op, reduction)) return failure();
+                       info.reductionDimensionSize);
+  if (!matchPattern(op, reduction)) return false;
 
   //
   // !!We must match exactly all payload ops when the dispatch is pre-formed!!
@@ -338,30 +262,29 @@ static FailureOr<GPUReductionStrategyInfos> matchGPUReduction(
       DBGS() << "Failed to match " << mustMatchNumPayloadOps
              << " payload ops, matched " << numMatchedOps << " instead\n";
     });
-    return failure();
+    return false;
   }
 
-  GPUReductionStrategyInfos info(reductionDimensionSize);
-  info.workgroupSize = {info.threadDistributionSizes.reductionTileSize, 1, 1};
+  // Hardcoded workgroup size, this could be deduced from the reduction dim.
+  info.workgroupSize = {32, 1, 1};
   SmallVector<unsigned> partitionedLoops =
       cast<iree_compiler::PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(iree_compiler::kNumMaxParallelDims);
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
-
   // Tile all the parallel dimension to 1.
   info.workgroupTileSizes.append(numLoops, 1);
   info.fillSecondTileSizes = {1, 0, 0};
   info.genericSecondTileSizes = {1, 1, 0};
-  return info;
+  return true;
 }
 
 LogicalResult iree_compiler::matchAndSetGPUReductionTransformStrategy(
     func::FuncOp entryPoint, linalg::LinalgOp op) {
   // 1. Match
-  FailureOr<GPUReductionStrategyInfos> maybeInfos = matchGPUReduction(op);
-  if (failed(maybeInfos)) return failure();
+  GPUReductionStrategyInfos infos;
+  if (!matchGPUReduction(op, infos)) return failure();
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    return createReductionCudaStrategy(b, variant, *maybeInfos);
+    return createReductionCudaStrategy(b, variant, infos);
   };
   // 2. Add the strategy.
   createTransformRegion(entryPoint, strategyBuilder);
