@@ -67,11 +67,6 @@ struct CaptureDim : public CaptureStaticValue<int64_t> {
   using Base::Base;
 };
 
-/// Captures the (static) sizes of multiple dimensions.
-struct CaptureDims : public CaptureStaticValue<SmallVector<int64_t>> {
-  using Base::Base;
-};
-
 /// Captures the rank of the operation.
 struct CaptureRank : public CaptureStaticValue<int64_t> {
   using Base::Base;
@@ -243,9 +238,9 @@ public:
   //===-------------------------------------------------------------------===//
   // Capture directives.
   //===-------------------------------------------------------------------===//
-  StructuredOpMatcher &rank(CaptureRank capture);
-  StructuredOpMatcher &dim(int64_t dimension, CaptureDim capture);
-  StructuredOpMatcher &dim(AllDims tag, CaptureDims captures);
+  StructuredOpMatcher &rank(CaptureStaticValue<int64_t> capture);
+  StructuredOpMatcher &dim(int64_t dimension,
+                           CaptureStaticValue<int64_t> capture);
 
   //===-------------------------------------------------------------------===//
   // Constraints on input operands.
@@ -464,15 +459,15 @@ inline StructuredOpMatcher m_StructuredOp() {
 class MatchCallbackResult {
 public:
   /// Returns the number of lists of payload operations.
-  int64_t getNumPayloadGroups() const { return payloadGroupLengths.size(); }
+  unsigned getNumPayloadGroups() const { return payloadGroupLengths.size(); }
 
   /// Returns the `position`-th list of payload operations.
-  ArrayRef<Operation *> getPayloadGroup(int64_t position) const;
+  ArrayRef<Operation *> getPayloadGroup(unsigned position) const;
 
   /// Adds a new list of payload operations to the list of lists. The new list
   /// must not contain null operations.
   template <typename Range>
-  int64_t addPayloadGroup(Range operations) {
+  unsigned addPayloadGroup(Range operations) {
     int64_t originalLength = payloadOperations.size();
     assert(llvm::all_of(operations, [](Operation *op) -> bool { return op; }) &&
            "null operation");
@@ -543,9 +538,9 @@ private:
 
 struct MatchedReductionCaptures {
   int64_t reductionRank = 0;
-  SmallVector<int64_t> leadingOpSizes = {};
-  SmallVector<int64_t> reductionOpSizes = {};
-  SmallVector<int64_t> trailingOpSizes = {};
+  // TODO: capture all dims.
+  int64_t mostMinorParallelDimensionSize = 0;
+  int64_t reductionDimensionSize = 0;
   int64_t maybeLeadingRank = 0;
   int64_t maybeTrailingRank = 0;
 };
