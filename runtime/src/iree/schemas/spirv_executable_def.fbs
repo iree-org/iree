@@ -17,9 +17,6 @@ table SpirVExecutableDef {
   // A map of entry point ordinals to string names as used in the shader module.
   entry_points:[string];
 
-  // Required subgroup size for each entry point. 0 means no requirement.
-  subgroup_sizes:[uint32];
-
   // SPIR-V code words.
   code:[uint32];
 }

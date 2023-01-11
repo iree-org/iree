@@ -207,9 +207,6 @@ iree_hal_vulkan_populate_enabled_device_extensions(
     } else if (strcmp(extension_name,
                       VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME) == 0) {
       extensions.calibrated_timestamps = true;
-    } else if (strcmp(extension_name,
-                      VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME) == 0) {
-      extensions.subgroup_size_control = true;
     }
   }
   return extensions;

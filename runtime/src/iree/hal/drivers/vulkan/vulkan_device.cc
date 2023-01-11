@@ -211,16 +211,6 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
           "VK_LAYER_KHRONOS_timeline_semaphore");
 
   //===--------------------------------------------------------------------===//
-  // Optional CodeGen features
-  //===--------------------------------------------------------------------===//
-  // VK_EXT_subgroup_size_control:
-  // This extensions allows us to control the subgroup size used by Vulkan
-  // implementations, which can boost performance. It's promoted to core
-  // since Vulkan v1.3.
-  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
-          VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME);
-
-  //===--------------------------------------------------------------------===//
   // Optional debugging features
   //===--------------------------------------------------------------------===//
   // Used only when explicitly requested as they drastically change the
@@ -920,16 +910,6 @@ iree_status_t iree_hal_vulkan_device_create(
     host_query_reset_features.pNext = features2.pNext;
     features2.pNext = &host_query_reset_features;
     host_query_reset_features.hostQueryReset = VK_TRUE;
-  }
-
-  VkPhysicalDeviceSubgroupSizeControlFeatures subgroup_control_features;
-  if (enabled_device_extensions.subgroup_size_control) {
-    memset(&subgroup_control_features, 0, sizeof(subgroup_control_features));
-    subgroup_control_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES;
-    subgroup_control_features.pNext = features2.pNext;
-    features2.pNext = &subgroup_control_features;
-    subgroup_control_features.subgroupSizeControl = VK_TRUE;
   }
 
   auto logical_device = new VkDeviceHandle(

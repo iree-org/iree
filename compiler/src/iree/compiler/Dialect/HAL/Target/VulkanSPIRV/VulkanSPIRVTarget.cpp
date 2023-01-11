@@ -23,7 +23,6 @@
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
@@ -149,23 +148,12 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     // list of entry point names here that are then passed in
     // VkShaderModuleCreateInfo.
     SmallVector<StringRef, 8> entryPointNames;
-    SmallVector<uint32_t, 8> subgroupSizes;
     spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
       entryPointNames.push_back(exportOp.getFn());
-      auto fn = spvModuleOp.lookupSymbol<spirv::FuncOp>(exportOp.getFn());
-      auto abi = fn->getAttrOfType<spirv::EntryPointABIAttr>(
-          spirv::getEntryPointABIAttrName());
-      if (abi && abi.getSubgroupSize()) {
-        subgroupSizes.push_back(*abi.getSubgroupSize());
-      } else {
-        subgroupSizes.push_back(0);
-      }
     });
     auto entryPointsRef = builder.createStringVec(entryPointNames);
-    auto subgroupSizesRef = builder.createInt32Vec(subgroupSizes);
 
     iree_SpirVExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_SpirVExecutableDef_subgroup_sizes_add(builder, subgroupSizesRef);
     iree_SpirVExecutableDef_code_add(builder, spvCodeRef);
     iree_SpirVExecutableDef_end_as_root(builder);
 
