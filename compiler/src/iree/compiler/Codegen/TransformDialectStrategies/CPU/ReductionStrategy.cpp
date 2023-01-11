@@ -18,6 +18,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -54,7 +55,7 @@ void mlir::iree_compiler::cpu::ReductionStrategy::configure(
   vectorSize = config.vectorSize;
 }
 
-/// Builds the transform IR tiling reductions for CUDA targets. Supports
+/// Builds the transform IR tiling reductions for CPU targets. Supports
 /// reductions in the last dimension, with optional leading and trailing
 /// elementwise operations.
 void mlir::iree_compiler::cpu::buildReductionStrategy(
@@ -74,8 +75,18 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
     if (rank == 0) continue;
     SmallVector<int64_t> tileSizes(rank - 1, 0);
     tileSizes.push_back(strategy.getVectorSize());
-    buildTileFuseToScfFor(b, val, {},
-                          getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)));
+    auto tileRes = buildTileFuseToScfFor(
+        b, val, {}, getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)));
+
+    // Don't know how to mask vectorize reductions yet.
+    if (val == gridReductionH) continue;
+    auto vectorTileSizes = strategy.workgroupTileSizes;
+    int64_t e = std::min(
+        static_cast<int64_t>(strategy.workgroupTileSizes.size()), rank - 1);
+    for (int64_t i = 0; i < e; ++i)
+      tileSizes[i] = strategy.workgroupTileSizes[i];
+    b.create<transform::MaskedVectorizeOp>(tileRes.tiledOpH, ValueRange{},
+                                           b.getDenseI64ArrayAttr({tileSizes}));
   }
 
   // Step 3-5. Common trailing steps.
