@@ -84,11 +84,7 @@ class WebGPUTargetBackend : public TargetBackend {
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                    OpPassManager &passManager) override {
-    // For now we disable translation if the variant has external object files.
-    if (variantOp.isExternal()) return;
-
+  void buildTranslationPassPipeline(OpPassManager &passManager) override {
     // WebGPU does not support push constants (yet?), so replace loads from
     // push constants with loads from uniform buffers.
     // The corresponding runtime code must perform similar emulation, based

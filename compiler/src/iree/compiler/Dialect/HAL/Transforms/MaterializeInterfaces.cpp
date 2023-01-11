@@ -34,20 +34,6 @@ namespace HAL {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// Linkage utilities
-//===----------------------------------------------------------------------===//
-
-static void setApplicableObjects(Operation *sourceOp,
-                                 IREE::HAL::ExecutableVariantOp targetOp) {
-  auto objectsAttr = sourceOp->getAttrOfType<IREE::HAL::ExecutableObjectsAttr>(
-      "hal.executable.objects");
-  if (!objectsAttr) return;
-  auto objects = objectsAttr.getApplicableObjects(targetOp.getTarget());
-  if (!objects) return;
-  targetOp.setObjectsAttr(*objects);
-}
-
-//===----------------------------------------------------------------------===//
 // hal.executable.source materialization
 //===----------------------------------------------------------------------===//
 
@@ -64,13 +50,13 @@ static LogicalResult materializeExecutableFromSourceOp(
   // With this hand-authored path all variants have the same layout and entry
   // points and we can just clone them.
   auto sourceEntryPointOps = sourceOp.getOps<IREE::HAL::ExecutableExportOp>();
+  auto sourceModuleOp = sourceOp.getInnerModule();
 
   // Materialize all of the hal.executable.variant ops for all backends we are
   // targeting.
   SymbolTable targetSymbolTable(executableOp);
   OpBuilder targetBuilder(&executableOp.getBlock().back());
   for (auto targetAttr : targetAttrs) {
-    // Create new variant and clone the exports.
     auto targetVariantOp = targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
         sourceOp->getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
     targetSymbolTable.insert(targetVariantOp);
@@ -78,20 +64,8 @@ static LogicalResult materializeExecutableFromSourceOp(
     for (auto sourceEntryPointOp : sourceEntryPointOps) {
       variantBuilder.clone(*sourceEntryPointOp);
     }
-
-    // Clone any target-specific object files specified.
-    if (auto objectsAttr = sourceOp.getObjectsAttr()) {
-      auto objects = objectsAttr.getApplicableObjects(targetAttr);
-      if (objects) targetVariantOp.setObjectsAttr(*objects);
-    }
-
-    // Clone inner module contents.
-    if (!sourceOp.isExternal()) {
-      auto sourceModuleOp = sourceOp.getInnerModule();
-      variantBuilder.clone(*sourceModuleOp);
-    }
+    variantBuilder.clone(*sourceModuleOp);
   }
-
   // Remove the original.
   sourceOp.erase();
 
@@ -236,9 +210,9 @@ static mlir::func::FuncOp cloneFuncWithInterface(
 // Annotates |dispatchOp| with resource binding to interface binding mappings.
 // TODO(benvanik): have a HAL op with structured information instead.
 static void annotateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
-                                 const PipelineResourceMap &resourceMap) {
+                                 const PipelineLayout &pipelineLayout) {
   SmallVector<Attribute> bindingAttrs;
-  for (auto setBinding : resourceMap) {
+  for (auto setBinding : pipelineLayout.resourceMap) {
     bindingAttrs.push_back(IREE::HAL::InterfaceBindingAttr::get(
         dispatchOp.getContext(), setBinding.first, setBinding.second));
   }
@@ -253,39 +227,34 @@ static LogicalResult declareEntryPointOps(
     IREE::Stream::ExecutableOp sourceExecutableOp,
     IREE::HAL::ExecutableOp targetExecutableOp,
     const BindingLayoutAnalysis &layoutAnalysis) {
-  auto sourceModuleOp = sourceExecutableOp.getInnerModule();
   auto variantOps =
       targetExecutableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>();
   OpBuilder executableBuilder(&targetExecutableOp.getBlock().front());
 
-  // Build a map of source function definitions to their version with the
-  // updated interface.
-  DenseMap<Operation *, Operation *> targetFuncOps;
+  // For each exported function create a HAL export decl and dispatch thunk.
   int nextOrdinal = 0;
   for (auto exportOp : sourceExecutableOp.getBody()
                            .getOps<IREE::Stream::ExecutableExportOp>()) {
-    auto sourceFuncOp = sourceModuleOp.lookupSymbol<mlir::func::FuncOp>(
-        exportOp.getFunctionRef());
+    int ordinal = nextOrdinal++;
+    auto sourceFuncOp =
+        sourceExecutableOp.getInnerModule().lookupSymbol<mlir::func::FuncOp>(
+            exportOp.getFunctionRef());
     if (failed(verifyEntryPointTypes(sourceFuncOp))) return failure();
+
+    const auto &pipelineLayout = layoutAnalysis.getPipelineLayout(exportOp);
 
     // Create the interface for this entry point based on the analysis of its
     // usage within the program.
-    const auto &pipelineLayout = layoutAnalysis.getPipelineLayout(exportOp);
     auto layoutAttr = makePipelineLayoutAttr(pipelineLayout, executableBuilder);
 
-    // Update all dispatch sites with the binding information required for
-    // conversion into the HAL dialect. By doing this here we ensure that the
-    // dialect conversion needs only local information on the ops and that it's
-    // not possible for the dispatches and their targets to get out of sync.
-    for (auto dispatchOp : layoutAnalysis.getExportDispatches(exportOp)) {
-      annotateDispatchSite(dispatchOp, pipelineLayout.resourceMap);
-    }
+    // Clone the source function and update it to use the new interface.
+    auto baseFuncOp =
+        cloneFuncWithInterface(sourceFuncOp, pipelineLayout, layoutAttr);
 
-    // Clone the updated function declaration into each variant.
-    int ordinal = nextOrdinal++;
+    // Clone the updated function into each variant.
     for (auto variantOp : variantOps) {
       // Declare the entry point on the target.
-      OpBuilder targetBuilder(variantOp.getInnerModule());
+      OpBuilder targetBuilder(&variantOp.getBlock().front());
       auto newExportOp = targetBuilder.create<IREE::HAL::ExecutableExportOp>(
           exportOp.getLoc(),
           targetBuilder.getStringAttr(exportOp.getFunctionRef()),
@@ -303,37 +272,19 @@ static LogicalResult declareEntryPointOps(
         newExportOp.getWorkgroupCount().insertArgument(0u, deviceType,
                                                        newExportOp.getLoc());
       }
+
+      // Clone the updated interface-based function into the target.
+      auto targetFuncOp = baseFuncOp.clone();
+      variantOp.getInnerModule().push_back(targetFuncOp);
     }
 
-    // Clone the source function and update it to use the new interface.
-    auto targetFuncOp =
-        cloneFuncWithInterface(sourceFuncOp, pipelineLayout, layoutAttr);
-    targetFuncOps[sourceFuncOp] = targetFuncOp;
-  }
-
-  // Clone all of the ops in the source module to each variant.
-  // We'll use the exported functions with the updated interfaces in place of
-  // the original versions and copy everything else verbatim.
-  for (auto variantOp : variantOps) {
-    auto targetBuilder = OpBuilder::atBlockBegin(
-        &variantOp.getInnerModule().getBodyRegion().front());
-    for (auto &op : sourceModuleOp.getOps()) {
-      auto targetFuncOp = targetFuncOps.find(&op);
-      if (targetFuncOp != targetFuncOps.end()) {
-        // Clone the updated function instead of the original.
-        targetBuilder.clone(*targetFuncOp->second);
-      } else {
-        // Regular op (globals, external function declarations, etc).
-        targetBuilder.clone(op);
-      }
+    // Update all dispatch sites with the binding information.
+    for (auto dispatchOp : layoutAnalysis.getExportDispatches(exportOp)) {
+      annotateDispatchSite(dispatchOp, pipelineLayout);
     }
-  }
 
-  // Drop the temporary target functions. We could avoid an additional clone if
-  // we only had one variant but this is relatively small in cost (once per
-  // variant).
-  for (auto it : targetFuncOps) it.second->erase();
-  targetFuncOps.clear();
+    baseFuncOp.erase();
+  }
 
   return success();
 }
@@ -474,7 +425,6 @@ class MaterializeInterfacesPass
             targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
                 sourceOp->getLoc(), targetAttr.getSymbolNameFragment(),
                 targetAttr);
-        setApplicableObjects(sourceOp, targetContainerOp);
         targetSymbolTable.insert(targetContainerOp);
         OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
         containerBuilder.create<mlir::ModuleOp>(sourceOp->getLoc());
@@ -493,49 +443,6 @@ class MaterializeInterfacesPass
       }
 
       sourceOp.erase();
-    }
-
-    // Do a cleanup pass for any dispatches that don't yet have interfaces
-    // assigned. If we had dispatches to externally-defined HAL executables we
-    // won't have materialized them from the stream ops above. We do expect to
-    // be able to find the dispatch targets such that we can pull out the
-    // pipeline layout, though, and any that fall through are errors.
-    auto annotateDispatchOp = [&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      if (dispatchOp->hasAttr("hal.interface.bindings")) {
-        // Already have bindings defined.
-        return WalkResult::advance();
-      }
-      PipelineResourceMap resourceMap;
-      auto exportOp =
-          symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
-              dispatchOp, dispatchOp.getEntryPointAttr());
-      if (exportOp) {
-        // Export found - we can use the pipeline layout defined there to infer
-        // the bindings. This allows for bindings to be sparse or have
-        // additional information declared.
-        for (auto setLayout : exportOp.getLayoutAttr().getSetLayouts()) {
-          for (auto binding : setLayout.getBindings()) {
-            resourceMap.emplace_back(setLayout.getOrdinal(),
-                                     binding.getOrdinal());
-          }
-        }
-      } else {
-        // No export found - this is likely an external executable and we can
-        // infer a dense pipeline layout. This is kind of shady as we may want
-        // to error in these cases where users have something special explicitly
-        // defined but then typo things but the ergonomic improvements in the
-        // normal case are worth that risk.
-        size_t resourceCount = dispatchOp.getResources().size();
-        for (int i = 0; i < resourceCount; ++i) {
-          // set=0, binding=resource ordinal
-          resourceMap.emplace_back(0, i);
-        }
-      }
-      annotateDispatchSite(dispatchOp, resourceMap);
-      return WalkResult::advance();
-    };
-    if (getOperation()->walk(annotateDispatchOp).wasInterrupted()) {
-      return signalPassFailure();
     }
   }
 };

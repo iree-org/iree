@@ -1558,8 +1558,7 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
 
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name,
-    OptionalAttr<HAL_ExecutableObjectsAttr>:$objects
+    SymbolNameAttr:$sym_name
   );
 
   let regions = (region SizedRegion<1>:$body);
@@ -1574,10 +1573,6 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
 
   let extraClassDeclaration = [{
     Block& getBlock() { return getBody().front(); }
-
-    bool isExternal() {
-      return getBlock().getOps<::mlir::ModuleOp>().empty();
-    }
 
     ::mlir::ModuleOp getInnerModule() {
       auto moduleOps = getBlock().getOps<::mlir::ModuleOp>();
@@ -1727,8 +1722,7 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
-    HAL_ExecutableTargetAttr:$target,
-    OptionalAttr<HAL_ExecutableObjectArrayAttr>:$objects
+    HAL_ExecutableTargetAttr:$target
   );
 
   let regions = (region SizedRegion<1>:$body);
@@ -1737,7 +1731,6 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     `,` `target` `=` $target
-    (`,` `objects` `=` $objects^ )?
     attr-dict-with-keyword
     regions
   }];
@@ -1749,10 +1742,6 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
 
   let extraClassDeclaration = [{
     Block& getBlock() { return getBody().front(); }
-
-    bool isExternal() {
-      return getBlock().getOps<::mlir::ModuleOp>().empty();
-    }
 
     ::mlir::ModuleOp getInnerModule() {
       auto moduleOps = getBlock().getOps<::mlir::ModuleOp>();

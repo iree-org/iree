@@ -113,26 +113,13 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                    OpPassManager &passManager) override {
-    // For now we disable translation if the variant has external object files.
-    // We could instead perform linking with those objects (if they're .spv
-    // files we could use spirv-link or import them into MLIR and merge here).
-    if (variantOp.isExternal()) return;
-
+  void buildTranslationPassPipeline(OpPassManager &passManager) override {
     buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
-    // Today we special-case external variants but in the future we could allow
-    // for a linking approach allowing both code generation and external .spv
-    // files to be combined together.
-    if (variantOp.isExternal()) {
-      return serializeExternalExecutable(options, variantOp, executableBuilder);
-    }
-
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spirvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
     if (!llvm::hasSingleElement(spirvModuleOps)) {
@@ -179,67 +166,6 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
 
     iree_SpirVExecutableDef_entry_points_add(builder, entryPointsRef);
     iree_SpirVExecutableDef_subgroup_sizes_add(builder, subgroupSizesRef);
-    iree_SpirVExecutableDef_code_add(builder, spvCodeRef);
-    iree_SpirVExecutableDef_end_as_root(builder);
-
-    // Add the binary data to the target executable.
-    auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(),
-        variantOp.getTarget().getFormat(),
-        builder.getBufferAttr(executableBuilder.getContext()));
-    binaryOp.setMimeTypeAttr(
-        executableBuilder.getStringAttr("application/x-flatbuffers"));
-
-    return success();
-  }
-
-  LogicalResult serializeExternalExecutable(
-      const SerializationOptions &options,
-      IREE::HAL::ExecutableVariantOp variantOp, OpBuilder &executableBuilder) {
-    if (!variantOp.getObjects().has_value()) {
-      return variantOp.emitOpError()
-             << "no objects defined for external variant";
-    } else if (variantOp.getObjects()->getValue().size() != 1) {
-      // For now we assume there will be exactly one object file.
-      // TODO(#7824): support multiple .spv files in a single flatbuffer archive
-      // so that we can combine executables.
-      return variantOp.emitOpError() << "only one object reference is "
-                                        "supported for external variants";
-    }
-
-    // Take exported names verbatim for passing into VkShaderModuleCreateInfo.
-    SmallVector<StringRef, 8> entryPointNames;
-    for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-      entryPointNames.emplace_back(exportOp.getSymName());
-    }
-
-    // Load .spv object file.
-    auto objectAttr = variantOp.getObjects()
-                          ->getValue()
-                          .front()
-                          .cast<IREE::HAL::ExecutableObjectAttr>();
-    std::string spvBinary;
-    if (auto data = objectAttr.loadData()) {
-      spvBinary = data.value();
-    } else {
-      return variantOp.emitOpError()
-             << "object file could not be loaded: " << objectAttr;
-    }
-    if (spvBinary.size() % 4 != 0) {
-      return variantOp.emitOpError()
-             << "object file is not 4-byte aligned as expected for SPIR-V";
-    }
-
-    FlatbufferBuilder builder;
-    iree_SpirVExecutableDef_start_as_root(builder);
-
-    auto spvCodeRef = flatbuffers_uint32_vec_create(
-        builder, reinterpret_cast<const uint32_t *>(spvBinary.data()),
-        spvBinary.size() / sizeof(uint32_t));
-
-    auto entryPointsRef = builder.createStringVec(entryPointNames);
-
-    iree_SpirVExecutableDef_entry_points_add(builder, entryPointsRef);
     iree_SpirVExecutableDef_code_add(builder, spvCodeRef);
     iree_SpirVExecutableDef_end_as_root(builder);
 

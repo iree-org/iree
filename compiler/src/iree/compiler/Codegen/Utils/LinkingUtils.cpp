@@ -196,9 +196,6 @@ LogicalResult linkExecutablesInto(
       OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
   auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
 
-  // Aggregation of all external objects specified on variants used.
-  SetVector<Attribute> objectAttrs;
-
   // Iterate over all source executable ops, linking as many as we can.
   for (auto sourceExecutableOp : sourceExecutableOps) {
     // Remap root executable refs.
@@ -213,11 +210,6 @@ LogicalResult linkExecutablesInto(
       // We could, for example, link all aarch64 variants together and then
       // use function multi-versioning to let LLVM insert runtime switches.
       if (variantOp.getTarget() != linkedTargetOp.getTarget()) continue;
-
-      // Add any required object files to the set we will link in the target.
-      if (auto objectsAttr = variantOp.getObjectsAttr()) {
-        objectAttrs.insert(objectsAttr.begin(), objectsAttr.end());
-      }
 
       // Remap variant refs.
       auto oldVariantRefAttr =
@@ -273,12 +265,6 @@ LogicalResult linkExecutablesInto(
     if (sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>().empty()) {
       sourceExecutableOp.erase();
     }
-  }
-
-  // Attach object files from source variants.
-  if (!objectAttrs.empty()) {
-    linkedTargetOp.setObjectsAttr(
-        builder.getArrayAttr(objectAttrs.takeVector()));
   }
 
   // Update references to @executable::@target::@entry symbols.

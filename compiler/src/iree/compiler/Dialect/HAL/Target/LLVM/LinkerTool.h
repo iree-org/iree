@@ -24,10 +24,6 @@ namespace IREE {
 namespace HAL {
 
 struct Artifact {
-  // Wraps an existing file on the file system.
-  // The file will not be deleted when the artifact is destroyed.
-  static Artifact fromFile(StringRef path);
-
   // Creates an output file path/container pair.
   // By default the file will be deleted when the link completes; callers must
   // use llvm::ToolOutputFile::keep() to prevent deletion upon success (or if
@@ -44,9 +40,6 @@ struct Artifact {
 
   std::string path;
   std::unique_ptr<llvm::ToolOutputFile> outputFile;
-
-  // Preserves the file contents on disk after the artifact has been destroyed.
-  void keep() const;
 
   // Reads the artifact file contents as bytes.
   Optional<std::vector<int8_t>> read() const;

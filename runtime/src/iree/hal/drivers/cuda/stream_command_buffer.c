@@ -445,7 +445,6 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
       iree_hal_cuda_pipeline_layout_num_constants(layout);
   iree_host_size_t constant_base_index =
       iree_hal_cuda_push_constant_index(layout);
-
   // Patch the push constants in the kernel arguments.
   for (iree_host_size_t i = 0; i < num_constants; i++) {
     *((uint32_t*)command_buffer->current_descriptor[i + constant_base_index]) =

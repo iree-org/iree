@@ -18,9 +18,6 @@ namespace IREE {
 namespace HAL {
 
 // static
-Artifact Artifact::fromFile(StringRef path) { return {path.str(), nullptr}; }
-
-// static
 Artifact Artifact::createTemporary(StringRef prefix, StringRef suffix) {
   auto sanitizedPrefix = sanitizeFileName(prefix);
   auto sanitizedSuffix = sanitizeFileName(suffix);
@@ -57,10 +54,6 @@ Artifact Artifact::createVariant(StringRef basePath, StringRef suffix) {
   return {filePath.str().str(), std::move(file)};
 }
 
-void Artifact::keep() const {
-  if (outputFile) outputFile->keep();
-}
-
 Optional<std::vector<int8_t>> Artifact::read() const {
   auto fileData = llvm::MemoryBuffer::getFile(path);
   if (!fileData) {
@@ -92,10 +85,10 @@ bool Artifact::readInto(raw_ostream &targetStream) const {
 void Artifact::close() { outputFile->os().close(); }
 
 void Artifacts::keepAllFiles() {
-  libraryFile.keep();
-  debugFile.keep();
+  if (libraryFile.outputFile) libraryFile.outputFile->keep();
+  if (debugFile.outputFile) debugFile.outputFile->keep();
   for (auto &file : otherFiles) {
-    file.keep();
+    file.outputFile->keep();
   }
 }
 

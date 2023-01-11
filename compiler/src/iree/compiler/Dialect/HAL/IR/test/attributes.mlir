@@ -31,35 +31,6 @@
 
 // -----
 
-"executable.objects"() {
-  // CHECK: data = #hal.executable.object<{data = dense<[4, 5, 6, 7]> : vector<4xi8>}>
-  data = #hal.executable.object<{data = dense<[4, 5, 6, 7]> : vector<4xi8>}>,
-  // CHECK: path = #hal.executable.object<{path = "foo"}>
-  path = #hal.executable.object<{path = "foo"}>
-} : () -> ()
-
-// -----
-
-#target_a = #hal.executable.target<"llvm-cpu", "a">
-#target_b = #hal.executable.target<"llvm-cpu", "b">
-#target_c = #hal.executable.target<"llvm-cpu", "c">
-// CHECK-LABEL: "executable.target_objects"
-"executable.target_objects"() {
-  // CHECK-SAME: empty = #hal.executable.objects<{}>
-  empty = #hal.executable.objects<{}>,
-  // CHECK-SAME: targets_a = #hal.executable.objects<{#hal.executable.target<"llvm-cpu", "a"> = [#hal.executable.object<{path = "a.o"}>]}>
-  targets_a = #hal.executable.objects<{
-    #target_a = [#hal.executable.object<{path = "a.o"}>]
-  }>,
-  // CHECK-SAME: targets_bc = #hal.executable.objects<{#hal.executable.target<"llvm-cpu", "b"> = [#hal.executable.object<{path = "b.o"}>], #hal.executable.target<"llvm-cpu", "c"> = [#hal.executable.object<{path = "c.o"}>]}>
-  targets_bc = #hal.executable.objects<{
-    #target_b = [#hal.executable.object<{path = "b.o"}>],
-    #target_c = [#hal.executable.object<{path = "c.o"}>]
-  }>
-} : () -> ()
-
-// -----
-
 "affinity.queue"() {
   // CHECK: any = #hal.affinity.queue<*>
   any = #hal.affinity.queue<*>,

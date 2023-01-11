@@ -687,11 +687,10 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
     newResourceAccesses.push_back(resourceAccess);
   }
 
-  auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
+  builder.create<IREE::Stream::CmdDispatchOp>(
       asyncOp.getLoc(), asyncOp.getWorkload(), asyncOp.getEntryPoint(),
       newOperands, newResources, newResourceSizes, newResourceOffsets,
       newResourceLengths, builder.getArrayAttr(newResourceAccesses));
-  newOp->setDialectAttrs(asyncOp->getDialectAttrs());
   asyncOp.erase();
   return success();
 }

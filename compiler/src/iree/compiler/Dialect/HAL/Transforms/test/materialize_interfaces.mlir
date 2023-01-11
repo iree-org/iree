@@ -26,7 +26,6 @@ module attributes {hal.device.targets = [
   // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
   // CHECK-NEXT: }
   // CHECK:     builtin.module
-  // CHECK-NEXT:  func.func private @extern_func()
   // CHECK-NEXT:  func.func @entry
   // CHECK:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64
   // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout) {
@@ -34,7 +33,6 @@ module attributes {hal.device.targets = [
   // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
   // CHECK-NEXT: }
   // CHECK:     builtin.module
-  // CHECK-NEXT:  func.func private @extern_func()
   // CHECK-NEXT:  func.func @entry
 
   stream.executable private @ex_workgroups {
@@ -42,7 +40,6 @@ module attributes {hal.device.targets = [
       stream.return %arg0, %arg1, %arg0 : index, index, index
     }
     builtin.module {
-      func.func private @extern_func()
       func.func @entry(%operand: i32, %arg0: !stream.binding {stream.alignment = 64 : index}, %arg1: !stream.binding {stream.alignment = 64 : index}, %arg2: !stream.binding {stream.alignment = 64 : index}) {
         return
       }

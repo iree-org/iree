@@ -149,8 +149,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                    OpPassManager &passManager) override {
+  void buildTranslationPassPipeline(OpPassManager &passManager) override {
     buildLLVMCPUCodegenPassPipeline(passManager);
   }
 
@@ -468,32 +467,6 @@ class LLVMCPUTargetBackend final : public TargetBackend {
         bitcodeFile.outputFile->keep();
       }
     }
-
-    // If custom object files were specified then add those to our artifact set.
-    // These will either be combined into the resulting static library or linked
-    // statically into the resulting dynamic library.
-    if (auto objectAttrs = variantOp.getObjects()) {
-      for (auto [index, attr] : llvm::enumerate(objectAttrs.value())) {
-        auto objectAttr = attr.cast<IREE::HAL::ExecutableObjectAttr>();
-        if (objectAttr.getPath()) {
-          auto absolutePath = objectAttr.getAbsolutePath();
-          if (failed(absolutePath)) {
-            llvm::errs()
-                << "ERROR: referenced object file not found on any path; use "
-                   "--iree-hal-executable-object-search-path= to add search "
-                   "paths: "
-                << objectAttr << "\n";
-            return failure();
-          }
-          objectFiles.push_back(Artifact::fromFile(*absolutePath));
-        } else if (auto dataAttr = objectAttr.getData()) {
-          objectFiles.push_back(Artifact::createTemporary(
-              objectFiles.front().path + "_object_" + std::to_string(index),
-              ".o"));
-        }
-      }
-    }
-
     if (options_.linkStatic) {
       return serializeStaticLibraryExecutable(options, variantOp,
                                               executableBuilder, libraryName,
@@ -555,7 +528,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
           << "    " << linkArtifacts.libraryFile.path;
       linkArtifacts.keepAllFiles();
       for (auto &objectFile : objectFiles) {
-        objectFile.keep();
+        objectFile.outputFile->keep();
       }
     }
 

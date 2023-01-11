@@ -181,11 +181,9 @@ class EmbeddedLinkerTool : public LinkerTool {
       // command themselves.
       if (targetOptions.keepLinkerArtifacts) {
         for (auto &objectFile : objectFiles) {
-          if (objectFile.outputFile) {
-            llvm::errs() << "linker input preserved: "
-                         << objectFile.outputFile->getFilename();
-            objectFile.keep();
-          }
+          llvm::errs() << "linker input preserved: "
+                       << objectFile.outputFile->getFilename();
+          objectFile.outputFile->keep();
         }
       }
       return llvm::None;

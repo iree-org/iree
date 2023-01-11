@@ -66,13 +66,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                    OpPassManager &passManager) override {
-    // For now we disable translation if the variant has external object files.
-    // We could instead perform linking with those objects (if they're Metal
-    // archives, etc).
-    if (variantOp.isExternal()) return;
-
+  void buildTranslationPassPipeline(OpPassManager &passManager) override {
     buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
   }
 

@@ -93,28 +93,22 @@ iree_status_t iree_hal_cuda_native_executable_create(
         "cuModuleLoadDataEx");
   }
 
-  if (iree_status_is_ok(status)) {
-    executable->entry_count = entry_count;
-    for (iree_host_size_t i = 0; i < entry_count; i++) {
+  executable->entry_count = entry_count;
+  for (iree_host_size_t i = 0; i < entry_count; i++) {
+    if (iree_status_is_ok(status)) {
       CUfunction function = NULL;
       const char* entry_name = flatbuffers_string_vec_at(entry_points_vec, i);
       status = CU_RESULT_TO_STATUS(
           context->syms, cuModuleGetFunction(&function, module, entry_name),
           "cuModuleGetFunction");
-      if (!iree_status_is_ok(status)) break;
-      if (!function) {
-        status = iree_make_status(IREE_STATUS_NOT_FOUND,
-                                  "exported module function %s not found",
-                                  entry_name);
-        break;
+      if (iree_status_is_ok(status)) {
+        status = CU_RESULT_TO_STATUS(
+            context->syms,
+            cuFuncSetAttribute(function,
+                               CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+                               shared_memory_sizes[i]),
+            "cuFuncSetAttribute");
       }
-      status = CU_RESULT_TO_STATUS(
-          context->syms,
-          cuFuncSetAttribute(function,
-                             CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
-                             shared_memory_sizes[i]),
-          "cuFuncSetAttribute");
-      if (!iree_status_is_ok(status)) break;
       executable->entry_functions[i].cu_function = function;
       executable->entry_functions[i].block_size_x = block_sizes_vec[i].x;
       executable->entry_functions[i].block_size_y = block_sizes_vec[i].y;

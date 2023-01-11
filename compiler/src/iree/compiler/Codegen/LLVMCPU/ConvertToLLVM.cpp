@@ -1077,16 +1077,6 @@ class RewriteExternCallOpToDynamicImportCallOp
         llvmFuncOp, symbol);
     if (calleeOp && !calleeOp.isExternal()) return failure();
 
-    // If the function is marked as statically linked we don't touch it. That'll
-    // let it fall through to the linker stage where it can be picked up either
-    // from the runtime build (in the case of us producing static libraries) or
-    // the user-specified object files (when producing dynamic libraries).
-    if (calleeOp->hasAttr("hal.import.static")) {
-      return rewriter.notifyMatchFailure(callOp,
-                                         "external function is marked static "
-                                         "and does not need an import wrapper");
-    }
-
     // TODO(benvanik): way to determine if weak (maybe via linkage?).
     bool weak = false;
 

@@ -11,10 +11,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
@@ -335,49 +331,6 @@ Attribute ExecutableTargetAttr::getMatchExpression() {
   return DeviceMatchExecutableFormatAttr::get(getContext(), getFormat());
 }
 
-// For now this is very simple: if there are any specified fields that are
-// present in this attribute they must match. We could allow target backends
-// to customize this via attribute interfaces in the future if we needed.
-bool ExecutableTargetAttr::isGenericOf(
-    IREE::HAL::ExecutableTargetAttr specificAttr) {
-  if (getBackend() != specificAttr.getBackend() ||
-      getFormat() != specificAttr.getFormat()) {
-    // Totally different backends and binary formats.
-    // There may be cases where we want to share things - such as when targeting
-    // both DLLs and dylibs or something - but today almost all of these are
-    // unique situations.
-    return false;
-  }
-
-  // If the config is empty on either we can quickly match.
-  // This is the most common case for users manually specifying targets.
-  auto genericConfigAttr = getConfiguration();
-  auto specificConfigAttr = specificAttr.getConfiguration();
-  if (!genericConfigAttr || !specificConfigAttr) return true;
-
-  // Ensure all fields in specificConfigAttr either don't exist or match.
-  for (auto expectedAttr : specificConfigAttr.getValue()) {
-    auto actualValue = genericConfigAttr.getNamed(expectedAttr.getName());
-    if (!actualValue) {
-      continue;  // ignore, not present in generic
-    }
-    if (actualValue->getValue() != expectedAttr.getValue()) {
-      return false;  // mismatch, both have values but they differ
-    }
-  }
-
-  // Ensure all fields in genericConfigAttr exist in the specific one.
-  // If missing then the generic is _more_ specific and can't match.
-  for (auto actualAttr : genericConfigAttr.getValue()) {
-    if (!specificConfigAttr.getNamed(actualAttr.getName())) {
-      return false;  // mismatch, present in generic but not specific
-    }
-  }
-
-  // All fields match or are omitted in the generic version.
-  return true;
-}
-
 // static
 ExecutableTargetAttr ExecutableTargetAttr::lookup(Operation *op) {
   auto *context = op->getContext();
@@ -396,181 +349,6 @@ ExecutableTargetAttr ExecutableTargetAttr::lookup(Operation *op) {
   // No target found during walk. No default to provide so fail and let the
   // caller decide what to do (assert/fallback/etc).
   return nullptr;
-}
-
-//===----------------------------------------------------------------------===//
-// #hal.executable.object
-//===----------------------------------------------------------------------===//
-
-// static
-Attribute ExecutableObjectAttr::parse(AsmParser &p, Type type) {
-  NamedAttrList dict;
-  // `<{` dict `}>`
-  if (failed(p.parseLess()) || failed(p.parseOptionalAttrDict(dict)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  auto pathAttr = dict.get("path").dyn_cast_or_null<StringAttr>();
-  auto dataAttr = dict.get("data").dyn_cast_or_null<DenseIntElementsAttr>();
-  return get(p.getContext(), pathAttr, dataAttr);
-}
-
-void ExecutableObjectAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<{";
-  if (auto pathAttr = getPath()) {
-    os << "path = ";
-    p.printAttribute(getPath());
-  } else if (auto dataAttr = getData()) {
-    os << "data = ";
-    p.printAttribute(getData());
-  }
-  os << "}>";
-}
-
-// Tries to find |filePath| on disk either at its absolute path or joined with
-// any of the specified |searchPaths| in order.
-// Returns the absolute file path when found or a failure if there are no hits.
-static FailureOr<std::string> findFileInPaths(
-    StringRef filePath, ArrayRef<std::string> searchPaths) {
-  // First try to see if it's an absolute path - we don't want to perform any
-  // additional processing on top of that.
-  if (llvm::sys::path::is_absolute(filePath)) {
-    if (llvm::sys::fs::exists(filePath)) return filePath.str();
-    return failure();
-  }
-
-  // Try a relative lookup from the current working directory.
-  if (llvm::sys::fs::exists(filePath)) return filePath.str();
-
-  // Search each path in turn for a file that exists.
-  // It doesn't mean we can open it but we'll get a better error out of the
-  // actual open attempt than what we could produce here.
-  for (auto searchPath : searchPaths) {
-    SmallVector<char> tryPath{searchPath.begin(), searchPath.end()};
-    llvm::sys::path::append(tryPath, filePath);
-    if (llvm::sys::fs::exists(Twine(tryPath))) return Twine(tryPath).str();
-  }
-
-  // Not found in either the user-specified absolute path, cwd, or the search
-  // paths.
-  return failure();
-}
-
-static llvm::cl::list<std::string> clExecutableObjectSearchPath(
-    "iree-hal-executable-object-search-path",
-    llvm::cl::desc("Additional search paths for resolving "
-                   "#hal.executable.object file references."),
-    llvm::cl::ZeroOrMore);
-
-FailureOr<std::string> ExecutableObjectAttr::getAbsolutePath() {
-  auto pathAttr = getPath();
-  if (!pathAttr) return failure();  // not a file reference
-  return findFileInPaths(pathAttr.getValue(), clExecutableObjectSearchPath);
-}
-
-Optional<std::string> ExecutableObjectAttr::loadData() {
-  if (auto dataAttr = getData()) {
-    // This is shady but so is using this feature.
-    // TODO(benvanik): figure out a way to limit the attribute to signless int8.
-    // We could share the attribute -> byte array code with the VM constant
-    // serialization if we wanted.
-    auto rawData = dataAttr.getRawData();
-    return std::string(rawData.data(), rawData.size());
-  } else if (auto pathAttr = getPath()) {
-    // Search for file and try to load it if found.
-    auto filePath =
-        findFileInPaths(pathAttr.getValue(), clExecutableObjectSearchPath);
-    if (failed(filePath)) {
-      llvm::errs()
-          << "ERROR: referenced object file not found on any path; use "
-             "--iree-hal-executable-object-search-path= to add search paths: "
-          << *this << "\n";
-      return None;
-    }
-    auto file = llvm::MemoryBuffer::getFile(*filePath);
-    if (!file) return None;
-    return std::string((*file)->getBuffer());
-  }
-  return None;
-}
-
-//===----------------------------------------------------------------------===//
-// #hal.executable.objects
-//===----------------------------------------------------------------------===//
-
-// static
-LogicalResult ExecutableObjectsAttr::verify(
-    function_ref<mlir::InFlightDiagnostic()> emitError, ArrayAttr targetsAttr,
-    ArrayAttr targetObjectsAttr) {
-  if (targetsAttr.size() != targetObjectsAttr.size()) {
-    return emitError() << "targets and objects must be 1:1";
-  }
-  for (auto targetAttr : targetsAttr) {
-    if (!targetAttr.isa<IREE::HAL::ExecutableTargetAttr>()) {
-      return emitError()
-             << "target keys must be #hal.executable.target attributes";
-    }
-  }
-  for (auto objectsAttr : targetObjectsAttr) {
-    auto objectsArrayAttr = objectsAttr.dyn_cast<ArrayAttr>();
-    if (!objectsArrayAttr) {
-      return emitError() << "target objects must be an array of "
-                            "#hal.executable.object attributes";
-    }
-  }
-  return success();
-}
-
-// static
-Attribute ExecutableObjectsAttr::parse(AsmParser &p, Type type) {
-  // `<{` target = [objects, ...], ... `}>`
-  SmallVector<Attribute> targetAttrs;
-  SmallVector<Attribute> objectsAttrs;
-  if (failed(p.parseLess())) return {};
-  if (succeeded(p.parseLBrace()) && !succeeded(p.parseOptionalRBrace())) {
-    do {
-      Attribute targetAttr;
-      ArrayAttr objectsAttr;
-      if (failed(p.parseAttribute(targetAttr)) || failed(p.parseEqual()) ||
-          failed(p.parseAttribute(objectsAttr))) {
-        return {};
-      }
-      targetAttrs.push_back(targetAttr);
-      objectsAttrs.push_back(objectsAttr);
-    } while (succeeded(p.parseOptionalComma()));
-    if (failed(p.parseRBrace())) return {};
-  }
-  if (failed(p.parseGreater())) return {};
-  return get(p.getContext(), ArrayAttr::get(p.getContext(), targetAttrs),
-             ArrayAttr::get(p.getContext(), objectsAttrs));
-}
-
-void ExecutableObjectsAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<{";
-  llvm::interleaveComma(llvm::zip(getTargets(), getTargetObjects()), os,
-                        [&](std::tuple<Attribute, Attribute> keyValue) {
-                          p.printAttribute(std::get<0>(keyValue));
-                          os << " = ";
-                          p.printAttributeWithoutType(std::get<1>(keyValue));
-                        });
-  os << "}>";
-}
-
-Optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
-    IREE::HAL::ExecutableTargetAttr specificTargetAttr) {
-  SmallVector<Attribute> allObjectAttrs;
-  for (auto [targetAttr, objectsAttr] :
-       llvm::zip(getTargets(), getTargetObjects())) {
-    auto genericTargetAttr = targetAttr.cast<IREE::HAL::ExecutableTargetAttr>();
-    if (genericTargetAttr.isGenericOf(specificTargetAttr)) {
-      auto objectsArrayAttr = objectsAttr.cast<ArrayAttr>();
-      allObjectAttrs.append(objectsArrayAttr.begin(), objectsArrayAttr.end());
-    }
-  }
-  if (allObjectAttrs.empty()) return None;
-  return ArrayAttr::get(specificTargetAttr.getContext(), allObjectAttrs);
 }
 
 //===----------------------------------------------------------------------===//
@@ -872,9 +650,6 @@ Value DeviceMatchExecutableFormatAttr::buildConditionExpression(
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.cpp.inc"
 
 void HALDialect::registerAttributes() {
-  // Register command line flags:
-  (void)clExecutableObjectSearchPath;
-
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"  // IWYU pragma: keep

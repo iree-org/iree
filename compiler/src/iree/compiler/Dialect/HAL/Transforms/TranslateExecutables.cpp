@@ -63,7 +63,7 @@ class TranslateTargetExecutableVariantsPass
     }
 
     OpPassManager passManager(variantOp.getOperationName());
-    targetBackend->buildTranslationPassPipeline(variantOp, passManager);
+    targetBackend->buildTranslationPassPipeline(passManager);
     if (failed(runPipeline(passManager, variantOp))) {
       variantOp.emitError() << "failed to run translation of source "
                                "executable to target executable for backend "

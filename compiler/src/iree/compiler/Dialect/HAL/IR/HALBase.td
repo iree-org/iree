@@ -735,10 +735,6 @@ def HAL_ExecutableTargetAttr :
     // device that can load an executable of this target.
     Attribute getMatchExpression();
 
-    // Returns true if this attribute is a generic version of |specificAttr|.
-    // A more generic version will match with many specific versions.
-    bool isGenericOf(IREE::HAL::ExecutableTargetAttr specificAttr);
-
     // Returns the executable target configuration for the given operation.
     // This will recursively walk parent operations until one with the
     // `hal.executable.target` attribute is found or a `hal.executable.variant`
@@ -747,100 +743,6 @@ def HAL_ExecutableTargetAttr :
   }];
 
   let hasCustomAssemblyFormat = 1;
-}
-
-//===----------------------------------------------------------------------===//
-// #hal.executable.object<*>
-//===----------------------------------------------------------------------===//
-
-def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
-  let mnemonic = "executable.object";
-  let summary = [{object file reference}];
-  let description = [{
-    WIP; defines an object file that can be linked into executables.
-    Today this is only supported for external file references with paths the
-    compiler can successfully resolve from its current working directory.
-
-    Future revisions may change this to an interface that allows both internal
-    and external resources to define the object contents. Linking needs to be
-    updated to support various object compositions and certain backends may
-    require additional infrastructure support.
-
-    In the long term the goal is to allow combinations of declared objects and
-    generated code in order to give control of linking behavior to frontends.
-    Instead of needing global command line flags to link in additional blobs
-    the frontend can emit executables with the dependencies already defined per
-    variant without needing to reach into the IREE compiler code.
-
-    Example:
-    ```mlir
-    #hal.executable.object<{path = "some/file.obj"}>
-    #hal.executable.object<{data = dense<[...]> : vector<2048xi8>}>
-    ```
-  }];
-
-  let parameters = (ins
-    OptionalParameter<"StringAttr", "">:$path,
-    OptionalParameter<"DenseIntElementsAttr", "">:$data
-  );
-
-  let hasCustomAssemblyFormat = 1;
-
-  let extraClassDeclaration = [{
-    // Returns the absolute path of the referenced object file if it exists.
-    FailureOr<std::string> getAbsolutePath();
-
-    // Returns the contents of the object file or None if loading failed.
-    // TODO(benvanik): better return type to support mapping/etc? eh
-    Optional<std::string> loadData();
-  }];
-}
-
-def HAL_ExecutableObjectArrayAttr :
-    TypedArrayAttrBase<HAL_ExecutableObjectAttr,
-                       "HAL executable object references">;
-
-def HAL_ExecutableObjectsAttr : AttrDef<HAL_Dialect, "ExecutableObjects"> {
-  let mnemonic = "executable.objects";
-  let summary = [{target-specific object file references}];
-  let description = [{
-    A dictionary mapping executable target specifications to a list of objects.
-    This is used to allow layers of the stack that support multi-targeting to
-    specify information used during lowering into each particular target.
-
-    The key attributes are matched against each target variant based on the
-    backend and format as well as any configuration data provided. When
-    comparing the configuration only fields present in both the key and
-    target variant will be checked and must match. This allows specification of
-    generic sets ("all x86_64 targets get these objects") as well as specific
-    ones ("only x86_64 targets with vector_size = 64 get these objects").
-
-    Example:
-    ```mlir
-    #hal.executable.objects<{
-      #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64"> = [
-        #hal.executable.object<{path = "some/file_arm_64.obj"}>
-      ],
-      #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64"> = [
-        #hal.executable.object<{path = "some/file_x86_64.obj"}>
-      ]
-    }>
-    ```
-  }];
-
-  let parameters = (ins
-    AttrParameter<"ArrayAttr", "">:$targets,
-    AttrParameter<"ArrayAttr", "">:$targetObjects
-  );
-
-  let genVerifyDecl = 1;
-  let hasCustomAssemblyFormat = 1;
-
-  let extraClassDeclaration = [{
-    // Returns the objects specified for the given generic target.
-    Optional<ArrayAttr> getApplicableObjects(
-        IREE::HAL::ExecutableTargetAttr specificTargetAttr);
-  }];
 }
 
 //===----------------------------------------------------------------------===//
