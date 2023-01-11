@@ -90,7 +90,7 @@ def VMVX_QueryTileSizesOp : VMVX_PureOp<"query_tile_sizes"> {
   );
 
   let assemblyFormat = [{
-    `sizes` `(` $sizes `)`
+    `sizes` `` `(` $sizes `)`
     `flags` `` `(` $flags `)`
     `->` type(results) attr-dict
   }];
