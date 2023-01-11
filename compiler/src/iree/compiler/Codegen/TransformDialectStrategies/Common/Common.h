@@ -52,10 +52,12 @@ void createTransformRegion(func::FuncOp entryPoint,
 // Low-level reusable builder APIs, these should follow MLIR-style builders.
 //===----------------------------------------------------------------------===//
 
-/// Prints `handles` in order. Prints the whole IR if `handles` is empty.
+/// Build transform IR that prints `handles` in order, or print the whole IR if
+/// `handles` is empty.
 void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 
-/// Dynamically selects the first non-empty handle; i.e. if (h1, h2) is:
+/// Build transform IR to dynamically selects the first non-empty handle; i.e.
+/// if (h1, h2) is:
 ///   - (non-empty, non-empty), returns (h1, h2)
 ///   - (empty, non-empty), returns (h2, empty)
 ///   - (non-empty, empty), returns (h1, empty)
@@ -81,6 +83,8 @@ struct TileToScfForAndFuseResult {
   Value tiledOpH;
 };
 
+/// Build transform IR to perform multi-level tile and fuse into an scf.for op.
+/// Note: fusion is currently unsupported.
 TileToScfForAndFuseResult buildTileFuseToScfFor(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes);
@@ -100,7 +104,7 @@ struct TileToForeachThreadAndFuseAndDistributeResult {
   Value tiledOpH;
 };
 
-/// Performs the following transformations:
+/// Build transform IR to perform the following transformations:
 ///   1. Tiles `rootH` to scf.foreach_thread to with `tileSizesOrNumThreads`
 ///      according to whether spec is a TileSizesSpec or a NumThreadsSpec.
 ///   2. Maps the resulting scf.foreach_thread to threads according to
@@ -117,6 +121,10 @@ struct TileToForeachThreadAndFuseAndDistributeResult {
 /// providing the fusion order and has interleaved canonicalization / cse /
 /// enabling transform will be introduced and may result in better fusions.
 ///
+/// Note: this version cannot be used for the block-level tiling in a dispatch
+/// region. `buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes` is
+/// the modified version that is aware of the `workgroup_count` region.
+///
 // TODO: if someone knows how to properly export templates go for it .. sigh.
 TileToForeachThreadAndFuseAndDistributeResult
 buildTileFuseDistToForeachThreadWithTileSizes(ImplicitLocOpBuilder &b,
@@ -125,28 +133,35 @@ buildTileFuseDistToForeachThreadWithTileSizes(ImplicitLocOpBuilder &b,
                                               ArrayRef<OpFoldResult> tileSizes,
                                               ArrayAttr threadDimMapping);
 
+/// Version of `buildTileFuseDistToForeachThreadWithTileSizes` that is aware of
+/// IREE's `workgroup_count` region and should be used for the block-level
+/// tiling in a dispatch region.
 TileToForeachThreadAndFuseAndDistributeResult
 buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping);
 
-/// See buildTileFuseDistWithTileSizes.
+/// Similar to `buildTileFuseDistWithTileSizes` but using `numThreads` instead
+/// of `tileSizes`.
 TileToForeachThreadAndFuseAndDistributeResult
 buildTileFuseDistToForeachThreadWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
 
+/// Version of `buildTileFuseDistToForeachThreadWithNumThreads` that is aware of
+/// IREE's `workgroup_count` region and should be used for the block-level
+/// tiling in a dispatch region.
 TileToForeachThreadAndFuseAndDistributeResult
 buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
 
-/// Apply patterns and vectorize (for now always applies rank-reduction).
+/// Build transform IR  that applies rank-reduction patterns and vectorizes.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH);
 
-/// Bufferize and drop HAL descriptor from memref ops.
+/// Build transform IR to bufferize and drop HAL descriptor from memref ops.
 /// Takes a handle variantOp and returns a handle to the same variant op.
 Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH,
                      bool targetGpu = false);
