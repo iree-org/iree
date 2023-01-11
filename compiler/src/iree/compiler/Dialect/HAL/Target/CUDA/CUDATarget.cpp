@@ -277,21 +277,6 @@ class CUDATargetBackend final : public TargetBackend {
           llvm::MDNode::get(llvmModule->getContext(), llvmMetadata);
       llvmModule->getOrInsertNamedMetadata("nvvm.annotations")
           ->addOperand(llvmMetadataNode);
-      /* Set maximum number of threads in the thread block (CTA). */
-      auto generateMetadata = [&](int dim, StringRef name) {
-        llvm::Metadata *llvmMetadata[] = {
-            llvm::ValueAsMetadata::get(llvmFunc),
-            llvm::MDString::get(llvmModule->getContext(), name),
-            llvm::ValueAsMetadata::get(llvm::ConstantInt::get(
-                llvm::Type::getInt32Ty(llvmModule->getContext()), dim))};
-        llvm::MDNode *llvmMetadataNode =
-            llvm::MDNode::get(llvmModule->getContext(), llvmMetadata);
-        llvmModule->getOrInsertNamedMetadata("nvvm.annotations")
-            ->addOperand(llvmMetadataNode);
-      };
-      generateMetadata(workgroupSize[0], "maxntidx");
-      generateMetadata(workgroupSize[1], "maxntidy");
-      generateMetadata(workgroupSize[2], "maxntidz");
     }
 
     std::unique_ptr<llvm::TargetMachine> targetMachine;
