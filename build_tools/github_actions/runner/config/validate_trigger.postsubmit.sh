@@ -8,7 +8,9 @@
 
 set -euo pipefail
 
-source /runner-root/config/functions.sh
+SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
+
+source "${SCRIPT_DIR}/functions.sh"
 
 ALLOWED_EVENTS=(
   "push"

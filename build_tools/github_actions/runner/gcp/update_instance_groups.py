@@ -20,9 +20,6 @@ DIRECT_UPDATE_COMMAND_NAME = "direct-update"
 
 CANARY_SIZE = compute.FixedOrPercent(fixed=1)
 
-TESTING_ENV_NAME = "testing"
-PROD_ENV_NAME = "prod"
-
 
 def resource_basename(resource):
   return os.path.basename(urllib.parse.urlparse(resource).path)
@@ -100,7 +97,7 @@ def main(args):
   )
 
   # Prod instances just have the bare name
-  modifier = None if args.env == PROD_ENV_NAME else args.env
+  modifier = None if args.env == "prod" else args.env
   migs = updater.get_migs(region=args.region,
                           type=args.type,
                           group=args.group,
@@ -126,7 +123,7 @@ def main(args):
   for mig in migs:
     region = resource_basename(mig.region)
     if args.command in [DIRECT_UPDATE_COMMAND_NAME, CANARY_COMMAND_NAME]:
-      if "testing" in args.version and args.env != TESTING_ENV_NAME:
+      if "testing" in args.version and args.env != "testing":
         scary_action = (f"using testing template version '{args.version}' in"
                         f" environment '{args.env}'")
         check_scary_action(scary_action, args.skip_confirmation)
@@ -283,31 +280,18 @@ def parse_args():
       ))
   subparser_base.add_argument("--env",
                               "--environment",
-                              default=TESTING_ENV_NAME,
+                              default="testing",
                               help="The environment for the MIGs.",
-                              choices=[PROD_ENV_NAME, TESTING_ENV_NAME])
+                              choices=["prod", "testing"])
   subparser_base.add_argument(
       "--dry-run",
       action="store_true",
       default=False,
       help="Print all output but don't actually send the update request.")
-
-  # Defaulting to true for testing environment avoids people getting in the
-  # habit of routinely passing --force.
-  skip_confirmation = subparser_base.add_mutually_exclusive_group()
-  skip_confirmation.add_argument(
-      "--skip-confirmation",
-      "--force",
-      action="store_true",
-      default=None,
-      help=("Skip all confirmation prompts. Be careful."
-            " Defaults to True for testing environment"))
-  skip_confirmation.add_argument("--noskip-confirmation",
-                                 "--noforce",
-                                 action="store_false",
-                                 default=None,
-                                 dest="skip_confirmation")
-
+  subparser_base.add_argument("--skip-confirmation",
+                              "--force",
+                              action="store_true",
+                              help="Skip all confirmation prompts. Be careful.")
   # These shouldn't be set very often, but it's just as easy to make them flags
   # as it is to make them global constants.
   subparser_base.add_argument("--name-prefix",
@@ -352,9 +336,6 @@ def parse_args():
   # canary_sp.add_argument("--canary-size", type=int, default=1)
 
   args = parser.parse_args()
-
-  if args.skip_confirmation is None:
-    args.skip_confirmation = args.env == TESTING_ENV_NAME
 
   if args.mode is None:
     if args.action == "refresh":

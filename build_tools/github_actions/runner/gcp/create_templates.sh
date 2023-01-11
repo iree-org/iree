@@ -15,7 +15,6 @@ SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 
 TESTING="${TEMPLATE_TESTING:-0}"
 DRY_RUN="${DRY_RUN:-0}"
-TESTING_SELF_DELETER="${TESTING_SELF_DELETER:-0}"
 
 GPU_IMAGE="github-runner-gpu-2022-09-29-1664451806"
 GPU_DISK_SIZE_GB=100
@@ -30,15 +29,15 @@ TEMPLATE_CONFIG_REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
 TEMPLATE_BASE_NAME="${TEMPLATE_BASE_NAME:-${PROD_TEMPLATE_BASE_NAME}}"
 
 if (( TESTING==0 )) && ! git merge-base --is-ancestor "${TEMPLATE_CONFIG_REF}" main; then
-  echo "Creating testing template because TEMPLATE_CONFIG_REF='${TEMPLATE_CONFIG_REF}' is not on the main branch" >&2
+  echo "Creating testing template because TEMPLATE_CONFIG_REF='${TEMPLATE_CONFIG_REF}' is not on the main branch"
   TESTING=1
 fi
 if (( TESTING==0 )) && [[ "${TEMPLATE_CONFIG_REPO}" != "${PROD_TEMPLATE_CONFIG_REPO}" ]]; then
-  echo "Creating testing template because TEMPLATE_CONFIG_REPO '${TEMPLATE_CONFIG_REPO}'!='${PROD_TEMPLATE_CONFIG_REPO}'" >&2
+  echo "Creating testing template because TEMPLATE_CONFIG_REPO '${TEMPLATE_CONFIG_REPO}'!='${PROD_TEMPLATE_CONFIG_REPO}'"
   TESTING=1
 fi
 if (( TESTING==0 )) && [[ "${TEMPLATE_BASE_NAME}" != "${PROD_TEMPLATE_BASE_NAME}" ]]; then
-  echo "Creating testing template because TEMPLATE_BASE_NAME '${TEMPLATE_BASE_NAME}'!='${PROD_TEMPLATE_BASE_NAME}'" >&2
+  echo "Creating testing template because TEMPLATE_BASE_NAME '${TEMPLATE_BASE_NAME}'!='${PROD_TEMPLATE_BASE_NAME}'"
   TESTING=1
 fi
 
@@ -60,12 +59,7 @@ GITHUB_RUNNER_SCOPE=iree-org
 GITHUB_RUNNER_VERSION="2.300.2"
 GITHUB_RUNNER_ARCHIVE_DIGEST="147c14700c6cb997421b9a239c012197f11ea9854cd901ee88ead6fe73a72c74"
 GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
-
-if (( TESTING_SELF_DELETER==1 )); then
-  INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-testing-zbhz5clunq-uc.a.run.app"
-else
-  INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-zbhz5clunq-uc.a.run.app"
-fi
+INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-zbhz5clunq-uc.a.run.app"
 
 declare -a METADATA=(
   "github-runner-version=${GITHUB_RUNNER_VERSION}"
@@ -124,10 +118,6 @@ function create_template() {
 
   local -a cmd=(
     gcloud compute instance-templates create
-    --quiet
-  )
-
-  cmd+=(
     "${TEMPLATE_BASE_NAME}-${group}-${type}-${VERSION}"
     "${common_args[@]}"
     --service-account="github-runner-${trust}-trust@iree-oss.iam.gserviceaccount.com"
@@ -157,9 +147,8 @@ function create_template() {
     # Prefix the command with a noop. It will still be printed by set -x
     cmd=(":" "${cmd[@]}")
   fi
-
-  (set -x; "${cmd[@]}") >&2
-  echo '' >&2
+  (set -x; "${cmd[@]}")
+  echo ''
 }
 
 for group in presubmit postsubmit; do
@@ -167,6 +156,4 @@ for group in presubmit postsubmit; do
     create_template "${group}" "${type}"
   done
 done
-
-echo "Created new templates for version: ${VERSION}" >&2
-echo "${VERSION}"
+echo "Created new templates for version: ${VERSION}"

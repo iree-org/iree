@@ -1,5 +1,0 @@
-[Unit]
-Description=Coordinates startup of all services related to the GitHub runner.
-
-[Install]
-WantedBy=multi-user.target

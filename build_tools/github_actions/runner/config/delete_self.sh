@@ -10,7 +10,9 @@
 
 set -euo pipefail
 
-source /runner-root/config/functions.sh
+SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
+source "${SCRIPT_DIR}/functions.sh"
+
 
 # If the nice way fails, hard shutdown
 function shutdown_now() {
