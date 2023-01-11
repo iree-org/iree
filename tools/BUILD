@@ -115,7 +115,6 @@ cc_binary(
     srcs = ["iree-run-mlir-main.cc"],
     tags = ["hostonly"],
     deps = [
-        "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
