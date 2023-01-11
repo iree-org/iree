@@ -43,7 +43,7 @@ LINK_LIBRARIES := \
 		dl \
 		pthread
 LIBRARY_FLAGS := $(addprefix -L,${LIBRARY_DIRS}) $(addprefix -l,${LINK_LIBRARIES})
-CXX_FLAGS := -flto -O2 ${INCLUDE_FLAGS} ${LIBRARY_FLAGS}
+CXX_FLAGS := -flto -Os ${INCLUDE_FLAGS} ${LIBRARY_FLAGS}
 
 all: native-training 
 clean:
