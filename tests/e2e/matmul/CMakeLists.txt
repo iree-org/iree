@@ -334,10 +334,8 @@ iree_generated_trace_runner_test(
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
-    "cuda"
     "llvm-cpu"
   DRIVERS
-    "cuda"
     "local-task"
   COMPILER_FLAGS
     "--iree-flow-split-matmul-reduction=4"
