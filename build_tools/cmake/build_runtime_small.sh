@@ -18,8 +18,6 @@ source build_tools/cmake/setup_ccache.sh
 
 "${CMAKE_BIN?}" -B "${BUILD_DIR}" \
   -G Ninja . \
-  -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
-  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DCMAKE_BUILD_TYPE=MinSizeRel \
   -DIREE_SIZE_OPTIMIZED=ON \
   -DIREE_BUILD_COMPILER=OFF
