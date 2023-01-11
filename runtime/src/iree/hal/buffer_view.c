@@ -67,17 +67,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create_like(
-    iree_hal_buffer_t* buffer, iree_hal_buffer_view_t* like_view,
-    iree_allocator_t host_allocator, iree_hal_buffer_view_t** out_buffer_view) {
-  return iree_hal_buffer_view_create(
-      buffer, iree_hal_buffer_view_shape_rank(like_view),
-      iree_hal_buffer_view_shape_dims(like_view),
-      iree_hal_buffer_view_element_type(like_view),
-      iree_hal_buffer_view_encoding_type(like_view), host_allocator,
-      out_buffer_view);
-}
-
 IREE_API_EXPORT void iree_hal_buffer_view_retain(
     iree_hal_buffer_view_t* buffer_view) {
   if (IREE_LIKELY(buffer_view)) {

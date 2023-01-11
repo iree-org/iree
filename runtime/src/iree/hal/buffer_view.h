@@ -193,12 +193,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_encoding_type_t encoding_type, iree_allocator_t host_allocator,
     iree_hal_buffer_view_t** out_buffer_view);
 
-// Creates a buffer view with the given |buffer| and metadata from |like_view|.
-// |out_buffer_view| must be released by the caller.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create_like(
-    iree_hal_buffer_t* buffer, iree_hal_buffer_view_t* like_view,
-    iree_allocator_t host_allocator, iree_hal_buffer_view_t** out_buffer_view);
-
 // Retains the given |buffer_view| for the caller.
 IREE_API_EXPORT void iree_hal_buffer_view_retain(
     iree_hal_buffer_view_t* buffer_view);
