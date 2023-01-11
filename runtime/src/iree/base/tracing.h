@@ -517,6 +517,7 @@ enum {
 #define IREE_TRACE_EVENT0
 
 #else
+#define IREE_TRACE_THREAD_ENABLE(name)
 #define IREE_TRACE_SCOPE()
 #define IREE_TRACE_SCOPE_DYNAMIC(name_string_view)
 #define IREE_TRACE_SCOPE0(name_literal)

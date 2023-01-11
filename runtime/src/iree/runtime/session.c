@@ -240,33 +240,10 @@ iree_runtime_session_append_bytecode_module_from_file(
       iree_runtime_session_append_bytecode_module_from_memory(
           session, flatbuffer_contents->const_buffer,
           iree_file_contents_deallocator(flatbuffer_contents));
-
   if (!iree_status_is_ok(status)) {
     iree_file_contents_free(flatbuffer_contents);
   }
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
 
-IREE_API_EXPORT iree_status_t
-iree_runtime_session_append_bytecode_module_from_stdin(
-    iree_runtime_session_t* session) {
-  IREE_ASSERT_ARGUMENT(session);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_file_contents_t* flatbuffer_contents = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_stdin_read_contents(iree_runtime_session_host_allocator(session),
-                                   &flatbuffer_contents));
-
-  iree_status_t status =
-      iree_runtime_session_append_bytecode_module_from_memory(
-          session, flatbuffer_contents->const_buffer,
-          iree_file_contents_deallocator(flatbuffer_contents));
-
-  if (!iree_status_is_ok(status)) {
-    iree_file_contents_free(flatbuffer_contents);
-  }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
