@@ -183,10 +183,8 @@ public:
   /// Creates a matcher for a structured operation with one of the given types.
   template <typename... OpType>
   static StructuredOpMatcher create() {
-    return StructuredOpMatcher([](linalg::LinalgOp op) {
-      debugOutputForCreate(ArrayRef<StringRef>{OpType::getOperationName()...});
-      return isa<OpType...>(op.getOperation());
-    });
+    return StructuredOpMatcher(
+        [](linalg::LinalgOp op) { return isa<OpType...>(op.getOperation()); });
   }
 
   /// Returns the matched operation if the match was successful.
@@ -249,7 +247,12 @@ public:
   //===-------------------------------------------------------------------===//
   /// Adds a predicate checking that the structured op has the given number of
   /// inputs.
-  StructuredOpMatcher &input(NumEqualsTo num);
+  StructuredOpMatcher &input(NumEqualsTo num) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      return linalgOp.getNumDpsInputs() == num.value;
+    });
+    return *this;
+  }
 
   /// Adds a predicate that recursively applies other predicates to the
   /// operation defining the `position`-th operand. The position may be
@@ -264,10 +267,24 @@ public:
       StructuredOpMatcher &>
   input(int64_t position, T &operandMatcher,
         OptionalMatch optional = OptionalMatch(false)) {
-    addInputMatcher(
-        position,
-        [&operandMatcher](Operation *op) { return operandMatcher.match(op); },
-        optional);
+    predicates.push_back([position, optional,
+                          &operandMatcher](linalg::LinalgOp linalgOp) -> bool {
+      int64_t transformedPosition =
+          position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
+      if (transformedPosition >= linalgOp.getNumDpsInputs())
+        return false;
+
+      Operation *definingOp = linalgOp.getDpsInputOperand(transformedPosition)
+                                  ->get()
+                                  .getDefiningOp();
+      if (!definingOp)
+        return optional.value;
+      // We MUST run the matcher at this point, even if the match is optional,
+      // to allow for capture.
+      if (operandMatcher.match(definingOp))
+        return true;
+      return optional.value;
+    });
     recordNestedMatcher(operandMatcher);
     return *this;
   }
@@ -315,7 +332,12 @@ public:
 
   /// Adds a predicate checking that the structured op has the given number of
   /// outputs.
-  StructuredOpMatcher &output(NumEqualsTo num);
+  StructuredOpMatcher &output(NumEqualsTo num) {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+      return linalgOp.getNumDpsInits() == num.value;
+    });
+    return *this;
+  }
 
   /// Adds a predicate checking that all output operands of the structured op
   /// have a permutation indexing map.
@@ -347,10 +369,24 @@ public:
       StructuredOpMatcher &>
   output(int64_t position, T &operandMatcher,
          OptionalMatch optional = OptionalMatch(false)) {
-    addOutputMatcher(
-        position,
-        [&operandMatcher](Operation *op) { return operandMatcher.match(op); },
-        optional);
+    predicates.push_back([position, optional,
+                          &operandMatcher](linalg::LinalgOp linalgOp) -> bool {
+      int64_t transformedPosition =
+          position >= 0 ? position : linalgOp.getNumDpsInits() + position;
+      if (transformedPosition >= linalgOp.getNumDpsInits())
+        return false;
+
+      Operation *definingOp = linalgOp.getDpsInitOperand(transformedPosition)
+                                  ->get()
+                                  .getDefiningOp();
+      if (!definingOp)
+        return optional.value;
+      // We MUST run the matcher at this point, even if the match is optional,
+      // to allow for capture.
+      if (operandMatcher.match(definingOp))
+        return true;
+      return optional.value;
+    });
     recordNestedMatcher(operandMatcher);
     return *this;
   }
@@ -370,12 +406,23 @@ public:
       StructuredOpMatcher &>
   result(int64_t position, HasAnyUse tag, T &resultUserMatcher,
          OptionalMatch optional = OptionalMatch(false)) {
-    addResultMatcher(
-        position, tag,
-        [&resultUserMatcher](Operation *op) {
-          return resultUserMatcher.match(op);
-        },
-        optional);
+    predicates.push_back([&resultUserMatcher, optional,
+                          position](linalg::LinalgOp linalgOp) -> bool {
+      int64_t transformedPosition =
+          position >= 0 ? position : linalgOp->getNumResults() + position;
+      if (transformedPosition >= linalgOp->getNumResults())
+        return false;
+
+      // We MUST run the matcher at this point, even if the match is optional,
+      // to allow for capture.
+      if (llvm::any_of(linalgOp->getResult(transformedPosition).getUsers(),
+                       [&resultUserMatcher](Operation *op) {
+                         return resultUserMatcher.match(op);
+                       })) {
+        return true;
+      }
+      return optional.value;
+    });
     recordNestedMatcher(resultUserMatcher);
     return *this;
   }
@@ -415,26 +462,9 @@ private:
                                      linalg::LinalgOp linalgOp,
                                      ArrayRef<CapturingOpMatcher *> matchers);
 
-  /// Produce the debug output for `create` method in a non-templated way.
-  static void debugOutputForCreate(ArrayRef<StringRef> opNames);
-
-  /// Non-template implementations of nested predicate builders for inputs,
-  /// outputs and results. Should not be called directly.
-  void addInputMatcher(int64_t position,
-                       std::function<bool(Operation *)> matcher,
-                       OptionalMatch optional);
-  void addOutputMatcher(int64_t position,
-                        std::function<bool(Operation *)> matcher,
-                        OptionalMatch optional);
-  void addResultMatcher(int64_t position, HasAnyUse tag,
-                        std::function<bool(Operation *)> matcher,
-                        OptionalMatch optional);
-
   /// Additional predicates to be checked on the structured op.
   SmallVector<PredicateFn> predicates;
 
-  /// A list of (recursively) nested capturing matchers that should be reset
-  /// when the current matcher is.
   SmallVector<CapturingOpMatcher *> nestedCapturingMatchers;
 
   /// Matched value.
