@@ -14,7 +14,7 @@ ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-E2E_TEST_ARTIFACTS_DIR="$(realpath ${E2E_TEST_ARTIFACTS_DIR:-$ROOT_DIR/build-e2e-test-artifacts/e2e_test_artifacts})"
+BUILD_BENCHMARK_SUITE_DIR="$(realpath ${BUILD_BENCHMARK_SUITE_DIR:-$ROOT_DIR/build-benchmarks/benchmark_suites})"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 BUILD_HOST_DIR="${BUILD_HOST_DIR:-build-benchmark-suites-test}"
 
@@ -38,7 +38,7 @@ declare -a CMAKE_ARGS=(
   "-DIREE_HOST_BINARY_ROOT=${IREE_HOST_BINARY_ROOT}"
   "-DIREE_BUILD_TESTS=ON"
   "-DIREE_BUILD_SAMPLES=OFF"
-  "-DIREE_E2E_TEST_ARTIFACTS_DIR=${E2E_TEST_ARTIFACTS_DIR}"
+  "-DIREE_BENCHMARK_SUITE_DIR=${BUILD_BENCHMARK_SUITE_DIR}"
 )
 
 echo "Configuring to build tests for benchmark suites"

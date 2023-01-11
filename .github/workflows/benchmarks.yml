@@ -37,6 +37,16 @@ on:
       tf-binaries-gcs-artifact:
         required: true
         type: string
+    outputs:
+      benchmarks-dir:
+        description: "Benchmarks directory"
+        value: ${{ jobs.build_suites.outputs.benchmarks-dir }}
+      benchmarks-archive:
+        description: "Benchmarks archive tarball"
+        value: ${{ jobs.build_suites.outputs.benchmarks-archive }}
+      benchmarks-gcs-artifact:
+        description: "Benchmarks GCS artifact"
+        value: ${{ jobs.build_suites.outputs.benchmarks-gcs-artifact }}
 
 env:
   # This duplicates the variable from ci.yml. The variable needs to be in env
@@ -47,8 +57,7 @@ env:
   GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
 
 jobs:
-  # TODO(#11263): Drop this job once the IREE_BUILD_BENCHMARKS is removed.
-  test_build_benchmark_suites:
+  build_suites:
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ inputs.runner-group }}
@@ -62,6 +71,10 @@ jobs:
       TF_BINARIES_DIR: ${{ inputs.tf-binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ inputs.tf-binaries-archive }}
       TF_BINARIES_GCS_ARTIFACT: ${{ inputs.tf-binaries-gcs-artifact }}
+    outputs:
+      benchmarks-dir: ${{ steps.build.outputs.benchmarks-dir }}
+      benchmarks-archive: ${{ steps.archive.outputs.benchmarks-archive }}
+      benchmarks-gcs-artifact: ${{ steps.upload.outputs.benchmarks-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
@@ -86,6 +99,29 @@ jobs:
             --env "IREE_BUILD_BENCHMARKS_DIR=${BENCHMARKS_OUTPUT_DIR}" \
             gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
             build_tools/cmake/build_benchmarks.sh
+          echo "benchmarks-dir=${BENCHMARKS_OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
+      - name: "Creating archive of benchmarks"
+        id: archive
+        env:
+          BENCHMARKS_ARCHIVE: benchmarks.tar
+          BENCHMARKS_DIR: ${{ steps.build.outputs.benchmarks-dir }}
+        run: |
+          # TODO(#10988): Excludes the experimental `models` and iree` dirs for
+          # now.
+          tar --exclude '*.tflite' --exclude '*.mlir' --exclude '*-tf-model' \
+            --exclude "${BENCHMARKS_DIR}/benchmark_suites/models" \
+            --exclude "${BENCHMARKS_DIR}/benchmark_suites/iree" \
+            -czf \
+            "${BENCHMARKS_ARCHIVE}" "${BENCHMARKS_DIR}/benchmark_suites"
+          echo "benchmarks-archive=${BENCHMARKS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading benchmarks archive"
+        id: upload
+        env:
+          BENCHMARKS_ARCHIVE: ${{ steps.archive.outputs.benchmarks-archive }}
+          BENCHMARKS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.benchmarks-archive }}
+        run: |
+          gcloud alpha storage cp "${BENCHMARKS_ARCHIVE}" "${BENCHMARKS_GCS_ARTIFACT}"
+          echo "benchmarks-gcs-artifact=${BENCHMARKS_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
   build_tools:
     runs-on:

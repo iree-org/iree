@@ -149,4 +149,71 @@ iree_static_linker_test(
   EMITC
 )
 
-include(generated_e2e_model_tests.cmake)
+iree_benchmark_suite_module_test(
+  NAME
+    mobilenet_v1_fp32_correctness_test
+  BENCHMARK_MODULE_SRC
+    "TFLite/MobileNetV1-fp32,imagenet"
+  DRIVER
+    "local-sync"
+  RUNNER_ARGS
+    "--entry_function=main"
+    "--function_input=1x224x224x3xf32=0"
+  EXPECTED_OUTPUT
+    "mobilenet_v1_fp32_expected_output.txt"
+  UNSUPPORTED_PLATFORMS
+    "android-arm64-v8a"
+    "riscv32-Linux"
+)
+
+iree_benchmark_suite_module_test(
+  NAME
+    efficientnet_int8_correctness_test
+  BENCHMARK_MODULE_SRC
+    "TFLite/EfficientNet-int8"
+  DRIVER
+    "local-sync"
+  RUNNER_ARGS
+    "--entry_function=main"
+    "--function_input=1x224x224x3xui8=0"
+  EXPECTED_OUTPUT
+    "efficientnet_int8_expected_output.txt"
+  UNSUPPORTED_PLATFORMS
+    "android-arm64-v8a"
+)
+
+# Need to download deeplab_v3_fp32_input_0_expected_output.npy from GCS
+# iree-model-artifacts.
+#TODO(#10748): Disabled due to `iree-import-tflite` failure.
+# iree_benchmark_suite_module_test(
+#   NAME
+#     deeplab_v3_fp32_correctness_test
+#   BENCHMARK_MODULE_SRC
+#     "TFLite/DeepLabV3-fp32"
+#   DRIVER
+#     "local-sync"
+#   RUNNER_ARGS
+#     "--entry_function=main"
+#     "--function_input=1x257x257x3xf32=0"
+#     "--expected_f32_threshold=0.001"
+#   EXPECTED_OUTPUT
+#     "deeplab_v3_fp32_input_0_expected_output.npy"
+#   UNSUPPORTED_PLATFORMS
+#     "riscv32-Linux"
+# )
+
+iree_benchmark_suite_module_test(
+  NAME
+    person_detect_int8_correctness_test
+  BENCHMARK_MODULE_SRC
+    "TFLite/PersonDetect-int8"
+  DRIVER
+    "local-sync"
+  RUNNER_ARGS
+    "--entry_function=main"
+    "--function_input=1x96x96x1xi8=0"
+  EXPECTED_OUTPUT
+    "1x2xi8=[72 -72]"
+  UNSUPPORTED_PLATFORMS
+    "android-arm64-v8a"
+)

@@ -25,7 +25,7 @@ set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_BUILD_ANDROID_DIR:-build-android}}"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
-E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts}"
+BUILD_BENCHMARK_SUITE_DIR="${BUILD_BENCHMARK_SUITE_DIR:-build-benchmarks/benchmark_suites}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
 source build_tools/cmake/setup_build.sh
@@ -63,10 +63,10 @@ case "${BUILD_PRESET}" in
     )
     ;;
   benchmark-suite-test)
-    E2E_TEST_ARTIFACTS_DIR="$(realpath ${E2E_TEST_ARTIFACTS_DIR})"
+    BUILD_BENCHMARK_SUITE_DIR="$(realpath ${BUILD_BENCHMARK_SUITE_DIR})"
     args+=(
       -DIREE_ENABLE_ASSERTIONS=ON
-      -DIREE_E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_DIR}"
+      -DIREE_BENCHMARK_SUITE_DIR="${BUILD_BENCHMARK_SUITE_DIR}"
     )
     ;;
   *)
