@@ -19,7 +19,6 @@ iree_cc_library(
     "ConvertAllocatorOps.cpp"
     "ConvertBufferOps.cpp"
     "ConvertBufferViewOps.cpp"
-    "ConvertChannelOps.cpp"
     "ConvertCommandBufferOps.cpp"
     "ConvertDeviceOps.cpp"
     "ConvertExecutableOps.cpp"

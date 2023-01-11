@@ -17,7 +17,6 @@ iree_lit_test_suite(
     "allocator_ops.mlir"
     "buffer_ops.mlir"
     "buffer_view_ops.mlir"
-    "channel_ops.mlir"
     "command_buffer_ops.mlir"
     "device_ops.mlir"
     "executable_ops.mlir"

@@ -163,25 +163,6 @@ vm.import @buffer_view.trace(
 )
 
 //===----------------------------------------------------------------------===//
-// iree_hal_channel_t
-//===----------------------------------------------------------------------===//
-
-// Creates a new channel for collective communication.
-vm.import @channel.create(
-  %device : !vm.ref<!hal.device>,
-  %queue_affinity : i64,
-  %rank : i32,
-  %count : i32
-) -> !vm.ref<!hal.channel>
-attributes {nosideeffects}
-
-// Returns the rank of the local participant in the group and the group count.
-vm.import @channel.rank_and_count(
-  %channel : !vm.ref<!hal.channel>
-) -> (i32, i32)
-attributes {nosideeffects}
-
-//===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t
 //===----------------------------------------------------------------------===//
 
@@ -240,22 +221,6 @@ vm.import @command_buffer.copy_buffer(
   %length : i64
 )
 
-// Dispatches a collective operation defined by |op| using the given buffers.
-// NOTE: order slightly differs from op in order to get better arg alignment.
-vm.import @command_buffer.collective(
-  %command_buffer : !vm.ref<!hal.command_buffer>,
-  %channel : !vm.ref<!hal.channel>,
-  %op : i32,
-  %param : i32,
-  %send_buffer : !vm.ref<!hal.buffer>,
-  %send_offset : i64,
-  %send_length : i64,
-  %recv_buffer : !vm.ref<!hal.buffer>,
-  %recv_offset : i64,
-  %recv_length : i64,
-  %element_count : i64
-)
-
 // Pushes constants for consumption by dispatches.
 vm.import @command_buffer.push_constants(
   %command_buffer : !vm.ref<!hal.command_buffer>,
@@ -272,7 +237,6 @@ vm.import @command_buffer.push_descriptor_set(
   // <binding, slot, buffer, offset, length>
   %bindings : tuple<i32, i32, !vm.ref<!hal.buffer>, i64, i64>...
 )
-
 // Dispatches an execution request.
 vm.import @command_buffer.dispatch(
   %command_buffer : !vm.ref<!hal.command_buffer>,

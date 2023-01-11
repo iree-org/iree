@@ -124,98 +124,6 @@ class CommandBufferFillBufferOpConversion
   mutable IREE::VM::ImportOp importOp;
 };
 
-class CommandBufferCollectiveOpConversion
-    : public OpConversionPattern<IREE::HAL::CommandBufferCollectiveOp> {
- public:
-  CommandBufferCollectiveOpConversion(MLIRContext *context,
-                                      SymbolTable &importSymbols,
-                                      TypeConverter &typeConverter,
-                                      StringRef importName)
-      : OpConversionPattern(typeConverter, context) {
-    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
-    assert(importOp);
-  }
-
-  LogicalResult matchAndRewrite(
-      IREE::HAL::CommandBufferCollectiveOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto importType = importOp.getFunctionType();
-
-    Value nullBuffer;
-    auto getNullBuffer = [&]() {
-      if (!nullBuffer) {
-        nullBuffer = rewriter.create<IREE::VM::ConstRefZeroOp>(
-            op.getLoc(),
-            IREE::VM::RefType::get(rewriter.getType<IREE::HAL::BufferType>()));
-      }
-      return nullBuffer;
-    };
-    Value zeroI64;
-    auto getZeroI64 = [&]() {
-      if (!zeroI64) {
-        zeroI64 = rewriter.create<IREE::VM::ConstI64ZeroOp>(op.getLoc());
-      }
-      return zeroI64;
-    };
-
-    // %command_buffer : !vm.ref<!hal.command_buffer>,
-    // %channel : !vm.ref<!hal.channel>,
-    // %op : i32,
-    // %param : i32,
-    // %send_buffer : !vm.ref<!hal.buffer>,
-    // %send_offset : i64,
-    // %send_length : i64,
-    // %recv_buffer : !vm.ref<!hal.buffer>,
-    // %recv_offset : i64,
-    // %recv_length : i64,
-    // %element_count : i64
-    SmallVector<Value, 8> callOperands;
-    callOperands.push_back(adaptor.getCommandBuffer());
-    callOperands.push_back(adaptor.getChannel());
-    callOperands.push_back(rewriter.create<IREE::VM::ConstI32Op>(
-        op.getLoc(), adaptor.getOp().getEncodedValue()));
-    if (auto paramValue = adaptor.getParam()) {
-      callOperands.push_back(paramValue);
-    } else {
-      callOperands.push_back(
-          rewriter.create<IREE::VM::ConstI32ZeroOp>(op.getLoc()));
-    }
-
-    if (adaptor.getSendBuffer()) {
-      callOperands.push_back(adaptor.getSendBuffer());
-      callOperands.push_back(adaptor.getSendOffset());
-      callOperands.push_back(adaptor.getSendLength());
-    } else {
-      callOperands.push_back(getNullBuffer());
-      callOperands.push_back(getZeroI64());
-      callOperands.push_back(getZeroI64());
-    }
-
-    if (adaptor.getRecvBuffer()) {
-      callOperands.push_back(adaptor.getRecvBuffer());
-      callOperands.push_back(adaptor.getRecvOffset());
-      callOperands.push_back(adaptor.getRecvLength());
-    } else {
-      callOperands.push_back(getNullBuffer());
-      callOperands.push_back(getZeroI64());
-      callOperands.push_back(getZeroI64());
-    }
-
-    callOperands.push_back(castToImportType(adaptor.getElementCount(),
-                                            rewriter.getI64Type(), rewriter));
-
-    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
-        op, SymbolRefAttr::get(importOp), importType.getResults(),
-        callOperands);
-
-    copyImportAttrs(importOp, callOp);
-    return success();
-  }
-
- private:
-  mutable IREE::VM::ImportOp importOp;
-};
-
 class CommandBufferPushDescriptorSetOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferPushDescriptorSetOp> {
  public:
@@ -324,8 +232,6 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.command_buffer.fill_buffer");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCopyBufferOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.copy_buffer");
-  patterns.insert<CommandBufferCollectiveOpConversion>(
-      context, importSymbols, typeConverter, "hal.command_buffer.collective");
   patterns
       .insert<VMImportOpConversion<IREE::HAL::CommandBufferPushConstantsOp>>(
           context, importSymbols, typeConverter,
