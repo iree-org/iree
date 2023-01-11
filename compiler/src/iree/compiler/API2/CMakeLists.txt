@@ -112,18 +112,9 @@ install(
 # The bazel side uses a "Impl" library alias to generically represent
 # static or shared. Provide a corresponding one here.
 
-if(IREE_LINK_COMPILER_SHARED_LIBRARY)
 iree_cc_library(
   NAME
     Impl
   DEPS
     ::SharedImpl
 )
-else()
-iree_cc_library(
-  NAME
-    Impl
-  DEPS
-    ::StaticImpl
-)
-endif()  # IREE_LINK_COMPILER_SHARED_LIBRARY
