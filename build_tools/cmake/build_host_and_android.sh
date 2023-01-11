@@ -86,7 +86,3 @@ echo "------------"
 echo "Building test deps for device"
 echo "------------------"
 "$CMAKE_BIN" --build . --target iree-test-deps -- -k 0
-
-echo "Building sample deps for device"
-echo "------------------"
-"$CMAKE_BIN" --build . --target iree-sample-deps -- -k 0

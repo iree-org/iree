@@ -14,23 +14,20 @@ functions into backend-specific forms like PTX, SPIR-V, or LLVM IR. It's
 possible to augment this translation by either bypassing these steps entirely
 and providing the already translated representation of the dispatch function or
 extending the code generation portion by calling out to external functions from
-within the generated dispatch (sometimes "microkernels" or "device libraries").
+within the generated dispatch ("microkernels").
 
 There's ongoing work across the core IREE compiler and specific backends to
 enable more extension points and ways to connect to them from frontends or
 compiler transforms. This current set of samples demonstrates a very early
 version of this extensibility that can be used to tunnel through dispatch
-workloads by bypassing code generation (in the case of PTX/SPIR-V) or coarsely
-interoperating (CPU function calls). In its current form it is intended for
+workloads by bypassing code generation. In its current form it is intended for
 things that would traditionally be custom ops in ML frameworks and produces much
-smaller, hermetic, retargetable, and optimizable programs than traditional
-custom ops can as there's nearly zero performance delta between what the
-compiler can dispatch and what the user decides to dispatch.
+smaller, hermetic, retargetable, and optimizable programs than custom ops can.
 
 ## Approaches
 
 In the fullness of time all backends will support all approaches but currently
-there are limitations and these samples only cover the supported cases:
+there are limitations:
 
 |                    | CPU                | CUDA               | Metal | SPIR-V             | WGSL            |
 |--------------------|:------------------:|:------------------:|:-----:|:------------------:|:---------------:|
@@ -89,22 +86,21 @@ interleaved with other IR.
                      +--------------+   +--------------+  |
 +--------------+            v           +--------------+  |
 | declarations | ----> iree-compile     | imports.c    | -+-> custom runtime
-+--------------+            v           +--------------+            ^
-                     +--------------+                               |
-                     | example.vmfb | - - - - - - - - - - - - - - - +
++--------------+            v           +--------------+
+                     +--------------+
+                     | example.vmfb |
                      +--------------+
 ```
 
 **Samples**:
 
-* TBD CPU dynamic imports (supported but requires build goo)
+* TBD CPU dynamic imports
 
 Unlike the other approaches this requires runtime device support for dynamic
 linking and introduces complexity to the user as they must be careful to version
-their input programs and their runtime libraries themselves. IREE's CPU backend
-does provide basic support for optional imports such that users can emit their
-calls and add fallbacks but otherwise such behavior falls on the user to
-implement.
+their input programs and their runtime libraries themselves. IREE does provide
+basic support for optional imports such that users can emit their calls and add
+fallbacks but otherwise such behavior falls on the user to implement.
 
 ### Statically-linked Dispatch Functions
 
@@ -157,9 +153,9 @@ IR, and emits calls to the functions in IR interleaved with other IR.
                      +--------------+   +--------------+  |
 +--------------+            v           +--------------+  |
 | declarations | ----> iree-compile     | dispatches.c | -+-> custom runtime
-+--------------+            v           +--------------+            ^
-                     +--------------+                               |
-                     | example.vmfb | - - - - - - - - - - - - - - - +
++--------------+            v           +--------------+
+                     +--------------+
+                     | example.vmfb |
                      +--------------+
 ```
 
@@ -187,9 +183,9 @@ the runtime.
                      +--------------+   +--------------+  |
 +--------------+            v           +--------------+  |
 | declarations | ----> iree-compile     | module.c     | -+-> custom runtime
-+--------------+            v           +--------------+            ^
-                     +--------------+                               |
-                     | example.vmfb | - - - - - - - - - - - - - - - +
++--------------+            v           +--------------+
+                     +--------------+
+                     | example.vmfb |
                      +--------------+
 ```
 
@@ -216,9 +212,3 @@ used (see the [custom_module/async/](/samples/custom_module/async/) sample).
 When at all possible the dispatch function call or dispatch function
 substitution approaches should be used instead and in many cases that is
 sufficient for most workloads not involving other libraries.
-
-### Others
-
-Most other situations are covered by [custom modules](/samples/custom_module/).
-These can still be asynchronous and scheduled in device order but incur
-additional overheads and deployment complexity as custom runtimes are required.
