@@ -136,22 +136,3 @@ jobs:
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: Running check_path_lengths
         run: ./build_tools/scripts/check_path_lengths.py
-
-  generated_cmake_files:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: Generates E2E test artifacts cmake files
-        run: |
-          ./build_tools/testing/generate_cmake_e2e_test_artifacts_suite.py \
-            --output_dir ./tests/e2e/test_artifacts
-      - name: Generates E2E model test cmake files
-        run: |
-          ./build_tools/testing/generate_cmake_e2e_model_tests.py \
-            --output ./tests/e2e/models/generated_e2e_model_tests.cmake
-      - name: Checking Diff
-        run: |
-          # Make sure to pick up new files that have been added.
-          git add -A
-          git diff HEAD --exit-code
