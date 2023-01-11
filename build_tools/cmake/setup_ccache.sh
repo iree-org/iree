@@ -20,11 +20,11 @@ if (( IREE_READ_REMOTE_CCACHE == 1 )); then
   export CCACHE_REMOTE_ONLY=1
   export CMAKE_C_COMPILER_LAUNCHER=ccache
   export CMAKE_CXX_COMPILER_LAUNCHER=ccache
-  if (( IREE_WRITE_REMOTE_CCACHE == 1 )); then
-    set +x # Don't leak the token (even though it's short-lived)
-    export CCACHE_REMOTE_STORAGE="${CCACHE_REMOTE_STORAGE}|bearer-token=${IREE_CCACHE_GCP_TOKEN}"
-    set -x
-  else
-    export CCACHE_REMOTE_STORAGE="${CCACHE_REMOTE_STORAGE}|read-only"
-  fi
+fi
+if (( IREE_WRITE_REMOTE_CCACHE == 1 )); then
+  set +x # Don't leak the token (even though it's short-lived)
+  export CCACHE_REMOTE_STORAGE="${CCACHE_REMOTE_STORAGE}|bearer-token=${IREE_CCACHE_GCP_TOKEN}"
+  set -x
+else
+  export CCACHE_REMOTE_STORAGE="${CCACHE_REMOTE_STORAGE}|read-only"
 fi
