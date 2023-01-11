@@ -582,23 +582,6 @@ void makeReductionMatcher(StructuredOpMatcher &reduction,
                           StructuredOpMatcher &trailing,
                           MatchedReductionCaptures &captures);
 
-/// Creates a group of matchers for:
-///
-///     trailing(
-///       combiner_reduction(
-///         parallel_reduction(leading(), parallel_fill()),
-///         original_fill())))
-///
-/// where trailing and leading are elementwise operations whose presence is
-/// optional, and with subsetting ops potentially present on the operand use-def
-/// chains.
-void makeSplitReductionMatcher(StructuredOpMatcher &parallel_reduction,
-                               StructuredOpMatcher &combiner_reduction,
-                               StructuredOpMatcher &parallel_fill,
-                               StructuredOpMatcher &original_fill,
-                               StructuredOpMatcher &leading,
-                               StructuredOpMatcher &trailing);
-
 } // namespace transform_ext
 } // namespace mlir
 
