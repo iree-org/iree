@@ -136,24 +136,6 @@ llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr) {
   return 1;
 }
 
-// See the iree/hal/command_buffer.h iree_hal_collective_op_t for details.
-uint32_t CollectiveAttr::getEncodedValue() const {
-  union {
-    uint32_t packed;  // packed value
-    struct {
-      uint8_t kind;
-      uint8_t reduction;
-      uint8_t elementType;
-      uint8_t reserved;
-    };
-  } value = {0};
-  value.kind = static_cast<uint8_t>(getKind());
-  value.reduction = static_cast<uint8_t>(
-      getReduction().value_or(CollectiveReductionOp::None));
-  value.elementType = static_cast<uint8_t>(getElementType());
-  return value.packed;
-}
-
 //===----------------------------------------------------------------------===//
 // Object types
 //===----------------------------------------------------------------------===//
@@ -657,10 +639,9 @@ void HALDialect::registerAttributes() {
 }
 
 void HALDialect::registerTypes() {
-  addTypes<AllocatorType, BufferType, BufferViewType, ChannelType,
-           CommandBufferType, DescriptorSetLayoutType, DeviceType, EventType,
-           ExecutableType, PipelineLayoutType, FenceType, RingBufferType,
-           SemaphoreType>();
+  addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
+           DescriptorSetLayoutType, DeviceType, EventType, ExecutableType,
+           PipelineLayoutType, FenceType, RingBufferType, SemaphoreType>();
 }
 
 //===----------------------------------------------------------------------===//
@@ -699,7 +680,6 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
           .Case("allocator", AllocatorType::get(getContext()))
           .Case("buffer", BufferType::get(getContext()))
           .Case("buffer_view", BufferViewType::get(getContext()))
-          .Case("channel", ChannelType::get(getContext()))
           .Case("command_buffer", CommandBufferType::get(getContext()))
           .Case("descriptor_set_layout",
                 DescriptorSetLayoutType::get(getContext()))
@@ -725,8 +705,6 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "buffer";
   } else if (type.isa<BufferViewType>()) {
     p << "buffer_view";
-  } else if (type.isa<ChannelType>()) {
-    p << "channel";
   } else if (type.isa<CommandBufferType>()) {
     p << "command_buffer";
   } else if (type.isa<DescriptorSetLayoutType>()) {

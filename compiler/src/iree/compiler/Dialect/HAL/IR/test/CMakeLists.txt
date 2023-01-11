@@ -19,7 +19,6 @@ iree_lit_test_suite(
     "buffer_ops.mlir"
     "buffer_view_folding.mlir"
     "buffer_view_ops.mlir"
-    "channel_ops.mlir"
     "command_buffer_folding.mlir"
     "command_buffer_ops.mlir"
     "descriptor_set_ops.mlir"

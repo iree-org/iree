@@ -416,21 +416,6 @@ void BufferViewBufferOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.channel.rank_and_count
-//===----------------------------------------------------------------------===//
-
-void ChannelCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "channel");
-}
-
-void ChannelRankAndCountOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getRank(), "ccl_rank");
-  setNameFn(getCount(), "ccl_count");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.command_buffer.create
 //===----------------------------------------------------------------------===//
 

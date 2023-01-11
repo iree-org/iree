@@ -235,74 +235,6 @@ def HAL_AccessScopeBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_CollectiveKind_AllGather : I32EnumAttrCase<"AllGather", 0, "all_gather">;
-def HAL_CollectiveKind_AllReduce : I32EnumAttrCase<"AllReduce", 1, "all_reduce">;
-def HAL_CollectiveKind_Broadcast : I32EnumAttrCase<"Broadcast", 2, "broadcast">;
-def HAL_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 3, "reduce">;
-def HAL_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 4, "reduce_scatter">;
-def HAL_CollectiveKind_Send : I32EnumAttrCase<"Send", 5, "send">;
-def HAL_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 6, "recv">;
-def HAL_CollectiveKindAttr :
-    I32EnumAttr<"CollectiveKind", "valid CollectiveKind", [
-      HAL_CollectiveKind_AllGather,
-      HAL_CollectiveKind_AllReduce,
-      HAL_CollectiveKind_Broadcast,
-      HAL_CollectiveKind_Reduce,
-      HAL_CollectiveKind_ReduceScatter,
-      HAL_CollectiveKind_Send,
-      HAL_CollectiveKind_Recv,
-    ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
-}
-
-def HAL_CollectiveReductionOp_None : I32EnumAttrCase<"None", 0, "none">;
-def HAL_CollectiveReductionOp_ReductionSum : I32EnumAttrCase<"ReductionSum", 1, "sum">;
-def HAL_CollectiveReductionOp_ReductionProduct : I32EnumAttrCase<"ReductionProduct", 2, "product">;
-def HAL_CollectiveReductionOp_ReductionMinimum : I32EnumAttrCase<"ReductionMinimum", 3, "minimum">;
-def HAL_CollectiveReductionOp_ReductionMaximum : I32EnumAttrCase<"ReductionMaximum", 4, "maximum">;
-def HAL_CollectiveReductionOp_ReductionAverage : I32EnumAttrCase<"ReductionAverage", 5, "average">;
-def HAL_CollectiveReductionOpAttr :
-    I32EnumAttr<"CollectiveReductionOp", "valid CollectiveReductionOp", [
-      HAL_CollectiveReductionOp_None,
-      HAL_CollectiveReductionOp_ReductionSum,
-      HAL_CollectiveReductionOp_ReductionProduct,
-      HAL_CollectiveReductionOp_ReductionMinimum,
-      HAL_CollectiveReductionOp_ReductionMaximum,
-      HAL_CollectiveReductionOp_ReductionAverage,
-    ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
-
-def HAL_CollectiveElementType_Sint8 : I32EnumAttrCase<"Sint8", 0, "si8">;
-def HAL_CollectiveElementType_Uint8 : I32EnumAttrCase<"Uint8", 1, "ui8">;
-def HAL_CollectiveElementType_Sint16 : I32EnumAttrCase<"Sint16", 2, "si16">;
-def HAL_CollectiveElementType_Uint16 : I32EnumAttrCase<"Uint16", 3, "ui16">;
-def HAL_CollectiveElementType_Sint32 : I32EnumAttrCase<"Sint32", 4, "si32">;
-def HAL_CollectiveElementType_Uint32 : I32EnumAttrCase<"Uint32", 5, "ui32">;
-def HAL_CollectiveElementType_Sint64 : I32EnumAttrCase<"Sint64", 6, "si64">;
-def HAL_CollectiveElementType_Uint64 : I32EnumAttrCase<"Uint64", 7, "ui64">;
-def HAL_CollectiveElementType_Float16 : I32EnumAttrCase<"Float16", 8, "f16">;
-def HAL_CollectiveElementType_Float32 : I32EnumAttrCase<"Float32", 9, "f32">;
-def HAL_CollectiveElementType_Float64 : I32EnumAttrCase<"Float64", 10, "f64">;
-def HAL_CollectiveElementType_BFloat16 : I32EnumAttrCase<"BFloat16", 11, "bf16">;
-def HAL_CollectiveElementTypeAttr :
-    I32EnumAttr<"CollectiveElementType", "valid CollectiveElementType", [
-      HAL_CollectiveElementType_Sint8,
-      HAL_CollectiveElementType_Uint8,
-      HAL_CollectiveElementType_Sint16,
-      HAL_CollectiveElementType_Uint16,
-      HAL_CollectiveElementType_Sint32,
-      HAL_CollectiveElementType_Uint32,
-      HAL_CollectiveElementType_Sint64,
-      HAL_CollectiveElementType_Uint64,
-      HAL_CollectiveElementType_Float16,
-      HAL_CollectiveElementType_Float32,
-      HAL_CollectiveElementType_Float64,
-      HAL_CollectiveElementType_BFloat16,
-    ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
-}
-
 //===----------------------------------------------------------------------===//
 // HAL types
 //===----------------------------------------------------------------------===//
@@ -342,17 +274,6 @@ def HAL_BufferView : DialectType<
     compiler and they'll only be seen when calling external functions.
   }];
   let builderCall = "$_builder.getType<IREE::HAL::BufferViewType>()";
-}
-
-def HAL_Channel : DialectType<
-    HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::ChannelType>()">,
-    "collective.channel"> {
-  let description = [{
-    Channel identifier used to allow for participation in multiple collective
-    groups.
-  }];
-  let builderCall = "$_builder.getType<IREE::HAL::ChannelType>()";
 }
 
 def HAL_CommandBuffer : DialectType<
@@ -513,27 +434,6 @@ def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
 //===----------------------------------------------------------------------===//
 // HAL structs
 //===----------------------------------------------------------------------===//
-
-def HAL_CollectiveAttr :
-    AttrDef<HAL_Dialect, "Collective", []> {
-  let mnemonic = "collective";
-  let summary = [{collective operation and specification}];
-  let description = [{
-    Specifies the collective operation to perform and any mode bits required.
-  }];
-  let parameters = (ins
-    AttrParameter<"CollectiveKind", "">:$kind,
-    OptionalParameter<"mlir::Optional<CollectiveReductionOp>">:$reduction,
-    AttrParameter<"CollectiveElementType", "">:$element_type
-  );
-  let assemblyFormat = [{
-    `<` $kind (`with` $reduction^)? `:` $element_type `>`
-  }];
-  let extraClassDeclaration = [{
-    // Returns the runtime encoding of the collective attribute.
-    uint32_t getEncodedValue() const;
-  }];
-}
 
 def HAL_DescriptorSetBindingAttr :
     AttrDef<HAL_Dialect, "DescriptorSetBinding", []> {

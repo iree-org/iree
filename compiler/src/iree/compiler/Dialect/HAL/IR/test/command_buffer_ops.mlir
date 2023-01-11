@@ -61,7 +61,8 @@ func.func @command_buffer_fill_buffer(
     %buffer: !hal.buffer,
     %offset: index,
     %length: index,
-    %pattern: i32) {
+    %pattern: i32
+  ) {
   //      CHECK: hal.command_buffer.fill_buffer<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   target(%[[BUFFER]] : !hal.buffer)[%[[OFFSET]], %[[LENGTH]]]
   // CHECK-SAME:   pattern(%[[PATTERN]] : i32)
@@ -98,67 +99,6 @@ func.func @command_buffer_copy_buffer(
 
 // -----
 
-// CHECK-LABEL: @command_buffer_collective
-//  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME:  %[[CHANNEL:.+]]: !hal.channel,
-//  CHECK-SAME:  %[[PARAM:.+]]: i32,
-//  CHECK-SAME:  %[[SEND_BUFFER:.+]]: !hal.buffer, %[[RECV_BUFFER:.+]]: !hal.buffer,
-//  CHECK-SAME:  %[[COUNT:.+]]: index)
-func.func @command_buffer_collective(
-    %cmd: !hal.command_buffer,
-    %channel: !hal.channel,
-    %param: i32,
-    %send_buffer: !hal.buffer, %recv_buffer: !hal.buffer,
-    %count: index) {
-  %c10 = arith.constant 10 : index
-  %c20 = arith.constant 20 : index
-  %c128 = arith.constant 128 : index
-  %c256 = arith.constant 256 : index
-
-  //      CHECK: hal.command_buffer.collective<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   channel(%[[CHANNEL]] : !hal.channel)
-  // CHECK-SAME:   op(<all_reduce with sum : f32>)
-  // CHECK-SAME:   send(%[[SEND_BUFFER]] : !hal.buffer)[%c10, %c128]
-  // CHECK-SAME:   recv(%[[RECV_BUFFER]] : !hal.buffer)[%c20, %c256]
-  // CHECK-SAME:   count(%[[COUNT]])
-  hal.command_buffer.collective<%cmd : !hal.command_buffer>
-      channel(%channel : !hal.channel)
-      op(<all_reduce with sum : f32>)
-      send(%send_buffer : !hal.buffer)[%c10, %c128]
-      recv(%recv_buffer : !hal.buffer)[%c20, %c256]
-      count(%count)
-
-  //      CHECK: hal.command_buffer.collective<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   channel(%[[CHANNEL]] : !hal.channel)
-  // CHECK-SAME:   op(<send : f32>)
-  // CHECK-SAME:   param(%[[PARAM]] : i32)
-  // CHECK-SAME:   send(%[[SEND_BUFFER]] : !hal.buffer)[%c10, %c128]
-  // CHECK-SAME:   count(%[[COUNT]])
-  hal.command_buffer.collective<%cmd : !hal.command_buffer>
-      channel(%channel : !hal.channel)
-      op(<send : f32>)
-      param(%param : i32)
-      send(%send_buffer : !hal.buffer)[%c10, %c128]
-      count(%count)
-
-  //      CHECK: hal.command_buffer.collective<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   channel(%[[CHANNEL]] : !hal.channel)
-  // CHECK-SAME:   op(<recv : f32>)
-  // CHECK-SAME:   param(%[[PARAM]] : i32)
-  // CHECK-SAME:   recv(%[[RECV_BUFFER]] : !hal.buffer)[%c20, %c128]
-  // CHECK-SAME:   count(%[[COUNT]])
-  hal.command_buffer.collective<%cmd : !hal.command_buffer>
-      channel(%channel : !hal.channel)
-      op(<recv : f32>)
-      param(%param : i32)
-      recv(%recv_buffer : !hal.buffer)[%c20, %c128]
-      count(%count)
-
-  return
-}
-
-// -----
-
 // CHECK-LABEL: @command_buffer_push_descriptor_set
 //  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[LAYOUT:.+]]: !hal.pipeline_layout,
@@ -168,7 +108,8 @@ func.func @command_buffer_push_descriptor_set(
     %cmd: !hal.command_buffer,
     %layout: !hal.pipeline_layout,
     %buffer: !hal.buffer,
-    %slot: index) {
+    %slot: index
+  ) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
@@ -208,7 +149,8 @@ func.func @command_buffer_dispatch(
     %cmd: !hal.command_buffer,
     %x: index,
     %y: index,
-    %z: index) {
+    %z: index
+  ) {
   //      CHECK: hal.command_buffer.dispatch.symbol<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   target(@ex::@backend::@entry0)
   // CHECK-SAME:   workgroups([%[[X]], %[[Y]], %[[Z]]])
@@ -233,8 +175,8 @@ hal.executable @ex {
 
 // CHECK-LABEL: @command_buffer_dispatch_indirect
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer,
-//  CHECK-SAME:  %[[OFFSET:.+]]: index)
+//  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
+//  CHECK-SAME: %[[OFFSET:.+]]: index)
 func.func @command_buffer_dispatch_indirect(
     %cmd: !hal.command_buffer,
     %buffer: !hal.buffer,

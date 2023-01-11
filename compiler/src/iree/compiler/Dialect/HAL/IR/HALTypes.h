@@ -83,10 +83,6 @@ struct BufferViewType
   Value inferSizeFromValue(Location loc, Value value, OpBuilder &builder) const;
 };
 
-struct ChannelType : public Type::TypeBase<ChannelType, Type, TypeStorage> {
-  using Base::Base;
-};
-
 struct CommandBufferType
     : public Type::TypeBase<CommandBufferType, Type, TypeStorage> {
   using Base::Base;
@@ -149,30 +145,11 @@ struct DescriptorSetBindingValue {
 
 // It's unfortunate this is required.
 namespace mlir {
-
-template <>
-struct FieldParser<
-    mlir::Optional<mlir::iree_compiler::IREE::HAL::CollectiveReductionOp>> {
-  static FailureOr<mlir::iree_compiler::IREE::HAL::CollectiveReductionOp> parse(
-      AsmParser &parser) {
-    std::string value;
-    if (parser.parseKeywordOrString(&value)) return failure();
-    auto result = mlir::iree_compiler::IREE::HAL::symbolizeEnum<
-        mlir::iree_compiler::IREE::HAL::CollectiveReductionOp>(value);
-    if (!result.has_value()) return failure();
-    return result.value();
-  }
-};
 static inline AsmPrinter &operator<<(
-    AsmPrinter &printer,
-    mlir::Optional<mlir::iree_compiler::IREE::HAL::CollectiveReductionOp>
-        param) {
-  printer << (param.has_value()
-                  ? mlir::iree_compiler::IREE::HAL::stringifyEnum(param.value())
-                  : StringRef{""});
+    AsmPrinter &printer, mlir::iree_compiler::IREE::HAL::DescriptorType param) {
+  printer << mlir::iree_compiler::IREE::HAL::stringifyEnum(param);
   return printer;
 }
-
 template <>
 struct FieldParser<
     mlir::Optional<mlir::iree_compiler::IREE::HAL::DescriptorFlags>> {
@@ -194,13 +171,6 @@ static inline AsmPrinter &operator<<(
                   : StringRef{""});
   return printer;
 }
-
-static inline AsmPrinter &operator<<(
-    AsmPrinter &printer, mlir::iree_compiler::IREE::HAL::DescriptorType param) {
-  printer << mlir::iree_compiler::IREE::HAL::stringifyEnum(param);
-  return printer;
-}
-
 }  // namespace mlir
 
 // clang-format off: must be included after all LLVM/MLIR headers.
