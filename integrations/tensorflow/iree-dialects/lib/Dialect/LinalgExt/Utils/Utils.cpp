@@ -71,15 +71,6 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
   return interchangeVector;
 }
 
-Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
-                                Location loc, PatternRewriter &rewriter) {
-  ArrayRef<float> vector(val, rows * cols);
-  SmallVector<int64_t> shape{rows, cols};
-  return rewriter.create<arith::ConstantOp>(
-      loc, DenseFPElementsAttr::get(
-               RankedTensorType::get(shape, rewriter.getF32Type()), vector));
-}
-
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

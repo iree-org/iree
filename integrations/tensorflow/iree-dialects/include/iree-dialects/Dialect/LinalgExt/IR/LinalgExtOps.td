@@ -588,7 +588,8 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     (`outer_dims_perm` `=` $outer_dims_perm^)?
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
-    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles)
+    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
+                             "ShapedType::kDynamic")
     `into` $outputs `:` `(` type($inputs) type($outputs) `)`
      (`->` type($results)^)?
   }];
@@ -692,8 +693,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
      "getLoopIteratorTypes",
      "generateScalarImplementation",
      "getResultTilePosition",
-     "getTiledImplementation",
-     "generateResultTileValue"]>,
+     "getTiledImplementation"]>,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
 ]>{
   let summary = "unpack operation";
@@ -740,7 +740,8 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
     (`outer_dims_perm` `=` $outer_dims_perm^)?
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
-    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles)
+    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
+                             "ShapedType::kDynamic")
     `into` $outputs `:` `(` type($inputs) type($outputs) `)`
      (`->` type($results)^)?
   }];
@@ -881,188 +882,6 @@ let builders = [
     TensorEncoding getSourceTensorEncoding() {
       return getSourceType().getEncoding().cast<EncodingAttr>()
           .getEncoding().getValue();
-    }
-  }];
-}
-
-//===----------------------------------------------------------------------===//
-// Winograd ops
-//===----------------------------------------------------------------------===//
-
-def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_transform",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
-     DeclareOpInterfaceMethods<TilingInterface,
-      ["getIterationDomain",
-       "getLoopIteratorTypes",
-       "getResultTilePosition",
-       "getTiledImplementation"]>]> {
-  let summary = "Winograd Input Transform operator";
-  let description = [{
-    This operator is the first step in converting a convolution to
-    its Winograd equivalent. Given a tile of an input image (I),
-    this operator computes matmul(tranpose(B), matmul(I, B)).
-    The input tile is assumed to be square with each side of size m + r - 1,
-    where the convolutional kernel is m x m and the output tile size is r x r.
-    B is a constant 2-d square matrix of the same shape as the input tile I.
-    The input to the operator is an image of shape (N, H, W, C) and the
-    output is an operator of shape (m + r - 1, m + r - 1, N, H', W', C)
-    where H' = ceil((H - m + 1)/r) and W' = ceil((W - m + 1)/r). The result
-    of this operator is first collapsed and then fed to a batch matmul op.
-  }];
-
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
-                       I64Attr:$output_tile_size,
-                       I64Attr:$kernel_size,
-                       DenseI64ArrayAttr:$image_dimensions
-  );
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions)>
-  ];
-
-  let results = (outs Variadic<AnyRankedTensor>:$result);
-  let hasFolder = 1;
-  let assemblyFormat = [{
-    attr-dict
-    `output_tile_size` `(` $output_tile_size `)`
-    `kernel_size` `(` $kernel_size `)`
-    `image_dimensions` `(` $image_dimensions `)`
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
-    (`->` type($result)^)?
-  }];
-
-  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value input() {
-      return getInputOperand(0)->get();
-    }
-    Value output() {
-      return getOutputOperand(0)->get();
-    }
-    ShapedType getInputOperandType() {
-      return input().getType().cast<ShapedType>();
-    }
-    ShapedType getOutputOperandType() {
-      return output().getType().cast<ShapedType>();
-    }
-    int64_t getInputOperandRank() {
-      return getInputOperandType().getRank();
-    }
-    int64_t getOutputOperandRank() {
-      return getOutputOperandType().getRank();
-    }
-    int64_t getInputTileSize() {
-      return getOutputTileSize() + getKernelSize() - 1;
-    }
-    SmallVector<int64_t> imageDimensions() {
-      return llvm::to_vector(getImageDimensions());
-    }
-    int64_t getIterationDomainRank() {
-      SmallVector<int64_t> imageDims = imageDimensions();
-      return getInputOperandRank() - imageDims.size();
-    }
-    // Method to implement for specifying output range for
-    // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
-    }
-  }];
-}
-
-def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_transform",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
-     DeclareOpInterfaceMethods<TilingInterface,
-      ["getIterationDomain",
-       "getLoopIteratorTypes",
-       "getResultTilePosition",
-       "getTiledImplementation"]>]> {
-  let summary = "Winograd Output Transform operator";
-  let description = [{
-    This operator is the last transform in converting a convolution to
-    its Winograd equivalent. After convolution in the Winograd domain
-    (which turns into an elementwise product for a single channel and
-    batch matrix multiplication for many channels), this operator converts
-    the output back into the original domain. Given a tile of the
-    output (O) in the Winograd domain, this operator computes
-    matmul(transpose(A), matmul(O, A)). The output tile is square with
-    each side of size m + r - 1, where the convolutional kernel is m x m
-    and the output tile size is r x r. A is a constant 2-d matrix of
-    shape (m + r - 1) x r. The input to the operator is a tensor of
-    shape (m + r - 1, m + r - 1, N, H', W', C) and the output is a
-    tensor of shape (N, H, W, C) where H = r H' and W = r W'. This operator
-    is followed by a tensor.extract_slice which extracts only the non-padded
-    part of the output.
-  }];
-
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
-                       I64Attr:$output_tile_size,
-                       I64Attr:$kernel_size,
-                       DenseI64ArrayAttr:$image_dimensions
-  );
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions)>
-  ];
-
-  let results = (outs Variadic<AnyRankedTensor>:$result);
-  let hasFolder = 1;
-  let assemblyFormat = [{
-    attr-dict
-    `output_tile_size` `(` $output_tile_size `)`
-    `kernel_size` `(` $kernel_size `)`
-    `image_dimensions` `(` $image_dimensions `)`
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
-    (`->` type($result)^)?
-  }];
-
-  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value input() {
-      return getInputOperand(0)->get();
-    }
-    Value output() {
-      return getOutputOperand(0)->get();
-    }
-    ShapedType getInputOperandType() {
-      return input().getType().cast<ShapedType>();
-    }
-    ShapedType getOutputOperandType() {
-      return output().getType().cast<ShapedType>();
-    }
-    SmallVector<int64_t> imageDimensions() {
-      return llvm::to_vector(getImageDimensions());
-    }
-    int64_t getInputOperandRank() {
-      return getInputOperandType().getRank();
-    }
-    int64_t getOutputOperandRank() {
-      return getOutputOperandType().getRank();
-    }
-    int64_t getIterationDomainRank() {
-      SmallVector<int64_t> imageDims = imageDimensions();
-      return getOutputOperandRank() - imageDims.size();
-    }
-    int64_t getInputTileSize() {
-      return getOutputTileSize() + getKernelSize() - 1;
-    }
-    // Method to implement for specifying output range for
-    // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
     }
   }];
 }

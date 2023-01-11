@@ -11,7 +11,6 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -53,11 +52,6 @@ SmallVector<T> undoInterchange(ArrayRef<T> elements,
 /// Returns the `interchangeVector` based on `dimsPos`.
 SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
                                                   int64_t rank);
-
-/// Converts a 2D float array to a constant value. The 2D array is stored as
-/// a 1D row-major array in `val` and has shape `rows` x `cols`.
-Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
-                                Location loc, PatternRewriter &rewriter);
 
 } // namespace LinalgExt
 } // namespace IREE

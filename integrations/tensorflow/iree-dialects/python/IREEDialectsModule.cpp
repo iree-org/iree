@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects-c/Dialects.h"
+#include "iree-dialects-c/Utils.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/BuiltinTypes.h"
 #include "mlir-c/Diagnostics.h"
@@ -19,6 +20,28 @@ PYBIND11_MODULE(_ireeDialects, m) {
 
   auto irModule = py::module::import(MAKE_MLIR_PYTHON_QUALNAME("ir"));
   auto typeClass = irModule.attr("Type");
+
+  //===--------------------------------------------------------------------===//
+  // Utils
+  //===--------------------------------------------------------------------===//
+
+  m.def(
+      "lookup_nearest_symbol_from",
+      [](MlirOperation fromOp, MlirAttribute symbol) {
+        if (!mlirAttributeIsASymbolRef(symbol)) {
+          throw std::invalid_argument("expected a SymbolRefAttr");
+        }
+        return ireeLookupNearestSymbolFrom(fromOp, symbol);
+      },
+      py::arg("fromOp"), py::arg("symbol"));
+
+  // TODO: Upstream this into the main Python bindings.
+  m.def(
+      "emit_error",
+      [](MlirLocation loc, std::string message) {
+        mlirEmitError(loc, message.c_str());
+      },
+      py::arg("loc"), py::arg("message"));
 
   //===--------------------------------------------------------------------===//
   // IREEDialect

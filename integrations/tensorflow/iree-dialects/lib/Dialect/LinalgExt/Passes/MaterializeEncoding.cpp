@@ -22,6 +22,35 @@ using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
 //===---------------------------------------------------------------------===//
+// Methods to convert the encoding to parameters of the Pack operation
+//===---------------------------------------------------------------------===//
+
+/// Given the `encoding` return the `MaterializeEncodingInfo` to use for
+/// materializing the pack op.
+// TODO(ravishankarm): THis is currently hard-coded here for convenience. When
+// used in IREE, this will be computed based on the architecture information in
+// `hal.executable.variant`.
+static FailureOr<MaterializeEncodingInfo>
+getPackOpInfoFromEncoding(TensorEncoding encoding) {
+  switch (encoding) {
+  case TensorEncoding::GEMM_LHS:
+    return MaterializeEncodingInfo{{0, 1}, {8, 4}, {}};
+    break;
+  case TensorEncoding::GEMM_RHS:
+    return MaterializeEncodingInfo{{0, 1}, {4, 8}, {}};
+    break;
+  case TensorEncoding::GEMM_RESULT:
+    return MaterializeEncodingInfo{{0, 1}, {8, 8}, {}};
+    break;
+  case TensorEncoding::GEMM_RHS_TRANSPOSE:
+    return MaterializeEncodingInfo{{1, 0}, {8, 4}, {1, 0}};
+    break;
+  default:
+    return failure();
+  }
+}
+
+//===---------------------------------------------------------------------===//
 // Utility methods
 //===---------------------------------------------------------------------===//
 
@@ -43,7 +72,7 @@ getMaterializedType(RankedTensorType tensorType,
   if (!encoding)
     return tensorType;
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
-      materializeEncodingFn(tensorType);
+      materializeEncodingFn(encoding.value());
   if (failed(materializeEncodingInfo)) {
     return tensorType;
   }
@@ -62,48 +91,6 @@ static SmallVector<OpFoldResult> getAsOpFoldResult(OpBuilder &builder,
                                                    ArrayRef<int64_t> values) {
   return llvm::to_vector(llvm::map_range(
       values, [&](int64_t v) { return getAsOpFoldResult(builder, v); }));
-}
-
-//===---------------------------------------------------------------------===//
-// Methods to convert the encoding to parameters of the Pack operation
-//===---------------------------------------------------------------------===//
-
-/// Given the `encoding` return the `MaterializeEncodingInfo` to use for
-/// materializing the pack op.
-// TODO(ravishankarm): This is currently hard-coded here for convenience. When
-// used in IREE, this will be computed based on the architecture information in
-// `hal.executable.variant`.
-// A real implementation would return tile sizes that depend on at least the
-// `tensorType`'s element type (e.g. different tile sizes for i8 vs f32, because
-// the SIMD instructions may have different shapes).
-// Moreover, in a real implementation, the tile sizes would typically also
-// depend on target information. This is demonstrated in
-// iree/compiler/src/iree/compiler/Codegen/Common/MaterializeEncodingPass.cpp
-static FailureOr<MaterializeEncodingInfo>
-chooseEncodingInfo(RankedTensorType tensorType) {
-  Optional<TensorEncoding> encoding = getEncoding(tensorType);
-  if (!encoding)
-    return failure();
-  switch (*encoding) {
-  case TensorEncoding::MATMUL_F32F32F32_LHS:
-  case TensorEncoding::MATMUL_I8I8I32_LHS:
-    return MaterializeEncodingInfo{{0, 1}, {8, 4}, {}};
-    break;
-  case TensorEncoding::MATMUL_F32F32F32_RHS:
-  case TensorEncoding::MATMUL_I8I8I32_RHS:
-    return MaterializeEncodingInfo{{0, 1}, {4, 8}, {}};
-    break;
-  case TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE:
-  case TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE:
-    return MaterializeEncodingInfo{{1, 0}, {8, 4}, {1, 0}};
-    break;
-  case TensorEncoding::MATMUL_F32F32F32_RESULT:
-  case TensorEncoding::MATMUL_I8I8I32_RESULT:
-    return MaterializeEncodingInfo{{0, 1}, {8, 8}, {}};
-    break;
-  default:
-    return failure();
-  }
 }
 
 //===---------------------------------------------------------------------===//
@@ -134,9 +121,8 @@ static FailureOr<PackOp>
 lowerSetEncodingOpToPackOp(RewriterBase &rewriter, SetEncodingOp encodingOp,
                            Value source,
                            MaterializeEncodingFn materializeEncodingFn) {
-  RankedTensorType resultType = encodingOp.getResultType();
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
-      materializeEncodingFn(resultType);
+      materializeEncodingFn(encodingOp.getResultTensorEncoding());
   if (failed(materializeEncodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled result encoding");
   }
@@ -151,7 +137,7 @@ lowerSetEncodingOpToPackOp(RewriterBase &rewriter, SetEncodingOp encodingOp,
                              materializeEncodingInfo->innerDimsPos,
                              materializeEncodingInfo->outerDimsPerm);
   auto initTensor = rewriter.create<tensor::EmptyOp>(
-      loc, resultDims, resultType.getElementType());
+      loc, resultDims, encodingOp.getSourceType().getElementType());
   Optional<Value> paddingValue = getPaddingValue(source);
   return rewriter.create<PackOp>(
       loc, source, initTensor, materializeEncodingInfo->innerDimsPos,
@@ -165,9 +151,8 @@ static FailureOr<UnPackOp>
 lowerUnsetEncodingToUnpackOp(RewriterBase &rewriter, UnsetEncodingOp encodingOp,
                              Value packedValue,
                              MaterializeEncodingFn materializeEncodingFn) {
-  RankedTensorType sourceType = encodingOp.getSourceType();
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
-      materializeEncodingFn(sourceType);
+      materializeEncodingFn(encodingOp.getSourceTensorEncoding());
   if (failed(materializeEncodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled source encoding");
   }
@@ -176,7 +161,7 @@ lowerUnsetEncodingToUnpackOp(RewriterBase &rewriter, UnsetEncodingOp encodingOp,
   SmallVector<OpFoldResult> resultDims =
       getDims(rewriter, loc, encodingOp.getSource());
   auto initTensor = rewriter.create<tensor::EmptyOp>(
-      loc, resultDims, sourceType.getElementType());
+      loc, resultDims, encodingOp.getResultType().getElementType());
 
   SmallVector<OpFoldResult> innerTileSizesOfr =
       getAsOpFoldResult(rewriter, materializeEncodingInfo->innerTileSizes);
@@ -186,9 +171,9 @@ lowerUnsetEncodingToUnpackOp(RewriterBase &rewriter, UnsetEncodingOp encodingOp,
 }
 
 /// Utility method to convert from `linalg.matmul` with
-/// - lhs encoding of MATMUL_*_LHS
-/// - rhs encoding of MATMUL_*_RHS_TRANSPOSE
-/// - result encoding of MATMUL_*_RESULT
+/// - lhs encoding of GEMM_LHS
+/// - rhs encoding of GEMM_RHS_TRANSPOSE
+/// - result encoding of GEMM_RESULT
 /// to linalg.mmt4d op.
 static FailureOr<Operation *>
 lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
@@ -205,15 +190,11 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
       getEncoding(inputs[1]->get().getType().cast<RankedTensorType>());
   Optional<TensorEncoding> resultEncoding =
       getEncoding(outputs[0]->get().getType().cast<RankedTensorType>());
-  if (!lhsEncoding ||
-      (lhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_LHS &&
-       lhsEncoding.value() != TensorEncoding::MATMUL_I8I8I32_LHS) ||
+  if (!lhsEncoding || lhsEncoding.value() != TensorEncoding::GEMM_LHS ||
       !rhsEncoding ||
-      (rhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE &&
-       rhsEncoding.value() != TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE) ||
+      rhsEncoding.value() != TensorEncoding::GEMM_RHS_TRANSPOSE ||
       !resultEncoding ||
-      (resultEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RESULT &&
-       resultEncoding.value() != TensorEncoding::MATMUL_I8I8I32_RESULT)) {
+      resultEncoding.value() != TensorEncoding::GEMM_RESULT) {
     return failure();
   }
   Operation *mmt4DOp = rewriter.create<linalg::Mmt4DOp>(
@@ -244,8 +225,13 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
                     ValueRange convertedOperands,
                     MaterializeEncodingFn materializeEncodingFn) {
   auto resultType = emptyOp.getResult().getType().cast<RankedTensorType>();
+  Optional<TensorEncoding> encoding = getEncoding(resultType);
+  if (!encoding) {
+    return rewriter.notifyMatchFailure(emptyOp,
+                                       "result type does not have encoding");
+  }
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
-      materializeEncodingFn(resultType);
+      materializeEncodingFn(encoding.value());
   if (failed(materializeEncodingInfo)) {
     return rewriter.notifyMatchFailure(
         emptyOp, "failed to find materialization info for result type");
@@ -374,12 +360,12 @@ void MaterializeEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
   {
-    Operation *op = getOperation();
     RewritePatternSet patterns(context);
-    MaterializeEncodingTypeConverter typeConverter(chooseEncodingInfo);
+    MaterializeEncodingTypeConverter typeConverter(getPackOpInfoFromEncoding);
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingPatterns(patterns, target, typeConverter);
-    if (failed(applyPartialConversion(op, target, std::move(patterns))))
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns))))
       return signalPassFailure();
   }
 
@@ -405,7 +391,6 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
   addConversion([](IntegerType intType) { return intType; });
   addConversion([](IndexType indexType) { return indexType; });
   addConversion([](FloatType floatType) { return floatType; });
-  addConversion([](MemRefType memrefType) { return memrefType; });
   addConversion(
       [materializeEncodingFn](RankedTensorType t) -> RankedTensorType {
         return getMaterializedType(t, materializeEncodingFn);
