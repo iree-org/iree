@@ -8,13 +8,12 @@
 import os
 import random
 import re
-from typing import (Any, Callable, Mapping, Optional, Sequence, Set, Tuple,
-                    Union)
+from typing import Any, Callable, Mapping, Sequence, Set, Tuple, Union
 
+from absl import logging
 import iree.runtime
 import numpy as np
 import tensorflow.compat.v2 as tf
-from absl import logging
 
 InputGeneratorType = Callable[[Sequence[int], Union[tf.DType, np.dtype]],
                               np.ndarray]
@@ -32,10 +31,9 @@ def uniform(shape: Sequence[int],
             low: float = -1.0,
             high: float = 1.0) -> np.ndarray:
   """np.random.uniform with simplified API and dtype and bool support."""
-  # pytype doesn't understand the ternary with tf as "Any"
-  dtype = dtype.as_numpy_dtype if isinstance(dtype, tf.DType) else dtype  # pytype: disable=attribute-error
-  if dtype == bool:
-    return np.random.choice(2, shape).astype(bool)
+  dtype = dtype.as_numpy_dtype if isinstance(dtype, tf.DType) else dtype
+  if dtype == np.bool:
+    return np.random.choice(2, shape).astype(np.bool)
   else:
     values = np.random.uniform(size=shape, low=low, high=high)
     if np.issubdtype(dtype, np.integer):
@@ -46,8 +44,7 @@ def uniform(shape: Sequence[int],
 def ndarange(shape: Sequence[int],
              dtype: Union[tf.DType, np.dtype] = np.float32) -> np.ndarray:
   """np.ndarange for arbitrary input shapes."""
-  # pytype doesn't understand the ternary with tf as "Any"
-  dtype = dtype.as_numpy_dtype if isinstance(dtype, tf.DType) else dtype  # pytype: disable=attribute-error
+  dtype = dtype.as_numpy_dtype if isinstance(dtype, tf.DType) else dtype
   return np.arange(np.prod(shape), dtype=dtype).reshape(shape)
 
 
@@ -114,7 +111,7 @@ def get_shape_and_dtype(array: np.ndarray,
 
 
 def save_input_values(inputs: Sequence[np.ndarray],
-                      artifacts_dir: Optional[str] = None) -> str:
+                      artifacts_dir: str = None) -> str:
   """Saves input values with IREE tools format if 'artifacts_dir' is set."""
   result = []
   for array in inputs:
@@ -233,8 +230,8 @@ def check_same(ref: Any, tar: Any, rtol: float,
     # Ignore np.bool != np.int8 because the IREE python runtime awkwardly
     # returns np.int8s instead of np.bools.
     if ref.dtype != tar.dtype and not (
-        (ref.dtype == bool and tar.dtype == np.int8) or
-        (ref.dtype == np.int8 and tar.dtype == bool)):
+        (ref.dtype == np.bool and tar.dtype == np.int8) or
+        (ref.dtype == np.int8 and tar.dtype == np.bool)):
       error = ("Expected ref and tar to have the same dtype, but got "
                f"'{ref.dtype}' and '{tar.dtype}'")
       logging.error(error)
