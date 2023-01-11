@@ -328,8 +328,9 @@ bool GreedyPatternRewriteDriver::simplify(MutableArrayRef<Region> regions) {
       // END
       //===----------------------------------------------------------------===//
       changed |= succeeded(simplifyRegions(rewriter, regions));
-  } while (changed && (iteration++ < config.maxIterations ||
-                       config.maxIterations == GreedyRewriteConfig::kNoLimit));
+  } while (changed &&
+           (iteration++ < config.maxIterations ||
+            config.maxIterations == GreedyRewriteConfig::kNoIterationLimit));
 
   // Whether the rewrite converges, i.e. wasn't changed in the last iteration.
   return !changed;

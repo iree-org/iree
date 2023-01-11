@@ -274,7 +274,7 @@ struct FusionOfTensorOpsPass
       memref::populateResolveRankedShapeTypeResultDimsPatterns(fusionPatterns);
 
       GreedyRewriteConfig rewriteConfig;
-      rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
+      rewriteConfig.maxIterations = GreedyRewriteConfig::kNoIterationLimit;
       if (failed(applyPatternsAndFoldGreedily(funcOp->getRegions(),
                                               std::move(fusionPatterns),
                                               rewriteConfig))) {
