@@ -575,17 +575,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVMapMemRefStorageClassPass();
 
-/// Pass pipeline to lower winograd ops. This pipeline follows the
-/// SPIRVBaseVectorize pipeline with the following exception:
-/// Since the ops are already tiled, we skip tiling and instead
-/// just annotate the loops with the spirv distribute attribute.
-///
-void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm);
-
-/// Annotates the innermost Winograd loops with the spirv distribute attribute.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVAnnotateWinogradLoopsPass();
-
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//

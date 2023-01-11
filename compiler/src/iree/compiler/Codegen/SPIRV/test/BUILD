@@ -18,7 +18,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "annotate_winograd_loops.mlir",
             "break_down_large_vector.mlir",
             "config_adreno_conv.mlir",
             "config_adreno_matmul.mlir",

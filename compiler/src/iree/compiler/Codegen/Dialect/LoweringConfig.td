@@ -47,10 +47,8 @@ def SPIRV_CooperativeMatrixVectorize
     : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 18>;
 def SPIRV_SubgroupReduce
     : I32EnumAttrCase<"SPIRVSubgroupReduce", 19>;
-def SPIRV_WinogradVectorize
-    : I32EnumAttrCase<"SPIRVWinogradVectorize", 20>;
 
-def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 21>;
+def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 20>;
 
 
 def Linalg_TransformInterpCodegen
@@ -74,7 +72,7 @@ def DispatchLoweringPassPipelineEnum
                     LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
                     SPIRV_BaseDistribute, SPIRV_BaseVectorize,
                     SPIRV_MatmulPromoteVectorize, SPIRV_CooperativeMatrixVectorize,
-                    SPIRV_SubgroupReduce, SPIRV_WinogradVectorize,
+                    SPIRV_SubgroupReduce,
                     VMVX_Default,
                     // Transform dialect based codegen
                     Linalg_TransformInterpCodegen,
