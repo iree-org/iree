@@ -70,7 +70,6 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
   ADD_PATTERN(eraseUnnecessaryTensorOperands,
               getEraseUnnecessaryTensorOperandsAttrName)
-  ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(promoteForeachThreadCaptureToShared,
               getPromoteForeachThreadCaptureToSharedAttrName)
@@ -163,10 +162,6 @@ struct PromoteCaptureToSharedOut
 };
 }  // namespace
 
-static void addFoldMemrefAliasPatterns(RewritePatternSet &patterns) {
-  memref::populateFoldMemRefAliasOpPatterns(patterns);
-}
-
 static void addForeachThreadCapturePromotionPatterns(
     RewritePatternSet &patterns) {
   patterns.add<PromoteCaptureToSharedOut>(patterns.getContext());
@@ -229,7 +224,6 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
   if (getEraseUnnecessaryTensorOperands())
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
-  if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getPromoteForeachThreadCaptureToShared())
     addForeachThreadCapturePromotionPatterns(patterns);
