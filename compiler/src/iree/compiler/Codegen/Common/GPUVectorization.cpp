@@ -26,12 +26,15 @@ using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 namespace mlir {
 namespace iree_compiler {
 
+// Max vector size we want to create. This could be changed to a pass option
+// based on target.
+static constexpr int64_t kMaxVectorSize = 4096;
+
 //====---------------------------------------------------------------------===//
 // Patterns for vectorization
 //====---------------------------------------------------------------------===//
 
-static void populateVectorizationPatterns(RewritePatternSet &patterns,
-                                          int64_t maxVectorSize) {
+static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   MLIRContext *ctx = patterns.getContext();
   IREE::LinalgExt::LinalgTransformationFilter f(
       {StringAttr::get(ctx, getWorkgroupKTiledMarker()),
@@ -41,7 +44,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns,
   // When vectorizing if some ops didn't get tiled we may end up with large
   // vectors being created that will later explode code size. If we have any
   // vectors larger than what would fit in register skip vectorization.
-  f.addFilter([maxVectorSize](Operation *op) {
+  f.addFilter([](Operation *op) {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) return success();
     int64_t maxFlatVecSize = 1;
@@ -51,7 +54,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns,
       if (!type.hasStaticShape()) return failure();
       maxFlatVecSize = std::max(maxFlatVecSize, type.getNumElements());
     }
-    return success(maxFlatVecSize <= maxVectorSize);
+    return success(maxFlatVecSize <= kMaxVectorSize);
   });
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp,
                         linalg::Conv1DNwcWcfOp,
@@ -64,9 +67,8 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns,
 namespace {
 struct GPUVectorizationPass
     : public GPUVectorizationBase<GPUVectorizationPass> {
-  GPUVectorizationPass(bool generateContract, int64_t maxVectorSize) {
+  GPUVectorizationPass(bool generateContract) {
     this->generateContract = generateContract;
-    this->maxVectorSize = maxVectorSize;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
@@ -93,7 +95,7 @@ struct GPUVectorizationPass
       return signalPassFailure();
 
     RewritePatternSet vectorizationPatterns(context);
-    populateVectorizationPatterns(vectorizationPatterns, maxVectorSize);
+    populateVectorizationPatterns(vectorizationPatterns);
     if (generateContract) {
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           vectorizationPatterns);
@@ -110,9 +112,8 @@ struct GPUVectorizationPass
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
-    bool generateContract, int64_t maxVectorSize) {
-  return std::make_unique<GPUVectorizationPass>(generateContract,
-                                                maxVectorSize);
+    bool generateContract) {
+  return std::make_unique<GPUVectorizationPass>(generateContract);
 }
 
 }  // namespace iree_compiler

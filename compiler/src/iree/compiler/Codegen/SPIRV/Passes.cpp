@@ -427,7 +427,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   // Performs mechanical vectorization. This does not perform unrolling or
   // lowering, which is done later.
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass(
-      /*generateContract=*/false, /*maxVectorSize=*/32768));
+      /*generateContract=*/false));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
