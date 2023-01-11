@@ -199,14 +199,11 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       exportOp->getWorkgroupSize().value(),
       [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  Optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
-  if (!subgroupSize) {
-    funcOp->emitError("failed to query subgroup size");
-    return signalPassFailure();
-  }
+  int subgroupSize =
+      getSPIRVTargetEnvAttr(funcOp).getResourceLimits().getSubgroupSize();
 
   // Only promote to workgroup size if there are multiple warps.
-  if (totalThreads > *subgroupSize) {
+  if (totalThreads > subgroupSize) {
     // Attach markers to contract ops to drive promotion.
     funcOp.walk([&](linalg::LinalgOp op) {
       if (isMatmulOrBatchMatmul(op)) {

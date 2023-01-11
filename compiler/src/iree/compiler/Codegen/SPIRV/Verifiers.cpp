@@ -9,7 +9,6 @@
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 
@@ -51,9 +50,7 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   const auto limits = targetEnv.getResourceLimits();
   LLVM_DEBUG(llvm::dbgs() << "target environment: " << targetEnvAttr << "\n");
 
-  auto funcOp = op->getParentOfType<func::FuncOp>();
-  const Optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
-  if (!subgroupSize) return funcOp->emitError("failed to query subgroup size");
+  const int subgroupSize = limits.getSubgroupSize();
   const int maxSharedMemory = limits.getMaxComputeSharedMemorySize();
   const int maxThreads = limits.getMaxComputeWorkgroupInvocations();
   const auto maxWorkGroupSize = llvm::to_vector<3>(llvm::map_range(
@@ -88,9 +85,9 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   }
 
   // Verify the total workgroup size should be multiple of subgroupSize.
-  if (totalWorkgroupSize % *subgroupSize != 0) {
+  if (totalWorkgroupSize % subgroupSize != 0) {
     return op->emitOpError("expected total workgroup size to be multiple of ")
-           << *subgroupSize;
+           << subgroupSize;
   }
 
   ArrayRef<int64_t> lhsShape =
@@ -185,9 +182,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   const auto limits = targetEnv.getResourceLimits();
   LLVM_DEBUG(llvm::dbgs() << "target environment: " << targetEnvAttr << "\n");
 
-  auto funcOp = op->getParentOfType<func::FuncOp>();
-  const Optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
-  if (!subgroupSize) return funcOp->emitError("failed to query subgroup size");
+  const int subgroupSize = limits.getSubgroupSize();
   const int maxSharedMemory = limits.getMaxComputeSharedMemorySize();
   const int maxThreads = limits.getMaxComputeWorkgroupInvocations();
   const auto maxWorkGroupSize = llvm::to_vector<3>(llvm::map_range(
@@ -222,16 +217,16 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   // Verify the total workgroup size should be multiple of subgroupSize.
-  if (totalWorkgroupSize % *subgroupSize != 0) {
+  if (totalWorkgroupSize % subgroupSize != 0) {
     return op->emitOpError("expected total workgroup size to be multiple of ")
-           << *subgroupSize;
+           << subgroupSize;
   }
 
   // Verify the total workgroup size should be equal or larger than 2 *
   // subgroupSize.
-  if (totalWorkgroupSize / *subgroupSize < 2) {
+  if (totalWorkgroupSize / subgroupSize < 2) {
     return op->emitOpError("expected total workgroup size to be >= ")
-           << 2 * *subgroupSize;
+           << 2 * subgroupSize;
   }
 
   // Verify that there are four level of tile sizes.
@@ -315,7 +310,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
 
   // Verify workgroup_size_x = warp_size * wg_tile_n / subgroup_tile_n.
   if (workgroupSize[0] * subgroupTileSizes[1] !=
-      *subgroupSize * workgroupTileSizes[1]) {
+      subgroupSize * workgroupTileSizes[1]) {
     return op->emitOpError(
         "expected workgroup x component equals to (warp_size * wg_tile_n / "
         "subgroup_tile_n)");

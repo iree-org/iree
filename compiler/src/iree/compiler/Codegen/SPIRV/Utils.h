@@ -21,13 +21,8 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Given an operation, returns the `spirv.target_env` attribute.
+/// Given an operation, return the `spirv.target_env` attribute.
 spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
-
-/// Given a FuncOp, returns the subgroup size to use for CodeGen, by first
-/// querying the hal.executable.export op, and then the SPIR-V target
-/// environment. Returns llvm::None on failures.
-llvm::Optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp);
 
 /// Returns the attribute name carrying information about distribution.
 const char *getSPIRVDistributeAttrName();

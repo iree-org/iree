@@ -844,16 +844,9 @@ LogicalResult setCooperativeMatrixConfig(
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
       SPIRVCooperativeMatrixVectorize;
 
-  Optional<int64_t> subgroupSize = limits.getSubgroupSize();
-  // AMD RDNA architectures supports both wave32 and wave64 modes. Prefer to use
-  // wave32 mode for better performance.
-  if (targetEnv.getVendorID() == spirv::Vendor::AMD) {
-    if (Optional<int> minSize = limits.getMinSubgroupSize())
-      subgroupSize = *minSize;
-  }
-
-  std::array<int64_t, 3> workgroupSize{coopMatSize->nWarpCount * *subgroupSize,
-                                       coopMatSize->mWarpCount, 1};
+  std::array<int64_t, 3> workgroupSize{
+      coopMatSize->nWarpCount * limits.getSubgroupSize(),
+      coopMatSize->mWarpCount, 1};
 
   SmallVector<int64_t> vectorSizes(kIndex + 1, 0);
   if (isBM) vectorSizes[bIndex] = 1;
@@ -886,6 +879,8 @@ LogicalResult setCooperativeMatrixConfig(
   tileSizes.push_back(subgroupTileSizes);
   tileSizes.push_back(reductionTileSizes);
   tileSizes.push_back(vectorSizes);
+
+  Optional<int64_t> subgroupSize = limits.getSubgroupSize();
 
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
