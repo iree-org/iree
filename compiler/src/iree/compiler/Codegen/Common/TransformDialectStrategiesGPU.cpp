@@ -277,9 +277,9 @@ void ReductionStrategyStagedThreadDistribution::compute(
   // TODO: Split to ensure 4 on most of the problem and use a 1-epilogue.
   int64_t reductionDimensionSize = captures.reductionOpSizes.back();
   if (reductionDimensionSize > 0 && reductionDimensionSize % 4 == 0)
-    vectorSize = std::min(maxVectorSize, int64_t(4));
+    vectorSize = std::min(maxVectorSize, 4l);
   else if (reductionDimensionSize > 0 && reductionDimensionSize % 2 == 0)
-    vectorSize = std::min(maxVectorSize, int64_t(2));
+    vectorSize = std::min(maxVectorSize, 2l);
   else
     vectorSize = 1;
   // Tile reduction to the maximal multiple `vectorSize` allowed.
