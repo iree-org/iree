@@ -130,39 +130,39 @@ static void buildSmallReductionStrategyThreadDistribution(
   // a single thread. This triggers the splitting but not the thread mapping
   // part.
   build1DSplittingStrategyWithOptionalThreadMapping(
-      /*b=*/b,
-      /*opH=*/blockReductionH,
-      /*rank=*/strategy.captures.reductionRank,
-      // TODO: capture and generalize mostMinorDim.
-      /*mostMinorDim=*/strategy.captures.reductionRank - 1,
-      /*opSizes=*/strategy.captures.reductionOpSizes,
+      b, blockReductionH, strategy.captures.reductionRank,
+      strategy.captures.reductionOpSizes,
       /*numThreads=*/1);
 
   // 3. apply the 1d splitting strategy to the trailing elementwise.
   build1DSplittingStrategyWithOptionalThreadMapping(
-      /*b=*/b,
-      /*opH=*/maybeBlockTrailingH,
-      /*rank=*/strategy.captures.maybeTrailingRank,
-      // TODO: capture and generalize mostMinorDim.
-      /*mostMinorDim=*/strategy.captures.maybeTrailingRank - 1,
-      /*opSizes=*/strategy.captures.trailingOpSizes,
-      /*numThreads=*/strategy.getNumThreadsXInBlock(),
-      /*mappingAttr=*/strategy.allThreadAttrs.front());
+      b, maybeBlockTrailingH, strategy.captures.maybeTrailingRank,
+      strategy.captures.trailingOpSizes,
+      strategy.getNumThreadsInBlock().back());
 }
 
 void mlir::iree_compiler::gpu::buildSmallReductionStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const SmallReductionStrategy &strategy) {
-  // Step 1. Apply block-level part of the strategy, keeps everything fused.
+  // Step 1. Call the matcher. Note that this is the same matcher as used to
+  // trigger this compilation path, so it must always apply.
+  b.create<RegisterMatchCallbacksOp>();
+  auto [maybeLeadingH, fillH, reductionH, maybeTrailingH] =
+      unpackRegisteredMatchCallback<4>(
+          b, "reduction", transform::FailurePropagationMode::Propagate,
+          variantH);
+
+  // Step 2. Apply block-level part of the strategy, keeps everything fused.
   auto [maybeLeadingHBlock, gridFillH, gridReductionH,
         maybeTiledTrailingHBlock] =
-      buildReductionStrategyBlockDistribution(b, variantH, strategy);
+      buildReductionStrategyBlockDistribution(
+          b, maybeLeadingH, fillH, reductionH, maybeTrailingH, strategy);
 
-  // Step 2. Apply thread-level part of the strategy, keeps everything fused.
+  // Step 3. Apply thread-level part of the strategy, keeps everything fused.
   buildSmallReductionStrategyThreadDistribution(
       b, maybeLeadingHBlock, gridFillH, gridReductionH,
       maybeTiledTrailingHBlock, strategy);
 
-  // Step 3-4. Common trailing steps.
+  // Step 4-5. Common trailing steps.
   buildCommonTrailingStrategy(b, variantH, strategy);
 }

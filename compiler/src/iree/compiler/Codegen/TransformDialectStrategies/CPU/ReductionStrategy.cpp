@@ -59,12 +59,21 @@ void mlir::iree_compiler::cpu::ReductionStrategy::configure(
 void mlir::iree_compiler::cpu::buildReductionStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const ReductionStrategy &strategy) {
-  // Step 1. Tiling to the block/workgroup level. Keep everything fused.
+  // Step 1. Call the matcher. Note that this is the same matcher as used to
+  // trigger this compilation path, so it must always apply.
+  b.create<RegisterMatchCallbacksOp>();
+  auto [maybeLeadingH, fillH, reductionH, maybeTrailingH] =
+      unpackRegisteredMatchCallback<4>(
+          b, "reduction", transform::FailurePropagationMode::Propagate,
+          variantH);
+
+  // Step 2. Tiling to the block/workgroup level. Keep everything fused.
   auto [maybeLeadingHBlock, gridFillH, gridReductionH,
         maybeTiledTrailingHBlock] =
-      buildReductionStrategyBlockDistribution(b, variantH, strategy);
+      buildReductionStrategyBlockDistribution(
+          b, maybeLeadingH, fillH, reductionH, maybeTrailingH, strategy);
 
-  // Step 2. Naive first strategy to tile the most minor dimension by
+  // Step 3. Naive first strategy to tile the most minor dimension by
   // strategy.getVectorSize().
   for (auto [val, rank] : SmallVector<std::pair<Value, int64_t>>{
            {maybeLeadingHBlock, strategy.captures.maybeLeadingRank},
@@ -77,6 +86,6 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
                           getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)));
   }
 
-  // Step 3-5. Common trailing steps.
+  // Step 4-6. Common trailing steps.
   buildCommonTrailingStrategy(b, variantH);
 }

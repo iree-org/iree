@@ -91,19 +91,13 @@ int64_t mlir::iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle(
 
 /// Compute the (splitPoint, vectorSize) pair to break [0 .. upperBound] into
 /// [0 .. splitPoint] and [splitPoint + 1 .. upperBound] such that `splitPoint`
-/// is a multiple of `fixedSize * vectorSize`.
-/// The returned `vectorSize` is the maximal power of `2`, smaller than
-/// `maxVectorSize`, for which `splitPoint` can be computed.
-///
-/// Note: `vectorSize` may be smaller than `maxVectorSize` when the upperBound
-/// is small enough. In such cases we give preference to keeping the `fixedSize`
-/// parameter unchanged and reducing the `vectorSize`. `fixedSize` generally
-/// captures the number of threads and we do not alter decisions on parallelism
-/// at this level.
+/// is a multiple of `minMultiple * vectorSize`.
+/// `vectorSize` is the maximal power of `2`, smaller than `maxVectorSize`, for
+/// which `splitPoint` can be computed.
 ///
 /// If such a positive multiple exists:
 ///   1. if it is `upperBound`, then `upperBound` is an even multiple of
-///      `fixedSize` * `vectorSize` and we can tile evenly without splitting.
+///      `minMultiple` * `vectorSize` and we can tile evenly without splitting.
 ///      In this case we return (0, vectorSize).
 ///   2. otherwise, it is a split point at which we can split with vectorSize
 ///      to obtain the largest divisible tiling.
@@ -113,7 +107,7 @@ int64_t mlir::iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle(
 // account and returning Values. The op then needs to become part of the
 // transform dialect.
 static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
-                                                     int64_t fixedSize,
+                                                     int64_t minMultiple,
                                                      int64_t maxVectorSize) {
   assert((maxVectorSize & (maxVectorSize - 1)) == 0 && "must be a power of 2");
   if (ShapedType::isDynamic(upperBound)) {
@@ -121,7 +115,7 @@ static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
   }
   for (int64_t vectorSize = maxVectorSize; vectorSize >= 1; vectorSize >>= 1) {
     int64_t splitPoint =
-        iree_compiler::previousMultipleOf(upperBound, fixedSize * vectorSize);
+        iree_compiler::previousMultipleOf(upperBound, minMultiple * vectorSize);
     if (splitPoint > 0) {
       return (upperBound == splitPoint)
                  ? std::make_pair(int64_t(0), vectorSize)
@@ -175,79 +169,56 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
 //===----------------------------------------------------------------------===//
 void mlir::iree_compiler::gpu::
     build1DSplittingStrategyWithOptionalThreadMapping(
-        ImplicitLocOpBuilder &b, Value opH, int64_t rank, int64_t mostMinorDim,
-        SmallVector<int64_t> opSizes, int64_t numThreads, Attribute mappingAttr,
+        ImplicitLocOpBuilder &b, Value elementwiseH, int64_t rank,
+        SmallVector<int64_t> elementwiseSizes, int64_t numThreads,
         int64_t maxVectorSize) {
-  // Poor man's handling of optionality in C++. Will need to be converted to
-  // proper transform dialect filters or handling of emptiness.
   if (rank == 0) return;
 
-  // Compute split point to guarantee we form a maximal chunk divisible by
-  // numThreads * vectorSize.
-  // This chunk is currently not aligned for proper vector accesses.
-  // In the future, this can be solved either by:
-  //   1. doing an extra prologue split that is cognizant of the future stride.
-  //   2. or, aligning allocations to a multiple of 128b on the most minor
-  //      dimensions but without changing problem sizes (i.e. poor man's
-  //      packing).
-  int64_t mostMinorSize = opSizes[mostMinorDim];
-  auto [splitPoint, vectorSize] = computeSplitPoint(
-      /*upperBound=*/mostMinorSize, /*fixedSize=*/numThreads,
-      /*maxVectorSize=*/maxVectorSize);
+  int64_t mostMinorDim = rank - 1;
+  int64_t mostMinorSize = elementwiseSizes[mostMinorDim];
+  auto [splitPoint, vectorSize] =
+      computeSplitPoint(mostMinorSize, numThreads, maxVectorSize);
 
-  // Create 1-D tile sizes for the first, divisible, part.
   SmallVector<int64_t> scfForTileSizes(rank, 0), foreachTileSizes(rank, 0);
   scfForTileSizes[mostMinorDim] = numThreads * vectorSize;
   foreachTileSizes[mostMinorDim] = numThreads;
 
-  // Split, tile and map the most minor dimension to `mappingAttr`.
+  auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
+                                                      mlir::gpu::Threads::DimX);
+  // Split, tile and map the most minor dimension to `gpu.thread x`.
   if (splitPoint > 0) {
     auto pdlOperation = pdl::OperationType::get(b.getContext());
-    auto split = b.create<transform::SplitOp>(
-        pdlOperation, pdlOperation, opH, b.getI64IntegerAttr(mostMinorDim),
-        Value(), b.getI64IntegerAttr(splitPoint));
-    opH = split.getFirst();
+    auto split =
+        b.create<transform::SplitOp>(pdlOperation, pdlOperation, elementwiseH,
+                                     b.getI64IntegerAttr(mostMinorDim), Value(),
+                                     b.getI64IntegerAttr(splitPoint));
+    elementwiseH = split.getFirst();
     if (vectorSize > 1) {
       auto res = iree_compiler::buildTileFuseToScfFor(
-          /*b=*/b,
-          /*rootH=*/opH,
-          /*opsHToFuse=*/{},
-          /*tileSizes=*/
+          b, elementwiseH, {},
           getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
-      opH = res.tiledOpH;
-      // Reset the vector size to 1 for the tail, which is known to not be
-      // divisible by `numThreads * vectorSize`.
-      vectorSize = 1;
+      elementwiseH = res.tiledOpH;
     }
     if (numThreads > 1) {
-      assert(mappingAttr && "must specify a mapping attribute");
       iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
-          /*b=*/b,
-          /*rootH=*/opH,
-          /*opsHToFuse=*/{},
-          /*numThreads=*/getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
-          /*threadDimMapping=*/b.getArrayAttr({mappingAttr}));
+          b, elementwiseH, {},
+          getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
+          b.getArrayAttr({threadX}));
     }
-    opH = split.getSecond();
+    elementwiseH = split.getSecond();
   }
-
-  // Tile and map the most minor dimension of the remainder to mappingAttr.
+  // Tile and map the most minor dimension of the remainder to `gpu.thread x`.
   if (vectorSize > 1) {
     auto res = iree_compiler::buildTileFuseToScfFor(
-        /*b=*/b,
-        /*rootH=*/opH,
-        /*opsHToFuse=*/{},
-        /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
-    opH = res.tiledOpH;
+        b, elementwiseH, {},
+        getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
+    elementwiseH = res.tiledOpH;
   }
   if (numThreads > 1) {
-    assert(mappingAttr && "must specify a mapping attribute");
     iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
-        /*b=*/b,
-        /*rootH=*/opH,
-        /*opsHToFuse=*/{},
-        /*numThreads=*/getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
-        /*threadDimMapping=*/b.getArrayAttr({mappingAttr}));
+        b, elementwiseH, {},
+        getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
+        b.getArrayAttr({threadX}));
   }
 }
 
@@ -333,7 +304,6 @@ static ReductionConfig getReductionConfig(
     int64_t maxNumThreads = 4 * kCudaWarpSize;
     return ReductionConfig{maxNumThreads, 0, ReductionStrategy::Small};
   }
-
   //===--------------------------------------------------------------------===//
   // Staged reduction strategy.
   //===--------------------------------------------------------------------===//
