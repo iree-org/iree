@@ -581,93 +581,6 @@ jobs:
             gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
             ./build_tools/cmake/build_and_test_tsan.sh
 
-  small_runtime:
-    needs: setup
-    if: needs.setup.outputs.should-run == 'true'
-    runs-on: ubuntu-20.04-64core
-    env:
-      BUILD_DIR: build-runtime
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Building size-optimized runtime"
-        # Note ccache is read-only here since this job runs on a GitHub-hosted runner
-        # and GitHub runners don't have write access to GCS
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
-            ./build_tools/cmake/build_runtime_small.sh \
-            "${BUILD_DIR}"
-      - name: "Testing runtime"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=1 \
-            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
-
-  gcc:
-    needs: setup
-    if: needs.setup.outputs.should-run == 'true'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: build-gcc
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-        with:
-          submodules: true
-      - name: "Building IREE with gcc"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env CC=/usr/bin/gcc-9 \
-            --env CXX=/usr/bin/g++-9 \
-            --env "IREE_TARGET_BACKEND_WEBGPU=OFF" \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206" \
-            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
-            ./build_tools/cmake/build_all.sh \
-            "${BUILD_DIR}"
-
-  tracing:
-    needs: setup
-    if: needs.setup.outputs.should-run == 'true'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: build-tracing
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-        with:
-          submodules: true
-      - name: "Building IREE with tracing enabled"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-        run: |
-          # TODO(#11394): Enable Web GPU
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206" \
-            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
-            ./build_tools/cmake/build_tracing.sh \
-            "${BUILD_DIR}"
-
   benchmarks:
     needs: [setup, build_all, build_tf_integrations]
     if: needs.setup.outputs.should-run == 'true'
@@ -960,9 +873,6 @@ jobs:
       # Configurations
       - asan
       - tsan
-      - small_runtime
-      - gcc
-      - tracing
 
       # Crosscompilation
       - cross_compile_and_test

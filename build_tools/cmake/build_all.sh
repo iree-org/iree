@@ -19,10 +19,6 @@ BUILD_DIR="${1:-${IREE_BUILD_DIR:-build}}"
 INSTALL_DIR="${IREE_INSTALL_DIR:-${BUILD_DIR}/install}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
-# Enable WebGPU compiler builds and tests by default. All deps get fetched as
-# needed, but some of the deps are too large to enable by default for all
-# developers.
-IREE_TARGET_BACKEND_WEBGPU="${IREE_TARGET_BACKEND_WEBGPU:-ON}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -52,8 +48,9 @@ declare -a CMAKE_ARGS=(
   "-DIREE_HAL_DRIVER_CUDA=ON"
   "-DIREE_TARGET_BACKEND_CUDA=ON"
 
-
-  "-DIREE_TARGET_BACKEND_WEBGPU=${IREE_TARGET_BACKEND_WEBGPU}"
+  # Enable WebGPU compiler builds and tests. All deps get fetched as needed,
+  # but some of the deps are too large to enable by default for all developers.
+  "-DIREE_TARGET_BACKEND_WEBGPU=ON"
 )
 
 "$CMAKE_BIN" "${CMAKE_ARGS[@]}"
