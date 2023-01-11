@@ -14,7 +14,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-struct AbstractReductionStrategy;
+class AbstractReductionStrategy;
 
 //===----------------------------------------------------------------------===//
 // General helpers.
