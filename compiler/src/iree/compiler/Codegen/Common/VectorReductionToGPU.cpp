@@ -20,8 +20,6 @@
 
 #define DEBUG_TYPE "iree-codegen-reduction-distribution"
 
-static constexpr unsigned kShuffleBitWidth = 32;
-
 namespace mlir {
 namespace iree_compiler {
 
@@ -42,90 +40,28 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
   return builder.create<memref::AllocOp>(loc, memrefType);
 }
 
-/// Packs scalar element to it's vector equivalent.
-/// (i.e f16 -> vector<1xf16> and f32 -> vector<1xf32>)
-static Value promoteElementToVector(Location loc, OpBuilder &builder,
-                                    Value input) {
-  VectorType vectorTypeBroadcast = VectorType::get({1}, input.getType());
-  Value vectorInput =
-      builder.create<vector::BroadcastOp>(loc, vectorTypeBroadcast, input);
-  return vectorInput;
-}
-
-/// Packs vector of lower precision into a single 32-bit width element.
-/// (i.e <2xf16> -> i32 and <4xi8> -> i32)
-static Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
-                                        Value input) {
-  LLVM_DEBUG({
-    auto vecType = input.getType().cast<VectorType>();
-    Type elementType = vecType.getElementType();
-    assert(vecType.getDimSize(0) * elementType.getIntOrFloatBitWidth() ==
-               kShuffleBitWidth &&
-           "vecSize * vecBitWidth needs to packable into 32-bitwidth.");
-    assert(elementType.isIntOrFloat() &&
-           "Only int and float packing is supported.");
-  });
-  VectorType packed32Type = VectorType::get({1}, builder.getI32Type());
-  Value packedInputVec =
-      builder.create<vector::BitCastOp>(loc, packed32Type, input);
-  Value packedInput = builder.create<vector::ExtractOp>(loc, packedInputVec, 0);
-  return packedInput;
-}
-
-/// Unpack single scalar element into a target vector type.
-/// (i.e i32 -> vector<4xi8> or f32 -> vector<2xf16>)
-static Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
-                            VectorType targetVecType) {
-  LLVM_DEBUG({
-    Type packedType = packedInput.getType();
-    assert(packedType.isIntOrFloat() && "Only ints and floats are unpackable.");
-    Type elementType = targetVecType.getElementType();
-    assert(targetVecType.getDimSize(0) * elementType.getIntOrFloatBitWidth() ==
-               packedType.getIntOrFloatBitWidth() &&
-           "packed width needs to be unpackable to vecSize * vecBitWidth.");
-  });
-  Value packedVector = promoteElementToVector(loc, builder, packedInput);
-  Value unpackedVector =
-      builder.create<vector::BitCastOp>(loc, targetVecType, packedVector);
-  return unpackedVector;
-}
-
 /// Emit warp reduction code sequence for a given input.
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            vector::CombiningKind kind, uint32_t warpSize,
                            uint32_t numLaneToReduce) {
-  VectorType unpackedType = input.getType().dyn_cast<VectorType>();
   Value laneVal = input;
   assert(llvm::isPowerOf2_32(numLaneToReduce));
   // Parallel reduction using butterfly shuffles.
   for (uint64_t i = 1; i < numLaneToReduce; i <<= 1) {
-    Value shuffleInput = laneVal;
-    if (unpackedType) {
-      shuffleInput = packVectorToSupportedWidth(loc, builder, laneVal);
-    }
     Value shuffled = builder
-                         .create<gpu::ShuffleOp>(loc, shuffleInput, i,
+                         .create<gpu::ShuffleOp>(loc, laneVal, i,
                                                  /*width=*/warpSize,
                                                  /*mode=*/gpu::ShuffleMode::XOR)
                          .getShuffleResult();
-    if (unpackedType) {
-      shuffled = unpackToVector(loc, builder, shuffled, unpackedType);
-    }
     laneVal = makeArithReduction(builder, loc, kind, laneVal, shuffled);
   }
   // Broadcast the result to all the lanes.
   if (warpSize != numLaneToReduce) {
-    if (unpackedType) {
-      laneVal = packVectorToSupportedWidth(loc, builder, laneVal);
-    }
     laneVal = builder
                   .create<gpu::ShuffleOp>(loc, laneVal, 0,
                                           /*width=*/warpSize,
                                           /*mode=*/gpu::ShuffleMode::IDX)
                   .getShuffleResult();
-    if (unpackedType) {
-      laneVal = unpackToVector(loc, builder, laneVal, unpackedType);
-    }
   }
   return laneVal;
 }
@@ -169,78 +105,6 @@ static Attribute getCombiningKindIdentity(OpBuilder &builder,
   return Attribute();
 }
 
-/// Compute the value on a single thread to get per lane reduction value.
-/// If bit-width is not supported on shuffle operations, and a lower precision,
-/// we represent them as a vector S.T we can pack them into a single 32-bit
-/// width for shuffles.
-static Value reduceToSupportedWidth(Location loc, OpBuilder &builder,
-                                    Value input, vector::CombiningKind kind) {
-  auto vecType = input.getType().cast<VectorType>();
-  Type elementType = vecType.getElementType();
-  int64_t vecSize = vecType.getDimSize(0);
-  unsigned bitWidth = elementType.getIntOrFloatBitWidth();
-  // Simply reduce if it's already 32 bits.
-  if (bitWidth == kShuffleBitWidth) {
-    return builder.create<vector::ReductionOp>(loc, kind, input);
-  }
-  assert(kShuffleBitWidth % bitWidth == 0 &&
-         "Bitwidth needs to be able to be packed into shuffle-bitwidth.");
-  int64_t unrollCount = kShuffleBitWidth / bitWidth;
-  // Original size needs to be divisble by or less than unroll count to
-  // determine slice size.
-  assert(vecSize % unrollCount == 0 || vecSize < unrollCount);
-  unsigned sliceSize = vecSize / unrollCount;
-  VectorType unrolledLaneValType = VectorType::get({unrollCount}, elementType);
-  Value perLaneReduction = builder.create<arith::ConstantOp>(
-      loc, builder.getZeroAttr(unrolledLaneValType));
-  if (vecSize % unrollCount == 0) {
-    // Unroll reductions s.t we can pack into a supported 32-bitWidth format.
-    for (int64_t i = 0; i < unrollCount; i++) {
-      Value laneValSlice = builder.create<vector::ExtractStridedSliceOp>(
-          loc, input,
-          /*offsets=*/ArrayRef<int64_t>{sliceSize * i},
-          /*sizes=*/ArrayRef<int64_t>{sliceSize},
-          /*strides=*/ArrayRef<int64_t>{1});
-      Value reductionSlice =
-          builder.create<vector::ReductionOp>(loc, kind, laneValSlice);
-      SmallVector<int64_t> perLaneUnrollId = {i};
-      perLaneReduction = builder.create<vector::InsertOp>(
-          loc, reductionSlice, perLaneReduction, perLaneUnrollId);
-    }
-  } else {
-    // In cases where vecSize < unrollCount, we would pad the vector
-    // with identity elements until it's total bit size is 32.
-    Attribute identityAttr =
-        getCombiningKindIdentity(builder, kind, elementType);
-    identityAttr = DenseElementsAttr::get(unrolledLaneValType, identityAttr);
-    Value identity = builder.create<arith::ConstantOp>(loc, identityAttr,
-                                                       unrolledLaneValType);
-    perLaneReduction = builder.create<vector::InsertStridedSliceOp>(
-        loc, input, identity, /*offsets=*/ArrayRef<int64_t>{0},
-        /*strides=*/ArrayRef<int64_t>{1});
-  }
-  return perLaneReduction;
-}
-
-/// Emit identity variable.
-static Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
-                                       vector::CombiningKind kind,
-                                       Type identityType) {
-  auto vectorType = identityType.dyn_cast<VectorType>();
-  Type elementType = identityType;
-  if (vectorType) {
-    elementType = vectorType.getElementType();
-  }
-  Attribute identityAttr = getCombiningKindIdentity(builder, kind, elementType);
-  if (vectorType) {
-    identityAttr = DenseElementsAttr::get(vectorType, identityAttr);
-  }
-  assert(identityAttr && "Unknown identity value for the reduction");
-  Value identity =
-      builder.create<arith::ConstantOp>(loc, identityAttr, identityType);
-  return identity;
-}
-
 /// Emit reduction across a group for a given input.
 static Value groupReduction(Location loc, OpBuilder &builder, Value input,
                             vector::CombiningKind kind, uint32_t size,
@@ -249,7 +113,7 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
       size % warpSize == 0 &&
       "Group reduction only support for sizes aligned on warp size for now.");
   // First reduce on a single thread to get per lane reduction value.
-  Value laneVal = reduceToSupportedWidth(loc, builder, input, kind);
+  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
   laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize);
   // if we have more than one warp, reduce across warps.
   if (size > warpSize) {
@@ -284,16 +148,14 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
       Value useIdentityElement = builder.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::sge, laneId, cstNumWarp);
       numWarp = llvm::PowerOf2Ceil(numWarp);
-      Value identity =
-          getCombiningIdentityValue(loc, builder, kind, loadVal.getType());
+      Attribute identityAttr =
+          getCombiningKindIdentity(builder, kind, loadVal.getType());
+      assert(identityAttr && "Unknown identity value for the reduction");
+      Value identity = builder.create<arith::ConstantOp>(loc, identityAttr);
       loadVal = builder.create<arith::SelectOp>(loc, useIdentityElement,
                                                 identity, loadVal);
     }
     laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp);
-  }
-  // Handles cases for sub-32bit precision where output is still in vector form.
-  if (laneVal.getType().isa<VectorType>()) {
-    laneVal = builder.create<vector::ReductionOp>(loc, kind, laneVal);
   }
   return laneVal;
 }
