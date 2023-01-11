@@ -125,9 +125,7 @@ PartitionSet partitionStreamableOpsReference(
     // dependency chain down the use-def chain to a partition.
     llvm::BitVector consumers(builders.size(), /*t=*/false);
     for (auto user : op.getUsers()) {
-      auto userInfoIt = opInfos.find(user);
-      if (userInfoIt == opInfos.end()) continue;
-      auto &userInfo = userInfoIt->second;
+      auto &userInfo = opInfos[user];
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
         user->print(llvm::dbgs(), *asmState);
@@ -334,9 +332,7 @@ PartitionSet partitionRegionConcurrencyReference(
     // We prune the set based on whether the users are part of a transitive
     // dependency chain down the use-def chain to a wave.
     for (auto user : op.getUsers()) {
-      auto userInfoIt = opInfos.find(user);
-      if (userInfoIt == opInfos.end()) continue;
-      auto &userInfo = userInfoIt->second;
+      auto &userInfo = opInfos[user];
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
         user->print(llvm::dbgs(), *asmState);
