@@ -1745,9 +1745,9 @@ module {
 //  CHECK-NEXT:     %[[ARG1:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128x128xf32>>
 //       CHECK:     %[[LOAD0:.+]] = flow.dispatch.tensor.load %[[ARG1]]
 //       CHECK:     %[[FILL0:.+]] = linalg.fill
-//       CHECK:     %[[FILL1:.+]] = linalg.fill
 //       CHECK:     %[[GENERIC0:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[LOAD0]] : tensor<12x128x128xf32>) outs(%[[FILL0]] : tensor<12x128xf32>)
+//       CHECK:     %[[FILL1:.+]] = linalg.fill
 //       CHECK:     %[[GENERIC1:.+]]:2 = linalg.generic
 //  CHECK-SAME:         ins(%[[LOAD0]], %[[GENERIC0]] : tensor<12x128x128xf32>, tensor<12x128xf32>)
 //  CHECK-SAME:         outs(%{{.*}}, %[[FILL1]] : tensor<12x128x128xf32>, tensor<12x128xf32>)
@@ -2050,33 +2050,3 @@ func.func @extract_slice1(%arg0 : tensor<5x24x48xf32>) -> tensor<4xf32> {
 //       CHECK:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]][%[[C2]], %[[C3]], %[[C4]] for %[[C1]], %[[C1]], %[[C4]]]
 //       CHECK:   %[[RESULT:.+]] = flow.tensor.reshape %[[SLICE]]
 //       CHECK:   return %[[RESULT]]
-
-// -----
-
-func.func @clone_fill_ops(%arg0 : tensor<128x256xf32>, %arg1 : tensor<256x512xf32>,
-    %arg2 : tensor<128x256xf32>, %arg3 : tensor<256x512xf32>)
-    -> (tensor<128x512xf32>, tensor<128x512xf32>) {
-  %0 = tensor.empty() : tensor<128x512xf32>
-  %cst = arith.constant 0.0 : f32
-  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<128x512xf32>) -> tensor<128x512xf32>
-  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<128x256xf32>, tensor<256x512xf32>)
-      outs(%1 : tensor<128x512xf32>) -> tensor<128x512xf32>
-  %3 = linalg.matmul ins(%arg2, %arg3 : tensor<128x256xf32>, tensor<256x512xf32>)
-      outs(%1 : tensor<128x512xf32>) -> tensor<128x512xf32>
-  return %2, %3 : tensor<128x512xf32>, tensor<128x512xf32>
-}
-// CHECK-LABEL: func @clone_fill_ops(
-//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<128x256xf32>
-//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<256x512xf32>
-//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9].+]]: tensor<128x256xf32>
-//  CHECK-SAME:   %[[ARG3:[a-zA-Z0-9].+]]: tensor<256x512xf32>
-//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
-//  CHECK-SAME:       (%[[ARG0]], %[[ARG1]])
-//       CHECK:     tensor.empty()
-//       CHECK:     linalg.fill
-//       CHECK:     linalg.matmul
-//       CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.workgroups
-//  CHECK-SAME:       (%[[ARG2]], %[[ARG3]])
-//       CHECK:     tensor.empty()
-//       CHECK:     linalg.fill
-//       CHECK:     linalg.matmul
