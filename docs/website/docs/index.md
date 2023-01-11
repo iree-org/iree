@@ -33,8 +33,8 @@ and can generate efficient code for a variety of runtime platforms:
 - [x] Linux
 - [x] Windows
 - [x] Android
-- [x] macOS
-- [x] iOS
+- [ ] macOS (planned)
+- [ ] iOS (planned)
 - [x] Bare metal
 - [ ] WebAssembly (planned)
 
