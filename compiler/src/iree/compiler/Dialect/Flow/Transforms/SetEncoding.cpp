@@ -29,8 +29,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-using IREE::LinalgExt::TensorEncoding;
-
 //===---------------------------------------------------------------------===//
 // Utility functions
 //===---------------------------------------------------------------------===//
@@ -130,81 +128,44 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
         llvm::any_of(outputs, hasEncoding)) {
       return failure();
     }
-
-    Value origLhs = inputs[0]->get();
-    Value origRhs = inputs[1]->get();
-    Value origOut = outputs[0]->get();
-
-    auto getElemType = [](Value v) -> Type {
-      if (auto tensorType = v.getType().dyn_cast<RankedTensorType>()) {
-        return tensorType.getElementType();
-      }
-      return {};
-    };
-    Type lhsElemType = getElemType(origLhs);
-    Type rhsElemType = getElemType(origRhs);
-    Type outElemType = getElemType(origOut);
-
-    if (!lhsElemType || !rhsElemType || !outElemType) {
-      return failure();
-    }
-
-    TensorEncoding lhsEncoding;
-    TensorEncoding rhsEncoding;
-    TensorEncoding outEncoding;
-
-    if (lhsElemType.isF32() && rhsElemType.isF32() && outElemType.isF32()) {
-      lhsEncoding = TensorEncoding::MATMUL_F32F32F32_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE;
-      outEncoding = TensorEncoding::MATMUL_F32F32F32_RESULT;
-    } else if (lhsElemType.isSignlessInteger(8) &&
-               rhsElemType.isSignlessInteger(8) &&
-               outElemType.isSignlessInteger(32)) {
-      lhsEncoding = TensorEncoding::MATMUL_I8I8I32_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE;
-      outEncoding = TensorEncoding::MATMUL_I8I8I32_RESULT;
-    } else {
-      return rewriter.notifyMatchFailure(
-          matmulOp,
-          "unhandled combination of (lhs, rhs, result) element types");
-    }
-
     Location loc = matmulOp.getLoc();
 
     // Set encoding for LHS (pad if necessary)
-    FailureOr<Value> paddedLhs = padIfNeeded(rewriter, loc, origLhs, padding);
-    if (failed(paddedLhs)) {
+    FailureOr<Value> lhs =
+        padIfNeeded(rewriter, loc, inputs[0]->get(), padding);
+    if (failed(lhs)) {
       return rewriter.notifyMatchFailure(matmulOp, "failed to pad lhs");
     }
+    Value lhsEncoding = rewriter.create<IREE::LinalgExt::SetEncodingOp>(
+        loc, lhs.value(), IREE::LinalgExt::TensorEncoding::GEMM_LHS);
 
     // Set encoding for RHS (pad if necessary)
-    FailureOr<Value> paddedRhs = padIfNeeded(rewriter, loc, origRhs, padding);
-    if (failed(paddedRhs)) {
+    FailureOr<Value> rhs =
+        padIfNeeded(rewriter, loc, inputs[1]->get(), padding);
+    if (failed(rhs)) {
       return rewriter.notifyMatchFailure(matmulOp, "failed to pad rhs");
     }
+    Value rhsEncoding = rewriter.create<IREE::LinalgExt::SetEncodingOp>(
+        loc, rhs.value(), IREE::LinalgExt::TensorEncoding::GEMM_RHS_TRANSPOSE);
 
     // Set encoding for OUTS (pad if necessary)
-    FailureOr<Value> paddedOut = padIfNeeded(rewriter, loc, origOut, padding);
-    if (failed(paddedOut)) {
+    FailureOr<Value> output =
+        padIfNeeded(rewriter, loc, outputs[0]->get(), padding);
+    if (failed(output)) {
       return rewriter.notifyMatchFailure(matmulOp, "failed to pad output");
     }
-
-    Value encodedLhs = rewriter.create<IREE::LinalgExt::SetEncodingOp>(
-        loc, paddedLhs.value(), lhsEncoding);
-    Value encodedRhs = rewriter.create<IREE::LinalgExt::SetEncodingOp>(
-        loc, paddedRhs.value(), rhsEncoding);
-    Value encodedOut = rewriter.create<IREE::LinalgExt::SetEncodingOp>(
-        loc, paddedOut.value(), outEncoding);
+    Value outsEncoding = rewriter.create<IREE::LinalgExt::SetEncodingOp>(
+        loc, output.value(), IREE::LinalgExt::TensorEncoding::GEMM_RESULT);
 
     auto matmulTiled = rewriter.create<linalg::MatmulOp>(
-        loc, encodedOut.getType(), ValueRange{encodedLhs, encodedRhs},
-        encodedOut);
+        loc, outsEncoding.getType(), ValueRange{lhsEncoding, rhsEncoding},
+        outsEncoding);
     auto unsetEncoding = rewriter.create<IREE::LinalgExt::UnsetEncodingOp>(
         loc, matmulTiled.getResult(0));
 
     Value replacement = unsetEncoding.getResult();
     // If the output was padded, extract the actual output.
-    if (paddedOut.value() != origOut) {
+    if (output.value() != outputs[0]->get()) {
       auto replacementRank =
           replacement.getType().cast<RankedTensorType>().getRank();
       // Offsets are all 0.
@@ -216,7 +177,7 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
 
       // Sizes are computed by original output size.
       FailureOr<SmallVector<OpFoldResult>> sizes =
-          LinalgExt::getDims(rewriter, loc, origOut);
+          LinalgExt::getDims(rewriter, loc, outputs[0]->get());
       if (failed(sizes)) {
         return rewriter.notifyMatchFailure(matmulOp,
                                            "failed to get shape of result");

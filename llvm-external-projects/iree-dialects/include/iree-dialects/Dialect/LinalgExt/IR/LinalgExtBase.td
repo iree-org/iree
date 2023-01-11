@@ -45,28 +45,19 @@ class IREELinalgExt_Attr<string name, list<Trait> traits = []>
   : AttrDef<IREELinalgExt_Dialect, name, traits>;
 
 // List of pre-defined data layout encoding attributes.
-def MATMUL_F32F32F32_LHS
-    : I32EnumAttrCase<"MATMUL_F32F32F32_LHS", 0>;
-def MATMUL_F32F32F32_RHS
-    : I32EnumAttrCase<"MATMUL_F32F32F32_RHS", 1>;
-def MATMUL_F32F32F32_RHS_TRANSPOSE
-    : I32EnumAttrCase<"MATMUL_F32F32F32_RHS_TRANSPOSE", 2>;
-def MATMUL_F32F32F32_RESULT
-    : I32EnumAttrCase<"MATMUL_F32F32F32_RESULT", 3>;
-def MATMUL_I8I8I32_LHS
-    : I32EnumAttrCase<"MATMUL_I8I8I32_LHS", 4>;
-def MATMUL_I8I8I32_RHS
-    : I32EnumAttrCase<"MATMUL_I8I8I32_RHS", 5>;
-def MATMUL_I8I8I32_RHS_TRANSPOSE
-    : I32EnumAttrCase<"MATMUL_I8I8I32_RHS_TRANSPOSE", 6>;
-def MATMUL_I8I8I32_RESULT
-    : I32EnumAttrCase<"MATMUL_I8I8I32_RESULT", 7>;
+def GEMM_LHS
+    : I32EnumAttrCase<"GEMM_LHS", 0>;
+def GEMM_RESULT
+    : I32EnumAttrCase<"GEMM_RESULT", 1>;
+def GEMM_RHS
+    : I32EnumAttrCase<"GEMM_RHS", 2>;
+def GEMM_RHS_TRANSPOSE
+    : I32EnumAttrCase<"GEMM_RHS_TRANSPOSE", 3>;
 
 def TensorEncodingEnum
     : I32EnumAttr<"TensorEncoding",
                   "identifier for encoding used for the tensor",[
-                    MATMUL_F32F32F32_LHS, MATMUL_F32F32F32_RHS, MATMUL_F32F32F32_RHS_TRANSPOSE, MATMUL_F32F32F32_RESULT,
-                    MATMUL_I8I8I32_LHS, MATMUL_I8I8I32_RHS, MATMUL_I8I8I32_RHS_TRANSPOSE, MATMUL_I8I8I32_RESULT,
+                    GEMM_LHS, GEMM_RESULT, GEMM_RHS, GEMM_RHS_TRANSPOSE
                   ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::LinalgExt";
   let genSpecializedAttr = 0;

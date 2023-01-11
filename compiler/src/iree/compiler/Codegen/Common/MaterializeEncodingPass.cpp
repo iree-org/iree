@@ -22,9 +22,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-using IREE::LinalgExt::MaterializeEncodingInfo;
-using IREE::LinalgExt::TensorEncoding;
-
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
 /// returns the materialized shape of the `dispatchTensorType`. The
 /// dynamic dimensions of the `dispatchTensorType` are provided in
@@ -47,7 +44,7 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
 
   IREE::LinalgExt::MaterializeEncodingFn materializeEncodingFn =
       typeConverter.getMaterializeEncodingFn();
-  FailureOr<MaterializeEncodingInfo> encodingInfo =
+  FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
       materializeEncodingFn(boundTensorType);
   if (failed(encodingInfo)) {
     return failure();
@@ -89,7 +86,8 @@ static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
 
 namespace {
 /// Extract encoding from the `tensorType` if specified.
-static Optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
+static Optional<IREE::LinalgExt::TensorEncoding> getEncoding(
+    RankedTensorType tensorType) {
   auto encodingAttr = tensorType.getEncoding()
                           .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
   if (!encodingAttr) return llvm::None;
@@ -100,29 +98,25 @@ static Optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
 /// materializing the pack op.
 // TODO(bjacob): This is in the process of being actually implemented in a way
 // that actually uses target information.
-static FailureOr<MaterializeEncodingInfo> chooseEncodingInfo(
+static FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> chooseEncodingInfo(
     RankedTensorType tensorType, Operation *op) {
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(op);
   // TODO: actually use `target`.
   (void)target;
-  Optional<TensorEncoding> encoding = getEncoding(tensorType);
+  Optional<IREE::LinalgExt::TensorEncoding> encoding = getEncoding(tensorType);
   if (!encoding) return failure();
   switch (*encoding) {
-    case TensorEncoding::MATMUL_F32F32F32_LHS:
-    case TensorEncoding::MATMUL_I8I8I32_LHS:
-      return MaterializeEncodingInfo{{0, 1}, {8, 4}, {}};
+    case IREE::LinalgExt::TensorEncoding::GEMM_LHS:
+      return IREE::LinalgExt::MaterializeEncodingInfo{{0, 1}, {8, 4}, {}};
       break;
-    case TensorEncoding::MATMUL_F32F32F32_RHS:
-    case TensorEncoding::MATMUL_I8I8I32_RHS:
-      return MaterializeEncodingInfo{{0, 1}, {4, 8}, {}};
+    case IREE::LinalgExt::TensorEncoding::GEMM_RHS:
+      return IREE::LinalgExt::MaterializeEncodingInfo{{0, 1}, {4, 8}, {}};
       break;
-    case TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE:
-    case TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE:
-      return MaterializeEncodingInfo{{1, 0}, {8, 4}, {1, 0}};
+    case IREE::LinalgExt::TensorEncoding::GEMM_RESULT:
+      return IREE::LinalgExt::MaterializeEncodingInfo{{0, 1}, {8, 8}, {}};
       break;
-    case TensorEncoding::MATMUL_F32F32F32_RESULT:
-    case TensorEncoding::MATMUL_I8I8I32_RESULT:
-      return MaterializeEncodingInfo{{0, 1}, {8, 8}, {}};
+    case IREE::LinalgExt::TensorEncoding::GEMM_RHS_TRANSPOSE:
+      return IREE::LinalgExt::MaterializeEncodingInfo{{1, 0}, {8, 4}, {1, 0}};
       break;
     default:
       return failure();

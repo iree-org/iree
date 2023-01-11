@@ -85,21 +85,17 @@ chooseEncodingInfo(RankedTensorType tensorType) {
   if (!encoding)
     return failure();
   switch (*encoding) {
-  case TensorEncoding::MATMUL_F32F32F32_LHS:
-  case TensorEncoding::MATMUL_I8I8I32_LHS:
+  case TensorEncoding::GEMM_LHS:
     return MaterializeEncodingInfo{{0, 1}, {8, 4}, {}};
     break;
-  case TensorEncoding::MATMUL_F32F32F32_RHS:
-  case TensorEncoding::MATMUL_I8I8I32_RHS:
+  case TensorEncoding::GEMM_RHS:
     return MaterializeEncodingInfo{{0, 1}, {4, 8}, {}};
     break;
-  case TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE:
-  case TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE:
-    return MaterializeEncodingInfo{{1, 0}, {8, 4}, {1, 0}};
-    break;
-  case TensorEncoding::MATMUL_F32F32F32_RESULT:
-  case TensorEncoding::MATMUL_I8I8I32_RESULT:
+  case TensorEncoding::GEMM_RESULT:
     return MaterializeEncodingInfo{{0, 1}, {8, 8}, {}};
+    break;
+  case TensorEncoding::GEMM_RHS_TRANSPOSE:
+    return MaterializeEncodingInfo{{1, 0}, {8, 4}, {1, 0}};
     break;
   default:
     return failure();
@@ -186,9 +182,9 @@ lowerUnsetEncodingToUnpackOp(RewriterBase &rewriter, UnsetEncodingOp encodingOp,
 }
 
 /// Utility method to convert from `linalg.matmul` with
-/// - lhs encoding of MATMUL_F32F32F32_LHS
-/// - rhs encoding of MATMUL_F32F32F32_RHS_TRANSPOSE
-/// - result encoding of MATMUL_F32F32F32_RESULT
+/// - lhs encoding of GEMM_LHS
+/// - rhs encoding of GEMM_RHS_TRANSPOSE
+/// - result encoding of GEMM_RESULT
 /// to linalg.mmt4d op.
 static FailureOr<Operation *>
 lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
@@ -205,12 +201,11 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
       getEncoding(inputs[1]->get().getType().cast<RankedTensorType>());
   Optional<TensorEncoding> resultEncoding =
       getEncoding(outputs[0]->get().getType().cast<RankedTensorType>());
-  if (!lhsEncoding ||
-      lhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_LHS ||
+  if (!lhsEncoding || lhsEncoding.value() != TensorEncoding::GEMM_LHS ||
       !rhsEncoding ||
-      rhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE ||
+      rhsEncoding.value() != TensorEncoding::GEMM_RHS_TRANSPOSE ||
       !resultEncoding ||
-      resultEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RESULT) {
+      resultEncoding.value() != TensorEncoding::GEMM_RESULT) {
     return failure();
   }
   Operation *mmt4DOp = rewriter.create<linalg::Mmt4DOp>(
