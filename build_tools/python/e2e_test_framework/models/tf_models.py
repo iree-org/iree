@@ -40,14 +40,3 @@ EFFICIENTNET_V2_S_FP32 = common_definitions.Model(
     "https://storage.googleapis.com/iree-model-artifacts/efficientnet-v2-s-tf-model.tar.gz",
     entry_function="forward",
     input_types=["1x384x384x3xf32"])
-
-RESNET50_TF_FP32 = common_definitions.Model(
-    id=unique_ids.MODEL_RESNET50_TF_FP32,
-    name="Resnet50TF",
-    tags=["fp32"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_TF,
-    # Derived from https://github.com/keras-team/keras/blob/v2.10.0/keras/applications/resnet.py.
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/resnet50-tf-model.tar.gz",
-    entry_function="forward",
-    input_types=["1x224x224x3xf32"])

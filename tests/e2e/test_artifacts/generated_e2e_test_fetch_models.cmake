@@ -137,13 +137,3 @@ iree_fetch_artifact(
     "${ROOT_ARTIFACTS_DIR}/models/ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF"
   UNPACK
 )
-
-iree_fetch_artifact(
-  NAME
-    "model-c393b4fa-beb4-45d5-982a-c6328aa05d08"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/resnet50-tf-model.tar.gz"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/models/c393b4fa-beb4-45d5-982a-c6328aa05d08_Resnet50TF"
-  UNPACK
-)
