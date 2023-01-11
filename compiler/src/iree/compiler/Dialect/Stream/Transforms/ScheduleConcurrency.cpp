@@ -110,15 +110,14 @@ struct WavePartitionBuilder {
     auto &entryBlock = concurrentOp.getBody().emplaceBlock();
     SmallVector<Location> operandLocs(operandTypes.size(),
                                       concurrentOp.getLoc());
-    for (auto args : llvm::zip_equal(
+    for (auto args : llvm::zip(
              operands, entryBlock.addArguments(operandTypes, operandLocs))) {
       mapping.map(std::get<0>(args), std::get<1>(args));
     }
     builder = OpBuilder::atBlockBegin(&entryBlock);
 
     // Remap results for escaping outputs.
-    for (auto results :
-         llvm::zip_equal(partition->outs, concurrentOp.getResults())) {
+    for (auto results : llvm::zip(partition->outs, concurrentOp.getResults())) {
       parentMapping.map(std::get<0>(results), std::get<1>(results));
     }
   }
@@ -237,8 +236,8 @@ class ScheduleConcurrencyPass
     // We must do this per block as we'll be updating dominated block values.
     for (auto &partitionBuilder : partitionBuilders) {
       for (auto resultPair :
-           llvm::zip_equal(partitionBuilder.partition->outs,
-                           partitionBuilder.concurrentOp.getResults())) {
+           llvm::zip(partitionBuilder.partition->outs,
+                     partitionBuilder.concurrentOp.getResults())) {
         auto oldResult = std::get<0>(resultPair);
         auto newResult = std::get<1>(resultPair);
         oldResult.replaceAllUsesWith(newResult);
