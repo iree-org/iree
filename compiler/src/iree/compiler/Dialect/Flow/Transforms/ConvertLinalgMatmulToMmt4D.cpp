@@ -387,7 +387,7 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
         "generic tiling parameters, as no known kernel was "
         "matched for this matmul and target");
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 /// Canonicalizes [tensor.empty() -> linalg.fill -> linalg.generic] ->

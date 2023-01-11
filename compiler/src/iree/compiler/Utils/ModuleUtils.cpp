@@ -26,7 +26,7 @@ static llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
   } else if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
     return loc;
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 std::string guessModuleName(mlir::ModuleOp moduleOp, StringRef defaultName) {

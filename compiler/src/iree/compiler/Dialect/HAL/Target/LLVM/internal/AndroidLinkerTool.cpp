@@ -216,7 +216,7 @@ class AndroidLinkerTool : public LinkerTool {
     flagsToPrefixForLinker.clear();
 
     auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine))) return std::nullopt;
+    if (failed(runLinkCommand(commandLine))) return llvm::None;
     return artifacts;
   }
 };

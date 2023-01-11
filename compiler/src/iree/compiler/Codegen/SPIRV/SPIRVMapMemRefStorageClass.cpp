@@ -30,7 +30,7 @@ Optional<spirv::StorageClass> mapHALDescriptorTypeForVulkan(Attribute attr) {
     case IREE::HAL::DescriptorType::StorageBuffer:
       return spirv::StorageClass::StorageBuffer;
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 Optional<spirv::StorageClass> mapHALDescriptorTypeForOpenCL(Attribute attr) {
@@ -42,7 +42,7 @@ Optional<spirv::StorageClass> mapHALDescriptorTypeForOpenCL(Attribute attr) {
     case IREE::HAL::DescriptorType::StorageBuffer:
       return spirv::StorageClass::CrossWorkgroup;
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 struct SPIRVMapMemRefStorageClassPass final

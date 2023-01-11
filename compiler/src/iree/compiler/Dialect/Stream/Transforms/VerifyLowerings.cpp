@@ -74,7 +74,7 @@ class Verifier {
       if (auto op = dyn_cast<OpT>(baseOp)) {
         return fn(op);
       }
-      return std::nullopt;
+      return llvm::None;
     };
     opVerifiers.push_back(wrapperFn);
   }
@@ -217,7 +217,7 @@ static void markStreamTensorOpsIllegal(Verifier &verifier) {
     if (op->hasTrait<OpTrait::IREE::Stream::TensorPhaseOp>()) {
       return Verifier::Legality::ILLEGAL;
     }
-    return std::nullopt;
+    return llvm::None;
   });
 }
 
@@ -226,7 +226,7 @@ static void markStreamAsyncOpsIllegal(Verifier &verifier) {
     if (op->hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>()) {
       return Verifier::Legality::ILLEGAL;
     }
-    return std::nullopt;
+    return llvm::None;
   });
 }
 
@@ -235,7 +235,7 @@ static void markStreamCmdOpsIllegal(Verifier &verifier) {
     if (op->hasTrait<OpTrait::IREE::Stream::CmdPhaseOp>()) {
       return Verifier::Legality::ILLEGAL;
     }
-    return std::nullopt;
+    return llvm::None;
   });
 }
 
@@ -366,7 +366,7 @@ class VerifyLoweringToAsyncPass
                 << ": streamable op expected to be in an execution region";
             return Verifier::Legality::ILLEGAL;
           }
-          return std::nullopt;
+          return llvm::None;
         });
 
     if (failed(verifier.run(getOperation()))) {

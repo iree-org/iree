@@ -668,7 +668,7 @@ llvm::Optional<ResourceUsageBitfield>
 ResourceUsageAnalysis::tryLookupResourceUsage(Value value) {
   auto resourceUsage =
       solver.lookupElementFor<ValueResourceUsage>(Position::forValue(value));
-  if (!resourceUsage) return std::nullopt;
+  if (!resourceUsage) return llvm::None;
   return resourceUsage->getAssumedUsage();
 }
 

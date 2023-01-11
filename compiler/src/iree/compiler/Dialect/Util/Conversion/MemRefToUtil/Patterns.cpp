@@ -279,7 +279,7 @@ void populateMemRefToUtilPatterns(MLIRContext *context,
             return IREE::Util::BufferType::get(type.getContext());
           }
         }
-        return std::nullopt;
+        return llvm::None;
       });
 
   patterns

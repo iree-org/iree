@@ -465,9 +465,10 @@ transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
   SimplePatternRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
       rewriteForeachThreadToFlowDispatchWorkgroups(target, rewriter);
-  if (failed(result)) return emitDefaultDefiniteFailure(target);
+  if (failed(result))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   results.push_back(*result);
-  return DiagnosedSilenceableFailure::success();
+  return DiagnosedSilenceableFailure(success());
 }
 
 void transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::getEffects(
@@ -483,9 +484,10 @@ DiagnosedSilenceableFailure transform_dialect::RegionToWorkgroupsOp::applyToOne(
   IRRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
       rewriteFlowDispatchRegionToFlowDispatchWorkgroups(target, rewriter);
-  if (failed(result)) return emitDefaultDefiniteFailure(target);
+  if (failed(result))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   results.push_back(*result);
-  return DiagnosedSilenceableFailure::success();
+  return DiagnosedSilenceableFailure(success());
 }
 
 void transform_dialect::RegionToWorkgroupsOp::getEffects(
@@ -510,12 +512,13 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
   }
 
   if (dispatchRegion.size() != 1)
-    return emitDefiniteFailure(
-        "requires exactly one target/dispatch region handle");
+    return DiagnosedSilenceableFailure(this->emitOpError(
+        "requires exactly one target/dispatch region handle"));
 
   auto regionOp = dyn_cast<Flow::DispatchRegionOp>(dispatchRegion.front());
   if (!regionOp)
-    return emitDefiniteFailure("expected 'dispatch.region' operand");
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("expected 'dispatch.region' operand"));
 
   // We are cloning ops one-by-one, so the order must be inversed (as opposed
   // to cloning all ops in one go).
@@ -530,12 +533,13 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
   for (Operation *target : orderedTargets) {
     FailureOr<Operation *> clonedTarget =
         clonePrecedingOpIntoDispatchRegion(rewriter, target, regionOp);
-    if (failed(clonedTarget)) return emitDefaultDefiniteFailure(target);
+    if (failed(clonedTarget))
+      return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
     clonedTargets.push_back(*clonedTarget);
   }
 
   transformResults.set(getCloned().cast<OpResult>(), clonedTargets);
-  return DiagnosedSilenceableFailure::success();
+  return DiagnosedSilenceableFailure(success());
 }
 
 void transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::getEffects(
@@ -561,12 +565,13 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
   }
 
   if (dispatchRegion.size() != 1)
-    return emitDefiniteFailure(
-        "requires exactly one target/dispatch region handle");
+    return DiagnosedSilenceableFailure(this->emitOpError(
+        "requires exactly one target/dispatch region handle"));
 
   auto regionOp = dyn_cast<Flow::DispatchRegionOp>(dispatchRegion.front());
   if (!regionOp)
-    return emitDefiniteFailure("expected 'dispatch.region' operand");
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("expected 'dispatch.region' operand"));
 
   // We are cloning ops one-by-one, so the order must be inversed (as opposed
   // to cloning all ops in one go).
@@ -580,13 +585,14 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
   for (Operation *target : orderedTargets) {
     auto newRegionOp =
         movePrecedingOpIntoDispatchRegion(rewriter, target, regionOp);
-    if (failed(newRegionOp)) return emitDefaultDefiniteFailure(target);
+    if (failed(newRegionOp))
+      return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
     regionOp = *newRegionOp;
   }
 
   transformResults.set(getTransformed().cast<OpResult>(),
                        regionOp.getOperation());
-  return DiagnosedSilenceableFailure::success();
+  return DiagnosedSilenceableFailure(success());
 }
 
 void transform_dialect::MovePrecedingOpIntoDispatchRegionOp::getEffects(
@@ -751,11 +757,13 @@ transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
       state.getPayloadOps(getDispatchRegion());
 
   if (dispatchRegion.size() != 1)
-    return emitDefiniteFailure("requires exactly one dispatch region handle");
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("requires exactly one dispatch region handle"));
 
   auto regionOp = dyn_cast<Flow::DispatchRegionOp>(dispatchRegion.front());
   if (!regionOp)
-    return emitDefiniteFailure("expected 'dispatch.region' operand");
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("expected 'dispatch.region' operand"));
 
   SmallVector<Operation *> orderedTargets(targetOps.begin(), targetOps.end());
   bool sortResult = computeTopologicalSorting(orderedTargets);
@@ -772,7 +780,7 @@ transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
   }
 
   transformResults.set(getCloned().cast<OpResult>(), newTargets);
-  return DiagnosedSilenceableFailure::success();
+  return DiagnosedSilenceableFailure(success());
 }
 
 void transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::getEffects(
@@ -792,12 +800,13 @@ transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::apply(
       state.getPayloadOps(getDispatchRegion());
 
   if (dispatchRegion.size() != 1)
-    return emitDefiniteFailure(
-        "requires exactly one target/dispatch region handle");
+    return DiagnosedSilenceableFailure(this->emitOpError(
+        "requires exactly one target/dispatch region handle"));
 
   auto regionOp = dyn_cast<Flow::DispatchRegionOp>(dispatchRegion.front());
   if (!regionOp)
-    return emitDefiniteFailure("expected 'dispatch.region' operand");
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("expected 'dispatch.region' operand"));
 
   SmallVector<Operation *> orderedTargets(targetOps.begin(), targetOps.end());
   bool sortResult = computeTopologicalSorting(orderedTargets);
@@ -814,7 +823,7 @@ transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::apply(
 
   transformResults.set(getTransformed().cast<OpResult>(),
                        regionOp.getOperation());
-  return DiagnosedSilenceableFailure::success();
+  return DiagnosedSilenceableFailure(success());
 }
 
 void transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::getEffects(
@@ -830,20 +839,21 @@ transform_dialect::WrapInDispatchRegionOp::applyToOne(
     Operation *target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   IRRewriter rewriter(target->getContext());
-  Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
+  Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None;
   if (getGenerateWorkload()) {
     auto maybeBuilder = Flow::getWorkloadBuilder(rewriter, target);
     if (failed(maybeBuilder)) {
-      return emitDefaultDefiniteFailure(target);
+      return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
     }
     workloadBuilder = *maybeBuilder;
   }
   auto regionOp =
       Flow::wrapOpInDispatchRegion(rewriter, target, workloadBuilder);
-  if (failed(regionOp)) return emitDefaultDefiniteFailure(target);
+  if (failed(regionOp))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
 
   results.push_back(*regionOp);
-  return DiagnosedSilenceableFailure::success();
+  return DiagnosedSilenceableFailure(success());
 }
 
 void transform_dialect::WrapInDispatchRegionOp::getEffects(

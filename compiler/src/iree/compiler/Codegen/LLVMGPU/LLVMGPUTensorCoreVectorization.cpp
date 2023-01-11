@@ -41,7 +41,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
 
 static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
   auto contract = dyn_cast<vector::ContractionOp>(op);
-  if (!contract) return std::nullopt;
+  if (!contract) return llvm::None;
   SmallVector<int64_t> order;
   // Pick an unrolling order that will allow tensorcore operation to reuse LHS
   // register. This is needed to get good performance on sm_80 target.
@@ -97,9 +97,9 @@ static Optional<SmallVector<int64_t>> getGPUTCNativeVectorSize(Operation *op) {
     VectorType sliceType;
     for (Operation *users : op->getUsers()) {
       auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-      if (!extract) return std::nullopt;
+      if (!extract) return llvm::None;
       auto vecType = extract.getResult().getType().cast<VectorType>();
-      if (sliceType && sliceType != vecType) return std::nullopt;
+      if (sliceType && sliceType != vecType) return llvm::None;
       sliceType = vecType;
     }
     return llvm::to_vector<>(sliceType.getShape());
@@ -112,7 +112,7 @@ static Optional<SmallVector<int64_t>> getGPUTCNativeVectorSize(Operation *op) {
       return nativeSize;
     }
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 static void populateVectorUnrollPatterns(RewritePatternSet &patterns) {

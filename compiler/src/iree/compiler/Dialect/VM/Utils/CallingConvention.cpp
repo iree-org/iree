@@ -87,12 +87,12 @@ Optional<std::string> makeImportCallingConventionString(
       if (importOp.isFuncArgumentVariadic(i)) {
         if (failed(encodeVariadicCallingConventionType(
                 importOp, functionType.getInput(i), s))) {
-          return std::nullopt;
+          return None;
         }
       } else {
         if (failed(encodeCallingConventionType(importOp,
                                                functionType.getInput(i), s))) {
-          return std::nullopt;
+          return None;
         }
       }
     }
@@ -104,7 +104,7 @@ Optional<std::string> makeImportCallingConventionString(
     for (int i = 0; i < functionType.getNumResults(); ++i) {
       if (failed(encodeCallingConventionType(importOp,
                                              functionType.getResult(i), s))) {
-        return std::nullopt;
+        return None;
       }
     }
   } else {
@@ -124,7 +124,7 @@ Optional<std::string> makeCallingConventionString(IREE::VM::FuncOp funcOp) {
     for (int i = 0; i < functionType.getNumInputs(); ++i) {
       if (failed(encodeCallingConventionType(funcOp, functionType.getInput(i),
                                              s))) {
-        return std::nullopt;
+        return None;
       }
     }
   } else {
@@ -135,7 +135,7 @@ Optional<std::string> makeCallingConventionString(IREE::VM::FuncOp funcOp) {
     for (int i = 0; i < functionType.getNumResults(); ++i) {
       if (failed(encodeCallingConventionType(funcOp, functionType.getResult(i),
                                              s))) {
-        return std::nullopt;
+        return None;
       }
     }
   } else {

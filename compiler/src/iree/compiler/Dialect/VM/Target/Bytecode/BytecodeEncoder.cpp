@@ -259,7 +259,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
 
   Optional<std::vector<uint8_t>> finish() {
     if (failed(fixupOffsets())) {
-      return std::nullopt;
+      return llvm::None;
     }
     return std::move(bytecode_);
   }
@@ -352,7 +352,7 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
   RegisterAllocation registerAllocation;
   if (failed(registerAllocation.recalculate(funcOp))) {
     funcOp.emitError() << "register allocation failed";
-    return std::nullopt;
+    return llvm::None;
   }
 
   FunctionSourceMap sourceMap;
@@ -362,14 +362,14 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
   for (auto &block : funcOp.getBlocks()) {
     if (failed(encoder.beginBlock(&block))) {
       funcOp.emitError() << "failed to begin block";
-      return std::nullopt;
+      return llvm::None;
     }
 
     for (auto &op : block.getOperations()) {
       auto serializableOp = dyn_cast<IREE::VM::VMSerializableOp>(op);
       if (!serializableOp) {
         op.emitOpError() << "is not serializable";
-        return std::nullopt;
+        return llvm::None;
       }
       sourceMap.locations.push_back(
           {static_cast<int32_t>(encoder.getOffset()), op.getLoc()});
@@ -377,13 +377,13 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
           failed(serializableOp.encode(symbolTable, encoder)) ||
           failed(encoder.endOp(&op))) {
         op.emitOpError() << "failed to encode";
-        return std::nullopt;
+        return llvm::None;
       }
     }
 
     if (failed(encoder.endBlock(&block))) {
       funcOp.emitError() << "failed to end block";
-      return std::nullopt;
+      return llvm::None;
     }
   }
 
@@ -391,12 +391,12 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
 
   if (failed(encoder.ensureAlignment(8))) {
     funcOp.emitError() << "failed to pad function";
-    return std::nullopt;
+    return llvm::None;
   }
   auto bytecodeData = encoder.finish();
   if (!bytecodeData.has_value()) {
     funcOp.emitError() << "failed to fixup and finish encoding";
-    return std::nullopt;
+    return llvm::None;
   }
   result.bytecodeData = bytecodeData.value();
   result.i32RegisterCount = registerAllocation.getMaxI32RegisterOrdinal() + 1;

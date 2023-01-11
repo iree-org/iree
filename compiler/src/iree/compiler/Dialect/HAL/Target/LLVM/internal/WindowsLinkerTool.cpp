@@ -192,7 +192,7 @@ class WindowsLinkerTool : public LinkerTool {
       llvm::errs() << "required environment for lld-link/link not specified; "
                       "ensure you are building from a shell where "
                       "vcvarsall/VsDevCmd.bat/etc has been used";
-      return std::nullopt;
+      return llvm::None;
     }
     const char *arch;
     if (targetTriple.isARM() && targetTriple.isArch32Bit()) {
@@ -206,7 +206,7 @@ class WindowsLinkerTool : public LinkerTool {
     } else {
       llvm::errs() << "unsupported Windows target triple (no arch libs): "
                    << targetTriple.str();
-      return std::nullopt;
+      return llvm::None;
     }
     flags.push_back(
         llvm::formatv("/libpath:\"{0}\\lib\\{1}\"", "%VCToolsInstallDir%", arch)
@@ -262,7 +262,7 @@ class WindowsLinkerTool : public LinkerTool {
     }
 
     auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine))) return std::nullopt;
+    if (failed(runLinkCommand(commandLine))) return llvm::None;
 
     // PDB file gets generated wtih the same path + .pdb.
     artifacts.debugFile =

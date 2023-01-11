@@ -123,14 +123,14 @@ llvm::Optional<int32_t> getElementTypeValue(Type type) {
         return makeElementTypeValue(NumericalType::kFloatBrain,
                                     floatType.getWidth());
       default:
-        return std::nullopt;
+        return llvm::None;
     }
   } else if (auto complexType = type.dyn_cast_or_null<ComplexType>()) {
     return makeElementTypeValue(
         NumericalType::kFloatComplex,
         complexType.getElementType().getIntOrFloatBitWidth() * 2);
   }
-  return std::nullopt;
+  return llvm::None;
 }
 
 llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr) {
@@ -486,13 +486,13 @@ Optional<std::string> ExecutableObjectAttr::loadData() {
           << "ERROR: referenced object file not found on any path; use "
              "--iree-hal-executable-object-search-path= to add search paths: "
           << *this << "\n";
-      return std::nullopt;
+      return None;
     }
     auto file = llvm::MemoryBuffer::getFile(*filePath);
-    if (!file) return std::nullopt;
+    if (!file) return None;
     return std::string((*file)->getBuffer());
   }
-  return std::nullopt;
+  return None;
 }
 
 //===----------------------------------------------------------------------===//
@@ -569,7 +569,7 @@ Optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
       allObjectAttrs.append(objectsArrayAttr.begin(), objectsArrayAttr.end());
     }
   }
-  if (allObjectAttrs.empty()) return std::nullopt;
+  if (allObjectAttrs.empty()) return None;
   return ArrayAttr::get(specificTargetAttr.getContext(), allObjectAttrs);
 }
 

@@ -18,7 +18,7 @@ namespace IREE {
 namespace HAL {
 
 // Compiles SPIR-V into WebGPU Shading Language (WGSL) source code.
-// Returns std::nullopt on failure.
+// Returns llvm::None on failure.
 llvm::Optional<std::string> compileSPIRVToWGSL(
     llvm::ArrayRef<uint32_t> spvBinary);
 

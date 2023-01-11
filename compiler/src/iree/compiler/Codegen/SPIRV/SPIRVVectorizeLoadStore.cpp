@@ -697,7 +697,7 @@ LogicalResult ProcessFunctionArgument::matchAndRewrite(
   // Creates a new function with the update signature.
   rewriter.updateRootInPlace(funcOp, [&] {
     funcOp.setType(rewriter.getFunctionType(
-        signatureConverter.getConvertedTypes(), std::nullopt));
+        signatureConverter.getConvertedTypes(), llvm::None));
   });
   return success();
 }

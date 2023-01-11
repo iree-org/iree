@@ -150,7 +150,7 @@ void populateUtilListToVMPatterns(MLIRContext *context,
         } else {
           elementType = typeConverter.convertType(type.getElementType());
         }
-        if (!elementType) return std::nullopt;
+        if (!elementType) return llvm::None;
         return IREE::VM::RefType::get(IREE::VM::ListType::get(elementType));
       });
 

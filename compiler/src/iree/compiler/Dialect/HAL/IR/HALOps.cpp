@@ -910,9 +910,8 @@ ParseResult ExecutableConstantBlockOp::parse(OpAsmParser &parser,
   }
   SmallVector<Type> argTypes;
   for (auto &arg : entryArgs) argTypes.push_back(arg.type);
-  auto fnType = builder.getFunctionType(argTypes, resultTypes);
-  result.addAttribute(getFunctionTypeAttrName(result.name),
-                      TypeAttr::get(fnType));
+  result.addAttribute("function_type", TypeAttr::get(builder.getFunctionType(
+                                           argTypes, resultTypes)));
 
   // Parse the keys used for each yielded constant value.
   // There must be one key per result. Note that we support omitted parens when
@@ -947,9 +946,8 @@ ParseResult ExecutableConstantBlockOp::parse(OpAsmParser &parser,
 
   // Add the attributes to the function arguments.
   assert(resultAttrs.size() == resultTypes.size());
-  mlir::function_interface_impl::addArgAndResultAttrs(
-      builder, result, entryArgs, resultAttrs, getArgAttrsAttrName(result.name),
-      getResAttrsAttrName(result.name));
+  mlir::function_interface_impl::addArgAndResultAttrs(builder, result,
+                                                      entryArgs, resultAttrs);
 
   // Parse the optional function body. The printer will not print the body if
   // its empty, so disallow parsing of empty body in the parser.
@@ -979,7 +977,7 @@ void ExecutableConstantBlockOp::print(OpAsmPrinter &p) {
                         [&](Attribute attr) { p << attr; });
   if (resultTypes.size() != 1) p << ')';
   mlir::function_interface_impl::printFunctionAttributes(
-      p, op, {getFunctionTypeAttrName(), getKeysAttrName()});
+      p, op, argTypes.size(), resultTypes.size(), {"keys"});
   p << " ";
   p.printRegion(getBody(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
@@ -1099,7 +1097,7 @@ static llvm::Optional<APInt> lookupValueOrAlignment(Value value) {
   }
 
   // TODO(benvanik): more searching.
-  return std::nullopt;
+  return llvm::None;
 }
 
 llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {

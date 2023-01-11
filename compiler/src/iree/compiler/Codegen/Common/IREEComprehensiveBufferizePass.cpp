@@ -58,10 +58,9 @@ class IREEComprehensiveBufferizePass
     : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
  public:
   explicit IREEComprehensiveBufferizePass(
-      Optional<BufferizationOptions::AllocationFn> allocationFn = std::nullopt,
-      Optional<BufferizationOptions::DeallocationFn> deallocationFn =
-          std::nullopt,
-      Optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt)
+      Optional<BufferizationOptions::AllocationFn> allocationFn = None,
+      Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,
+      Optional<BufferizationOptions::MemCpyFn> memCpyFn = None)
       : allocationFn(allocationFn),
         deallocationFn(deallocationFn),
         memCpyFn(memCpyFn) {}

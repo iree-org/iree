@@ -156,7 +156,7 @@ Optional<Extent> computeBinaryResultExtent(OpBuilder &builder, Location loc,
       emitError(loc) << "cannot broadcast extents of differing size unless "
                         "if one of them is 1 (got "
                      << lhsDim.getStatic() << ", " << rhsDim.getStatic() << ")";
-      return std::nullopt;
+      return llvm::None;
     }
 
     // Static expansions.
@@ -266,7 +266,7 @@ Optional<Extent> computeTernaryResultExtent(OpBuilder &builder, Location loc,
                           "if one of them is 1 (got "
                        << cmpLhs.getStatic() << ", " << cmpRhs.getStatic()
                        << ")";
-        return std::nullopt;
+        return llvm::None;
       }
       continue;
     }

@@ -118,14 +118,14 @@ Optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
   OpBuilder::InsertionGuard guard(builder);
 
   func::FuncOp funcOp = subview->getParentOfType<func::FuncOp>();
-  if (!funcOp) return std::nullopt;
+  if (!funcOp) return llvm::None;
 
   // The subview size bounds are expected to be constant; they specify the shape
   // of the allocation.
   SmallVector<int64_t, 2> shape;
   for (Value bound : sizeBounds) {
     APInt value;
-    if (!matchPattern(bound, m_ConstantInt(&value))) return std::nullopt;
+    if (!matchPattern(bound, m_ConstantInt(&value))) return llvm::None;
     shape.push_back(value.getSExtValue());
   }
 
