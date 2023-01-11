@@ -34,8 +34,11 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %func = transform.structured.match ops{["func.func"]} in %variant_op
   // TODO: masked vectorization on block_more_parallel_op_2 if we want 
   // vector<4> to work as intended.
-  %func_2 = transform.iree.apply_patterns %func { rank_reducing }
-  %func_3 = transform.structured.vectorize %func_2
+  // TODO: there is a conflicting pattern here that introduces a tensor.empty
+  // to collapse/expand shape + scf.for. 
+  // This is investigated in parallel.
+  // %func_2 = transform.iree.apply_patterns %func { rank_reducing }
+  %func_3 = transform.structured.vectorize %func
 
   // Step 4. Bufferize and drop HAL descriptor from memref ops.
   // ===========================================================================
