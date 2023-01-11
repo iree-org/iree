@@ -40,11 +40,6 @@ struct AllDims {};
 /// for all operands of the relevant kind.
 struct AllOperands {};
 
-struct CaptureDim {
-  explicit CaptureDim(int64_t &value) : value(value) {}
-  int64_t &value;
-};
-
 /// A tag indicating to look for any user of the operation's result that would
 /// satisfy the predicate.
 struct HasAnyUse {};
@@ -157,8 +152,6 @@ public:
   /// may be negative, in which case dimensions are counted from the last one
   /// (i.e. Python-style).
   StructuredOpMatcher &dim(int64_t dimension, DivisibleBy divisibleBy);
-
-  StructuredOpMatcher &dim(int64_t dimension, CaptureDim capture);
 
   /// Adds a predicate checking that the structured op has the given number of
   /// inputs.
@@ -452,8 +445,7 @@ private:
 void makeReductionMatcher(StructuredOpMatcher &reduction,
                           StructuredOpMatcher &fill,
                           StructuredOpMatcher &leading,
-                          StructuredOpMatcher &trailing,
-                          int64_t &reductionDimensionSize);
+                          StructuredOpMatcher &trailing);
 
 /// Creates a group of matchers for:
 ///
