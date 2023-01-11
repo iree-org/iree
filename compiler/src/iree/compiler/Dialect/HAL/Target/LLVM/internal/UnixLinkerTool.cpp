@@ -138,7 +138,7 @@ class UnixLinkerTool : public LinkerTool {
 };
 
 std::unique_ptr<LinkerTool> createUnixLinkerTool(
-    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
   return std::make_unique<UnixLinkerTool>(targetTriple, targetOptions);
 }
 

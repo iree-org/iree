@@ -280,7 +280,7 @@ class WindowsLinkerTool : public LinkerTool {
 };
 
 std::unique_ptr<LinkerTool> createWindowsLinkerTool(
-    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
   return std::make_unique<WindowsLinkerTool>(targetTriple, targetOptions);
 }
 

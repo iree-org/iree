@@ -222,7 +222,7 @@ class AndroidLinkerTool : public LinkerTool {
 };
 
 std::unique_ptr<LinkerTool> createAndroidLinkerTool(
-    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
+    Triple &targetTriple, LLVMTargetOptions &targetOptions) {
   assert(targetTriple.isAndroid() &&
          "only use the AndroidLinkerTool for Android targets");
   return std::make_unique<AndroidLinkerTool>(targetTriple, targetOptions);

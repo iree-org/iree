@@ -15,19 +15,19 @@ namespace HAL {
 // createMacLinkerTool using ld64.lld
 
 std::unique_ptr<LinkerTool> createAndroidLinkerTool(
-    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 std::unique_ptr<LinkerTool> createEmbeddedLinkerTool(
-    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 std::unique_ptr<LinkerTool> createUnixLinkerTool(
-    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 std::unique_ptr<LinkerTool> createWasmLinkerTool(
-    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 std::unique_ptr<LinkerTool> createWindowsLinkerTool(
-    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 
 // static
 std::unique_ptr<LinkerTool> LinkerTool::getForTarget(
-    const llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
   if (targetOptions.linkEmbedded) {
     return createEmbeddedLinkerTool(targetTriple, targetOptions);
   } else if (targetTriple.isAndroid()) {

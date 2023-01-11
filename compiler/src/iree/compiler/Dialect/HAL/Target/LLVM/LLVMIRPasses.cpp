@@ -28,15 +28,16 @@ namespace IREE {
 namespace HAL {
 
 std::unique_ptr<llvm::TargetMachine> createTargetMachine(
-    const LLVMTarget &target, const LLVMTargetOptions &targetOptions) {
+    const LLVMTargetOptions &targetOptions) {
   std::string errorMessage;
-  auto llvmTarget =
-      llvm::TargetRegistry::lookupTarget(target.triple, errorMessage);
-  if (!llvmTarget) return nullptr;
-  std::unique_ptr<llvm::TargetMachine> machine(llvmTarget->createTargetMachine(
-      target.triple, target.cpu /* cpu e.g k8*/,
-      target.cpuFeatures /* cpu features e.g avx512fma*/, targetOptions.options,
-      llvm::Reloc::Model::PIC_, {}, targetOptions.codeGenOptLevel,
+  auto target = llvm::TargetRegistry::lookupTarget(targetOptions.targetTriple,
+                                                   errorMessage);
+  if (!target) return nullptr;
+  std::unique_ptr<llvm::TargetMachine> machine(target->createTargetMachine(
+      targetOptions.targetTriple, targetOptions.targetCPU /* cpu e.g k8*/,
+      targetOptions.targetCPUFeatures /* cpu features e.g avx512fma*/,
+      targetOptions.options, llvm::Reloc::Model::PIC_, {},
+      targetOptions.codeGenOptLevel,
       /*JIT=*/false));
   return machine;
 }
