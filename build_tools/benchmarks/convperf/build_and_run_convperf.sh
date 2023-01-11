@@ -47,10 +47,7 @@ popd # external/iree
 popd # ${REPO_DIR}
 
 # Build ConvPerf.
-cmake -GNinja \
-  -DCMAKE_C_COMPILER="${CC:-clang}" \
-  -DCMAKE_CXX_COMPILER="${CXX:-clang++}" \
-  -B "${BUILD_DIR}" "${REPO_DIR}"
+cmake -GNinja -B "${BUILD_DIR}" "${REPO_DIR}"
 cmake --build "${BUILD_DIR}"
 
 # Run ConvPerf for several threading configurations.
