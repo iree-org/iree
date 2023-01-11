@@ -58,7 +58,8 @@ const IreeLibraryLoopEmscripten = {
       }
 
       destroy() {
-        for (const [id, operation] of Object.entries(this.pendingOperations)) {
+        for (const id in this.pendingOperations) {
+          const operation = this.pendingOperations[id];
           operation.abort();
           delete this.pendingOperations[id];
         }
