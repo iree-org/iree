@@ -69,8 +69,6 @@ set(IREE_RELEASE_VERSION "0.1a1" CACHE STRING "Version to embed in distributed p
 set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision information to embed in distributed packages")
 option(IREE_EMBED_RELEASE_INFO "Embed the IREE version information in built artifacts." OFF)
 
-set(IREE_HOST_BINARY_ROOT "" CACHE STRING "Path to installed IREE tools, to use instead of building them from source")
-
 option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 

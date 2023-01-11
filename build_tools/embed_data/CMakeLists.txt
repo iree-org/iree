@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Just import if IREE_HOST_BINARY_ROOT is set (e.g. when cross-compiling).
-if(IREE_HOST_BINARY_ROOT)
+if(DEFINED IREE_HOST_BINARY_ROOT)
   iree_import_binary(NAME generate_embed_data)
   install(IMPORTED_RUNTIME_ARTIFACTS generate_embed_data
           COMPONENT generate_embed_data

@@ -292,7 +292,7 @@ if(IREE_BUILD_COMPILER)
     DESTINATION "tests/bin"
     COMPONENT Tests
   )
-elseif(NOT IREE_HOST_BINARY_ROOT)
+elseif(NOT DEFINED IREE_HOST_BINARY_ROOT)
   message(STATUS
       "*Not* building or importing IREE's compiler tools.\n   "
       "Set IREE_BUILD_COMPILER to build them or IREE_HOST_BINARY_ROOT to "
