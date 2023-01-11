@@ -129,7 +129,8 @@ bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
 // features in the future, we may want to consider a persistent state to carry
 // over processed HAL information or keeping the TTI instance alive and query
 // subtarget features data structure.
-bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
+static bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr,
+                       StringRef feature) {
   Optional<StringRef> features = getCpuFeatures(targetAttr);
   if (!features) {
     return false;

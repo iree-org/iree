@@ -186,9 +186,9 @@ lowerUnsetEncodingToUnpackOp(RewriterBase &rewriter, UnsetEncodingOp encodingOp,
 }
 
 /// Utility method to convert from `linalg.matmul` with
-/// - lhs encoding of MATMUL_*_LHS
-/// - rhs encoding of MATMUL_*_RHS_TRANSPOSE
-/// - result encoding of MATMUL_*_RESULT
+/// - lhs encoding of MATMUL_F32F32F32_LHS
+/// - rhs encoding of MATMUL_F32F32F32_RHS_TRANSPOSE
+/// - result encoding of MATMUL_F32F32F32_RESULT
 /// to linalg.mmt4d op.
 static FailureOr<Operation *>
 lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
@@ -206,14 +206,11 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   Optional<TensorEncoding> resultEncoding =
       getEncoding(outputs[0]->get().getType().cast<RankedTensorType>());
   if (!lhsEncoding ||
-      (lhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_LHS &&
-       lhsEncoding.value() != TensorEncoding::MATMUL_I8I8I32_LHS) ||
+      lhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_LHS ||
       !rhsEncoding ||
-      (rhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE &&
-       rhsEncoding.value() != TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE) ||
+      rhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE ||
       !resultEncoding ||
-      (resultEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RESULT &&
-       resultEncoding.value() != TensorEncoding::MATMUL_I8I8I32_RESULT)) {
+      resultEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RESULT) {
     return failure();
   }
   Operation *mmt4DOp = rewriter.create<linalg::Mmt4DOp>(

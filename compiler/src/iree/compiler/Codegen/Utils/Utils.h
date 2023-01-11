@@ -66,19 +66,16 @@ bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 
-/// Returns true if `targetAttr` has `feature` in its CPU features.
-bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature);
-
-/// Returns true if the 'targetAttr' contains '+avx2' in its cpu features.
+/// Returns true if the 'variantOp' contains '+avx2' in its cpu features.
 bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
-/// Returns true if the 'targetAttr' contains '+v' in its cpu features.
+/// Returns true if the 'variantOp' contains '+v' in its cpu features.
 bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
-/// Returns true if the 'targetAttr' contains '+zve32x' in its cpu features.
+/// Returns true if the 'variantOp' contains '+zve32x' in its cpu features.
 bool hasZve32xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
-/// Returns true if the 'targetAttr' contains '+zve64x' in its cpu features.
+/// Returns true if the 'variantOp' contains '+zve64x' in its cpu features.
 bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Checks if a tensor value is generated from a read-only object, like
