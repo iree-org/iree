@@ -181,7 +181,7 @@ def _parse_arguments():
   parser.add_argument("--verbose", action="store_true")
   verification_parser = parser.add_mutually_exclusive_group(required=True)
   verification_parser.add_argument("--github_event_json", type=pathlib.Path)
-  # Temporarily option for buildkite pipeline.
+  # Temporary option for buildkite pipeline.
   verification_parser.add_argument("--no_verify_pr", action="store_true")
   return parser.parse_args()
 
@@ -228,7 +228,7 @@ def main(args: argparse.Namespace):
     # comment data can't be modified without changing the code).
     if workflow_run_sha != pr_head_sha:
       raise ValueError(
-          f"Workflow run SHA: {workflow_run_sha} mismatches "
+          f"Workflow run SHA: {workflow_run_sha} does not match "
           f"the head SHA: {pr_head_sha} of the pull request: {pr_number}.")
 
   gist_client = GithubClient(requester=APIRequester(
