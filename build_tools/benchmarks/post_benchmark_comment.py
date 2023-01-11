@@ -160,8 +160,8 @@ class GithubClient(object):
           f"Failed to comment on GitHub; error code: {response.status_code} - {response.text}"
       )
 
-  def get_pull_request_author_id(self, pr_number: int) -> int:
-    """Get pull request information."""
+  def get_pull_request_head_commit(self, pr_number: int) -> str:
+    """Get pull request head commit SHA."""
 
     response = self._requester.get(
         endpoint=f"{GITHUB_IREE_API_PREFIX}/pulls/{pr_number}",
@@ -172,7 +172,7 @@ class GithubClient(object):
           f"Failed to fetch the pull request: {pr_number}; "
           f"error code: {response.status_code} - {response.text}")
 
-    return response.json()["user"]["id"]
+    return response.json()["head"]["sha"]
 
 
 def _parse_arguments():
@@ -197,6 +197,7 @@ def main(args: argparse.Namespace):
     raise ValueError("GIST_BOT_TOKEN must be set.")
 
   github_event = json.loads(args.github_event_json.read_text())
+  workflow_run_sha = github_event["workflow_run"]["head_sha"]
 
   comment_data = benchmark_comment.CommentData(
       **json.loads(args.comment_json.read_text()))
@@ -204,17 +205,24 @@ def main(args: argparse.Namespace):
   pr_number = int(comment_data.unverified_pr_number)
 
   pr_client = GithubClient(requester=APIRequester(github_token=github_token))
-  pr_author_id = pr_client.get_pull_request_author_id(pr_number=pr_number)
-  workflow_run_actor_id = github_event["workflow_run"]["actor"]["id"]
-  # We can't get the trusted PR number of a workflow run from Github API. So we
-  # take the untrusted PR number from presubmit workflow and verify if the PR
-  # author is the same user who initiates the workflow run. This at least makes
-  # sure malicious presubmit run won't be post comment to other users' PRs.
-  if pr_author_id != workflow_run_actor_id:
+  pr_head_sha = pr_client.get_pull_request_head_commit(pr_number=pr_number)
+  # We can't get the trusted PR number of a workflow run from GitHub API. So we
+  # take the untrusted PR number from presubmit workflow and verify if the PR's
+  # current head SHA matches the commit SHA in the workflow run. It assumes that
+  # to generate the malicious comment data, attacker must modify the code and
+  # has a new commit SHA. So if the PR head commit matches the workflow run with
+  # attacker's commit, either the PR is created by the attacker or other's PR
+  # has the malicious commit. In both cases posting malicious comment is
+  # acceptable.
+  #
+  # Note that the collision of a target SHA1 is possible but GitHub has some
+  # protections (https://github.blog/2017-03-20-sha-1-collision-detection-on-github-com/).
+  # The assumption also only holds if files in GCS can't be overwritten (so the
+  # comment data can't be modified without changing the code).
+  if workflow_run_sha != pr_head_sha:
     raise ValueError(
-        f"Workflow run and PR author mismatched. "
-        f"Workflow run actor id: {workflow_run_actor_id} != PR author id: {pr_author_id}"
-    )
+        f"Workflow run SHA: {workflow_run_sha} mismatches "
+        f"the head SHA: {pr_head_sha} of the pull request: {pr_number}.")
 
   gist_client = GithubClient(requester=APIRequester(
       github_token=gist_bot_token))
