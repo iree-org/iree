@@ -98,7 +98,7 @@ def MapNestedForeachThreadToGpuThreadsOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::func::FuncOp target,
-        ::mlir::transform::ApplyToEachResultList &results,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
         ::mlir::transform::TransformState &state);
   }];
 }
@@ -203,7 +203,7 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::scf::IfOp target,
-        ::mlir::transform::ApplyToEachResultList &results,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
         ::mlir::transform::TransformState &state);
   }];
 }
@@ -311,7 +311,7 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,
-        ::mlir::transform::ApplyToEachResultList &results,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
         ::mlir::transform::TransformState &state);
   }];
 }

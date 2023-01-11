@@ -60,7 +60,7 @@ def RewriteForeachThreadToAsyncOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::scf::ForeachThreadOp target,
-        ::mlir::transform::ApplyToEachResultList &results,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
         ::mlir::transform::TransformState &state);
   }];
 }
@@ -96,7 +96,7 @@ def RewriteForeachThreadToScfForOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::scf::ForeachThreadOp target,
-        ::mlir::transform::ApplyToEachResultList &results,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
         ::mlir::transform::TransformState &state);
   }];
 }

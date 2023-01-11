@@ -216,7 +216,7 @@ static void addConverToDPSPatterns(RewritePatternSet &patterns) {
 }
 
 DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
+    Operation *target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     return mlir::emitDefiniteFailure(
@@ -256,7 +256,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (failed(listenerResult))
     return mlir::emitDefiniteFailure(target, "listener tracking failed");
 
-  results.push_back(target);
+  results.assign({target});
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -442,7 +442,7 @@ LogicalResult rewriteForeachThreadToWorkgroup(
 
 DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
-    func::FuncOp target, transform::ApplyToEachResultList &results,
+    func::FuncOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     return mlir::emitDefiniteFailure(
@@ -484,7 +484,7 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
                                      "rewriteForeachThreadToWorkgroup failed");
   }
 
-  results.push_back(target);
+  results.assign({target});
   return DiagnosedSilenceableFailure::success();
 }
 
