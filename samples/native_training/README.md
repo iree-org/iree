@@ -29,6 +29,7 @@ convenient wrappers around `torch-mlir` and `iree` compilation:
 pip install -f https://iree-org.github.io/iree/pip-release-links.html iree-compiler
 pip install -f https://llvm.github.io/torch-mlir/package-index/ torch-mlir
 pip install git+https://github.com/iree-org/iree-torch.git
+pip install scikit-learn
 ```
 
 Update submodules in this repo:
