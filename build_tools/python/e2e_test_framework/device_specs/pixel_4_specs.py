@@ -9,22 +9,22 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework.device_specs import device_parameters
 
-DEVICE_NAME = "Pixel-4"
+VENDOR_NAME = "Pixel-4"
 
 BIG_CORES = common_definitions.DeviceSpec(
     id=unique_ids.DEVICE_SPEC_MOBILE_PIXEL_4 + "_big-core",
-    device_name=DEVICE_NAME,
+    vendor_name=VENDOR_NAME,
     architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
     device_parameters=[device_parameters.ARM_BIG_CORES])
 LITTLE_CORES = common_definitions.DeviceSpec(
     id=unique_ids.DEVICE_SPEC_MOBILE_PIXEL_4 + "_little-core",
-    device_name=DEVICE_NAME,
+    vendor_name=VENDOR_NAME,
     architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
     device_parameters=[device_parameters.ARM_LITTLE_CORES])
 GPU = common_definitions.DeviceSpec(
     id=unique_ids.DEVICE_SPEC_MOBILE_PIXEL_4 + "_gpu",
-    device_name=DEVICE_NAME,
+    vendor_name=VENDOR_NAME,
     architecture=common_definitions.DeviceArchitecture.ADRENO_GENERIC,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
