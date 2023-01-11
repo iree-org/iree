@@ -24,13 +24,11 @@ export REPO_DIR=$1
 export REPO_SHA=$2
 
 pushd ${REPO_DIR}
-
-mkdir mmperf
+git clone --jobs 8 --depth 1 --no-single-branch --recurse-submodules https://github.com/mmperf/mmperf.git
 pushd mmperf
-git init
-git fetch --depth 1 https://github.com/mmperf/mmperf.git "${REPO_SHA}"
+
+# Checkout a specific commit.
 git checkout ${REPO_SHA}
-git submodule update --init --recursive --jobs 8 --depth 1
 
 # Create virtual environment.
 python3 -m venv mmperf.venv

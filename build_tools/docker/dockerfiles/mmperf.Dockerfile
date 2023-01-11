@@ -1,4 +1,4 @@
-# Copyright 2022 The IREE Authors
+# Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -105,7 +105,7 @@ ENV BLIS_DIR="/opt/blis"
 ######## MMPERF ########
 COPY build_tools/docker/context/setup_mmperf.sh /usr/local/bin
 
-ARG MMPERF_SHA="ae523a31449a58ef39592c6b8cf9c042e0a55a1f"
+ARG MMPERF_SHA="ae523a3"
 
 # Generate a version of mmperf for CPU.
 RUN mkdir -p "/usr/local/src/mmperf" \

@@ -13,7 +13,7 @@
 # in the `mmperf` repo and built from source, and other backends are expected
 # to already be installed.
 #
-# Please refer to `build_tools/docker/dockerfiles/mmperf.Dockerfile` for commands on
+# Please refer to `build_tools/docker/mmperf/Dockerfile` for commands on
 # installing various backends.
 #
 # Currently x86 CPU and CUDA are supported.
