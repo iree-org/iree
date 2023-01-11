@@ -153,25 +153,16 @@ static void buildSmallReductionStrategyThreadDistribution(
 void mlir::iree_compiler::gpu::buildSmallReductionStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const SmallReductionStrategy &strategy) {
-  // Step 1. Call the matcher. Note that this is the same matcher as used to
-  // trigger this compilation path, so it must always apply.
-  b.create<RegisterMatchCallbacksOp>();
-  auto [maybeLeadingH, fillH, reductionH, maybeTrailingH] =
-      unpackRegisteredMatchCallback<4>(
-          b, "reduction", transform::FailurePropagationMode::Propagate,
-          variantH);
-
-  // Step 2. Apply block-level part of the strategy, keeps everything fused.
+  // Step 1. Apply block-level part of the strategy, keeps everything fused.
   auto [maybeLeadingHBlock, gridFillH, gridReductionH,
         maybeTiledTrailingHBlock] =
-      buildReductionStrategyBlockDistribution(
-          b, maybeLeadingH, fillH, reductionH, maybeTrailingH, strategy);
+      buildReductionStrategyBlockDistribution(b, variantH, strategy);
 
-  // Step 3. Apply thread-level part of the strategy, keeps everything fused.
+  // Step 2. Apply thread-level part of the strategy, keeps everything fused.
   buildSmallReductionStrategyThreadDistribution(
       b, maybeLeadingHBlock, gridFillH, gridReductionH,
       maybeTiledTrailingHBlock, strategy);
 
-  // Step 4-5. Common trailing steps.
+  // Step 3-4. Common trailing steps.
   buildCommonTrailingStrategy(b, variantH, strategy);
 }

@@ -176,23 +176,34 @@ std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
     ImplicitLocOpBuilder &b, Value reductionH, int64_t reductionRank,
     int64_t tileSize, int64_t reductionVectorSize, Attribute mappingAttr);
 
-/// Uses TileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes to create a
-/// top-level `scf.foreach_thread` tiled by `strategy.workgroupTileSizes`. All
-/// of `maybeLeadingH`, `fillH`, `reductionH` and `maybeTrailingH` are fused
-/// into the top-level `scf.foreach_thread`.
-/// Handles are returned to the fused versions of `maybeLeadingH`, `fillH`,
-/// `reductionH` and `maybeTrailingH` that are all tiled and distributed
-/// accordingly.
-/// The mapping of the `scf.foreach_thread` dimensions is to the first
-/// dimensions of `strategy.allBlockAttrs`.
-std::tuple<Value, Value, Value, Value> buildReductionStrategyBlockDistribution(
-    ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
-    Value maybeTrailingH, const AbstractReductionStrategy &strategy);
-
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.
 //===----------------------------------------------------------------------===//
+
+/// Build transform IR to match exactly an N-D reduction operation (with
+/// optional leading and trailing elementwise) and create a top-level
+/// `scf.foreach_thread` tiled by `strategy.workgroupTileSizes`.
+/// The matched `maybeLeadingH`, `fillH`, `reductionH` and `maybeTrailingH` are
+/// fused into the top-level `scf.foreach_thread` and handles are returned to
+/// the fused versions of these ops, in order, that are all tiled and
+/// distributed accordingly.
+/// The mapping of the `scf.foreach_thread` dimensions is tied the first
+/// dimensions of `strategy.allBlockAttrs`.
+///
+/// Note: `buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes` is
+/// called internally, this version is only for the block-level tiling inside a
+/// dispatch region with an attached workgroup_count region.
+///
+/// Note: the matching is enforced to be exact (i.e. no other compute ops may
+/// exist under variantH). This is consistent with application confined within
+/// the dispatch region, where we must not miss any op.
+///
+/// Note: A future version of this op will be able to directly apply on the DAG
+/// and form the dispatch region.
+std::tuple<Value, Value, Value, Value> buildReductionStrategyBlockDistribution(
+    ImplicitLocOpBuilder &b, Value variantH,
+    const AbstractReductionStrategy &strategy);
 
 }  // namespace iree_compiler
 }  // namespace mlir

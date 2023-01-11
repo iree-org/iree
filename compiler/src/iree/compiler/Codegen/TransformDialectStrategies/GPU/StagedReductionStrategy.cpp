@@ -33,8 +33,6 @@ using transform::FuseIntoContainingOp;
 using transform::MatchOp;
 using transform::ScalarizeOp;
 using transform::SequenceOp;
-using transform_ext::MatchCallbackOp;
-using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::StructuredOpMatcher;
 
 using iree_compiler::buildTileReductionUsingScfForeach;
@@ -177,34 +175,25 @@ static void buildStagedReductionStrategyFindBetterName(
 void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const StagedReductionStrategy &strategy) {
-  // Step 1. Call the matcher. Note that this is the same matcher as used to
-  // trigger this compilation path, so it must always apply.
-  b.create<RegisterMatchCallbacksOp>();
-  auto [maybeLeadingH, fillH, reductionH, maybeTrailingH] =
-      unpackRegisteredMatchCallback<4>(
-          b, "reduction", transform::FailurePropagationMode::Propagate,
-          variantH);
-
-  // Step 2. Use tiling to introduce a single-iteration loop mapped to a
-  // single block/workgroup. Keep everything fused.
+  // Step 1. Match and tile to introduce the top-level scf.foreach_thread for
+  // the block/workgroup level. Keep everything fused.
   auto [maybeLeadingHBlock, gridFillH, gridReductionH,
         maybeTiledTrailingHBlock] =
-      buildReductionStrategyBlockDistribution(
-          b, maybeLeadingH, fillH, reductionH, maybeTrailingH, strategy);
+      buildReductionStrategyBlockDistribution(b, variantH, strategy);
 
-  // Step 3. Split the reduction and tile the pieces to ensure vector
+  // Step 2. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
   // TODO: consider fusing gridFillH.
   buildStagedReductionStrategyFindBetterName(
       b, gridReductionH, maybeLeadingHBlock, maybeTiledTrailingHBlock,
       strategy);
 
-  // Step 4-5. Common trailing steps.
+  // Step 3-4. Common trailing steps.
   auto [variantH2, funcH] = buildCommonTrailingStrategy(b, variantH, strategy);
 
-  // Step 6. The staged strategy has a post-bufferization vector distribution
+  // Step 5. The staged strategy has a post-bufferization vector distribution
   // with rank-reduction. The vector distribution occurs on multiple warps and
-  // is itself internally staged in 2 steps.
+  // is itself internally staged in 2 stages.
   assert(strategy.getNumThreadsXInBlock() % kCudaWarpSize == 0 &&
          "strategy requires full warps");
   int64_t numWarpsToUse = strategy.getNumThreadsXInBlock() / kCudaWarpSize;

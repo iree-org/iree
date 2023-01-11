@@ -41,6 +41,7 @@ using transform::SplitHandlesOp;
 using transform::SplitReductionOp;
 using transform::TileToForeachThreadOp;
 using transform::VectorizeOp;
+using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::TakeFirstOp;
 
 /// Matches `args` within `targetH` and unpacks a number of handles `N`.
@@ -363,8 +364,16 @@ mlir::iree_compiler::buildTileReductionUsingScfForeach(
 
 std::tuple<Value, Value, Value, Value>
 mlir::iree_compiler::buildReductionStrategyBlockDistribution(
-    ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
-    Value maybeTrailingH, const AbstractReductionStrategy &strategy) {
+    ImplicitLocOpBuilder &b, Value variantH,
+    const AbstractReductionStrategy &strategy) {
+  // Step 1. Call the matcher. Note that this is the same matcher as used to
+  // trigger this compilation path, so it must always apply.
+  b.create<RegisterMatchCallbacksOp>();
+  auto [maybeLeadingH, fillH, reductionH, maybeTrailingH] =
+      unpackRegisteredMatchCallback<4>(
+          b, "reduction", transform::FailurePropagationMode::Propagate,
+          variantH);
+  // Step 2. Create the block/mapping tiling level and fusee.
   auto [fusionTargetH, fusionGroupH] =
       buildSelectFirstNonEmpty(b, maybeTrailingH, reductionH);
   ArrayRef<Attribute> allBlocksRef(strategy.allBlockAttrs);
@@ -381,9 +390,9 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
   fillH = b.create<FuseIntoContainingOp>(fillH, tileResult.foreachThreadH);
   maybeLeadingH =
       b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.foreachThreadH);
-
-  auto [gridReductionH, maybeGridTrailingH] = buildSelectFirstNonEmpty(
+  // Step 3. Normalize to reorder results irrespective of emptiness.
+  auto [blockReductionH, maybeBlockTrailingH] = buildSelectFirstNonEmpty(
       b, tileResult.resultingFusedOpsHandles.front(), tileResult.tiledOpH);
-  return std::make_tuple(maybeLeadingH, fillH, gridReductionH,
-                         maybeGridTrailingH);
+  return std::make_tuple(maybeLeadingH, fillH, blockReductionH,
+                         maybeBlockTrailingH);
 }
