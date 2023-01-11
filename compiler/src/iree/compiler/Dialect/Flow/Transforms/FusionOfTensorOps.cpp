@@ -271,12 +271,8 @@ struct FusionOfTensorOpsPass
           ->getCanonicalizationPatterns(fusionPatterns);
       memref::populateResolveRankedShapeTypeResultDimsPatterns(fusionPatterns);
 
-      GreedyRewriteConfig rewriteConfig;
-      rewriteConfig.maxIterations = GreedyRewriteConfig::kNoIterationLimit;
       if (failed(applyPatternsAndFoldGreedily(funcOp->getRegions(),
-                                              std::move(fusionPatterns),
-                                              rewriteConfig))) {
-        funcOp->emitError("failed to apply fusion patterns");
+                                              std::move(fusionPatterns)))) {
         return signalPassFailure();
       }
 
@@ -315,7 +311,6 @@ struct FusionOfTensorOpsPass
           collapsingReshapePatterns);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp->getRegions(), std::move(collapsingReshapePatterns)))) {
-        funcOp->emitError("failed to apply collapsing reshape patterns");
         return signalPassFailure();
       }
 
@@ -335,10 +330,7 @@ struct FusionOfTensorOpsPass
         auto &dominanceInfo = getAnalysis<DominanceInfo>();
         FailureOr<unsigned> numOfFusableCandidates =
             fuseMultiUseProducers(funcOp, context, dominanceInfo);
-        if (failed(numOfFusableCandidates)) {
-          funcOp->emitError("failed to fuse multi-use producers");
-          return signalPassFailure();
-        }
+        if (failed(numOfFusableCandidates)) return signalPassFailure();
         if (numOfFusableCandidates.value() == 0) break;
       }
     }
