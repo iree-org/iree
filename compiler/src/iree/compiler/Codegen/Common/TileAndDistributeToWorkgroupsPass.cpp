@@ -133,8 +133,12 @@ getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
     encodingInfo.innerTileSizes.push_back(
         tileSize.get<Attribute>().cast<IntegerAttr>().getInt());
   }
-  encodingInfo.innerDimsPos = llvm::to_vector(packOp.getInnerDimsPos());
-  encodingInfo.outerDimsPerm = llvm::to_vector(packOp.getOuterDimsPerm());
+  encodingInfo.innerDimsPos = llvm::to_vector(llvm::map_range(
+      packOp.getInnerDimsPos(),
+      [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+  encodingInfo.outerDimsPerm = llvm::to_vector(llvm::map_range(
+      packOp.getOuterDimsPerm(),
+      [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
   return encodingInfo;
 }
 

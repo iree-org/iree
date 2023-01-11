@@ -175,8 +175,8 @@ struct GenericOpTypePropagation
 
     // 3. Create a clone of the operation without cloning its regions.
     auto linalgOp = cast<linalg::LinalgOp>(genericOp.getOperation());
-    auto modifiedOp = cast<linalg::LinalgOp>(mlir::cloneWithoutRegions(
-        rewriter, linalgOp, resultTypes, adaptor.getOperands()));
+    auto modifiedOp = cast<linalg::LinalgOp>(linalgOp.cloneWithoutRegions(
+        rewriter, genericOp.getLoc(), resultTypes, adaptor.getOperands()));
 
     if (genericOp->getNumRegions() != 1) {
       return genericOp.emitOpError("unhanled linalg op with numRegions != 1");

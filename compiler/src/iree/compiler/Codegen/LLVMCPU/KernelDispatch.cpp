@@ -1058,7 +1058,7 @@ static LogicalResult setRootConfig(
 
   // Fixup for making tileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
-  ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
+  SmallVector<int64_t> dimPos = extractFromI64ArrayAttr(op.getInnerDimsPos());
   for (auto it : llvm::zip(dimPos, innerTiles)) {
     int64_t pos = std::get<0>(it);
     int64_t size = std::get<1>(it);

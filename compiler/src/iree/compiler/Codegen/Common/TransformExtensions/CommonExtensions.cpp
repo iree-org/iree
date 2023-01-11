@@ -482,14 +482,15 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   // bugs ensue.
   MLIRContext *ctx = builder.getContext();
   auto operationType = pdl::OperationType::get(ctx);
+  auto staticTileSizesAttr = builder.getI64ArrayAttr(staticTileSizes);
 
   build(builder, result,
         /*resultTypes=*/TypeRange{operationType, operationType},
         /*target=*/target,
         /*numThreads=*/ValueRange{},
         /*tileSizes=*/dynamicTileSizes,
-        /*staticNumThreads=*/ArrayRef<int64_t>(),
-        /*staticTileSizes=*/staticTileSizes,
+        /*staticNumThreads=*/ArrayAttr(),
+        /*staticTileSizes=*/staticTileSizesAttr,
         /*mapping=*/mappingAttr);
 }
 
@@ -519,13 +520,14 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   // bugs ensue.
   MLIRContext *ctx = builder.getContext();
   auto operationType = pdl::OperationType::get(ctx);
+  auto staticNumThreadsAttr = builder.getI64ArrayAttr(staticNumThreads);
   build(builder, result,
         /*resultTypes=*/TypeRange{operationType, operationType},
         /*target=*/target,
         /*numThreads=*/dynamicNumThreads,
         /*tileSizes=*/ValueRange{},
-        /*staticNumThreads=*/staticNumThreads,
-        /*staticTileSizes=*/ArrayRef<int64_t>(),
+        /*staticNumThreads=*/staticNumThreadsAttr,
+        /*staticTileSizes=*/ArrayAttr(),
         /*mapping=*/mappingAttr);
 }
 
@@ -614,14 +616,12 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
 
 SmallVector<OpFoldResult> transform_dialect::
     TileToForeachThreadAndWorkgroupCountRegionOp::getMixedNumThreads() {
-  Builder b(getContext());
-  return getMixedValues(getStaticNumThreads(), getNumThreads(), b);
+  return getMixedValues(getStaticNumThreads(), getNumThreads());
 }
 
 SmallVector<OpFoldResult> transform_dialect::
     TileToForeachThreadAndWorkgroupCountRegionOp::getMixedTileSizes() {
-  Builder b(getContext());
-  return getMixedValues(getStaticTileSizes(), getTileSizes(), b);
+  return getMixedValues(getStaticTileSizes(), getTileSizes());
 }
 
 LogicalResult

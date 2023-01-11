@@ -789,7 +789,7 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
     // The size is less than or equal to tileSize because outer dims are all 1s.
     Optional<int64_t> tileSize =
         getConstantIntValue(tileAndPosMapping.lookup(dim));
-    assert(tileSize.has_value() && "dynamic inner tile size is not supported");
+    assert(tileSize.hasValue() && "dynamic inner tile size is not supported");
     paddedShape.push_back(tileSize.value());
   }
   auto resultType =
@@ -826,11 +826,12 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
     }
     // The dimensions map in the order of output dimensions. Since the
     // interchange is applied, we have to undo it for input.
-    if (!packOp.getOuterDimsPerm().empty()) {
-      inputExprs =
-          undoInterchange<AffineExpr>(inputExprs, packOp.getOuterDimsPerm());
+    if (auto outerDims = packOp.getOuterDimsPerm()) {
+      inputExprs = undoInterchange<AffineExpr>(
+          inputExprs, extractFromI64ArrayAttr(outerDims));
     }
-    for (auto en : llvm::enumerate(packOp.getInnerDimsPos())) {
+    for (auto en :
+         llvm::enumerate(extractFromI64ArrayAttr(packOp.getInnerDimsPos()))) {
       inputExprs[en.value()] =
           rewriter.getAffineDimExpr(inputRank + en.index());
     }
@@ -896,7 +897,8 @@ struct GeneralizeUnPackOpPattern : OpRewritePattern<UnPackOp> {
         loc, readType, unpackOp.getInput(), readOffsets, readSizes,
         readStrides);
 
-    ArrayRef<int64_t> innerDimsPos = unpackOp.getInnerDimsPos();
+    SmallVector<int64_t> innerDimsPos =
+        extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
     auto interchangeVector =
         computeInterchangeFromDimPos(innerDimsPos, outputRank);
     SmallVector<int64_t> transpShape =

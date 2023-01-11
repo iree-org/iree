@@ -54,8 +54,10 @@ struct FoldUnpackWithExtractSliceOp
         sliceOp.getLoc(), sliceOp.getMixedSizes(), elementType);
     rewriter.replaceOpWithNewOp<UnPackOp>(
         sliceOp, output.getType(), unpackOp.getInput(), output,
-        unpackOp.getOuterDimsPerm(), unpackOp.getInnerDimsPos(),
-        unpackOp.getInnerTiles(), unpackOp.getStaticInnerTiles());
+        unpackOp.getOuterDimsPerm().empty() ? nullptr
+                                            : unpackOp.getOuterDimsPerm(),
+        unpackOp.getInnerDimsPos(), unpackOp.getInnerTiles(),
+        unpackOp.getStaticInnerTiles());
     return success();
   }
 };

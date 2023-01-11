@@ -152,7 +152,7 @@ static void linkAndOptimize(llvm::Module &module,
 
   llvm::PassInstrumentationCallbacks pic;
 
-  llvm::StandardInstrumentations si(module.getContext(), false);
+  llvm::StandardInstrumentations si(false);
   si.registerCallbacks(pic, &fam);
 
   llvm::PassBuilder pb(&targetMachine, pto, llvm::None, &pic);

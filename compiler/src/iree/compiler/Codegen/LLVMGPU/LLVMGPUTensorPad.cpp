@@ -76,7 +76,7 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
   auto resultTensorTypes = ValueRange(paddedOperands)
                                .take_back(linalgOp.getNumDpsInits())
                                .getTypes();
-  paddedOp = mlir::clone(rewriter, linalgOp, resultTensorTypes, paddedOperands);
+  paddedOp = linalgOp.clone(rewriter, loc, resultTensorTypes, paddedOperands);
 
   // Slice out the original shape from the padded result to pass on to
   // consumers. The original linalg op is used to provide the dims for the reify

@@ -162,8 +162,8 @@ class VMImportOpConversion : public OpConversionPattern<T> {
       ConversionPatternRewriter &rewriter) const override {
     auto results = rewriteToCall(op, adaptor, importOp,
                                  *this->getTypeConverter(), rewriter);
-    if (!results.has_value()) return failure();
-    rewriter.replaceOp(op, results.value());
+    if (!results.hasValue()) return failure();
+    rewriter.replaceOp(op, results.getValue());
     return success();
   }
 

@@ -384,9 +384,9 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     Variadic<Index>:$offsets,
     Variadic<Index>:$sizes,
     Variadic<Index>:$strides,
-    DenseI64ArrayAttr:$static_offsets,
-    DenseI64ArrayAttr:$static_sizes,
-    DenseI64ArrayAttr:$static_strides
+    I64ArrayAttr:$static_offsets,
+    I64ArrayAttr:$static_sizes,
+    I64ArrayAttr:$static_strides
   );
   let results = (outs
     AnyRankedTensor:$result
@@ -448,8 +448,11 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     // Workaround for OffsetSizeAndStrideOpInterface being incompatible with
     // prefixed accessors.
     OperandRange offsets() { return getOffsets(); }
+    ArrayAttr static_offsets() { return getStaticOffsets(); }
     OperandRange sizes() { return getSizes(); }
+    ArrayAttr static_sizes() { return getStaticSizes(); }
     OperandRange strides() { return getStrides(); }
+    ArrayAttr static_strides() { return getStaticStrides(); }
 
     /// Returns the type of the result based on the sizes.
     static RankedTensorType inferResultType
@@ -503,9 +506,9 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     Variadic<Index>:$offsets,
     Variadic<Index>:$sizes,
     Variadic<Index>:$strides,
-    DenseI64ArrayAttr:$static_offsets,
-    DenseI64ArrayAttr:$static_sizes,
-    DenseI64ArrayAttr:$static_strides
+    I64ArrayAttr:$static_offsets,
+    I64ArrayAttr:$static_sizes,
+    I64ArrayAttr:$static_strides
   );
   let results = (outs);
 
@@ -565,8 +568,11 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     // Workaround for OffsetSizeAndStrideOpInterface being incompatible with
     // prefixed accessors.
     OperandRange offsets() { return getOffsets(); }
+    ArrayAttr static_offsets() { return getStaticOffsets(); }
     OperandRange sizes() { return getSizes(); }
+    ArrayAttr static_sizes() { return getStaticSizes(); }
     OperandRange strides() { return getStrides(); }
+    ArrayAttr static_strides() { return getStaticStrides(); }
 
     ValueRange getOperandDynamicDims(unsigned idx) {
       return idx == 0 ? getSizes() : getTargetDims();

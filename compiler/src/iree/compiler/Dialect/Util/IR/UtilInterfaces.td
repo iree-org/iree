@@ -661,8 +661,8 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         auto resultIndex = result.cast<mlir::OpResult>().getResultNumber();
         auto operandIndex = cast<TiedOpInterface>($_op.getOperation())
             .getTiedResultOperandIndex(resultIndex);
-        return operandIndex.has_value() ?
-            $_op.getOperand(operandIndex.value()) :
+        return operandIndex.hasValue() ?
+            $_op.getOperand(operandIndex.getValue()) :
             nullptr;
       }]
     >,

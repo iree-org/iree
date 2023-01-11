@@ -52,7 +52,6 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
 
   llvm::PassInstrumentationCallbacks passInstrumentationCallbacks;
   llvm::StandardInstrumentations standardInstrumentations(
-      module->getContext(),
       /*DebugLogging=*/false);
   standardInstrumentations.registerCallbacks(passInstrumentationCallbacks);
 

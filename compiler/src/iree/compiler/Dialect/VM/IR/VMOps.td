@@ -354,10 +354,10 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
       if (isMutable) {
         $_state.addAttribute("is_mutable", $_builder.getUnitAttr());
       }
-      if (initialValue.has_value() &&
-                 (initialValue.value().isa<IntegerAttr>() ||
-                  initialValue.value().isa<FloatAttr>())) {
-        $_state.addAttribute("initial_value", initialValue.value());
+      if (initialValue.hasValue() &&
+                 (initialValue.getValue().isa<IntegerAttr>() ||
+                  initialValue.getValue().isa<FloatAttr>())) {
+        $_state.addAttribute("initial_value", initialValue.getValue());
       }
       $_state.addAttribute("type", TypeAttr::get(type));
       $_state.attributes.append(attrs.begin(), attrs.end());

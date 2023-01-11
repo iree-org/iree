@@ -246,8 +246,8 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
   let arguments = (ins PDL_Operation:$target,
                    Variadic<PDL_Operation>:$num_threads,
                    Variadic<PDL_Operation>:$tile_sizes,
-                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_num_threads,
-                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_tile_sizes,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$static_num_threads,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$static_tile_sizes,
                    OptionalAttr<DeviceMappingArrayAttr>:$mapping);
   let results = (outs PDL_Operation:$foreach_thread_op,
                       PDL_Operation:$tiled_op);

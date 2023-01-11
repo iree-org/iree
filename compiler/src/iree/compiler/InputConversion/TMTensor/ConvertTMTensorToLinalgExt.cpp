@@ -59,7 +59,7 @@ struct ScatterOpConversion
 
     auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
         op.getLoc(), op->getResultTypes(), op.getInputs(), op.getOutputs(),
-        dimMap, op.getUniqueIndices());
+        rewriter.getI64ArrayAttr(dimMap), op.getUniqueIndices());
 
     rewriter.inlineRegionBefore(op.getRegion(), scatterOp.getRegion(),
                                 scatterOp.getRegion().begin());

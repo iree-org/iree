@@ -35,7 +35,6 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/MathExtras.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -162,7 +161,7 @@ LogicalResult ScatterOp::verify() {
     return op->emitOpError("expected index depth is static");
   }
 
-  ArrayRef<int64_t> dimMap = getDimensionMap();
+  auto dimMap = dimensionMap();
   if (dimMap.size() != indexDepth) {
     return op->emitOpError("invalid number of dimension map entries ");
   }
@@ -330,8 +329,9 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
     resultTypes.push_back(tiledOriginal.getType());
   }
   Operation *tiledScatterOp =
-      mlir::clone(builder, getOperation(), resultTypes,
-                  ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
+      cast<DestinationStyleOpInterface>(getOperation())
+          .clone(builder, loc, resultTypes,
+                 ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
   return {tiledScatterOp};
 }
 
@@ -378,7 +378,7 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
     starts[it.index() + offset] = it.value();
   }
 
-  ArrayRef<int64_t> dimMap = getDimensionMap();
+  auto dimMap = dimensionMap();
 
   for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
     loadIndices.back() = b.create<arith::ConstantIndexOp>(loc, i);
@@ -509,6 +509,7 @@ SortOp::getTiledImplementation(OpBuilder &builder,
          sizes.size() == static_cast<size_t>(rank));
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
+  Location loc = getLoc();
   SmallVector<Value> tiledOperands(getOutputs().size());
   for (auto en : llvm::enumerate(getOutputs())) {
     tiledOperands[en.index()] =
@@ -520,8 +521,8 @@ SortOp::getTiledImplementation(OpBuilder &builder,
     resultTypes = llvm::to_vector<4>(
         llvm::map_range(tiledOperands, [&](Value v) { return v.getType(); }));
   }
-  Operation *tiledSortOp =
-      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  Operation *tiledSortOp = cast<DestinationStyleOpInterface>(getOperation())
+                               .clone(builder, loc, resultTypes, tiledOperands);
   return {tiledSortOp};
 }
 
@@ -829,6 +830,7 @@ FftOp::getTiledImplementation(OpBuilder &builder,
                               ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
+  Location loc = getLoc();
   SmallVector<Value> tiledOperands(3);
   tiledOperands[0] = getStage();
   tiledOperands[1] = getRealCoeff();
@@ -842,8 +844,8 @@ FftOp::getTiledImplementation(OpBuilder &builder,
       resultTypes.push_back(tiledOperands.back().getType());
     }
   }
-  Operation *tiledFftOp =
-      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  Operation *tiledFftOp = cast<DestinationStyleOpInterface>(getOperation())
+                              .clone(builder, loc, resultTypes, tiledOperands);
   return {tiledFftOp};
 }
 
@@ -1031,6 +1033,7 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
          sizes.size() == static_cast<size_t>(rank));
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
+  Location loc = getLoc();
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(
       getSlice(builder, getLoc(), input(), offsets, sizes, strides));
@@ -1056,8 +1059,8 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
     resultTypes.push_back(tiledOperands[2].getType());
   }
 
-  Operation *tiledScanOp =
-      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  Operation *tiledScanOp = cast<DestinationStyleOpInterface>(getOperation())
+                               .clone(builder, loc, resultTypes, tiledOperands);
   return {tiledScanOp};
 }
 
@@ -1205,8 +1208,8 @@ ReverseOp::getTiledImplementation(OpBuilder &builder,
         getSlice(builder, loc, output(), mirrorOffsets, sizes, strides));
   }
 
-  Operation *tiledRevOp =
-      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  Operation *tiledRevOp = cast<DestinationStyleOpInterface>(getOperation())
+                              .clone(builder, loc, resultTypes, tiledOperands);
 
   return {tiledRevOp};
 }
@@ -1482,8 +1485,8 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
     resultTypes.push_back(tiledOperands[tiledOperands.size() - 1].getType());
   }
 
-  Operation *tiledTopkOp =
-      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  Operation *tiledTopkOp = cast<DestinationStyleOpInterface>(getOperation())
+                               .clone(builder, loc, resultTypes, tiledOperands);
   return {tiledTopkOp};
 }
 
@@ -1546,10 +1549,10 @@ static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
                 "applies to only pack or unpack operations");
   SmallVector<OpFoldResult> mixedInnerTiles;
   unsigned dynamicValIndex = 0;
-  OpBuilder b(op.getContext());
-  for (int64_t tileSize : op.getStaticInnerTiles()) {
-    if (!ShapedType::isDynamic(tileSize))
-      mixedInnerTiles.push_back(b.getIndexAttr(tileSize));
+  for (Attribute attr : op.getStaticInnerTiles()) {
+    auto tileAttr = attr.cast<IntegerAttr>();
+    if (!ShapedType::isDynamic(tileAttr.getInt()))
+      mixedInnerTiles.push_back(tileAttr);
     else
       mixedInnerTiles.push_back(op.getInnerTiles()[dynamicValIndex++]);
   }
@@ -1577,7 +1580,8 @@ static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
                 "applies to only pack or unpack operations");
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
-  ArrayRef<int64_t> dimsToBlock = op.getInnerDimsPos();
+  SmallVector<int64_t> dimsToBlock =
+      extractFromI64ArrayAttr(op.getInnerDimsPos());
   SmallVector<OpFoldResult> tiles = op.getMixedTiles();
   assert(tiles.size() == dimsToBlock.size() &&
          "tiles must match indices of dimension to block");
@@ -1619,8 +1623,10 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
                                 ? packOrUnPack.getInputType()
                                 : packOrUnPack.getOutputType();
   int64_t unpackedRank = unpackedType.getRank();
-  ArrayRef<int64_t> innerDimsPos = packOrUnPack.getInnerDimsPos();
-  ArrayRef<int64_t> outerDimPerm = packOrUnPack.getOuterDimsPerm();
+  SmallVector<int64_t> innerDimsPos =
+      extractFromI64ArrayAttr(packOrUnPack.getInnerDimsPos());
+  SmallVector<int64_t> outerDimPerm =
+      extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPerm());
   // Verify tiles. Make sure each provided tile is non-zero.
   SmallVector<OpFoldResult> mixedTiles = packOrUnPack.getMixedTiles();
   if (hasZeros(mixedTiles))
@@ -1706,8 +1712,11 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
   SmallVector<Value> dynamicTileSizes;
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
                              ShapedType::kDynamic);
-  build(builder, state, output.getType(), source, output, outerDimsPerm,
-        innerDimsPos, dynamicTileSizes, staticTileSizes,
+  build(builder, state, output.getType(), source, output,
+        outerDimsPerm.empty() ? nullptr
+                              : builder.getI64ArrayAttr(outerDimsPerm),
+        builder.getI64ArrayAttr(innerDimsPos), dynamicTileSizes,
+        builder.getI64ArrayAttr(staticTileSizes),
         (paddingValue ? paddingValue.value() : nullptr));
 }
 
@@ -1832,8 +1841,10 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
   // the point loop? However, if we interchange `ivs` once more to go to the
   // canonical blocking format: ABCabc, this connection becomes trivial: Each
   // point loop is pointLoopsOffset + inputRank away from the tiled loop.
-  ArrayRef<int64_t> dimsToInnerBlock = packOp.getInnerDimsPos();
-  ArrayRef<int64_t> dimsToOuterBlock = packOp.getOuterDimsPerm();
+  SmallVector<int64_t> dimsToInnerBlock =
+      extractFromI64ArrayAttr(packOp.getInnerDimsPos());
+  SmallVector<int64_t> dimsToOuterBlock =
+      extractFromI64ArrayAttr(packOp.getOuterDimsPerm());
 
   SmallVector<Value> interchangedIvs = ivs;
   SmallVector<int64_t> interchangeVector =
@@ -1968,7 +1979,8 @@ PackOp::getTiledImplementation(OpBuilder &builder,
 
   // The tiling is applied on interchanged dimensions. We have to undo the
   // interchange to map sizes and offsets to the original input.
-  ArrayRef<int64_t> dimsToOuterBlock = getOuterDimsPerm();
+  SmallVector<int64_t> dimsToOuterBlock =
+      extractFromI64ArrayAttr(getOuterDimsPerm());
   SmallVector<OpFoldResult> origOffsets(offsets.begin(), offsets.end());
   SmallVector<OpFoldResult> origSizes(sizes.begin(), sizes.end());
   if (!dimsToOuterBlock.empty()) {
@@ -2039,7 +2051,8 @@ PackOp::getTiledImplementation(OpBuilder &builder,
   }
 
   Operation *tiledPackOp =
-      mlir::clone(builder, getOperation(), tiledResultTypes, tiledOperands);
+      cast<DestinationStyleOpInterface>(getOperation())
+          .clone(builder, loc, tiledResultTypes, tiledOperands);
 
   return {tiledPackOp};
 }
@@ -2096,8 +2109,11 @@ void UnPackOp::build(OpBuilder &builder, OperationState &state, Value source,
   SmallVector<Value> dynamicTileSizes;
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
                              ShapedType::kDynamic);
-  build(builder, state, output.getType(), source, output, outerDimsPerm,
-        innerDimsPos, dynamicTileSizes, staticTileSizes);
+  build(builder, state, output.getType(), source, output,
+        outerDimsPerm.empty() ? nullptr
+                              : builder.getI64ArrayAttr(outerDimsPerm),
+        builder.getI64ArrayAttr(innerDimsPos), dynamicTileSizes,
+        builder.getI64ArrayAttr(staticTileSizes));
 }
 
 SmallVector<OpFoldResult> UnPackOp::getMixedTiles() {
@@ -2151,14 +2167,14 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   assert(inputIvsPointLoops.size() + inputIvs.size() == getInputRank() &&
          "expect same number of iduction variables equals to input rank");
   // interchange the point loops induction variables based on `inner_dim_pos`.
-  ArrayRef<int64_t> innerDims = getInnerDimsPos();
+  SmallVector<int64_t> innerDims = extractFromI64ArrayAttr(getInnerDimsPos());
   SmallVector<int64_t> interchangeVector =
       computeInterchangeFromDimPos(innerDims, getOutputRank());
   SmallVector<Value> interchangedInputIvsPointLoops = inputIvsPointLoops;
   interchangedInputIvsPointLoops = interchange<Value>(
       interchangedInputIvsPointLoops, interchangeVector, /*offset=*/0);
   // interchange the tiled loops induction variables based on `outer_dims_perm`.
-  ArrayRef<int64_t> outerDims = getOuterDimsPerm();
+  SmallVector<int64_t> outerDims = extractFromI64ArrayAttr(getOuterDimsPerm());
   if (!outerDims.empty()) {
     inputIvs = interchange<Value>(inputIvs, outerDims, /*offset=*/0);
   }
@@ -2203,21 +2219,8 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   auto sub = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
     return makeComposedFoldedAffineApply(builder, loc, subMap, {v1, v2});
   };
-  auto ceilDiv = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
-    return makeComposedFoldedAffineApply(builder, loc, dim0.ceilDiv(dim1),
-                                         {v1, v2});
-  };
-  auto floorDiv = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
-    return makeComposedFoldedAffineApply(builder, loc, dim0.floorDiv(dim1),
-                                         {v1, v2});
-  };
 
-  // The perfect tiling case indicates that the tiling sizes is are multiple of
-  // inner_tile_size. In this context, The indices of input slice are all
-  // aligned to head. No extra data is needed when representing the tiled unpack
-  // op.
-  bool isPerfectTilingCase = true;
-
+  int64_t inputRank = getInputRank();
   int64_t outputRank = getOutputRank();
   Attribute zeroAttr = builder.getIndexAttr(0);
   Attribute oneAttr = builder.getIndexAttr(1);
@@ -2225,62 +2228,39 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> inputIndices, inputSizes, outputNewOffsets,
       outputExpandedSizes;
   for (auto dim : llvm::seq<int64_t>(0, outputRank)) {
-    if (!dimAndTileMapping.count(dim)) {
-      inputIndices.push_back(offsets[dim]);
-      inputSizes.push_back(sizes[dim]);
-      outputNewOffsets.push_back(zeroAttr);
-      outputExpandedSizes.push_back(sizes[dim]);
-      continue;
-    }
+    if (dimAndTileMapping.count(dim)) {
+      DivModValue firstCoord =
+          getDivMod(builder, loc,
+                    getValueOrCreateConstantIndexOp(builder, loc, offsets[dim]),
+                    getValueOrCreateConstantIndexOp(builder, loc,
+                                                    dimAndTileMapping[dim]));
+      DivModValue lastCoord = getDivMod(
+          builder, loc,
+          getValueOrCreateConstantIndexOp(
+              builder, loc, sub(add(offsets[dim], sizes[dim]), oneAttr)),
+          getValueOrCreateConstantIndexOp(builder, loc,
+                                          dimAndTileMapping[dim]));
 
-    FailureOr<int64_t> cstSize = linalg::getConstantUpperBoundForIndex(
-        getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]));
-    Optional<int64_t> cstInnerSize =
-        getConstantIntValue(dimAndTileMapping[dim]);
-    bool isAlignedToInnerTileSize = false;
-    if (!failed(cstSize) && cstInnerSize) {
-      // If the tiling size equals to the inner tiling size, the outer dims are
-      // always 1.
-      if (cstInnerSize.value() == cstSize.value()) {
-        inputIndices.push_back(floorDiv(offsets[dim], dimAndTileMapping[dim]));
-        inputSizes.push_back(builder.getIndexAttr(1));
-        outputNewOffsets.push_back(zeroAttr);
-        outputExpandedSizes.push_back(sizes[dim]);
-        continue;
-      }
-      if (cstSize.value() % cstInnerSize.value() == 0)
-        isAlignedToInnerTileSize = true;
-    }
-
-    if (!isAlignedToInnerTileSize)
-      isPerfectTilingCase = false;
-
-    DivModValue firstCoord = getDivMod(
-        builder, loc,
-        getValueOrCreateConstantIndexOp(builder, loc, offsets[dim]),
-        getValueOrCreateConstantIndexOp(builder, loc, dimAndTileMapping[dim]));
-    DivModValue lastCoord = getDivMod(
-        builder, loc,
-        getValueOrCreateConstantIndexOp(
-            builder, loc, sub(add(offsets[dim], sizes[dim]), oneAttr)),
-        getValueOrCreateConstantIndexOp(builder, loc, dimAndTileMapping[dim]));
-
-    if (isAlignedToInnerTileSize) {
-      inputIndices.push_back(floorDiv(offsets[dim], dimAndTileMapping[dim]));
-      outputNewOffsets.push_back(zeroAttr);
-      outputExpandedSizes.push_back(sizes[dim]);
-
-      // The ceilDiv is needed here because there could be incomplete tile even
-      // it is perfect tiling cases. E.g.,
-      //   %0 = unpack tensor<33x2xf32> into tensor<64xf32>
-      // If the tiling size is 32, there will be three tiles. Two of them have
-      // size=32; one of them have size=2. The size is represented using
-      // affine_min op; we need ceilDiv.
-      inputSizes.push_back(ceilDiv(sizes[dim], dimAndTileMapping[dim]));
-    } else {
       inputIndices.push_back(firstCoord.quotient);
-      inputSizes.push_back(
-          add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
+
+      // Get the upper bound because it could be an extract_slice case. The
+      // sizes are determined by loop bound and step, where loop bound is the
+      // size of output shape.
+      // In incomplete tile cases, the input could have larger shape, it is safe
+      // to extend the boundary because they are pre-padded. I.e., the size of
+      // input dim is always aligned to inner_tile_size.
+      FailureOr<int64_t> cstSize = linalg::getConstantUpperBoundForIndex(
+          getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]));
+      Optional<int64_t> cstInnerSize =
+          getConstantIntValue(dimAndTileMapping[dim]);
+      if (!failed(cstSize) && cstInnerSize &&
+          cstSize.value() % cstInnerSize.value() == 0) {
+        inputSizes.push_back(
+            builder.getIndexAttr(cstSize.value() / cstInnerSize.value()));
+      } else {
+        inputSizes.push_back(
+            add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
+      }
       outputNewOffsets.push_back(firstCoord.remainder);
 
       AffineExpr i, tile;
@@ -2290,16 +2270,21 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
           builder, loc, i * tile,
           ArrayRef<OpFoldResult>{inputSizes.back(), dimAndTileMapping[dim]});
       outputExpandedSizes.push_back(size);
+    } else {
+      inputIndices.push_back(offsets[dim]);
+      inputSizes.push_back(sizes[dim]);
+      outputNewOffsets.push_back(zeroAttr);
+      outputExpandedSizes.push_back(sizes[dim]);
     }
   }
 
   // The tiling is applied on output dimensions. We have to apply the
   // interchange on input dimensions if outer_dims_perm is set.
-  int64_t inputRank = getInputRank();
-  ArrayRef<int64_t> dimsToOuterBlock = getOuterDimsPerm();
+  SmallVector<int64_t> dimsToOuterBlock =
+      extractFromI64ArrayAttr(getOuterDimsPerm());
   if (!dimsToOuterBlock.empty()) {
     SmallVector<int64_t> vec =
-        computeInterchangeFromDimPos(dimsToOuterBlock, inputRank);
+        computeInterchangeFromDimPos(dimsToOuterBlock, getInputRank());
     inputIndices = interchange<OpFoldResult>(inputIndices, vec);
     inputSizes = interchange<OpFoldResult>(inputSizes, vec);
   }
@@ -2313,28 +2298,20 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   tiledOperands.push_back(getSlice(builder, loc, getInput(), inputIndices,
                                    inputSizes, inputStrides));
 
-  SmallVector<OpFoldResult> outputStrides(outputRank, oneAttr);
-  if (isPerfectTilingCase) {
-    tiledOperands.push_back(
-        getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides));
-  } else {
-    // The tiling is only avaiable on tensors. It's fine to create a
-    // tensor.empty instead of tensor.pad because the op is not a
-    // destination-style op.
-    auto empty = builder.create<tensor::EmptyOp>(
-        loc, outputExpandedSizes, getOutputType().getElementType());
-    tiledOperands.push_back(empty.getResult());
-  }
+  // The tiling is only avaiable on tensors. It's fine to create a tensor.empty
+  // instead of tensor.pad because the op is not a destination-style op.
+  auto empty = builder.create<tensor::EmptyOp>(
+      loc, outputExpandedSizes, getOutputType().getElementType());
+  tiledOperands.push_back(empty.getResult());
 
   SmallVector<Type, 4> tiledResultTypes;
   tiledResultTypes.push_back(tiledOperands[1].getType());
 
   Operation *tiledUnpackOp =
-      mlir::clone(builder, getOperation(), tiledResultTypes, tiledOperands);
+      cast<DestinationStyleOpInterface>(getOperation())
+          .clone(builder, loc, tiledResultTypes, tiledOperands);
 
-  if (isPerfectTilingCase)
-    return {tiledUnpackOp};
-
+  SmallVector<OpFoldResult> outputStrides(outputRank, oneAttr);
   Operation *extractSlice = builder.create<tensor::ExtractSliceOp>(
       loc, tiledUnpackOp->getResult(0), outputNewOffsets, sizes, outputStrides);
 
@@ -2363,174 +2340,6 @@ SmallVector<utils::IteratorType> UnPackOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-//===----------------------------------------------------------------------===//
-// WinogradInputTransformOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult WinogradInputTransformOp::verify() {
-  Operation *op = getOperation();
-  if (getNumInputs() != 1) {
-    return op->emitOpError("expected one input operand");
-  }
-  if (getNumOutputs() != 1) {
-    return op->emitOpError("expected one output operand");
-  }
-  auto inputType = input().getType().cast<ShapedType>();
-  auto outputType = output().getType().cast<ShapedType>();
-  ArrayRef<int64_t> inputShape = inputType.getShape();
-  if (inputShape.size() != 4) {
-    return op->emitOpError("expected input operand to have rank 4");
-  }
-  ArrayRef<int64_t> outputShape = outputType.getShape();
-  if (outputType.getElementType() != inputType.getElementType()) {
-    return op->emitOpError(
-        "expected input/output element types to be identical");
-  }
-  if (getOutputOperandRank() != getInputOperandRank() + 2) {
-    return op->emitOpError(
-        "expected output rank to be equal to input rank + 2");
-  }
-  const SmallVector<int64_t> imageDims = imageDimensions();
-  const size_t numImageDims = imageDims.size();
-  llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
-                                                imageDims.end());
-  if (imageDims.size() != 2) {
-    return op->emitOpError("expected only 2 image dimensions");
-  }
-  for (auto dim : imageDims) {
-    if ((dim < 0) || (dim > 3)) {
-      return op->emitOpError(
-          "expect image dimensions to be in the range: [0, 3]");
-    }
-  }
-  const int64_t outputTileSize = getOutputTileSize();
-  const int64_t kernelSize = getKernelSize();
-  const int64_t inputTileSize = getInputTileSize();
-  SmallVector<int64_t> expectedOutputShape(getOutputOperandRank(),
-                                           inputTileSize);
-  int outputIndex;
-  for (int i = 0; i < inputShape.size(); i++) {
-    outputIndex = i + numImageDims;
-    if (ShapedType::isDynamic(inputShape[i])) {
-      expectedOutputShape[outputIndex] = inputShape[i];
-      continue;
-    }
-    if (!imageDimsSet.contains(i)) {
-      expectedOutputShape[outputIndex] = inputShape[i];
-    } else {
-      expectedOutputShape[outputIndex] =
-          std::ceil((float)(inputShape[i] - kernelSize + 1) / outputTileSize);
-    }
-  }
-  if (!areShapesCompatible(expectedOutputShape, outputShape)) {
-    return op->emitOpError("incompatible output shape");
-  }
-  return success();
-}
-
-SmallVector<Range>
-WinogradInputTransformOp::getIterationDomain(OpBuilder &builder) {
-  Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  Value source = input();
-  SmallVector<int64_t> imageDims = imageDimensions();
-  llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
-                                                imageDims.end());
-  SmallVector<Range> loopBounds(imageDims.size());
-  int count = 0;
-  for (auto dim : llvm::seq<int64_t>(0, getInputOperandRank())) {
-    if (!imageDimsSet.contains(dim)) {
-      loopBounds[count].offset = zero;
-      loopBounds[count].size = getDimValue(builder, loc, source, dim);
-      loopBounds[count].stride = one;
-      count++;
-    }
-  }
-  return loopBounds;
-}
-
-SmallVector<utils::IteratorType>
-WinogradInputTransformOp::getLoopIteratorTypes() {
-  SmallVector<utils::IteratorType> iteratorTypes(getIterationDomainRank(),
-                                                 utils::IteratorType::parallel);
-  return iteratorTypes;
-}
-
-SmallVector<Operation *>
-WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
-                                                 ArrayRef<OpFoldResult> offsets,
-                                                 ArrayRef<OpFoldResult> sizes) {
-
-  Location loc = getLoc();
-  auto one = builder.getIndexAttr(1);
-  auto zero = builder.getIndexAttr(0);
-
-  assert(offsets.size() == 2);
-  SmallVector<OpFoldResult> inputOffsets(getInputOperandRank(), zero);
-  SmallVector<OpFoldResult> outputOffsets(getOutputOperandRank(), zero);
-  outputOffsets[2] = inputOffsets[0] = offsets[0];
-  outputOffsets[5] = inputOffsets[3] = offsets[1];
-
-  SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
-  SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
-
-  assert(sizes.size() == 2);
-  auto inputShape = input().getType().cast<ShapedType>().getShape();
-  auto outputShape = output().getType().cast<ShapedType>().getShape();
-  SmallVector<OpFoldResult> inputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
-  SmallVector<OpFoldResult> outputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
-  outputSizes[2] = inputSizes[0] = sizes[0];
-  outputSizes[5] = inputSizes[3] = sizes[1];
-
-  SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, input(), inputOffsets, inputSizes, inputStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, output(), outputOffsets,
-                                      outputSizes, outputStrides));
-
-  SmallVector<Type, 4> resultTypes;
-  if (hasTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[1].getType());
-  }
-
-  Operation *tiledOp =
-      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-
-  return {tiledOp};
-}
-
-LogicalResult WinogradInputTransformOp::getResultTilePosition(
-    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
-    SmallVector<OpFoldResult> &resultSizes) {
-  if (resultNumber == 0) {
-    auto resultShape = output().getType().cast<ShapedType>().getShape();
-    resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
-    resultOffsets = SmallVector<OpFoldResult>(getOutputOperandRank(),
-                                              builder.getIndexAttr(0));
-    resultOffsets[2] = offsets[0];
-    resultOffsets[5] = offsets[1];
-    resultSizes[2] = sizes[0];
-    resultSizes[5] = sizes[1];
-    return success();
-  }
-  return failure();
-}
-
-LogicalResult WinogradInputTransformOp::fold(ArrayRef<Attribute>,
-                                             SmallVectorImpl<OpFoldResult> &) {
-  return memref::foldMemRefCast(*this);
-}
-
-LogicalResult WinogradInputTransformOp::reifyResultShapes(
-    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  return cast<LinalgExtOp>(getOperation())
-      .reifyResultShapes(b, reifiedReturnShapes);
-}
-
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -2549,7 +2358,6 @@ DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
-DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
 
 //===----------------------------------------------------------------------===//
 // iree_linalg_ext.set_encoding
@@ -2679,7 +2487,9 @@ struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
                                 : opOperand->get());
     }
     // Clone op.
-    Operation *newOp = mlir::clone(rewriter, op, newResultTypes, newOperands);
+    Operation *newOp =
+        cast<DestinationStyleOpInterface>(op.getOperation())
+            .clone(rewriter, op->getLoc(), newResultTypes, newOperands);
     SmallVector<Value, 4> replacements;
     replacements.reserve(newOp->getNumResults());
     for (auto result : llvm::zip(op->getResults(), newOp->getResults())) {

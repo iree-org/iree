@@ -113,8 +113,8 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
     // Padding for K-dim doesn't change result size.
     if (paddingForM == 0 && paddingForN == 0) {
       auto paddedMatmulOp =
-          mlir::clone(rewriter, linalgOp, {resultType},
-                      ArrayRef<Value>{paddedLhs, paddedRhs, result});
+          linalgOp.clone(rewriter, loc, {resultType},
+                         ArrayRef<Value>{paddedLhs, paddedRhs, result});
       rewriter.replaceOp(linalgOp, paddedMatmulOp->getResults());
     } else {
       auto newResultType = RankedTensorType::get(
@@ -125,8 +125,8 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
           loc, newResultType, result, createPadding({0, 0}),
           createPadding({paddingForM, paddingForN}), resultPaddingValue);
       auto paddedMatmulOp =
-          mlir::clone(rewriter, linalgOp, {newResultType},
-                      ArrayRef<Value>{paddedLhs, paddedRhs, paddedResult});
+          linalgOp.clone(rewriter, loc, {newResultType},
+                         ArrayRef<Value>{paddedLhs, paddedRhs, paddedResult});
 
       auto zero = rewriter.getI64IntegerAttr(0);
       auto one = rewriter.getI64IntegerAttr(1);
