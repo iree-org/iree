@@ -345,16 +345,6 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
         })
-        .Case([&](IREE::Stream::AsyncCollectiveOp op) {
-          // We treat collectives as transfer + dispatch as any particular
-          // implementation may use either (or both).
-          // TODO(#11249): handle source == target aliasing.
-          removeAssumedBits(NOT_TRANSFER_WRITE | NOT_DISPATCH_WRITE);
-          auto targetUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.getTarget()),
-              DFX::Resolution::REQUIRED);
-          getState() ^= targetUsage.getState();
-        })
         .Case([&](IREE::Stream::AsyncTransferOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
           auto sourceUsage = solver.getElementFor<ValueResourceUsage>(
@@ -529,21 +519,6 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
             removeAssumedBits(NOT_TRANSFER_READ);
           } else {
             removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE);
-            auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-                *this, Position::forValue(op.getResult()),
-                DFX::Resolution::REQUIRED);
-            getState() ^= resultUsage.getState();
-          }
-        })
-        .Case([&](IREE::Stream::AsyncCollectiveOp op) {
-          // We treat collectives as transfer + dispatch as any particular
-          // implementation may use either (or both).
-          // TODO(#11249): handle source == target aliasing.
-          if (value == op.getSource()) {
-            removeAssumedBits(NOT_TRANSFER_READ | NOT_DISPATCH_READ);
-          } else {
-            removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE |
-                              NOT_DISPATCH_WRITE);
             auto resultUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(op.getResult()),
                 DFX::Resolution::REQUIRED);

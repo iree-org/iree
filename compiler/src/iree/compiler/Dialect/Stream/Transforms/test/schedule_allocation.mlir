@@ -391,35 +391,6 @@ func.func @applyConcurrentAsyncCopyOp(%source: !stream.resource<external>, %targ
 
 // -----
 
-// TODO(#11249): add a test for in-place collectives (send == recv).
-
-// CHECK-LABEL: @applyAsyncCollectiveOpOutOfPlace
-// CHECK-SAME: (%[[SEND:.+]]: !stream.resource<external>, %[[SEND_SIZE:[a-z0-9]+]]: index,
-// CHECK-SAME:  %[[RECV:.+]]: !stream.resource<transient>, %[[RECV_SIZE:[a-z0-9]+]]: index,
-// CHECK-SAME:  %[[COUNT:[a-z0-9]+]]: index)
-func.func @applyAsyncCollectiveOpOutOfPlace(%send: !stream.resource<external>, %send_size: index, %recv: !stream.resource<transient>, %recv_size: index, %count: index) {
-  %c0 = arith.constant 0 : index
-  %channel = stream.channel.default : !stream.channel
-  // CHECK: stream.cmd.execute
-  // CHECK-SAME: with(%[[SEND]] as %[[SEND_CAPTURE:.+]]: !stream.resource<external>{%[[SEND_SIZE]]},
-  // CHECK-SAME:      %[[RECV]] as %[[RECV_CAPTURE:.+]]: !stream.resource<transient>{%[[RECV_SIZE]]})
-  %result, %result_timepoint = stream.async.execute with(%send as %captured_send: !stream.resource<external>{%send_size}, %recv as %captured_recv: !stream.resource<transient>{%recv_size}) -> (!stream.resource<transient>{%recv_size}) {
-    // CHECK: stream.cmd.collective<all_gather : f32>[%[[COUNT]]]
-    %0 = stream.async.collective<all_gather : f32>[%count] channel(%channel)
-        // CHECK-NEXT: ro %[[SEND_CAPTURE]][%c0 for %[[SEND_SIZE]]] : !stream.resource<external>{%[[SEND_SIZE]]}
-        %captured_send[%c0 to %send_size for %send_size],
-        // CHECK-NEXT: wo %[[RECV_CAPTURE]][%c0 for %[[RECV_SIZE]]] : !stream.resource<transient>{%[[RECV_SIZE]]}
-        %captured_recv[%c0 to %recv_size for %recv_size] :
-        !stream.resource<external>{%send_size} -> %captured_recv as !stream.resource<transient>{%recv_size}
-    stream.yield %0 : !stream.resource<transient>{%recv_size}
-  } => !stream.timepoint
-  // CHECK: util.optimization_barrier %[[RECV]]
-  util.optimization_barrier %result : !stream.resource<transient>
-  return
-}
-
-// -----
-
 // TODO(benvanik): test affinity changes that would introduce invalidate/fill.
 
 // CHECK-LABEL: @applyAsyncTransferOp

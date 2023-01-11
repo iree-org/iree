@@ -68,30 +68,6 @@ func.func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.re
 
 // -----
 
-// Tests collectives with naturally tied results.
-// TODO(#11249): support in-place collectives - when supported this will become
-// a negative test as we'd expect %send_recv to be used for both operands.
-
-// CHECK-LABEL: @tiedCollectivesTODO
-//  CHECK-SAME: (%[[SEND_RECV:.+]]: !stream.resource<*>, %[[SEND_SIZE:.+]]: index, %[[RECV_SIZE:.+]]: index, %[[COUNT:.+]]: index)
-func.func private @tiedCollectivesTODO(%send_recv: !stream.resource<*>, %send_size: index, %recv_size: index, %count: index) -> !stream.resource<*> {
-  %c0 = arith.constant 0 : index
-  %channel = stream.channel.default : !stream.channel
-  // CHECK: %[[RECV_CLONE:.+]] = stream.async.clone on(#hal.affinity.queue<[0]>) %[[SEND_RECV]]
-  // CHECK: %[[ALL_GATHER:.+]] = stream.async.collective<all_gather : f32>[%[[COUNT]]]
-  %0 = stream.async.collective<all_gather : f32>[%count] on(#hal.affinity.queue<[0]>) channel(%channel)
-      // CHECK-SAME: %[[SEND_RECV]][%c0 to %[[SEND_SIZE]] for %[[SEND_SIZE]]],
-      %send_recv[%c0 to %send_size for %send_size],
-      // CHECK-SAME: %[[RECV_CLONE]][%c0 to %[[RECV_SIZE]] for %[[RECV_SIZE]]] :
-      %send_recv[%c0 to %recv_size for %recv_size] :
-      // CHECK-SAME: !stream.resource<*>{%[[SEND_SIZE]]} -> %[[RECV_CLONE]] as !stream.resource<*>{%[[RECV_SIZE]]}
-      !stream.resource<*>{%send_size} -> %recv as !stream.resource<*>{%recv_size}
-  // CHECK: return %[[ALL_GATHER]]
-  return %0 : !stream.resource<*>
-}
-
-// -----
-
 // Tests tied dispatches with a data dependency.
 // %splat0 is mutated by @dispatch0 and a clone gets inserted to preserve its
 // original contents for use by @dispatch1.

@@ -104,7 +104,6 @@ static bool emplaceAllocationsInRegion(Region &region) {
       if (!op.hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>()) continue;
       // TODO(benvanik): support placement for more ops e.g. copies/collectives.
       didChange = TypeSwitch<Operation *, bool>(&op)
-                      // TODO(#11249): support in-place collective ops.
                       .Case<IREE::Stream::AsyncDispatchOp>(
                           [&](auto op) { return tryEmplaceDispatchOp(op); })
                       .Default(false) ||

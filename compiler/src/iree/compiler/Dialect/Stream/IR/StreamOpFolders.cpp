@@ -1560,15 +1560,6 @@ void AsyncCopyOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
-// stream.async.collective
-//===----------------------------------------------------------------------===//
-
-void AsyncCollectiveOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                    MLIRContext *context) {
-  results.insert<ElideUnusedOp<AsyncCollectiveOp>>(context);
-}
-
-//===----------------------------------------------------------------------===//
 // stream.async.transfer
 //===----------------------------------------------------------------------===//
 

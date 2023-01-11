@@ -80,64 +80,6 @@ func.func @asyncCopy(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.re
 
 // -----
 
-// This covers all_gather, all_reduce, and reduce_scatter variants.
-
-// CHECK-LABEL: @asyncCollectiveAllGather
-func.func @asyncCollectiveAllGather(
-    // CHECK-SAME: %[[SEND:[a-z0-9]+]]: !stream.resource<*>, %[[SEND_SIZE:[a-z0-9]+]]: index,
-    %send: !stream.resource<*>, %send_size: index,
-    // CHECK-SAME: %[[RECV_SIZE:[a-z0-9]+]]: index, %[[COUNT:[a-z0-9]+]]: index)
-    %recv_size: index, %count: index) -> !stream.resource<*> {
-  %c0 = arith.constant 0 : index
-  // CHECK: %[[CHANNEL:.+]] = stream.channel.default
-  %channel = stream.channel.default : !stream.channel
-  // CHECK: %[[RECV:.+]] = stream.async.alloca
-  %recv = stream.async.alloca : !stream.resource<*>{%recv_size}
-  // CHECK: = stream.async.collective<all_gather : f32>[%[[COUNT]]]
-  %0 = stream.async.collective<all_gather : f32>[%count]
-      // CHECK-SAME: on(#hal.affinity.queue<[0]>) channel(%[[CHANNEL]])
-      on(#hal.affinity.queue<[0]>) channel(%channel)
-      // CHECK-SAME: %[[SEND]][%c0 to %[[SEND_SIZE]] for %[[SEND_SIZE]]],
-      %send[%c0 to %send_size for %send_size],
-      // CHECK-SAME: %[[RECV]][%c0 to %[[RECV_SIZE]] for %[[RECV_SIZE]]] :
-      %recv[%c0 to %recv_size for %recv_size] :
-      // CHECK-SAME: !stream.resource<*>{%[[SEND_SIZE]]} -> %[[RECV]] as !stream.resource<*>{%[[RECV_SIZE]]}
-      !stream.resource<*>{%send_size} -> %recv as !stream.resource<*>{%recv_size}
-  return %0 : !stream.resource<*>
-}
-
-// -----
-
-// This covers broadcast and reduce variants.
-
-// CHECK-LABEL: @asyncCollectiveBroadcast
-func.func @asyncCollectiveBroadcast(
-    // CHECK-SAME: %[[RANK:[a-z0-9]+]]: i32,
-    %rank: i32,
-    // CHECK-SAME: %[[SEND:[a-z0-9]+]]: !stream.resource<*>, %[[SEND_SIZE:[a-z0-9]+]]: index,
-    %send: !stream.resource<*>, %send_size: index,
-    // CHECK-SAME: %[[RECV_SIZE:[a-z0-9]+]]: index, %[[COUNT:[a-z0-9]+]]: index)
-    %recv_size: index, %count: index) -> !stream.resource<*> {
-  %c0 = arith.constant 0 : index
-  // CHECK: %[[CHANNEL:.+]] = stream.channel.default
-  %channel = stream.channel.default : !stream.channel
-  // CHECK: %[[RECV:.+]] = stream.async.alloca
-  %recv = stream.async.alloca : !stream.resource<*>{%recv_size}
-  // CHECK: = stream.async.collective<broadcast : f32>[%[[COUNT]]]
-  %0 = stream.async.collective<broadcast : f32>[%count]
-      // CHECK-SAME: on(#hal.affinity.queue<[0]>) channel(%[[CHANNEL]]) source(%[[RANK]])
-      on(#hal.affinity.queue<[0]>) channel(%channel) source(%rank)
-      // CHECK-SAME: %[[SEND]][%c0 to %[[SEND_SIZE]] for %[[SEND_SIZE]]],
-      %send[%c0 to %send_size for %send_size],
-      // CHECK-SAME: %[[RECV]][%c0 to %[[RECV_SIZE]] for %[[RECV_SIZE]]] :
-      %recv[%c0 to %recv_size for %recv_size] :
-      // CHECK-SAME: !stream.resource<*>{%[[SEND_SIZE]]} -> %[[RECV]] as !stream.resource<*>{%[[RECV_SIZE]]}
-      !stream.resource<*>{%send_size} -> %recv as !stream.resource<*>{%recv_size}
-  return %0 : !stream.resource<*>
-}
-
-// -----
-
 // CHECK-LABEL: @asyncTransfer
 func.func @asyncTransfer(%arg0: !stream.resource<constant>, %arg1: index) -> !stream.resource<staging> {
   // CHECK: = stream.async.transfer %arg0 : !stream.resource<constant>{%arg1} -> !stream.resource<staging>{%arg1}

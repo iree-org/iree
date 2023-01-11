@@ -540,49 +540,6 @@ static LogicalResult applyAsyncCopyOp(IREE::Stream::AsyncCopyOp asyncOp,
   return success();
 }
 
-static LogicalResult applyAsyncCollectiveOp(
-    IREE::Stream::AsyncCollectiveOp asyncOp, AllocationScope &scope,
-    OpBuilder builder) {
-  SmallVector<Value> newResources;
-  SmallVector<Value> newResourceSizes;
-  SmallVector<Value> newResourceOffsets;
-  SmallVector<Value> newResourceLengths;
-  SmallVector<Attribute> newResourceAccesses;
-
-  // TODO(#11249): support in-place collectives by a r/w resource? it may be
-  // fine to leave them separate as then we get unique invalidation ranges.
-
-  auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
-  auto sourceOffset = scope.add(asyncOp.getLoc(), sourceRange.offset,
-                                asyncOp.getSourceOffset());
-  auto sourceLength = sourceRange.length;
-  newResources.push_back(sourceRange.resource);
-  newResourceSizes.push_back(sourceRange.resourceSize);
-  newResourceOffsets.push_back(sourceOffset);
-  newResourceLengths.push_back(sourceLength);
-  newResourceAccesses.push_back(IREE::Stream::ResourceAccessBitfieldAttr::get(
-      builder.getContext(), IREE::Stream::ResourceAccessBitfield::Read));
-
-  auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
-  auto targetOffset = scope.add(asyncOp.getLoc(), targetRange.offset,
-                                asyncOp.getTargetOffset());
-  auto targetLength = targetRange.length;
-  newResources.push_back(targetRange.resource);
-  newResourceSizes.push_back(targetRange.resourceSize);
-  newResourceOffsets.push_back(targetOffset);
-  newResourceLengths.push_back(targetLength);
-  newResourceAccesses.push_back(IREE::Stream::ResourceAccessBitfieldAttr::get(
-      builder.getContext(), IREE::Stream::ResourceAccessBitfield::Write));
-
-  builder.create<IREE::Stream::CmdCollectiveOp>(
-      asyncOp.getLoc(), asyncOp.getOp(), asyncOp.getChannel(),
-      asyncOp.getElementCount(), asyncOp.getParam(), newResources,
-      newResourceSizes, newResourceOffsets, newResourceLengths,
-      builder.getArrayAttr(newResourceAccesses));
-  asyncOp.erase();
-  return success();
-}
-
 static LogicalResult applyAsyncTransferOp(IREE::Stream::AsyncTransferOp asyncOp,
                                           AllocationScope &scope,
                                           OpBuilder builder) {
@@ -766,9 +723,6 @@ static LogicalResult applyAsyncAllocations(Region &region,
                    })
                    .Case([&](IREE::Stream::AsyncCopyOp op) {
                      return applyAsyncCopyOp(op, scope, OpBuilder(op));
-                   })
-                   .Case([&](IREE::Stream::AsyncCollectiveOp op) {
-                     return applyAsyncCollectiveOp(op, scope, OpBuilder(op));
                    })
                    .Case([&](IREE::Stream::AsyncTransferOp op) {
                      return applyAsyncTransferOp(op, scope, OpBuilder(op));
@@ -1099,10 +1053,6 @@ static LogicalResult allocateExecutionRegion(
   llvm::append_range(newOperands, executeOp.getResourceOperands());
   llvm::append_range(newOperandSizes, executeOp.getResourceOperandSizes());
   SmallVector<Value> joinTimepoints;
-
-  // TODO(#11249): pre-scan region for collectives and handle in-place behavior
-  // where send aliases recv. We probably want to do this early in case both
-  // values are produced locally and escape the region.
 
   // First find all constants and pull them out into a dedicated constant upload
   // op. We'll then capture the result and use that to initialize variables and

@@ -124,11 +124,8 @@ static bool materializeRegionCOW(Region &region) {
           TypeSwitch<Operation *, bool>(&op)
               .Case<IREE::Stream::TensorImportOp, IREE::Stream::TensorExportOp,
                     IREE::Stream::AsyncFillOp, IREE::Stream::AsyncUpdateOp,
-                    IREE::Stream::AsyncCopyOp,
-                    // TODO(#11249): special case collectives for in-place.
-                    // We don't want to clone the send buffer.
-                    IREE::Stream::AsyncCollectiveOp,
-                    IREE::Stream::AsyncDispatchOp, IREE::Stream::AsyncExecuteOp,
+                    IREE::Stream::AsyncCopyOp, IREE::Stream::AsyncDispatchOp,
+                    IREE::Stream::AsyncExecuteOp,
                     IREE::Stream::AsyncConcurrentOp>(
                   [&](auto op) { return materializeTiedOpCOW(op); })
               .Default(false) ||
