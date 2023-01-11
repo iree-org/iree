@@ -82,15 +82,17 @@ def VMVX_QueryTileSizesOp : VMVX_PureOp<"query_tile_sizes"> {
   }];
 
   let arguments = (ins
-    I64:$encoding,
-    Variadic<VMVX_Index>:$sizes
+    Variadic<VMVX_Index>:$sizes,
+    I32Attr:$flags
   );
   let results = (outs
     Variadic<VMVX_Index>:$tileSizes
   );
 
   let assemblyFormat = [{
-    `encoding` `(` $encoding `)` `sizes` `(` $sizes `)` `->` type(results) attr-dict
+    `sizes` `` `(` $sizes `)`
+    `flags` `` `(` $flags `)`
+    `->` type(results) attr-dict
   }];
 }
 
