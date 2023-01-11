@@ -137,8 +137,8 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
   let arguments = (
       ins PDL_Operation:$target,
           UnitAttr:$target_gpu,
-          UnitAttr:$test_analysis_only,
-          UnitAttr:$print_conflicts
+          DefaultValuedAttr<BoolAttr, "false">:$test_analysis_only,
+          DefaultValuedAttr<BoolAttr, "false">:$print_conflicts
   );
   let results = (outs PDL_Operation:$result);
 
@@ -146,10 +146,7 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let builders = [
-    OpBuilder<(ins "Value":$target,
-                   CArg<"bool", "false">:$targetGpu,
-                   CArg<"bool", "false">:$testAnalysisOnly,
-                   CArg<"bool", "false">:$printConflicts)>
+    OpBuilder<(ins "Value":$target, CArg<"bool", "false">:$targetGpu)>
   ];
 }
 
