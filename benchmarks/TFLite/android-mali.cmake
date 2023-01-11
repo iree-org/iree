@@ -33,7 +33,6 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
-    "${MOBILEBERT_INT8_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
