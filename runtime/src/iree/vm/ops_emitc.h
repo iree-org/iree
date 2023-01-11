@@ -49,10 +49,15 @@
 // Get the address of an array element
 #define EMITC_ARRAY_ELEMENT_ADDRESS(array, index) &(array)[index]
 
-// Unary operators
-#define EMITC_UNARY(op, arg) (op(arg))
+// Unary operations
+#define EMITC_NOT(arg) (!(arg))
 
-// Binary operators
-#define EMITC_BINARY(op, lhs, rhs) ((lhs)op(rhs))
+// Binary operations
+#define EMITC_AND(lhs, rhs) ((lhs) && (rhs))
+#define EMITC_EQ(lhs, rhs) ((lhs) == (rhs))
+#define EMITC_NE(lhs, rhs) ((lhs) != (rhs))
+#define EMITC_OR(lhs, rhs) ((lhs) || (rhs))
+
+#define EMITC_ADD(lhs, rhs) ((lhs) + (rhs))
 
 #endif  // IREE_VM_OPS_EMITC_H_
