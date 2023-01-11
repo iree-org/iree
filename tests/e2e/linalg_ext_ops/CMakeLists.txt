@@ -81,7 +81,6 @@ iree_check_single_backend_test_suite(
     "top-k.mlir"
     "unpack.mlir"
     "winograd_input.mlir"
-    "winograd_output.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER

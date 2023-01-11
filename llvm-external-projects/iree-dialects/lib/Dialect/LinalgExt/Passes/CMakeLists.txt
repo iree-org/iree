@@ -5,7 +5,7 @@ add_mlir_library(IREELinalgExtPasses
   PadContractionToBlockSize.cpp
   Passes.cpp
   SplitReduction.cpp
-  TileAndDecomposeWinogradPass.cpp
+  TileAndDecomposeWinogradInputPass.cpp
   Tiling.cpp
 
   DEPENDS

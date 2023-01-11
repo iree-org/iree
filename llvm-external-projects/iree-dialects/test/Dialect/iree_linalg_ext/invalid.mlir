@@ -681,14 +681,3 @@ func.func @illegal_winograd_input_rank(%arg0: tensor<1x10x10x32xf32>) -> tensor<
 }
 
 // -----
-
-func.func @illegal_winograd_output_shape(%arg0: tensor<8x8x1x2x2x32xf32>) -> tensor<1x8x8x32xf32> {
-  %0 = tensor.empty() : tensor<1x8x8x32xf32>
-  // expected-error @+1 {{incompatible output shape}}
-  %1 = iree_linalg_ext.winograd.output_transform output_tile_size(6)
-        kernel_size(3) image_dimensions([1, 2])
-        ins(%arg0 : tensor<8x8x1x2x2x32xf32>) outs(%0 : tensor<1x8x8x32xf32>) -> tensor<1x8x8x32xf32>
-  return %1 : tensor<1x8x8x32xf32>
-}
-
-// -----

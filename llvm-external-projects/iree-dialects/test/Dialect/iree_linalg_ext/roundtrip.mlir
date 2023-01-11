@@ -966,35 +966,3 @@ func.func @winograd_input_transform_dynamic(%arg0: tensor<?x?x?x?xf32>, %arg1: t
 // CHECK:      }
 
 // -----
-
-func.func @winograd_output_transform(%arg0: tensor<8x8x1x2x2x1280xf32>) -> tensor<1x12x12x1280xf32> {
-  %0 = tensor.empty() : tensor<1x12x12x1280xf32>
-  %1 = iree_linalg_ext.winograd.output_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2])
-    ins(%arg0 : tensor<8x8x1x2x2x1280xf32>) outs(%0 : tensor<1x12x12x1280xf32>) -> tensor<1x12x12x1280xf32>
-  return %1 : tensor<1x12x12x1280xf32>
-}
-// CHECK:      func.func @winograd_output_transform(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<8x8x1x2x2x1280xf32>) ->
-// CHECK-SAME:   tensor<1x12x12x1280xf32> {
-// CHECK:        %[[D0:.+]] = tensor.empty() : tensor<1x12x12x1280xf32>
-// CHECK:        %[[D1:.+]] = iree_linalg_ext.winograd.output_transform output_tile_size(6) kernel_size(3)
-// CHECK-SAME:     image_dimensions([1, 2]) ins(%[[ARG0]] : tensor<8x8x1x2x2x1280xf32>) outs(%[[D0]] :
-// CHECK-SAME:     tensor<1x12x12x1280xf32>) -> tensor<1x12x12x1280xf32>
-// CHECK:        return %[[D1]] : tensor<1x12x12x1280xf32>
-// CHECK:      }
-
-// -----
-
-func.func @winograd_output_transform(%arg0: tensor<8x8x?x?x?x?xf32>, %arg1: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
-  %1 = iree_linalg_ext.winograd.output_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2])
-    ins(%arg0 : tensor<8x8x?x?x?x?xf32>) outs(%arg1 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
-  return %1 : tensor<?x?x?x?xf32>
-}
-// CHECK:      func.func @winograd_output_transform(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<8x8x?x?x?x?xf32>,
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
-// CHECK:        %[[D0:.+]] = iree_linalg_ext.winograd.output_transform output_tile_size(6) kernel_size(3)
-// CHECK-SAME:     image_dimensions([1, 2]) ins(%[[ARG0]] : tensor<8x8x?x?x?x?xf32>) outs(%[[ARG1]] :
-// CHECK-SAME:     tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
-// CHECK:        return %[[D0]] : tensor<?x?x?x?xf32>
-// CHECK:      }
-
-// -----
