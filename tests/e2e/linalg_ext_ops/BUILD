@@ -154,7 +154,6 @@ iree_check_single_backend_test_suite(
             #    "top-k.mlir",
             "sort.mlir",
             "winograd_input.mlir",
-            "winograd_output.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
@@ -164,6 +163,7 @@ iree_check_single_backend_test_suite(
             # Re-enable this once we have new devices with up-to-date drivers.
             "top-k.mlir",
             "scan.mlir",
+            "winograd_output.mlir",
         ],
     ),
     driver = "vulkan",

@@ -930,8 +930,9 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 // Winograd Default Configuration
 //===----------------------------------------------------------------------===//
 
-static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
-                                         IREE::LinalgExt::LinalgExtOp op) {
+static LogicalResult setWinogradOpConfig(
+    spirv::ResourceLimitsAttr limits,
+    IREE::LinalgExt::WinogradInputTransformOp op) {
   // Tiling is already done by tile and decompose, so we only set pipeline and
   // workgroup size. The tile sizes below are placeholders and were obtained
   // by manual tuning on the AMD Navi2 GPU on a small set of convolution
@@ -1355,9 +1356,10 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
       .Case<IREE::LinalgExt::FftOp>([limits](IREE::LinalgExt::FftOp op) {
         return setFftOpConfig(limits, op);
       })
-      .Case<IREE::LinalgExt::WinogradInputTransformOp,
-            IREE::LinalgExt::WinogradOutputTransformOp>(
-          [&](auto op) { return setWinogradOpConfig(limits, op); })
+      .Case<IREE::LinalgExt::WinogradInputTransformOp>(
+          [&](IREE::LinalgExt::WinogradInputTransformOp op) {
+            return setWinogradOpConfig(limits, op);
+          })
       .Default([](Operation *) { return success(); });
 };
 
