@@ -52,7 +52,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TransformUtils",
-        "@llvm-project//mlir:VectorDialect",
         "@llvm-project//mlir:ViewLikeInterface",
     ],
 )

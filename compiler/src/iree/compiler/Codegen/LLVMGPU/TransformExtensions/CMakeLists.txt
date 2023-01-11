@@ -48,7 +48,6 @@ iree_cc_library(
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorTransforms
-    iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
