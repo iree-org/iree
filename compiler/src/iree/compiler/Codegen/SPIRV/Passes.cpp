@@ -223,12 +223,12 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
 
   OpPassManager &spirvPM = pm.nest<spirv::ModuleOp>();
   spirvPM.addPass(spirv::createUnifyAliasedResourcePass(getTargetEnv));
-  spirvPM.addPass(spirv::createSPIRVLowerABIAttributesPass());
+  spirvPM.addPass(spirv::createLowerABIAttributesPass());
   spirvPM.addPass(createCanonicalizerPass());
   spirvPM.addPass(createCSEPass());
-  spirvPM.addPass(spirv::createSPIRVRewriteInsertsPass());
-  spirvPM.addPass(spirv::createSPIRVCanonicalizeGLPass());
-  spirvPM.addPass(spirv::createSPIRVUpdateVCEPass());
+  spirvPM.addPass(spirv::createRewriteInsertsPass());
+  spirvPM.addPass(spirv::createCanonicalizeGLPass());
+  spirvPM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 }
 
 //===----------------------------------------------------------------------===//
