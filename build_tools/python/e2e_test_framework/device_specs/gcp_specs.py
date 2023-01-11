@@ -7,14 +7,13 @@
 
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
-from e2e_test_framework.device_specs import device_parameters
 
 GCP_C2_STANDARD_16 = common_definitions.DeviceSpec(
     id=unique_ids.DEVICE_SPEC_GCP_C2_STANDARD_16,
     vendor_name="GCP-c2-standard-16",
     architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
     platform=common_definitions.DevicePlatform.GENERIC_LINUX,
-    device_parameters=[device_parameters.OCTA_CORES])
+    device_parameters=["all-cores"])
 
 GCP_A2_HIGHGPU_1G = common_definitions.DeviceSpec(
     id=unique_ids.DEVICE_SPEC_GCP_A2_HIGHGPU_1G,

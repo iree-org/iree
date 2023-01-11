@@ -13,7 +13,6 @@ import pathlib
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 BENCHMARK_RESULTS_REL_PATH = "benchmark-results"
 CAPTURES_REL_PATH = "captures"
-E2E_TEST_ARTIFACTS_REL_PATH = "e2e_test_artifacts"
 
 
 @dataclass
@@ -109,21 +108,15 @@ class BenchmarkConfig:
           capture_tmp_dir=per_commit_tmp_dir / CAPTURES_REL_PATH)
 
     build_dir = args.build_dir.resolve()
-    if args.run_config is None:
-      # TODO(#11076): Remove legacy path.
-      root_benchmark_dir = build_dir / BENCHMARK_SUITE_REL_PATH
-    else:
-      root_benchmark_dir = build_dir / E2E_TEST_ARTIFACTS_REL_PATH
-
-    return BenchmarkConfig(root_benchmark_dir=root_benchmark_dir,
-                           benchmark_results_dir=per_commit_tmp_dir /
-                           BENCHMARK_RESULTS_REL_PATH,
-                           git_commit_hash=git_commit_hash,
-                           normal_benchmark_tool_dir=real_path_or_none(
-                               args.normal_benchmark_tool_dir),
-                           trace_capture_config=trace_capture_config,
-                           driver_filter=args.driver_filter_regex,
-                           model_name_filter=args.model_name_regex,
-                           mode_filter=args.mode_regex,
-                           keep_going=args.keep_going,
-                           benchmark_min_time=args.benchmark_min_time)
+    return BenchmarkConfig(
+        root_benchmark_dir=build_dir / BENCHMARK_SUITE_REL_PATH,
+        benchmark_results_dir=per_commit_tmp_dir / BENCHMARK_RESULTS_REL_PATH,
+        git_commit_hash=git_commit_hash,
+        normal_benchmark_tool_dir=real_path_or_none(
+            args.normal_benchmark_tool_dir),
+        trace_capture_config=trace_capture_config,
+        driver_filter=args.driver_filter_regex,
+        model_name_filter=args.model_name_regex,
+        mode_filter=args.mode_regex,
+        keep_going=args.keep_going,
+        benchmark_min_time=args.benchmark_min_time)

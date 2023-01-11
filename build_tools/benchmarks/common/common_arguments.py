@@ -22,13 +22,6 @@ def build_common_argument_parser():
     else:
       raise argparse.ArgumentTypeError(path)
 
-  def check_file_path(path):
-    path = pathlib.Path(path)
-    if path.is_file():
-      return path
-    else:
-      raise argparse.ArgumentTypeError(f"'{path}' is not found")
-
   def check_exe_path(path):
     path = pathlib.Path(path)
     if os.access(path, os.X_OK):
@@ -136,10 +129,6 @@ def build_common_argument_parser():
       "for). In that case, no --benchmark_repetitions flag will be passed."
       " If not specified, a --benchmark_repetitions will be passed "
       "instead.")
-  parser.add_argument("--run_config",
-                      type=check_file_path,
-                      default=None,
-                      help="JSON file of the run config")
 
   return parser
 
