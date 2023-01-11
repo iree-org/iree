@@ -534,10 +534,9 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand,
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
 
-  // Fuse unset_encoding operations with `tensor.extract_slice` and elementwise
-  // generic ops.
-  auto producerUnsetEncodingOp = dyn_cast<LinalgExt::UnsetEncodingOp>(producer);
-  if (producerUnsetEncodingOp && isa<tensor::ExtractSliceOp>(consumer)) {
+  // Fuse unset_encoding operations with `tensor.extract_slice`.
+  if (isa<LinalgExt::UnsetEncodingOp>(producer) &&
+      isa<tensor::ExtractSliceOp>(consumer)) {
     auto sliceOp = cast<tensor::ExtractSliceOp>(consumer);
     return llvm::all_of(
                sliceOp.getMixedOffsets(),
@@ -546,14 +545,9 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand,
              return isConstantIntValue(ofr, 1);
            });
   }
-  auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
-  if (producerUnsetEncodingOp && consumerLinalgOp) {
-    return linalg::isElementwise(consumerLinalgOp) &&
-           consumerLinalgOp.getNumLoops() ==
-               producerUnsetEncodingOp.getType().getRank();
-  }
 
   auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
+  auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
   if (!producerLinalgOp || !consumerLinalgOp) return false;
 
   // Check that the consumer is all parallel.

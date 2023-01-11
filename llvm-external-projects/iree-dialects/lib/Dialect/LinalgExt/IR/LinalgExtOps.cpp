@@ -2369,15 +2369,6 @@ SmallVector<utils::IteratorType> UnPackOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-FailureOr<Value>
-UnPackOp::generateResultTileValue(OpBuilder &b, unsigned resultNumber,
-                                  ArrayRef<OpFoldResult> offsets,
-                                  ArrayRef<OpFoldResult> sizes) {
-  return getTiledImplementation(b, offsets, sizes)
-      .back()
-      ->getResult(resultNumber);
-}
-
 //===----------------------------------------------------------------------===//
 // WinogradInputTransformOp
 //===----------------------------------------------------------------------===//
