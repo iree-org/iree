@@ -109,13 +109,6 @@ function docker_run() {
       --env SANDBOX_BASE=/dev/shm
     )
 
-    # Some scripts need elevated permissions to control system-level scheduling.
-    # Since we're not using Docker for sandboxing, it is fine to run in
-    # privileged mode.
-    DOCKER_RUN_ARGS+=(
-      --privileged
-    )
-
     docker run "${DOCKER_RUN_ARGS[@]}" "$@"
 }
 
