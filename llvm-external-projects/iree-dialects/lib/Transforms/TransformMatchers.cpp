@@ -296,47 +296,6 @@ transform_ext::StructuredOpMatcher::input(AllOperands tag,
 }
 
 transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::input(int64_t position,
-                                          ElementTypeBitWidth width) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    LLVM_DEBUG(DBGS() << "input operand #" << position
-                      << " has elemental type with bit width " << width.value);
-    int64_t updatedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
-    if (0 < updatedPosition || updatedPosition >= linalgOp.getNumDpsInputs())
-      return false;
-    auto shapedType = linalgOp.getDpsInputOperand(updatedPosition)
-                          ->get()
-                          .getType()
-                          .dyn_cast<ShapedType>();
-    return shapedType && shapedType.getElementType().isIntOrFloat() &&
-           shapedType.getElementType().getIntOrFloatBitWidth() == width.value;
-  });
-  return *this;
-}
-
-transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::input(int64_t position,
-                                          CaptureElementTypeBitWidth width) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    LLVM_DEBUG(DBGS() << "input operand #" << position << " capture bitwidth");
-    int64_t updatedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
-    if (0 < updatedPosition || updatedPosition >= linalgOp.getNumDpsInputs())
-      return false;
-    auto shapedType = linalgOp.getDpsInputOperand(updatedPosition)
-                          ->get()
-                          .getType()
-                          .dyn_cast<ShapedType>();
-    if (!shapedType || !shapedType.getElementType().isIntOrFloat())
-      return false;
-    width.value = shapedType.getElementType().getIntOrFloatBitWidth();
-    return true;
-  });
-  return *this;
-}
-
-transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::input(NumEqualsTo num) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "number of input operands == " << num.value);
@@ -492,7 +451,7 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
                       << " has elemental type with bit width " << width.value);
     int64_t updatedPosition =
         position >= 0 ? position : linalgOp.getNumDpsInits() + position;
-    if (0 < updatedPosition || updatedPosition >= linalgOp.getNumDpsInits())
+    if (updatedPosition >= linalgOp.getNumDpsInits())
       return false;
     auto shapedType = linalgOp.getDpsInitOperand(updatedPosition)
                           ->get()
@@ -506,34 +465,13 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(int64_t position,
-                                           CaptureElementTypeBitWidth width) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    LLVM_DEBUG(DBGS() << "output operand #" << position << " capture bitwidth");
-    int64_t updatedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInits() + position;
-    if (0 < updatedPosition || updatedPosition >= linalgOp.getNumDpsInits())
-      return false;
-    auto shapedType = linalgOp.getDpsInitOperand(updatedPosition)
-                          ->get()
-                          .getType()
-                          .dyn_cast<ShapedType>();
-    if (!shapedType || !shapedType.getElementType().isIntOrFloat())
-      return false;
-    width.value = shapedType.getElementType().getIntOrFloatBitWidth();
-    return true;
-  });
-  return *this;
-}
-
-transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::output(int64_t position,
                                            SingleCombinerReduction tag) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "output operand #" << position
                       << " is populated by a single-combiner reduction");
     int64_t updatedPosition =
         position >= 0 ? position : linalgOp.getNumDpsInits() + position;
-    if (0 < updatedPosition || updatedPosition >= linalgOp.getNumDpsInits())
+    if (updatedPosition >= linalgOp.getNumDpsInits())
       return false;
     SmallVector<Operation *> combinerOps;
     return matchReduction(linalgOp.getRegionOutputArgs(), updatedPosition,
@@ -709,12 +647,11 @@ void transform_ext::makeReductionMatcher(
           // A reduction output must be a projected permutation, match it but we
           // could also drop this technically.
           .output(AllOperands(), IsProjectedPermutation())
-          // Only single combiner for now due to reduction warp
+          // Only single combiner over 32 bits for now due to reduction warp
           // distribution.
           // TODO: relax this once reduction distribution is more powerful.
           //
-          .output(0, CaptureElementTypeBitWidth(
-                         captures.reductionOutputElementalTypeBitWidth))
+          .output(0, ElementTypeBitWidth(32))
           .output(0, SingleCombinerReduction());
 
   // Mandatory FillOp must create the unique output of the reduction.
@@ -748,14 +685,10 @@ void transform_ext::makeReductionMatcher(
   // TODO: match more optional leading ops, one per input of the reduction.
   // TODO: careful about multi-output and turning into a contraction.
   //
-  leading =
-      commonLeadingOrTrailing
-          .rank(CaptureRank(captures.maybeLeadingRank))
-          // Capture op sizes.
-          .dim(AllDims(), CaptureDims(captures.leadingOpSizes))
-          // Capture output elemental type.
-          .output(0, CaptureElementTypeBitWidth(
-                         captures.maybeLeadingOutputElementalTypeBitWidth));
+  leading = commonLeadingOrTrailing
+                .rank(CaptureRank(captures.maybeLeadingRank))
+                // Capture op sizes.
+                .dim(AllDims(), CaptureDims(captures.leadingOpSizes));
   reduction = reduction.input(0, leading, OptionalMatch());
 
   // Optional trailing can be any map, transpose, broadcast but not reduce or
@@ -764,14 +697,10 @@ void transform_ext::makeReductionMatcher(
   // TODO: match more optional leading ops, one per input of the reduction.
   // TODO: careful about multi-output and turning into a contraction.
   //
-  trailing =
-      commonLeadingOrTrailing
-          .rank(CaptureRank(captures.maybeTrailingRank))
-          // Capture op sizes.
-          .dim(AllDims(), CaptureDims(captures.trailingOpSizes))
-          // Capture output elemental type.
-          .output(0, CaptureElementTypeBitWidth(
-                         captures.maybeTrailingOutputElementalTypeBitWidth));
+  trailing = commonLeadingOrTrailing
+                 .rank(CaptureRank(captures.maybeTrailingRank))
+                 // Capture op sizes.
+                 .dim(AllDims(), CaptureDims(captures.trailingOpSizes));
   reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch())
                   .allTilableOpsCaptured<func::FuncOp>();
 }
