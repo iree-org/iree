@@ -105,7 +105,7 @@ func.func @resourceTryMap(%source: !util.buffer) -> (i1, !stream.resource<consta
 // CHECK-LABEL: @resourceLoad
 // CHECK-SAME: (%[[BUFFER:.+]]: !util.buffer, %[[BUFFER_SIZE:.+]]: index, %[[OFFSET:.+]]: index)
 func.func @resourceLoad(%resource: !stream.resource<staging>, %resource_size: index, %offset: index) -> i32 {
-  // CHECK: %[[VALUE:.+]] = util.buffer.load %[[BUFFER]][%[[OFFSET]] for {{.+}}] : !util.buffer{%[[BUFFER_SIZE]]} -> i32
+  // CHECK: %[[VALUE:.+]] = util.buffer.load %[[BUFFER]][%[[OFFSET]]] : !util.buffer{%[[BUFFER_SIZE]]} -> i32
   %0 = stream.resource.load %resource[%offset] : !stream.resource<staging>{%resource_size} -> i32
   // CHECK: return %[[VALUE]]
   return %0 : i32
@@ -118,7 +118,7 @@ func.func @resourceLoad(%resource: !stream.resource<staging>, %resource_size: in
 func.func @resourceStore(%resource: !stream.resource<staging>, %resource_size: index, %offset: index) {
   // CHECK-DAG: %[[VALUE:.+]] = arith.constant 123
   %value = arith.constant 123 : i32
-  // CHECK: util.buffer.store %[[VALUE]], %[[BUFFER]][%[[OFFSET]] for {{.+}}] : i32 -> !util.buffer{%[[BUFFER_SIZE]]}
+  // CHECK: util.buffer.store %[[VALUE]], %[[BUFFER]][%[[OFFSET]]] : i32 -> !util.buffer{%[[BUFFER_SIZE]]}
   stream.resource.store %value, %resource[%offset] : i32 -> !stream.resource<staging>{%resource_size}
   return
 }

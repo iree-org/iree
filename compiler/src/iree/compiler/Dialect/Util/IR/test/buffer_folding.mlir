@@ -60,11 +60,10 @@ func.func @SinkSubspanAcrossSelectOps(%arg0: !util.buffer, %arg1: i1) -> !util.b
 // CHECK-LABEL: @FoldBufferSizeOp
 func.func @FoldBufferSizeOp(%arg0: !util.buffer, %arg1: index) -> (index, i32) {
   %c0 = arith.constant 0 : index
-  %c4 = arith.constant 4 : index
   // CHECK-NOT: util.buffer.size
   %0 = util.buffer.size %arg0 : !util.buffer
   // CHECK: %[[LOAD:.+]] = util.buffer.load
-  %1 = util.buffer.load %arg0[%c0 for %c4] : !util.buffer{%arg1} -> i32
+  %1 = util.buffer.load %arg0[%c0] : !util.buffer{%arg1} -> i32
   // CHECK: return %arg1, %[[LOAD]]
   return %0, %1 : index, i32
 }
@@ -82,13 +81,13 @@ func.func @FoldNestedBufferSizeOp(%buffer: !util.buffer) {
     // CHECK: %[[BUFFER_SIZE_INNER:.+]] = util.buffer.size %[[BUFFER]]
     %buffer_size_inner = util.buffer.size %buffer : !util.buffer
     // CHECK: util.buffer.load %[[BUFFER]]{{.+}} : !util.buffer{%[[BUFFER_SIZE_INNER]]}
-    %inner = util.buffer.load %buffer[%i for %c1] : !util.buffer{%buffer_size_inner} -> i8
+    %inner = util.buffer.load %buffer[%i] : !util.buffer{%buffer_size_inner} -> i8
     util.optimization_barrier %inner : i8
   }
   // CHECK: %[[BUFFER_SIZE_OUTER:.+]] = util.buffer.size %[[BUFFER]]
   %buffer_size_outer = util.buffer.size %buffer : !util.buffer
   // CHECK: util.buffer.load %[[BUFFER]]{{.+}} : !util.buffer{%[[BUFFER_SIZE_OUTER]]}
-  %outer = util.buffer.load %buffer[%c128 for %c1] : !util.buffer{%buffer_size_outer} -> i8
+  %outer = util.buffer.load %buffer[%c128] : !util.buffer{%buffer_size_outer} -> i8
   util.optimization_barrier %outer : i8
   return
 }
@@ -185,14 +184,13 @@ func.func @FoldSubspansIntoFillOp(%arg0: !util.buffer, %arg1: index, %arg2: i32,
 
 // CHECK-LABEL: @FoldSubspanIntoLoadOp
 func.func @FoldSubspanIntoLoadOp(%arg0: !util.buffer, %arg1: index) -> i32 {
-  %c4 = arith.constant 4 : index
   %c64 = arith.constant 64 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
   // CHECK-NOT: util.buffer.subspan
   %0 = util.buffer.subspan %arg0[%c128] : !util.buffer{%arg1} -> !util.buffer{%c256}
-  // CHECK: = util.buffer.load %arg0[%c192 for %c4] : !util.buffer{%arg1} -> i32
-  %1 = util.buffer.load %0[%c64 for %c4] : !util.buffer{%c256} -> i32
+  // CHECK: = util.buffer.load %arg0[%c192] : !util.buffer{%arg1} -> i32
+  %1 = util.buffer.load %0[%c64] : !util.buffer{%c256} -> i32
   return %1 : i32
 }
 
@@ -200,14 +198,13 @@ func.func @FoldSubspanIntoLoadOp(%arg0: !util.buffer, %arg1: index) -> i32 {
 
 // CHECK-LABEL: @FoldSubspanIntoStoreOp
 func.func @FoldSubspanIntoStoreOp(%arg0: !util.buffer, %arg1: index) {
-  %c4 = arith.constant 4 : index
   %c64 = arith.constant 64 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
   %c123_i32 = arith.constant 123 : i32
   // CHECK-NOT: util.buffer.subspan
   %0 = util.buffer.subspan %arg0[%c128] : !util.buffer{%arg1} -> !util.buffer{%c256}
-  // CHECK: util.buffer.store %c123_i32, %arg0[%c192 for %c4] : i32 -> !util.buffer{%arg1}
-  util.buffer.store %c123_i32, %0[%c64 for %c4] : i32 -> !util.buffer{%c256}
+  // CHECK: util.buffer.store %c123_i32, %arg0[%c192] : i32 -> !util.buffer{%arg1}
+  util.buffer.store %c123_i32, %0[%c64] : i32 -> !util.buffer{%c256}
   return
 }

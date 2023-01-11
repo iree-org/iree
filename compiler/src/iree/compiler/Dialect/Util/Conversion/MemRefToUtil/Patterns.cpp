@@ -34,32 +34,30 @@ static bool isRankZeroOrOneMemRef(Type type) {
   return false;
 }
 
-/// Returns the offset, in bytes, of an index within a linearized dense buffer
-/// and the element length accessed.
+/// Returns the offset, in bytes, of an index within a linearized dense buffer.
 /// Expects that the |memrefValue| has been linearized already.
-static std::pair<Value, Value> getBufferOffsetAndLength(
-    Location loc, Value memrefValue, ValueRange indices,
-    ConversionPatternRewriter &rewriter) {
+static Value getBufferOffset(Location loc, Value memrefValue,
+                             ValueRange indices,
+                             ConversionPatternRewriter &rewriter) {
+  auto memrefType = memrefValue.getType().cast<ShapedType>();
+  if (memrefType.getRank() == 0) {
+    // Rank 0 buffers (like memref<i32>) have only a single valid offset at 0.
+    return rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0);
+  }
+  assert(memrefType.getRank() == 1 && "memrefs should have been flattened");
+
   // Element type byte length as the base. Note that this is the unconverted
   // element type. Since these are storage types within a buffer, they are
   // not subject to general type conversion (i.e. a general type converter
   // may elect to represent all i8 registers as i32, but this does not mean
   // that all memrefs are widened from i8 to i32).
-  auto memrefType = memrefValue.getType().cast<ShapedType>();
   auto elementType = memrefType.getElementType();
   auto elementSize =
       rewriter.createOrFold<IREE::Util::SizeOfOp>(loc, elementType);
 
-  if (memrefType.getRank() == 0) {
-    // Rank 0 buffers (like memref<i32>) have only a single valid offset at 0.
-    return {rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0), elementSize};
-  }
-  assert(memrefType.getRank() == 1 && "memrefs should have been flattened");
-
   // Rank 1 memrefs are just offset by their element width by the offset.
   auto elementCount = indices.front();
-  return {rewriter.create<arith::MulIOp>(loc, elementSize, elementCount),
-          elementSize};
+  return rewriter.create<arith::MulIOp>(loc, elementSize, elementCount);
 }
 
 /// Pattern to lower operations that become a no-ops at this level.
@@ -204,11 +202,10 @@ struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
     auto newType = getTypeConverter()->convertType(oldType);
     auto memRefSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
         loadOp.getLoc(), rewriter.getIndexType(), adaptor.getMemref());
-    auto [byteOffset, byteLength] = getBufferOffsetAndLength(
-        loadOp.getLoc(), loadOp.getMemref(), loadOp.getIndices(), rewriter);
+    auto byteOffset = getBufferOffset(loadOp.getLoc(), loadOp.getMemref(),
+                                      loadOp.getIndices(), rewriter);
     Value loaded = rewriter.create<IREE::Util::BufferLoadOp>(
-        loadOp.getLoc(), oldType, adaptor.getMemref(), memRefSize, byteOffset,
-        byteLength);
+        loadOp.getLoc(), oldType, adaptor.getMemref(), memRefSize, byteOffset);
     if (newType != oldType) {
       // Since the BufferLoadOp semantics include its result type (i.e. a load
       // of an i8 is different than a load of an i32), in the presence of type
@@ -238,8 +235,8 @@ struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
     }
     auto memRefSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
         storeOp.getLoc(), rewriter.getIndexType(), adaptor.getMemref());
-    auto [byteOffset, byteLength] = getBufferOffsetAndLength(
-        storeOp.getLoc(), storeOp.getMemref(), storeOp.getIndices(), rewriter);
+    auto byteOffset = getBufferOffset(storeOp.getLoc(), storeOp.getMemref(),
+                                      storeOp.getIndices(), rewriter);
     Value newValue = adaptor.getValue();
     if (newValue.getType() != storeOp.getValue().getType()) {
       // In combination with type conversion, the elemental type may change,
@@ -255,8 +252,7 @@ struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
               .getResult(0);
     }
     rewriter.replaceOpWithNewOp<IREE::Util::BufferStoreOp>(
-        storeOp, newValue, adaptor.getMemref(), memRefSize, byteOffset,
-        byteLength);
+        storeOp, newValue, adaptor.getMemref(), memRefSize, byteOffset);
     return success();
   }
 };

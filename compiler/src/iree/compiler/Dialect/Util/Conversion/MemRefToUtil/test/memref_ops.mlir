@@ -78,10 +78,10 @@ func.func @alloc_index(%idx0: index) -> memref<4xindex> {
 func.func @load_store_f32(%buffer: memref<?xf32>, %idx0: index, %idx1: index) -> f32 {
   // CHECK: %[[BUFFER_SIZE:.+]] = util.buffer.size %[[BUFFER]]
   // CHECK: %[[IDX0_BYTES:.+]] = arith.muli %[[IDX0]], %c4
-  // CHECK: %[[VALUE:.+]] = util.buffer.load %[[BUFFER]][%[[IDX0_BYTES]] for %c4] : !util.buffer{%[[BUFFER_SIZE]]} -> f32
+  // CHECK: %[[VALUE:.+]] = util.buffer.load %[[BUFFER]][%[[IDX0_BYTES]]] : !util.buffer{%[[BUFFER_SIZE]]} -> f32
   %0 = memref.load %buffer[%idx0] : memref<?xf32>
   // CHECK: %[[IDX1_BYTES:.+]] = arith.muli %[[IDX1]], %c4
-  // CHECK: util.buffer.store %[[VALUE]], %[[BUFFER]][%[[IDX1_BYTES]] for %c4] : f32 -> !util.buffer{%[[BUFFER_SIZE]]}
+  // CHECK: util.buffer.store %[[VALUE]], %[[BUFFER]][%[[IDX1_BYTES]]] : f32 -> !util.buffer{%[[BUFFER_SIZE]]}
   memref.store %0, %buffer[%idx1] : memref<?xf32>
   // CHECK: return %[[VALUE]] : f32
   return %0 : f32
@@ -101,7 +101,7 @@ func.func @constant_global_f32(%idx: index) -> f32 {
   %0 = memref.get_global @__constant_f32 : memref<2xf32>
   // CHECK: %[[BUFFER_SIZE:.+]] = util.buffer.size %[[BUFFER]]
   // CHECK: %[[IDX_BYTES:.+]] = arith.muli %[[IDX]], %c4
-  // CHECK: %[[VALUE:.+]] = util.buffer.load %[[BUFFER]][%[[IDX_BYTES]] for %c4] : !util.buffer{%[[BUFFER_SIZE]]} -> f32
+  // CHECK: %[[VALUE:.+]] = util.buffer.load %[[BUFFER]][%[[IDX_BYTES]]] : !util.buffer{%[[BUFFER_SIZE]]} -> f32
   %1 = memref.load %0[%idx] : memref<2xf32>
   // CHECK: return %[[VALUE]] : f32
   return %1 : f32
@@ -115,10 +115,10 @@ func.func @load_store_i16(%buffer: memref<?xi16>, %idx0: index, %idx1: index, %v
   // CHECK-DAG: %[[SZ:.*]] = util.buffer.size %[[BUFFER]]
   // CHECK-DAG: %[[OFS0:.*]] = arith.muli %[[IDX0]], %[[C2]] : index
   // CHECK-DAG: %[[UCST0:.*]] = builtin.unrealized_conversion_cast %[[VALUE]] : i32 to i16
-  // CHECK: util.buffer.store %[[UCST0]], %[[BUFFER]][%[[OFS0]] for %[[C2]]] : i16 -> !util.buffer{%[[SZ]]}
+  // CHECK: util.buffer.store %[[UCST0]], %[[BUFFER]][%[[OFS0]]] : i16 -> !util.buffer{%[[SZ]]}
   memref.store %value, %buffer[%idx0] : memref<?xi16>
   // CHECK: %[[OFS1:.*]] = arith.muli %[[IDX1]], %[[C2]] : index
-  // CHECK: %[[LD:.*]] = util.buffer.load %[[BUFFER]][%[[OFS1]] for %c2] : !util.buffer{%[[SZ]]} -> i16
+  // CHECK: %[[LD:.*]] = util.buffer.load %[[BUFFER]][%[[OFS1]]] : !util.buffer{%[[SZ]]} -> i16
   // CHECK: %[[UCST1:.*]] = builtin.unrealized_conversion_cast %[[LD]] : i16 to i32
   %1 = memref.load %buffer[%idx1] : memref<?xi16>
   // CHECK: return %[[UCST1]]
@@ -132,10 +132,10 @@ func.func @load_store_index(%buffer: memref<?xindex>, %idx0: index, %idx1: index
   // CHECK-DAG: %[[SIZEOF:.*]] = util.sizeof index
   // CHECK-DAG: %[[SZ:.*]] = util.buffer.size %[[BUFFER]]
   // CHECK-DAG: %[[OFS0:.*]] = arith.muli %[[SIZEOF]], %[[IDX0]] : index
-  // CHECK: util.buffer.store %[[VALUE]], %[[BUFFER]][%[[OFS0]] for %[[SIZEOF]]] : index -> !util.buffer{%[[SZ]]}
+  // CHECK: util.buffer.store %[[VALUE]], %[[BUFFER]][%[[OFS0]]] : index -> !util.buffer{%[[SZ]]}
   memref.store %value, %buffer[%idx0] : memref<?xindex>
   // CHECK: %[[OFS1:.*]] = arith.muli %[[SIZEOF]], %[[IDX1]] : index
-  // CHECK: %[[LD:.*]] = util.buffer.load %[[BUFFER]][%[[OFS1]] for %[[SIZEOF]]] : !util.buffer{%[[SZ]]} -> index
+  // CHECK: %[[LD:.*]] = util.buffer.load %[[BUFFER]][%[[OFS1]]] : !util.buffer{%[[SZ]]} -> index
   %1 = memref.load %buffer[%idx1] : memref<?xindex>
   // CHECK: return %[[LD]]
   return %1 : index

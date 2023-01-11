@@ -109,10 +109,9 @@ func.func @buffer_fill(%arg0: !util.buffer, %arg1: index, %arg2: i32) {
 
 // CHECK-LABEL: @buffer_load
 func.func @buffer_load(%arg0: !util.buffer, %arg1: index) -> i32 {
-  %c4 = arith.constant 4 : index
   %c100 = arith.constant 100 : index
-  // CHECK: = util.buffer.load %arg0[%c100 for %c4] : !util.buffer{%arg1} -> i32
-  %0 = util.buffer.load %arg0[%c100 for %c4] : !util.buffer{%arg1} -> i32
+  // CHECK: = util.buffer.load %arg0[%c100] : !util.buffer{%arg1} -> i32
+  %0 = util.buffer.load %arg0[%c100] : !util.buffer{%arg1} -> i32
   return %0 : i32
 }
 
@@ -120,9 +119,8 @@ func.func @buffer_load(%arg0: !util.buffer, %arg1: index) -> i32 {
 
 // CHECK-LABEL: @buffer_store
 func.func @buffer_store(%arg0: !util.buffer, %arg1: index, %arg2: i32) {
-  %c4 = arith.constant 4 : index
   %c100 = arith.constant 100 : index
-  // CHECK: util.buffer.store %arg2, %arg0[%c100 for %c4] : i32 -> !util.buffer{%arg1}
-  util.buffer.store %arg2, %arg0[%c100 for %c4] : i32 -> !util.buffer{%arg1}
+  // CHECK: util.buffer.store %arg2, %arg0[%c100] : i32 -> !util.buffer{%arg1}
+  util.buffer.store %arg2, %arg0[%c100] : i32 -> !util.buffer{%arg1}
   return
 }

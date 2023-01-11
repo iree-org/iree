@@ -178,12 +178,11 @@ func.func @buffer_fill_index(%arg0: !util.buffer, %arg1: index, %arg2: index) {
 // CHECK-LABEL: @buffer_load_i1
 func.func @buffer_load_i32(%arg0: !util.buffer, %arg1: index) -> i1 {
   %byte_offset = arith.constant 128 : index
-  %element_size = arith.constant 1 : index
   // CHECK-32-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 128
   // CHECK-32: %[[VALUE:.+]] = vm.buffer.load.i8.s %arg0[%[[ELEMENT_OFFSET]]] : !vm.buffer -> i32
   // CHECK-64-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 128
   // CHECK-64: %[[VALUE:.+]] = vm.buffer.load.i8.s %arg0[%[[ELEMENT_OFFSET]]] : !vm.buffer -> i32
-  %0 = util.buffer.load %arg0[%byte_offset for %element_size] : !util.buffer{%arg1} -> i1
+  %0 = util.buffer.load %arg0[%byte_offset] : !util.buffer{%arg1} -> i1
   // CHECK: return %[[VALUE]]
   return %0 : i1
 }
@@ -193,12 +192,11 @@ func.func @buffer_load_i32(%arg0: !util.buffer, %arg1: index) -> i1 {
 // CHECK-LABEL: @buffer_load_i32
 func.func @buffer_load_i32(%arg0: !util.buffer, %arg1: index) -> i32 {
   %byte_offset = arith.constant 128 : index
-  %element_size = arith.constant 4 : index
   // CHECK-32-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 32
   // CHECK-32: %[[VALUE:.+]] = vm.buffer.load.i32 %arg0[%[[ELEMENT_OFFSET]]] : !vm.buffer -> i32
   // CHECK-64-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 32
   // CHECK-64: %[[VALUE:.+]] = vm.buffer.load.i32 %arg0[%[[ELEMENT_OFFSET]]] : !vm.buffer -> i32
-  %0 = util.buffer.load %arg0[%byte_offset for %element_size] : !util.buffer{%arg1} -> i32
+  %0 = util.buffer.load %arg0[%byte_offset] : !util.buffer{%arg1} -> i32
   // CHECK: return %[[VALUE]]
   return %0 : i32
 }
@@ -208,12 +206,11 @@ func.func @buffer_load_i32(%arg0: !util.buffer, %arg1: index) -> i32 {
 // CHECK-LABEL: @buffer_load_i64
 func.func @buffer_load_i64(%arg0: !util.buffer, %arg1: index) -> i64 {
   %byte_offset = arith.constant 128 : index
-  %element_size = arith.constant 8 : index
   // CHECK-32-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 16
   // CHECK-32: %[[VALUE:.+]] = vm.buffer.load.i64 %arg0[%[[ELEMENT_OFFSET]]] : !vm.buffer -> i64
   // CHECK-64-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 16
   // CHECK-64: %[[VALUE:.+]] = vm.buffer.load.i64 %arg0[%[[ELEMENT_OFFSET]]] : !vm.buffer -> i64
-  %0 = util.buffer.load %arg0[%byte_offset for %element_size] : !util.buffer{%arg1} -> i64
+  %0 = util.buffer.load %arg0[%byte_offset] : !util.buffer{%arg1} -> i64
   // CHECK: return %[[VALUE]]
   return %0 : i64
 }
@@ -223,10 +220,9 @@ func.func @buffer_load_i64(%arg0: !util.buffer, %arg1: index) -> i64 {
 // CHECK-LABEL: @buffer_load_index
 func.func @buffer_load_index(%arg0: !util.buffer, %arg1: index) -> index {
   %byte_offset = arith.constant 100 : index
-  %element_size = util.sizeof index
   // CHECK-32: vm.buffer.load.i32
   // CHECK-64: vm.buffer.load.i64
-  %0 = util.buffer.load %arg0[%byte_offset for %element_size] : !util.buffer{%arg1} -> index
+  %0 = util.buffer.load %arg0[%byte_offset] : !util.buffer{%arg1} -> index
   return %0 : index
 }
 
@@ -235,12 +231,11 @@ func.func @buffer_load_index(%arg0: !util.buffer, %arg1: index) -> index {
 // CHECK-LABEL: @buffer_store_i1
 func.func @buffer_store_i1(%arg0: !util.buffer, %arg1: index, %arg2: i1) {
   %byte_offset = arith.constant 128 : index
-  %element_size = arith.constant 1 : index
   // CHECK-32-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 128
   // CHECK-32: vm.buffer.store.i8 %arg2, %arg0[%[[ELEMENT_OFFSET]]] : i32 -> !vm.buffer
   // CHECK-64-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 128
   // CHECK-64: vm.buffer.store.i8 %arg2, %arg0[%[[ELEMENT_OFFSET]]] : i32 -> !vm.buffer
-  util.buffer.store %arg2, %arg0[%byte_offset for %element_size] : i1 -> !util.buffer{%arg1}
+  util.buffer.store %arg2, %arg0[%byte_offset] : i1 -> !util.buffer{%arg1}
   return
 }
 
@@ -249,12 +244,11 @@ func.func @buffer_store_i1(%arg0: !util.buffer, %arg1: index, %arg2: i1) {
 // CHECK-LABEL: @buffer_store_i32
 func.func @buffer_store_i32(%arg0: !util.buffer, %arg1: index, %arg2: i32) {
   %byte_offset = arith.constant 128 : index
-  %element_size = arith.constant 4 : index
   // CHECK-32-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 32
   // CHECK-32: vm.buffer.store.i32 %arg2, %arg0[%[[ELEMENT_OFFSET]]] : i32 -> !vm.buffer
   // CHECK-64-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 32
   // CHECK-64: vm.buffer.store.i32 %arg2, %arg0[%[[ELEMENT_OFFSET]]] : i32 -> !vm.buffer
-  util.buffer.store %arg2, %arg0[%byte_offset for %element_size] : i32 -> !util.buffer{%arg1}
+  util.buffer.store %arg2, %arg0[%byte_offset] : i32 -> !util.buffer{%arg1}
   return
 }
 
@@ -263,12 +257,11 @@ func.func @buffer_store_i32(%arg0: !util.buffer, %arg1: index, %arg2: i32) {
 // CHECK-LABEL: @buffer_store_i64
 func.func @buffer_store_i64(%arg0: !util.buffer, %arg1: index, %arg2: i64) {
   %byte_offset = arith.constant 128 : index
-  %element_size = arith.constant 8 : index
   // CHECK-32-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 16
   // CHECK-32: vm.buffer.store.i64 %arg2, %arg0[%[[ELEMENT_OFFSET]]] : i64 -> !vm.buffer
   // CHECK-64-DAG: %[[ELEMENT_OFFSET:.+]] = vm.const.i64 16
   // CHECK-64: vm.buffer.store.i64 %arg2, %arg0[%[[ELEMENT_OFFSET]]] : i64 -> !vm.buffer
-  util.buffer.store %arg2, %arg0[%byte_offset for %element_size] : i64 -> !util.buffer{%arg1}
+  util.buffer.store %arg2, %arg0[%byte_offset] : i64 -> !util.buffer{%arg1}
   return
 }
 
@@ -277,9 +270,8 @@ func.func @buffer_store_i64(%arg0: !util.buffer, %arg1: index, %arg2: i64) {
 // CHECK-LABEL: @buffer_store_index
 func.func @buffer_store_index(%arg0: !util.buffer, %arg1: index, %arg2: index) {
   %byte_offset = arith.constant 100 : index
-  %element_size = util.sizeof index
   // CHECK-32: vm.buffer.store.i32
   // CHECK-64: vm.buffer.store.i64
-  util.buffer.store %arg2, %arg0[%byte_offset for %element_size] : index -> !util.buffer{%arg1}
+  util.buffer.store %arg2, %arg0[%byte_offset] : index -> !util.buffer{%arg1}
   return
 }

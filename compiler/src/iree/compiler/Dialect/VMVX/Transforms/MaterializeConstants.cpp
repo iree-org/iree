@@ -107,22 +107,19 @@ class MaterializeConstantsPass
     Value buffer = setterOp.getArgument(0);
     Value bufferSize = setterBuilder.create<arith::ConstantIndexOp>(
         buffer.getLoc(), allLoadOps.size() * sizeof(uint32_t));
-    Value elementSizeIndex = setterBuilder.create<arith::ConstantIndexOp>(
-        buffer.getLoc(), sizeof(uint32_t));
-    Value elementSizeI32 = setterBuilder.create<arith::ConstantIntOp>(
+    Value elementSize = setterBuilder.create<arith::ConstantIntOp>(
         buffer.getLoc(), sizeof(uint32_t), 32);
     for (auto [ordinalGlobalOp, valueGlobalOp] :
          llvm::zip(ordinalGlobalOps, valueGlobalOps)) {
       Value loadedOrdinal = setterBuilder.create<IREE::Util::GlobalLoadOp>(
           ordinalGlobalOp.getLoc(), ordinalGlobalOp);
       Value bufferOffset = setterBuilder.create<arith::MulIOp>(
-          loadedOrdinal.getLoc(), loadedOrdinal, elementSizeI32);
+          loadedOrdinal.getLoc(), loadedOrdinal, elementSize);
       Value loadedValue = setterBuilder.create<IREE::Util::BufferLoadOp>(
           valueGlobalOp.getLoc(), loadedOrdinal.getType(), buffer, bufferSize,
           setterBuilder.create<arith::IndexCastOp>(bufferOffset.getLoc(),
                                                    setterBuilder.getIndexType(),
-                                                   bufferOffset),
-          elementSizeIndex);
+                                                   bufferOffset));
       setterBuilder.create<IREE::Util::GlobalStoreOp>(
           valueGlobalOp.getLoc(), loadedValue, valueGlobalOp);
     }

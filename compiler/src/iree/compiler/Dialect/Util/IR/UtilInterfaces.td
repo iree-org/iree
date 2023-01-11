@@ -1053,34 +1053,6 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
   ];
 }
 
-def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
-
-  let description = [{
-    Interface for operations that consume subranges of size-aware resources.
-    The methods are used to manipulate the subranges during transformation.
-  }];
-
-  let methods = [
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the subrange operand values for the given flat operand index.
-      }],
-      /*retTy=*/"SubrangeOperand",
-      /*methodName=*/"getSubrangeOperand",
-      /*args=*/(ins "unsigned":$operandIndex)
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Updates the subrange operand values for the given flat operand index.
-      }],
-      /*retTy=*/"void",
-      /*methodName=*/"setSubrangeOperand",
-      /*args=*/(ins "unsigned":$operandIndex, "SubrangeOperand":$operand)
-    >,
-  ];
-}
-
 //===----------------------------------------------------------------------===//
 // IREE::Util::SerializableAttrInterface
 //===----------------------------------------------------------------------===//

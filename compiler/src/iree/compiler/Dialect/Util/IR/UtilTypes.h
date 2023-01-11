@@ -77,18 +77,6 @@ struct ValueAccess {
   static ValueAccess DiscardWrite() { return ValueAccess(false, true, true); }
 };
 
-// An (offset, length) range within a size-aware resource.
-struct SubrangeOperand {
-  // Base resource the subrange references into.
-  Value resource;
-  // Size of the full base resource.
-  Value resourceSize;
-  // Offset into the base resource the range begins.
-  Value offset;
-  // Total length of the range within the base resource.
-  Value length;
-};
-
 //===----------------------------------------------------------------------===//
 // Op utilities common in util patterns and folders
 //===----------------------------------------------------------------------===//

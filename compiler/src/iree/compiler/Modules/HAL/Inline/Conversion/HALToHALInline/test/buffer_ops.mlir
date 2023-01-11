@@ -32,7 +32,7 @@ func.func @buffer_load(%buffer: !hal.buffer) -> i32 {
   %rel_offset = arith.constant 100 : index
   // CHECK-DAG: %[[STORAGE:.+]] = hal_inline.buffer.storage<%[[BUFFER:.+]] : !hal.buffer> : !util.buffer
   // CHECK-DAG: %[[LENGTH:.+]] = hal_inline.buffer.length<%[[BUFFER]] : !hal.buffer> : index
-  // CHECK: %[[VALUE:.+]] = util.buffer.load %[[STORAGE]][%[[REL_OFFSET]] for {{.+}}] : !util.buffer{%[[LENGTH]]} -> i32
+  // CHECK: %[[VALUE:.+]] = util.buffer.load %[[STORAGE]][%[[REL_OFFSET]]] : !util.buffer{%[[LENGTH]]} -> i32
   %value = hal.buffer.load<%buffer : !hal.buffer>[%rel_offset] : i32
   // CHECK-NEXT: return %[[VALUE]]
   return %value : i32
@@ -47,7 +47,7 @@ func.func @buffer_store(%buffer: !hal.buffer, %value: i32) {
   %rel_offset = arith.constant 100 : index
   // CHECK-DAG: %[[STORAGE:.+]] = hal_inline.buffer.storage<%[[BUFFER:.+]] : !hal.buffer> : !util.buffer
   // CHECK-DAG: %[[LENGTH:.+]] = hal_inline.buffer.length<%[[BUFFER]] : !hal.buffer> : index
-  // CHECK: util.buffer.store %[[VALUE]], %[[STORAGE]][%[[REL_OFFSET]] for {{.+}}] : i32 -> !util.buffer{%[[LENGTH]]}
+  // CHECK: util.buffer.store %[[VALUE]], %[[STORAGE]][%[[REL_OFFSET]]] : i32 -> !util.buffer{%[[LENGTH]]}
   hal.buffer.store<%buffer : !hal.buffer>[%rel_offset] value(%value : i32)
   return
 }

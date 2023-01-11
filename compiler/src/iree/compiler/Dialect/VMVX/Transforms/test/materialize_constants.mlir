@@ -21,12 +21,12 @@ func.func private @no_constants_required() {
 // CHECK:   %[[FOO_ORDINAL:.+]] = util.global.load @__constant_foo_ordinal
 // CHECK:   %[[FOO_OFFSET:.+]] = arith.muli %[[FOO_ORDINAL]], %c4
 // CHECK:   %[[FOO_OFFSET_IDX:.+]] = arith.index_cast %[[FOO_OFFSET]]
-// CHECK:   %[[FOO_VALUE:.+]] = util.buffer.load %[[BUFFER]][%[[FOO_OFFSET_IDX]] for {{.+}}] : !util.buffer{%[[BUFFER_SIZE]]}
+// CHECK:   %[[FOO_VALUE:.+]] = util.buffer.load %[[BUFFER]][%[[FOO_OFFSET_IDX]]] : !util.buffer{%[[BUFFER_SIZE]]}
 // CHECK:   util.global.store %[[FOO_VALUE]], @__constant_foo : i32
 // CHECK:   %[[BAR_ORDINAL:.+]] = util.global.load @__constant_bar_ordinal
 // CHECK:   %[[BAR_OFFSET:.+]] = arith.muli %[[BAR_ORDINAL]], %c4
 // CHECK:   %[[BAR_OFFSET_IDX:.+]] = arith.index_cast %[[BAR_OFFSET]]
-// CHECK:   %[[BAR_VALUE:.+]] = util.buffer.load %[[BUFFER]][%[[BAR_OFFSET_IDX]] for {{.+}}] : !util.buffer{%[[BUFFER_SIZE]]}
+// CHECK:   %[[BAR_VALUE:.+]] = util.buffer.load %[[BUFFER]][%[[BAR_OFFSET_IDX]]] : !util.buffer{%[[BUFFER_SIZE]]}
 // CHECK:   util.global.store %[[BAR_VALUE]], @__constant_bar : i32
 // CHECK:   return
 // CHECK: }

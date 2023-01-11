@@ -992,25 +992,6 @@ void BufferSliceOp::getAsmResultNames(
   setNameFn(getResult(), "buffer");
 }
 
-SubrangeOperand BufferSliceOp::getSubrangeOperand(unsigned operandIndex) {
-  if (operandIndex == 0) {
-    return SubrangeOperand{getSource(), getSourceSize(), getSourceOffset(),
-                           getResultSize()};
-  } else {
-    assert(false && "only source is a subrange");
-    return {};
-  }
-}
-
-void BufferSliceOp::setSubrangeOperand(unsigned operandIndex,
-                                       SubrangeOperand operand) {
-  assert(operandIndex == 0 && "only source is a subrange");
-  getSourceMutable().assign(operand.resource);
-  getSourceSizeMutable().assign(operand.resourceSize);
-  getSourceOffsetMutable().assign(operand.offset);
-  getResultSizeMutable().assign(operand.length);
-}
-
 void BufferSubspanOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "buffer_span");
@@ -1020,25 +1001,6 @@ Value BufferSubspanOp::getViewSource() { return getSource(); }
 
 Value BufferSubspanOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
-}
-
-SubrangeOperand BufferSubspanOp::getSubrangeOperand(unsigned operandIndex) {
-  if (operandIndex == 0) {
-    return SubrangeOperand{getSource(), getSourceSize(), getSourceOffset(),
-                           getResultSize()};
-  } else {
-    assert(false && "only source is a subrange");
-    return {};
-  }
-}
-
-void BufferSubspanOp::setSubrangeOperand(unsigned operandIndex,
-                                         SubrangeOperand operand) {
-  assert(operandIndex == 0 && "only source is a subrange");
-  getSourceMutable().assign(operand.resource);
-  getSourceSizeMutable().assign(operand.resourceSize);
-  getSourceOffsetMutable().assign(operand.offset);
-  getResultSizeMutable().assign(operand.length);
 }
 
 ::llvm::Optional<unsigned> BufferSubspanOp::getTiedResultOperandIndex(
@@ -1081,121 +1043,6 @@ void BufferStorageOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "buffer_storage");
   setNameFn(getOffset(), "buffer_offset");
-}
-
-SubrangeOperand BufferCopyOp::getSubrangeOperand(unsigned operandIndex) {
-  if (operandIndex == 0) {
-    return SubrangeOperand{getSource(), getSourceSize(), getSourceOffset(),
-                           getLength()};
-  } else if (operandIndex == 3) {
-    return SubrangeOperand{getTarget(), getTargetSize(), getTargetOffset(),
-                           getLength()};
-  } else {
-    assert(false && "only source/target are subranges");
-    return {};
-  }
-}
-
-void BufferCopyOp::setSubrangeOperand(unsigned operandIndex,
-                                      SubrangeOperand operand) {
-  if (operandIndex == 0) {
-    getSourceMutable().assign(operand.resource);
-    getSourceSizeMutable().assign(operand.resourceSize);
-    getSourceOffsetMutable().assign(operand.offset);
-    getLengthMutable().assign(operand.length);
-  } else if (operandIndex == 3) {
-    getTargetMutable().assign(operand.resource);
-    getTargetSizeMutable().assign(operand.resourceSize);
-    getTargetOffsetMutable().assign(operand.offset);
-    getLengthMutable().assign(operand.length);
-  } else {
-    assert(false && "only source/target are subranges");
-  }
-}
-
-SubrangeOperand BufferCompareOp::getSubrangeOperand(unsigned operandIndex) {
-  if (operandIndex == 0) {
-    return SubrangeOperand{getLhs(), getLhsSize(), getLhsOffset(), getLength()};
-  } else if (operandIndex == 3) {
-    return SubrangeOperand{getRhs(), getRhsSize(), getRhsOffset(), getLength()};
-  } else {
-    assert(false && "only lhs/rhs are subranges");
-    return {};
-  }
-}
-
-void BufferCompareOp::setSubrangeOperand(unsigned operandIndex,
-                                         SubrangeOperand operand) {
-  if (operandIndex == 0) {
-    getLhsMutable().assign(operand.resource);
-    getLhsSizeMutable().assign(operand.resourceSize);
-    getLhsOffsetMutable().assign(operand.offset);
-    getLengthMutable().assign(operand.length);
-  } else if (operandIndex == 3) {
-    getRhsMutable().assign(operand.resource);
-    getRhsSizeMutable().assign(operand.resourceSize);
-    getRhsOffsetMutable().assign(operand.offset);
-    getLengthMutable().assign(operand.length);
-  } else {
-    assert(false && "only lhs/rhs are subranges");
-  }
-}
-
-SubrangeOperand BufferFillOp::getSubrangeOperand(unsigned operandIndex) {
-  if (operandIndex == 1) {
-    return SubrangeOperand{getTarget(), getTargetSize(), getTargetOffset(),
-                           getLength()};
-  } else {
-    assert(false && "only target is a subrange");
-    return {};
-  }
-}
-
-void BufferFillOp::setSubrangeOperand(unsigned operandIndex,
-                                      SubrangeOperand operand) {
-  assert(operandIndex == 1 && "only target is a subrange");
-  getTargetMutable().assign(operand.resource);
-  getTargetSizeMutable().assign(operand.resourceSize);
-  getTargetOffsetMutable().assign(operand.offset);
-  getLengthMutable().assign(operand.length);
-}
-
-SubrangeOperand BufferLoadOp::getSubrangeOperand(unsigned operandIndex) {
-  if (operandIndex == 0) {
-    return SubrangeOperand{getSource(), getSourceSize(), getSourceOffset(),
-                           getLength()};
-  } else {
-    assert(false && "only source is a subrange");
-    return {};
-  }
-}
-
-void BufferLoadOp::setSubrangeOperand(unsigned operandIndex,
-                                      SubrangeOperand operand) {
-  assert(operandIndex == 0 && "only source is a subrange");
-  getSourceMutable().assign(operand.resource);
-  getSourceSizeMutable().assign(operand.resourceSize);
-  getSourceOffsetMutable().assign(operand.offset);
-  getLengthMutable().assign(operand.length);
-}
-
-SubrangeOperand BufferStoreOp::getSubrangeOperand(unsigned operandIndex) {
-  if (operandIndex == 1) {
-    return SubrangeOperand{getTarget(), getTargetSize(), getTargetOffset(),
-                           getLength()};
-  } else {
-    assert(false && "only target is a subrange");
-    return {};
-  }
-}
-
-void BufferStoreOp::setSubrangeOperand(unsigned operandIndex,
-                                       SubrangeOperand operand) {
-  assert(operandIndex == 1 && "only target is a subrange");
-  getTargetMutable().assign(operand.resource);
-  getTargetSizeMutable().assign(operand.resourceSize);
-  getTargetOffsetMutable().assign(operand.offset);
-  getLengthMutable().assign(operand.length);
 }
 
 }  // namespace Util

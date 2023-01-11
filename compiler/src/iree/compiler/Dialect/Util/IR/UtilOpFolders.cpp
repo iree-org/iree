@@ -585,6 +585,45 @@ void BufferAllocOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// util.buffer.slice
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds subspan ranges into slice ranges.
+//
+// Example:
+//  %0 = util.buffer.subspan %src[%subspan_offset] ... -> {%subspan_length}
+//  %1 = util.buffer.slice %0[%slice_offset] ... -> {%slice_length}
+// ->
+//  %new_offset = arith.addi %slice_offset, %subspan_offset
+//  %1 = util.buffer.slice %src[%new_offset] ... -> {%slice_length}
+struct FoldSubspansIntoSliceOp : public OpRewritePattern<BufferSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(BufferSliceOp op,
+                                PatternRewriter &rewriter) const override {
+    auto subspanOp = BufferSubspanOp::findSubspanOp(op.getSource());
+    if (!subspanOp) return failure();
+    auto fusedLoc = rewriter.getFusedLoc({subspanOp.getLoc(), op.getLoc()});
+    auto newOffset = rewriter.createOrFold<arith::AddIOp>(
+        fusedLoc, subspanOp.getSourceOffset(), op.getSourceOffset());
+    rewriter.updateRootInPlace(op, [&]() {
+      op.getSourceMutable().assign(subspanOp.getSource());
+      op.getSourceSizeMutable().assign(subspanOp.getSourceSize());
+      op.getSourceOffsetMutable().assign(newOffset);
+    });
+    return success();
+  }
+};
+
+}  // namespace
+
+void BufferSliceOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
+  results.insert<FoldSubspansIntoSliceOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // util.buffer.subspan
 //===----------------------------------------------------------------------===//
 
@@ -614,42 +653,6 @@ struct FoldBufferSubspanOps : public OpRewritePattern<BufferSubspanOp> {
         op.getResultSize());
     rewriter.replaceOp(op, newOp.getResult());
     return success();
-  }
-};
-
-// Folds subspan ranges into consumer ranges.
-//
-// Example:
-//  %0 = util.buffer.subspan %src[%subspan_offset] ... -> {%subspan_length}
-//  %1 = util.buffer.subspan %dst[%subspan_offset] ... -> {%subspan_length}
-//  util.buffer.copy %0[%offset], %1[%offset], %length
-// ->
-//  %new_offset = arith.addi %offset, %subspan_offset
-//  util.buffer.copy %src[%new_offset], %dst[%new_offset], %subspan_length
-struct FoldBufferSubspanOpsIntoConsumers
-    : public OpRewritePattern<BufferSubspanOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(BufferSubspanOp op,
-                                PatternRewriter &rewriter) const override {
-    bool didUpdateAny = false;
-    for (auto &use : llvm::make_early_inc_range(op.getResult().getUses())) {
-      auto subrangeOp =
-          dyn_cast<IREE::Util::SubrangeOperandOpInterface>(use.getOwner());
-      if (!subrangeOp) continue;
-      didUpdateAny = true;
-      rewriter.setInsertionPoint(subrangeOp);
-      auto oldRange = subrangeOp.getSubrangeOperand(use.getOperandNumber());
-      auto fusedLoc =
-          rewriter.getFusedLoc({op.getLoc(), use.getOwner()->getLoc()});
-      auto newOffset = rewriter.createOrFold<arith::AddIOp>(
-          fusedLoc, op.getSourceOffset(), oldRange.offset);
-      auto newRange = SubrangeOperand{op.getSource(), op.getSourceSize(),
-                                      newOffset, oldRange.length};
-      rewriter.updateRootInPlace(subrangeOp, [&]() {
-        subrangeOp.setSubrangeOperand(use.getOperandNumber(), newRange);
-      });
-    }
-    return success(didUpdateAny);
   }
 };
 
@@ -694,7 +697,6 @@ struct SinkSubspanAcrossSelectOps
 void BufferSubspanOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   results.insert<FoldBufferSubspanOps>(context);
-  results.insert<FoldBufferSubspanOpsIntoConsumers>(context);
   results.insert<SinkSubspanAcrossSelectOps>(context);
 }
 
@@ -813,12 +815,235 @@ void BufferStorageOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// util.buffer.copy
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds subspan ranges into copy ranges.
+//
+// Example:
+//  %0 = util.buffer.subspan %src[%subspan_offset] ... -> {%subspan_length}
+//  %1 = util.buffer.subspan %dst[%subspan_offset] ... -> {%subspan_length}
+//  util.buffer.copy %0[%offset], %1[%offset], %length
+// ->
+//  %new_offset = arith.addi %offset, %subspan_offset
+//  util.buffer.copy %src[%new_offset], %dst[%new_offset], %subspan_length
+struct FoldSubspansIntoCopyOp : public OpRewritePattern<BufferCopyOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(BufferCopyOp op,
+                                PatternRewriter &rewriter) const override {
+    auto sourceSubspanOp = BufferSubspanOp::findSubspanOp(op.getSource());
+    auto targetSubspanOp = BufferSubspanOp::findSubspanOp(op.getTarget());
+    if (!sourceSubspanOp && !targetSubspanOp) return failure();
+    if (sourceSubspanOp) {
+      auto fusedLoc =
+          rewriter.getFusedLoc({sourceSubspanOp.getLoc(), op.getLoc()});
+      auto newOffset = rewriter.createOrFold<arith::AddIOp>(
+          fusedLoc, sourceSubspanOp.getSourceOffset(), op.getSourceOffset());
+      rewriter.updateRootInPlace(op, [&]() {
+        op.getSourceMutable().assign(sourceSubspanOp.getSource());
+        op.getSourceSizeMutable().assign(sourceSubspanOp.getSourceSize());
+        op.getSourceOffsetMutable().assign(newOffset);
+      });
+    }
+    if (targetSubspanOp) {
+      auto fusedLoc =
+          rewriter.getFusedLoc({targetSubspanOp.getLoc(), op.getLoc()});
+      auto newOffset = rewriter.createOrFold<arith::AddIOp>(
+          fusedLoc, targetSubspanOp.getSourceOffset(), op.getTargetOffset());
+      rewriter.updateRootInPlace(op, [&]() {
+        op.getTargetMutable().assign(targetSubspanOp.getSource());
+        op.getTargetSizeMutable().assign(targetSubspanOp.getSourceSize());
+        op.getTargetOffsetMutable().assign(newOffset);
+      });
+    }
+    return success();
+  }
+};
+
+}  // namespace
+
+void BufferCopyOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
+  results.insert<FoldSubspansIntoCopyOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// util.buffer.compare
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds subspan ranges into copy ranges.
+//
+// Example:
+//  %0 = util.buffer.subspan %src[%subspan_offset] ... -> {%subspan_length}
+//  %1 = util.buffer.subspan %dst[%subspan_offset] ... -> {%subspan_length}
+//  util.buffer.copy %0[%offset], %1[%offset], %length
+// ->
+//  %new_offset = arith.addi %offset, %subspan_offset
+//  util.buffer.copy %src[%new_offset], %dst[%new_offset], %subspan_length
+struct FoldSubspansIntoCompareOp : public OpRewritePattern<BufferCompareOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(BufferCompareOp op,
+                                PatternRewriter &rewriter) const override {
+    auto sourceSubspanOp = BufferSubspanOp::findSubspanOp(op.getLhs());
+    auto targetSubspanOp = BufferSubspanOp::findSubspanOp(op.getRhs());
+    if (!sourceSubspanOp && !targetSubspanOp) return failure();
+    if (sourceSubspanOp) {
+      auto fusedLoc =
+          rewriter.getFusedLoc({sourceSubspanOp.getLoc(), op.getLoc()});
+      auto newOffset = rewriter.createOrFold<arith::AddIOp>(
+          fusedLoc, sourceSubspanOp.getSourceOffset(), op.getLhsOffset());
+      rewriter.updateRootInPlace(op, [&]() {
+        op.getLhsMutable().assign(sourceSubspanOp.getSource());
+        op.getLhsSizeMutable().assign(sourceSubspanOp.getSourceSize());
+        op.getLhsOffsetMutable().assign(newOffset);
+      });
+    }
+    if (targetSubspanOp) {
+      auto fusedLoc =
+          rewriter.getFusedLoc({targetSubspanOp.getLoc(), op.getLoc()});
+      auto newOffset = rewriter.createOrFold<arith::AddIOp>(
+          fusedLoc, targetSubspanOp.getSourceOffset(), op.getRhsOffset());
+      rewriter.updateRootInPlace(op, [&]() {
+        op.getRhsMutable().assign(targetSubspanOp.getSource());
+        op.getRhsSizeMutable().assign(targetSubspanOp.getSourceSize());
+        op.getRhsOffsetMutable().assign(newOffset);
+      });
+    }
+    return success();
+  }
+};
+
+}  // namespace
+
+void BufferCompareOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
+  results.insert<FoldSubspansIntoCompareOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// util.buffer.fill
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds subspan ranges into fill ranges.
+//
+// Example:
+//  %0 = util.buffer.subspan %dst[%subspan_offset] ... -> {%subspan_length}
+//  util.buffer.fill %cst, %0[%offset for %length]
+// ->
+//  %new_offset = arith.addi %offset, %subspan_offset
+//  util.buffer.fill %cst, %dst[%new_offset for %subspan_length]
+struct FoldSubspansIntoFillOp : public OpRewritePattern<BufferFillOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(BufferFillOp op,
+                                PatternRewriter &rewriter) const override {
+    auto subspanOp = BufferSubspanOp::findSubspanOp(op.getTarget());
+    if (!subspanOp) return failure();
+    auto fusedLoc = rewriter.getFusedLoc({subspanOp.getLoc(), op.getLoc()});
+    auto newOffset = rewriter.createOrFold<arith::AddIOp>(
+        fusedLoc, subspanOp.getSourceOffset(), op.getTargetOffset());
+    rewriter.updateRootInPlace(op, [&]() {
+      op.getTargetMutable().assign(subspanOp.getSource());
+      op.getTargetSizeMutable().assign(subspanOp.getSourceSize());
+      op.getTargetOffsetMutable().assign(newOffset);
+    });
+    return success();
+  }
+};
+
+}  // namespace
+
+void BufferFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
+  results.insert<FoldSubspansIntoFillOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // util.buffer.load
 //===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds subspan offsets into loads.
+//
+// Example:
+//  %0 = util.buffer.subspan %src[%subspan_offset] ... -> {%subspan_length}
+//  %1 = util.buffer.load %0[%offset]
+// ->
+//  %new_offset = arith.addi %offset, %subspan_offset
+//  %1 = util.buffer.load %src[%new_offset]
+struct FoldSubspanIntoLoadOp : public OpRewritePattern<BufferLoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(BufferLoadOp op,
+                                PatternRewriter &rewriter) const override {
+    auto subspanOp = BufferSubspanOp::findSubspanOp(op.getSource());
+    if (!subspanOp) return failure();
+    auto fusedLoc = rewriter.getFusedLoc({subspanOp.getLoc(), op.getLoc()});
+    auto newOffset = rewriter.createOrFold<arith::AddIOp>(
+        fusedLoc, subspanOp.getSourceOffset(), op.getSourceOffset());
+    rewriter.updateRootInPlace(op, [&]() {
+      op.getSourceMutable().assign(subspanOp.getSource());
+      op.getSourceSizeMutable().assign(subspanOp.getSourceSize());
+      op.getSourceOffsetMutable().assign(newOffset);
+    });
+    return success();
+  }
+};
+
+}  // namespace
 
 OpFoldResult BufferLoadOp::fold(ArrayRef<Attribute> operands) {
   // TODO(benvanik): if source is a constant then perform the load.
   return {};
+}
+
+void BufferLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
+  results.insert<FoldSubspanIntoLoadOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// util.buffer.store
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds subspan offsets into stores.
+//
+// Example:
+//  %0 = util.buffer.subspan %dst[%subspan_offset] ... -> {%subspan_length}
+//  util.buffer.store %c123_i32, %0[%offset]
+// ->
+//  %new_offset = arith.addi %offset, %subspan_offset
+//  util.buffer.store %c123_i32, %dst[%new_offset]
+struct FoldSubspanIntoStoreOp : public OpRewritePattern<BufferStoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(BufferStoreOp op,
+                                PatternRewriter &rewriter) const override {
+    auto subspanOp = BufferSubspanOp::findSubspanOp(op.getTarget());
+    if (!subspanOp) return failure();
+    auto fusedLoc = rewriter.getFusedLoc({subspanOp.getLoc(), op.getLoc()});
+    auto newOffset = rewriter.createOrFold<arith::AddIOp>(
+        fusedLoc, subspanOp.getSourceOffset(), op.getTargetOffset());
+    rewriter.updateRootInPlace(op, [&]() {
+      op.getTargetMutable().assign(subspanOp.getSource());
+      op.getTargetSizeMutable().assign(subspanOp.getSourceSize());
+      op.getTargetOffsetMutable().assign(newOffset);
+    });
+    return success();
+  }
+};
+
+}  // namespace
+
+void BufferStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
+  results.insert<FoldSubspanIntoStoreOp>(context);
 }
 
 }  // namespace Util

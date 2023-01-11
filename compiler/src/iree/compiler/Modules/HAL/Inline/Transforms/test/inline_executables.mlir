@@ -36,12 +36,10 @@ hal.executable private @ex {
           %workgroup_x: i32, %workgroup_y: i32, %workgroup_z: i32,
           %workgroup_size_x: i32, %workgroup_size_y: i32, %workgroup_size_z: i32,
           %workgroup_count_x: i32, %workgroup_count_y: i32, %workgroup_count_z: i32) {
-        %c4 = arith.constant 4 : index
-
         // Unpack push constants:
         %constants_size = util.buffer.size %constants : !util.buffer
         %constant1_offset = arith.constant 4 : index
-        %constant1_i32 = util.buffer.load %constants[%constant1_offset for %c4] : !util.buffer{%constants_size} -> i32
+        %constant1_i32 = util.buffer.load %constants[%constant1_offset] : !util.buffer{%constants_size} -> i32
         %constant1_f32 = arith.sitofp %constant1_i32 : i32 to f32
 
         // Unpack buffer bindings:
@@ -59,14 +57,16 @@ hal.executable private @ex {
         %global_constant = util.global.load @global_constant : !util.buffer
         util.optimization_barrier %global_constant : !util.buffer
 
+
+        %c4 = arith.constant 4 : index
         %workgroup_x_idx = arith.index_cast %workgroup_x : i32 to index
         scf.for %i = %c0 to %workgroup_x_idx step %c1 {
           %idx = arith.muli %i, %c4 : index
-          %lhs = util.buffer.load %buffer0[%idx for %c4] : !util.buffer{%buffer0_size} -> f32
-          %rhs = util.buffer.load %buffer1[%idx for %c4] : !util.buffer{%buffer1_size} -> f32
+          %lhs = util.buffer.load %buffer0[%idx] : !util.buffer{%buffer0_size} -> f32
+          %rhs = util.buffer.load %buffer1[%idx] : !util.buffer{%buffer1_size} -> f32
           %mul = arith.mulf %lhs, %rhs : f32
           %scaled = arith.mulf %mul, %constant1_f32 : f32
-          util.buffer.store %scaled, %buffer2[%idx for %c4] : f32 -> !util.buffer{%buffer2_size}
+          util.buffer.store %scaled, %buffer2[%idx] : f32 -> !util.buffer{%buffer2_size}
         }
         return
       }
@@ -110,11 +110,11 @@ func.func private @dispatch_0()
 // CHECK: %[[X_IDX:.+]] = arith.index_cast %[[X_I32]]
 // CHECK: scf.for %[[ELEMENT_INDEX:.+]] = %c0 to %[[X_IDX]]
 // CHECK:   %[[ELEMENT_OFFSET:.+]] = arith.muli %[[ELEMENT_INDEX]]
-// CHECK:   %[[LHS:.+]] = util.buffer.load %[[BINDING0]][%[[ELEMENT_OFFSET]] for {{.+}}] : !util.buffer{%[[BINDING0_SIZE]]} -> f32
-// CHECK:   %[[RHS:.+]] = util.buffer.load %[[BINDING1]][%[[ELEMENT_OFFSET]] for {{.+}}] : !util.buffer{%[[BINDING1_SIZE]]} -> f32
+// CHECK:   %[[LHS:.+]] = util.buffer.load %[[BINDING0]][%[[ELEMENT_OFFSET]]] : !util.buffer{%[[BINDING0_SIZE]]} -> f32
+// CHECK:   %[[RHS:.+]] = util.buffer.load %[[BINDING1]][%[[ELEMENT_OFFSET]]] : !util.buffer{%[[BINDING1_SIZE]]} -> f32
 // CHECK:   %[[MUL:.+]] = arith.mulf %[[LHS]], %[[RHS]] : f32
 // CHECK:   %[[SCALED:.+]] = arith.mulf %[[MUL]], %[[CONSTANT1_F32]] : f32
-// CHECK:   util.buffer.store %[[SCALED]], %[[BINDING2]][%[[ELEMENT_OFFSET]] for {{.+}}] : f32 -> !util.buffer{%[[BINDING2_SIZE]]}
+// CHECK:   util.buffer.store %[[SCALED]], %[[BINDING2]][%[[ELEMENT_OFFSET]]] : f32 -> !util.buffer{%[[BINDING2_SIZE]]}
 // CHECK: return
 
 // CHECK-LABEL: func private @__dispatch_ex_dispatch_0
