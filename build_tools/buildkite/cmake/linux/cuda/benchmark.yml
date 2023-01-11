@@ -5,23 +5,44 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 steps:
+  - label: ":hammer_and_wrench: Build linux-cuda benchmark tools"
+    key: "build-cuda-benchmark-tools"
+    commands: |
+      docker run --user=$(id -u):$(id -g) \
+        --volume="$${HOME?}:$${HOME?}" \
+        --volume="/etc/passwd:/etc/passwd:ro" \
+        --volume="/etc/group:/etc/group:ro" \
+        --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
+        --workdir="$$IREE_DOCKER_WORKDIR" \
+        --rm \
+        $${DOCKER_IMAGE} \
+        build_tools/cmake/build_linux_benchmark_tools.sh linux-cuda
+      tar -czvf iree-linux-cuda-tools-${BUILDKITE_BUILD_NUMBER}.tgz \
+        build-targets/linux-cuda/tools/iree-benchmark-module \
+        build-targets/linux-cuda/tools/build_config.txt
+    agents:
+      - "queue=build"
+    artifact_paths:
+      - "iree-linux-cuda-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
+
   - label: ":stopwatch: Benchmark on Nvidia A100 (GCP-a2-highgpu-1g)"
     key: "run-cuda-benchmark-gcp-gpu-a100"
+    depends_on: "build-cuda-benchmark-tools"
     commands: |
       git clean -fdx
       buildkite-agent artifact download \
         "benchmark-suites-linux-cuda-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
       buildkite-agent artifact download \
-        "iree-linux-tools-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
+        "iree-linux-cuda-tools-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
       tar -xzvf "benchmark-suites-linux-cuda-$${BUILDKITE_BUILD_NUMBER}.tgz"
-      tar -xzvf "iree-linux-tools-$${BUILDKITE_BUILD_NUMBER}.tgz"
+      tar -xzvf "iree-linux-cuda-tools-$${BUILDKITE_BUILD_NUMBER}.tgz"
       python3 build_tools/benchmarks/run_benchmarks_on_linux.py \
         --device_model=GCP-a2-highgpu-1g \
-        --normal_benchmark_tool_dir=build-linux/tools/ \
+        --normal_benchmark_tool_dir=build-targets/linux-cuda/tools/ \
         --driver_filter_regex=cuda \
         -o "benchmark-results-gcp-gpu-a100-$${BUILDKITE_BUILD_NUMBER}.json" \
         --verbose \
-        build-linux
+        build-targets/linux-cuda
     agents:
       - "gcp:machine-type=a2-highgpu-1g"
       - "queue=benchmark-cuda"

@@ -5,7 +5,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build only the IREE runtime using CMake for the host
+# Build only the IREE runtime using CMake
 #
 # Designed for CI, but can be run locally. The desired build directory can be
 # passed as the first argument. Otherwise, it uses the environment variable
@@ -16,63 +16,14 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_RUNTIME_BUILD_DIR:-build-runtime}}"
-BUILD_PRESET="${BUILD_PRESET:-test}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
 
-declare -a args
-args=(
-  "-G" "Ninja"
-  "-B" "${BUILD_DIR}"
+"${CMAKE_BIN}" -B "${BUILD_DIR}" -G Ninja . \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_BUILD_COMPILER=OFF
-)
-
-case "${BUILD_PRESET}" in
-  test)
-    args+=(
-      -DIREE_ENABLE_ASSERTIONS=ON
-      -DIREE_BUILD_SAMPLES=ON
-    )
-    ;;
-  benchmark)
-    args+=(
-      -DIREE_ENABLE_ASSERTIONS=OFF
-      -DIREE_BUILD_SAMPLES=OFF
-      -DIREE_BUILD_TESTS=OFF
-      -DIREE_HAL_DRIVER_CUDA=ON
-    )
-    ;;
-  benchmark-with-tracing)
-    args+=(
-      -DIREE_ENABLE_ASSERTIONS=OFF
-      -DIREE_BUILD_SAMPLES=OFF
-      -DIREE_BUILD_TESTS=OFF
-      -DIREE_HAL_DRIVER_CUDA=ON
-      -DIREE_ENABLE_RUNTIME_TRACING=ON
-    )
-    ;;
-  *)
-    echo "Unknown build preset: ${BUILD_PRESET}"
-    exit 1
-    ;;
-esac
-
-"${CMAKE_BIN}" "${args[@]}"
-
-case "${BUILD_PRESET}" in
-  test)
-    "${CMAKE_BIN}" --build "${BUILD_DIR}" -- -k 0
-    ;;
-  benchmark|benchmark-with-tracing)
-    "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-benchmark-module -- -k 0
-    ;;
-  *)
-    echo "Unknown build preset: ${BUILD_PRESET}"
-    exit 1
-    ;;
-esac
+"${CMAKE_BIN}" --build "${BUILD_DIR}" -- -k 0
 
 if (( IREE_READ_REMOTE_CCACHE == 1 )); then
   ccache --show-stats

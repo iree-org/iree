@@ -97,22 +97,15 @@ jobs:
     strategy:
       matrix:
         target:
-          - platform: "linux"
-            architecture: "x86_64"
-            docker_image: "gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206"
-            # Builds tools on the host and assumes the builder is Linux x86_64.
-            build_script: "./build_tools/cmake/build_runtime.sh"
           - platform: "riscv"
             architecture: "rv64"
             docker_image: "gcr.io/iree-oss/riscv@sha256:5034a40068f14d91d5caf07d615f323561416caee8afda32ae622746a4dd8b04"
-            build_script: "./build_tools/cmake/build_riscv.sh"
     outputs:
       benchmark-tools-gcs-artifacts: ${{ toJSON(steps.upload.outputs) }}
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCHITECTURE: ${{ matrix.target.architecture }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
-      BUILD_SCRIPT: ${{ matrix.target.build_script }}
       BUILD_TOOLS_DIR: ${{ matrix.target.platform }}-${{ matrix.target.architecture }}-benchmark-tools-dir
       BUILD_DIR: ${{ inputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ inputs.build-dir-archive }}
@@ -133,7 +126,9 @@ jobs:
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
             --env "BUILD_PRESET=benchmark" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build"
+            "${DOCKER_IMAGE}" \
+            "./build_tools/cmake/build_${PLATFORM}.sh" \
+            "${BUILD_TOOLS_DIR}/build"
       - name: "Compiling the benchmark tools with tracing"
         id: build-with-tracing
         run: |
@@ -141,7 +136,9 @@ jobs:
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
             --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
+            "${DOCKER_IMAGE}" \
+            "./build_tools/cmake/build_${PLATFORM}.sh" \
+            "${BUILD_TOOLS_DIR}/build-traced"
       - name: "Creating the benchmark tools archive"
         id: archive
         env:

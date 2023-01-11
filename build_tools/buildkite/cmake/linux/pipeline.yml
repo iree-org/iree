@@ -75,28 +75,6 @@ steps:
       - "benchmark-suites-*-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "source-mlir-models-${BUILDKITE_BUILD_NUMBER}.tgz"
 
-  - label: ":hammer_and_wrench: Build linux benchmark tools"
-    key: "build-linux-benchmark-tools"
-    commands: |
-      # Builds tools on the host and assumes the builder is Linux x86_64.
-      docker run --user=$(id -u):$(id -g) \
-        --volume="$${HOME?}:$${HOME?}" \
-        --volume="/etc/passwd:/etc/passwd:ro" \
-        --volume="/etc/group:/etc/group:ro" \
-        --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
-        --workdir="$$IREE_DOCKER_WORKDIR" \
-        --env "BUILD_PRESET=benchmark" \
-        --rm \
-        $${DOCKER_IMAGE} \
-        build_tools/cmake/build_runtime.sh build-linux
-      tar -czvf iree-linux-tools-${BUILDKITE_BUILD_NUMBER}.tgz \
-        build-linux/tools/iree-benchmark-module \
-        build-linux/tools/build_config.txt
-    agents:
-      - "queue=build"
-    artifact_paths:
-      - "iree-linux-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
-
   - wait
 
   - label: ":arrow_forward: Execute linux-x86_64 benchmark pipeline"
