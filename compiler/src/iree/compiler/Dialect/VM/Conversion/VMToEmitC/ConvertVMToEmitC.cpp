@@ -1255,9 +1255,8 @@ ResultOpTy lookupSymbolRef(Operation *accessOp, StringRef attrName) {
 
 // Convert vm operations to emitc calls. The resultiong call has the ops
 // operands as arguments followed by an argument for every attribute.
-template <typename SrcOpTy>
+template <typename SrcOpTy, typename Adaptor = typename SrcOpTy::Adaptor>
 class GenericOpConversion : public OpConversionPattern<SrcOpTy> {
-  using Adaptor = typename SrcOpTy::Adaptor;
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
  public:
@@ -1305,9 +1304,10 @@ class GenericOpConversion : public OpConversionPattern<SrcOpTy> {
 
 template <typename SrcOpTy>
 class DeleteOpConversion : public OpConversionPattern<SrcOpTy> {
-  using Adaptor = typename SrcOpTy::Adaptor;
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+  using Adaptor = typename SrcOpTy::Adaptor;
 
+ private:
   LogicalResult matchAndRewrite(
       SrcOpTy op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -1317,11 +1317,12 @@ class DeleteOpConversion : public OpConversionPattern<SrcOpTy> {
 };
 
 class FuncOpConversion : public OpConversionPattern<mlir::func::FuncOp> {
+ public:
   using OpConversionPattern<mlir::func::FuncOp>::OpConversionPattern;
-  using Adaptor = mlir::func::FuncOp::Adaptor;
 
+ private:
   LogicalResult matchAndRewrite(
-      mlir::func::FuncOp funcOp, Adaptor adaptor,
+      mlir::func::FuncOp funcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     TypeConverter::SignatureConversion signatureConverter(
         funcOp.getFunctionType().getNumInputs());
@@ -1346,9 +1347,10 @@ class FuncOpConversion : public OpConversionPattern<mlir::func::FuncOp> {
 };
 
 class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
-  using Adaptor = IREE::VM::ExportOp::Adaptor;
+ public:
   using OpConversionPattern<IREE::VM::ExportOp>::OpConversionPattern;
 
+ private:
   struct GeneratedStruct {
     Optional<Value> value = std::nullopt;
     Optional<std::string> name = std::nullopt;
@@ -1356,7 +1358,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
   };
 
   LogicalResult matchAndRewrite(
-      IREE::VM::ExportOp exportOp, Adaptor adaptor,
+      IREE::VM::ExportOp exportOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = exportOp.getContext();
     auto loc = exportOp.getLoc();
@@ -2394,9 +2396,11 @@ class ImportOpConverter {
 
 template <typename CallOpTy>
 class CallOpConversion : public OpConversionPattern<CallOpTy> {
+ public:
   using Adaptor = typename CallOpTy::Adaptor;
   using OpConversionPattern<CallOpTy>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
       CallOpTy op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -2664,12 +2668,11 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
   }
 };
 
-template <typename CmpOpTy>
+template <typename CmpOpTy, typename Adaptor = typename CmpOpTy::Adaptor>
 class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
-  using Adaptor = typename CmpOpTy::Adaptor;
+ public:
   using OpConversionPattern<CmpOpTy>::OpConversionPattern;
 
- public:
   CompareRefOpConversion(TypeConverter &typeConverter, MLIRContext *context,
                          StringRef funcName)
       : OpConversionPattern<CmpOpTy>(typeConverter, context),
@@ -2735,11 +2738,11 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
 
 class CompareRefNotZeroOpConversion
     : public OpConversionPattern<IREE::VM::CmpNZRefOp> {
-  using Adaptor = IREE::VM::CmpNZRefOp::Adaptor;
   using OpConversionPattern<IREE::VM::CmpNZRefOp>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
-      IREE::VM::CmpNZRefOp cmpOp, Adaptor adaptor,
+      IREE::VM::CmpNZRefOp cmpOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = cmpOp.getContext();
     auto loc = cmpOp.getLoc();
@@ -2781,12 +2784,13 @@ class CompareRefNotZeroOpConversion
 
 template <typename ConstOpTy>
 class ConstOpConversion : public OpConversionPattern<ConstOpTy> {
+ public:
   using Adaptor = typename ConstOpTy::Adaptor;
   using OpConversionPattern<ConstOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       ConstOpTy constOp, Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+      ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<emitc::ConstantOp>(constOp, constOp.getType(),
                                                    constOp.getValue());
     return success();
@@ -2795,12 +2799,13 @@ class ConstOpConversion : public OpConversionPattern<ConstOpTy> {
 
 template <typename ConstZeroOpTy>
 class ConstZeroOpConversion : public OpConversionPattern<ConstZeroOpTy> {
+ public:
   using Adaptor = typename ConstZeroOpTy::Adaptor;
   using OpConversionPattern<ConstZeroOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       ConstZeroOpTy constZeroOp, Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+      ConversionPatternRewriter &rewriter) const final {
     auto type = constZeroOp.getType();
 
     Attribute value = rewriter.getZeroAttr(type);
@@ -2812,12 +2817,12 @@ class ConstZeroOpConversion : public OpConversionPattern<ConstZeroOpTy> {
 
 class ConstRefZeroOpConversion
     : public OpConversionPattern<IREE::VM::ConstRefZeroOp> {
-  using Adaptor = IREE::VM::ConstRefZeroOp::Adaptor;
+ public:
   using OpConversionPattern<IREE::VM::ConstRefZeroOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::ConstRefZeroOp constRefZeroOp, Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+      IREE::VM::ConstRefZeroOp constRefZeroOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const final {
     auto loc = constRefZeroOp.getLoc();
 
     IREE::VM::EmitCTypeConverter *typeConverter =
@@ -2840,12 +2845,12 @@ class ConstRefZeroOpConversion
 
 class ConstRefRodataOpConversion
     : public OpConversionPattern<IREE::VM::ConstRefRodataOp> {
-  using Adaptor = IREE::VM::ConstRefRodataOp::Adaptor;
+ public:
   using OpConversionPattern<IREE::VM::ConstRefRodataOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::VM::ConstRefRodataOp constRefRodataOp, Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+      IREE::VM::ConstRefRodataOp constRefRodataOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const final {
     auto ctx = constRefRodataOp.getContext();
     auto loc = constRefRodataOp.getLoc();
 
@@ -2912,11 +2917,11 @@ class ConstRefRodataOpConversion
 };
 
 class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
-  using Adaptor = IREE::VM::BranchOp::Adaptor;
   using OpConversionPattern<IREE::VM::BranchOp>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
-      IREE::VM::BranchOp op, Adaptor adaptor,
+      IREE::VM::BranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
 
@@ -3022,11 +3027,11 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
 // clang-format on
 class CondBranchOpConversion
     : public OpConversionPattern<IREE::VM::CondBranchOp> {
-  using Adaptor = IREE::VM::CondBranchOp::Adaptor;
   using OpConversionPattern<IREE::VM::CondBranchOp>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
-      IREE::VM::CondBranchOp op, Adaptor adaptor,
+      IREE::VM::CondBranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
 
@@ -3101,11 +3106,11 @@ class CondBranchOpConversion
 };
 
 class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
-  using Adaptor = IREE::VM::ReturnOp::Adaptor;
   using OpConversionPattern<IREE::VM::ReturnOp>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
-      IREE::VM::ReturnOp op, Adaptor adaptor,
+      IREE::VM::ReturnOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
@@ -3163,7 +3168,6 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
 
 class ImportResolvedOpConversion
     : public OpConversionPattern<IREE::VM::ImportResolvedOp> {
-  using Adaptor = IREE::VM::ImportResolvedOp::Adaptor;
   using OpConversionPattern<IREE::VM::ImportResolvedOp>::OpConversionPattern;
 
  public:
@@ -3172,7 +3176,7 @@ class ImportResolvedOpConversion
 
  private:
   LogicalResult matchAndRewrite(
-      IREE::VM::ImportResolvedOp op, Adaptor adaptor,
+      IREE::VM::ImportResolvedOp op, IREE::VM::ImportResolvedOpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
@@ -3245,11 +3249,11 @@ class ImportResolvedOpConversion
 };
 
 class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
-  using Adaptor = IREE::VM::FailOp::Adaptor;
   using OpConversionPattern<IREE::VM::FailOp>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
-      IREE::VM::FailOp op, Adaptor adaptor,
+      IREE::VM::FailOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
@@ -3346,9 +3350,9 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
   }
 };
 
-template <typename LoadOpTy, typename GlobalOpTy>
+template <typename LoadOpTy, typename GlobalOpTy,
+          typename Adaptor = typename LoadOpTy::Adaptor>
 class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
-  using Adaptor = typename LoadOpTy::Adaptor;
   using OpConversionPattern<LoadOpTy>::OpConversionPattern;
 
  public:
@@ -3398,12 +3402,14 @@ class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
   StringRef funcName;
 };
 
-template <typename LoadStoreOpTy>
+template <typename LoadStoreOpTy,
+          typename Adaptor = typename LoadStoreOpTy::Adaptor>
 class GlobalLoadStoreRefOpConversion
     : public OpConversionPattern<LoadStoreOpTy> {
-  using Adaptor = typename LoadStoreOpTy::Adaptor;
+ public:
   using OpConversionPattern<LoadStoreOpTy>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
       LoadStoreOpTy op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -3505,9 +3511,9 @@ class GlobalLoadStoreRefOpConversion
   }
 };
 
-template <typename StoreOpTy, typename GlobalOpTy>
+template <typename StoreOpTy, typename GlobalOpTy,
+          typename Adaptor = typename StoreOpTy::Adaptor>
 class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
-  using Adaptor = typename StoreOpTy::Adaptor;
   using OpConversionPattern<StoreOpTy>::OpConversionPattern;
 
  public:
@@ -3562,9 +3568,8 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
 // Convert vm list operations to two emitc calls. The wrapping ref pointer
 // is first dereferenced and the result is used as the argument of the
 // specified function name.
-template <typename SrcOpTy>
+template <typename SrcOpTy, typename Adaptor = typename SrcOpTy::Adaptor>
 class ListOpConversion : public OpConversionPattern<SrcOpTy> {
-  using Adaptor = typename SrcOpTy::Adaptor;
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
  public:
@@ -3650,11 +3655,12 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
 
 class ListAllocOpConversion
     : public OpConversionPattern<IREE::VM::ListAllocOp> {
-  using Adaptor = IREE::VM::ListAllocOp::Adaptor;
+ public:
   using OpConversionPattern<IREE::VM::ListAllocOp>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
-      IREE::VM::ListAllocOp allocOp, Adaptor adaptor,
+      IREE::VM::ListAllocOp allocOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = allocOp.getContext();
     auto loc = allocOp.getLoc();
@@ -3740,11 +3746,11 @@ class ListAllocOpConversion
   }
 };
 
-template <typename GetOpTy>
+template <typename GetOpTy, typename Adaptor = typename GetOpTy::Adaptor>
 class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
-  using Adaptor = typename GetOpTy::Adaptor;
   using OpConversionPattern<GetOpTy>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
       GetOpTy getOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -3826,11 +3832,12 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
 
 class ListGetRefOpConversion
     : public OpConversionPattern<IREE::VM::ListGetRefOp> {
-  using Adaptor = IREE::VM::ListGetRefOp::Adaptor;
+ public:
   using OpConversionPattern<IREE::VM::ListGetRefOp>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
-      IREE::VM::ListGetRefOp getOp, Adaptor adaptor,
+      IREE::VM::ListGetRefOp getOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = getOp.getContext();
     auto loc = getOp.getLoc();
@@ -3978,11 +3985,11 @@ class ListGetRefOpConversion
   }
 };
 
-template <typename SetOpTy>
+template <typename SetOpTy, typename Adaptor = typename SetOpTy::Adaptor>
 class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
-  using Adaptor = typename SetOpTy::Adaptor;
   using OpConversionPattern<SetOpTy>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
       SetOpTy setOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -4047,11 +4054,11 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
 
 class ListSetRefOpConversion
     : public OpConversionPattern<IREE::VM::ListSetRefOp> {
-  using Adaptor = IREE::VM::ListSetRefOp::Adaptor;
   using OpConversionPattern<IREE::VM::ListSetRefOp>::OpConversionPattern;
 
+ private:
   LogicalResult matchAndRewrite(
-      IREE::VM::ListSetRefOp setOp, Adaptor adaptor,
+      IREE::VM::ListSetRefOp setOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = setOp.getContext();
     auto loc = setOp.getLoc();
