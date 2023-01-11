@@ -268,7 +268,6 @@ def parse_args():
   )
   subparser_base.add_argument(
       "--mode",
-      default="opportunistic",
       choices=["opportunistic", "proactive"],
       help=(
           "The mode in which to update instances. See README and"
@@ -276,6 +275,7 @@ def parse_args():
       ))
   subparser_base.add_argument(
       "--action",
+      default="refresh",
       choices=["refresh", "restart", "replace"],
       help=(
           "What action to take when updating an instance. See README and"
@@ -345,8 +345,8 @@ def parse_args():
   for sp in [canary_sp, direct_sp]:
     sp.add_argument(
         "--version",
-        help=("The new instance template version. Usually git hash +"
-              " 3-character uid, e.g. 56e40f6505-9lp"))
+        help=("The new instance template version. Usually git hash + ISO date +"
+              " timestamp, e.g. b213037174-2022-09-06-1662502818"))
 
   # TODO: Add this argument with a custom parser
   # canary_sp.add_argument("--canary-size", type=int, default=1)
@@ -356,11 +356,11 @@ def parse_args():
   if args.skip_confirmation is None:
     args.skip_confirmation = args.env == TESTING_ENV_NAME
 
-  if args.action is None:
-    if args.mode == "proactive":
-      args.action = "refresh"
+  if args.mode is None:
+    if args.action == "refresh":
+      args.mode = "proactive"
     else:
-      args.action = "replace"
+      args.mode = "opportunistic"
 
   return args
 
