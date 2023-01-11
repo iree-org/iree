@@ -6,21 +6,28 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build "all" of the IREE project.
-#
-# Designed for CI, but can be run locally. The desired build directory can be
-# passed as the first argument. Otherwise, it uses the environment variable
-# IREE_BUILD_DIR, defaulting to "build". It reuses the build directory if it
-# already exists. Expects to be run from the root of the IREE repository.
+# Build "all" of the IREE project. Designed for CI, but can be run locally.
 
 set -xeuo pipefail
 
+ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
+cd "${ROOT_DIR}"
+
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 BUILD_DIR="${1:-${IREE_BUILD_DIR:-build}}"
 INSTALL_DIR="${IREE_INSTALL_DIR:-${BUILD_DIR}/install}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
 
-source build_tools/cmake/setup_build.sh
+"$CMAKE_BIN" --version
+ninja --version
+
+if [[ -d "${BUILD_DIR}" ]]; then
+  echo "Build directory '${BUILD_DIR}' already exists. Will use cached results there."
+else
+  echo "Build directory '${BUILD_DIR}' does not already exist. Creating a new one."
+  mkdir "${BUILD_DIR}"
+fi
 
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"
@@ -50,6 +57,8 @@ declare -a CMAKE_ARGS=(
   # Enable WebGPU compiler builds and tests. All deps get fetched as needed,
   # but some of the deps are too large to enable by default for all developers.
   "-DIREE_TARGET_BACKEND_WEBGPU=ON"
+
+  "${ROOT_DIR}"
 )
 
 "$CMAKE_BIN" "${CMAKE_ARGS[@]}"

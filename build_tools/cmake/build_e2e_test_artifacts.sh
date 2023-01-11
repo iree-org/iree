@@ -7,31 +7,34 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Build e2e test artifacts using a host tools directory.
+# Designed for CI, but can be run locally.
 #
-# This is copied and modified from build_tools/cmake/build_benchmarks.sh. We
-# will remove build_tools/cmake/build_benchmarks.sh once everything has been
+# This is copied and modified from build_tools/cmake/build_benchmarks.sh.
+# We will remove build_tools/cmake/build_benchmarks.sh once everything has been
 # migrated.
-#
-# The required IREE_HOST_BINARY_ROOT environment variable indicates the location
-# of the precompiled IREE binaries.
-#
-# Designed for CI, but can be run locally. The desired build directory can be
-# passed as the first argument. Otherwise, it uses the environment variable
-# IREE_BUILD_E2E_TEST_ARTIFACTS_DIR, defaulting to "build-e2e-test-artifacts".
-# It reuses the build directory if it already exists. Expects to be run from the
-# root of the IREE repository.
-
 
 set -xeuo pipefail
 
-BUILD_DIR="${1:-${IREE_BUILD_E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts}}"
+ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
+cd "${ROOT_DIR}"
+
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/iree_tf_compiler}"
+BUILD_E2E_TEST_ARTIFACTS_DIR="${BUILD_E2E_TEST_ARTIFACTS_DIR:-$ROOT_DIR/build-e2e-test-artifacts}"
 
-source build_tools/cmake/setup_build.sh
+"$CMAKE_BIN" --version
+ninja --version
+
+if [[ -d "${BUILD_E2E_TEST_ARTIFACTS_DIR}" ]]; then
+  echo "${BUILD_E2E_TEST_ARTIFACTS_DIR} directory already exists. Will use cached results there."
+else
+  echo "${BUILD_E2E_TEST_ARTIFACTS_DIR} directory does not already exist. Creating a new one."
+  mkdir "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
+fi
 
 echo "Configuring to build e2e test artifacts"
-"${CMAKE_BIN}" -B "${BUILD_DIR}" \
+"${CMAKE_BIN}" -B "${BUILD_E2E_TEST_ARTIFACTS_DIR}" \
   -G Ninja \
   -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}" \
   -DIREE_BUILD_EXPERIMENTAL_E2E_TEST_ARTIFACTS=ON \
@@ -43,6 +46,6 @@ echo "Configuring to build e2e test artifacts"
 
 echo "Building e2e test artifacts"
 "${CMAKE_BIN}" \
-  --build "${BUILD_DIR}" \
+  --build "${BUILD_E2E_TEST_ARTIFACTS_DIR}" \
   --target iree-e2e-test-artifacts \
   -- -k 0

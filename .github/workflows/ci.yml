@@ -590,9 +590,9 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
       TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
       TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
@@ -605,9 +605,9 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting install from build dir archive"
-        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
@@ -619,10 +619,10 @@ jobs:
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "BUILD_E2E_TEST_ARTIFACTS_DIR=${BUILD_E2E_TEST_ARTIFACTS_DIR}" \
             gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
-            build_tools/cmake/build_e2e_test_artifacts.sh \
-            "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
+            build_tools/cmake/build_e2e_test_artifacts.sh
           echo "::set-output name=e2e-test-artifacts-dir::${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts"
       - name: "Uploading e2e test artifacts"
         id: upload
@@ -660,7 +660,7 @@ jobs:
             architecture: arm64-v8a
             abi: arm64-v8a
             docker_image: "gcr.io/iree-oss/android@sha256:740f87664b2f4d9288549c95d4d355d5b4a543d55257dcff0308b0c2920bd229"
-            # No test_script
+            test_script: "echo 'bypass tests'"
           - platform: riscv
             architecture: rv64
             abi: lp64d
@@ -679,41 +679,40 @@ jobs:
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCHITECTURE: ${{ matrix.target.architecture }}
-      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.architecture }}
       ABI: ${{ matrix.target.abi }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
       TEST_SCRIPT: ${{ matrix.target.test_script }}
-      HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
-        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Build cross-compiling target"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
             --env "${PLATFORM^^}_ABI=${ABI}" \
             --env "BUILD_PRESET=test" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
-            "./build_tools/cmake/build_${PLATFORM}.sh" \
-            "${TARGET_BUILD_DIR}"
+            ./build_tools/cmake/build_${PLATFORM}.sh
       - name: "Test cross-compiling target"
-        if: ${{ matrix.target.test_script }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
             --env "BUILD_PRESET=test" \
             "${DOCKER_IMAGE}" \
-            "${TEST_SCRIPT}" \
-            "${TARGET_BUILD_DIR}"
+            bash -euo pipefail -c \
+              "${TEST_SCRIPT}"
 
   emscripten:
     needs: [setup, build_all]
@@ -725,22 +724,22 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting install from build dir archive"
-        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Building the runtime for the web using Emscripten"
         run: |
           build_tools/github_actions/docker_run.sh \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             gcr.io/iree-oss/emscripten@sha256:6e75298c786a5a7d0a076578a210527bcc753d0a228c635ad3b75efd5421632a \
             build_tools/cmake/build_runtime_emscripten.sh
 
@@ -776,9 +775,9 @@ jobs:
       ARCHITECTURE: ${{ matrix.target.architecture }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
       RUN_SCRIPTS: ${{ matrix.target.run_scripts }}
-      HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
       BENCHMARKS_ARCHIVE: ${{ needs.benchmarks.outputs.benchmarks-archive }}
       BENCHMARKS_GCS_ARTIFACT: ${{ needs.benchmarks.outputs.benchmarks-gcs-artifact }}
     steps:
@@ -787,9 +786,9 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
-        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Downloading benchmarks archive"
         id: download_benchmarks
         run: gcloud alpha storage cp "${BENCHMARKS_GCS_ARTIFACT}" "${BENCHMARKS_ARCHIVE}"
@@ -811,9 +810,9 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
-            --env "IREE_BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
             --env "BUILD_PRESET=benchmark-suite-test" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             --env "BUILD_BENCHMARK_SUITE_DIR=${BUILD_BENCHMARK_SUITE_DIR}" \
             "${DOCKER_IMAGE}" \
             bash -euo pipefail -c \

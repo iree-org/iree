@@ -6,24 +6,39 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build and test, using CMake/CTest, with AddressSanitizer instrumentation.
+# Note: this script diverges from the non-ASan build in a few ways:
+#   * The CMake build sets `IREE_ENABLE_ASAN=ON`
+#   * Omit optional components that don't work with ASan (e.g. Python bindings)
+#   * Some tests that fail under ASan are individually excluded
 #
-# See https://clang.llvm.org/docs/AddressSanitizer.html. Components that don't
-# work with ASan (e.g. Python bindings) are disabled. Some tests that fail under
-# ASan are individually excluded.
+# The desired build directory can be passed as
+# the first argument. Otherwise, it uses the environment variable
+# IREE_ASAN_BUILD_DIR, defaulting to "build-asan". Designed for CI, but
+# can be run manually. This reuses the build directory if it already exists.
 #
-# The desired build directory can be passed as the first argument. Otherwise, it
-# uses the environment variable IREE_ASAN_BUILD_DIR, defaulting to "build-asan".
-# Designed for CI, but can be run manually. It reuses the build directory if it
-# already exists. Expects to be run from the root of the IREE repository.
+# Build and test the project with CMake with ASan enabled and using
+# SwiftShader's software Vulkan driver.
+# ASan docs: https://clang.llvm.org/docs/AddressSanitizer.html
+
 
 set -xeuo pipefail
 
+ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
+cd "${ROOT_DIR}"
+
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 BUILD_DIR="${1:-${IREE_ASAN_BUILD_DIR:-build-asan}}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 
-source build_tools/cmake/setup_build.sh
+"$CMAKE_BIN" --version
+ninja --version
 
+if [[ -d "${BUILD_DIR}" ]]; then
+  echo "Build directory '${BUILD_DIR}' already exists. Will use cached results there."
+else
+  echo "Build directory '${BUILD_DIR}' does not already exist. Creating a new one."
+  mkdir "${BUILD_DIR}"
+fi
 
 CMAKE_ARGS=(
   "-G" "Ninja"

@@ -160,28 +160,28 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=${BUILD_TOOLS_DIR}/build" \
             --env "BUILD_PRESET=benchmark" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
-            "./build_tools/cmake/build_${PLATFORM}.sh" \
-            "${BUILD_TOOLS_DIR}/build"
+            bash -euo pipefail -c "./build_tools/cmake/build_${PLATFORM}.sh"
       - name: "Compiling the benchmark tools with tracing"
         id: build-with-tracing
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=${BUILD_TOOLS_DIR}/build-traced" \
             --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
-            "./build_tools/cmake/build_${PLATFORM}.sh" \
-            "${BUILD_TOOLS_DIR}/build-traced"
+            bash -euo pipefail -c "./build_tools/cmake/build_${PLATFORM}.sh"
       - name: "Creating the benchmark tools archive"
         id: archive
         env:
           BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.architecture }}-benchmarks-tools.tar
         run: |
-          tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
-            "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module
+          tar -cf ${BENCHMARK_TOOLS_ARCHIVE} \
+            ${BUILD_TOOLS_DIR}/*/tools/iree-benchmark-module
           echo "::set-output name=benchmark-tools-archive::${BENCHMARK_TOOLS_ARCHIVE}"
       - name: "Uploading the benchmark tools archive"
         id: upload

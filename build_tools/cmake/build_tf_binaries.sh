@@ -8,7 +8,7 @@
 
 # Build the IREE TF integration binaries. Despite the name, also runs the few
 # lit tests for these that are enabled through Bazel. These take seconds to run
-# all of them and it's easiest to just run them here rather than trying to
+# all of them and it's easiest to just run themm here rather than trying to
 # figure out how to pass prebuilt binaries to Bazel tests.
 
 set -xeuo pipefail

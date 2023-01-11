@@ -10,15 +10,16 @@
 
 set -euo pipefail
 
-# Check these exist and print the versions for later debugging.
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+ROOT_DIR=$(git rev-parse --show-toplevel)
+cd "${ROOT_DIR}"
+
+CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 "${CMAKE_BIN}" --version
 ninja --version
-python3 --version
 
 if [[ -d "${BUILD_DIR}" ]]; then
   echo "'${BUILD_DIR}' directory already exists. Will use cached results there."
 else
   echo "'${BUILD_DIR}' directory does not already exist. Creating a new one."
-  mkdir -p "${BUILD_DIR}"
+  mkdir "${BUILD_DIR}"
 fi

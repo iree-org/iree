@@ -7,19 +7,18 @@
 
 # Build and test, using CMake/CTest, with ThreadSanitizer instrumentation.
 #
-# See https://clang.llvm.org/docs/ThreadSanitizer.html. Some tests are run many
-# times to flush out non-determinstic failures.
-#
-# The desired build directory can be passed as the first argument. Otherwise, it
-# uses the environment variable IREE_TSAN_BUILD_DIR, defaulting to "build-tsan".
-# Designed for CI, but can be run manually. It reuses the build directory if it
-# already exists. Expects to be run from the root of the IREE repository.
+# The desired build directory can be passed as
+# the first argument. Otherwise, it uses the environment variable
+# IREE_TSAN_BUILD_DIR, defaulting to "build-tsan". Designed for CI, but
+# can be run manually. This reuses the build directory if it already exists.
 
 set -euo pipefail
 
+SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
+
 BUILD_DIR="${1:-${IREE_TSAN_BUILD_DIR:-build-tsan}}"
 
-source build_tools/cmake/setup_build.sh
+source "${SCRIPT_DIR}/setup_build.sh"
 
 CMAKE_ARGS=(
   "-G" "Ninja"
@@ -76,10 +75,10 @@ export IREE_CUDA_DISABLE=1
 export IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE=notsan
 
 # Run all tests, once
-build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+"${SCRIPT_DIR}/ctest_all.sh" "${BUILD_DIR}"
 
 # Re-run many times certain tests that are cheap and prone to nondeterministic
 # failure (typically, IREE runtime tests exercising multi-threading features).
 export IREE_CTEST_TESTS_REGEX="(^iree/base/|^iree/task/)"
 export IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT=32
-build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+"${SCRIPT_DIR}/ctest_all.sh" "${BUILD_DIR}"

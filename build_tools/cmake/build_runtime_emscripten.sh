@@ -22,13 +22,19 @@ then
 fi
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
-BUILD_DIR="build-emscripten"
+cd ${ROOT_DIR?}
+
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 
-cd "${ROOT_DIR}"
-source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
-
-cd "${BUILD_DIR}"
+if [ -d "build-emscripten" ]
+then
+  echo "build-emscripten directory already exists. Will use cached results there."
+else
+  echo "build-emscripten directory does not already exist. Creating a new one."
+  mkdir build-emscripten
+fi
+cd build-emscripten
 
 # Configure using Emscripten's CMake wrapper, then build.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \

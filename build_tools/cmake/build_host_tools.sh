@@ -6,24 +6,34 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Builds IREE host tools for use by other builds.
-#
-# The desired build directory can be passed as the first argument. Otherwise, it
-# uses the environment variable IREE_HOST_BUILD_DIR, defaulting to "build-host".
-# Designed for CI, but can be run manually. It reuses the build directory if it
-# already exists. Expects to be run from the root of the IREE repository.
+# Builds IREE host tools for use by other builds. Designed for CI, but can be
+# run manually. This uses previously cached build results and does not clear
+# build directories.
 
 set -xeuo pipefail
+
+ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
+cd "${ROOT_DIR?}"
 
 BUILD_DIR="${1:-${IREE_HOST_BUILD_DIR:-build-host}}"
 INSTALL_DIR="${INSTALL_DIR:-${BUILD_DIR}/install}"
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-OFF}"
 
-source build_tools/cmake/setup_build.sh
+"${CMAKE_BIN?}" --version
+ninja --version
+
+# --------------------------------------------------------------------------- #
+if [[ -d "${BUILD_DIR}" ]]; then
+  echo "${BUILD_DIR} directory already exists. Will use cached results there."
+else
+  echo "${BUILD_DIR} directory does not already exist. Creating a new one."
+  mkdir -p "${BUILD_DIR}"
+fi
 
 mkdir -p "${INSTALL_DIR}"
 
+# Configure, build, install.
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
@@ -48,3 +58,4 @@ declare -a CMAKE_ARGS=(
 
 "${CMAKE_BIN}" "${CMAKE_ARGS[@]}"
 "${CMAKE_BIN}" --build "${BUILD_DIR}" --target install -- -k 0
+# --------------------------------------------------------------------------- #

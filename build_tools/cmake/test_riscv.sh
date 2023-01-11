@@ -7,15 +7,14 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Test the cross-compiled RISCV 64-bit Linux targets.
-#
-# The desired build directory can be passed as the first argument. Otherwise, it
-# uses the environment variable IREE_RISCV_BUILD_DIR, defaulting to
-# "build-riscv". Designed for CI, but can be run manually. Expects to be run
-# from the root of the IREE repository.
 
 set -xeuo pipefail
 
-BUILD_DIR="${1:-${IREE_BUILD_RISCV_DIR:-build-riscv}}"
+# Print the UTC time when set -x is on
+export PS4='[$(date -u "+%T %Z")] '
+
+ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
+BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
 RISCV_ARCH="${RISCV_ARCH:-rv64}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
@@ -54,7 +53,7 @@ if [[ "${BUILD_PRESET}" == "benchmark-suite-test" ]]; then
   )
   label_include_regex="($(IFS="|" ; echo "${label_args[*]}"))"
   echo "******** Running run-module CTest ********"
-  ctest --test-dir ${BUILD_DIR} ${ctest_args[@]} \
+  ctest --test-dir ${BUILD_RISCV_DIR} ${ctest_args[@]} \
     --label-regex ${label_include_regex}
   exit 0
 fi
@@ -62,7 +61,7 @@ fi
 # Test runtime unit tests
 runtime_label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
 runtime_ctest_args=(
-  "--test-dir ${BUILD_DIR}/runtime/"
+  "--test-dir ${BUILD_RISCV_DIR}/runtime/"
   ${ctest_args[@]}
   "--label-exclude ${runtime_label_exclude_regex}"
 )
@@ -70,7 +69,7 @@ echo "******** Running runtime CTest ********"
 ctest ${runtime_ctest_args[@]}
 
 tools_ctest_args=(
-  "--test-dir ${BUILD_DIR}/tools/test"
+  "--test-dir ${BUILD_RISCV_DIR}/tools/test"
   ${ctest_args[@]}
   "--label-exclude ${runtime_label_exclude_regex}"
 )
@@ -88,7 +87,7 @@ fi
 tests_label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
 tests_exclude_regex="($(IFS="|" ; echo "${test_exclude_args[*]}"))"
 test_ctest_args=(
-  "--test-dir ${BUILD_DIR}/tests/e2e"
+  "--test-dir ${BUILD_RISCV_DIR}/tests/e2e"
   ${ctest_args[@]}
   "--label-exclude ${tests_label_exclude_regex}"
   "--exclude-regex ${tests_exclude_regex}"

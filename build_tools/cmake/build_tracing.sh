@@ -13,17 +13,26 @@ set -e
 set -x
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
-BUILD_DIR="${1:-${IREE_TRACING_BUILD_DIR:-build-tracing}}"
+cd ${ROOT_DIR?}
 
-cd "${ROOT_DIR}"
-source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+"${CMAKE_BIN?}" --version
+ninja --version
+
+if [ -d "build-tracing" ]
+then
+  echo "build-tracing directory already exists. Will use cached results there."
+else
+  echo "build-tracing directory does not already exist. Creating a new one."
+  mkdir build-tracing
+fi
+cd build-tracing
 
 # Note: https://github.com/iree-org/iree/issues/6404 prevents us from building
 # tests with these other settings. Many tests invoke the compiler tools with
 # MLIR threading enabled, which crashes with compiler tracing enabled.
-"${CMAKE_BIN?}" -B "${BUILD_DIR}" \
-  -G Ninja . \
+"${CMAKE_BIN?}" -G Ninja .. \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_ENABLE_RUNTIME_TRACING=ON \
   -DIREE_BUILD_COMPILER=OFF
-"${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0
+"${CMAKE_BIN?}" --build . -- -k 0
