@@ -160,7 +160,8 @@ static bool doesSliceSpanWholeTarget(
   // All the sizes must match the entire target size.
   SmallVector<int64_t> staticSizes;
   SmallVector<Value> dynamicSizes;
-  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes,
+                             ShapedType::kDynamic);
   auto targetType = dispatchType;
   if (staticSizes != targetType.getShape() ||
       llvm::any_of(llvm::zip_equal(dynamicSizes, dispatchTypeDims),

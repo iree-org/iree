@@ -1564,7 +1564,8 @@ static SmallVector<int64_t> getStaticTiles(OpTy op) {
                 "applies to only pack or unpack operations");
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
-  dispatchIndexOpFoldResults(op.getMixedTiles(), dynamicTiles, staticTiles);
+  dispatchIndexOpFoldResults(op.getMixedTiles(), dynamicTiles, staticTiles,
+                             ShapedType::kDynamic);
   return staticTiles;
 }
 
@@ -1703,7 +1704,8 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
          "original dimensions to be tiled");
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
-  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
+  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
+                             ShapedType::kDynamic);
   build(builder, state, output.getType(), source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getDenseI64ArrayAttr(outerDimsPerm),
@@ -2125,7 +2127,8 @@ void UnPackOp::build(OpBuilder &builder, OperationState &state, Value source,
                      ArrayRef<int64_t> outerDimsPerm) {
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
-  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
+  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
+                             ShapedType::kDynamic);
   build(builder, state, output.getType(), source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getDenseI64ArrayAttr(outerDimsPerm),
