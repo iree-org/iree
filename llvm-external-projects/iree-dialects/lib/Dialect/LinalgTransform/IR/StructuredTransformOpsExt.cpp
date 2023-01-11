@@ -1259,7 +1259,7 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   }
 
   transform_ext::StructuredOpMatcher pattern, fill, leading, trailing;
-  transform_ext::MatchedReductionCaptures ignore;
+  int64_t ignore;
   makeReductionMatcher(pattern, fill, leading, trailing, ignore);
 
   // TODO: need a mechanism for this to go around the entire IR,
