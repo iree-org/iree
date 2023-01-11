@@ -34,7 +34,6 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
-#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -414,7 +413,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       // casting ops into tiled operations.
       RewritePatternSet patterns(context);
       linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
-      tensor::populateFoldTensorEmptyPatterns(patterns);
       populateFoldAffineMinInDistributedLoopsPatterns(patterns);
       context->getOrLoadDialect<IREE::LinalgExt::IREELinalgExtDialect>()
           ->getCanonicalizationPatterns(patterns);
