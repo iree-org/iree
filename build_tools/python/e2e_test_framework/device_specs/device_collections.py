@@ -19,7 +19,7 @@ class DeviceCollection(object):
   def query_device_specs(
       self,
       architecture: common_definitions.DeviceArchitecture,
-      host_environment: common_definitions.HostEnvironment,
+      platform: common_definitions.DevicePlatform,
       device_parameters: Set[str] = set()
   ) -> List[common_definitions.DeviceSpec]:
     """Query the device specs.
@@ -36,7 +36,7 @@ class DeviceCollection(object):
     for device_spec in self.device_specs:
       if device_spec.architecture != architecture:
         continue
-      if device_spec.host_environment != host_environment:
+      if device_spec.platform != platform:
         continue
       if not device_parameters.issubset(device_spec.device_parameters):
         continue
