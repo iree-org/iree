@@ -118,72 +118,6 @@ LogicalResult PtrType::verify(function_ref<InFlightDiagnostic()> emitError,
 }
 
 //===----------------------------------------------------------------------===//
-// Op utilities common in util patterns and folders
-//===----------------------------------------------------------------------===//
-
-// Walks up the ancestors of |sourceBlock| until |targetBlock| is reached.
-// Returns an insertion point in the |targetBlock|.
-static std::pair<Block *, Block::iterator> findCommonBlockInsertionPoint(
-    Block *targetBlock, Block *sourceBlock,
-    Block::iterator sourceInsertionPoint) {
-  auto *ancestorOp = targetBlock->findAncestorOpInBlock(*sourceInsertionPoint);
-  if (ancestorOp) {
-    return std::make_pair(ancestorOp->getBlock(), Block::iterator(ancestorOp));
-  }
-  return std::make_pair(sourceBlock, sourceInsertionPoint);
-}
-
-bool isValueUsableForOp(Value value, Block *block,
-                        Block::iterator insertionPoint) {
-  // If the insertion point is nested within an op in the defining block we can
-  // use the parent op as the insertion point to check.
-  auto *definingBlock = value.getParentBlock();
-  std::tie(block, insertionPoint) =
-      findCommonBlockInsertionPoint(definingBlock, block, insertionPoint);
-  if (block == nullptr) {
-    // Op is not in a block; can't analyze (maybe?).
-    return false;
-  }
-  if (definingBlock == block) {
-    // Defined in the same block; ensure block order.
-    if (value.isa<BlockArgument>()) return true;
-    if (insertionPoint == block->end()) return true;
-    if (value.getDefiningOp()->isBeforeInBlock(&*insertionPoint)) {
-      return true;
-    }
-  } else if (definingBlock->isEntryBlock() &&
-             llvm::isa<FunctionOpInterface>(definingBlock->getParentOp())) {
-    // Function entry block always dominates - fast path for constants.
-    return true;
-  } else {
-    // See if block the value is defined in dominates the forOp block.
-    // TODO(benvanik): optimize this, it's terribly expensive to recompute.
-    DominanceInfo dominanceInfo(block->getParentOp());
-    return dominanceInfo.dominates(definingBlock, block);
-  }
-  return false;
-}
-
-bool isValueUsableForOp(Value value, Operation *op) {
-  return isValueUsableForOp(value, op->getBlock(), Block::iterator(op));
-}
-
-bool tryMoveProducerBefore(Value value, Operation *consumerOp) {
-  auto *producerOp = value.getDefiningOp();
-  if (!producerOp) return true;  // block arg, ok to use
-  if (producerOp->getBlock() == consumerOp->getBlock()) {
-    if (producerOp->isBeforeInBlock(consumerOp)) return true;
-    for (auto operand : producerOp->getOperands()) {
-      if (!isValueUsableForOp(operand, consumerOp)) return false;
-    }
-    producerOp->moveBefore(consumerOp);
-    return true;
-  }
-  // Could extend this - really need a shared helper function.
-  return false;
-}
-
-//===----------------------------------------------------------------------===//
 // Global and structural interface utilities
 //===----------------------------------------------------------------------===//
 
@@ -466,6 +400,53 @@ void excludeTiedOperandAndResultIndices(
 //===----------------------------------------------------------------------===//
 // IREE::Util::SizeAwareTypeInterface
 //===----------------------------------------------------------------------===//
+
+// Walks up the ancestors of |sourceBlock| until |targetBlock| is reached.
+// Returns an insertion point in the |targetBlock|.
+static std::pair<Block *, Block::iterator> findCommonBlockInsertionPoint(
+    Block *targetBlock, Block *sourceBlock,
+    Block::iterator sourceInsertionPoint) {
+  auto *ancestorOp = targetBlock->findAncestorOpInBlock(*sourceInsertionPoint);
+  if (ancestorOp) {
+    return std::make_pair(ancestorOp->getBlock(), Block::iterator(ancestorOp));
+  }
+  return std::make_pair(sourceBlock, sourceInsertionPoint);
+}
+
+bool isValueUsableForOp(Value value, Block *block,
+                        Block::iterator insertionPoint) {
+  // If the insertion point is nested within an op in the defining block we can
+  // use the parent op as the insertion point to check.
+  auto *definingBlock = value.getParentBlock();
+  std::tie(block, insertionPoint) =
+      findCommonBlockInsertionPoint(definingBlock, block, insertionPoint);
+  if (block == nullptr) {
+    // Op is not in a block; can't analyze (maybe?).
+    return false;
+  }
+  if (definingBlock == block) {
+    // Defined in the same block; ensure block order.
+    if (value.isa<BlockArgument>()) return true;
+    if (insertionPoint == block->end()) return true;
+    if (value.getDefiningOp()->isBeforeInBlock(&*insertionPoint)) {
+      return true;
+    }
+  } else if (definingBlock->isEntryBlock() &&
+             llvm::isa<FunctionOpInterface>(definingBlock->getParentOp())) {
+    // Function entry block always dominates - fast path for constants.
+    return true;
+  } else {
+    // See if block the value is defined in dominates the forOp block.
+    // TODO(benvanik): optimize this, it's terribly expensive to recompute.
+    DominanceInfo dominanceInfo(block->getParentOp());
+    return dominanceInfo.dominates(definingBlock, block);
+  }
+  return false;
+}
+
+bool isValueUsableForOp(Value value, Operation *op) {
+  return isValueUsableForOp(value, op->getBlock(), Block::iterator(op));
+}
 
 // static
 Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,

@@ -1439,8 +1439,6 @@ def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute"> {
     (`commands` `(` `[` $command_buffers^ `]` `)`)?
     attr-dict-with-keyword
   }];
-
-  let hasCanonicalizer = 1;
 }
 
 def HAL_DeviceQueueFlushOp : HAL_Op<"device.queue.flush"> {

@@ -35,6 +35,21 @@ namespace {
 // Emplacement
 //===----------------------------------------------------------------------===//
 
+static bool tryMoveTargetBefore(Value target, Operation *consumerOp) {
+  auto *producerOp = target.getDefiningOp();
+  if (!producerOp) return true;  // block arg, ok to use
+  if (producerOp->getBlock() == consumerOp->getBlock()) {
+    if (producerOp->isBeforeInBlock(consumerOp)) return true;
+    for (auto operand : producerOp->getOperands()) {
+      if (!IREE::Util::isValueUsableForOp(operand, consumerOp)) return false;
+    }
+    producerOp->moveBefore(consumerOp);
+    return true;
+  }
+  // Could extend this - really need a shared helper function.
+  return false;
+}
+
 static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
   bool didChange = false;
   for (auto [resultIndex, result] : llvm::enumerate(dispatchOp.getResults())) {
@@ -57,11 +72,7 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
     Operation *userOp = *result.user_begin();
     if (auto updateOp = dyn_cast<IREE::Stream::AsyncUpdateOp>(userOp)) {
       if (updateOp.getUpdate() != result) continue;
-      if (!IREE::Util::tryMoveProducerBefore(updateOp.getTarget(),
-                                             dispatchOp)) {
-        // Failed to move while keeping valid SSA dominance.
-        continue;
-      }
+      if (!tryMoveTargetBefore(updateOp.getTarget(), dispatchOp)) continue;
       targetResource = updateOp.getTarget();
       targetResourceSize = updateOp.getTargetSize();
       targetOffset = updateOp.getTargetOffset();
