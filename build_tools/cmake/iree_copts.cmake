@@ -358,6 +358,14 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
 )
 
+# Add to LINKOPTS on a binary to configure it for X/Wayland/Windows/etc
+# depending on the target cross-compilation platform.
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+  set(IREE_TARGET_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
+else()
+  set(IREE_TARGET_GUI_LINKOPTS "")
+endif()
+
 #-------------------------------------------------------------------------------
 # Size-optimized build flags
 #-------------------------------------------------------------------------------

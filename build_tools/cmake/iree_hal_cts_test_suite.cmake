@@ -102,6 +102,8 @@ function(iree_hal_cts_test_suite)
             "${IREE_ROOT_DIR}/runtime/src/iree/hal/cts/testdata/${_FILE_NAME}.mlir"
           FLAGS
             ${_TRANSLATE_FLAGS}
+          COMPILE_TOOL
+            "iree-compile"
           PUBLIC
           TESTONLY
         )

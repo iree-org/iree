@@ -262,6 +262,7 @@ iree_bytecode_module(
     testonly = True,
     src = "bytecode_module_benchmark.mlir",
     c_identifier = "iree_vm_bytecode_module_benchmark_module",
+    compile_tool = "//tools:iree-compile",
     flags = ["--compile-mode=vm"],
 )
 
@@ -281,6 +282,7 @@ iree_bytecode_module(
     testonly = True,
     src = "bytecode_module_size_benchmark.mlir",
     c_identifier = "iree_vm_bytecode_module_size_benchmark_module",
+    compile_tool = "//tools:iree-compile",
     flags = ["--compile-mode=vm"],
 )
 

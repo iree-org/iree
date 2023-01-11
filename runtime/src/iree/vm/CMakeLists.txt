@@ -227,6 +227,8 @@ iree_bytecode_module(
     "bytecode_module_benchmark.mlir"
   C_IDENTIFIER
     "iree_vm_bytecode_module_benchmark_module"
+  COMPILE_TOOL
+    iree-compile
   FLAGS
     "--compile-mode=vm"
   TESTONLY
@@ -253,6 +255,8 @@ iree_bytecode_module(
     "bytecode_module_size_benchmark.mlir"
   C_IDENTIFIER
     "iree_vm_bytecode_module_size_benchmark_module"
+  COMPILE_TOOL
+    iree-compile
   FLAGS
     "--compile-mode=vm"
   TESTONLY
