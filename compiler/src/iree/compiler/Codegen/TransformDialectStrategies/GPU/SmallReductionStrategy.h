@@ -65,12 +65,17 @@ class SmallReductionStrategy : public AbstractReductionStrategy {
   // instead resolve bounding by being more eager.
   SmallReductionStrategy(
       MLIRContext *context,
-      const transform_ext::MatchedReductionCaptures &captures)
-      : AbstractReductionStrategy(context, captures) {}
+      const transform_ext::MatchedReductionCaptures &captures,
+      int64_t maxNumThreadsToUse)
+      : AbstractReductionStrategy(context, captures) {
+    compute(maxNumThreadsToUse, captures.maybeTrailingRank > 0);
+  }
 
   /// Compute the small strategy based on the problem size and the
-  /// `maxNumThreadsToUse`.
-  void configure(const ReductionConfig &reductionConfig);
+  /// `maxNumThreadsToUse`. `hasTrailingElementwise` is currently used to guard
+  /// against pathological cases where IREE can't bound a buffer and crashes.
+  // TODO: Fix IREE's codegen/Common/PadDynamicAlloc.cpp.
+  void compute(int64_t maxNumThreadsToUse, bool hasTrailingElementwise);
 
   /// Encode whether the strategy is profitable.
   bool profitable = false;

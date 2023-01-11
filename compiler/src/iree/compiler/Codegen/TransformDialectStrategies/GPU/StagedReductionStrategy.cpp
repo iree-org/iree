@@ -37,7 +37,6 @@ using transform_ext::MatchCallbackOp;
 using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::StructuredOpMatcher;
 
-using iree_compiler::buildTileReductionUsingScfForeach;
 using iree_compiler::gpu::AbstractReductionStrategy;
 using iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
@@ -54,17 +53,16 @@ StagedReductionStrategy
 mlir::iree_compiler::gpu::StagedReductionStrategy::create(
     MLIRContext *context,
     const transform_ext::MatchedReductionCaptures &captures) {
-  ReductionConfig reductionConfig = getStagedReductionConfig(captures);
-  StagedReductionStrategy strategy(context, captures);
-  strategy.configure(reductionConfig);
-  LLVM_DEBUG(DBGS() << "use GPU staged reduction strategy\n");
+  ReductionConfig gpuReductionConfig = getStagedReductionConfig(captures);
+  StagedReductionStrategy strategy(context, captures,
+                                   gpuReductionConfig.maxNumThreads,
+                                   gpuReductionConfig.vectorSize);
+  LLVM_DEBUG(DBGS() << "use staged reduction strategy\n");
   return strategy;
 }
 
-void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
-    const ReductionConfig &reductionConfig) {
-  int64_t maxNumThreadsToUse = reductionConfig.maxNumThreads;
-  int64_t maxVectorSize = reductionConfig.vectorSize;
+void mlir::iree_compiler::gpu::StagedReductionStrategy::compute(
+    int64_t maxNumThreadsToUse, int64_t maxVectorSize) {
   assert(maxNumThreadsToUse > 0 && "maxNumThreadsToUse must be > 0");
   assert(maxNumThreadsToUse >= kCudaWarpSize && "need at least a warp?");
   assert(maxVectorSize > 0 && "maxVectorSize must be > 0");
@@ -114,6 +112,38 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
   }
 }
 
+/// Build transform IR to split the reduction into a parallel and combiner part.
+/// Then tile the parallel part and map it to `tileSize` threads, each reducing
+/// on `vectorSize` elements.
+/// Lastly, fuse the newly created fill and elementwise operations into the
+/// resulting containing foreach_thread op.
+/// Return a triple of handles to (foreach_thread, fill, combiner)
+static std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
+    ImplicitLocOpBuilder &b, Value gridReductionH, int64_t reductionRank,
+    int64_t tileSize, int64_t reductionVectorSize) {
+  auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
+                                                      mlir::gpu::Threads::DimX);
+
+  SmallVector<int64_t> leadingParallelDims(reductionRank - 1, 0);
+  SmallVector<int64_t> numThreads = leadingParallelDims;
+  numThreads.push_back(tileSize);
+  SmallVector<int64_t> tileSizes = leadingParallelDims;
+  tileSizes.push_back(reductionVectorSize);
+  auto tileReduction = b.create<transform::TileReductionUsingForeachThreadOp>(
+      /*target=*/gridReductionH,
+      /*numThreads=*/numThreads,
+      /*tileSizes=*/tileSizes,
+      /*threadDimMapping=*/b.getArrayAttr(threadX));
+  Value blockParallelForeachThreadOp = tileReduction.getForeachThreadOp();
+  Value blockParallelFillH = tileReduction.getFillOp();
+  Value blockCombinerOpH = tileReduction.getCombiningLinalgOp();
+  // Fuse the fill and elementwise to privatize them.
+  blockParallelFillH = b.create<FuseIntoContainingOp>(
+      blockParallelFillH, blockParallelForeachThreadOp);
+  return std::make_tuple(blockParallelForeachThreadOp, blockParallelFillH,
+                         blockCombinerOpH);
+}
+
 static void buildStagedReductionStrategyFindBetterName(
     ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledLeadingH,
     Value maybeTiledTrailingH, const StagedReductionStrategy &strategy) {
@@ -131,12 +161,10 @@ static void buildStagedReductionStrategyFindBetterName(
   }
 
   // Staged reduction step 1: break gridReductionH apart.
-  auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
-                                                      mlir::gpu::Threads::DimX);
   auto [blockParallelForeachThreadOp, blockParallelFillH, blockCombinerOpH] =
       buildTileReductionUsingScfForeach(
           b, gridReductionH, strategy.captures.reductionRank,
-          strategy.getNumThreadsXInBlock(), strategy.getVectorSize(), threadX);
+          strategy.getNumThreadsXInBlock(), strategy.getVectorSize());
 
   // Staged reduction step 2: multi-warp shuffle reduce.
   // Map the combiner reduction to one thread along y so it can be mapped

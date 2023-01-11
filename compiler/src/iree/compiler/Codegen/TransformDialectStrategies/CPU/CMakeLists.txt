@@ -15,10 +15,8 @@ iree_cc_library(
     TransformDialectStrategies
   HDRS
     "Common.h"
-    "ReductionStrategy.h"
   SRCS
     "Common.cpp"
-    "ReductionStrategy.cpp"
   DEPS
     IREEDialectsTransforms
     IREELinalgExtDialect
@@ -54,7 +52,6 @@ iree_cc_library(
     MLIRTensorTransforms
     MLIRTransformDialect
     MLIRVectorDialect
-    MLIRVectorTransformOps
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
