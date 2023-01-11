@@ -11,8 +11,7 @@ if(NOT CMAKE_CROSSCOMPILING)
 
   install(TARGETS generate_embed_data
           COMPONENT generate_embed_data
-          RUNTIME DESTINATION bin
-          BUNDLE DESTINATION bin)
+          RUNTIME DESTINATION bin)
 
   iree_c_embed_data(
     NAME
