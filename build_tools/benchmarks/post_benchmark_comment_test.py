@@ -181,8 +181,7 @@ class GithubClientTest(unittest.TestCase):
 
     self.assertEqual(commit_sha, "sha123")
     self._mock_requester.get.assert_called_once_with(
-        endpoint=f"{post_benchmark_comment.GITHUB_IREE_API_PREFIX}/pulls/123",
-        payload={})
+        endpoint=f"{post_benchmark_comment.GITHUB_IREE_API_PREFIX}/pulls/123")
 
 
 if __name__ == "__main__":
