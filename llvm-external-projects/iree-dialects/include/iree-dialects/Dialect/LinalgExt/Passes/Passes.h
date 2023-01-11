@@ -8,7 +8,6 @@
 #define IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_PASSES_H_
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
@@ -88,9 +87,19 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTilingInterfaceTilingPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtToLoopsPass();
 
+/// Container of information needed to materialize the pack operation.
+struct MaterializeEncodingInfo {
+  SmallVector<int64_t> innerDimsPos;
+  SmallVector<int64_t> innerTileSizes;
+  SmallVector<int64_t> outerDimsPerm;
+  unsigned srcRank = 0;
+};
+using MaterializeEncodingFn =
+    std::function<FailureOr<MaterializeEncodingInfo>(RankedTensorType)>;
+
 /// TypeConverter to use for materializing the encoding.
 struct MaterializeEncodingTypeConverter : public TypeConverter {
-  MaterializeEncodingTypeConverter(MaterializeEncodingFn fn);
+  MaterializeEncodingTypeConverter(MaterializeEncodingFn materializeEncodingFn);
   MaterializeEncodingFn &getMaterializeEncodingFn() {
     return materializeEncodingFn;
   }
@@ -106,17 +115,10 @@ struct MaterializeEncodingConversionTarget : public ConversionTarget {
 
 /// Base class for patterns that materialize encoding.
 template <typename OpTy>
-class OpMaterializeEncodingPattern : public OpConversionPattern<OpTy> {
-public:
-  OpMaterializeEncodingPattern(
-      MLIRContext *context, MaterializeEncodingTypeConverter &typeConverter,
-      MaterializeEncodingValueFn materializeEncodingValueFn = {},
-      PatternBenefit benefit = 1)
-      : OpConversionPattern<OpTy>(typeConverter, context, benefit),
-        materializeEncodingValueFn(materializeEncodingValueFn) {}
-
-protected:
-  const MaterializeEncodingValueFn materializeEncodingValueFn;
+struct OpMaterializeEncodingPattern : public OpConversionPattern<OpTy> {
+  OpMaterializeEncodingPattern(MaterializeEncodingTypeConverter &typeConverter,
+                               MLIRContext *context, PatternBenefit benefit = 1)
+      : OpConversionPattern<OpTy>(typeConverter, context, benefit) {}
 };
 
 /// Method to populate the patterns to convert operations that have operands
@@ -128,8 +130,7 @@ protected:
 void populateMaterializeEncodingPatterns(
     RewritePatternSet &patterns,
     MaterializeEncodingConversionTarget &conversionTarget,
-    MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn = {});
+    MaterializeEncodingTypeConverter &typeConverter);
 
 /// Pass to apply patterns specified by `populateMaterializeEncodingPass`.
 std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass();
