@@ -154,7 +154,7 @@ steps:
       export GIST_BOT_TOKEN="$${GITHUB_TOKEN}"
       python3 build_tools/benchmarks/post_benchmark_comment.py \
         --verbose \
-        --pr_number="$${BUILDKITE_PULL_REQUEST}" \
+        --no_verify_pr \
         "benchmark-comment.json"
     key: "post-on-pr"
     if: "build.pull_request.id != null && (build.pull_request.labels includes 'buildkite:benchmark' || build.pull_request.labels includes 'buildkite:benchmark-android')"
