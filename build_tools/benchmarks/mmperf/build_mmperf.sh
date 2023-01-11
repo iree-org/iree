@@ -46,7 +46,6 @@ done
 # Update IREE.
 pushd external/iree
 git fetch https://github.com/iree-org/iree "${IREE_SHA}"
-git checkout "${IREE_SHA}"
 git submodule update --init --jobs 8 --depth 1
 popd # external/iree
 
