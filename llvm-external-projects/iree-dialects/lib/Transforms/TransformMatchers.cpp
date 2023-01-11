@@ -345,86 +345,6 @@ transform_ext::StructuredOpMatcher::input(NumEqualsTo num) {
   return *this;
 }
 
-/// Traverses the transitive sources of `val` until it reaches an operation that
-/// is not a known "subset-like" operation, i.e. `extract_slice` or
-/// `foreach_thread`.
-static Operation *traverseSubsetsBackwards(Value val) {
-  do {
-    Operation *op = val.getDefiningOp();
-    if (!op) {
-      // TODO: This should likely be done via RegionBranchOpInterface as a sort
-      // of data flow analysis.
-      auto bbArg = val.cast<BlockArgument>();
-      Operation *blockOp = bbArg.getOwner()->getParentOp();
-      assert(blockOp && "detached block");
-      if (auto loop = dyn_cast<scf::ForeachThreadOp>(blockOp)) {
-        val = loop.getTiedOpOperand(bbArg)->get();
-        continue;
-      }
-      return blockOp;
-    }
-
-    // TODO: We may eventually want a "subset-like" interface that we can use to
-    // traverse ops here and in post-canonicalization replacement
-    // identification.
-    if (auto extractSlice = dyn_cast<tensor::ExtractSliceOp>(op)) {
-      val = extractSlice.getSource();
-      continue;
-    }
-    return op;
-  } while (true);
-}
-
-/// Greedily traverses the transitive uses of `val` until it reaches an
-/// operation that is not a known "subset-like" operation, i.e. `extract_slice`
-/// or `foreach_thread`.
-static Operation *traverseSubsetsForwardAnyUse(Value val) {
-  do {
-    for (OpOperand &use : val.getUses()) {
-      Operation *user = use.getOwner();
-      if (auto loop = dyn_cast<scf::ForeachThreadOp>(user)) {
-        auto range = loop.getOutputBlockArguments();
-        auto it = llvm::find_if(range, [&](BlockArgument bbarg) {
-          return loop.getTiedOpOperand(bbarg) != &use;
-        });
-        if (it == range.end())
-          return user;
-        val = *it;
-        continue;
-      }
-      if (auto slice = dyn_cast<tensor::ExtractSliceOp>(user)) {
-        val = slice.getResult();
-        continue;
-      }
-      return user;
-    }
-  } while (true);
-}
-
-transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::input(int64_t position, SubsetOf subset) {
-  // Implementation note: SubsetOf must *not* be passed by-reference because
-  // it is typically a temporary constructed within the argument of a function
-  // call, but it will be used in the lambda that outlives the temporary. The
-  // lambda itself must capture by value for the same reason.
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    LLVM_DEBUG(DBGS() << "operand #" << position << " is a subset of\n");
-    int64_t transformedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
-    if (transformedPosition >= linalgOp.getNumDpsInputs())
-      return false;
-
-    LLVM_DEBUG(DBGS() << "start recursive match {\n");
-    Operation *producer = traverseSubsetsBackwards(
-        linalgOp.getDpsInputOperand(transformedPosition)->get());
-    bool result = subset.matcher.match(producer);
-    LLVM_DEBUG(DBGS() << "} end recursive match");
-    return result;
-  });
-  recordNestedMatcher(subset.matcher);
-  return *this;
-}
-
 //===---------------------------------------------------------------------===//
 // Constraints on output operands.
 //===---------------------------------------------------------------------===//
@@ -544,31 +464,6 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
 }
 
 transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::output(int64_t position, SubsetOf subset) {
-  // Implementation note: SubsetOf must *not* be passed by-reference because
-  // it is typically a temporary constructed within the argument of a function
-  // call, but it will be used in the lambda that outlives the temporary. The
-  // lambda itself must capture by value for the same reason.
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    LLVM_DEBUG(DBGS() << "output operand #" << position
-                      << " is produced by a subset of\n");
-    int64_t transformedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
-    if (transformedPosition >= linalgOp.getNumDpsInputs())
-      return false;
-
-    LLVM_DEBUG(llvm::dbgs() << "start recursive match {\n");
-    Operation *producer = traverseSubsetsBackwards(
-        linalgOp.getDpsInitOperand(transformedPosition)->get());
-    bool result = subset.matcher.match(producer);
-    LLVM_DEBUG(DBGS() << "} end recursive match");
-    return result;
-  });
-  recordNestedMatcher(subset.matcher);
-  return *this;
-}
-
-transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(NumEqualsTo num) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "number of output operands == " << num.value);
@@ -605,27 +500,6 @@ void transform_ext::StructuredOpMatcher::addResultMatcher(
     }
     return optional.value;
   });
-}
-
-transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::result(
-    int64_t position, HasAnyUse tag, SubsetOf subset, OptionalMatch optional) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    LLVM_DEBUG(DBGS() << "result #" << position
-                      << "has a use that is a subset of\n");
-    int64_t transformedPosition =
-        position >= 0 ? position : linalgOp->getNumResults() + position;
-    if (transformedPosition >= linalgOp->getNumResults())
-      return false;
-
-    LLVM_DEBUG(DBGS() << "start recursive match {\n");
-    Operation *user =
-        traverseSubsetsForwardAnyUse(linalgOp->getResult(transformedPosition));
-    bool result = subset.matcher.match(user) || optional.value;
-    LLVM_DEBUG(DBGS() << "} end recursive match");
-    return result;
-  });
-  recordNestedMatcher(subset.matcher);
-  return *this;
 }
 
 bool transform_ext::StructuredOpMatcher::checkAllTilableMatched(
