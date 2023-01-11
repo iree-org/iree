@@ -146,12 +146,14 @@ function(iree_cc_binary)
             RENAME ${_RULE_NAME}
             COMPONENT ${_RULE_NAME}
             RUNTIME DESTINATION bin
+            BUNDLE DESTINATION bin
             EXCLUDE_FROM_ALL)
   else()
     install(TARGETS ${_NAME}
       RENAME ${_RULE_NAME}
       COMPONENT ${_RULE_NAME}
-      RUNTIME DESTINATION bin)
+      RUNTIME DESTINATION bin
+      BUNDLE DESTINATION bin)
   endif()
 
   # Setup RPATH if on a Unix-like system. We have two use cases that we are
@@ -189,5 +191,19 @@ function(iree_cc_binary)
         INSTALL_RPATH "${_install_rpath}"
       )
     endif()
+  endif()
+
+  # Set up Info.plist properties when building macOS/iOS app bundles.
+  get_target_property(APPLE_BUNDLE ${_NAME} MACOSX_BUNDLE)
+  if (APPLE_BUNDLE)
+    set_target_properties(${_NAME} PROPERTIES
+      MACOSX_BUNDLE_BUNDLE_NAME "${_RULE_NAME}"
+      MACOSX_BUNDLE_GUI_IDENTIFIER "dev.iree.${_RULE_NAME}"
+      MACOSX_BUNDLE_COPYRIGHT "Copyright © 2023 The IREE Authors"
+      # These are just placeholder version numbers until we define proper
+      # version scheme and support.
+      MACOSX_BUNDLE_BUNDLE_VERSION 0.1
+      MACOSX_BUNDLE_SHORT_VERSION_STRING 0.1
+      MACOSX_BUNDLE_LONG_VERSION_STRING 0.1)
   endif()
 endfunction()

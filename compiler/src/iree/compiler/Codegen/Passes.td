@@ -234,22 +234,33 @@ def PadDynamicAlloc :
 
 def TransformDialectInterpreter :
     Pass<"iree-transform-dialect-interpreter"> {
-  let summary = "Pass to apply transform dialect operations one by one.";
+  let summary = "Pass to apply transform dialect operations.";
   let constructor =
     "mlir::iree_compiler::createTransformDialectInterpreterPass()";
   let options = [
     Option<"transformFileName", "transform-file-name", "std::string",
             /*default=*/"\"\"",
             "Optional filename containing a transform dialect specification to "
-            "apply. If left empty, the IR is assumed to contain a transform "
-            "dialect spec embedded next to the top-level op.">,
+            "apply. If left empty, the IR is assumed to contain one top-level "
+            "transform dialect operation somewhere in the module.">,
+    Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",
+            /*default=*/"\"\"",
+            "Select the operation with 'transform.iree_tag' attribute having "
+            "the given value as payload IR root. This allows user control on "
+            "what operation to transform in debug mode, without requiring "
+            "intimate knowledge of the IREE nested pass pipeline.\\n"
+            "If empty (normal operation mode), select the pass anchor "
+            "operation in the IREE pipeline, as the payload IR root.">,
+    Option<"debugTransformRootTag", "debug-transform-root-tag", "std::string",
+            /*default=*/"\"\"",
+            "Select the operation with 'transform.iree_tag' attribute having "
+            "the given value as container IR for top-level transform ops. This "
+            "allows user control on what transformation to apply in debug "
+            "mode, without requiring intimate knowledge of the IREE nested "
+            "pass pipeline.\\n"
+            "If empty (normal operation mode), select the container of the "
+            "top-level transform op.">
   ];
-}
-def TransformDialectJitter :
-    Pass<"iree-transform-dialect-jitter"> {
-  let summary = "Pass to create and apply transform dialect on the fly.";
-  let constructor =
-    "mlir::iree_compiler::createTransformDialectJitterPass()";
 }
 
 def GPUVectorization :
@@ -260,6 +271,9 @@ def GPUVectorization :
     Option<"generateContract", "generate-contract", "bool",
             /*default=*/"true",
            "Try to convert reduction to vector.contract.">,
+    Option<"maxVectorSize", "max-vector-size", "int64_t",
+            /*default=*/"4096",
+           "Max vector size allowed to avoid creating large vectors.">
   ];
 }
 
@@ -294,6 +308,13 @@ def EraseHALDescriptorTypeFromMemRef :
   let summary = "Erase #hal.descriptor_type from MemRef memory space";
   let constructor =
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
+}
+
+def RematerializeParallelOps :
+    Pass<"iree-codegen-rematerialize-parallel-ops", "func::FuncOp"> {
+  let summary = "Pass to rematerialize and merge parallel ops to avoid"
+                "creating temporary allocs.";
+  let constructor = "mlir::iree_compiler::createRematerializeParallelOpsPass()";
 }
 
 //------------------------------------------------------------------------------

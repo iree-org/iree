@@ -33,6 +33,7 @@
 #include "mlir/Support/FileUtilities.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/SourceMgr.h"
 
 #define DEBUG_TYPE "transform-dialect-interpreter"
@@ -44,8 +45,9 @@ LogicalResult mlir::transform::parseTransformModuleFromFile(
     MLIRContext *context, llvm::StringRef transformFileName,
     OwningOpRef<ModuleOp> &transformModule) {
   if (transformFileName.empty()) {
-    llvm::errs() << "no transform file name specified, assuming the transform "
-                    "module is embedded in the IR next to the top-level\n";
+    LLVM_DEBUG(
+        DBGS() << "no transform file name specified, assuming the transform "
+                  "module is embedded in the IR next to the top-level\n");
     return success();
   }
   // Parse transformFileName content into a ModuleOp.
@@ -240,23 +242,31 @@ struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
   }
 
   void runOnOperation() override {
+    SmallVector<Operation *> toDelete;
     getOperation()->walk<WalkOrder::PreOrder>([&](Operation *nestedOp) {
-      if (isa<iree_compiler::IREE::LinalgExt::DoNotDCEOperandsOp>(nestedOp))
-        nestedOp->erase();
-      if (isa<::mlir::transform::TransformOpInterface>(nestedOp)) {
-        nestedOp->erase();
+      if (isa<iree_compiler::IREE::LinalgExt::DoNotDCEOperandsOp>(nestedOp)) {
+        toDelete.push_back(nestedOp);
+      } else if (isa<::mlir::transform::TransformOpInterface>(nestedOp)) {
+        toDelete.push_back(nestedOp);
         return WalkResult::skip();
       }
       return WalkResult::advance();
     });
+    for (auto op : toDelete) {
+      op->erase();
+    }
+    SmallVector<ModuleOp> modulesToDelete;
     // Remove potential empty module after cleanup.
     getOperation()->walk([&](ModuleOp module) {
       if (module.getBodyRegion().hasOneBlock() && module.getBody()->empty()) {
-        module->erase();
+        modulesToDelete.push_back(module);
         return WalkResult::skip();
       }
       return WalkResult::advance();
     });
+    for (auto module : modulesToDelete) {
+      module->erase();
+    }
   }
 };
 } // namespace

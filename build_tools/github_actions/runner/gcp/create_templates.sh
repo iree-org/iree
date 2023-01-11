@@ -15,6 +15,7 @@ SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 
 TESTING="${TEMPLATE_TESTING:-0}"
 DRY_RUN="${DRY_RUN:-0}"
+TESTING_SELF_DELETER="${TESTING_SELF_DELETER:-0}"
 
 GPU_IMAGE="github-runner-gpu-2022-09-29-1664451806"
 GPU_DISK_SIZE_GB=100
@@ -29,15 +30,15 @@ TEMPLATE_CONFIG_REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
 TEMPLATE_BASE_NAME="${TEMPLATE_BASE_NAME:-${PROD_TEMPLATE_BASE_NAME}}"
 
 if (( TESTING==0 )) && ! git merge-base --is-ancestor "${TEMPLATE_CONFIG_REF}" main; then
-  echo "Creating testing template because TEMPLATE_CONFIG_REF='${TEMPLATE_CONFIG_REF}' is not on the main branch"
+  echo "Creating testing template because TEMPLATE_CONFIG_REF='${TEMPLATE_CONFIG_REF}' is not on the main branch" >&2
   TESTING=1
 fi
 if (( TESTING==0 )) && [[ "${TEMPLATE_CONFIG_REPO}" != "${PROD_TEMPLATE_CONFIG_REPO}" ]]; then
-  echo "Creating testing template because TEMPLATE_CONFIG_REPO '${TEMPLATE_CONFIG_REPO}'!='${PROD_TEMPLATE_CONFIG_REPO}'"
+  echo "Creating testing template because TEMPLATE_CONFIG_REPO '${TEMPLATE_CONFIG_REPO}'!='${PROD_TEMPLATE_CONFIG_REPO}'" >&2
   TESTING=1
 fi
 if (( TESTING==0 )) && [[ "${TEMPLATE_BASE_NAME}" != "${PROD_TEMPLATE_BASE_NAME}" ]]; then
-  echo "Creating testing template because TEMPLATE_BASE_NAME '${TEMPLATE_BASE_NAME}'!='${PROD_TEMPLATE_BASE_NAME}'"
+  echo "Creating testing template because TEMPLATE_BASE_NAME '${TEMPLATE_BASE_NAME}'!='${PROD_TEMPLATE_BASE_NAME}'" >&2
   TESTING=1
 fi
 
@@ -56,9 +57,15 @@ if (( TESTING!=0 )); then
   VERSION="${VERSION}-testing"
 fi
 GITHUB_RUNNER_SCOPE=iree-org
-GITHUB_RUNNER_VERSION="2.299.1"
-GITHUB_RUNNER_ARCHIVE_DIGEST="147c14700c6cb997421b9a239c012197f11ea9854cd901ee88ead6fe73a72c74"
+GITHUB_RUNNER_VERSION="2.300.2"
+GITHUB_RUNNER_ARCHIVE_DIGEST="ed5bf2799c1ef7b2dd607df66e6b676dff8c44fb359c6fedc9ebf7db53339f0c"
 GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
+
+if (( TESTING_SELF_DELETER==1 )); then
+  INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-testing-zbhz5clunq-uc.a.run.app"
+else
+  INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-zbhz5clunq-uc.a.run.app"
+fi
 
 declare -a METADATA=(
   "github-runner-version=${GITHUB_RUNNER_VERSION}"
@@ -67,6 +74,7 @@ declare -a METADATA=(
   "github-runner-config-repo=${TEMPLATE_CONFIG_REPO}"
   "github-runner-scope=${GITHUB_RUNNER_SCOPE}"
   "github-token-proxy-url=${GITHUB_TOKEN_PROXY_URL}"
+  "instance-self-deleter-url=${INSTANCE_SELF_DELETER_URL}"
 )
 
 declare -a common_args=(
@@ -79,6 +87,10 @@ declare -a common_args=(
   # Matches firewall rule for health check traffic
   --tags="allow-health-checks"
   --provisioning-model=STANDARD
+  # The instance group manager handles this for us and this is necessary to
+  # achieve better local SSD performance:
+  # https://cloud.google.com/compute/docs/disks/optimizing-local-ssd-performance#disable-automatic-restart
+  --no-restart-on-failure
   --scopes=https://www.googleapis.com/auth/cloud-platform
   --no-shielded-secure-boot
   --shielded-vtpm
@@ -112,6 +124,10 @@ function create_template() {
 
   local -a cmd=(
     gcloud compute instance-templates create
+    --quiet
+  )
+
+  cmd+=(
     "${TEMPLATE_BASE_NAME}-${group}-${type}-${VERSION}"
     "${common_args[@]}"
     --service-account="github-runner-${trust}-trust@iree-oss.iam.gserviceaccount.com"
@@ -124,10 +140,18 @@ function create_template() {
       --maintenance-policy=TERMINATE
       --accelerator=count=1,type=nvidia-tesla-a100
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-balanced"
+      # See comment in build_tools/github_actions/runner/config/setup.sh
+      --local-ssd=interface=NVME
     )
   elif [[ "${type}" == cpu ]]; then
     cmd+=(
       --machine-type=n1-standard-96
+      --maintenance-policy=MIGRATE
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
+    )
+  elif [[ "${type}" == cpu-c2-16 ]]; then
+    cmd+=(
+      --machine-type=c2-standard-16
       --maintenance-policy=MIGRATE
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
     )
@@ -139,13 +163,16 @@ function create_template() {
     # Prefix the command with a noop. It will still be printed by set -x
     cmd=(":" "${cmd[@]}")
   fi
-  (set -x; "${cmd[@]}")
-  echo ''
+
+  (set -x; "${cmd[@]}") >&2
+  echo '' >&2
 }
 
 for group in presubmit postsubmit; do
-  for type in gpu cpu; do
+  for type in gpu cpu cpu-c2-16; do
     create_template "${group}" "${type}"
   done
 done
-echo "Created new templates for version: ${VERSION}"
+
+echo "Created new templates for version: ${VERSION}" >&2
+echo "${VERSION}"

@@ -85,8 +85,11 @@ replaced with the multithreaded "task device", which uses a "task executor":
 ```c
 ...
 iree_task_executor_t* executor = NULL;
+iree_host_size_t executor_count = 0;
 iree_status_t status =
-    iree_task_executor_create_from_flags(iree_allocator_system(), &executor);
+    iree_task_executors_create_from_flags(iree_allocator_system(),
+                                          1, &executor, &executor_count);
+IREE_ASSERT_EQ(count, 1, "NUMA unsupported");
 
 iree_string_view_t identifier = iree_make_cstring_view("local-task");
 if (iree_status_is_ok(status)) {

@@ -48,6 +48,7 @@ llvm_disable_optional_support_deps()
 ###############################################################################
 # All other IREE submodule dependencies
 
-load("//build_tools/bazel:workspace.bzl", "configure_iree_submodule_deps")
+load("//build_tools/bazel:workspace.bzl", "configure_iree_cuda_deps", "configure_iree_submodule_deps")
 
 configure_iree_submodule_deps()
+configure_iree_cuda_deps()

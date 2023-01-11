@@ -11,15 +11,40 @@
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
+#include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/OpDefinition.h"
 
 namespace mlir {
 namespace linalg {
 class LinalgOp;
 } // namespace linalg
+namespace pdl {
+class FoOperationTyperOp;
+} // namespace pdl
 namespace scf {
 class ForOp;
 } // namespace scf
+namespace transform_ext {
+class MatchCallbackOp;
+} // namespace transform_ext
+
+/// Matches a C++ callback previously registered under `callbackName` and
+/// taking arguments `args`.
+/// Unpacks a number of handles `N` (asserts there are exactly `N` matched
+/// ops but this could be relaxed if needed). Returns the tuple of handles.
+template <int N, typename... MatchingArgs>
+auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
+                                   StringRef callbackName,
+                                   MatchingArgs... args) {
+  SmallVector<Type> matchedTypes(N, pdl::OperationType::get(b.getContext()));
+  auto matchOp = b.create<transform_ext::MatchCallbackOp>(
+      matchedTypes, callbackName, std::forward<decltype(args)>(args)...);
+  assert(matchOp->getNumResults() == N && "Unexpected number of results");
+  std::array<Value, N> a;
+  for (int64_t i = 0; i < N; ++i)
+    a[i] = matchOp->getResult(i);
+  return std::tuple_cat(a);
+}
 
 class TrackingListener : public RewriteListener,
                          public transform::TransformState::Extension {
@@ -81,29 +106,6 @@ class StructuredTransformOpsExtension
 public:
   StructuredTransformOpsExtension();
 };
-
-//===---------------------------------------------------------------------===//
-// IMPORTANT WARNING FOR ALL MATCH CALLBACK OPS !!!
-//===---------------------------------------------------------------------===//
-// We need to temporarily encode additional constraints in C++ that we
-// cannot yet express in the Matchers.
-//
-// These extra constraints are necessary because of the layering IREE
-// imposes on us: the dispatch regions are already pre-formed and we must
-// match **exactly** (best effort..) to avoid leaving dangling payload IR
-// in the dispatch that is not transformed (and leads to catastrophic
-// performance bugs or even miscompiles).
-// A future more robust system will let us form our own dispatches and we
-// won't need to be as strict on matching **exactly**.
-//
-// It is important that these additional C++ constraints can all be
-// expressed as separable matchers (and in the future as contraint IR).
-//
-// In the following, we make the assumption that TilingInterface ops are
-// exactly the payload ops that we must not miss.
-// This is best effort and if anything else must not be missed, it should also
-// be added here.
-int64_t getNumPayloadOpsThatWeMustMatch(Operation *root);
 
 } // namespace transform_ext
 } // namespace mlir

@@ -16,6 +16,8 @@ CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 ninja --version
 python3 --version
 
+IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
+
 if [[ -d "${BUILD_DIR}" ]]; then
   echo "'${BUILD_DIR}' directory already exists. Will use cached results there."
 else

@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 env:
-  DOCKER_IMAGE: "gcr.io/iree-oss/frontends@sha256:e70c8a13ce02fed19fd9407517d8f945070ecd2e2a97657d4d3117ac6d7e0030"
+  DOCKER_IMAGE: "gcr.io/iree-oss/frontends@sha256:41e82bb62a3850c01d0252aa67aebd7816e47da0132af677cd70fc76731c4b5d"
   IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
 
 steps:
@@ -125,6 +125,7 @@ steps:
         tar -xzvf "{}"
       ls build-targets | xargs -I "{target}" -- \
         python3 build_tools/benchmarks/collect_compilation_statistics.py \
+          legacy \
           --verbose \
           --output "compile-stats-results-{target}-$${BUILDKITE_BUILD_NUMBER}.json" \
           "build-targets/{target}"
@@ -145,18 +146,34 @@ steps:
     key: "post-on-pr"
     commands: |
       set -euo pipefail
+      # Fetch base branch for comparison.
+      git fetch -v --prune --no-recurse-submodules -- origin \
+        "$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
       # Try to download the artifacts, continuing with a message if not found.
       buildkite-agent artifact download "benchmark-results-*.json" ./ 2>&1 | tee bench-dl-log \
         || grep -q "No artifacts found" ./bench-dl-log
       buildkite-agent artifact download "compile-stats-results-*.json" ./ 2>&1 | tee stats-dl-log \
         || grep -q "No artifacts found" ./stats-dl-log
       # The script will handle the wildcard patterns.
-      python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py \
+      # --comment_type_id is a random-generated id and shouldn't be changed (
+      # even we change the title); otherwise the script will post a new comment
+      # instead of updating the existing one.
+      python3 build_tools/benchmarks/generate_benchmark_comment.py \
         --verbose \
-        --query-base \
-        --comment-title="Abbreviated Linux Benchmark Summary" \
-        --benchmark_files "benchmark-results-*.json" \
-        --compile_stats_files "compile-stats-results-*.json"
+        --benchmark_files="benchmark-results-*.json" \
+        --compile_stats_files="compile-stats-results-*.json" \
+        --pr_number="$${BUILDKITE_PULL_REQUEST}" \
+        --pr_committish="$${BUILDKITE_COMMIT}" \
+        --pr_base_branch="origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
+        --build_url="$${BUILDKITE_BUILD_URL}" \
+        --comment_type="linux-benchmark-summary" \
+        --output="benchmark-comment.json"
+      export GIST_BOT_USER="iree-github-actions-bot"
+      export GIST_BOT_TOKEN="$${GITHUB_TOKEN}"
+      python3 build_tools/benchmarks/post_benchmark_comment.py \
+        --verbose \
+        --pr_number="$${BUILDKITE_PULL_REQUEST}" \
+        "benchmark-comment.json"
     if: >
       build.pull_request.id != null && (
         build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||

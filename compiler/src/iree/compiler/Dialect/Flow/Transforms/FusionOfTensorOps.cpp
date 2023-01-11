@@ -164,7 +164,17 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
     if (!fusableUse) return;
     if (!linalg::areElementwiseOpsFusable(fusableUse.value())) return;
 
-    Operation *consumer = fusableUse.value()->getOwner();
+    auto consumer = dyn_cast<linalg::GenericOp>(fusableUse.value()->getOwner());
+    auto isParallelIteratorType = [](Attribute attr) {
+      return linalg::isParallelIterator(
+          attr.cast<linalg::IteratorTypeAttr>().getValue());
+    };
+    if (!consumer ||
+        !(llvm::all_of(genericOp.getIteratorTypes(), isParallelIteratorType) &&
+          llvm::all_of(consumer.getIteratorTypes(), isParallelIteratorType))) {
+      return;
+    }
+
     genericOp->setAttr(producerAttrName,
                        builder.getI64IntegerAttr(numCandidates));
     consumer->setAttr(consumerAttrName,
@@ -274,7 +284,7 @@ struct FusionOfTensorOpsPass
       memref::populateResolveRankedShapeTypeResultDimsPatterns(fusionPatterns);
 
       GreedyRewriteConfig rewriteConfig;
-      rewriteConfig.maxIterations = GreedyRewriteConfig::kNoIterationLimit;
+      rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
       if (failed(applyPatternsAndFoldGreedily(funcOp->getRegions(),
                                               std::move(fusionPatterns),
                                               rewriteConfig))) {

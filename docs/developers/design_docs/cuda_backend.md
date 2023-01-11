@@ -68,24 +68,32 @@ Once we get into LinalgToLLVMGPU passes we first do bufferize to generate Linalg
 
 Save the following mlir in /tmp/add.mlir
 ```mlir
-func @add(%lhs: tensor<4xf32>, %rhs: tensor<4xf32>) -> tensor<4xf32> {
- %0 = "mhlo.add"(%lhs, %rhs) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
- return %0 : tensor<4xf32>
+func.func @add(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
+  %0 = tensor.empty() : tensor<4xf32>
+  %1 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+      ins(%arg0, %arg1 : tensor<4xf32>, tensor<4xf32>)
+      outs(%0 : tensor<4xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %2 = arith.addf %in, %in_0 : f32
+    linalg.yield %2 : f32
+  } -> tensor<4xf32>
+  return %1 : tensor<4xf32>
 }
 ```
 
 ```shell
 # First compile into a VM bytecode module.
 $ ../iree-build/tools/iree-compile \
-  --iree-input-type=mhlo \
   --iree-hal-target-backends=cuda \
   /tmp/add.mlir \
-  -o /tmp/mhlo-add.vmfb
+  -o /tmp/add.vmfb
 
 # Run the module through CUDA HAL backend.
 $ ../iree-build/tools/iree-run-module \
   --device=cuda \
-  --module_file=/tmp/mhlo-add.vmfb \
+  --module_file=/tmp/add.vmfb \
   --entry_function=add \
   --function_input="4xf32=[1 2 3 4]" \
   --function_input="4xf32=[2 2 2 2]"

@@ -352,9 +352,25 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         auto materializeEncodingValueFn =
             getMaterializeEncodingValueFn(targetAttr);
         auto tensorType = packRootOp.getInputType().cast<RankedTensorType>();
+        // The LowerDispatchWorkgroupCountFromSetEncodingOp pattern is going to
+        // call materializeEncodingValueFn, passing it a tensor type, expecting
+        // that tensor type to have a TensorEncodingAttr. The problem is that
+        // MaterializeEncoding has already run, rewriting the SetEncoding op
+        // and its result tensor, which used to hold the TensorEncodingAttr,
+        // into a pack op, whose new result tensor does not anymore have a
+        // TensorEncodingAttr. As a work-around for that, we made
+        // MaterializeEncoding preserve the TensorEncodingAttr as an attr on the
+        // pack op itself, so the present code can read it and reconstruct a
+        // tensorTypeWithEncoding, so
+        // LowerDispatchWorkgroupCountFromSetEncodingOp can call
+        // materializeEncodingValueFn.
+        Attribute encodingAttr =
+            packRootOp->getAttr(StringAttr::get(context, "encoding"));
+        auto tensorTypeWithEncoding = RankedTensorType::Builder(
+            tensorType.getShape(), tensorType.getElementType(), encodingAttr);
         patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
             context, encodingInfo.value(), materializeEncodingValueFn,
-            tensorType);
+            tensorTypeWithEncoding);
       }
       if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
         exportOp.emitOpError("failed to lower number of workgroups");

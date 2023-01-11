@@ -14,7 +14,7 @@ macro(iree_set_benchmark_cmake_options)
 endmacro()
 
 macro(iree_set_cpuinfo_cmake_options)
-  set(CPUINFO_BUILD_TOOLS ON CACHE BOOL "" FORCE)
+  set(CPUINFO_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 
   set(CPUINFO_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
   set(CPUINFO_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)

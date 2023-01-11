@@ -89,7 +89,7 @@ def _bool_to_int8(
 
   # IREE models booleans as i8s.
   # TODO(#5359): This cast should be moved into the function abi.
-  if array.dtype == np.bool:
+  if array.dtype == bool:
     array = array.astype(np.int8)
   return array
 

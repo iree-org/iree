@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "dead_alloc.mlir"
     "decompose_linalg_generic.mlir"
     "distribute_gpu_shared_memory.mlir"
+    "eliminate_empty_tensors.mlir"
     "erase_hal_descriptor_type.mlir"
     "flatten_memref_subspan.mlir"
     "fold_affine_min_in_distributed_loops.mlir"
@@ -33,6 +34,7 @@ iree_lit_test_suite(
     "pad_dynamic_alloc.mlir"
     "reduce_bank_conflicts.mlir"
     "reductions.mlir"
+    "rematerialize_parallel_ops.mlir"
     "remove_dead_allocs.mlir"
     "remove_trivial_loops.mlir"
     "swizzle_workgroup.mlir"
@@ -51,6 +53,7 @@ iree_lit_test_suite(
     iree-opt
   DATA
     reductions_codegen_spec.mlir
+    reductions_match_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

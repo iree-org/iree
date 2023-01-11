@@ -25,67 +25,13 @@ iree_cc_library(
   SRCS
     "TransformDialectInterpreterPass.cpp"
   DEPS
-    IREELinalgExtDialect
-    IREELinalgExtTransformOps
-    IREELinalgTransformDialect
-    LLVMSupport
-    MLIRAffineDialect
-    MLIRAffineUtils
-    MLIRArithDialect
-    MLIRArithTransforms
-    MLIRArithUtils
-    MLIRAsyncDialect
-    MLIRBufferizationDialect
-    MLIRBufferizationTransforms
-    MLIRFuncDialect
-    MLIRGPUOps
-    MLIRIR
-    MLIRLLVMDialect
-    MLIRLinalgDialect
-    MLIRLinalgTransformOps
-    MLIRLinalgTransforms
-    MLIRPDLDialect
-    MLIRPDLInterpDialect
-    MLIRParser
-    MLIRPass
-    MLIRRewrite
-    MLIRSCFDialect
-    MLIRSCFTransforms
-    MLIRSCFUtils
-    MLIRSupport
-    MLIRTensorDialect
-    MLIRTensorTransforms
-    MLIRTransformDialect
-    MLIRVectorDialect
-    MLIRVectorTransforms
-    iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
-    iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
-    iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
-    iree::compiler::Codegen::PassHeaders
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    TransformDialectJitterPass
-  HDRS
-    "TransformDialectStrategies.h"
-    "TransformDialectStrategiesCPU.h"
-    "TransformDialectStrategiesGPU.h"
-  SRCS
-    "TransformDialectJitterPass.cpp"
-    "TransformDialectStrategies.cpp"
-    "TransformDialectStrategiesCPU.cpp"
-    "TransformDialectStrategiesGPU.cpp"
-  DEPS
     IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
+    MLIRAffineTransformOps
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
@@ -96,17 +42,20 @@ iree_cc_library(
     MLIRBufferizationTransforms
     MLIRFuncDialect
     MLIRGPUOps
+    MLIRGPUTransformOps
     MLIRIR
     MLIRLLVMDialect
     MLIRLinalgDialect
     MLIRLinalgTransformOps
     MLIRLinalgTransforms
+    MLIRMemRefTransformOps
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRParser
     MLIRPass
     MLIRRewrite
     MLIRSCFDialect
+    MLIRSCFTransformOps
     MLIRSCFTransforms
     MLIRSCFUtils
     MLIRSupport
@@ -114,12 +63,13 @@ iree_cc_library(
     MLIRTensorTransforms
     MLIRTransformDialect
     MLIRVectorDialect
+    MLIRVectorTransformOps
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::TransformDialectStrategies::Common::TransformDialectStrategies
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
   PUBLIC
@@ -146,6 +96,7 @@ iree_cc_library(
     "MaterializeEncodingPass.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PolynomialApproximationPass.cpp"
+    "RematerializeParallelOps.cpp"
     "SplitFullPartialTransferPass.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
@@ -192,6 +143,7 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorTransforms
     MLIRViewLikeInterface
+    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
@@ -202,6 +154,8 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::VMVX::IR
+    iree::compiler::Dialect::VMVX::IR::VMVXDialect
   PUBLIC
 )
 
@@ -211,7 +165,6 @@ iree_cc_library(
   HDRS
     "GPUPatterns.h"
     "LinalgOpInfo.h"
-    "TransformDialectStrategies.h"
     "UserConfig.h"
   SRCS
     "DecomposeLinalgGeneric.cpp"
@@ -236,7 +189,6 @@ iree_cc_library(
   DEPS
     ::CommonPasses
     ::TransformDialectInterpreterPass
-    ::TransformDialectJitterPass
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms

@@ -1,10 +1,8 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))" \
-// RUN: --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir \
+// RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(iree-transform-dialect-interpreter{transform-file-name=%p/transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir}))" \
 // RUN: --allow-unregistered-dialect | \
 // RUN: FileCheck %s --check-prefix=WARP-EXECUTE
 
-// RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))" \
-// RUN: --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_vector_distribution_spec.mlir \
+// RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(iree-transform-dialect-interpreter{transform-file-name=%p/transform_dialect_codegen_vector_distribution_spec.mlir}))" \
 // RUN: --allow-unregistered-dialect | \
 // RUN: FileCheck %s
 

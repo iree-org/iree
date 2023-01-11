@@ -181,7 +181,7 @@
 // Flush the settings we have so far; settings after this point will be
 // overriding values set by Tracy itself.
 #if defined(TRACY_ENABLE)
-#include "third_party/tracy/public/tracy/TracyC.h"  // IWYU pragma: export
+#include "tracy/TracyC.h"  // IWYU pragma: export
 #endif
 
 // Disable callstack capture if our depth is 0; this allows us to avoid any
@@ -503,7 +503,7 @@ enum {
 #ifdef __cplusplus
 
 #if defined(TRACY_ENABLE)
-#include "third_party/tracy/public/tracy/Tracy.hpp"  // IWYU pragma: export
+#include "tracy/Tracy.hpp"  // IWYU pragma: export
 #endif
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION

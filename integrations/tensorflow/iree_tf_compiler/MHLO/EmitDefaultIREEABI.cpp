@@ -97,9 +97,10 @@ class EmitDefaultIREEABIPass
 
   llvm::Optional<json::Value> mapTypeToJsonTypeRecord(Type type) {
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
+      auto typeValue = mapTypeToJsonTypeRecord(shapedType.getElementType());
       json::Array record({
           json::Value("ndarray"),
-          mapTypeToJsonTypeRecord(shapedType.getElementType()),
+          typeValue ? *typeValue : json::Value(nullptr),
           shapedType.hasRank() ? json::Value(shapedType.getRank())
                                : json::Value(nullptr),
       });

@@ -10,10 +10,10 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
-#include "iree/compiler/Codegen/Common/TransformDialectStrategiesGPU.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -42,11 +42,17 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
 
-llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes(
-    "iree-codegen-llvmgpu-workgroup-tile-sizes",
-    llvm::cl::desc("Fixed tile sizes when using the transform dialect starting "
-                   "from IR already workgroup distributed"),
-    llvm::cl::CommaSeparated);
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag(
+    "iree-codegen-llvmgpu-transform-dialect-debug-payload-tag",
+    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
+                   "payload root operation"),
+    llvm::cl::init(""));
+
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
+    "iree-codegen-llvmgpu-transform-dialect-debug-transform-tag",
+    llvm::cl::desc(
+        "tag attribute value for the transform dialect transform op container"),
+    llvm::cl::init(""));
 }  // namespace iree_compiler
 }  // namespace mlir
 
@@ -82,6 +88,7 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}}));
 
+  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}}));
@@ -292,7 +299,8 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
     // Pick the best configuration where the original shape is aligned on the
     // tile size.
     for (TileWorkgroupSizePair &config : tileSizeConfig) {
-      if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
+      if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0 &&
+          sizeK % config.tileSize[2] == 0) {
         return setMatmulConfig(
             config.tileSize[0], config.tileSize[1], config.tileSize[2],
             config.workgroupSize, softwarePipelineDepthSimt,
@@ -309,7 +317,13 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   const TileWorkgroupSizePair &config = tileSizeConfig[configIndex];
   const int64_t tileX = config.tileSize[0];
   const int64_t tileY = config.tileSize[1];
-  const int64_t tileK = config.tileSize[2];
+  int64_t tileK = config.tileSize[2];
+  // Since specialization doesn't work for K loop and peeling is not enabled yet
+  // we pick a tileK size that is aligned on the K size.
+  if (ShapedType::isDynamic(sizeK)) tileK = 1;
+  while (sizeK % tileK != 0) {
+    tileK >>= 1;
+  }
   const std::array<int64_t, 3> workgroupSize{config.workgroupSize[0],
                                              config.workgroupSize[1],
                                              config.workgroupSize[2]};
@@ -502,19 +516,36 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 }
 
 /// Set configuration for reduction transform dialect based strategy.
-static LogicalResult setReductionTransformJitConfig(
+static LogicalResult setReductionTransformDialectConfig(
     func::FuncOp entryPoint, linalg::LinalgOp op,
     const TargetInfo &targetInfo) {
-  if (!clGPUEnableTransformDialectJit) return failure();
+  if (!clGPUCodegenTransformDialectFileName.empty() &&
+      clGPUEnableTransformDialectJit) {
+    return entryPoint.emitError()
+           << "option clash in transform dialect lowering config: the filename "
+              "cannot be provided when the jit option is set";
+  }
+
+  if (!clGPUEnableTransformDialectJit &&
+      clGPUCodegenTransformDialectFileName.empty()) {
+    return failure();
+  }
   if (!targetInfo.hasWarpShuffle) return failure();
-  if (failed(matchAndSetGPUReductionTransformStrategy(entryPoint, op)))
+
+  // Transform script file provided, use it.
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPoint.getContext(),
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
+  if (!clGPUCodegenTransformDialectFileName.empty()) {
+    return setTranslationInfo(entryPoint, translationInfo);
+  }
+
+  iree_compiler::gpu::GPUModel gpuModel;
+  if (failed(iree_compiler::gpu::matchAndSetReductionStrategy(entryPoint, op,
+                                                              gpuModel)))
     return failure();
 
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPoint->getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                    TransformDialectJitterCodegen);
-  if (failed(setTranslationInfo(entryPoint, translationInfo))) return failure();
-  return success();
+  return setTranslationInfo(entryPoint, translationInfo);
 }
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
@@ -524,7 +555,11 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   if (!targetInfo.hasWarpShuffle) return failure();
   if (!isa<linalg::GenericOp>(op)) return failure();
   // TODO(thomasraoux): Enable dynamic shape.
-  if (op.hasDynamicShape()) return failure();
+  bool hasDynamicShape = false;
+  entryPoint.walk([&hasDynamicShape](linalg::LinalgOp op) {
+    if (op.hasDynamicShape()) hasDynamicShape = true;
+  });
+  if (hasDynamicShape) return failure();
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
   if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
@@ -538,11 +573,21 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
       }))
     return failure();
 
-  // Only single combiner operations are supported for now.
-  SmallVector<Operation *, 4> combinerOps;
-  if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
-      combinerOps.size() != 1)
-    return failure();
+  bool foundSingleReductionOutput = false;
+  for (int64_t i = 0, e = op.getDpsInitOperands().size(); i < e; i++) {
+    // Only single combiner operations are supported for now.
+    SmallVector<Operation *, 4> combinerOps;
+    if (matchReduction(op.getRegionOutputArgs(), i, combinerOps) &&
+        combinerOps.size() == 1) {
+      if (foundSingleReductionOutput) return failure();
+      foundSingleReductionOutput = true;
+      continue;
+    }
+    if (!op.getMatchingIndexingMap(op.getDpsInitOperand(i)).isIdentity())
+      return failure();
+  }
+  if (!foundSingleReductionOutput) return failure();
+
   Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
 
@@ -810,17 +855,6 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
-  if (!clGPUCodegenTransformDialectTileSizes.empty()) {
-    SmallVector<int64_t, 4> workgroupTileSizes(
-        clGPUCodegenTransformDialectTileSizes.begin(),
-        clGPUCodegenTransformDialectTileSizes.end());
-    TileSizesListType tileSizes;
-    tileSizes.emplace_back(std::move(workgroupTileSizes));
-    auto config = IREE::Codegen::LoweringConfigAttr::get(
-        computeOp->getContext(), tileSizes);
-    setLoweringConfig(computeOp, config);
-    return success();
-  }
   TargetInfo targetInfo = getTargetInfo(entryPointFn);
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(computeOp)) {
@@ -829,11 +863,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     return setUserConfig(entryPointFn, computeOp, compilationInfo);
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
-    if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
+    if (succeeded(setReductionTransformDialectConfig(entryPointFn, linalgOp,
+                                                     targetInfo))) {
       return success();
     }
-    if (succeeded(setReductionTransformJitConfig(entryPointFn, linalgOp,
-                                                 targetInfo))) {
+    if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
       return success();
     }
     if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp, targetInfo))) {
@@ -847,6 +881,18 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       return success();
     }
   }
+
+  // If using the transform dialect, call the proper pipeline.
+  assert((clGPUCodegenTransformDialectFileName.empty() ||
+          !clGPUEnableTransformDialectJit) &&
+         "Can't use both transform dialect interpreted and jitted modes");
+  if (clGPUCodegenTransformDialectFileName.size() > 0) {
+    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+        entryPointFn.getContext(),
+        IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
+    return setTranslationInfo(entryPointFn, translationInfo);
+  }
+
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);
   }
@@ -870,18 +916,6 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     SmallVector<Operation *> computeOps;
     if (failed(getComputeOps(funcOp, computeOps))) {
       return funcOp.emitOpError("failed to get compute ops");
-    }
-
-    // If using the transform dialect, call the proper pipeline.
-    assert((clGPUCodegenTransformDialectFileName.empty() ||
-            !clGPUEnableTransformDialectJit) &&
-           "Can't use both transform dialect interpreted and jitted modes");
-    if (clGPUCodegenTransformDialectFileName.size() > 0) {
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectInterpreterCodegen);
-      if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
-      if (clGPUCodegenTransformDialectTileSizes.empty()) continue;
     }
 
     Operation *rootOperation = nullptr;

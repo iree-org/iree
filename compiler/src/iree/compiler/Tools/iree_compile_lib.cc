@@ -13,6 +13,7 @@
 
 #include "iree/compiler/API2/Embed.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
+#include "iree/compiler/Tools/init_iree.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/raw_ostream.h"
@@ -49,10 +50,7 @@ enum class CompileMode {
 }  // namespace mlir
 
 int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
-  llvm::setBugReportMsg(
-      "Please report issues to https://github.com/iree-org/iree/issues and "
-      "include the crash backtrace.\n");
-  llvm::InitLLVM y(argc, argv);
+  InitIree y(argc, argv);
   static llvm::cl::OptionCategory mainOptions("IREE Main Options");
   ireeCompilerGlobalInitialize(/*initializeCommandLine=*/true);
 
@@ -273,6 +271,6 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     if (!processBuffer(s.source)) return 1;
   }
 
-  ireeCompileOutputKeep(s.output);
+  ireeCompilerOutputKeep(s.output);
   return 0;
 }

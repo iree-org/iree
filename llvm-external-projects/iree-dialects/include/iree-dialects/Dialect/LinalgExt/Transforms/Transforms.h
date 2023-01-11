@@ -262,12 +262,14 @@ struct LinalgVectorizationPattern
   /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
   LinalgVectorizationPattern(
       MLIRContext *context,
+      LinalgVectorizationOptions opts = LinalgVectorizationOptions(),
       LinalgTransformationFilter f = LinalgTransformationFilter(),
       PatternBenefit benefit = 1);
 
   /// Construct a pattern specifically applied to `opName`.
   LinalgVectorizationPattern(
       StringRef opName, MLIRContext *context,
+      LinalgVectorizationOptions opts = LinalgVectorizationOptions(),
       LinalgTransformationFilter f = LinalgTransformationFilter(),
       PatternBenefit benefit = 1);
 
@@ -276,6 +278,7 @@ struct LinalgVectorizationPattern
 
 private:
   /// LinalgTransformMarker handles special attribute manipulations.
+  LinalgVectorizationOptions options;
   LinalgTransformationFilter filter;
 };
 
@@ -286,6 +289,7 @@ template <>
 class VectorizationPatterns<> {
 public:
   static void insert(RewritePatternSet &patterns,
+                     const LinalgVectorizationOptions &opts,
                      const LinalgTransformationFilter &f) {}
 };
 
@@ -293,10 +297,11 @@ template <typename OpTy, typename... OpTypes>
 class VectorizationPatterns<OpTy, OpTypes...> {
 public:
   static void insert(RewritePatternSet &patterns,
+                     const LinalgVectorizationOptions &opts,
                      const LinalgTransformationFilter &f) {
     patterns.add<LinalgVectorizationPattern>(OpTy::getOperationName(),
-                                             patterns.getContext(), f);
-    VectorizationPatterns<OpTypes...>::insert(patterns, f);
+                                             patterns.getContext(), opts, f);
+    VectorizationPatterns<OpTypes...>::insert(patterns, opts, f);
   }
 };
 

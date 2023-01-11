@@ -11,9 +11,11 @@ include(CMakeParseArguments)
 # CMake function to imitate Bazel's c_embed_data rule.
 #
 # Parameters:
+# PACKAGE: Name of the package (overrides actual path)
 # NAME: Name of target (see Note).
 # SRCS: List of source files to embed (non-absolute paths will be resolved
 #     relative to CMAKE_CURRENT_SRC_DIR).
+# INCLUDES: Include directories to add to dependencies
 # GENERATED_SRCS: List of generated source files to embed.
 # C_FILE_OUTPUT: The C implementation file to output.
 # H_FILE_OUTPUT: The H header file to output.
@@ -31,8 +33,8 @@ function(iree_c_embed_data)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY;FLATTEN"
-    "NAME;IDENTIFIER;STRIP_PREFIX;C_FILE_OUTPUT;H_FILE_OUTPUT"
-    "DEPS;SRCS;GENERATED_SRCS"
+    "PACKAGE;NAME;IDENTIFIER;STRIP_PREFIX;C_FILE_OUTPUT;H_FILE_OUTPUT"
+    "DEPS;SRCS;GENERATED_SRCS;INCLUDES"
     ${ARGN}
   )
 
@@ -84,10 +86,12 @@ function(iree_c_embed_data)
   endif()
 
   iree_cc_library(
+    PACKAGE ${_RULE_PACKAGE}
     NAME ${_RULE_NAME}
     HDRS "${_RULE_H_FILE_OUTPUT}"
     SRCS "${_RULE_C_FILE_OUTPUT}"
     DEPS "${_RULE_DEPS}"
+    INCLUDES ${_RULE_INCLUDES}
     "${_PUBLIC_ARG}"
     "${_TESTONLY_ARG}"
   )

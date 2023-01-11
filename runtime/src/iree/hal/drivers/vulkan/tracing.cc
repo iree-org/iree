@@ -8,11 +8,11 @@
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
+#include "client/TracyProfiler.hpp"
+#include "common/TracyAlloc.hpp"
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
-#include "third_party/tracy/public/client/TracyProfiler.hpp"
-#include "third_party/tracy/public/common/TracyAlloc.hpp"
-#include "third_party/tracy/public/tracy/Tracy.hpp"
+#include "tracy/Tracy.hpp"
 
 // Total number of queries the per-queue query pool will contain. This
 // translates to the maximum number of outstanding queries before collection is

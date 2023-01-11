@@ -5,25 +5,39 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from io import BytesIO, StringIO
+import json
+import pathlib
 import unittest
 import zipfile
 
-from io import BytesIO, StringIO
-
 from common.benchmark_definition import ModuleComponentSizes
-from collect_compilation_statistics import CONST_COMPONENT_NAME, VM_COMPONENT_NAME, get_module_component_info, get_module_path, match_module_cmake_target, parse_compilation_time_from_ninja_log
+from collect_compilation_statistics import CONST_COMPONENT_NAME, VM_COMPONENT_NAME, get_module_component_info, get_module_path, parse_compilation_time_from_ninja_log
+from e2e_test_artifacts import iree_artifacts
+from e2e_test_framework import serialization
+from e2e_test_framework.definitions import common_definitions, iree_definitions
+import collect_compilation_statistics
+import common.benchmark_definition
 
 
 class CollectCompilationStatistics(unittest.TestCase):
 
-  def test_match_module_cmake_target(self):
-    target = match_module_cmake_target(
-        "iree/iree-build/benchmark_suites/TFLite/vmfb/test.vmfb")
+  def test_match_module_cmake_target_with_e2e_test_artifacts(self):
+    target = collect_compilation_statistics.match_module_cmake_target(
+        pathlib.PurePath("e2e_test_artifacts/iree_abcd/module.vmfb"))
+
+    self.assertEqual(target, "e2e_test_artifacts/iree_abcd/module.vmfb")
+
+  def test_match_module_cmake_target_with_benchmark_suites(self):
+    target = collect_compilation_statistics.match_module_cmake_target(
+        pathlib.PurePath(
+            "iree/iree-build/benchmark_suites/TFLite/vmfb/test.vmfb"))
 
     self.assertEqual(target, "benchmark_suites/TFLite/vmfb/test.vmfb")
 
   def test_match_module_cmake_target_not_match(self):
-    target = match_module_cmake_target("benchmark_suites/TFLite/vmfb/test.mlir")
+    target = collect_compilation_statistics.match_module_cmake_target(
+        pathlib.PurePath("benchmark_suites/TFLite/vmfb/test.mlir"))
 
     self.assertIsNone(target)
 
@@ -78,6 +92,76 @@ class CollectCompilationStatistics(unittest.TestCase):
     moduel_path = get_module_path(flag_file)
 
     self.assertEqual(moduel_path, "/abcd-compile-stats.vmfb")
+
+  def test_get_module_map_from_generation_config(self):
+    model_a = common_definitions.Model(
+        id="1234",
+        name="tflite_m",
+        tags=[],
+        source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+        source_url="https://example.com/xyz.tflite",
+        entry_function="main",
+        input_types=["1xf32"])
+    imported_model_a = iree_definitions.ImportedModel(
+        model=model_a, dialect_type=iree_definitions.MLIRDialectType.TOSA)
+    compile_config_a = iree_definitions.CompileConfig(
+        id="config_a",
+        tags=["defaults"],
+        compile_targets=[
+            iree_definitions.CompileTarget(
+                target_architecture=common_definitions.DeviceArchitecture.
+                X86_64_CASCADELAKE,
+                target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+                target_abi=iree_definitions.TargetABI.LINUX_GNU)
+        ])
+    compile_config_b = iree_definitions.CompileConfig(
+        id="config_b",
+        tags=["defaults"],
+        compile_targets=[
+            iree_definitions.CompileTarget(
+                target_architecture=common_definitions.DeviceArchitecture.
+                RV64_GENERIC,
+                target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+                target_abi=iree_definitions.TargetABI.LINUX_GNU),
+            iree_definitions.CompileTarget(
+                target_architecture=common_definitions.DeviceArchitecture.
+                RV32_GENERIC,
+                target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+                target_abi=iree_definitions.TargetABI.LINUX_GNU)
+        ])
+    gen_config_a = iree_definitions.ModuleGenerationConfig(
+        imported_model=imported_model_a, compile_config=compile_config_a)
+    gen_config_b = iree_definitions.ModuleGenerationConfig(
+        imported_model=imported_model_a, compile_config=compile_config_b)
+    serialized_gen_config = json.dumps(
+        serialization.serialize_and_pack([gen_config_a, gen_config_b]))
+    root_dir = pathlib.PurePath("artifacts_dir")
+
+    module_map = collect_compilation_statistics.get_module_map_from_generation_config(
+        serialized_gen_config=StringIO(serialized_gen_config),
+        e2e_test_artifacts_dir=root_dir)
+
+    compile_info_a = common.benchmark_definition.CompilationInfo(
+        model_name=model_a.name,
+        model_tags=tuple(model_a.tags),
+        model_source=model_a.source_type.value,
+        target_arch=f"[cpu-x86_64-cascadelake-linux-gnu]",
+        compile_tags=tuple(gen_config_a.compile_config.tags))
+    module_a_path = iree_artifacts.get_module_dir_path(
+        gen_config_a, root_dir) / iree_artifacts.MODULE_FILENAME
+    compile_info_b = common.benchmark_definition.CompilationInfo(
+        model_name=model_a.name,
+        model_tags=tuple(model_a.tags),
+        model_source=model_a.source_type.value,
+        target_arch=
+        f"[cpu-riscv_64-generic-linux-gnu,cpu-riscv_32-generic-linux-gnu]",
+        compile_tags=tuple(gen_config_a.compile_config.tags))
+    module_b_path = iree_artifacts.get_module_dir_path(
+        gen_config_b, root_dir) / iree_artifacts.MODULE_FILENAME
+    self.assertEqual(module_map, {
+        compile_info_a: module_a_path,
+        compile_info_b: module_b_path
+    })
 
 
 if __name__ == "__main__":

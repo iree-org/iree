@@ -54,9 +54,9 @@ python -m pip install iree-compiler
 
 Please make sure you have followed the [Getting started][get-started] page
 to build IREE for your host platform and the
-[Android cross-compilation][android-cc] page if you are cross compiling for
-Android. The LLVM (CPU) compiler backend is compiled in by default on all
-platforms.
+[Android cross-compilation][android-cc] or [iOS cross-compilation][ios-cc] page
+if you are cross compiling for a mobile device. The LLVM (CPU) compiler backend
+is compiled in by default on all platforms.
 
 Ensure that the `IREE_TARGET_BACKEND_LLVM_CPU` CMake option is `ON` when
 configuring for the host.
@@ -147,6 +147,7 @@ concrete values.
 <!-- TODO(??): troubleshooting -->
 
 [android-cc]: ../building-from-source/android.md
+[ios-cc]: ../building-from-source/ios.md
 [get-started]: ../building-from-source/getting-started.md
 [llvm]: https://llvm.org/
 [mlir]: https://mlir.llvm.org/

@@ -7,13 +7,17 @@
 
 from dataclasses import dataclass
 from typing import Dict, List, Sequence
-import collections
 import pathlib
 
+from benchmark_suites.iree import benchmark_collections
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_artifacts.cmake_generator import model_rule_generator
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 import cmake_builder.rules
+
+BENCHMARK_IMPORT_MODELS_CMAKE_TARGET = "iree-benchmark-import-models"
+BENCHMARK_SUITES_CMAKE_TARGET = "iree-benchmark-suites"
+E2E_COMPILE_STATS_SUITES = "iree-e2e-compile-stats-suites"
 
 
 @dataclass(frozen=True)
@@ -59,14 +63,14 @@ class IreeRuleBuilder(object):
     if model.source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tflite_model(
-              target_path=self._build_target_path(target_name),
+              target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
               output_mlir_file=str(output_file_path))
       ]
     elif model.source_type == common_definitions.ModelSourceType.EXPORTED_TF:
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tf_model(
-              target_path=self._build_target_path(target_name),
+              target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
               entry_function=model.entry_function,
               output_mlir_file=str(output_file_path))
@@ -75,11 +79,6 @@ class IreeRuleBuilder(object):
       raise ValueError(
           f"Unsupported source type '{model.source_type}' of the model '{model.id}'."
       )
-
-    cmake_rules.append(
-        cmake_builder.rules.build_add_dependencies(
-            target="iree-benchmark-import-models",
-            deps=[self._build_target_path(target_name)]))
 
     return IreeModelImportRule(target_name=target_name,
                                output_file_path=output_file_path,
@@ -104,10 +103,7 @@ class IreeRuleBuilder(object):
             target_name=target_name,
             src=str(model_import_rule.output_file_path),
             module_name=str(output_file_path),
-            flags=compile_flags),
-        cmake_builder.rules.build_add_dependencies(
-            target="iree-benchmark-suites",
-            deps=[self._build_target_path(target_name)])
+            flags=compile_flags)
     ]
 
     # TODO(#10155): Dump the compile flags from iree_bytecode_module into a flagfile.
@@ -115,6 +111,12 @@ class IreeRuleBuilder(object):
     return IreeModuleCompileRule(target_name=target_name,
                                  output_module_path=output_file_path,
                                  cmake_rules=cmake_rules)
+
+  def build_target_path(self, target_name: str):
+    """Returns the full target path by combining the package name and the target
+    name.
+    """
+    return f"{self._package_name}_{target_name}"
 
   def _generate_compile_flags(self,
                               compile_config: iree_definitions.CompileConfig,
@@ -139,7 +141,7 @@ class IreeRuleBuilder(object):
           f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
           f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
       ]
-    elif arch_info.architecture == "rv64":
+    elif arch_info.architecture == "riscv_64":
       flags = [
           f"--iree-llvm-target-triple=riscv64-pc-{target.target_abi.value}",
           "--iree-llvm-target-cpu=generic-rv64", "--iree-llvm-target-abi=lp64d",
@@ -147,7 +149,7 @@ class IreeRuleBuilder(object):
           "--riscv-v-vector-bits-min=512",
           "--riscv-v-fixed-length-vector-lmul-max=8"
       ]
-    elif arch_info.architecture == "rv32":
+    elif arch_info.architecture == "riscv_32":
       flags = [
           f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
           "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
@@ -180,12 +182,6 @@ class IreeRuleBuilder(object):
       raise ValueError(f"Unsupported architecture: '{arch_info.architecture}'")
     return flags
 
-  def _build_target_path(self, target_name: str):
-    """Returns the full target path by combining the variable of package name
-    and the target name.
-    """
-    return f"{self._package_name}_{target_name}"
-
 
 def generate_rules(
     package_name: str, root_path: pathlib.PurePath,
@@ -206,7 +202,7 @@ def generate_rules(
 
   rule_builder = IreeRuleBuilder(package_name=package_name)
 
-  all_imported_models = collections.OrderedDict(
+  all_imported_models = dict(
       (config.imported_model.model.id, config.imported_model)
       for config in module_generation_configs)
 
@@ -226,6 +222,8 @@ def generate_rules(
     model_import_rule_map[model_id] = model_import_rule
     cmake_rules.extend(model_import_rule.cmake_rules)
 
+  module_target_names = []
+  compile_stats_module_target_names = []
   for gen_config in module_generation_configs:
     model_import_rule = model_import_rule_map[
         gen_config.imported_model.model.id]
@@ -236,6 +234,35 @@ def generate_rules(
         imported_model=gen_config.imported_model,
         compile_config=gen_config.compile_config,
         output_file_path=module_dir_path / iree_artifacts.MODULE_FILENAME)
+    if benchmark_collections.COMPILE_STATS_TAG in gen_config.compile_config.tags:
+      compile_stats_module_target_names.append(module_compile_rule.target_name)
+    else:
+      module_target_names.append(module_compile_rule.target_name)
     cmake_rules.extend(module_compile_rule.cmake_rules)
+
+  if len(model_import_rule_map) > 0:
+    cmake_rules.append(
+        cmake_builder.rules.build_add_dependencies(
+            target=BENCHMARK_IMPORT_MODELS_CMAKE_TARGET,
+            deps=[
+                rule_builder.build_target_path(rule.target_name)
+                for rule in model_import_rule_map.values()
+            ]))
+  if len(module_target_names) > 0:
+    cmake_rules.append(
+        cmake_builder.rules.build_add_dependencies(
+            target=BENCHMARK_SUITES_CMAKE_TARGET,
+            deps=[
+                rule_builder.build_target_path(target_name)
+                for target_name in module_target_names
+            ]))
+  if len(compile_stats_module_target_names) > 0:
+    cmake_rules.append(
+        cmake_builder.rules.build_add_dependencies(
+            target=E2E_COMPILE_STATS_SUITES,
+            deps=[
+                rule_builder.build_target_path(target_name)
+                for target_name in compile_stats_module_target_names
+            ]))
 
   return cmake_rules

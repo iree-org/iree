@@ -1,40 +1,38 @@
-!type = tensor<512x9xf32>
+!type = tensor<9x512xf32>
+!type2 = tensor<512x9xf32>
+
 #trait = { indexing_maps  = [affine_map<(d0, d1) -> (d0, d1)>],
            iterator_types = ["parallel", "parallel"] }
 
 #trait2 = { indexing_maps  = [affine_map<(d0, d1) -> (d0, d1)>,
-                              affine_map<(d0, d1) -> (d0, d1)>],
+                              affine_map<(d0, d1) -> (d1, d0)>],
            iterator_types = ["parallel", "parallel"] }
 
-func.func @vecadd2d() -> (!type) {
+util.global private @"lhs" {noinline} = dense<0.0> : !type2
+util.global private @"rhs" {noinline} = dense<2.0> : !type
+
+func.func @vecadd2d() -> (!type2) {
   %cst0 = arith.constant 0.000000e+00 : f32
   %cst1 = arith.constant 2.000000e+00 : f32
-  %0 = tensor.empty() : !type
-  %1 = tensor.empty() : !type
-  %x = linalg.generic #trait outs(%0 : !type) {
-  ^bb0(%arg: f32):
-    linalg.yield %cst1 : f32
-  } -> !type
-  %y = linalg.generic #trait outs(%0 : !type) {
-  ^bb0(%arg: f32):
-    linalg.yield %cst0 : f32
-  } -> !type
+  
+  %x_ptr = util.global.address @"rhs" : !util.ptr<!type>  
+  %x = util.global.load.indirect %x_ptr : !util.ptr<!type> -> !type  
+  %y_ptr = util.global.address @"lhs" : !util.ptr<!type2>  
+  %y = util.global.load.indirect %y_ptr : !util.ptr<!type2> -> !type2
+
   // Note: Two linalg.generics to fill the tensors will make IREE generate two
   // separate kernels for the above and the below. It is important to validate
   // the results.
-  %2 = linalg.generic #trait2 ins(%x : !type) outs(%y : !type) {
+  %2 = linalg.generic #trait2 ins(%x : !type) outs(%y : !type2) {
   ^bb0(%arg3: f32, %arg4: f32):
     %3 = arith.addf %arg3, %arg4 : f32
     linalg.yield %3 : f32
-  } -> !type
+  } -> !type2
 
-  return %2 : !type
+  return %2 : !type2
 }
 
 // RUN: iree-opt %s --iree-hal-target-backends=cuda \
-/// We must disable collapsing linalg.generic, because transform dialect maps 
-/// dimensions explicitly and is not aware of collapsing
-// RUN:     --iree-flow-form-dispatch-regions-collapse=false \
 // RUN:     --iree-abi-transformation-pipeline \
 // RUN:     --iree-flow-transformation-pipeline  \
 // RUN:     --iree-stream-transformation-pipeline \
@@ -44,7 +42,6 @@ func.func @vecadd2d() -> (!type) {
 // RUN: FileCheck %s --check-prefix=CHECK
 
 // RUN: iree-opt %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-flow-form-dispatch-regions-collapse=false \
 // RUN:     --iree-abi-transformation-pipeline \
 // RUN:     --iree-flow-transformation-pipeline  \
 // RUN:     --iree-stream-transformation-pipeline \
@@ -54,7 +51,6 @@ func.func @vecadd2d() -> (!type) {
 // RUN: FileCheck %s --check-prefix=CHECK-PARTIAL-TILE
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-flow-form-dispatch-regions-collapse=false \
 // RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
 /// Constant JIT'ing must be disabled because the transform-dialect debug
 /// flags leak to the JIT session, which doesn't know what to do with them.

@@ -32,6 +32,7 @@ iree_cc_library(
     "CaptureDispatchDynamicDims.cpp"
     "CleanupNumericNarrowing.cpp"
     "CleanupTensorShapes.cpp"
+    "CollapseDimensions.cpp"
     "CollapseReductionDims.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
     "ConvertConv2DToImg2Col.cpp"

@@ -59,6 +59,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":LLVMGPUExtensionsOpGen",
+        "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",

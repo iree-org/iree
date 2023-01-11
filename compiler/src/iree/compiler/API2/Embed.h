@@ -111,14 +111,52 @@ IREE_EMBED_EXPORTED iree_compiler_session_t *ireeCompilerSessionCreate();
 IREE_EMBED_EXPORTED void ireeCompilerSessionDestroy(
     iree_compiler_session_t *session);
 
+// Sets session-local flags. These are a subset of flags supported by CLI
+// tools and are privately scoped.
+IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerSessionSetFlags(
+    iree_compiler_session_t *session, int argc, const char *const *argv);
+
+// Gets textual flags actually in effect from any source. Optionally, only
+// calls back for non-default valued flags.
+IREE_EMBED_EXPORTED void ireeCompilerSessionGetFlags(
+    iree_compiler_session_t *session, bool nonDefaultOnly,
+    void (*onFlag)(const char *flag, size_t length, void *), void *userData);
+
 //===----------------------------------------------------------------------===//
 // Run management.
 // Runs execute against a session and represent a discrete invocation of the
 // compiler.
 //===----------------------------------------------------------------------===//
 
+enum iree_compiler_diagnostic_severity_t {
+  IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE = 0,
+  IREE_COMPILER_DIAGNOSTIC_SEVERITY_WARNING = 1,
+  IREE_COMPILER_DIAGNOSTIC_SEVERITY_ERROR = 2,
+  IREE_COMPILER_DIAGNOSTIC_SEVERITY_REMARK = 3,
+};
+
 IREE_EMBED_EXPORTED iree_compiler_invocation_t *ireeCompilerInvocationCreate(
     iree_compiler_session_t *session);
+
+// Enables a callback to receive diagnostics. This is targeted at API use of
+// the compiler, allowing fine grained collection of formatted diagnostic
+// records. It is not completely identical to
+// |ireeCompilerInvocationEnableConsoleDiagnostics| which produces output
+// suitable for an interactive stream (including color detection, etc) and has
+// additional features for reading source files, etc. With default flags, no
+// system state outside of the session will be used (i.e. no debug information
+// loaded from files, etc).
+// The |flags| parameter is reserved for the future and must be 0.
+// The |callback| may be invoked from any thread at any time prior to
+// destruction of the invocation. The callback should not make any calls back
+// into compiler APIs.
+// The |message| passes to the callback is only valid for the duration of
+// the callback and the |messageSize| does not include a terminator nul.
+IREE_EMBED_EXPORTED void ireeCompilerInvocationEnableCallbackDiagnostics(
+    iree_compiler_invocation_t *inv, int flags,
+    void (*callback)(enum iree_compiler_diagnostic_severity_t severity,
+                     const char *message, size_t messageSize, void *userData),
+    void *userData);
 
 // Enables default, pretty-printed diagnostics to the console. This is usually
 // the right thing to do for command-line tools, but other mechanisms are
@@ -240,10 +278,16 @@ IREE_EMBED_EXPORTED void ireeCompilerOutputDestroy(
 IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFile(
     const char *filePath, iree_compiler_output_t **out_output);
 
+// Opens a file descriptor for output.
+// Must be destroyed via ireeCompilerOutputDestroy().
+IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFD(
+    int fd, iree_compiler_output_t **out_output);
+
 // For file or other persistent outputs, by default they will be deleted on
-// destroy. It is necessary to call |ireeCompileOutputKeep| in order to have
-// them committed to their accessible place.
-IREE_EMBED_EXPORTED void ireeCompileOutputKeep(iree_compiler_output_t *output);
+// |ireeCompilerOutputDestroy| (or exit). It is necessary to call
+// |ireeCompilerOutputKeep| in order to have them committed to their accessible
+// place.
+IREE_EMBED_EXPORTED void ireeCompilerOutputKeep(iree_compiler_output_t *output);
 
 // Writes arbitrary data to the output.
 IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputWrite(

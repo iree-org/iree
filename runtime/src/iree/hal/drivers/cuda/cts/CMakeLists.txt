@@ -18,11 +18,7 @@ iree_hal_cts_test_suite(
   DEPS
     iree::hal::drivers::cuda::registration
   EXCLUDED_TESTS
-    # This test depends on iree_hal_cuda_stream_command_buffer_update_buffer
-    # via iree_hal_buffer_view_allocate_buffer, which is not implemented yet.
-    "command_buffer_dispatch"
-    # Semaphores are not implemented in the CUDA backend yet.
-    "semaphore_submission"
+    # Semaphores are not fully implemented in the CUDA backend yet.
     "semaphore"
 )
 
@@ -46,7 +42,5 @@ iree_hal_cts_test_suite(
     iree::hal::drivers::cuda::registration
   INCLUDED_TESTS
     "command_buffer"
-    # This test depends on iree_hal_cuda_stream_command_buffer_update_buffer
-    # via iree_hal_buffer_view_allocate_buffer, which is not implemented yet.
-    # "command_buffer_dispatch"
+    "command_buffer_dispatch"
 )

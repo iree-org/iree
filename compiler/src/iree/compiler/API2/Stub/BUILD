@@ -23,6 +23,6 @@ iree_compiler_cc_library(
     ],
     deps = [
         "//build_tools:dl",
-        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/src/iree/compiler/API2:EmbedHeaders",
     ],
 )

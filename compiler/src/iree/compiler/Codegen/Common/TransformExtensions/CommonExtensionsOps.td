@@ -17,15 +17,18 @@ include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
 def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
     Greedily applies patterns as specified by its attributes.
 
     Must be applied to an op with trait IsolatedFromAbove since the
-    GreedyPatternRewriter asserts those.
+    GreedyPatternRewriter asserts those. Internally, uses the tracking rewriter
+    to preserve handles to payload operations nested within operations
+    associated with `target`. Fails if tracking cannot find replacement for a
+    payload operation. This may become controllable with an attribute in the
+    future.
 
     Returns the IsolatedFromAbove op whose content it has modified for better
     chaining APIs.
@@ -64,17 +67,17 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       This allows dropping the generation or an annoying internal scf.if but may
       yield incorrect code in pathological cases.
 
-    Return modes:
-    =============
-    This operation applies a number of patterns to rewrite vector IR into
-    distributed warp form. To apply these patterns, this operation must target
-    an operation that is isolated from above, otherwise the transform definitely
-    fails.
+    #### Return modes:
+
+    This operation applies a set of patterns specified by attributes. To apply
+    these patterns, this operation must target an operation that is isolated
+    from above, otherwise the transform definitely fails.
 
     If the pattern application fails, or if the underlying listener fails to
     capture op handles, the transformation definitely fails.
 
-    Otherwise the transformation is successful and no result is returned.
+    Otherwise the transformation is successful and returns the handle to the
+    same payload as its operand to allow for simpler composition.
   }];
 
   let arguments = (ins PDL_Operation:$target,
@@ -103,7 +106,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
 }
@@ -137,8 +140,8 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
   let arguments = (
       ins PDL_Operation:$target,
           UnitAttr:$target_gpu,
-          DefaultValuedAttr<BoolAttr, "false">:$test_analysis_only,
-          DefaultValuedAttr<BoolAttr, "false">:$print_conflicts
+          UnitAttr:$test_analysis_only,
+          UnitAttr:$print_conflicts
   );
   let results = (outs PDL_Operation:$result);
 
@@ -146,7 +149,10 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let builders = [
-    OpBuilder<(ins "Value":$target, CArg<"bool", "false">:$targetGpu)>
+    OpBuilder<(ins "Value":$target,
+                   CArg<"bool", "false">:$targetGpu,
+                   CArg<"bool", "false">:$testAnalysisOnly,
+                   CArg<"bool", "false">:$printConflicts)>
   ];
 }
 
@@ -263,7 +269,7 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::func::FuncOp target,
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
 }

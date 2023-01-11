@@ -29,6 +29,8 @@ source build_tools/cmake/setup_build.sh
 echo "Configuring to build benchmarks"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
   -G Ninja \
+  -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}" \
   -DIREE_BUILD_BENCHMARKS=ON \
   -DIREE_BUILD_MICROBENCHMARKS=ON \

@@ -11,6 +11,7 @@ include(CMakeParseArguments)
 # CMake function to imitate Bazel's cc_library rule.
 #
 # Parameters:
+# PACKAGE: Name of the package (overrides actual path)
 # NAME: name of target (see Note)
 # HDRS: List of public header files for the library
 # TEXTUAL_HDRS: List of public header files that cannot be compiled on their own
@@ -61,7 +62,7 @@ function(iree_cc_library)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY;SHARED"
-    "NAME;WINDOWS_DEF_FILE"
+    "PACKAGE;NAME;WINDOWS_DEF_FILE"
     "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
   )
@@ -70,14 +71,19 @@ function(iree_cc_library)
     return()
   endif()
 
-  # Replace dependencies passed by ::name with iree::package::name
-  iree_package_ns(_PACKAGE_NS)
-  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
-
   # Prefix the library with the package name, so we get: iree_package_name.
-  iree_package_name(_PACKAGE_NAME)
+  if(_RULE_PACKAGE)
+    set(_PACKAGE_NS "${_RULE_PACKAGE}")
+    string(REPLACE "::" "_" _PACKAGE_NAME ${_RULE_PACKAGE})
+  else()
+    iree_package_ns(_PACKAGE_NS)
+    iree_package_name(_PACKAGE_NAME)
+  endif()
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
   set(_OBJECTS_NAME ${_NAME}.objects)
+
+  # Replace dependencies passed by ::name with iree::package::name
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
 
   # Check if this is a header-only library.
   # Note that as of February 2019, many popular OS's (for example, Ubuntu
@@ -324,8 +330,12 @@ function(iree_cc_unified_library)
   set(_LIBS "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS>>>")
 
   # For debugging, write out evaluated objects to a file.
-  file(GENERATE OUTPUT "${_RULE_NAME}.$<CONFIG>.contents.txt" CONTENT
-    "OBJECTS:\n${_OBJECTS}\n\nLIBS:\n${_LIBS}\n")
+  # This cannot be enabled for Xcode given that Xcode does not support
+  # per-configuration sources.
+  if (NOT "${CMAKE_GENERATOR}" STREQUAL "Xcode")
+    file(GENERATE OUTPUT "${_RULE_NAME}.$<CONFIG>.contents.txt" CONTENT
+      "OBJECTS:\n${_OBJECTS}\n\nLIBS:\n${_LIBS}\n")
+  endif()
   if(_RULE_SHARED)
     add_library(${_NAME} SHARED ${_OBJECTS})
   else()

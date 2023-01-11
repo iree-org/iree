@@ -152,9 +152,32 @@ void ireeCompilerSessionDestroy(iree_compiler_session_t *session) {
   __ireeCompilerSessionDestroy(session);
 }
 
+iree_compiler_error_t *ireeCompilerSessionSetFlags(
+    iree_compiler_session_t *session, int argc, const char *const *argv) {
+  assertLoaded();
+  return __ireeCompilerSessionSetFlags(session, argc, argv);
+}
+
+void ireeCompilerSessionGetFlags(
+    iree_compiler_session_t *session, bool nonDefaultOnly,
+    void (*onFlag)(const char *flag, size_t length, void *), void *userData) {
+  assertLoaded();
+  return __ireeCompilerSessionGetFlags(session, nonDefaultOnly, onFlag,
+                                       userData);
+}
+
 iree_compiler_invocation_t *ireeCompilerInvocationCreate(
     iree_compiler_session_t *session) {
   return __ireeCompilerInvocationCreate(session);
+}
+
+void ireeCompilerInvocationEnableCallbackDiagnostics(
+    iree_compiler_invocation_t *inv, int flags,
+    void (*callback)(enum iree_compiler_diagnostic_severity_t severity,
+                     const char *message, size_t messageSize, void *userData),
+    void *userData) {
+  __ireeCompilerInvocationEnableCallbackDiagnostics(inv, flags, callback,
+                                                    userData);
 }
 
 void ireeCompilerInvocationEnableConsoleDiagnostics(
@@ -239,8 +262,13 @@ iree_compiler_error_t *ireeCompilerOutputOpenFile(
   return __ireeCompilerOutputOpenFile(filePath, out_output);
 }
 
-void ireeCompileOutputKeep(iree_compiler_output_t *output) {
-  __ireeCompileOutputKeep(output);
+iree_compiler_error_t *ireeCompilerOutputOpenFD(
+    int fd, iree_compiler_output_t **out_output) {
+  return __ireeCompilerOutputOpenFD(fd, out_output);
+}
+
+void ireeCompilerOutputKeep(iree_compiler_output_t *output) {
+  __ireeCompilerOutputKeep(output);
 }
 
 iree_compiler_error_t *ireeCompilerOutputWrite(iree_compiler_output_t *output,

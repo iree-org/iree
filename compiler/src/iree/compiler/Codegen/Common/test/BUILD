@@ -25,6 +25,7 @@ iree_lit_test_suite(
             "dead_alloc.mlir",
             "decompose_linalg_generic.mlir",
             "distribute_gpu_shared_memory.mlir",
+            "eliminate_empty_tensors.mlir",
             "erase_hal_descriptor_type.mlir",
             "flatten_memref_subspan.mlir",
             "fold_affine_min_in_distributed_loops.mlir",
@@ -35,6 +36,7 @@ iree_lit_test_suite(
             "iree_comprehensive_bufferize.mlir",
             "pad_dynamic_alloc.mlir",
             "materialize_encoding.mlir",
+            "rematerialize_parallel_ops.mlir",
             "reduce_bank_conflicts.mlir",
             "reductions.mlir",
             "remove_dead_allocs.mlir",
@@ -54,6 +56,7 @@ iree_lit_test_suite(
         include = ["*.mlir"],
         exclude = [
             "reductions_codegen_spec.mlir",
+            "reductions_match_spec.mlir",
         ],
     ),
     cfg = "//compiler:lit.cfg.py",
@@ -61,6 +64,7 @@ iree_lit_test_suite(
     # they need to be included as data.
     data = [
         "reductions_codegen_spec.mlir",
+        "reductions_match_spec.mlir",
     ],
     tools = [
         "//tools:iree-opt",

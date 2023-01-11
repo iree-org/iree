@@ -391,8 +391,20 @@ LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
   return eliminateEmptyTensors(
       rewriter, op, state,
       /*anchorMatchFunc=*/
-      [&](OpOperand &operand, SmallVector<Value> &) {
-        return isa<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
+      [&](OpOperand &operand, SmallVector<Value> &neededValues) {
+        auto storeOp =
+            dyn_cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
+        if (!storeOp) return false;
+        neededValues.push_back(storeOp.getTarget());
+        neededValues.append(storeOp.getTargetDims().begin(),
+                            storeOp.getTargetDims().end());
+        neededValues.append(storeOp.getOffsets().begin(),
+                            storeOp.getOffsets().end());
+        neededValues.append(storeOp.getSizes().begin(),
+                            storeOp.getSizes().end());
+        neededValues.append(storeOp.getStrides().begin(),
+                            storeOp.getStrides().end());
+        return true;
       },
       /*rewriteFunc=*/
       [](OpBuilder &b, Location loc, OpOperand &operand) {
@@ -424,31 +436,29 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         IREE::Flow::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpInterface>(*ctx);
       });
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-        IREE::LinalgExt::FftOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
-        IREE::LinalgExt::PackOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::PackOp>>(*ctx);
-        IREE::LinalgExt::UnPackOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::UnPackOp>>(*ctx);
-        IREE::LinalgExt::ReverseOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::ReverseOp>>(*ctx);
-        IREE::LinalgExt::ScanOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::ScanOp>>(*ctx);
-        IREE::LinalgExt::ScatterOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
-        IREE::LinalgExt::SortOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
-        IREE::LinalgExt::TopkOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
-        IREE::LinalgExt::WinogradInputTransformOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(
-            *ctx);
-        IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(
-            *ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+    IREE::LinalgExt::FftOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
+    IREE::LinalgExt::PackOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::PackOp>>(*ctx);
+    IREE::LinalgExt::UnPackOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::UnPackOp>>(*ctx);
+    IREE::LinalgExt::ReverseOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::ReverseOp>>(*ctx);
+    IREE::LinalgExt::ScanOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::ScanOp>>(*ctx);
+    IREE::LinalgExt::ScatterOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
+    IREE::LinalgExt::SortOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
+    IREE::LinalgExt::TopkOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
+    IREE::LinalgExt::WinogradInputTransformOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(*ctx);
+    IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
+  });
 }
 
 }  // namespace iree_compiler

@@ -16,7 +16,7 @@
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 static const char* IREE_HAL_CUDA_ALLOCATOR_ID = "CUDA";
-#endif
+#endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 typedef struct iree_hal_cuda_allocator_t {
   iree_hal_resource_t resource;

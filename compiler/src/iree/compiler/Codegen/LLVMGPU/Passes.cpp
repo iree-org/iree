@@ -308,7 +308,9 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
 void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
-
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileReductionPass());
@@ -317,7 +319,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
 
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass(
-      /*generateContract=*/false));
+      /*generateContract=*/false, /*maxVectorSize=*/16384));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -410,37 +412,17 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 }
 
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName;
-extern llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes;
+extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag;
+extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag;
 
-void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
-  if (!clGPUCodegenTransformDialectTileSizes.empty()) {
-    // First do the tile and distribution to workgroups and remove the
-    // distributions loops. Then apply the transform dialect.
-    passManager.addPass(createTileAndDistributeToWorkgroupsPass());
-    auto &nestedModulePM = passManager.nest<ModuleOp>();
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createConvertToDestinationPassingStylePass());
-    nestedModulePM.addPass(createCanonicalizerPass());
-    nestedModulePM.addPass(createCSEPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createRemoveSingleIterationLoopPass());
-  }
-
+void addGPUTransformDialectPasses(OpPassManager &passManager) {
   // Give control to the transform dialect.
   passManager.addPass(
       mlir::iree_compiler::createTransformDialectInterpreterPass(
-          clGPUCodegenTransformDialectFileName));
+          clGPUCodegenTransformDialectFileName,
+          clGPUCodegenTransformDialectDebugPayloadTag,
+          clGPUCodegenTransformDialectDebugTransformTag));
 
-  // Dropping the schedule is needed:
-  //   1. if we want to embed the transform in the module: we should drop the
-  //      schedule once applied.
-  //   2. if transform.do_not_dce_operands ops are introduced.
-  passManager.addPass(createDropSchedulePass());
-}
-
-void addGPUTransformDialectJitterPasses(OpPassManager &passManager) {
-  // Give control to the transform dialect.
-  passManager.addPass(mlir::iree_compiler::createTransformDialectJitterPass());
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
   //      schedule once applied.

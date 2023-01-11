@@ -81,11 +81,11 @@ iree_cc_library(
     MLIRVectorToSCF
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
-    iree::compiler::Codegen::Common::TransformDialectJitterPass
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Sandbox
+    iree::compiler::Codegen::TransformDialectStrategies::CPU::TransformDialectStrategies
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::VMVX

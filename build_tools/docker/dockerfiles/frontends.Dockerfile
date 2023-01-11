@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/android@sha256:e5f45760ab2dc8a1d72dc6e9d90056719bedac5678ee90e6d9f9b958172b4834
+FROM gcr.io/iree-oss/android@sha256:b0b607d95af8da6a6ce430f22d9d7c621702df13ce2b5d264b79d0ac7e60d670
 
 WORKDIR /pip-install
 

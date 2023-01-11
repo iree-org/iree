@@ -13,21 +13,21 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-ALL_DRIVERS = [
-    "cuda",
-    "local-sync",
-    "local-task",
-    "vulkan",
-]
-
 string_list_flag(
     name = "enabled_drivers",
     build_setting_default = [
+        "cuda",
         "local-sync",
         "local-task",
         "vulkan",
     ],
 )
+
+UNCONDITIONAL_DRIVERS = [
+    "local-sync",
+    "local-task",
+    "vulkan",
+]
 
 [
     config_setting(
@@ -36,8 +36,17 @@ string_list_flag(
             ":enabled_drivers": driver,
         },
     )
-    for driver in ALL_DRIVERS
+    for driver in UNCONDITIONAL_DRIVERS
 ]
+
+# CUDA is special and is conditioned on availability of the CUDA toolkit.
+config_setting(
+    name = "cuda_enabled",
+    flag_values = {
+        ":enabled_drivers": "cuda",
+        "@iree_cuda//:enabled": "True",
+    },
+)
 
 iree_runtime_cc_library(
     name = "drivers",

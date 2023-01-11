@@ -354,12 +354,13 @@ static linalg::LinalgOp findSingleLinalgOpDefiningAll(ValueRange range) {
     // operands may be coming from a Linalg op. Or a completely different
     // mechanism of tracking op replacement at creation, or even different
     // patterns that identify the "main" result of a transformation.
-    while (isa<tensor::CastOp, tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
-        value.getDefiningOp())) {
+    while (isa<tensor::CastOp, tensor::CollapseShapeOp, tensor::ExpandShapeOp,
+               tensor::InsertSliceOp>(value.getDefiningOp())) {
       value = llvm::TypeSwitch<Operation *, Value>(value.getDefiningOp())
                   .Case([](tensor::CastOp op) { return op.getSource(); })
                   .Case([](tensor::CollapseShapeOp op) { return op.getSrc(); })
                   .Case([](tensor::ExpandShapeOp op) { return op.getSrc(); })
+                  .Case([](tensor::InsertSliceOp op) { return op.getSource(); })
                   .Default([](Operation *) {
                     llvm_unreachable("Wrong op type");
                     return Value();
@@ -497,7 +498,7 @@ void ::transform_ext::CanonicalizedSequenceOp::build(
     OpBuilder &builder, OperationState &state,
     transform::FailurePropagationMode failurePropagationMode,
     ::transform_ext::CanonicalizedSequenceOp::BodyBuilderFn bodyBuilder) {
-  assert(state.name.isRegistered() && "not registered!!");
+  assert(state.name.isRegistered() && "not registered!");
   assert(bodyBuilder && "requires a body builder");
   MLIRContext *ctx = builder.getContext();
   state.addAttribute(
@@ -1208,33 +1209,6 @@ testMatchCallbackCallback(transform_ext::MatchCallbackResult &res, Location loc,
   return DiagnosedSilenceableFailure::success();
 }
 
-//===---------------------------------------------------------------------===//
-// IMPORTANT WARNING FOR ALL MATCH CALLBACK OPS !!!
-//===---------------------------------------------------------------------===//
-// We need to temporarily encode additional constraints in C++ that we
-// cannot yet express in the Matchers.
-//
-// These extra constraints are necessary because of the layering IREE
-// imposes on us: the dispatch regions are already pre-formed and we must
-// match **exactly** (best effort..) to avoid leaving dangling payload IR
-// in the dispatch that is not transformed (and leads to catastrophic
-// performance bugs or even miscompiles).
-// A future more robust system will let us form our own dispatches and we
-// won't need to be as strict on matching **exactly**.
-//
-// It is important that these additional C++ constraints can all be
-// expressed as separable matchers (and in the future as contraint IR).
-//
-// In the following, we make the assumption that TilingInterface ops are
-// exactly the payload ops that we must not miss.
-// This is best effort and if anything else must not be missed, it should also
-// be added here.
-int64_t transform_ext::getNumPayloadOpsThatWeMustMatch(Operation *root) {
-  int64_t mustMatchNumPayloadOps = 0;
-  root->walk([&](TilingInterface op) { mustMatchNumPayloadOps++; });
-  return mustMatchNumPayloadOps;
-}
-
 /// Match callback for a reduction with optional leading and trailing
 /// elementwise operations. Matches *the first* occurrence of such a reduction
 /// within an op associated with the given handle.
@@ -1266,12 +1240,6 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   // potentially with list matches for each group.
   Operation *root = state.getPayloadOps(handles[0])[0];
 
-  //
-  // !!We must match exactly all payload ops when the dispatch is pre-formed!!
-  //
-  int64_t mustMatchNumPayloadOps =
-      transform_ext::getNumPayloadOpsThatWeMustMatch(root);
-
   WalkResult walkResult = root->walk([&](Operation *op) {
     pattern.resetCapture();
     if (!matchPattern(op, pattern))
@@ -1283,122 +1251,15 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
       if (leading.getCaptured())
         DBGS() << leading.getCaptured() << "\n";
       DBGS() << "fill: " << fill.getCaptured() << "\n";
-      DBGS() << "pattern: " << fill.getCaptured() << "\n";
+      DBGS() << "pattern: " << pattern.getCaptured() << "\n";
       DBGS() << "trailing:\n";
       if (trailing.getCaptured())
         DBGS() << trailing.getCaptured() << "\n";
     });
-
-    //
-    // !!We must match exactly all payload ops when the dispatch is pre-formed!!
-    //
-    int64_t numMatchedOps = 2; // Mandatory operations.
-    if (leading.getCaptured())
-      ++numMatchedOps;
-    if (trailing.getCaptured())
-      ++numMatchedOps;
-    if (numMatchedOps != mustMatchNumPayloadOps) {
-      LLVM_DEBUG({
-        DBGS() << "Failed to match " << mustMatchNumPayloadOps
-               << " payload ops, matched " << numMatchedOps << " instead\n";
-      });
-      return WalkResult::advance();
-    }
 
     res.addPotentiallyEmptyPayloadGroup(leading.getCaptured());
     res.addPayloadGroup({fill.getCaptured()});
     res.addPayloadGroup({pattern.getCaptured()});
-    res.addPotentiallyEmptyPayloadGroup(trailing.getCaptured());
-    return WalkResult::interrupt();
-  });
-
-  if (walkResult.wasInterrupted())
-    return DiagnosedSilenceableFailure::success();
-  return emitSilenceableFailure(loc) << "failed to match";
-}
-
-/// Match callback for a reduction after splitting with optional leading and
-/// trailing elementwise operations. Matches *the first* occurrence of such a
-/// reduction within an op associated with the given handle.
-///
-/// Input handles:
-///
-///   - container op, must be associated with one operation.
-///
-/// Output handles:
-///
-///   - leading elementwise op, if any;
-///   - the "fill" op preceding the original reduction;
-///   - the "fill" op preceding the split, more parallel reduction;
-///   - the split, more parallel reduction op;
-///   - reduction op;
-///   - trailing elementwise op, if any.
-static DiagnosedSilenceableFailure
-splitReductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
-                       const mlir::transform::TransformState &state,
-                       ValueRange handles) {
-  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
-    return emitSilenceableFailure(loc)
-           << "expected one handle to one operation";
-  }
-
-  transform_ext::StructuredOpMatcher parallel_reduction, combiner_reduction,
-      parallel_fill, original_fill, leading, trailing;
-  makeSplitReductionMatcher(parallel_reduction, combiner_reduction,
-                            parallel_fill, original_fill, leading, trailing);
-
-  // TODO: need a mechanism for this to go around the entire IR,
-  // potentially with list matches for each group.
-  Operation *root = state.getPayloadOps(handles[0])[0];
-
-  //
-  // !!We must match exactly all payload ops when the dispatch is pre-formed!!
-  //
-  int64_t mustMatchNumPayloadOps =
-      transform_ext::getNumPayloadOpsThatWeMustMatch(root);
-
-  WalkResult walkResult = root->walk([&](Operation *op) {
-    combiner_reduction.resetCapture();
-    if (!matchPattern(op, combiner_reduction))
-      return WalkResult::advance();
-
-    // TODO: notify properly.
-    LLVM_DEBUG({
-      DBGS() << "leading:\n";
-      if (leading.getCaptured())
-        DBGS() << leading.getCaptured() << "\n";
-      DBGS() << "original_fill: " << original_fill.getCaptured() << "\n";
-      DBGS() << "parallel_fill: " << parallel_fill.getCaptured() << "\n";
-      DBGS() << "parallel_reduction: " << parallel_reduction.getCaptured()
-             << "\n";
-      DBGS() << "combiner_reduction: " << combiner_reduction.getCaptured()
-             << "\n";
-      DBGS() << "trailing:\n";
-      if (trailing.getCaptured())
-        DBGS() << trailing.getCaptured() << "\n";
-    });
-
-    //
-    // !!We must match exactly all payload ops when the dispatch is pre-formed!!
-    //
-    int64_t numMatchedOps = 4; // Mandatory operations.
-    if (leading.getCaptured())
-      ++numMatchedOps;
-    if (trailing.getCaptured())
-      ++numMatchedOps;
-    if (numMatchedOps != mustMatchNumPayloadOps) {
-      LLVM_DEBUG({
-        DBGS() << "Failed to match " << mustMatchNumPayloadOps
-               << " payload ops, matched " << numMatchedOps << " instead\n";
-      });
-      return WalkResult::advance();
-    }
-
-    res.addPotentiallyEmptyPayloadGroup(leading.getCaptured());
-    res.addPayloadGroup({original_fill.getCaptured()});
-    res.addPayloadGroup({parallel_fill.getCaptured()});
-    res.addPayloadGroup({parallel_reduction.getCaptured()});
-    res.addPayloadGroup({combiner_reduction.getCaptured()});
     res.addPotentiallyEmptyPayloadGroup(trailing.getCaptured());
     return WalkResult::interrupt();
   });
@@ -1414,7 +1275,6 @@ DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
   auto &registry = state.addExtension<transform_ext::MatchCallbacksRegistry>();
   registry.registerCallback("_test_match_callback", testMatchCallbackCallback);
   registry.registerCallback("reduction", reductionCallback);
-  registry.registerCallback("split_reduction", splitReductionCallback);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -1457,4 +1317,23 @@ void transform_ext::TakeFirstOp::getEffects(
   mlir::transform::onlyReadsHandle(getInputs(), effects);
   mlir::transform::producesHandle(getFirst(), effects);
   mlir::transform::producesHandle(getRest(), effects);
+}
+
+//===---------------------------------------------------------------------===//
+// EmitRemarkOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_ext::EmitRemarkOp::applyToOne(
+    Operation *target, mlir::transform::ApplyToEachResultList &results,
+    mlir::transform::TransformState &state) {
+  for (Operation *payload : state.getPayloadOps(getHandle())) {
+    payload->emitRemark(getMessage());
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_ext::EmitRemarkOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  mlir::transform::onlyReadsHandle(getHandle(), effects);
+  mlir::transform::onlyReadsPayload(effects);
 }

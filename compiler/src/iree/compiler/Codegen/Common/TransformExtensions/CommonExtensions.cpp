@@ -184,7 +184,7 @@ static void addEraseUnnecessaryTensorOperandsPatterns(
 static void addRankReducingPatterns(RewritePatternSet &patterns) {
   populateReshapeToInterfaceTensorPatterns(patterns);
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
 }
 
 static void addSwappingPatterns(RewritePatternSet &patterns,
@@ -209,14 +209,8 @@ static void addAllRegisteredCanonicalizationPatterns(
     op.getCanonicalizationPatterns(patterns, ctx);
 }
 
-static void addConverToDPSPatterns(RewritePatternSet &patterns) {
-  populateReshapeToInterfaceTensorPatterns(patterns);
-  vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
-}
-
 DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
-    Operation *target, SmallVectorImpl<Operation *> &results,
+    Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     return mlir::emitDefiniteFailure(
@@ -256,8 +250,15 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (failed(listenerResult))
     return mlir::emitDefiniteFailure(target, "listener tracking failed");
 
-  results.assign({target});
+  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ApplyPatternsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
 }
 
 //===---------------------------------------------------------------------===//
@@ -442,7 +443,7 @@ LogicalResult rewriteForeachThreadToWorkgroup(
 
 DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
-    func::FuncOp target, SmallVectorImpl<Operation *> &results,
+    func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     return mlir::emitDefiniteFailure(
@@ -484,7 +485,7 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
                                      "rewriteForeachThreadToWorkgroup failed");
   }
 
-  results.assign({target});
+  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -755,10 +756,21 @@ using mlir::bufferization::OneShotBufferizationOptions;
 
 void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
                                                OperationState &result,
-                                               Value target, bool targetGpu) {
+                                               Value target, bool targetGpu,
+                                               bool testAnalysisOnly,
+                                               bool printConflicts) {
   result.addOperands(target);
   if (targetGpu) {
     result.addAttribute(IREEBufferizeOp::getTargetGpuAttrName(result.name),
+                        builder.getUnitAttr());
+  }
+  if (testAnalysisOnly) {
+    result.addAttribute(
+        IREEBufferizeOp::getTestAnalysisOnlyAttrName(result.name),
+        builder.getUnitAttr());
+  }
+  if (printConflicts) {
+    result.addAttribute(IREEBufferizeOp::getPrintConflictsAttrName(result.name),
                         builder.getUnitAttr());
   }
   MLIRContext *ctx = builder.getContext();
@@ -939,6 +951,12 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   });
   if (res.wasInterrupted())
     return DiagnosedSilenceableFailure::definiteFailure();
+
+  // Early exit if test_analysis_only is set.
+  if (getTestAnalysisOnly()) {
+    results.set(getOperation()->getOpResult(0), payload.front());
+    return DiagnosedSilenceableFailure::success();
+  }
 
   //   3. Post-bufferization passes are fine.
   PassManager pm(getContext());

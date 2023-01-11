@@ -12,7 +12,7 @@
 // We do this here instead of relying on an external build target so that we can
 // ensure our configuration specified in tracing.h is picked up.
 #if IREE_TRACING_FEATURES != 0
-#include "third_party/tracy/public/TracyClient.cpp"
+#include "TracyClient.cpp"
 #endif  // IREE_TRACING_FEATURES
 
 #ifdef __cplusplus

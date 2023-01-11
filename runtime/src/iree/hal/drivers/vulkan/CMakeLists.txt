@@ -77,6 +77,7 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::spirv_executable_def_c_fbs
+    tracy_client::runtime_impl
     vulkan_memory_allocator
   PUBLIC
 )

@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# bazel-to-cmake: skip
+
 # This is problematic on anything non-Linux but Bazel has failed
 # for years to provide the flexibility to make it any better. Yolo.
 # We really only support this for some very narrow use cases that

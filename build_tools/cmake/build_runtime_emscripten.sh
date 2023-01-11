@@ -31,6 +31,8 @@ cd "${BUILD_DIR}"
 
 # Configure using Emscripten's CMake wrapper, then build.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
+  -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}" \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \

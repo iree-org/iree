@@ -10,9 +10,9 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
-#include "iree/compiler/Codegen/Common/TransformDialectStrategiesCPU.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/CPU/Common.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -95,6 +95,17 @@ llvm::cl::opt<bool> clCPUEnableTransformDialectJit(
     "iree-codegen-llvmcpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
+llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugPayloadTag(
+    "iree-codegen-llvmcpu-transform-dialect-debug-payload-tag",
+    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
+                   "payload root operation"),
+    llvm::cl::init(""));
+
+llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugTransformTag(
+    "iree-codegen-llvmcpu-transform-dialect-debug-transform-tag",
+    llvm::cl::desc(
+        "tag attribute value for the transform dialect transform op container"),
+    llvm::cl::init(""));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -1212,15 +1223,15 @@ static LogicalResult setTransformStrategyRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  if (!clCPUEnableTransformDialectJit) return success();
-  if (getLoweringConfig(genericOp)) {
-    return success();
-  }
-  if (failed(matchAndSetCPUReductionTransformStrategy(entryPointFn, genericOp)))
-    return success();
+  if (!clCPUEnableTransformDialectJit) return failure();
+  if (getLoweringConfig(genericOp)) return failure();
+  cpu::CPUModel cpuModel;
+  if (failed(
+          cpu::matchAndSetReductionStrategy(entryPointFn, genericOp, cpuModel)))
+    return failure();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                      TransformDialectJitterCodegen);
+      entryPointFn->getContext(),
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
   if (failed(setTranslationInfo(entryPointFn, translationInfo)))
     return failure();
   return success();
@@ -1376,9 +1387,11 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  if (failed(setTransformStrategyRootConfig(entryPointFn, genericOp,
-                                            linalgOpInfo, targetMLTransInfo)) ||
-      failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp, linalgOpInfo,
+  // First, try to apply the transform dialect strategy, if defined.
+  if (succeeded(setTransformStrategyRootConfig(
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo)))
+    return success();
+  if (failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp, linalgOpInfo,
                                           targetMLTransInfo)) ||
       failed(setElementwiseGenericOpRootConfig(
           entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo)) ||
@@ -1389,13 +1402,23 @@ static LogicalResult setRootConfig(
   return success();
 }
 
+namespace {
+bool is2DPoolingOp(linalg::LinalgOp op) {
+  return isa<linalg::PoolingNhwcSumOp, linalg::PoolingNchwSumOp,
+             linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+             linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
+             linalg::PoolingNchwMaxOp>(op.getOperation());
+}
+}  // namespace
+
 /// Sets lowering configuration for conv ops. See below for supported conv ops.
 static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
                                        linalg::LinalgOp convOp,
                                        ArrayRef<int64_t> targetTileSizes,
                                        int64_t vectorSize) {
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-           linalg::DepthwiseConv2DNhwcHwcOp>(convOp.getOperation())) {
+           linalg::DepthwiseConv2DNhwcHwcOp>(convOp.getOperation()) &&
+      !is2DPoolingOp(convOp)) {
     return failure();
   }
 
@@ -1448,7 +1471,8 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
                                                   linalg::LinalgOp op,
                                                   int64_t vectorSize) {
   bool isSupported = isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-                         linalg::DepthwiseConv2DNhwcHwcOp>(op.getOperation());
+                         linalg::DepthwiseConv2DNhwcHwcOp>(op.getOperation()) ||
+                     is2DPoolingOp(op);
   (void)isSupported;
   assert(isSupported && "conv op is not supported");
 
@@ -1457,21 +1481,27 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
 
   if (isX86(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp>(
+        .Case<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
+              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 3}; })
         .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   } else if (isRISCV(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp>(
+        .Case<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
+              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize, 1, 3}; })
         .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   } else if (isAArch64(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp>(
+        .Case<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
+              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp>(
             [&](auto op) { tileSizes = {1, 1, 32, 64, 1, 1, 16}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 4, 4, 1, 4}; })
@@ -1479,9 +1509,12 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
   } else {
     // Get default hard-coded tile sizes if we couldn't compute anything better.
     TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp>([&](auto op) {
-          tileSizes = {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
-        })
+        .Case<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
+              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp>(
+            [&](auto op) {
+              tileSizes = {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
+            })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>([&](auto op) {
           tileSizes = {1, 1, vectorSize, vectorSize, 1, vectorSize};
         })
@@ -1491,23 +1524,68 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
   return tileSizes;
 }
 
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::Conv2DNhwcHwcfOp convOp) {
+static LogicalResult setConvNhwcRootConfigImpl(func::FuncOp entryPointFn,
+                                               linalg::LinalgOp convOp) {
   int64_t vectorSize =
-      getVectorSize(entryPointFn, convOp.getResult(0).getType());
+      getVectorSize(entryPointFn, convOp.getDpsInitOperand(0)->get().getType());
   SmallVector<int64_t> targetTileSizes =
       getConvWorkgroupSizes(entryPointFn, convOp, vectorSize);
   return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
 }
 
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::Conv2DNhwcHwcfOp convOp) {
+  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
+}
+
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::PoolingNhwcSumOp convOp) {
+  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
+}
+
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::PoolingNhwcMaxOp convOp) {
+  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
+}
+
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::PoolingNhwcMaxUnsignedOp convOp) {
+  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
+}
+
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::PoolingNhwcMinOp convOp) {
+  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
+}
+
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::PoolingNhwcMinUnsignedOp convOp) {
+  return setConvNhwcRootConfigImpl(entryPointFn, convOp);
+}
+
 /// Sets the lowering configuration for linalg.conv_2d_nchw_fchw
 /// operations.
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::Conv2DNchwFchwOp convOp) {
+static LogicalResult setConvNchwRootConfigImpl(func::FuncOp entryPointFn,
+                                               linalg::LinalgOp convOp) {
   int64_t vectorSize =
-      getVectorSize(entryPointFn, convOp.getResult(0).getType());
+      getVectorSize(entryPointFn, convOp.getDpsInitOperand(0)->get().getType());
   SmallVector<int64_t> targetTileSizes = {1, vectorSize * 2, 1, 8, 8, 1, 1};
   return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
+}
+
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::Conv2DNchwFchwOp convOp) {
+  return setConvNchwRootConfigImpl(entryPointFn, convOp);
+}
+
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::PoolingNchwSumOp convOp) {
+  return setConvNchwRootConfigImpl(entryPointFn, convOp);
+}
+
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::PoolingNchwMaxOp convOp) {
+  return setConvNchwRootConfigImpl(entryPointFn, convOp);
 }
 
 /// Sets the lowering configuration for linalg.depthwise_conv_2d_nhwc_hwc
@@ -1733,21 +1811,13 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     if (!exportOp) continue;
     if (getTranslationInfo(exportOp)) continue;
 
-    // If using the transform dialect, call the proper pipeline.
-    assert((clCPUCodegenTransformDialectFileName.empty() ||
-            !clCPUEnableTransformDialectJit) &&
-           "Can't use both transform dialect interpreted and jitted modes");
+    // If using the transform dialect with a script file, intercept early.
     if (!clCPUCodegenTransformDialectFileName.empty()) {
+      assert(!clCPUEnableTransformDialectJit &&
+             "Can't use both transform dialect interpreted and jitted modes");
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectInterpreterCodegen);
-      if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
-      continue;
-    }
-    if (clCPUEnableTransformDialectJit) {
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectJitterCodegen);
+          moduleOp.getContext(),
+          IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
       if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
       continue;
     }
@@ -1764,7 +1834,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     }
   }
 
-  // The root confguration setting introduces `tensor.dim` operations. Resolve
+  // The root configuration setting introduces `tensor.dim` operations. Resolve
   // those away.
   RewritePatternSet patterns(moduleOp.getContext());
   memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);

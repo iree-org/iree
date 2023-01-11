@@ -15,7 +15,11 @@ package(
 iree_compiler_cc_library(
     name = "Embed",
     srcs = [
+        "Diagnostics.cpp",
         "Embed.cpp",
+    ],
+    hdrs = [
+        "Diagnostics.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/API2:Headers",

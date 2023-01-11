@@ -241,6 +241,7 @@ hal.executable @shared_memory_dealloc_elision {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.export @shared_memory_dealloc_elision layout(#pipeline_layout)
     builtin.module {
+// CHECK-LABEL: llvm.func @shared_memory_dealloc_elision() {
       func.func @shared_memory_dealloc_elision() {
         %f0 = arith.constant 0.0 : f32
         %c0 = arith.constant 0 : index
@@ -254,3 +255,40 @@ hal.executable @shared_memory_dealloc_elision {
     }
   }
 }
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
+hal.executable @shared_memory_lowering_aligned_alloc {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.export @shared_memory_lowering_aligned_alloc layout(#pipeline_layout)
+    builtin.module {
+      func.func @shared_memory_lowering_aligned_alloc() {
+        %c0 = arith.constant 0 : index
+        %cst_f32 = arith.constant 0.000000e+00 : f32
+        %cst_i8 = arith.constant 0 : i8
+        %0 = memref.alloc() : memref<1xi8, 3>
+        %1 = memref.alloc() : memref<32xf32, 3>
+        memref.store %cst_i8, %0[%c0] : memref<1xi8, 3>
+        memref.store %cst_f32, %1[%c0] : memref<32xf32, 3>
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
+// CHECK-LABEL: llvm.func @shared_memory_lowering_aligned_alloc() {
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x i8>, 3>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<32 x f32>, 3>

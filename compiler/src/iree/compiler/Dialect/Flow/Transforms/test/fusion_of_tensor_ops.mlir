@@ -46,18 +46,24 @@ func.func @softmax(%arg0 : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
 //       CHECK:   %[[FILL0:.+]] = linalg.fill
 //  CHECK-SAME:       outs(%[[INIT0]] :
 //       CHECK:   %[[GENERIC0:.+]] = linalg.generic
+//  CHECK-SAME:       ["parallel", "parallel", "reduction"]
 //  CHECK-SAME:       ins(%[[ARG0]] :
 //  CHECK-SAME:       outs(%[[FILL0]] :
 //       CHECK:   %[[INIT1:.+]] = tensor.empty()
+//       CHECK:   %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:       ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:       ins(%[[ARG0]], %[[GENERIC0]] :
+//  CHECK-SAME:       outs(%[[INIT1]] :
 //       CHECK:   %[[FILL1:.+]] = linalg.fill
 //  CHECK-SAME:       outs(%[[INIT0]] :
-//       CHECK:   %[[GENERIC1:.+]]:2 = linalg.generic
-//  CHECK-SAME:       ins(%[[ARG0]], %[[GENERIC0]] :
-//  CHECK-SAME:       outs(%[[INIT1]], %[[FILL1]] :
 //       CHECK:   %[[GENERIC2:.+]] = linalg.generic
-//  CHECK-SAME:       ins(%[[GENERIC1]]#0, %[[GENERIC1]]#1 :
+//  CHECK-SAME:       ["parallel", "parallel", "reduction"]
+//  CHECK-SAME:       ins(%[[GENERIC1]] :
+//  CHECK-SAME:       outs(%[[FILL1]] :
+//       CHECK:   %[[GENERIC3:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[GENERIC1]], %[[GENERIC2]] :
 //  CHECK-SAME:       outs(%[[INIT1]] :
-//       CHECK:   return %[[GENERIC2]]
+//       CHECK:   return %[[GENERIC3]]
 
 // -----
 

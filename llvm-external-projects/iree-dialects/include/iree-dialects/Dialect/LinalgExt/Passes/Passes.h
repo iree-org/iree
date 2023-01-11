@@ -246,11 +246,46 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPeelPass(
         LinalgExt::LinalgTransformationFilter());
 
 /// Create a LinalgStrategyVectorizePass.
+using VectorSizeComputationFunction =
+    std::function<SmallVector<int64_t>(linalg::LinalgOp, ArrayRef<int64_t>)>;
+
+struct LinalgVectorizationOptions {
+  /// Canonical vector sizes for the vector iteration space (i.e., vectorization
+  /// factors). They are optional for input code with full static shapes.
+  SmallVector<int64_t> canonicalVectorSizes;
+
+  LinalgVectorizationOptions &
+  setCanonicalVectorSizes(ArrayRef<int64_t> vecSizes) {
+    assert(canonicalVectorSizes.empty() &&
+           "Canonical vector sizes are already set");
+    canonicalVectorSizes.append(vecSizes.begin(), vecSizes.end());
+    return *this;
+  }
+
+  /// Computation function that returns the vector sizes to vectorize a given
+  /// Linalg operation and the canonical vector sizes of the iteration space.
+  VectorSizeComputationFunction vectorSizeComputationFunction = nullptr;
+
+  LinalgVectorizationOptions &
+  setVectorSizeComputationFunction(VectorSizeComputationFunction fun) {
+    vectorSizeComputationFunction = std::move(fun);
+    return *this;
+  }
+
+  /// Enable vectorization of padding operations.
+  bool vectorizePadding = false;
+
+  LinalgVectorizationOptions &setVectorizePadding(bool vecPad) {
+    vectorizePadding = vecPad;
+    return *this;
+  }
+};
+
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyVectorizePass(
     StringRef opName = "",
+    const LinalgVectorizationOptions &options = LinalgVectorizationOptions(),
     const LinalgExt::LinalgTransformationFilter &filter =
-        LinalgExt::LinalgTransformationFilter(),
-    bool padVectorize = false);
+        LinalgExt::LinalgTransformationFilter());
 
 /// Create a LinalgStrategyEnablePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyEnablePass(

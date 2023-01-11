@@ -166,8 +166,8 @@ def MatchCallbackOp :
 
   let arguments = (ins StrAttr:$callback_name,
                        FailurePropagationMode:$failure_propagation_mode,
-                       Variadic<TransformTypeInterface>:$inputs);
-  let results = (outs Variadic<TransformTypeInterface>:$outputs);
+                       Variadic<TransformHandleTypeInterface>:$inputs);
+  let results = (outs Variadic<TransformHandleTypeInterface>:$outputs);
   let assemblyFormat = "`failures` `(` $failure_propagation_mode `)` "
                        "$callback_name `(` $inputs `)` attr-dict "
                        "`:` functional-type($inputs, $outputs)";
@@ -193,12 +193,34 @@ def TakeFirstOp :
     unsuccessful matches.
   }];
 
-  let arguments = (ins Variadic<TransformTypeInterface>:$inputs);
-  let results = (outs TransformTypeInterface:$first,
-                      TransformTypeInterface:$rest);
+  let arguments = (ins Variadic<TransformHandleTypeInterface>:$inputs);
+  let results = (outs TransformHandleTypeInterface:$first,
+                      TransformHandleTypeInterface:$rest);
   let assemblyFormat =
       "$inputs attr-dict `:` functional-type($inputs, results)";
   let cppNamespace = "mlir::transform_ext";
+}
+
+def EmitRemarkOp :
+    Op<Transform_Dialect, "iree.emit_remark",
+       [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+        TransformOpInterface, TransformEachOpTrait]> {
+  let description = [{
+    Emits a diagnostic remark with the given message located at payload ops
+    associated with the given handle. This can be used, e.g., for debugging.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$handle,
+                       StrAttr:$message);
+  let assemblyFormat = "$message `at` $handle attr-dict `:` type($handle)";
+  let cppNamespace = "mlir::transform_ext";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+      ::mlir::Operation *target,
+      ::mlir::transform::ApplyToEachResultList &results,
+      ::mlir::transform::TransformState &state);
+  }];
 }
 
 #endif // STRUCTURED_TRANSFORM_OPS_EXT

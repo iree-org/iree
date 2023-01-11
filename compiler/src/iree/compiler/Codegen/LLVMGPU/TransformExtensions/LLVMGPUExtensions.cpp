@@ -7,6 +7,7 @@
 #include "LLVMGPUExtensions.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -57,7 +58,7 @@ void transform_dialect::MapNestedForeachThreadToGpuThreadsOp::build(
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
 transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
-    func::FuncOp target, SmallVectorImpl<Operation *> &results,
+    func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     state.getTopLevel()->emitOpError(
@@ -99,7 +100,7 @@ transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
     // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
     exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
   }
-  results.assign({target});
+  results.push_back(target);
   return diag;
 }
 
@@ -266,9 +267,10 @@ static HAL::ExecutableExportOp getExecutableExportOpForFunc(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
-    scf::IfOp target, SmallVectorImpl<Operation *> &results,
+    scf::IfOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
+    results.assign(1, nullptr);
     return emitDefaultSilenceableFailure(state.getTopLevel())
            << "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel "
               "so that IR is properly isolated. This is required so we can "
@@ -320,7 +322,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
            << "scf::ifOp needs to be predicated on threadIdx.x == 0 --- the "
               "transform is not applied";
   }
-  results.assign({vectorDistributionResult->warpOp});
+  results.push_back(vectorDistributionResult->warpOp);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -348,23 +350,6 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
                                  gpu::GPUDialect::getWorkgroupAddressSpace());
   }
   return builder.create<memref::AllocOp>(loc, memrefType);
-}
-
-/// Emit warp reduction code sequence for a given input.
-static Value warpReduction(Location loc, OpBuilder &builder, Value input,
-                           vector::CombiningKind kind, uint32_t size) {
-  // First reduce on a single thread to get per lane reduction value.
-  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-  // Parallel reduction using butterfly shuffles.
-  for (uint64_t i = 1; i < size; i <<= 1) {
-    Value shuffled = builder
-                         .create<gpu::ShuffleOp>(loc, laneVal, i,
-                                                 /*width=*/size,
-                                                 /*mode=*/gpu::ShuffleMode::XOR)
-                         .getShuffleResult();
-    laneVal = makeArithReduction(builder, loc, kind, laneVal, shuffled);
-  }
-  return laneVal;
 }
 
 /// Return a value yielded by `warpOp` which statifies the filter lamdba
@@ -535,10 +520,15 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
 static void populatePropagateVectorDistribution(Operation *target,
                                                 RewritePatternSet &patterns,
                                                 PatternBenefit benefit) {
+  auto groupReductionFn = [](Location loc, OpBuilder &builder, Value input,
+                             vector::CombiningKind kind, uint32_t size) {
+    return mlir::iree_compiler::emitGPUGroupReduction(loc, builder, input, kind,
+                                                      size, 32);
+  };
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populatePropagateWarpVectorDistributionPatterns(
       patterns, simpleDistributionFunction, simpleWarpShuffleFunction, benefit);
-  vector::populateDistributeReduction(patterns, warpReduction, benefit);
+  vector::populateDistributeReduction(patterns, groupReductionFn, benefit);
   patterns.add<WarpOpLoad, HoistSharedMemoryAlloc>(target->getContext(),
                                                    benefit);
 }
@@ -559,7 +549,7 @@ static void populateWarpExecuteOnLane0ToScf(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorWarpDistributionOp::applyToOne(
-    Operation *target, SmallVectorImpl<Operation *> &results,
+    Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     target->emitOpError(

@@ -77,8 +77,6 @@ def FormDispatchRegions :
            /*default=*/"false", "Fuse with aggressive heuristics">,
     Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
            /*default=*/"true", "Generate workload regions of WorkgroupOps">,
-    Option<"collapse", "collapse", "bool",
-           /*default=*/"true", "Collapse Op and tensors that are used">,
   ];
 }
 
@@ -90,6 +88,12 @@ def FormDispatchWorkgroups :
     Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
            /*default=*/"true", "Generate workload regions of WorkgroupOps">,
   ];
+}
+
+def CollapseDimensions :
+    InterfacePass<"iree-flow-collapse-dimensions", "mlir::FunctionOpInterface"> {
+  let summary = "Collapse dimensions of Linalg Ops on tensor ops.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCollapseDimensionsPass()";  
 }
 
 def DispatchWithTransformDialect :

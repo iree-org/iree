@@ -28,11 +28,8 @@ if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
     DEPS
       iree::hal::drivers::local_sync::registration
     EXCLUDED_TESTS
-      # TODO(#4680): command buffer recording so that these can run on sync HAL
-      "command_buffer"
-      "event"
-      "semaphore_submission"
-  )
+      "semaphore_submission"  # SubmitWithWait hangs?
+    )
 endif()
 
 if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
@@ -52,9 +49,6 @@ if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
     DEPS
       iree::hal::drivers::local_sync::registration
     EXCLUDED_TESTS
-      # TODO(#4680): command buffer recording so that these can run on sync HAL
-      "command_buffer"
-      "event"
-      "semaphore_submission"
+      "semaphore_submission"  # SubmitWithWait hangs?
   )
 endif()

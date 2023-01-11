@@ -15,11 +15,14 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
+#include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "runtime/src/iree/builtins/ukernel/exported_bits.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -39,11 +42,6 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
   auto boundTensorType =
       dispatchTensorType.getBoundType().dyn_cast<RankedTensorType>();
   if (!boundTensorType) {
-    return failure();
-  }
-
-  auto encoding = boundTensorType.getEncoding().dyn_cast<EncodingAttr>();
-  if (!encoding) {
     return failure();
   }
 
@@ -257,12 +255,41 @@ static FailureOr<MaterializeEncodingInfo> chooseEncodingInfo(
 static FailureOr<MaterializeEncodingValueInfo>
 chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
                                           OpBuilder &builder, Location loc) {
-  // For now just create Values equal to 1.
-  // TODO: create a new vmvx.get_tile_sizes op here.
-  MaterializeEncodingValueInfo info;
-  info.innerTileSizes = SmallVector<Value>(
-      tensorType.getRank(), builder.create<arith::ConstantIndexOp>(loc, 1));
-  return info;
+  Optional<TensorEncoding> encoding = getEncoding(tensorType);
+  if (!encoding) return failure();
+  auto matmulType = getMatmulType(*encoding);
+  auto matmulOperandRole = getMatmulOperandRole(*encoding);
+  if (!matmulType || !matmulOperandRole) return failure();
+  uint32_t flags = 0;
+  if (*matmulType == MatmulType::F32F32F32) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
+  } else if (*matmulType == MatmulType::I8I8I32) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
+  } else {
+    return failure();
+  }
+  if (*matmulOperandRole == MatmulOperandRole::LHS) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
+  } else if (*matmulOperandRole == MatmulOperandRole::RHS) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
+  } else if (*matmulOperandRole == MatmulOperandRole::RHS_TRANSPOSE) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS_TRANSPOSE;
+  } else if (*matmulOperandRole == MatmulOperandRole::RESULT) {
+    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
+  } else {
+    return failure();
+  }
+  SmallVector<Type> tileSizesTypes(tensorType.getRank(),
+                                   builder.getIndexType());
+  SmallVector<Value> shapeValues;
+  for (int64_t i : tensorType.getShape()) {
+    shapeValues.push_back(builder.create<arith::ConstantIndexOp>(loc, i));
+  }
+  auto op = builder.create<IREE::VMVX::QueryTileSizesOp>(
+      loc, tileSizesTypes, shapeValues, builder.getI32IntegerAttr(flags));
+  MaterializeEncodingValueInfo result;
+  result.innerTileSizes = op.getTileSizes();
+  return result;
 }
 
 /// Pattern to materialize the encoding for `hal.interface.binding.subspan`
@@ -421,7 +448,8 @@ struct IREEMaterializeEncodingPass
     : public IREEMaterializeEncodingBase<IREEMaterializeEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, AffineDialect, IREE::Flow::FlowDialect,
-                    IREELinalgExtDialect>();
+                    IREE::LinalgExt::IREELinalgExtDialect,
+                    IREE::VMVX::VMVXDialect>();
   }
   void runOnOperation() override;
 };

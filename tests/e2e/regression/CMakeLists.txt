@@ -162,6 +162,26 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    aggressive_fusion_test_cuda
+  SRCS
+    "softmax.mlir"
+    "softmax_large.mlir"
+  TARGET_BACKEND
+    "cuda"
+  DRIVER
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-flow-enable-aggressive-fusion"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     disable_demote_f64_to_f32
   SRCS
     "disable_demote_f64_to_f32.mlir"
