@@ -139,13 +139,11 @@ std::unique_ptr<InterfacePass<CallableOpInterface>> createPackAllocationsPass();
 std::unique_ptr<InterfacePass<CallableOpInterface>> createLayoutSlicesPass();
 
 //===----------------------------------------------------------------------===//
-// Memoization
+// Stream memoization
 //===----------------------------------------------------------------------===//
 
 // TODO(benvanik): outline streams (ala dispatch regions).
 // TODO(benvanik): deduplicate outlined streams.
-
-std::unique_ptr<OperationPass<ModuleOp>> createMemoizeChannelsPass();
 
 //===----------------------------------------------------------------------===//
 // Dispatch optimization
@@ -154,6 +152,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeChannelsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldUniformOperandsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseDispatchBindingsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createSpecializeDispatchesPass();
+
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createAnnotateDispatchArgumentsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPackDispatchOperandsPass();

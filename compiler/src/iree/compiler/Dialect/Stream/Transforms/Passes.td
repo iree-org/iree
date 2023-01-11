@@ -166,19 +166,11 @@ def LayoutSlices :
 }
 
 //===----------------------------------------------------------------------===//
-// Memoization
+// Stream memoization
 //===----------------------------------------------------------------------===//
 
 // TODO(benvanik): outline streams (ala dispatch regions).
 // TODO(benvanik): deduplicate outlined streams.
-
-def MemoizeChannels :
-    Pass<"iree-stream-memoize-channels", "mlir::ModuleOp"> {
-  let summary = "Memoizes channel creation by migrating accesses to globals.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Stream::createMemoizeChannelsPass()
-  }];
-}
 
 //===----------------------------------------------------------------------===//
 // Dispatch optimization

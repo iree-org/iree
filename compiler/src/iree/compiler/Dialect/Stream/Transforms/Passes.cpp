@@ -328,9 +328,6 @@ void buildStreamTransformPassPipeline(
   // Post-pipeline cleanup
   //----------------------------------------------------------------------------
 
-  // Memoize shared resources.
-  passManager.addPass(IREE::Stream::createMemoizeChannelsPass());
-
   // Final cleanup after we optimize dispatches and fuse operands and bindings.
   addCleanupPatterns(passManager);
 

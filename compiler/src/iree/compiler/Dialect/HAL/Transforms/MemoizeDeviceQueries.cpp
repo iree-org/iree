@@ -42,8 +42,10 @@ class MemoizeDeviceQueriesPass
     // This lets us easily replace all usages of a match with a single variable.
     SmallVector<Attribute, 4> deviceQueryKeys;
     DenseMap<Attribute, std::vector<IREE::HAL::DeviceQueryOp>> deviceQueryOps;
-    for (auto callableOp : moduleOp.getOps<mlir::CallableOpInterface>()) {
-      callableOp.walk([&](IREE::HAL::DeviceQueryOp queryOp) {
+    for (Operation &funcLikeOp : moduleOp.getOps()) {
+      auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
+      if (!funcOp) continue;
+      funcLikeOp.walk([&](IREE::HAL::DeviceQueryOp queryOp) {
         auto fullKey = ArrayAttr::get(
             moduleOp.getContext(),
             {
