@@ -112,7 +112,7 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
   }
 }
 
-static void buildStagedReductionStrategyFindBetterName(
+static void buildStagedReductionStrategyThreadLevel(
     ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledLeadingH,
     Value maybeTiledTrailingH, const StagedReductionStrategy &strategy) {
   // Map the potential maybeTiledLeadingH.
@@ -135,21 +135,26 @@ static void buildStagedReductionStrategyFindBetterName(
   }
 
   // Staged reduction step 1: break gridReductionH apart.
-  auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
-                                                      mlir::gpu::Threads::DimX);
   auto [blockParallelForeachThreadOp, blockParallelFillH, blockCombinerOpH] =
       buildTileReductionUsingScfForeach(
-          b, gridReductionH, strategy.captures.reductionRank,
-          strategy.getNumThreadsXInBlock(), strategy.getVectorSize(), threadX);
+          /*b=*/b,
+          /*reductionH=*/gridReductionH,
+          /*reductionRank=*/strategy.captures.reductionRank,
+          /*tileSize=*/strategy.getNumThreadsXInBlock(),
+          /*reductionVectorSize=*/strategy.getVectorSize(),
+          /*mappingAttr=*/strategy.allThreadAttrs[0]);
 
   // Staged reduction step 2: multi-warp shuffle reduce.
-  // Map the combiner reduction to one thread along y so it can be mapped
-  // further via predication.
-  auto threadY = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
-                                                      mlir::gpu::Threads::DimY);
+  // Map the combiner reduction to one thread along y. Mapping this part along
+  // y only will trigger the insertion of an `scf.if (threadIdx.x == 0)`
+  // predicate after `scf.foreach_thread` is lowered.
+  // This predicate allows further vector distribution to kick in.
   iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
-      b, blockCombinerOpH, {}, getAsOpFoldResult(b.getI64ArrayAttr({1})),
-      b.getArrayAttr(threadY));
+      /*b=*/b,
+      /*rootH=*/blockCombinerOpH,
+      /*opsToFuse=*/{},
+      /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({1})),
+      /*mappingAttr=*/b.getArrayAttr(strategy.allThreadAttrs[1]));
 
   // Map the potential maybeTiledTrailingH.
   if (strategy.captures.maybeTrailingRank > 0) {
@@ -184,9 +189,8 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
   // Step 2. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
   // TODO: consider fusing gridFillH.
-  buildStagedReductionStrategyFindBetterName(
-      b, gridReductionH, maybeLeadingHBlock, maybeTiledTrailingHBlock,
-      strategy);
+  buildStagedReductionStrategyThreadLevel(b, gridReductionH, maybeLeadingHBlock,
+                                          maybeTiledTrailingHBlock, strategy);
 
   // Step 3-4. Common trailing steps.
   auto [variantH2, funcH] = buildCommonTrailingStrategy(b, variantH, strategy);
