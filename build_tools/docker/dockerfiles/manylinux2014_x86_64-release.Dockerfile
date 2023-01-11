@@ -15,7 +15,7 @@
 # to a newer revision. Newer manylinux images are based on Debian.
 #
 # Refer to: https://github.com/pypa/manylinux
-FROM quay.io/pypa/manylinux2014_x86_64@sha256:54c66a6865280a601b3888601b741e3a1c362ef8ef5d969118a22275ea225102
+FROM quay.io/pypa/manylinux2014_x86_64@sha256:9b463efac479efbcab6dec77eca28c5cfa0c5ef64f13ac184eb7117dc1f8edda
 
 SHELL ["/bin/bash", "-e", "-u", "-o", "pipefail", "-c"]
 
