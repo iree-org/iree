@@ -22,9 +22,11 @@ namespace gpu {
 /// sufficient to steer the strategy to produce a good version.
 /// These can be thought of as latent variables or embeddings that directly
 /// control the strategy and can be derived from the hardware by some procedure.
+enum class ReductionStrategy { Small, Staged };
 struct ReductionConfig {
   int64_t maxNumThreads;
   int64_t vectorSize;
+  ReductionStrategy strategy;
 };
 
 /// Structure to hold the parameters that control the reduction strategy.
@@ -44,7 +46,6 @@ struct AbstractReductionStrategy : iree_compiler::AbstractReductionStrategy {
 
   virtual ~AbstractReductionStrategy() {}
 
-  virtual bool isProfitable() = 0;
   virtual std::array<int64_t, 3> getNumThreadsInBlock() const = 0;
 
   /// Derived quantities.

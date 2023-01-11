@@ -151,6 +151,16 @@ Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH);
 Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH,
                      bool targetGpu = false);
 
+/// Build transform IR to split the reduction into a parallel and combiner part.
+/// Then tile the parallel part and map it to `tileSize` threads, each reducing
+/// on `vectorSize` elements.
+/// Lastly, fuse the newly created fill and elementwise operations into the
+/// resulting containing foreach_thread op.
+/// Return a triple of handles to (foreach_thread, fill, combiner)
+std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
+    ImplicitLocOpBuilder &b, Value reductionH, int64_t reductionRank,
+    int64_t tileSize, int64_t reductionVectorSize, Attribute mappingAttr);
+
 /// Uses TileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes to create a
 /// top-level `scf.foreach_thread` tiled by `strategy.workgroupTileSizes`. All
 /// of `maybeLeadingH`, `fillH`, `reductionH` and `maybeTrailingH` are fused

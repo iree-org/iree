@@ -37,6 +37,7 @@ using transform_ext::MatchCallbackOp;
 using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::StructuredOpMatcher;
 
+using iree_compiler::buildTileReductionUsingScfForeach;
 using iree_compiler::gpu::AbstractReductionStrategy;
 using iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
@@ -52,17 +53,18 @@ using iree_compiler::gpu::StagedReductionStrategy;
 StagedReductionStrategy
 mlir::iree_compiler::gpu::StagedReductionStrategy::create(
     MLIRContext *context,
-    const transform_ext::MatchedReductionCaptures &captures) {
-  ReductionConfig gpuReductionConfig = getStagedReductionConfig(captures);
-  StagedReductionStrategy strategy(context, captures,
-                                   gpuReductionConfig.maxNumThreads,
-                                   gpuReductionConfig.vectorSize);
-  LLVM_DEBUG(DBGS() << "use staged reduction strategy\n");
+    const transform_ext::MatchedReductionCaptures &captures,
+    const ReductionConfig &reductionConfig) {
+  StagedReductionStrategy strategy(context, captures);
+  strategy.configure(reductionConfig);
+  LLVM_DEBUG(DBGS() << "use GPU staged reduction strategy\n");
   return strategy;
 }
 
-void mlir::iree_compiler::gpu::StagedReductionStrategy::compute(
-    int64_t maxNumThreadsToUse, int64_t maxVectorSize) {
+void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
+    const ReductionConfig &reductionConfig) {
+  int64_t maxNumThreadsToUse = reductionConfig.maxNumThreads;
+  int64_t maxVectorSize = reductionConfig.vectorSize;
   assert(maxNumThreadsToUse > 0 && "maxNumThreadsToUse must be > 0");
   assert(maxNumThreadsToUse >= kCudaWarpSize && "need at least a warp?");
   assert(maxVectorSize > 0 && "maxVectorSize must be > 0");
@@ -112,38 +114,6 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::compute(
   }
 }
 
-/// Build transform IR to split the reduction into a parallel and combiner part.
-/// Then tile the parallel part and map it to `tileSize` threads, each reducing
-/// on `vectorSize` elements.
-/// Lastly, fuse the newly created fill and elementwise operations into the
-/// resulting containing foreach_thread op.
-/// Return a triple of handles to (foreach_thread, fill, combiner)
-static std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
-    ImplicitLocOpBuilder &b, Value gridReductionH, int64_t reductionRank,
-    int64_t tileSize, int64_t reductionVectorSize) {
-  auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
-                                                      mlir::gpu::Threads::DimX);
-
-  SmallVector<int64_t> leadingParallelDims(reductionRank - 1, 0);
-  SmallVector<int64_t> numThreads = leadingParallelDims;
-  numThreads.push_back(tileSize);
-  SmallVector<int64_t> tileSizes = leadingParallelDims;
-  tileSizes.push_back(reductionVectorSize);
-  auto tileReduction = b.create<transform::TileReductionUsingForeachThreadOp>(
-      /*target=*/gridReductionH,
-      /*numThreads=*/numThreads,
-      /*tileSizes=*/tileSizes,
-      /*threadDimMapping=*/b.getArrayAttr(threadX));
-  Value blockParallelForeachThreadOp = tileReduction.getForeachThreadOp();
-  Value blockParallelFillH = tileReduction.getFillOp();
-  Value blockCombinerOpH = tileReduction.getCombiningLinalgOp();
-  // Fuse the fill and elementwise to privatize them.
-  blockParallelFillH = b.create<FuseIntoContainingOp>(
-      blockParallelFillH, blockParallelForeachThreadOp);
-  return std::make_tuple(blockParallelForeachThreadOp, blockParallelFillH,
-                         blockCombinerOpH);
-}
-
 static void buildStagedReductionStrategyFindBetterName(
     ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledLeadingH,
     Value maybeTiledTrailingH, const StagedReductionStrategy &strategy) {
@@ -161,10 +131,12 @@ static void buildStagedReductionStrategyFindBetterName(
   }
 
   // Staged reduction step 1: break gridReductionH apart.
+  auto threadX = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
+                                                      mlir::gpu::Threads::DimX);
   auto [blockParallelForeachThreadOp, blockParallelFillH, blockCombinerOpH] =
       buildTileReductionUsingScfForeach(
           b, gridReductionH, strategy.captures.reductionRank,
-          strategy.getNumThreadsXInBlock(), strategy.getVectorSize());
+          strategy.getNumThreadsXInBlock(), strategy.getVectorSize(), threadX);
 
   // Staged reduction step 2: multi-warp shuffle reduce.
   // Map the combiner reduction to one thread along y so it can be mapped
@@ -226,54 +198,4 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
   int64_t bitWidth = strategy.captures.reductionOutputElementalTypeBitWidth;
   numWarpsToUse = adjustNumberOfWarpsForBlockShuffle(numWarpsToUse, bitWidth);
   buildDistributeVectors(b, variantH2, funcH, numWarpsToUse * kCudaWarpSize);
-}
-
-/// The configuration below has been determined empirically by performing a
-/// manual tradeoff between problem size, amount of parallelism and vector size
-/// on a particular NVIDIA RTX2080Ti 12GB card.
-/// This is a coarse tradeoff that should generally give reasonably good results
-/// but that begs to be complemented by hardcoded known good configurations and
-/// ultimately a database and/or a random forest compression of configurations
-/// with guaranteed performance.
-// TODO: Lift some of the strategy sizing logic as hints and/or heuristics to
-// also work properly in the dynamic case.
-// TODO: Support more HW configs and make it more pluggable.
-ReductionConfig mlir::iree_compiler::gpu::getStagedReductionConfig(
-    const transform_ext::MatchedReductionCaptures &captures) {
-  int64_t bitWidth = captures.reductionOutputElementalTypeBitWidth;
-  int64_t vectorSize = scaleUpByBitWidth(4, bitWidth);
-  int64_t maxNumThreads = 8 * kCudaWarpSize;
-  // No adjustments in the dynamic case, we need extra information to make a
-  // good decision.
-  int64_t redSize = captures.reductionOpSizes.back();
-  if (ShapedType::isDynamic(redSize))
-    return ReductionConfig{maxNumThreads, vectorSize};
-  // Scale down to smaller sizes (4, 8, 16)-warps.
-  if (scaleUpByBitWidth(redSize, bitWidth) <= 4 * kCudaWarpSize) {
-    vectorSize = scaleUpByBitWidth(1, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
-  } else if (scaleUpByBitWidth(redSize, bitWidth) <= 8 * kCudaWarpSize) {
-    vectorSize = scaleUpByBitWidth(2, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
-  } else if (scaleUpByBitWidth(redSize, bitWidth) <= 8 * 2 * kCudaWarpSize) {
-    vectorSize = scaleUpByBitWidth(4, bitWidth);
-    maxNumThreads = 4 * kCudaWarpSize;
-  }
-  // Scale up to larger sizes (32, 64, 128+)-warps, using vector-4.
-  if (!captures.trailingOpSizes.empty()) {
-    if (scaleUpByBitWidth(redSize, bitWidth) >= 128 * 4 * kCudaWarpSize) {
-      vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 32 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 64 * 4 * kCudaWarpSize) {
-      vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 16 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 32 * 4 * kCudaWarpSize) {
-      vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 8 * kCudaWarpSize;
-    } else if (scaleUpByBitWidth(redSize, bitWidth) >= 16 * 4 * kCudaWarpSize) {
-      vectorSize = scaleUpByBitWidth(4, bitWidth);
-      maxNumThreads = 4 * kCudaWarpSize;
-    }
-  }
-  return ReductionConfig{maxNumThreads, vectorSize};
 }

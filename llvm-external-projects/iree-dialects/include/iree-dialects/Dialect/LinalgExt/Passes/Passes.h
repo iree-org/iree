@@ -247,7 +247,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPeelPass(
 
 /// Create a LinalgStrategyVectorizePass.
 using VectorSizeComputationFunction =
-    std::function<SmallVector<int64_t, 4>(linalg::LinalgOp, ArrayRef<int64_t>)>;
+    std::function<SmallVector<int64_t>(linalg::LinalgOp, ArrayRef<int64_t>)>;
 
 struct LinalgVectorizationOptions {
   /// Canonical vector sizes for the vector iteration space (i.e., vectorization

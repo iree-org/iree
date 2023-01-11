@@ -269,7 +269,7 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
   patterns.foldReassociativeReshapes = true;
   funcH = b.create<ApplyPatternsOp>(funcH, patterns);
   variantH = b.create<IREEEliminateEmptyTensorsOp>(variantH);
-  variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
+  variantH = b.create<IREEBufferizeOp>(variantH, targetGpu);
   Value memrefFunc =
       b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   b.create<IREEEraseHALDescriptorTypeFromMemRefOp>(memrefFunc);
@@ -387,6 +387,36 @@ Value mlir::iree_compiler::buildReductionStrategyBlockDistributionPart(
   }
 
   return variantH;
+}
+
+/// Build transform IR to split the reduction into a parallel and combiner part.
+/// Then tile the parallel part and map it to `tileSize` threads, each reducing
+/// on `vectorSize` elements.
+/// Lastly, fuse the newly created fill and elementwise operations into the
+/// resulting containing foreach_thread op.
+/// Return a triple of handles to (foreach_thread, fill, combiner)
+std::tuple<Value, Value, Value>
+mlir::iree_compiler::buildTileReductionUsingScfForeach(
+    ImplicitLocOpBuilder &b, Value reductionH, int64_t reductionRank,
+    int64_t tileSize, int64_t reductionVectorSize, Attribute mappingAttr) {
+  SmallVector<int64_t> leadingParallelDims(reductionRank - 1, 0);
+  SmallVector<int64_t> numThreads = leadingParallelDims;
+  numThreads.push_back(tileSize);
+  SmallVector<int64_t> tileSizes = leadingParallelDims;
+  tileSizes.push_back(reductionVectorSize);
+  auto tileReduction = b.create<transform::TileReductionUsingForeachThreadOp>(
+      /*target=*/reductionH,
+      /*numThreads=*/numThreads,
+      /*tileSizes=*/tileSizes,
+      /*threadDimMapping=*/b.getArrayAttr(mappingAttr));
+  Value blockParallelForeachThreadOp = tileReduction.getForeachThreadOp();
+  Value blockParallelFillH = tileReduction.getFillOp();
+  Value blockCombinerOpH = tileReduction.getCombiningLinalgOp();
+  // Fuse the fill and elementwise to privatize them.
+  blockParallelFillH = b.create<FuseIntoContainingOp>(
+      blockParallelFillH, blockParallelForeachThreadOp);
+  return std::make_tuple(blockParallelForeachThreadOp, blockParallelFillH,
+                         blockCombinerOpH);
 }
 
 std::tuple<Value, Value, Value, Value>

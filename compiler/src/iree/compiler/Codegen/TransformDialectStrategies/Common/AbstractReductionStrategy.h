@@ -32,10 +32,6 @@ struct AbstractReductionStrategy {
     allBlockAttrs = SmallVector<Attribute>{blockX, blockY, blockZ};
   }
 
-  virtual ~AbstractReductionStrategy() {}
-
-  virtual bool isProfitable() = 0;
-
   /// Constructor quantities.
   MLIRContext *context;
   transform_ext::MatchedReductionCaptures captures;

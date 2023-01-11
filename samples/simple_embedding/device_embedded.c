@@ -20,6 +20,7 @@
 #include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_riscv_32_c.h"
 #include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_riscv_64_c.h"
 #include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_x86_64_c.h"
+
 iree_status_t create_sample_device(iree_allocator_t host_allocator,
                                    iree_hal_device_t** out_device) {
   // Set parameters for the device created in the next step.
@@ -30,9 +31,11 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
   IREE_RETURN_IF_ERROR(iree_hal_embedded_elf_loader_create(
       iree_hal_executable_import_provider_null(), host_allocator, &loader));
 
-  iree_task_executor_t* executor = NULL;
-  iree_status_t status =
-      iree_task_executor_create_from_flags(host_allocator, &executor);
+  // NOTE: hardcoded maximum executor count for this sample to keep it simple.
+  iree_task_executor_t* executors[8] = {NULL};
+  iree_host_size_t executor_count = 0;
+  iree_status_t status = iree_task_executors_create_from_flags(
+      host_allocator, IREE_ARRAYSIZE(executors), executors, &executor_count);
 
   iree_string_view_t identifier = iree_make_cstring_view("local-task");
 
@@ -46,13 +49,15 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
   // Create the device.
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_device_create(
-        identifier, &params, /*queue_count=*/1, &executor,
+        identifier, &params, executor_count, executors,
         /*loader_count=*/1, &loader, device_allocator, host_allocator,
         out_device);
   }
 
   iree_hal_allocator_release(device_allocator);
-  iree_task_executor_release(executor);
+  for (iree_host_size_t i = 0; i < executor_count; ++i) {
+    iree_task_executor_release(executors[i]);
+  }
   iree_hal_executable_loader_release(loader);
   return status;
 }

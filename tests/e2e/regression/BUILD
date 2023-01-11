@@ -56,6 +56,7 @@ iree_lit_test_suite(
             "layernorm.mlir",
             "linalg_quantized_matmul_vs_linalg_matmul.mlir",
             "lowering_config.mlir",
+            "softmax_large.mlir",
         ] + BACKEND_TESTS,
     ),
     cfg = "//tests:lit.cfg.py",
@@ -123,6 +124,27 @@ iree_check_single_backend_test_suite(
         "layernorm.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
+    driver = "cuda",
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "cuda",
+)
+
+iree_check_single_backend_test_suite(
+    name = "aggressive_fusion_test_cuda",
+    srcs = [
+        "softmax.mlir",
+        "softmax_large.mlir",
+    ],
+    compiler_flags = [
+        "--iree-flow-enable-aggressive-fusion",
+    ],
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
