@@ -570,8 +570,6 @@ private:
 
 struct MatchedReductionCaptures {
   int64_t reductionRank = 0;
-  // TODO: capture all dims.
-  int64_t mostMinorParallelDimensionSize = 0;
   int64_t reductionDimensionSize = 0;
   int64_t maybeLeadingRank = 0;
   int64_t maybeTrailingRank = 0;
