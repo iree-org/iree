@@ -172,6 +172,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
 /// registrations necessary for IREE.
 std::unique_ptr<Pass> createTransformDialectInterpreterPass(
     llvm::StringRef transformFileName = llvm::StringRef());
+std::unique_ptr<Pass> createTransformDialectJitterPass();
 
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
@@ -344,8 +345,11 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     ArrayRef<int64_t> workgroupSize = {});
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager);
 
-/// Transform dialect-based common.
-void addTransformDialectPasses(OpPassManager &passManager);
+/// Populates the passes from Sandbox for testing transformations from
+/// sandbox. Unlike other pipelines this pass mangaer is nested at the
+/// `hal.executable.variant` op.
+void addTransformDialectInterpreterPasses(OpPassManager &passManager);
+void addTransformDialectJitterPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
@@ -413,8 +417,9 @@ void addGPUTransposePassPipeline(OpPassManager &pm);
 /// Lowering reductions to warp reductions.
 void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 
-/// Transform dialect-based path.
-void addGPUTransformDialectPasses(OpPassManager &pm);
+/// Experimental path for transform dialect.
+void addGPUTransformDialectInterpreterPasses(OpPassManager &pm);
+void addGPUTransformDialectJitterPasses(OpPassManager &pm);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a

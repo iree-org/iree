@@ -181,8 +181,13 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
         addGPUWarpReductionPassPipeline(executableLoweringPipeline);
         break;
       // Transform-dialect pipelines.
-      case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
-        addGPUTransformDialectPasses(executableLoweringPipeline);
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          TransformDialectInterpreterCodegen:
+        addGPUTransformDialectInterpreterPasses(executableLoweringPipeline);
+        break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          TransformDialectJitterCodegen:
+        addGPUTransformDialectJitterPasses(executableLoweringPipeline);
         break;
       default:
         variantOp.emitOpError("Unsupported pipeline on GPU target.");
