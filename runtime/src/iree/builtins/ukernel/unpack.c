@@ -8,7 +8,14 @@
 
 static iree_uk_status_t iree_uk_unpack_validate(
     const iree_uk_unpack_params_t* params) {
-#ifdef IREE_UK_ENABLE_VALIDATION
+#ifdef NDEBUG
+  // Avoid validation code overhead (code size and latency) in release builds.
+  // This actually enables more thorough validation as it removes optimization
+  // concerns from the validation code.
+  // Microkernels take raw pointers/sizes/strides anyway, so if params are
+  // incorrect, UB will happen no matter how much we try to validate.
+  return iree_uk_status_ok;
+#endif
   const iree_uk_uint32_t allflags =
       IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER | IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER;
   if (params->flags & ~allflags) {
@@ -45,7 +52,6 @@ static iree_uk_status_t iree_uk_unpack_validate(
       (outer_size1 - 1) * tile_size1 >= params->out_size1) {
     return iree_uk_status_shapes_mismatch;
   }
-#endif  // IREE_UK_ENABLE_VALIDATION
   return iree_uk_status_ok;
 }
 

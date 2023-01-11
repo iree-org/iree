@@ -12,17 +12,17 @@
 #include "iree/builtins/ukernel/common.h"
 
 typedef enum iree_uk_pack_type_t {
-  iree_uk_pack_type_f32f32 = IREE_UK_TIE_2_TYPES_LITERAL(FLOAT_32, FLOAT_32),
-  iree_uk_pack_type_i8i8 = IREE_UK_TIE_2_TYPES_LITERAL(INT_8, INT_8),
-  iree_uk_pack_type_i32i32 = IREE_UK_TIE_2_TYPES_LITERAL(INT_32, INT_32),
+  iree_uk_pack_type_f32f32 = IREE_UK_PACK_2_TYPES_LITERAL(FLOAT_32, FLOAT_32),
+  iree_uk_pack_type_i8i8 = IREE_UK_PACK_2_TYPES_LITERAL(INT_8, INT_8),
+  iree_uk_pack_type_i32i32 = IREE_UK_PACK_2_TYPES_LITERAL(INT_32, INT_32),
 } iree_uk_pack_type_t;
 
 static inline iree_uk_type_t iree_uk_pack_in_type(iree_uk_pack_type_t type) {
-  return iree_uk_untie_type(0, type);
+  return IREE_UK_UNPACK_TYPE(0, type);
 }
 
 static inline iree_uk_type_t iree_uk_pack_out_type(iree_uk_pack_type_t type) {
-  return iree_uk_untie_type(1, type);
+  return IREE_UK_UNPACK_TYPE(1, type);
 }
 
 // Parameters for a pack operation.

@@ -117,9 +117,9 @@ int iree_uk_test_type_pair_str(char* buf, int buf_length,
   char type0_buf[8];
   char type1_buf[8];
   iree_uk_test_type_str(type0_buf, sizeof type0_buf,
-                        iree_uk_untie_type(0, pair));
+                        iree_uk_unpack_type(0, pair));
   iree_uk_test_type_str(type1_buf, sizeof type1_buf,
-                        iree_uk_untie_type(1, pair));
+                        iree_uk_unpack_type(1, pair));
   return snprintf(buf, buf_length, "(%s,%s)", type0_buf, type1_buf);
 }
 
@@ -129,11 +129,11 @@ int iree_uk_test_type_triple_str(char* buf, int buf_length,
   char type1_buf[8];
   char type2_buf[8];
   iree_uk_test_type_str(type0_buf, sizeof type0_buf,
-                        iree_uk_untie_type(0, triple));
+                        iree_uk_unpack_type(0, triple));
   iree_uk_test_type_str(type1_buf, sizeof type1_buf,
-                        iree_uk_untie_type(1, triple));
+                        iree_uk_unpack_type(1, triple));
   iree_uk_test_type_str(type2_buf, sizeof type2_buf,
-                        iree_uk_untie_type(2, triple));
+                        iree_uk_unpack_type(2, triple));
   return snprintf(buf, buf_length, "(%s,%s,%s)", type0_buf, type1_buf,
                   type2_buf);
 }

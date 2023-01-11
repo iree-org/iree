@@ -110,19 +110,6 @@ extern "C" {
 // Attributes and metadata
 //===----------------------------------------------------------------------===//
 
-// Queries for [[attribute]] identifiers in modern compilers.
-#ifdef __has_attribute
-#define IREE_UK_HAVE_ATTRIBUTE(x) __has_attribute(x)
-#else
-#define IREE_UK_HAVE_ATTRIBUTE(x) 0
-#endif  // __has_attribute
-
-#ifdef __has_builtin
-#define IREE_UK_HAVE_BUILTIN(x) __has_builtin(x)
-#else
-#define IREE_UK_HAVE_BUILTIN(x) 0
-#endif  // __has_builtin
-
 // Tagged on functions that are part of the public API.
 // TODO(benvanik): use this to change symbol visibility? We don't want a library
 // that embeds this one to transitively export functions but may want to have
@@ -142,58 +129,6 @@ extern "C" {
 #else
 #define IREE_UK_RESTRICT restrict
 #endif  // _MSC_VER
-
-// Same as LLVM_BUILTIN_UNREACHABLE. Extremely dangerous. Use only in locations
-// that are provably unreachable (+/- edge case of unreachable-past-assertions
-// discussed below).
-//
-// The potential benefit of UNREACHABLE statements is code size and/or speed
-// optimization. This is an arcane optimization. As such, each use must be
-// carefully justified.
-//
-// There is the edge case of locations that are provably unreachable when
-// optional validation code is enabled, but the validation code may also be
-// disabled, making the location technically reachable. Typically: assertions.
-// Use careful judgement for such cases.
-//
-// A typical use case in microkernels is as follows. A microkernel is
-// parametrized by type triples packed into uint32s, and needs to have a switch
-// statement on those:
-//
-// switch (params->type_triple) {
-//   case iree_uk_mykernel_f32f32f32:  // 0xf5f5f5
-//     return 123;
-//   case iree_uk_mykernel_i8i8i32:  // 0x232325
-//     return 321;
-//   default:
-//     return 0;
-// }
-//
-// As long as the microkernel has validation code (running at least as Debug
-// assertions) validating type_triple, and this code is already past that,
-// and this switch statement covers all valid cases, the `default:` case should
-// be unreachable. Adding an UNREACHABLE statement there can help with code
-// size. This would be negligible if the case constants were small enough to
-// fit in compare-with-immediate instructions, but the 24-bit type triple
-// constants here would typically not, so without UNREACHABLE, the compiler has
-// to fully implement each 24-bit literal separately.
-//
-// https://godbolt.org/z/hTv4qqbx9 shows a snipped similar as above where
-// the __builtin_unreachable shrinks the AArch64 code from 11 to 7 instructions.
-#if IREE_UK_HAVE_BUILTIN(__builtin_unreachable) || defined(__GNUC__)
-#define IREE_UK_ASSUME_UNREACHABLE __builtin_unreachable()
-#elif defined(_MSC_VER)
-#define IREE_UK_ASSUME_UNREACHABLE __assume(false)
-#else
-#define IREE_UK_ASSUME_UNREACHABLE
-#endif
-
-#if IREE_UK_HAVE_ATTRIBUTE(noinline) || \
-    (defined(__GNUC__) && !defined(__clang__))
-#define IREE_UK_ATTRIBUTE_NOINLINE __attribute__((noinline))
-#else
-#define IREE_UK_ATTRIBUTE_NOINLINE
-#endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
 
 //===----------------------------------------------------------------------===//
 // Local replacements for stdint.h types and constants
@@ -281,56 +216,17 @@ static inline void iree_uk_ssize_swap(iree_uk_ssize_t* a, iree_uk_ssize_t* b) {
 // Status codes returned by microkernels.
 //===----------------------------------------------------------------------===//
 
-// When IREE_UK_ENABLE_VALIDATION is defined, ukernels validate their inputs and
-// may return statuses other than iree_uk_status_ok.
-//
-// When IREE_UK_ENABLE_VALIDATION is not defined, statuses other than
-// iree_uk_status_ok are not even defined.
-//
-// Currently IREE_UK_ENABLE_VALIDATION is defined if and only if NDEBUG is not,
-// that is, validation treated as assertions, disabling them in release.
-//
-// This actually enables more thorough validation as it removes optimization
-// concerns from the validation code. Microkernels take raw
-// pointers/sizes/strides anyway, so if params are incorrect, UB will happen no
-// matter how much we try to validate.
-#ifndef NDEBUG
-#define IREE_UK_ENABLE_VALIDATION
-#endif
-
-// Status codes that ukernels may return.
 typedef enum iree_uk_status_e {
   iree_uk_status_ok = 0,
-#ifdef IREE_UK_ENABLE_VALIDATION
   iree_uk_status_bad_type,
   iree_uk_status_bad_flags,
   iree_uk_status_unsupported_huge_or_negative_dimension,
   iree_uk_status_unsupported_generic_tile_size,
   iree_uk_status_shapes_mismatch,
-#endif
 } iree_uk_status_t;
 
-#ifdef IREE_UK_ENABLE_VALIDATION
 // Convert a status code to a human-readable string.
 IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status);
-#else
-static inline const char* iree_uk_status_message(iree_uk_status_t status) {
-  // Typical callers do:
-  //
-  //   iree_uk_status_t status = iree_uk_someukernel(&ukernel_params);
-  //   if (status != iree_uk_status_ok) {
-  //     return iree_make_status(IREE_STATUS_INTERNAL,
-  //                             iree_uk_status_message(status));
-  //   }
-  //
-  // The below UNREACHABLE actually helps Clang 16 elide the caller's
-  // `if (status != iree_uk_status_ok)` branch: https://godbolt.org/z/xoanddxrv
-  if (status != iree_uk_status_ok) {
-    IREE_UK_ASSUME_UNREACHABLE;
-  }
-  return "OK";
-}
-#endif
 
 #define IREE_UK_RETURN_IF_ERROR(X)     \
   do {                                 \
@@ -468,33 +364,90 @@ static inline int iree_uk_type_size(iree_uk_type_t t) {
 }
 
 //===----------------------------------------------------------------------===//
-// Tuples of types, packed ("tied") into a word.
+// Tuples of types, packed into a word.
 //===----------------------------------------------------------------------===//
-
-// Note: the choice of word "tie" echoes C++ std::tie and generally tuple
-// terminology. We used to call that "pack" but that was confusing as that word
-// is also the name of a ukernel, iree_uk_pack.
 
 typedef iree_uk_uint16_t iree_uk_type_pair_t;
 typedef iree_uk_uint32_t iree_uk_type_triple_t;
 
-#define IREE_UK_TIE_2_TYPES(B0, B1) ((B0) + ((B1) << 8))
-#define IREE_UK_TIE_3_TYPES(B0, B1, B2) ((B0) + ((B1) << 8) + ((B2) << 16))
-#define IREE_UK_TIE_2_TYPES_LITERAL(T0, T1) \
-  IREE_UK_TIE_2_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1)
-#define IREE_UK_TIE_3_TYPES_LITERAL(T0, T1, T2) \
-  IREE_UK_TIE_3_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1, IREE_UK_TYPE_##T2)
+#define IREE_UK_PACK_2_TYPES(B0, B1) ((B0) + ((B1) << 8))
+#define IREE_UK_PACK_3_TYPES(B0, B1, B2) ((B0) + ((B1) << 8) + ((B2) << 16))
+#define IREE_UK_PACK_2_TYPES_LITERAL(T0, T1) \
+  IREE_UK_PACK_2_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1)
+#define IREE_UK_PACK_3_TYPES_LITERAL(T0, T1, T2) \
+  IREE_UK_PACK_3_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1, IREE_UK_TYPE_##T2)
 
-#define IREE_UK_UNTIE_TYPE(POS, WORD) (((WORD) >> (8 * (POS))) & 0xFF)
+#define IREE_UK_UNPACK_TYPE(POS, WORD) (((WORD) >> (8 * (POS))) & 0xFF)
 
-static inline iree_uk_type_t iree_uk_untie_type(int pos,
-                                                iree_uk_uint32_t word) {
-  return IREE_UK_UNTIE_TYPE(pos, word);
+static inline iree_uk_type_t iree_uk_unpack_type(int pos,
+                                                 iree_uk_uint32_t word) {
+  return IREE_UK_UNPACK_TYPE(pos, word);
 }
 
-//===----------------------------------------------------------------------===//
-// Local replacement for <string.h>
-//===----------------------------------------------------------------------===//
+#ifdef __has_builtin
+#define IREE_UK_HAS_BUILTIN(x) __has_builtin(x)
+#else
+#define IREE_UK_HAS_BUILTIN(x) 0
+#endif
+
+// Same as LLVM_BUILTIN_UNREACHABLE. Extremely dangerous. Use only in locations
+// that are provably unreachable (+/- edge case of unreachable-past-assertions
+// discussed below).
+//
+// The potential benefit of UNREACHABLE statements is code size and/or speed
+// optimization. This is an arcane optimization. As such, each use must be
+// carefully justified.
+//
+// There is the edge case of locations that are provably unreachable when
+// optional validation code is enabled, but the validation code may also be
+// disabled, making the location technically reachable. Typically: assertions.
+// Use careful judgement for such cases.
+//
+// A typical use case in microkernels is as follows. A microkernel is
+// parametrized by type triples packed into uint32s, and needs to have a switch
+// statement on those:
+//
+// switch (params->type_triple) {
+//   case iree_uk_mykernel_f32f32f32:  // 0xf5f5f5
+//     return 123;
+//   case iree_uk_mykernel_i8i8i32:  // 0x232325
+//     return 321;
+//   default:
+//     return 0;
+// }
+//
+// As long as the microkernel has validation code (running at least as Debug
+// assertions) validating type_triple, and this code is already past that,
+// and this switch statement covers all valid cases, the `default:` case should
+// be unreachable. Adding an UNREACHABLE statement there can help with code
+// size. This would be negligible if the case constants were small enough to
+// fit in compare-with-immediate instructions, but the 24-bit type triple
+// constants here would typically not, so without UNREACHABLE, the compiler has
+// to fully implement each 24-bit literal separately.
+//
+// https://godbolt.org/z/hTv4qqbx9 shows a snipped similar as above where
+// the __builtin_unreachable shrinks the AArch64 code from 11 to 7 instructions.
+#if IREE_UK_HAS_BUILTIN(__builtin_unreachable) || defined(__GNUC__)
+#define IREE_UK_ASSUME_UNREACHABLE __builtin_unreachable()
+#elif defined(_MSC_VER)
+#define IREE_UK_ASSUME_UNREACHABLE __assume(false)
+#else
+#define IREE_UK_ASSUME_UNREACHABLE
+#endif
+
+// Queries for [[attribute]] identifiers in modern compilers.
+#ifdef __has_attribute
+#define IREE_UK_HAVE_ATTRIBUTE(x) __has_attribute(x)
+#else
+#define IREE_UK_HAVE_ATTRIBUTE(x) 0
+#endif  // __has_attribute
+
+#if IREE_UK_HAVE_ATTRIBUTE(noinline) || \
+    (defined(__GNUC__) && !defined(__clang__))
+#define IREE_UK_ATTRIBUTE_NOINLINE __attribute__((noinline))
+#else
+#define IREE_UK_ATTRIBUTE_NOINLINE
+#endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
 
 // The `restrict` here have the effect of enabling the compiler to rewrite this
 // as a memcpy call, shrinking code size of the (slow anyway) generic code paths
@@ -504,15 +457,6 @@ static inline void iree_uk_memcpy(void* IREE_UK_RESTRICT dst,
                                   iree_uk_ssize_t size) {
   for (iree_uk_ssize_t i = 0; i < size; ++i)
     ((char*)dst)[i] = ((const char*)src)[i];
-}
-
-static inline void iree_uk_memset(void* buf, int val, iree_uk_ssize_t n) {
-  // No need for memset builtins: this naive loop is already transformed into a
-  // memset by both clang and gcc on ARM64. As __builtin_memset_inline requires
-  // a compile-time-constant size, it would require writing more complex code,
-  // which could actually prevent the optimization matching it as a single
-  // memset!
-  for (iree_uk_ssize_t i = 0; i < n; ++i) ((char*)buf)[i] = val;
 }
 
 #ifdef __cplusplus

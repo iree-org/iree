@@ -13,7 +13,15 @@
 
 static iree_uk_status_t iree_uk_mmt4d_validate(
     const iree_uk_mmt4d_params_t* params) {
-#ifdef IREE_UK_ENABLE_VALIDATION
+#ifdef NDEBUG
+  // Avoid validation code overhead (code size and latency) in release builds.
+  // This actually enables more thorough validation as it removes optimization
+  // concerns from the validation code.
+  // Microkernels take raw pointers/sizes/strides anyway, so if params are
+  // incorrect, UB will happen no matter how much we try to validate.
+  return iree_uk_status_ok;
+#endif
+
   if (params->flags & ~IREE_UK_FLAG_ACCUMULATE) {
     return iree_uk_status_bad_flags;
   }
@@ -44,7 +52,7 @@ static iree_uk_status_t iree_uk_mmt4d_validate(
   if (tile_bytes > iree_uk_mmt4d_tile_generic_max_bytes) {
     return iree_uk_status_unsupported_generic_tile_size;
   }
-#endif  // IREE_UK_ENABLE_VALIDATION
+
   return iree_uk_status_ok;
 }
 
@@ -97,6 +105,17 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
   }
 }
 
+// A memset implementation that we can use here, as we can't #include <string.h>
+// as that brings in <stdint.h>. Special-cased for byte value 0.
+void iree_uk_memset_zero(void* buf, iree_uk_ssize_t n) {
+  // No need for memset builtins: this naive loop is already transformed into a
+  // memset by both clang and gcc on ARM64. As __builtin_memset_inline requires
+  // a compile-time-constant size, it would require writing more complex code,
+  // which could actually prevent the optimization matching it as a single
+  // memset!
+  for (iree_uk_ssize_t i = 0; i < n; ++i) ((char*)buf)[i] = 0;
+}
+
 // Helper for early-return path when K==0 and we just need to clear the output.
 static void iree_uk_mmt4d_zero_out(const iree_uk_mmt4d_params_t* params) {
   iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params->type);
@@ -106,7 +125,7 @@ static void iree_uk_mmt4d_zero_out(const iree_uk_mmt4d_params_t* params) {
   iree_uk_ssize_t stride = params->out_stride << out_type_size_log2;
   char* out_ptr = params->out_buffer;
   for (iree_uk_ssize_t i = 0; i < params->M; ++i) {
-    iree_uk_memset(out_ptr, 0, contiguous_size);
+    iree_uk_memset_zero(out_ptr, contiguous_size);
     out_ptr += stride;
   }
 }

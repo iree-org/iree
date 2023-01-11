@@ -11,21 +11,21 @@
 
 typedef enum iree_uk_mmt4d_type_t {
   iree_uk_mmt4d_type_f32f32f32 =
-      IREE_UK_TIE_3_TYPES_LITERAL(FLOAT_32, FLOAT_32, FLOAT_32),
+      IREE_UK_PACK_3_TYPES_LITERAL(FLOAT_32, FLOAT_32, FLOAT_32),
   iree_uk_mmt4d_type_i8i8i32 =
-      IREE_UK_TIE_3_TYPES_LITERAL(INT_8, INT_8, INT_32),
+      IREE_UK_PACK_3_TYPES_LITERAL(INT_8, INT_8, INT_32),
 } iree_uk_mmt4d_type_t;
 
 static inline iree_uk_type_t iree_uk_mmt4d_lhs_type(iree_uk_mmt4d_type_t type) {
-  return iree_uk_untie_type(0, type);
+  return IREE_UK_UNPACK_TYPE(0, type);
 }
 
 static inline iree_uk_type_t iree_uk_mmt4d_rhs_type(iree_uk_mmt4d_type_t type) {
-  return iree_uk_untie_type(1, type);
+  return IREE_UK_UNPACK_TYPE(1, type);
 }
 
 static inline iree_uk_type_t iree_uk_mmt4d_out_type(iree_uk_mmt4d_type_t type) {
-  return iree_uk_untie_type(2, type);
+  return IREE_UK_UNPACK_TYPE(2, type);
 }
 
 // Parameters for a mmt4d operation.
