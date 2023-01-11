@@ -13,7 +13,6 @@
 #include "iree/base/api.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
-#include "iree/hal/channel.h"
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable_cache.h"
@@ -467,10 +466,6 @@ typedef struct iree_hal_device_vtable_t {
                                          iree_string_view_t category,
                                          iree_string_view_t key,
                                          int64_t* out_value);
-
-  iree_status_t(IREE_API_PTR* create_channel)(
-      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
-      iree_hal_channel_params_t params, iree_hal_channel_t** out_channel);
 
   iree_status_t(IREE_API_PTR* create_command_buffer)(
       iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,

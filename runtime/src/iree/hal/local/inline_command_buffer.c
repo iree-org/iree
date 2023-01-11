@@ -359,19 +359,6 @@ static iree_status_t iree_hal_inline_command_buffer_copy_buffer(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_command_buffer_collective
-//===----------------------------------------------------------------------===//
-
-static iree_status_t iree_hal_inline_command_buffer_collective(
-    iree_hal_command_buffer_t* base_command_buffer, iree_hal_channel_t* channel,
-    iree_hal_collective_op_t op, uint32_t param,
-    iree_hal_buffer_binding_t send_binding,
-    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "collectives not yet implemented on CPU");
-}
-
-//===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_push_constants
 //===----------------------------------------------------------------------===//
 // NOTE: command buffer state change only; enqueues no tasks.
@@ -580,10 +567,6 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch_indirect(
       workgroup_count.y, workgroup_count.z);
 }
 
-//===----------------------------------------------------------------------===//
-// iree_hal_command_buffer_execute_commands
-//===----------------------------------------------------------------------===//
-
 static iree_status_t iree_hal_inline_command_buffer_execute_commands(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_command_buffer_t* base_commands,
@@ -616,7 +599,6 @@ static const iree_hal_command_buffer_vtable_t
         .fill_buffer = iree_hal_inline_command_buffer_fill_buffer,
         .update_buffer = iree_hal_inline_command_buffer_update_buffer,
         .copy_buffer = iree_hal_inline_command_buffer_copy_buffer,
-        .collective = iree_hal_inline_command_buffer_collective,
         .push_constants = iree_hal_inline_command_buffer_push_constants,
         .push_descriptor_set =
             iree_hal_inline_command_buffer_push_descriptor_set,

@@ -588,7 +588,6 @@
   <DisplayString Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.allocator&quot;)==0">{(iree_hal_allocator_t*)ptr}</DisplayString>
   <DisplayString Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.buffer&quot;)==0">{(iree_hal_buffer_t*)ptr}</DisplayString>
   <DisplayString Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.buffer_view&quot;)==0">{(iree_hal_buffer_view_t*)ptr}</DisplayString>
-  <DisplayString Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.channel&quot;)==0">{(iree_hal_channel_t*)ptr}</DisplayString>
   <DisplayString Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.command_buffer&quot;)==0">{(iree_hal_command_buffer_t*)ptr}</DisplayString>
   <DisplayString Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.descriptor_set_layout&quot;)==0">{(iree_hal_descriptor_set_layout_t*)ptr}</DisplayString>
   <DisplayString Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.device&quot;)==0">{(iree_hal_device_t*)ptr}</DisplayString>
@@ -610,7 +609,6 @@
     <ExpandedItem Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.allocator&quot;)==0">(iree_hal_allocator_t*)ptr</ExpandedItem>
     <ExpandedItem Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.buffer&quot;)==0">(iree_hal_buffer_t*)ptr</ExpandedItem>
     <ExpandedItem Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.buffer_view&quot;)==0">(iree_hal_buffer_view_t*)ptr</ExpandedItem>
-    <ExpandedItem Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.channel&quot;)==0">(iree_hal_channel_t*)ptr</ExpandedItem>
     <ExpandedItem Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.command_buffer&quot;)==0">(iree_hal_command_buffer_t*)ptr</ExpandedItem>
     <ExpandedItem Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.descriptor_set_layout&quot;)==0">(iree_hal_descriptor_set_layout_t*)ptr</ExpandedItem>
     <ExpandedItem Condition="ptr!=0 &amp;&amp; strcmp(iree_vm_ref_type_descriptors[type]->type_name.data, &quot;hal.device&quot;)==0">(iree_hal_device_t*)ptr</ExpandedItem>

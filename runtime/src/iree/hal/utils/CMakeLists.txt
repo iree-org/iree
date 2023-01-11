@@ -26,22 +26,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    collective_batch
-  HDRS
-    "collective_batch.h"
-  SRCS
-    "collective_batch.c"
-  DEPS
-    ::resource_set
-    iree::base
-    iree::base::internal::arena
-    iree::base::tracing
-    iree::hal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     deferred_command_buffer
   HDRS
     "deferred_command_buffer.h"

@@ -654,15 +654,6 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_copy_buffer(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_direct_command_buffer_collective(
-    iree_hal_command_buffer_t* base_command_buffer, iree_hal_channel_t* channel,
-    iree_hal_collective_op_t op, uint32_t param,
-    iree_hal_buffer_binding_t send_binding,
-    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "collectives not yet implemented on Vulkan");
-}
-
 static iree_status_t iree_hal_vulkan_direct_command_buffer_push_constants(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
@@ -844,8 +835,6 @@ const iree_hal_command_buffer_vtable_t
         /*.update_buffer=*/
         iree_hal_vulkan_direct_command_buffer_update_buffer,
         /*.copy_buffer=*/iree_hal_vulkan_direct_command_buffer_copy_buffer,
-        /*.collective=*/
-        iree_hal_vulkan_direct_command_buffer_collective,
         /*.push_constants=*/
         iree_hal_vulkan_direct_command_buffer_push_constants,
         /*.push_descriptor_set=*/

@@ -26,20 +26,6 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
-    name = "collective_batch",
-    srcs = ["collective_batch.c"],
-    hdrs = ["collective_batch.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":resource_set",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
-        "//runtime/src/iree/base/internal:arena",
-        "//runtime/src/iree/hal",
-    ],
-)
-
-iree_runtime_cc_library(
     name = "deferred_command_buffer",
     srcs = ["deferred_command_buffer.c"],
     hdrs = ["deferred_command_buffer.h"],

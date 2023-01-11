@@ -13,7 +13,6 @@
 #include "iree/base/api.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
-#include "iree/hal/channel.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/pipeline_layout.h"
@@ -206,146 +205,6 @@ typedef struct iree_hal_descriptor_set_binding_t {
   // ranges regardless of offset.
   iree_device_size_t length;
 } iree_hal_descriptor_set_binding_t;
-
-// Specifies the type of collective operation.
-enum iree_hal_collective_kind_e {
-  // Gathers N*|element_count| elements of the specified type in |recv_binding|
-  // by sourcing |element_count| elements from the |send_binding| of each rank
-  // and concatenating them.
-  //
-  // |param|: unused
-  // |send_binding|: local elements to add at offset rank
-  // |recv_binding|: concatenated results from all ranks
-  // In-place: |send_binding| == |recv_binding| + rank * |element_count|
-  // Equivalent to:
-  //   ncclAllGather
-  IREE_HAL_COLLECTIVE_KIND_ALL_GATHER = 0u,
-
-  // Reduces |element_count| elements of the specified type in |send_binding|
-  // using the specified reduction operation and places identical copies of the
-  // result in each |recv_binding|.
-  //
-  // |param|: unused
-  // |send_binding|: local elements to reduce
-  // |recv_binding|: copy of the reduction results
-  // In-place: |send_binding| == |recv_binding|
-  // Equivalent to:
-  //   ncclAllReduce
-  IREE_HAL_COLLECTIVE_KIND_ALL_REDUCE,
-
-  // Copies |element_count| elements of the specified type from |send_binding|
-  // on the specified rank |param| to all other ranks |recv_binding|s.
-  //
-  // |param|: source rank of the broadcast value
-  // |send_binding|: only used on the source rank
-  // |recv_binding|: only used on non-source ranks
-  // In-place: |send_binding| == |recv_binding|
-  // Equivalent to:
-  //   ncclBroadcast
-  IREE_HAL_COLLECTIVE_KIND_BROADCAST,
-
-  // Reduces |element_count| elements of the specified type in |send_binding|
-  // using the specified reduction operation and places the results in the
-  // |recv_binding| of the target rank |param|.
-  //
-  // |param|: target rank of the resulting value
-  // |send_binding|: used on all ranks
-  // |recv_binding|: only used on the target rank
-  // In-place: |send_binding| == |recv_binding|
-  // Equivalent to:
-  //   ncclReduce
-  IREE_HAL_COLLECTIVE_KIND_REDUCE,
-
-  // Reduce |element_count| elements of the specified type in |send_binding|
-  // from all ranks using the specified reduction operation and scatters the
-  // reduced results over the ranks such that the |recv_binding| on rank i
-  // will contain the i-th block of the results.
-  //
-  // |param|: unused
-  // |send_binding|: used on all ranks
-  // |recv_binding|: partial results for the hosting rank
-  // In-place: |recv_binding| == |send_binding| + rank * |element_count|
-  // Equivalent to:
-  //   ncclReduceScatter
-  IREE_HAL_COLLECTIVE_KIND_REDUCE_SCATTER,
-
-  // Sends |element_count| elements of the specified type in |send_binding| to
-  // the target rank |param|.
-  //
-  // |param|: target performing a IREE_HAL_COLLECTIVE_KIND_RECV
-  // |send_binding|: used on source
-  // |recv_binding|: unused
-  // Equivalent to:
-  //   ncclSend
-  IREE_HAL_COLLECTIVE_KIND_SEND,
-
-  // Receives |element_count| elements of the specified type in |recv_binding|
-  // from source rank |param|.
-  //
-  // |param|: source performing a IREE_HAL_COLLECTIVE_KIND_SEND
-  // |send_binding|: unused
-  // |recv_binding|: used on target
-  // Equivalent to:
-  //   ncclRecv
-  IREE_HAL_COLLECTIVE_KIND_RECV,
-
-  // Maximum enumeration value for collective operations.
-  IREE_HAL_COLLECTIVE_KIND_MAX_VALUE = IREE_HAL_COLLECTIVE_KIND_RECV,
-};
-typedef uint8_t iree_hal_collective_kind_t;
-
-// Specifies the reduction operator of a collective reduction operation.
-enum iree_hal_collective_reduction_e {
-  // Specifies that the reduction operation computes a sum (addition).
-  IREE_HAL_COLLECTIVE_REDUCTION_SUM = 0,
-  // Specifies that the reduction operation computes a product (multiplication).
-  IREE_HAL_COLLECTIVE_REDUCTION_PRODUCT,
-  // Specifies that the reduction operation computes a minimum (min).
-  IREE_HAL_COLLECTIVE_REDUCTION_MINIMUM,
-  // Specifies that the reduction operation computes a maximum (max).
-  IREE_HAL_COLLECTIVE_REDUCTION_MAXIMUM,
-  // Specifies that the reduction operation computes an average (avg).
-  IREE_HAL_COLLECTIVE_REDUCTION_AVERAGE,
-};
-typedef uint8_t iree_hal_collective_reduction_t;
-
-// Specifies the element type as processed by a collective operation.
-// Note that these types are a much restricted set compared to
-// iree_hal_element_type_t as most collective compute libraries only expose a
-// limited number of primitives as some may be backed by fixed-function
-// hardware.
-enum iree_hal_collective_element_type_e {
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_8 = 0,
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_8,
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_16,  // not commonly implemented
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_16,  // not commonly implemented
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_32,
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_32,
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_64,
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_64,
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_16,
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_32,
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_64,
-  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_BFLOAT_16,
-};
-typedef uint8_t iree_hal_collective_element_type_t;
-
-// Describes a collective operation.
-typedef union {
-  uint32_t packed;  // packed value
-  struct {
-    // Collective operation.
-    iree_hal_collective_kind_t kind;
-    // Reduction type (for reduction ops).
-    iree_hal_collective_reduction_t reduction;
-    // Element type.
-    iree_hal_collective_element_type_t element_type;
-    // Reserved for future use.
-    uint8_t reserved;
-  };
-} iree_hal_collective_op_t;
-static_assert(sizeof(iree_hal_collective_op_t) == sizeof(uint32_t),
-              "must pack");
 
 // Describes a subrange of a buffer that can be bound to a binding slot.
 typedef struct iree_hal_buffer_binding_t {
@@ -619,15 +478,6 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length);
 
-// Dispatches a collective operation defined by |op| using the given buffers.
-// |param| must be specified for operations that require a root/peer rank
-// identifier and is otherwise ignored.
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
-    iree_hal_command_buffer_t* command_buffer, iree_hal_channel_t* channel,
-    iree_hal_collective_op_t op, uint32_t param,
-    iree_hal_buffer_binding_t send_binding,
-    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count);
-
 // Pushes an inline set of constants that can be accessed by subsequent
 // dispatches using a compatible pipeline layout.
 //
@@ -832,12 +682,6 @@ typedef struct iree_hal_command_buffer_vtable_t {
       iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
       iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
       iree_device_size_t length);
-
-  iree_status_t(IREE_API_PTR* collective)(
-      iree_hal_command_buffer_t* command_buffer, iree_hal_channel_t* channel,
-      iree_hal_collective_op_t op, uint32_t param,
-      iree_hal_buffer_binding_t send_binding,
-      iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count);
 
   iree_status_t(IREE_API_PTR* push_constants)(
       iree_hal_command_buffer_t* command_buffer,

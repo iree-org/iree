@@ -33,8 +33,6 @@ iree_cc_library(
     "graph_command_buffer.h"
     "native_executable.c"
     "native_executable.h"
-    "nccl_channel.c"
-    "nccl_channel.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
     "pipeline_layout.c"
@@ -54,7 +52,6 @@ iree_cc_library(
     iree::base::tracing
     iree::hal
     iree::hal::utils::buffer_transfer
-    iree::hal::utils::collective_batch
     iree::hal::utils::deferred_command_buffer
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base

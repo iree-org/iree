@@ -15,10 +15,8 @@
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
-#include "iree/hal/drivers/cuda/nccl_channel.h"
 #include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/drivers/cuda/status_util.h"
-#include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
 
 #define IREE_HAL_CUDA_MAX_BINDING_COUNT 64
@@ -47,12 +45,7 @@ typedef struct iree_hal_cuda_graph_command_buffer_t {
   // Keep track of the last node added to the command buffer as we are currently
   // serializing all the nodes (each node depends on the previous one).
   CUgraphNode last_node;
-
-  // Iteratively constructed batch of collective operations.
-  iree_hal_collective_batch_t collective_batch;
-
   int32_t push_constant[IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT];
-
   // Keep track of the current set of kernel arguments.
   void* current_descriptor[];
 } iree_hal_cuda_graph_command_buffer_t;
@@ -112,11 +105,6 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
     status = iree_hal_resource_set_allocate(block_pool,
                                             &command_buffer->resource_set);
   }
-  if (iree_status_is_ok(status)) {
-    iree_hal_collective_batch_initialize(&command_buffer->arena,
-                                         command_buffer->resource_set,
-                                         &command_buffer->collective_batch);
-  }
 
   if (iree_status_is_ok(status)) {
     *out_command_buffer = &command_buffer->base;
@@ -133,9 +121,6 @@ static void iree_hal_cuda_graph_command_buffer_destroy(
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Drop any pending collective batches before we tear things down.
-  iree_hal_collective_batch_reset(&command_buffer->collective_batch);
-
   if (command_buffer->graph != NULL) {
     CUDA_IGNORE_ERROR(command_buffer->context->syms,
                       cuGraphDestroy(command_buffer->graph));
@@ -148,7 +133,6 @@ static void iree_hal_cuda_graph_command_buffer_destroy(
   }
   command_buffer->last_node = NULL;
 
-  iree_hal_collective_batch_deinitialize(&command_buffer->collective_batch);
   iree_hal_resource_set_free(command_buffer->resource_set);
   iree_arena_deinitialize(&command_buffer->arena);
   iree_allocator_free(command_buffer->context->host_allocator, command_buffer);
@@ -180,47 +164,6 @@ static void* iree_hal_cuda_graph_command_buffer_dyn_cast(
   return NULL;
 }
 
-// Flushes any pending batched collective operations.
-// Must be called before any other non-collective nodes are added to the graph
-// or a barrier is encountered.
-static iree_status_t iree_hal_cuda_graph_command_buffer_flush_collectives(
-    iree_hal_cuda_graph_command_buffer_t* command_buffer) {
-  // NOTE: we could move this out into callers by way of an always-inline shim -
-  // that would make this a single compare against the command buffer state we
-  // are likely to access immediately after anyway and keep overheads minimal.
-  if (IREE_LIKELY(iree_hal_collective_batch_is_empty(
-          &command_buffer->collective_batch))) {
-    return iree_ok_status();
-  }
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // TODO(#9580): use CUDA graph capture so that the NCCL calls end up in the
-  // graph:
-  // https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/cudagraph.html
-  //
-  // Something like:
-  //  syms->cuStreamBeginCapture(nccl_stream);
-  //  iree_hal_cuda_nccl_submit_batch(command_buffer->context,
-  //                                  &command_buffer->collective_batch,
-  //                                  nccl_stream);
-  //  syms->cuStreamEndCapture(nccl_stream, &child_graph);
-  //  syms->cuGraphAddChildGraphNode(..., child_graph);
-  //  syms->cuGraphDestroy(child_graph);  // probably, I think it gets cloned
-  //
-  // Note that we'll want to create a scratch stream that we use to perform the
-  // capture - we could memoize that on the command buffer or on the device
-  // (though that introduces potential threading issues). There may be a special
-  // stream mode for these capture-only streams that is lighter weight than a
-  // normal stream.
-  iree_status_t status = iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED,
-      "CUDA graph capture of collective operations not yet implemented");
-
-  iree_hal_collective_batch_reset(&command_buffer->collective_batch);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 static iree_status_t iree_hal_cuda_graph_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
@@ -244,10 +187,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_end(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-
-  // Flush any pending collective batches.
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
 
   // Reset state used during recording.
   command_buffer->last_node = NULL;
@@ -291,42 +230,24 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_execution_barrier(
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
-  iree_hal_cuda_graph_command_buffer_t* command_buffer =
-      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
-
   // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized so this is a no-op.
-
+  // serialized.
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_signal_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
-  iree_hal_cuda_graph_command_buffer_t* command_buffer =
-      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
-
   // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized so this is a no-op.
-
+  // serialized.
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_reset_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
-  iree_hal_cuda_graph_command_buffer_t* command_buffer =
-      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
-
   // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized so this is a no-op.
-
+  // serialized.
   return iree_ok_status();
 }
 
@@ -339,21 +260,15 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_wait_events(
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
-  iree_hal_cuda_graph_command_buffer_t* command_buffer =
-      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
-
   // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized so this is a no-op.
-
+  // serialized.
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_discard_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* buffer) {
-  // We could mark the memory as invalidated so that if this is a managed buffer
-  // CUDA does not try to copy it back to the host.
+  // We could mark the memory as invalidated so that if managed CUDA does not
+  // try to copy it back to the host.
   return iree_ok_status();
 }
 
@@ -386,8 +301,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
     iree_host_size_t pattern_length) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &target_buffer));
@@ -396,7 +309,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
       iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
   uint32_t dword_pattern = iree_hal_cuda_splat_pattern(pattern, pattern_length);
-
   CUDA_MEMSET_NODE_PARAMS params = {
       .dst = target_device_buffer + target_offset,
       .elementSize = pattern_length,
@@ -414,7 +326,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
                            dep, numNode, &params,
                            command_buffer->context->cu_context),
       "cuGraphAddMemsetNode");
-
   return iree_ok_status();
 }
 
@@ -424,8 +335,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
     iree_device_size_t target_offset, iree_device_size_t length) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
 
   // Allocate scratch space in the arena for the data and copy it in.
   // The update buffer API requires that the command buffer capture the host
@@ -453,18 +362,15 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
       .Height = 1,
       .Depth = 1,
   };
-
   // Serialize all the nodes for now.
   CUgraphNode dep[] = {command_buffer->last_node};
   size_t numNode = command_buffer->last_node ? 1 : 0;
-
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
       cuGraphAddMemcpyNode(&command_buffer->last_node, command_buffer->graph,
                            dep, numNode, &params,
                            command_buffer->context->cu_context),
       "cuGraphAddMemcpyNode");
-
   return iree_ok_status();
 }
 
@@ -475,8 +381,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
     iree_device_size_t length) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
 
   const iree_hal_buffer_t* buffers[2] = {source_buffer, target_buffer};
   IREE_RETURN_IF_ERROR(
@@ -488,7 +392,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
   CUdeviceptr source_device_buffer = iree_hal_cuda_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(source_buffer));
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
-
   CUDA_MEMCPY3D params = {
       .srcMemoryType = CU_MEMORYTYPE_DEVICE,
       .srcDevice = source_device_buffer,
@@ -500,31 +403,16 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
       .Height = 1,
       .Depth = 1,
   };
-
   // Serialize all the nodes for now.
   CUgraphNode dep[] = {command_buffer->last_node};
   size_t numNode = command_buffer->last_node ? 1 : 0;
-
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
       cuGraphAddMemcpyNode(&command_buffer->last_node, command_buffer->graph,
                            dep, numNode, &params,
                            command_buffer->context->cu_context),
       "cuGraphAddMemcpyNode");
-
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_cuda_graph_command_buffer_collective(
-    iree_hal_command_buffer_t* base_command_buffer, iree_hal_channel_t* channel,
-    iree_hal_collective_op_t op, uint32_t param,
-    iree_hal_buffer_binding_t send_binding,
-    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
-  iree_hal_cuda_graph_command_buffer_t* command_buffer =
-      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  return iree_hal_collective_batch_append(&command_buffer->collective_batch,
-                                          channel, op, param, send_binding,
-                                          recv_binding, element_count);
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_push_constants(
@@ -563,10 +451,8 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-
   iree_host_size_t base_binding =
       iree_hal_cuda_base_binding_index(pipeline_layout, set);
-
   // Convention with the compiler side. We map bindings to kernel argument.
   // We compact the bindings to get a dense set of arguments and keep them order
   // based on the binding index.
@@ -577,13 +463,10 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
     iree_hal_cuda_binding_mapping_t buffer = {i, bindings[i].binding};
     binding_used[i] = buffer;
   }
-  // TODO: remove this sort - it's thankfully small (1-8 on average) but we
-  // should be able to avoid it like we do on the CPU side with a bitmap.
   qsort(binding_used, binding_count, sizeof(iree_hal_cuda_binding_mapping_t),
         compare_binding_index);
   IREE_ASSERT_LT(binding_count, IREE_HAL_CUDA_MAX_BINDING_COUNT,
                  "binding count larger than the max expected");
-
   for (iree_host_size_t i = 0; i < binding_count; i++) {
     const iree_hal_descriptor_set_binding_t* binding =
         &bindings[binding_used[i].index];
@@ -600,7 +483,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
           command_buffer->resource_set, 1, &binding->buffer));
     }
   }
-
   return iree_ok_status();
 }
 
@@ -610,9 +492,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
-
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &executable));
   iree_hal_pipeline_layout_t* layout =
@@ -621,20 +500,17 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
       iree_hal_cuda_pipeline_layout_num_constants(layout);
   iree_host_size_t constant_base_index =
       iree_hal_cuda_push_constant_index(layout);
-
   // Patch the push constants in the kernel arguments.
   for (iree_host_size_t i = 0; i < num_constants; i++) {
     *((uint32_t*)command_buffer->current_descriptor[i + constant_base_index]) =
         command_buffer->push_constant[i];
   }
-
   int32_t block_size_x, block_size_y, block_size_z;
   int32_t shared_memory_size;
   IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_block_size(
       executable, entry_point, &block_size_x, &block_size_y, &block_size_z));
   IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_shared_memory_size(
       executable, entry_point, &shared_memory_size));
-
   CUDA_KERNEL_NODE_PARAMS params = {
       .func = iree_hal_cuda_native_executable_for_entry_point(executable,
                                                               entry_point),
@@ -647,17 +523,14 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
       .kernelParams = command_buffer->current_descriptor,
       .sharedMemBytes = shared_memory_size,
   };
-
   // Serialize all the nodes for now.
   CUgraphNode dep[] = {command_buffer->last_node};
   size_t numNodes = command_buffer->last_node ? 1 : 0;
-
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
       cuGraphAddKernelNode(&command_buffer->last_node, command_buffer->graph,
                            dep, numNodes, &params),
       "cuGraphAddKernelNode");
-
   return iree_ok_status();
 }
 
@@ -701,7 +574,6 @@ static const iree_hal_command_buffer_vtable_t
         .fill_buffer = iree_hal_cuda_graph_command_buffer_fill_buffer,
         .update_buffer = iree_hal_cuda_graph_command_buffer_update_buffer,
         .copy_buffer = iree_hal_cuda_graph_command_buffer_copy_buffer,
-        .collective = iree_hal_cuda_graph_command_buffer_collective,
         .push_constants = iree_hal_cuda_graph_command_buffer_push_constants,
         .push_descriptor_set =
             iree_hal_cuda_graph_command_buffer_push_descriptor_set,

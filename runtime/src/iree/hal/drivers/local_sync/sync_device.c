@@ -189,13 +189,6 @@ static iree_status_t iree_hal_sync_device_query_i64(
       (int)category.size, category.data, (int)key.size, key.data);
 }
 
-static iree_status_t iree_hal_sync_device_create_channel(
-    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "collectives not implemented");
-}
-
 static iree_status_t iree_hal_sync_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -407,7 +400,6 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .device_allocator = iree_hal_sync_device_allocator,
     .trim = iree_hal_sync_device_trim,
     .query_i64 = iree_hal_sync_device_query_i64,
-    .create_channel = iree_hal_sync_device_create_channel,
     .create_command_buffer = iree_hal_sync_device_create_command_buffer,
     .create_descriptor_set_layout =
         iree_hal_sync_device_create_descriptor_set_layout,

@@ -34,8 +34,6 @@ iree_runtime_cc_library(
         "buffer_view.h",
         "buffer_view_util.c",
         "buffer_view_util.h",
-        "channel.c",
-        "channel.h",
         "command_buffer.c",
         "command_buffer.h",
         "command_buffer_validation.c",

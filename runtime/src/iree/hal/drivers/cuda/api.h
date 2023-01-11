@@ -24,11 +24,6 @@ typedef enum iree_hal_cuda_command_buffer_mode_e {
   IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM = 1,
 } iree_hal_cuda_command_buffer_mode_t;
 
-// ncclUniqueId exposed without exporting the NCCL headers.
-typedef struct {
-  char data[128];
-} iree_hal_cuda_nccl_id_t;
-
 // Parameters configuring an iree_hal_cuda_device_t.
 // Must be initialized with iree_hal_cuda_device_params_initialize prior to use.
 typedef struct iree_hal_cuda_device_params_t {
@@ -49,19 +44,6 @@ typedef struct iree_hal_cuda_device_params_t {
   // Only command buffers produced by the compiler that have the
   // IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION bit set will use this.
   bool allow_inline_execution;
-
-  // Opaque NCCL ID used during channel creation when empty IDs are provided.
-  // Today this is used for all communicators created but in the future this may
-  // just be used as a default when not otherwise specified on channel creation.
-  iree_hal_cuda_nccl_id_t nccl_default_id;
-  // Default base rank to use when creating collective channels.
-  // This will be added to the local rank assigned to communicators when
-  // IREE_HAL_CHANNEL_RANK_DEFAULT is specified on creation calls.
-  int nccl_default_rank;
-  // Default total number of participants to use when creating collective
-  // channels. This will be used IREE_HAL_CHANNEL_COUNT_DEFAULT is specified on
-  // creation calls.
-  int nccl_default_count;
 } iree_hal_cuda_device_params_t;
 
 // Initializes |out_params| to default values.

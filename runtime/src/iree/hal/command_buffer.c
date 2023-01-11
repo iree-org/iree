@@ -365,27 +365,6 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
-    iree_hal_command_buffer_t* command_buffer, iree_hal_channel_t* channel,
-    iree_hal_collective_op_t op, uint32_t param,
-    iree_hal_buffer_binding_t send_binding,
-    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
-  IREE_ASSERT_ARGUMENT(command_buffer);
-  IREE_ASSERT_ARGUMENT(channel);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IF_VALIDATING(command_buffer, {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_command_buffer_collective_validation(
-                command_buffer, VALIDATION_STATE(command_buffer), channel, op,
-                param, send_binding, recv_binding, element_count));
-  });
-  iree_status_t status = _VTABLE_DISPATCH(command_buffer, collective)(
-      command_buffer, channel, op, param, send_binding, recv_binding,
-      element_count);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_constants(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
