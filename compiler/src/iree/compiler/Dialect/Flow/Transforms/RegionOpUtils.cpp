@@ -189,7 +189,7 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
   SmallVector<Value> returnedValues(returnOp.getOperands().begin(),
                                     returnOp.getOperands().end());
   returnedValues.push_back(result);
-  returnOp.getOperandsMutable().assign(returnedValues);
+  returnOp.operandsMutable().assign(returnedValues);
 
   return newRegionOp;
 }

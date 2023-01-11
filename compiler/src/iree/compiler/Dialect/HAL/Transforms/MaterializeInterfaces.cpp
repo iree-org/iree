@@ -348,7 +348,7 @@ struct ConvertReturnPattern : public OpRewritePattern<IREE::Stream::ReturnOp> {
   using OpRewritePattern<IREE::Stream::ReturnOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::ReturnOp op,
                                 PatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::HAL::ReturnOp>(op, op.getOperands());
+    rewriter.replaceOpWithNewOp<IREE::HAL::ReturnOp>(op, op.operands());
     return success();
   }
 };

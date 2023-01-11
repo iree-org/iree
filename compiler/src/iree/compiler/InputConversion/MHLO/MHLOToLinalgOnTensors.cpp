@@ -358,9 +358,6 @@ struct ConvertMHLOToLinalgOnTensorsPass
     populateMHLOToFlowPatterns(context, patterns);
     chlo::populateDecomposeChloPatterns(context, &patterns);
     populateMHLOBroadcastingToLinalgPatterns(context, *typeConverter, patterns);
-    mhlo::populateScalarHloToArithmeticConversionPatterns(
-        context, *typeConverter, &patterns,
-        [](Operation *op) { return mhlo::isInBodyOfLinalgOps(op); });
     populateMHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
                                                     patterns);
     populateMHLOComplexToRealPatterns(context, *typeConverter, patterns);

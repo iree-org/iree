@@ -73,11 +73,11 @@ static OpFoldResult foldRangeOp(Type type, ValueRange operands,
 }
 
 OpFoldResult RangeMinOp::fold(ArrayRef<Attribute> operands) {
-  return foldRangeOp<INT64_MAX, xmin>(getType(), this->getOperands(), operands);
+  return foldRangeOp<INT64_MAX, xmin>(getType(), this->operands(), operands);
 }
 
 OpFoldResult RangeMaxOp::fold(ArrayRef<Attribute> operands) {
-  return foldRangeOp<INT64_MIN, xmax>(getType(), this->getOperands(), operands);
+  return foldRangeOp<INT64_MIN, xmax>(getType(), this->operands(), operands);
 }
 
 namespace {
@@ -129,7 +129,7 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
       }
     }
     if (operands.size() + (constantValue != initialValue ? 1 : 0) ==
-        op.getOperands().size()) {
+        op.operands().size()) {
       // No change in operand count.
       return failure();
     }

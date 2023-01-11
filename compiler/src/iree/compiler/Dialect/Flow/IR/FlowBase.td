@@ -19,6 +19,7 @@ include "mlir/IR/AttrTypeBase.td"
 def Flow_Dialect : Dialect {
   let name = "flow";
   let cppNamespace = "::mlir::iree_compiler::IREE::Flow";
+  let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 
   let summary = [{
     A dialect designed to model execution data flow and partitioning.

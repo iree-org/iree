@@ -549,7 +549,7 @@ struct ProcessSubgroupMMAStore final
 
     rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
         storeOp, adaptor.getSrc(), adaptor.getDstMemref(), indices.value(),
-        newLeadDimSize, storeOp.getTransposeAttr());
+        newLeadDimSize);
     return success();
   }
 };
