@@ -1162,8 +1162,6 @@ void ConvertToLLVMPass::runOnOperation() {
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorBroadcastLoweringPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(patterns);
-    vector::populateVectorMaskMaterializationPatterns(
-        patterns, /*force32BitVectorIndices=*/false);
     vector::populateVectorMaskOpLoweringPatterns(patterns);
     vector::populateVectorShapeCastLoweringPatterns(patterns);
     vector::populateVectorTransposeLoweringPatterns(patterns);

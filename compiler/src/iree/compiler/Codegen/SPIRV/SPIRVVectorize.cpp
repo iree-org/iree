@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -122,13 +121,10 @@ Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
 /// Add patterns to vectorize any supported Linalg ops.
 void populateVectorizationPatterns(RewritePatternSet &patterns) {
   IREE::LinalgExt::LinalgTransformationFilter f;
-  IREE::LinalgExt::LinalgVectorizationOptions vectorizationOptions;
-  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, vectorizationOptions, f);
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns, f);
   linalg::populateConvolutionVectorizationPatterns(patterns);
   patterns.add<LinalgVectorizationPattern>(
-      patterns.getContext(), vectorizationOptions,
-      f.addOpFilter<linalg::ContractionOpInterface>());
+      patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>());
 }
 
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.

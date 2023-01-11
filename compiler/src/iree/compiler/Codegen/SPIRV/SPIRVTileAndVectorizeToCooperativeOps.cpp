@@ -13,7 +13,6 @@
 
 #include <algorithm>
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPUPatterns.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
@@ -139,11 +138,9 @@ void populateVectorizationPatterns(MLIRContext *context,
                                    RewritePatternSet &patterns) {
   IREE::LinalgExt::LinalgTransformationFilter f(
       StringAttr::get(context, getVectorizeMarker()));
-  IREE::LinalgExt::LinalgVectorizationOptions opts;
-  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
-                                                                   opts, f);
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns, f);
   patterns.add<LinalgVectorizationPattern>(
-      context, opts, f.addOpFilter<linalg::ContractionOpInterface>());
+      context, f.addOpFilter<linalg::ContractionOpInterface>());
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
 }

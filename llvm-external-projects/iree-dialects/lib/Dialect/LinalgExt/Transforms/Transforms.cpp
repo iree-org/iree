@@ -21,7 +21,6 @@
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -244,27 +243,23 @@ LinalgSCFTileAndFusePattern::matchAndRewrite(TilingInterface op,
 }
 
 LinalgVectorizationPattern::LinalgVectorizationPattern(
-    MLIRContext *context, LinalgVectorizationOptions opts,
-    LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
+    MLIRContext *context, LinalgExt::LinalgTransformationFilter f,
+    PatternBenefit benefit)
     : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
-      options(std::move(opts)), filter(std::move(f)) {}
+      filter(std::move(f)) {}
 
 LinalgVectorizationPattern::LinalgVectorizationPattern(
-    StringRef opName, MLIRContext *context, LinalgVectorizationOptions opts,
+    StringRef opName, MLIRContext *context,
     LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
     : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
-      options(std::move(opts)), filter(f.addOpNameFilter(opName)) {}
+      filter(f.addOpNameFilter(opName)) {}
 
 LogicalResult
 LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
                                             PatternRewriter &rewriter) const {
   if (failed(filter.checkAndNotify(rewriter, linalgOp)))
     return failure();
-  SmallVector<int64_t> vectorSizes;
-  if (options.vectorSizeComputationFunction)
-    vectorSizes.append(options.vectorSizeComputationFunction(
-        linalgOp, options.canonicalVectorSizes));
-  return vectorize(rewriter, linalgOp, vectorSizes);
+  return vectorize(rewriter, linalgOp);
 }
 
 namespace {
@@ -507,11 +502,13 @@ struct LinalgStrategyVectorizePass
 
   LinalgStrategyVectorizePass() = default;
 
-  LinalgStrategyVectorizePass(StringRef opName, LinalgVectorizationOptions opts,
-                              LinalgExt::LinalgTransformationFilter filt)
-      : options(std::move(opts)), filter(std::move(filt)) {
-    this->vectorizePadding = opts.vectorizePadding;
-  };
+  LinalgStrategyVectorizePass(StringRef opName,
+                              LinalgExt::LinalgTransformationFilter filt,
+                              bool padVectorize = false)
+      : filter(std::move(filt)) {
+    this->anchorOpName.setValue(opName.str());
+    this->vectorizePadding.setValue(padVectorize);
+  }
 
   void runOnOperation() override {
     auto funcOp = getOperation();
@@ -521,17 +518,11 @@ struct LinalgStrategyVectorizePass
     RewritePatternSet vectorizationPatterns(funcOp.getContext());
     if (!anchorOpName.empty()) {
       vectorizationPatterns.add<LinalgVectorizationPattern>(
-          anchorOpName, funcOp.getContext(), options, filter);
+          anchorOpName, funcOp.getContext(), filter);
     } else {
       vectorizationPatterns.add<LinalgVectorizationPattern>(funcOp.getContext(),
-                                                            options, filter);
+                                                            filter);
     }
-
-    // TODO: Move this down the pipeline once we have the ODM-based masking
-    // representation.
-    vector::populateVectorMaskLoweringPatternsForSideEffectingOps(
-        vectorizationPatterns);
-
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorizationPatterns);
     vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
@@ -556,7 +547,6 @@ struct LinalgStrategyVectorizePass
     }
   }
 
-  LinalgVectorizationOptions options;
   LinalgExt::LinalgTransformationFilter filter;
 };
 
@@ -737,9 +727,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPeelPass(
 
 /// Create a LinalgStrategyVectorizePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyVectorizePass(
-    StringRef opName, const LinalgVectorizationOptions &options,
-    const LinalgExt::LinalgTransformationFilter &filter) {
-  return std::make_unique<LinalgStrategyVectorizePass>(opName, options, filter);
+    StringRef opName, const LinalgExt::LinalgTransformationFilter &filter,
+    bool padVectorize) {
+  return std::make_unique<LinalgStrategyVectorizePass>(opName, filter,
+                                                       padVectorize);
 }
 
 /// Create a LinalgStrategyEnablePass.

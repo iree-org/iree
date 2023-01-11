@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -54,17 +53,12 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns,
     }
     return success(maxFlatVecSize <= maxVectorSize);
   });
-
-  IREE::LinalgExt::LinalgVectorizationOptions vectorizationOptions;
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp,
                         linalg::Conv1DNwcWcfOp,
-                        linalg::Conv1DNcwFcwOp>::insert(patterns,
-                                                        vectorizationOptions,
-                                                        f);
+                        linalg::Conv1DNcwFcwOp>::insert(patterns, f);
   patterns.add<linalg::CopyVectorizationPattern>(ctx);
   patterns.add<LinalgVectorizationPattern>(
-      ctx, vectorizationOptions,
-      f.addOpFilter<linalg::ContractionOpInterface>());
+      ctx, f.addOpFilter<linalg::ContractionOpInterface>());
 }
 
 namespace {

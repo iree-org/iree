@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPUPatterns.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
@@ -33,12 +32,9 @@ extern llvm::cl::opt<bool> llvmgpuUseMMASync;
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   IREE::LinalgExt::LinalgTransformationFilter f(
       StringAttr::get(patterns.getContext(), getVectorizeMarker()));
-  IREE::LinalgExt::LinalgVectorizationOptions vectorizationOptions;
-  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, vectorizationOptions, f);
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns, f);
   patterns.add<LinalgVectorizationPattern>(
-      patterns.getContext(), vectorizationOptions,
-      f.addOpFilter<linalg::ContractionOpInterface>());
+      patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>());
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
 }

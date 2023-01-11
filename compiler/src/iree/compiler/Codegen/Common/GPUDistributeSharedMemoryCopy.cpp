@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
@@ -253,12 +252,11 @@ static void populateTilingAndDistribute(RewritePatternSet &patterns,
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   VectorizationPatterns<linalg::GenericOp>::insert(
-      patterns, IREE::LinalgExt::LinalgVectorizationOptions(),
-      IREE::LinalgExt::LinalgTransformationFilter(
-          {StringAttr::get(patterns.getContext(),
-                           getCopyToWorkgroupMemoryMarker()),
-           StringAttr::get(patterns.getContext(), kCopyDistributed)},
-          std::nullopt));
+      patterns, IREE::LinalgExt::LinalgTransformationFilter(
+                    {StringAttr::get(patterns.getContext(),
+                                     getCopyToWorkgroupMemoryMarker()),
+                     StringAttr::get(patterns.getContext(), kCopyDistributed)},
+                    std::nullopt));
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.

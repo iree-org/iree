@@ -49,7 +49,6 @@ iree_lit_test_suite(
             "unfused_fma.mlir",
             "vector_contract_to_arm_asm.mlir",
             "vector_contract_to_arm_intrinsics.mlir",
-            "vector_masking.mlir",
             "verify_linalg_transform_legality.mlir",
         ],
         include = ["*.mlir"],
