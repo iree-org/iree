@@ -42,7 +42,6 @@
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -1205,7 +1204,6 @@ void ConvertToLLVMPass::runOnOperation() {
 
   populateComplexToLLVMConversionPatterns(converter, patterns);
   populateMathToLLVMConversionPatterns(converter, patterns);
-  memref::populateExpandStridedMetadataPatterns(patterns);
   populateMemRefToLLVMConversionPatterns(converter, patterns);
   populateFuncToLLVMConversionPatterns(converter, patterns);
   arith::populateArithToLLVMConversionPatterns(converter, patterns);
