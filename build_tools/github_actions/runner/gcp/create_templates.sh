@@ -149,12 +149,6 @@ function create_template() {
       --maintenance-policy=MIGRATE
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
     )
-  elif [[ "${type}" == cpu-c2-16 ]]; then
-    cmd+=(
-      --machine-type=c2-standard-16
-      --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
-    )
   else
     echo "Got unrecognized type '${type}'" >2
     exit 1
@@ -169,7 +163,7 @@ function create_template() {
 }
 
 for group in presubmit postsubmit; do
-  for type in gpu cpu cpu-c2-16; do
+  for type in gpu cpu; do
     create_template "${group}" "${type}"
   done
 done
