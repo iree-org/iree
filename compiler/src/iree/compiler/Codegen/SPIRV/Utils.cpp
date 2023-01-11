@@ -15,9 +15,9 @@
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Support/LogicalResult.h"
@@ -35,15 +35,6 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
   auto config = targetAttr.getConfiguration();
   if (!config) return nullptr;
   return config.getAs<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
-}
-
-/// Returns true if the given MemRef is in workgroup memory.
-bool isInWorkgroupMemory(MemRefType memrefType) {
-  Optional<unsigned> workgroupMemorySpace =
-      spirv::mapVulkanStorageClassToMemorySpace(spirv::StorageClass::Workgroup);
-  if (auto attr = memrefType.getMemorySpace().dyn_cast_or_null<IntegerAttr>())
-    if (attr.getInt() == *workgroupMemorySpace) return true;
-  return false;
 }
 
 llvm::Optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp) {

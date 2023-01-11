@@ -13,6 +13,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPUPatterns.h"
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
@@ -26,6 +27,7 @@
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -135,8 +137,6 @@ class SPIRVTileAndPromotePass final
   void runOnOperation() override;
 
  private:
-  /// Promotes C matrix to shared memory when necessary and returns success if
-  /// no error happens.
   LogicalResult doPromoteCMatrix(func::FuncOp funcOp) const;
 
   // Whether to promote C matrix to use shared memory.
@@ -292,57 +292,25 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
   MLIRContext *context = funcOp.getContext();
   if (!promoteCMatrix) return success();
 
+  // If there are no fused elementwise ops, we can avoid promoting C matrix.
   SmallVector<Operation *> computeOps;
   if (failed(getComputeOps(funcOp, computeOps)))
     return funcOp.emitError("failed to get compute ops");
-
-  SmallVector<Operation *> linalgOps;
+  unsigned count = 0;
   for (Operation *op : computeOps) {
-    if (isa<linalg::FillOp>(op)) continue;  // Don't care
-    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-      linalgOps.push_back(linalgOp);
-    } else {
-      return funcOp.emitError("unknown compute op ") << *op;
-    }
+    if (!isa<linalg::FillOp>(op)) ++count;
   }
+  if (count <= 1) return success();
 
-  if (linalgOps.size() > 2) {
-    return funcOp.emitError("unhandled multiple matmul/generic cases");
-  }
-
-  // If there are no fused elementwise ops, we can avoid promoting C matrix.
-  if (linalgOps.size() <= 1) return success();
-
-  linalg::LinalgOp matmulOp = linalgOps.front();
-  auto genericOp = cast<linalg::GenericOp>(*linalgOps.back());
-
-  auto matmulType =
-      matmulOp.getDpsInitOperand(0)->get().getType().cast<MemRefType>();
-  if (isInWorkgroupMemory(matmulType)) {
-    // The matmul output is already in shared memory. This can happen when
-    // bufferization decides an allocation is needed, e.g., matmul + arith.extf,
-    // where the output have different element types. For such cases, don't need
-    // to promote and propagate shared memory copy anymore. Just mark the
-    // following generic op for distribution accordingly.
-    setMarker(genericOp, getCopyToWorkgroupMemoryMarker());
-    return success();
-  }
-
-  // Finally do promote C matrix.
   RewritePatternSet patterns(context);
   populateContractPromotionPatterns(patterns, {2});
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return failure();
   }
+  propagateSharedMemoryCopy(funcOp);
+
   LLVM_DEBUG({
     llvm::dbgs() << "--- After promoting C matrix ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
-  propagateSharedMemoryCopy(funcOp);
-  LLVM_DEBUG({
-    llvm::dbgs() << "--- After propagating shared memory copy ---\n";
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
