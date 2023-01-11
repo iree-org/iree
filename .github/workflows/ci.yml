@@ -147,7 +147,7 @@ jobs:
         run: |
           tar -I 'zstd -T0' \
             -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
-          echo "build-dir-archive=${BUILD_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
       - name: "Uploading build dir archive"
         id: upload
         env:
@@ -155,7 +155,7 @@ jobs:
           BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
         run: |
           gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
-          echo "build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
 
   # TODO(#11350): re-enable this job when it works again
   build_test_all_windows:
@@ -366,7 +366,7 @@ jobs:
             --env "IREE_TF_BINARIES_OUTPUT_DIR=${IREE_TF_BINARIES_OUTPUT_DIR}" \
             gcr.io/iree-oss/frontends-swiftshader@sha256:8dbbfe9d0b9d72e8af591f9390ef8865536cc67bd262285335b7a83b2218548d \
             build_tools/cmake/build_tf_binaries.sh
-          echo "binaries-dir=${IREE_TF_BINARIES_OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=binaries-dir::${IREE_TF_BINARIES_OUTPUT_DIR}"
       - name: "Creating archive of binaries"
         id: archive
         env:
@@ -374,7 +374,7 @@ jobs:
           BINARIES_DIR: ${{ steps.build.outputs.binaries-dir }}
         run: |
           tar -cf "${BINARIES_ARCHIVE}" "${BINARIES_DIR}"
-          echo "binaries-archive=${BINARIES_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=binaries-archive::${BINARIES_ARCHIVE}"
       - name: "Uploading binaries archive"
         id: upload
         env:
@@ -382,7 +382,7 @@ jobs:
           BINARIES_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
         run: |
           gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${BINARIES_GCS_ARTIFACT}"
-          echo "binaries-gcs-artifact=${BINARIES_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=binaries-gcs-artifact::${BINARIES_GCS_ARTIFACT}"
 
   test_tf_integrations:
     needs: [setup, build_all, build_tf_integrations]
@@ -640,7 +640,7 @@ jobs:
             gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
-          echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=e2e-test-artifacts-dir::${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts"
       - name: "Uploading e2e test artifacts"
         id: upload
         env:
@@ -653,7 +653,7 @@ jobs:
           # on GCS.
           # More details: https://cloud.google.com/sdk/gcloud/reference/storage/cp#--gzip-in-flight-all
           gcloud alpha storage cp -r --gzip-in-flight-all "${E2E_TEST_ARTIFACTS_DIR}/iree" "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/iree"
-          echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=e2e-test-artifacts-gcs-artifact-dir::${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
@@ -825,7 +825,7 @@ jobs:
           EXPECTED_OUTPUT_FILE: deeplab_v3_fp32_input_0_expected_output.npy
         run: |
           gcloud alpha storage cp "${EXPECTED_OUTPUT_GSC_ARTIFACT}" "${BUILD_BENCHMARK_SUITE_DIR}/${EXPECTED_OUTPUT_FILE}"
-          echo "benchmark-suite-dir=${BUILD_BENCHMARK_SUITE_DIR}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=benchmark-suite-dir::${BUILD_BENCHMARK_SUITE_DIR}"
       - name: "Build iree-run-module and test benchmark suite modules"
         env:
           BUILD_BENCHMARK_SUITE_DIR: ${{ steps.download_expected_output.outputs.benchmark-suite-dir }}

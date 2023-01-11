@@ -127,7 +127,7 @@ jobs:
         run: |
           tar -I 'zstd -T0' \
             -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
-          echo "build-dir-archive=${BUILD_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
       - name: "Uploading build dir archive"
         id: upload
         env:
@@ -135,7 +135,7 @@ jobs:
           BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
         run: |
           gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
-          echo "build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
 
   benchmark_cuda:
     needs: [setup, build_cuda]

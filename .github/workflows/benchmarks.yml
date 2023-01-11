@@ -99,7 +99,7 @@ jobs:
             --env "IREE_BUILD_BENCHMARKS_DIR=${BENCHMARKS_OUTPUT_DIR}" \
             gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
             build_tools/cmake/build_benchmarks.sh
-          echo "benchmarks-dir=${BENCHMARKS_OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=benchmarks-dir::${BENCHMARKS_OUTPUT_DIR}"
       - name: "Creating archive of benchmarks"
         id: archive
         env:
@@ -113,7 +113,7 @@ jobs:
             --exclude "${BENCHMARKS_DIR}/benchmark_suites/iree" \
             -czf \
             "${BENCHMARKS_ARCHIVE}" "${BENCHMARKS_DIR}/benchmark_suites"
-          echo "benchmarks-archive=${BENCHMARKS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=benchmarks-archive::${BENCHMARKS_ARCHIVE}"
       - name: "Uploading benchmarks archive"
         id: upload
         env:
@@ -121,7 +121,7 @@ jobs:
           BENCHMARKS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.benchmarks-archive }}
         run: |
           gcloud alpha storage cp "${BENCHMARKS_ARCHIVE}" "${BENCHMARKS_GCS_ARTIFACT}"
-          echo "benchmarks-gcs-artifact=${BENCHMARKS_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=benchmarks-gcs-artifact::${BENCHMARKS_GCS_ARTIFACT}"
 
   build_tools:
     runs-on:
@@ -182,7 +182,7 @@ jobs:
         run: |
           tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
             "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module
-          echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=benchmark-tools-archive::${BENCHMARK_TOOLS_ARCHIVE}"
       - name: "Uploading the benchmark tools archive"
         id: upload
         env:
@@ -190,4 +190,4 @@ jobs:
           BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.benchmark-tools-archive }}
         run: |
           gcloud alpha storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT}"
-          echo "${PLATFORM}-${ARCHITECTURE}-benchmark-tools-gcs-artifact=${BENCHMARK_TOOLS_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+          echo "::set-output name=${PLATFORM}-${ARCHITECTURE}-benchmark-tools-gcs-artifact::${BENCHMARK_TOOLS_GCS_ARTIFACT}"
