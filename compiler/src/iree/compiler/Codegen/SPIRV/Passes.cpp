@@ -298,11 +298,6 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
 
-  // Reduce bank conflicts by padding.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUReduceSharedMemoryBankConflicts(
-          detail::bankConflictReductionPaddingBits));
-
   // Tile and distribute to GPU subgroups and vectorize.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVTileAndVectorizeToCooperativeOpsPass());
