@@ -164,9 +164,7 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::
           SPIRVCooperativeMatrixVectorize:
-        addSPIRVCooperativeMatrixVectorizePassPipeline(
-            pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-            translationInfo.value().getSoftwarePipelineStoreStage());
+        addSPIRVCooperativeMatrixVectorizePassPipeline(pipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::
           SPIRVMatmulPromoteVectorize:

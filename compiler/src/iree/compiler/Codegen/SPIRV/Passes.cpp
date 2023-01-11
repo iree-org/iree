@@ -269,9 +269,7 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
       createOptimizeVectorTransferPass());
 }
 
-void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
-                                                    unsigned pipelineDepth,
-                                                    unsigned storeStage) {
+void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   addTileAndDistributeToWorkgroupsPasses(
       pm, /*useFuseTensorPadWithConsumerPass=*/false,
       /*useWARForCooperativeMatrixCodegen=*/true);
@@ -289,15 +287,6 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
   // removing trip-one loops.
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
-
-  // Tile and distribute to GPU subgroups.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVTileToCooperativeOpsPass());
-
-  // Multi-buffer depending on pipeline depth and distribute to shared memory.
-  if (pipelineDepth > 0)
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createGPUMultiBuffering(pipelineDepth + 1));
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
@@ -307,12 +296,11 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
       createGPUReduceSharedMemoryBankConflicts(
           detail::bankConflictReductionPaddingBits));
 
-  // Vectorize to cooperative ops.
+  // Tile and distribute to GPU subgroups and vectorize.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVVectorizeToCooperativeOpsPass());
+      createSPIRVTileAndVectorizeToCooperativeOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
-
   // Run canonicalization patterns to propagate constant shape sizes after
   // removing trip-one loops.
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -329,13 +317,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVVectorToGPUSubgroupMMAOpsPass());
-  nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
-
-  if (pipelineDepth > 0)
-    nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
-        /*epiloguePeeling=*/true, pipelineDepth, storeStage));
 }
 
 void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
