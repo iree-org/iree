@@ -55,13 +55,10 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
       offset = globalMemoryOffsetMap[globalOp];
     } else {
       offset = numberOfBytes;
-      if (std::optional<uint64_t> alignment = globalOp.getAlignment()) {
-        offset = llvm::alignTo(offset, *alignment);
-      }
       globalMemoryOffsetMap[globalOp] = offset;
       auto thisarray = globalOp.getType();
       DataLayout dataLayout = DataLayout::closest(addressOfOp);
-      numberOfBytes = offset + dataLayout.getTypeSizeInBits(thisarray) / 8;
+      numberOfBytes += dataLayout.getTypeSizeInBits(thisarray) / 8;
     }
     auto loc = addressOfOp.getLoc();
     builder.setInsertionPoint(addressOfOp);
@@ -141,18 +138,6 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
                      [](int64_t dim) { return dim == ShapedType::kDynamic; })) {
       return failure();
     }
-
-    uint64_t alignement;
-    if (llvm::Optional<uint64_t> alignementInfo = allocOp.getAlignment()) {
-      alignement = alignementInfo.value();
-    } else {
-      // If no alignment specified align at least to the size of an element.
-      Type elType = allocOp.getType().getElementType();
-      if (auto shapeType = elType.dyn_cast<ShapedType>())
-        alignement = shapeType.getSizeInBits() / 8;
-      else
-        alignement = elType.getIntOrFloatBitWidth() / 8;
-    }
     // In CUDA workgroup memory is represented by a global variable.
     MemRefType allocType = allocOp.getType();
     auto funcOp = allocOp->getParentOfType<func::FuncOp>();
@@ -165,8 +150,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
         /*sym_visibility=*/rewriter.getStringAttr("private"),
         /*type=*/allocType,
         /*initial_value=*/ElementsAttr(),
-        /*constant=*/false,
-        /*alignment=*/rewriter.getI64IntegerAttr(alignement));
+        /*constant=*/false, /*alignment=*/IntegerAttr());
     symbolTable.insert(global);
 
     rewriter.setInsertionPointToStart(&(*funcOp.getFunctionBody().begin()));
