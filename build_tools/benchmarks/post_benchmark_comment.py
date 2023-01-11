@@ -179,7 +179,10 @@ def _parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("comment_json", type=pathlib.Path)
   parser.add_argument("--verbose", action="store_true")
-  parser.add_argument("--github_event_json", required=True, type=pathlib.Path)
+  verification_parser = parser.add_mutually_exclusive_group(required=True)
+  verification_parser.add_argument("--github_event_json", type=pathlib.Path)
+  # Temporarily option for buildkite pipeline.
+  verification_parser.add_argument("--no_verify_pr", action="store_true")
   return parser.parse_args()
 
 
@@ -196,33 +199,37 @@ def main(args: argparse.Namespace):
   if gist_bot_token is None:
     raise ValueError("GIST_BOT_TOKEN must be set.")
 
-  github_event = json.loads(args.github_event_json.read_text())
-  workflow_run_sha = github_event["workflow_run"]["head_sha"]
-
   comment_data = benchmark_comment.CommentData(
       **json.loads(args.comment_json.read_text()))
   # Sanitize the pr number to make sure it is an integer.
   pr_number = int(comment_data.unverified_pr_number)
 
+  if args.no_verify_pr:
+    github_event = None
+  else:
+    github_event = json.loads(args.github_event_json.read_text())
+
   pr_client = GithubClient(requester=APIRequester(github_token=github_token))
-  pr_head_sha = pr_client.get_pull_request_head_commit(pr_number=pr_number)
-  # We can't get the trusted PR number of a workflow run from GitHub API. So we
-  # take the untrusted PR number from presubmit workflow and verify if the PR's
-  # current head SHA matches the commit SHA in the workflow run. It assumes that
-  # to generate the malicious comment data, attacker must modify the code and
-  # has a new commit SHA. So if the PR head commit matches the workflow run with
-  # attacker's commit, either the PR is created by the attacker or other's PR
-  # has the malicious commit. In both cases posting malicious comment is
-  # acceptable.
-  #
-  # Note that the collision of a target SHA1 is possible but GitHub has some
-  # protections (https://github.blog/2017-03-20-sha-1-collision-detection-on-github-com/).
-  # The assumption also only holds if files in GCS can't be overwritten (so the
-  # comment data can't be modified without changing the code).
-  if workflow_run_sha != pr_head_sha:
-    raise ValueError(
-        f"Workflow run SHA: {workflow_run_sha} mismatches "
-        f"the head SHA: {pr_head_sha} of the pull request: {pr_number}.")
+  if github_event is not None:
+    workflow_run_sha = github_event["workflow_run"]["head_sha"]
+    pr_head_sha = pr_client.get_pull_request_head_commit(pr_number=pr_number)
+    # We can't get the trusted PR number of a workflow run from GitHub API. So we
+    # take the untrusted PR number from presubmit workflow and verify if the PR's
+    # current head SHA matches the commit SHA in the workflow run. It assumes that
+    # to generate the malicious comment data, attacker must modify the code and
+    # has a new commit SHA. So if the PR head commit matches the workflow run with
+    # attacker's commit, either the PR is created by the attacker or other's PR
+    # has the malicious commit. In both cases posting malicious comment is
+    # acceptable.
+    #
+    # Note that the collision of a target SHA1 is possible but GitHub has some
+    # protections (https://github.blog/2017-03-20-sha-1-collision-detection-on-github-com/).
+    # The assumption also only holds if files in GCS can't be overwritten (so the
+    # comment data can't be modified without changing the code).
+    if workflow_run_sha != pr_head_sha:
+      raise ValueError(
+          f"Workflow run SHA: {workflow_run_sha} mismatches "
+          f"the head SHA: {pr_head_sha} of the pull request: {pr_number}.")
 
   gist_client = GithubClient(requester=APIRequester(
       github_token=gist_bot_token))
@@ -239,6 +246,8 @@ def main(args: argparse.Namespace):
 
   abbr_md = comment_data.abbr_md.replace(
       benchmark_comment.GIST_LINK_PLACEHORDER, gist_url)
+  if github_event is not None:
+    abbr_md += f'\n\n[Source Workflow Run]({github_event["workflow_run"]["html_url"]})'
   if previous_comment_id is not None:
     pr_client.update_comment_on_pr(comment_id=previous_comment_id,
                                    content=abbr_md)

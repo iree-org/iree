@@ -41,7 +41,7 @@ jobs:
           git log --oneline --graph --max-count=3
           ./build_tools/github_actions/configure_ci.py
 
-  check_benchmark_job:
+  post_comment:
     needs: setup
     if: needs.setup.outputs.should-run == 'true'
     runs-on: ubuntu-20.04
@@ -65,7 +65,7 @@ jobs:
               '.jobs | map(select(.name==$job))[0] | .conclusion')
           echo "job-conclusion=${CONCLUSION}" >> "${GITHUB_OUTPUT}"
       - name: "Downloading artifacts"
-        if: steps.check.job-conclusion == 'success'
+        if: steps.check.outputs.job-conclusion == 'success'
         id: download
         env:
           # Currently GitHub managed runner doesn't have GCP credential. Fetch
@@ -78,7 +78,7 @@ jobs:
           echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
       - name: Posting comments
         # TODO(#11076): Temporarily disabled until we migrate the database.
-        if: false && steps.check.job-conclusion == 'success'
+        if: false && steps.check.outputs.job-conclusion == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIST_BOT_TOKEN: ${{ secrets.GIST_BOT_TOKEN }}
