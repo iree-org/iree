@@ -818,8 +818,9 @@ struct LinalgTrivialGenericConversion
     // Presumed to be a yield terminator: configure the emitter.
     CopyEmitter emitter;
     Operation &yieldOp = children.front();
-    for (auto [outputIndex, yieldOperand] :
-         llvm::enumerate(yieldOp.getOperands())) {
+    for (auto it : llvm::enumerate(yieldOp.getOperands())) {
+      unsigned outputIndex = it.index();
+      Value yieldOperand = it.value();
       if (auto blockArg = yieldOperand.dyn_cast<BlockArgument>()) {
         unsigned inputIndex = blockArg.getArgNumber();
         OpOperand *input = op.getDpsInputOperand(inputIndex);
