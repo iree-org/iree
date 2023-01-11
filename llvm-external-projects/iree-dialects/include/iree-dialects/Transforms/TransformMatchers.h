@@ -139,13 +139,6 @@ struct OptionalMatch : public SingleValuePredicateParam<bool> {
 /// operation.
 struct SingleCombinerReduction {};
 
-/// Indicates that it suffices for only a subset of an operand or result value
-/// to be used.
-struct SubsetOf {
-  explicit SubsetOf(StructuredOpMatcher &matcher) : matcher(matcher) {}
-  StructuredOpMatcher &matcher;
-};
-
 namespace detail {
 template <typename T>
 using has_reset_capture_t = decltype(std::declval<T>().resetCapture());
@@ -296,11 +289,6 @@ public:
   StructuredOpMatcher &input(int64_t position,
                              CaptureElementTypeBitWidth width);
 
-  /// Adds a predicate that recursively applies another predicate to the
-  /// operation defining the `position`-th input operand, looking through any
-  /// "subsetting" operation such as "tensor.extract_slice".
-  StructuredOpMatcher &input(int64_t position, SubsetOf subset);
-
   //===-------------------------------------------------------------------===//
   // Constraints on adjacent ops.
   //===-------------------------------------------------------------------===//
@@ -323,11 +311,6 @@ public:
   //===-------------------------------------------------------------------===//
   // Constraints on output operands.
   //===-------------------------------------------------------------------===//
-
-  /// Adds a predicate that recursively applies another predicate to the
-  /// operation defining the `position`-th output operand, looking through any
-  /// "subsetting" operation such as "tensor.extract_slice".
-  StructuredOpMatcher &output(int64_t position, SubsetOf subset);
 
   /// Adds a predicate checking that the structured op has the given number of
   /// outputs.
@@ -399,14 +382,6 @@ public:
     recordNestedMatcher(resultUserMatcher);
     return *this;
   }
-
-  /// Adds a predicate that recursively applies to users of the `positions`-th
-  /// result, looking through any "subsetting" operation such as
-  /// "tensor.extract_slice". Succeeds if any user matches the predicate.
-  /// When the match is optional, the predicate check succeeds as long as the
-  /// `position` is in bounds, after running the given matcher.
-  StructuredOpMatcher &result(int64_t position, HasAnyUse tag, SubsetOf subset,
-                              OptionalMatch optional = OptionalMatch(false));
 
   /// Resets the captured value to null. This should be called if the same
   /// pattern needs to be applied more than once as it may keep captured values
@@ -581,23 +556,6 @@ void makeReductionMatcher(StructuredOpMatcher &reduction,
                           StructuredOpMatcher &leading,
                           StructuredOpMatcher &trailing,
                           MatchedReductionCaptures &captures);
-
-/// Creates a group of matchers for:
-///
-///     trailing(
-///       combiner_reduction(
-///         parallel_reduction(leading(), parallel_fill()),
-///         original_fill())))
-///
-/// where trailing and leading are elementwise operations whose presence is
-/// optional, and with subsetting ops potentially present on the operand use-def
-/// chains.
-void makeSplitReductionMatcher(StructuredOpMatcher &parallel_reduction,
-                               StructuredOpMatcher &combiner_reduction,
-                               StructuredOpMatcher &parallel_fill,
-                               StructuredOpMatcher &original_fill,
-                               StructuredOpMatcher &leading,
-                               StructuredOpMatcher &trailing);
 
 } // namespace transform_ext
 } // namespace mlir

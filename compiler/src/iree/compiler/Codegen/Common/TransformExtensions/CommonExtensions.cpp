@@ -254,6 +254,13 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
+void transform_dialect::ApplyPatternsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
+}
+
 //===---------------------------------------------------------------------===//
 // ForeachThreadToWorkgroupOp
 //===---------------------------------------------------------------------===//
