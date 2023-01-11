@@ -41,7 +41,6 @@ stream.executable public @add_dispatch_0 {
 }
 
 // PTX: .entry add_dispatch_0
-// PTX: .maxntid 64, 1, 1
 // PTX:   add.rn.f32
 
 //      CHECK:   hal.executable.binary public @cuda_nvptx_fb attributes {
