@@ -238,14 +238,6 @@ function(iree_check_single_backend_test_suite)
     # such as when cross compiling, then we can't easily check for which
     # compiler target backends are enabled. Just assume all are enabled and only
     # rely on the runtime HAL driver check above for filtering.
-
-    # No driver, so this is a special configuration. The assumption above
-    # might not be true, so skip (these tests are _probably_ already being
-    # built on the host anyway, so no need to build when cross compiling).
-    # TODO(#11354): Use a different test function / move compile to test-time
-    if(NOT DEFINED _RULE_DRIVER)
-      return()
-    endif()
   else()
     # We are building the host tools, so check enabled compiler target backends.
     if(NOT IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
