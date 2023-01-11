@@ -191,7 +191,7 @@ public:
             loopNest.loops.back().getBody()->getTerminator())) {
       rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, updatedOutput);
     }
-    inputOp.getResults()[0].replaceAllUsesWith(loopNest.results[0]);
+    inputOp.getResults()[0].replaceAllUsesWith(loopNest.getResults()[0]);
     return success();
   }
 };
@@ -338,7 +338,7 @@ public:
             loopNest.loops.back().getBody()->getTerminator())) {
       rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, updatedOutput);
     }
-    outputOp.getResults()[0].replaceAllUsesWith(loopNest.results[0]);
+    outputOp.getResults()[0].replaceAllUsesWith(loopNest.getResults()[0]);
     return success();
   }
 };

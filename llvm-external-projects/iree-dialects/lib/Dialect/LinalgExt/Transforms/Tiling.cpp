@@ -90,7 +90,7 @@ SmallVector<Value> tileToSCF(PatternRewriter &rewriter, TilingInterface op,
             createMatchingSubsetInsertOp(b, loc, sliceOp, sliceOp, iterArgs[0]);
         return scf::ValueVector({yieldValue});
       });
-  return loopNest.results;
+  return loopNest.getResults();
 }
 
 namespace {

@@ -96,10 +96,10 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 //      CHECK:   %[[ARR:.*]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[c0]]) alignment(64) : memref<102401xf32>
 //      CHECK:   %[[ARR2:.*]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%[[c0]]) alignment(64) : memref<102401xf32>
 //      CHECK:   %[[BLKX:.*]] = hal.interface.workgroup.id[0] : index
-//      CHECK:   %[[BLKX2:.*]] = affine.min #{{.+}}()[%[[BLKX]]]
+//      CHECK:   %[[BLKX2:.*]] = affine.min #map2()[%[[BLKX]]]
 //      CHECK:   %[[CMP:.*]] = arith.cmpi eq, %[[BLKX2]], %[[c256]] : index
 //      CHECK:   scf.if %[[CMP]]
 //      CHECK:   %[[TIDX:.*]] = gpu.thread_id  x
-//      CHECK:   %[[AFF:.*]] = affine.apply #{{.+}}(%[[TIDX]])[%[[BLKX]]]
+//      CHECK:   %[[AFF:.*]] = affine.apply #map3(%[[TIDX]])[%[[BLKX]]]
 //      CHECK:   vector.transfer_read %[[ARR]][%[[AFF]]], %[[cst]] {in_bounds = [true]} : memref<102401xf32>, vector<4xf32>
 //      CHECK:   vector.transfer_read %[[ARR2]][%[[AFF]]], %[[cst]] {in_bounds = [true]} : memref<102401xf32>, vector<4xf32>

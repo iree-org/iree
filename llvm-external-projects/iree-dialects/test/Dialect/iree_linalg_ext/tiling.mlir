@@ -1322,6 +1322,8 @@ func.func @winograd_input_transform_memref(%arg0: memref<1x10x10x1280xf32>, %arg
     ins(%arg0 : memref<1x10x10x1280xf32>) outs(%arg1 : memref<8x8x1x2x2x1280xf32>)
   return
 }
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (1, -d0 + s1)>
 // CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
 // CHECK:      func.func @winograd_input_transform_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<1x10x10x1280xf32>,
@@ -1396,6 +1398,8 @@ func.func @winograd_output_transform_memref(%arg0: memref<8x8x1x2x2x32xf32>, %ar
    ins(%arg0 : memref<8x8x1x2x2x32xf32>) outs(%arg1 : memref<1x12x12x32xf32>)
   return
 }
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (1, -d0 + s1)>
 // CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
 // CHECK:      func.func @winograd_output_transform_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<8x8x1x2x2x32xf32>,

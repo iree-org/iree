@@ -79,6 +79,7 @@ inline void registerMlirPasses() {
   registerConvertGPUToSPIRVPass();
   registerConvertControlFlowToSPIRVPass();
   registerConvertFuncToSPIRVPass();
+  registerConvertLinalgToSPIRVPass();
 }
 
 }  // namespace mlir
