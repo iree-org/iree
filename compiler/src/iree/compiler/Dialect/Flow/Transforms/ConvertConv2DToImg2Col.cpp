@@ -189,10 +189,9 @@ class ConvertConv2DNhwcHwcf final
       result = matmulOp.getResults().front();
     } else {
       // For cases where batch is not 1, we need to keep the batch dimension
-      // separate. Because the filter does not share the same batch dimension,
-      // the batch dimension is only used in indexing the input and output. Thus
-      // we cannot use existing linalg named ops like linalg.batch_matmul.
-      // i.e. (B x) M x K * K x N = (B x) M x N
+      // separate. However the batch dimension is only used in indexing the
+      // input and output. So we cannot use existing linalg named ops like
+      // linalg.batch_matmul; doing it with a linalg.generic instead.
       AffineExpr bDim, mDim, nDim, kDim;
       bindDims(getContext(), bDim, mDim, nDim, kDim);
       auto lhsMap = AffineMap::get(4, 0, {bDim, mDim, kDim}, getContext());
@@ -376,156 +375,6 @@ class ConvertDepthwiseConv2DNhwcHwc final
   }
 };
 
-// For nchw, because the channels are to the left of the image shape dimensions,
-// the position of the contraction dimension in the resulting matmul is
-// reversed. This swaps the LHS and RHS of the matmul when compared with nhwc
-// (i.e. (D, C x Kh x Kw) * (C x Kh x Kw, Ho x Wo))
-class ConvertConv2DNchwFchw final
-    : public OpRewritePattern<linalg::Conv2DNchwFchwOp> {
- public:
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
-                                PatternRewriter &rewriter) const override {
-    auto inputType = convOp.getInputs()[0].getType().cast<ShapedType>();
-    auto filterType = convOp.getInputs()[1].getType().cast<ShapedType>();
-    auto outputType = convOp.getOutputs()[0].getType().cast<ShapedType>();
-
-    if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
-      return failure();
-    }
-
-    // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations())) return failure();
-
-    Value input = convOp.getInputs()[0];
-    Value filter = convOp.getInputs()[1];
-    Value output = convOp.getOutputs()[0];
-
-    auto filterShape = filterType.getShape();
-    auto outputShape = outputType.getShape();
-
-    const int n = outputShape[0];
-    const int oc = outputShape[1];
-    const int oh = outputShape[2];
-    const int ow = outputShape[3];
-    const int ic = filterShape[1];
-    const int fh = filterShape[2];
-    const int fw = filterShape[3];
-
-    auto loc = convOp.getLoc();
-
-    SmallVector<int64_t, 4> colTensorShape = {n, ic, fh, fw, oh, ow};
-
-    Value colTensor = rewriter.create<tensor::EmptyOp>(
-        loc, colTensorShape, inputType.getElementType());
-
-    AffineExpr nDim, icDim, khDim, kwDim, ohDim, owDim;
-    bindDims(getContext(), nDim, icDim, khDim, kwDim, ohDim, owDim);
-
-    auto shSym = rewriter.getAffineConstantExpr(
-        convOp.getStrides().getValues<int64_t>()[0]);
-    auto swSym = rewriter.getAffineConstantExpr(
-        convOp.getStrides().getValues<int64_t>()[1]);
-
-    SmallVector<AffineExpr, 4> inputExprs = {nDim, icDim, ohDim * shSym + khDim,
-                                             owDim * swSym + kwDim};
-
-    auto nloops = colTensorShape.size();
-
-    auto parallel = utils::IteratorType::parallel;
-    auto reduction = utils::IteratorType::reduction;
-    SmallVector<utils::IteratorType, 3> img2colIterators(nloops, parallel);
-
-    SmallVector<AffineMap, 4> img2colIndexingMaps = {
-        AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
-        AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
-
-    auto img2ColTensor = rewriter.create<linalg::GenericOp>(
-        loc, colTensor.getType(),
-        /*inputs=*/input, /*outputs=*/colTensor, img2colIndexingMaps,
-        img2colIterators,
-        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
-          nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
-        });
-
-    SmallVector<ReassociationIndices> filterReassocIndices = {{0}, {1, 2, 3}};
-    auto reshapedFilterType =
-        RankedTensorType::get({oc, fh * fw * ic}, inputType.getElementType());
-    Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(
-        loc, reshapedFilterType, filter, filterReassocIndices);
-
-    SmallVector<ReassociationIndices> img2ColTensorReassocIndices;
-    SmallVector<ReassociationIndices> outputReassocIndices;
-    RankedTensorType reshapedImg2ColTensorType, reshapedOutputType;
-    if (n == 1) {
-      img2ColTensorReassocIndices = {{0, 1, 2, 3}, {4, 5}};
-      outputReassocIndices = {{0, 1}, {2, 3}};
-
-      reshapedImg2ColTensorType = RankedTensorType::get(
-          {fh * fw * ic, oh * ow}, inputType.getElementType());
-      reshapedOutputType =
-          RankedTensorType::get({oc, oh * ow}, outputType.getElementType());
-    } else {
-      img2ColTensorReassocIndices = {{0}, {1, 2, 3}, {4, 5}};
-      outputReassocIndices = {{0}, {1}, {2, 3}};
-
-      reshapedImg2ColTensorType = RankedTensorType::get(
-          {n, fh * fw * ic, oh * ow}, inputType.getElementType());
-      reshapedOutputType =
-          RankedTensorType::get({n, oc, oh * ow}, outputType.getElementType());
-    }
-
-    Value reshapedImg2ColTensor = rewriter.create<tensor::CollapseShapeOp>(
-        loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
-        img2ColTensorReassocIndices);
-
-    Value reshapedOutput = rewriter.create<tensor::CollapseShapeOp>(
-        loc, reshapedOutputType, output, outputReassocIndices);
-
-    Value result;
-    if (n == 1) {
-      auto matmulOp = rewriter.create<linalg::MatmulOp>(
-          loc, reshapedOutputType,
-          ArrayRef<Value>{reshapedFilter, reshapedImg2ColTensor},
-          ArrayRef<Value>{reshapedOutput});
-      result = matmulOp.getResults().front();
-    } else {
-      // For cases where batch is not 1, we need to keep the batch dimension
-      // separate. Because the filter does not share the same batch dimension,
-      // the batch dimension is only used in indexing the input and output. Thus
-      // we cannot use existing linalg named ops like linalg.batch_matmul.
-      // i.e. M x K * (B x) K x N = (B x) M x N
-      AffineExpr bDim, mDim, nDim, kDim;
-      bindDims(getContext(), bDim, mDim, nDim, kDim);
-      auto lhsMap = AffineMap::get(4, 0, {mDim, kDim}, getContext());
-      auto rhsMap = AffineMap::get(4, 0, {bDim, kDim, nDim}, getContext());
-      auto resultMap = AffineMap::get(4, 0, {bDim, mDim, nDim}, getContext());
-      SmallVector<utils::IteratorType> genericIterators = {parallel, parallel,
-                                                           parallel, reduction};
-      bool isInt = outputType.getElementType().isa<IntegerType>();
-      auto genericOp = rewriter.create<linalg::GenericOp>(
-          loc, reshapedOutputType,
-          /*inputs=*/ValueRange{reshapedFilter, reshapedImg2ColTensor},
-          /*outputs=*/ValueRange{reshapedOutput},
-          ArrayRef<AffineMap>{lhsMap, rhsMap, resultMap}, genericIterators,
-          [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
-            Value mul = createMul(loc, args[0], args[1], isInt, nestedBuilder);
-            Value add = createAdd(loc, mul, args[2], isInt, nestedBuilder);
-            nestedBuilder.create<linalg::YieldOp>(nestedLoc, add);
-          });
-      result = genericOp.getResults().front();
-    }
-
-    auto reshapedResult = rewriter.create<tensor::ExpandShapeOp>(
-        loc, outputType, result, outputReassocIndices);
-
-    rewriter.replaceOp(convOp, ArrayRef<Value>{reshapedResult});
-
-    return success();
-  }
-};
-
 struct ConvertConv2DToImg2ColPass
     : ConvertConv2DToImg2ColBase<ConvertConv2DToImg2ColPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -534,8 +383,8 @@ struct ConvertConv2DToImg2ColPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
-    patterns.insert<ConvertConv2DNhwcHwcf, ConvertDepthwiseConv2DNhwcHwc,
-                    ConvertConv2DNchwFchw>(context);
+    patterns.insert<ConvertConv2DNhwcHwcf, ConvertDepthwiseConv2DNhwcHwc>(
+        context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();

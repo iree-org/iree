@@ -105,7 +105,7 @@ func.func @depthwise_conv_hwc_114x16x3(%input: tensor<1x114x114x16xf32>, %filter
 
 // -----
 
-func.func @batch_nhwc_conv(%arg0: tensor<8x16x16x4xf32>, %arg1: tensor<3x3x4x16xf32>, %arg2: tensor<8x14x14x16xf32>) -> tensor<8x14x14x16xf32> {
+func.func @batch_conv(%arg0: tensor<8x16x16x4xf32>, %arg1: tensor<3x3x4x16xf32>, %arg2: tensor<8x14x14x16xf32>) -> tensor<8x14x14x16xf32> {
     %0 = linalg.conv_2d_nhwc_hwcf
       {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
        ins(%arg0, %arg1: tensor<8x16x16x4xf32>, tensor<3x3x4x16xf32>)
@@ -119,7 +119,7 @@ func.func @batch_nhwc_conv(%arg0: tensor<8x16x16x4xf32>, %arg1: tensor<3x3x4x16x
 //  CHECK-DAG: #[[RHSMAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
 //  CHECK-DAG: #[[RESMAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 
-//      CHECK: func.func @batch_nhwc_conv
+//      CHECK: func.func @batch_conv
 // CHECK-SAME: (%[[INPUT:.+]]: tensor<8x16x16x4xf32>, %[[FILTER:.+]]: tensor<3x3x4x16xf32>, %[[INIT:.+]]: tensor<8x14x14x16xf32>)
 //      CHECK:   %[[IT:.+]] = tensor.empty() : tensor<8x14x14x3x3x4xf32>
 //      CHECK:   %[[IMG2COL:.+]] = linalg.generic
@@ -141,44 +141,4 @@ func.func @batch_nhwc_conv(%arg0: tensor<8x16x16x4xf32>, %arg1: tensor<3x3x4x16x
 //      CHECK:     linalg.yield %[[ADD]] : f32
 //      CHECK:   } -> tensor<8x196x16xf32>
 //      CHECK:   %[[CS_FINAL:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1, 2], [3]] : tensor<8x196x16xf32> into tensor<8x14x14x16xf32>
-//      CHECK:   return %[[CS_FINAL]]
-
-// -----
-
-func.func @batch_nchw_conv(%arg0: tensor<8x4x16x16xf32>, %arg1: tensor<16x4x3x3xf32>, %arg2: tensor<8x16x14x14xf32>) -> tensor<8x16x14x14xf32> {
-    %0 = linalg.conv_2d_nchw_fchw
-      {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
-       ins(%arg0, %arg1: tensor<8x4x16x16xf32>, tensor<16x4x3x3xf32>)
-      outs(%arg2: tensor<8x16x14x14xf32>) -> tensor<8x16x14x14xf32>
-    return %0 : tensor<8x16x14x14xf32>
-}
-
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4 + d2, d5 + d3)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>
-//  CHECK-DAG: #[[LHSMAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
-//  CHECK-DAG: #[[RHSMAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
-//  CHECK-DAG: #[[RESMAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-
-//      CHECK: func.func @batch_nchw_conv
-// CHECK-SAME: (%[[INPUT:.+]]: tensor<8x4x16x16xf32>, %[[FILTER:.+]]: tensor<16x4x3x3xf32>, %[[INIT:.+]]: tensor<8x16x14x14xf32>)
-//      CHECK:   %[[IT:.+]] = tensor.empty() : tensor<8x4x3x3x14x14xf32>
-//      CHECK:   %[[IMG2COL:.+]] = linalg.generic
-// CHECK-SAME:      indexing_maps = [#[[MAP0]], #[[MAP1]]]
-// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
-// CHECK-SAME:   ins(%[[INPUT]] : tensor<8x4x16x16xf32>)
-// CHECK-SAME:   outs(%[[IT]] : tensor<8x4x3x3x14x14xf32>)
-//      CHECK:   %[[CS_FILTER:.+]] = tensor.collapse_shape %[[FILTER]] {{\[}}[0], [1, 2, 3]] : tensor<16x4x3x3xf32> into tensor<16x36xf32>
-//      CHECK:   %[[CS_INPUT:.+]] = tensor.collapse_shape %[[IMG2COL]] {{\[}}[0], [1, 2, 3], [4, 5]] : tensor<8x4x3x3x14x14xf32> into tensor<8x36x196xf32>
-//      CHECK:   %[[CS_RESULT:.+]] = tensor.collapse_shape %[[INIT]] {{\[}}[0], [1], [2, 3]] : tensor<8x16x14x14xf32> into tensor<8x16x196xf32>
-//      CHECK:   %[[MATMUL:.+]] = linalg.generic
-// CHECK-SAME:      indexing_maps = [#[[LHSMAP]], #[[RHSMAP]], #[[RESMAP]]],
-// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "reduction"]
-// CHECK-SAME:   ins(%[[CS_FILTER]], %[[CS_INPUT]] : tensor<16x36xf32>, tensor<8x36x196xf32>)
-// CHECK-SAME:   outs(%[[CS_RESULT]] : tensor<8x16x196xf32>)
-//      CHECK:   ^bb0(%[[ARG0:.+]]: f32, %[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32):
-//      CHECK:     %[[MUL:.+]] = arith.mulf %[[ARG0]], %[[ARG1]] : f32
-//      CHECK:     %[[ADD:.+]] = arith.addf %[[MUL]], %[[ARG2]] : f32
-//      CHECK:     linalg.yield %[[ADD]] : f32
-//      CHECK:   } -> tensor<8x16x196xf32>
-//      CHECK:   %[[CS_FINAL:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0], [1], [2, 3]] : tensor<8x16x196xf32> into tensor<8x16x14x14xf32>
 //      CHECK:   return %[[CS_FINAL]]
