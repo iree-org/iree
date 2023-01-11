@@ -22,7 +22,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
         with:
-          token: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: ${{ steps.last_green_commit.outputs.result }}
 
       - name: Compute version
@@ -44,7 +44,7 @@ jobs:
         id: create_release
         uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
         env:
-          GITHUB_TOKEN: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
           tag_name: ${{ env.tag_name }}
           release_name: iree candidate ${{ env.tag_name }}
@@ -58,6 +58,6 @@ jobs:
         uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7 # v1
         with:
           workflow: Build Native Release Packages
-          token: ${{ secrets.FG_WRITE_ACCESS_TOKEN }}
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: "${{ env.tag_name }}"
           inputs: '{"package_suffix": "", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}", "commit": "${{ steps.last_green_commit.outputs.result }}"}'
