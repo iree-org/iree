@@ -181,8 +181,7 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 
 /// Returns the option that distributes the ops using the flow workgroup
 /// ID/Count operations.
-linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes);
+linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions();
 
 /// Replace the uses of memref `oldOp` with the given `val` and for subview uses
 /// propagate the type change. Changing the memref type may require propagating

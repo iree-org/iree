@@ -29,7 +29,6 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRArithDialect
-    MLIRArithUtils
     MLIRFuncDialect
     MLIRGPUOps
     MLIRIR

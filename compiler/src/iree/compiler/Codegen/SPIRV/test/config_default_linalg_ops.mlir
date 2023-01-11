@@ -515,7 +515,7 @@ hal.executable @four_dim_elementwise {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 2, 4, 8], [0, 1, 1, 4]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 4, 8], [0, 1, 1, 4], [4, 0, 0, 0]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 // CHECK-LABEL: hal.executable.export public @four_dim_elementwise
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]

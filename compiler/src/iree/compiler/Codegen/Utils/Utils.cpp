@@ -17,7 +17,6 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -633,54 +632,13 @@ static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
   return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
 }
 
-linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes) {
+linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions() {
   return {
-      [&tileSizes](OpBuilder &builder, Location loc,
-                   ArrayRef<Range> parallelLoopRanges) {
-        SmallVector<int64_t> nonZeroTileSizes;
-        for (int64_t size : tileSizes) {
-          if (size != 0) nonZeroTileSizes.push_back(size);
-        }
+      [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
         auto numParallelDims = parallelLoopRanges.size();
 
         SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-        Value splitDim;
         for (size_t dim = 0; dim < numParallelDims; ++dim) {
-          if (numParallelDims > kNumMaxParallelDims &&
-              dim >= kNumMaxParallelDims - 1) {
-            if (!splitDim) {
-              splitDim =
-                  buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
-                      builder, 2);
-            }
-            Value size = getValueOrCreateConstantIndexOp(
-                builder, loc,
-                parallelLoopRanges[numParallelDims - dim - 1].size);
-            Value offset = getValueOrCreateConstantIndexOp(
-                builder, loc,
-                parallelLoopRanges[numParallelDims - dim - 1].offset);
-            AffineExpr d0, d1;
-            int64_t tileSize = nonZeroTileSizes[numParallelDims - dim - 1];
-            bindSymbols(builder.getContext(), d0, d1);
-            Value numTiles = makeComposedAffineApply(
-                builder, loc, (d0 - d1).ceilDiv(tileSize), {size, offset});
-            Value dimValue;
-            if (dim == numParallelDims - 1)
-              dimValue = splitDim;
-            else {
-              dimValue =
-                  builder.create<arith::RemUIOp>(loc, splitDim, numTiles);
-              splitDim =
-                  builder.create<arith::DivUIOp>(loc, splitDim, numTiles);
-            }
-            procInfo[numParallelDims - dim - 1] = {
-                dimValue,
-                numTiles,
-                linalg::DistributionMethod::Cyclic,
-            };
-            continue;
-          }
           procInfo[numParallelDims - dim - 1] = {
               buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
                   builder, dim),

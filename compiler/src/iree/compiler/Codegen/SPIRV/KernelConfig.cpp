@@ -1111,15 +1111,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                  Optional<int64_t> lossFactor = llvm::None) {
     LLVM_DEBUG(llvm::dbgs() << "\nLoss factor: " << lossFactor << "\n");
     initConfiguration();
-    // If there are more than 3 parallel dim try to tile the extra higher level
-    // dimensions to 1 for extra dimensions.
-    if (isa<linalg::GenericOp>(linalgOp.getOperation())) {
-      SmallVector<int64_t> ranges = linalgOp.getStaticLoopRanges();
-      for (int64_t i = 0, e = workgroupTileSizes.size(); i < e; i++) {
-        if (workgroupTileSizes[i] != 0) break;
-        if (ranges[i] != 1) workgroupTileSizes[i] = 1;
-      }
-    }
+
     // Scan from the innermost shape dimension and try to deduce the
     // configuration for the corresponding GPU workgroup dimension.
     int64_t wgDim = 0;

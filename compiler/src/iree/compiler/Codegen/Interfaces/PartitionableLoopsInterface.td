@@ -24,12 +24,12 @@ def PartitionableLoopsInterface : OpInterface<"PartitionableLoopsInterface"> {
       /*desc=*/[{
         Returns the loop IDs (0 being outermost) that are partitionable.
 
-        If `maxNumPartitionedLoops` is passed the size of the vector returned
-        is always lesser than the value.
+        The size of the vector returned is always lesser than
+        `maxNumPartitionedLoops`.
       }],
       /*retTy=*/"::llvm::SmallVector<unsigned>",
       /*methodName=*/"getPartitionableLoops",
-      /*args=*/(ins "llvm::Optional<unsigned>":$maxNumPartitionedLoops),
+      /*args=*/(ins "unsigned":$maxNumPartitionedLoops),
       /*methodBody=*/"",
       /*defaultImplementation*/"return {};"
     >,

@@ -353,7 +353,8 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
-  auto partitionedLoops = interfaceOp.getPartitionableLoops(llvm::None);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
