@@ -57,34 +57,3 @@ transform.sequence failures(propagate) {
   %0 = transform.structured.match ops{["func.func"]} in %arg1
   transform.iree.apply_patterns %0 { promote_foreach_thread_capture_to_shared }
 }
-
-// -----
-
-#map2 = affine_map<(d0, d1) -> (d0, d1)>
-
-func.func private @mutate(f32) -> f32
-
-// CHECK-LABEL: @bubble_up
-func.func @bubble_up(%arg0: tensor<32x64xf32>) -> tensor<32x2x32xf32> {
-  // Check that shape expansion precedes linalg.generic after the patterns were applied.
-  // CHECK: tensor.expand_shape
-  // CHECK: tensor.expand_shape
-  // CHECK: linalg.generic
-  %init = tensor.empty() : tensor<32x64xf32>
-  %result = linalg.generic {
-    indexing_maps = [#map2, #map2],
-    iterator_types = ["parallel", "parallel"]}
-  ins(%arg0: tensor<32x64xf32>) outs(%init: tensor<32x64xf32>) {
-  ^bb0(%arg1: f32, %arg2: f32):
-    %0 = func.call @mutate(%arg1) : (f32) -> f32
-    linalg.yield %0 : f32
-  } -> tensor<32x64xf32>
-  %out = tensor.expand_shape %result[[0], [1, 2]] : tensor<32x64xf32> into tensor<32x2x32xf32>
-  return %out : tensor<32x2x32xf32>
-}
-
-transform.sequence failures(propagate) {
-^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["func.func"]} in %arg1
-  transform.iree.apply_patterns %0 { bubble_collapse_expand }
-}
