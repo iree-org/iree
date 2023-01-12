@@ -23,19 +23,24 @@ iree_cc_library(
     "VMVXMaterializeEncodingPass.cpp"
   DEPS
     IREELinalgExtDialect
+    IREELinalgExtPasses
     LLVMSupport
+    MLIRAffineDialect
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRMathDialect
     MLIRMemRefDialect
+    MLIRMemRefTransforms
     MLIRPass
     MLIRTransforms
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VMVX::IR

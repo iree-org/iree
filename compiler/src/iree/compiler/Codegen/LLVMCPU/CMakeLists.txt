@@ -39,6 +39,7 @@ iree_cc_library(
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     LLVMSupport
+    MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAnalysis
     MLIRArithDialect
