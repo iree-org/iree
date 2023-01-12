@@ -66,4 +66,4 @@ jobs:
           github_token: ${{ secrets.CI_WRITE_TOKEN }}
           branch: shark
           repository: nod-ai/shark-runtime
-          force: true
+          force_with_lease: true
