@@ -103,17 +103,20 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
   }
 
 #if IREE_HAL_CUDA_NCCL_ENABLE
-  // Initialize NCCL if NPROCS is set.
-  if (driver->default_params.nccl_default_count > 0) {
-    // get a unique ID from the environmental variable
-    status = iree_hal_nccl_get_unique_id_from_env(driver);
-    if (!iree_status_is_ok(status)) {
-      iree_hal_driver_release((iree_hal_driver_t*)driver);
-      return status;
+  if (iree_status_is_ok(status)) {
+    // Initialize NCCL if NPROCS is set.
+    if (driver->default_params.nccl_default_count > 0) {
+      // get a unique ID from the environmental variable
+      status = iree_hal_nccl_get_unique_id_from_env(driver);
     }
   }
-#endif
-  *out_driver = (iree_hal_driver_t*)driver;
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
+
+  if (iree_status_is_ok(status)) {
+    *out_driver = (iree_hal_driver_t*)driver;
+  } else {
+    iree_hal_driver_release((iree_hal_driver_t*)driver);
+  }
   return status;
 }
 
