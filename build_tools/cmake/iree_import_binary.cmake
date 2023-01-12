@@ -9,7 +9,7 @@ include(CMakeParseArguments)
 # iree_import_binary()
 #
 # CMake function to import an executable/binary file into a CMake target.
-# This imports from the directory specified by IREE_HOST_BINARY_ROOT/bin, and
+# This imports from the directory specified by IREE_HOST_BIN_DIR, and
 # that variable _must_ be set for calls to the function to be valid.
 #
 # Parameters:
@@ -21,8 +21,8 @@ include(CMakeParseArguments)
 #       NAME awesome-tool
 #       SRCS "awesome-tool-main.cc"
 #     )
-#   elseif(DEFINED IREE_HOST_BINARY_ROOT)
-#     # Import '${IREE_HOST_BINARY_ROOT}/bin/awesome-tool[.exe]' into the
+#   elseif(IREE_HOST_BIN_DIR)
+#     # Import '${IREE_HOST_BIN_DIR}/awesome-tool[.exe]' into the
 #     # CMake target 'awesome-tool'.
 #     iree_import_binary(NAME awesome-tool)
 #   else()
@@ -41,18 +41,18 @@ function(iree_import_binary)
   # TODO(scotttodd): remove /bin suffix from this rule and update all scripts/docs
   # TODO(scotttodd): SHARED_LIBRARY_DEPS argument?
 
-  if(NOT DEFINED IREE_HOST_BINARY_ROOT)
-    message(FATAL_ERROR "IREE_HOST_BINARY_ROOT must be set to use iree_import_binary")
+  if(NOT IREE_HOST_BIN_DIR)
+    message(FATAL_ERROR "IREE_HOST_BIN_DIR must be set to use iree_import_binary")
   endif()
 
   set(_FULL_BINARY_NAME "${_RULE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
-  set(_BINARY_PATH "${IREE_HOST_BINARY_ROOT}/bin/${_FULL_BINARY_NAME}")
+  set(_BINARY_PATH "${IREE_HOST_BIN_DIR}/${_FULL_BINARY_NAME}")
   file(REAL_PATH "${_BINARY_PATH}" _BINARY_PATH
        BASE_DIRECTORY ${IREE_ROOT_DIR} EXPAND_TILDE)
 
   if(NOT EXISTS ${_BINARY_PATH})
     message(FATAL_ERROR "Could not find '${_FULL_BINARY_NAME}' under "
-            "'${IREE_HOST_BINARY_ROOT}/bin'\n(Expanded to '${_BINARY_PATH}').\n"
+            "'${IREE_HOST_BIN_DIR}'\n(Expanded to '${_BINARY_PATH}').\n"
             "Ensure that IREE_HOST_BINARY_ROOT points to a complete install directory.")
   endif()
 

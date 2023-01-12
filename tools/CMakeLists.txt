@@ -14,7 +14,7 @@
 # Compiler tools are designed to run on host platforms (Linux, macOS, Windows),
 # so they are only built when IREE_BUILD_COMPILER is set and are tagged
 # "hostonly". When cross-compiling (or generally wanting to use already-built
-# compiler tools), set the IREE_HOST_BINARY_ROOT CMake option.
+# compiler tools), set the IREE_HOST_BIN_DIR CMake option.
 #
 # This file does not use bazel_to_cmake because of special logic throughout.
 
@@ -26,7 +26,7 @@ iree_add_all_subdirs()
 # TODO(scotttodd): Should this be checking IREE_BUILD_COMPILER?
 #   Maybe we should disallow setting both at the same time, since it's
 #   ambigious which should be used
-if(IREE_HOST_BINARY_ROOT AND NOT IREE_BUILD_COMPILER)
+if(IREE_HOST_BIN_DIR AND NOT IREE_BUILD_COMPILER)
   iree_import_binary(NAME iree-tblgen)
   iree_import_binary(NAME iree-compile)
   iree_import_binary(NAME iree-opt)
@@ -292,9 +292,9 @@ if(IREE_BUILD_COMPILER)
     DESTINATION "tests/bin"
     COMPONENT Tests
   )
-elseif(NOT DEFINED IREE_HOST_BINARY_ROOT)
+elseif(NOT IREE_HOST_BIN_DIR)
   message(STATUS
       "*Not* building or importing IREE's compiler tools.\n   "
-      "Set IREE_BUILD_COMPILER to build them or IREE_HOST_BINARY_ROOT to "
+      "Set IREE_BUILD_COMPILER to build them or IREE_HOST_BIN_DIR to "
       "import them.")
 endif()

@@ -17,7 +17,7 @@ package(
 iree_cmake_extra_content(
     content = """
 if(IREE_HAL_DRIVER_LOCAL_SYNC AND IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE AND
-   (IREE_TARGET_BACKEND_VMVX OR DEFINED IREE_HOST_BINARY_ROOT))
+   (IREE_TARGET_BACKEND_VMVX OR IREE_HOST_BIN_DIR))
 """,
     inline = True,
 )
@@ -65,7 +65,7 @@ endif()
 iree_cmake_extra_content(
     content = """
 if(IREE_HAL_DRIVER_LOCAL_SYNC AND IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF AND
-   (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT))
+   (IREE_TARGET_BACKEND_LLVM_CPU OR IREE_HOST_BIN_DIR))
 """,
     inline = True,
 )
@@ -217,7 +217,7 @@ iree_cmake_extra_content(
 endif()
 
 if(IREE_HAL_DRIVER_VULKAN AND
-   (IREE_TARGET_BACKEND_VULKAN_SPIRV OR DEFINED IREE_HOST_BINARY_ROOT))
+   (IREE_TARGET_BACKEND_VULKAN_SPIRV OR IREE_HOST_BIN_DIR))
 """,
     inline = True,
 )
@@ -269,7 +269,7 @@ endif()
 # iree_cmake_extra_content(
 #     content = """
 # if(IREE_HAL_DRIVER_CUDA AND
-#    (IREE_TARGET_BACKEND_CUDA OR DEFINED IREE_HOST_BINARY_ROOT))
+#    (IREE_TARGET_BACKEND_CUDA OR IREE_HOST_BIN_DIR))
 # """,
 #     inline = True,
 # )

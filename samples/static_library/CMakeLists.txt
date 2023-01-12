@@ -91,7 +91,7 @@ iree_lit_test(
     "hostonly"
 )
 
-if(NOT (IREE_OUTPUT_FORMAT_C OR DEFINED IREE_HOST_BINARY_ROOT))
+if(NOT (IREE_OUTPUT_FORMAT_C OR IREE_HOST_BIN_DIR))
   return()
 endif()
 
