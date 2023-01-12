@@ -136,6 +136,13 @@ getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
 // workgroups.
 //===---------------------------------------------------------------------===//
 
+namespace {
+
+class SimpleRewriter : public PatternRewriter {
+ public:
+  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
+};
+
 /// The `flow.dispatch.workgroup_count_from_dag_root` op is lowered to
 /// a sequence of `affine.apply affine_map<()[s0, s1] -> ceildDiv(s0,
 /// s1)>(workload, tileSize)`. for each of the dimensions. When tile size is
@@ -296,7 +303,6 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
 // Patterns and methods for tile and distribute of Linalg ops to workgroups.
 //===---------------------------------------------------------------------===//
 
-namespace {
 struct TileAndDistributeToWorkgroupsPass
     : public TileAndDistributeToWorkgroupsBase<
           TileAndDistributeToWorkgroupsPass> {
@@ -384,11 +390,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     // If there are no compute ops, nothing more to do.
     if (computeOps.empty()) continue;
 
-    // Add a marker to the last operation in the list.
-    auto marker = StringAttr::get(context, "__workgroup_tiling__");
-    computeOps.back()->setAttr(
-        IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker, marker);
-
     // Configure the linalg options.
     // Tile size selection function.
     auto tileSizeFn = [&](OpBuilder &builder,
@@ -413,23 +414,23 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
             .setLoopType(linalg::LinalgTilingLoopType::Loops)
             .setTileSizeComputationFunction(tileSizeFn);
 
+    SimpleRewriter rewriter(context);
+    if (failed(tileAndFuseDispatchUsingSCFForOp(
+            cast<TilingInterface>(computeOps.back()), linalgTilingOptions,
+            rewriter))) {
+      funcOp.emitOpError("Tile+Distribute failed");
+      return signalPassFailure();
+    }
+
     {
       RewritePatternSet patterns(context);
-      populateTileAndDistributeToWorkgroupsPatterns(
-          patterns, linalgTilingOptions,
-          IREE::LinalgExt::LinalgTransformationFilter(marker));
+      populateTileAndDistributeToWorkgroupsCleanupPatterns(patterns,
+                                                           linalgTilingOptions);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        funcOp.emitOpError("Tile+Distribute failed");
+        funcOp.emitOpError("Tile+Distribute clean up patterns failed");
         return signalPassFailure();
       }
     }
-
-    // If tiling didn't happen because there are no tile sizes we are
-    // potentially left with a marker that will confuse the following passes so
-    // we remove the intermediate markers.
-    funcOp->walk([&](Operation *op) {
-      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
-    });
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After Tile + Distribute ---\n";
