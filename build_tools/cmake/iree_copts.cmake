@@ -432,8 +432,9 @@ endif()
 #-------------------------------------------------------------------------------
 # Third party: llvm-project
 #-------------------------------------------------------------------------------
+
 if(IREE_BUILD_COMPILER)
-  # iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
-  # tools in LLVM.
-  iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
+  # iree-tblgen is not defined using the add_tablegen mechanism as other
+  # TableGen tools in LLVM.
+  set(IREE_TABLEGEN_EXE "$<TARGET_FILE:iree-tblgen>")
 endif()

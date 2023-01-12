@@ -370,6 +370,7 @@ include(iree_copts)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
+include(iree_import_binary)
 include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
@@ -612,19 +613,11 @@ if(IREE_ENABLE_THREADING)
   endif()
 endif()
 
-add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
+# This defines the iree-flatcc-cli target, so we don't use EXCLUDE_FROM_ALL.
+add_subdirectory(build_tools/third_party/flatcc)
 
 if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
-endif()
-
-# TODO(scotttodd): Iterate some more and find a better place for this.
-if(NOT CMAKE_CROSSCOMPILING)
-  install(
-    TARGETS iree-flatcc-cli
-    COMPONENT iree-flatcc-cli
-    RUNTIME DESTINATION bin
-  )
 endif()
 
 if(IREE_BUILD_COMPILER)

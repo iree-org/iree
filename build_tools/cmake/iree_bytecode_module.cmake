@@ -68,8 +68,6 @@ function(iree_bytecode_module)
     set(_MODULE_FILE_NAME "${_RULE_NAME}.vmfb")
   endif()
 
-  iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
-
   set(_ARGS "--output-format=vm-bytecode")
   list(APPEND _ARGS "${_RULE_FLAGS}")
 
@@ -84,7 +82,7 @@ function(iree_bytecode_module)
 
   # If an LLVM CPU backend is enabled, supply the linker tool.
   if(IREE_LLD_TARGET)
-    iree_get_executable_path(_LINKER_TOOL_EXECUTABLE "lld")
+    set(_LINKER_TOOL_EXECUTABLE "$<TARGET_FILE:${IREE_LLD_TARGET}>")
     list(APPEND _ARGS "--iree-llvm-embedded-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
     list(APPEND _ARGS "--iree-llvm-wasm-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
     # Note: --iree-llvm-system-linker-path is left unspecified.
@@ -130,11 +128,10 @@ function(iree_bytecode_module)
     OUTPUT
       ${_OUTPUT_FILES}
     COMMAND
-      ${_COMPILE_TOOL_EXECUTABLE}
+      ${_COMPILE_TOOL}
       ${_ARGS}
-    # Changes to either the compiler tool or the input sources should rebuild.
     DEPENDS
-      ${_COMPILE_TOOL_EXECUTABLE}
+      ${_COMPILE_TOOL}
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
       ${_RULE_DEPENDS}

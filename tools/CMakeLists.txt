@@ -11,33 +11,33 @@
 # directory. Library targets and header files should be placed in the
 # appropriate subtree, e.g. `compiler/src/iree/compiler/Tools/`.
 #
-# Programs with a dependency on the compiler are not designed to run on device
-# platforms (e.g. Android), so they are tagged "hostonly".
+# Compiler tools are designed to run on host platforms (Linux, macOS, Windows),
+# so they are only built when IREE_BUILD_COMPILER is set and are tagged
+# "hostonly". When cross-compiling (or generally wanting to use already-built
+# compiler tools), set the IREE_HOST_BINARY_ROOT CMake option.
 #
 # This file does not use bazel_to_cmake because of special logic throughout.
+
+# Write some important CMake options to a file for convenient use from scripts.
+configure_file(build_config_template.txt.in build_config.txt)
+
+iree_add_all_subdirs()
+
+# TODO(scotttodd): Should this be checking IREE_BUILD_COMPILER?
+#   Maybe we should disallow setting both at the same time, since it's
+#   ambigious which should be used
+if(IREE_HOST_BINARY_ROOT AND NOT IREE_BUILD_COMPILER)
+  iree_import_binary(NAME iree-tblgen)
+  iree_import_binary(NAME iree-compile)
+  iree_import_binary(NAME iree-opt)
+  iree_import_binary(NAME iree-run-mlir)
+endif()
 
 # TODO(#6353): Tools has thread dependencies in gtest, benchmark, yaml, etc.
 # This should be split between runtime/compiler with optional threading support.
 if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
-
-# Write some important CMake options to a file for convenient use from scripts.
-configure_file(build_config_template.txt.in build_config.txt)
-
-# Depending on which target backends are enabled, we may or may not have built
-# LLD.
-if(IREE_LLD_TARGET)
-  # lld install - required by the compiler to link codegen executables.
-  install(
-    TARGETS lld
-    COMPONENT Compiler
-    RUNTIME DESTINATION bin
-  )
-endif()
-
-add_subdirectory(android)
-add_subdirectory(test)
 
 iree_cc_binary(
   NAME
@@ -172,6 +172,16 @@ iree_cc_binary(
 )
 
 if(IREE_BUILD_COMPILER)
+  # If a target backend that requires LLD to link codegen executables is
+  # enabled, install the target.
+  if(IREE_LLD_TARGET)
+    install(
+      TARGETS lld
+      COMPONENT Compiler
+      RUNTIME DESTINATION bin
+    )
+  endif()
+
   iree_cc_binary(
     NAME
       iree-tblgen
@@ -282,4 +292,9 @@ if(IREE_BUILD_COMPILER)
     DESTINATION "tests/bin"
     COMPONENT Tests
   )
-endif(IREE_BUILD_COMPILER)
+elseif(NOT DEFINED IREE_HOST_BINARY_ROOT)
+  message(STATUS
+      "*Not* building or importing IREE's compiler tools.\n   "
+      "Set IREE_BUILD_COMPILER to build them or IREE_HOST_BINARY_ROOT to "
+      "import them.")
+endif()

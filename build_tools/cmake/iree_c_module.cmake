@@ -60,7 +60,6 @@ function(iree_c_module)
     set(_COMPILE_TOOL "iree-compile")
   endif()
 
-  iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
   get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
 
   set(_ARGS "--output-format=vm-c")
@@ -88,9 +87,8 @@ function(iree_c_module)
 
   add_custom_command(
     OUTPUT ${_OUTPUT_FILES}
-    COMMAND ${_COMPILE_TOOL_EXECUTABLE} ${_ARGS}
-    # Changes to either the compiler tool or the input source should rebuild.
-    DEPENDS ${_COMPILE_TOOL_EXECUTABLE} ${_SRC_PATH}
+    COMMAND ${_COMPILE_TOOL} ${_ARGS}
+    DEPENDS ${_COMPILE_TOOL} ${_SRC_PATH}
   )
 
   iree_cc_library(
