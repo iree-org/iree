@@ -38,7 +38,6 @@ function(iree_import_binary)
   )
 
   # TODO(scotttodd): optional 'TARGET' argument (that defaults to NAME)
-  # TODO(scotttodd): remove /bin suffix from this rule and update all scripts/docs
   # TODO(scotttodd): SHARED_LIBRARY_DEPS argument?
 
   if(NOT IREE_HOST_BIN_DIR)
