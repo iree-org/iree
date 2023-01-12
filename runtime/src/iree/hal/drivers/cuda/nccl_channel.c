@@ -198,6 +198,9 @@ static iree_status_t get_nccl_data_type(iree_hal_collective_element_type_t in,
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_BFLOAT_16:
       *out = ncclFloat64;
       break;
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unhandled element type for collective op");
   }
   return iree_ok_status();
 }
@@ -220,6 +223,9 @@ static iree_status_t get_nccl_red_type(iree_hal_collective_reduction_t in,
     case IREE_HAL_COLLECTIVE_REDUCTION_AVERAGE:
       *out = ncclAvg;
       break;
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unhandled reduction type for collective op");
   }
 
   return iree_ok_status();
