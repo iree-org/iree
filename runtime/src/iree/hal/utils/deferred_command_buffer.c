@@ -33,7 +33,9 @@ typedef enum iree_hal_command_type_e {
 
 // Header prefixed to all commands, forming a linked-list.
 //
-// Each command is allocated from the arena and does *not* retain any resources.
+// Each command is allocated from the arena and does *not* retain any resources;
+// the command buffer has a resource set that does lifetime tracking.
+//
 // We could elide some of these commands by keeping local state however that
 // requires knowing more about the target device (pipeline layouts, etc) and
 // prevents using this as a way to debug or benchmark command buffers. The

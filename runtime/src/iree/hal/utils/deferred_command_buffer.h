@@ -25,9 +25,8 @@ typedef struct iree_arena_block_pool_t iree_arena_block_pool_t;
 //
 // Argument arrays (like push constants) and host buffers (like the source
 // buffer in iree_hal_command_buffer_update_buffer) that usually live on the
-// stack will be cloned. As with all command buffers the resources (buffers,
-// events, etc) referenced will not be retained and the caller must ensure that
-// all resource lifetimes outlive the command buffer.
+// stack will be cloned. All resources used will be referenced until the command
+// buffer is reset or released.
 //
 // |block_pool| will be used to allocate the underlying storage and the blocks
 // will be retained until the command buffer is reset or released, or if

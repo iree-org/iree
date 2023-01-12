@@ -248,6 +248,30 @@ iree_hal_device_host_allocator(iree_hal_device_t* device);
 IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
     iree_hal_device_t* device);
 
+// Replaces the default device memory allocator.
+// The |new_allocator| will be retained for the lifetime of the device or the
+// allocator is replaced again. The common usage pattern is to shim the default
+// allocator with a wrapper:
+//   // Retain the existing allocator in the new wrapper.
+//   wrap_allocator(iree_hal_device_allocator(device), &new_allocator);
+//   // Update the device to use the wrapper for allocations.
+//   iree_hal_device_replace_allocator(device, new_allocator);
+//
+// WARNING: this is not thread-safe and must only be performed when the device
+// is idle and all buffers that may have been allocated from the existing
+// allocator have been released. In general the only safe time to call this is
+// immediately after device creation upon startup and before any buffers have
+// been allocated. Beware: there are no internal checks for this condition!
+//
+// TODO(benvanik): remove this method and instead allow allocators to be
+// composed without the safety caveats. This may take the form of unbound
+// allocators that the device can inject the base allocator into. Another
+// approach would be to replace the singular allocator with queue-specific pools
+// and make the user register those pools explicitly with the implementation
+// they desire.
+IREE_API_EXPORT void iree_hal_device_replace_allocator(
+    iree_hal_device_t* device, iree_hal_allocator_t* new_allocator);
+
 // Trims pools and caches used by the HAL to the minimum required for live
 // allocations. This can be used on low-memory conditions or when
 // suspending/parking instances.
@@ -460,6 +484,8 @@ typedef struct iree_hal_device_vtable_t {
   iree_allocator_t(IREE_API_PTR* host_allocator)(iree_hal_device_t* device);
   iree_hal_allocator_t*(IREE_API_PTR* device_allocator)(
       iree_hal_device_t* device);
+  void(IREE_API_PTR* replace_device_allocator)(
+      iree_hal_device_t* device, iree_hal_allocator_t* new_allocator);
 
   iree_status_t(IREE_API_PTR* trim)(iree_hal_device_t* device);
 

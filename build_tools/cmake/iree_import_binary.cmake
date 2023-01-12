@@ -45,8 +45,16 @@ function(iree_import_binary)
     message(FATAL_ERROR "IREE_HOST_BIN_DIR must be set to use iree_import_binary")
   endif()
 
-  set(_FULL_BINARY_NAME "${_RULE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
-  set(_BINARY_PATH "${IREE_HOST_BIN_DIR}/${_FULL_BINARY_NAME}")
+  # We can't use CMAKE_EXECUTABLE_SUFFIX for host tools when cross-compiling for
+  # platforms like Emscripten that set the suffix (e.g. to .js).
+  # https://gitlab.kitware.com/cmake/cmake/-/issues/17553
+  set(_HOST_EXECUTABLE_SUFFIX "")
+  if(CMAKE_HOST_WIN32)
+    set(_HOST_EXECUTABLE_SUFFIX ".exe")
+  endif()
+
+  set(_FULL_BINARY_NAME "${_RULE_NAME}${_HOST_EXECUTABLE_SUFFIX}")
+  set(_BINARY_PATH "${IREE_HOST_BINARY_ROOT}/${_FULL_BINARY_NAME}")
   file(REAL_PATH "${_BINARY_PATH}" _BINARY_PATH
        BASE_DIRECTORY ${IREE_ROOT_DIR} EXPAND_TILDE)
 
