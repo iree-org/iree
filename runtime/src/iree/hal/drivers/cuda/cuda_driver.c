@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <iree/base/status.h>
-#if IREE_HAL_CUDA_NCCL_ENABLE
-#include <nccl.h>
-#endif
 #include <stdint.h>
 #include <string.h>
+
+#if IREE_HAL_CUDA_NCCL_ENABLE
+#include "nccl.h"
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
