@@ -61,7 +61,9 @@ static iree_status_t iree_hal_nccl_get_unique_id_from_env(
   char* nccl_comm_id_str = getenv("NCCL_COMM_ID");
   if (!nccl_comm_id_str) {
     IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_INTERNAL);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "expected NCCL_COMM_ID environment variable to be "
+                            "set when using the default NCCL configuration");
   }
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
