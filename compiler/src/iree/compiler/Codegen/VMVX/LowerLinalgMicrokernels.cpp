@@ -72,7 +72,11 @@ void leftPadToRank(Location loc, SmallVectorImpl<Value> &indices,
 }
 
 // Returns true if all inner dimensions (that is, all but the outer-most dim)
-// are statically known to be contiguous row-major. This is vacuously true for
+// are contiguous row-major.
+//
+// TODO(#11633): Dynamic dimensions are currently assumed to be row-major.
+//
+// This is vacuously true for
 // rank<=1 (as there are no inner dims). For rank 2, this is equivalent to
 // asking for the inner dimension to have unit stride. For rank>=3, this is
 // asking for the strides of all but the outermost dimension to equal the
@@ -102,9 +106,13 @@ bool verifyMemRefInnerDimsContiguousRowMajor(MemRefType type) {
   int64_t product_of_inner_sizes = 1;
   for (int i = rank - 1; i >= 2; --i) {
     if (sizes[i] == ShapedType::kDynamic) {
-      return false;
+      // TODO(#11633): Dynamic dimensions are currently assumed to be row-major.
+      product_of_inner_sizes = ShapedType::kDynamic;
+    } else {
+      if (product_of_inner_sizes != ShapedType::kDynamic) {
+        product_of_inner_sizes *= sizes[i];
+      }
     }
-    product_of_inner_sizes *= sizes[i];
     if (strides[i - 1] != product_of_inner_sizes) {
       return false;
     }
