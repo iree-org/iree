@@ -100,8 +100,12 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
   if (iree_status_is_ok(status)) {
     // Initialize NCCL if NPROCS is set.
     if (driver->default_params.nccl_default_count > 0) {
-      // Get a unique ID from the environmental variable.
-      status = iree_hal_nccl_get_unique_id_from_env(driver);
+      status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
+                                                             &driver->syms);
+      if (iree_status_is_ok(status)) {
+        // Get a unique ID from the environmental variable.
+        status = iree_hal_nccl_get_unique_id_from_env(driver);
+      }
     }
   }
 

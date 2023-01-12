@@ -58,7 +58,16 @@ TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);
-    std::cerr << "Symbols cannot be loaded, skipping test.";
+    std::cerr << "CUDA symbols cannot be loaded, skipping test.";
+    GTEST_SKIP();
+  }
+
+  status = iree_hal_cuda_nccl_dynamic_symbols_initialize(
+      iree_allocator_system(), &symbols);
+  if (!iree_status_is_ok(status)) {
+    iree_status_fprint(stderr, status);
+    iree_status_ignore(status);
+    std::cerr << "CUDA NCCL symbols cannot be loaded, skipping test.";
     GTEST_SKIP();
   }
 

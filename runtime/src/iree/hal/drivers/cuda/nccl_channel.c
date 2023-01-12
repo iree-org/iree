@@ -65,6 +65,7 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
   IREE_ASSERT_ARGUMENT(out_channel);
   *out_channel = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+
   const uint64_t id_hash = iree_hal_cuda_nccl_hash_id(id);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, id_hash);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, rank);
