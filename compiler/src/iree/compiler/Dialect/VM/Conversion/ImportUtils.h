@@ -100,9 +100,9 @@ Optional<SmallVector<Value>> rewriteToCall(
           assert(false && "arity mismatch between tuple and variadic");
           return std::nullopt;
         }
-        for (auto it : llvm::zip(newOperands, inputTupleType.getTypes())) {
-          state.addOperands(
-              castToImportType(std::get<0>(it), std::get<1>(it), rewriter));
+        for (auto [newOperand, inputType] :
+             llvm::zip_equal(newOperands, inputTupleType.getTypes())) {
+          state.addOperands(castToImportType(newOperand, inputType, rewriter));
         }
       } else {
         for (auto &operand : newOperands) {
@@ -135,10 +135,8 @@ Optional<SmallVector<Value>> rewriteToCall(
   copyImportAttrs(importOp, callOp);
 
   SmallVector<Value> results;
-  for (auto resultToType :
-       llvm::zip(callOp->getResults(), operation->getResultTypes())) {
-    auto result = std::get<0>(resultToType);
-    auto targetType = std::get<1>(resultToType);
+  for (auto [result, targetType] :
+       llvm::zip_equal(callOp->getResults(), operation->getResultTypes())) {
     targetType = typeConverter.convertType(targetType);
     if (!targetType) return std::nullopt;
     results.push_back(castFromImportType(result, targetType, rewriter));
