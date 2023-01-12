@@ -60,8 +60,9 @@ cc_test(
     srcs = ["comparison_test.cc"],
     deps = [
         ":comparison",
-        ":vm_util_cc",
+        ":vm_util",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/testing:gtest",
@@ -147,27 +148,14 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "vm_util_cc",
-    srcs = ["vm_util_cc.cc"],
-    hdrs = ["vm_util_cc.h"],
-    deps = [
-        ":vm_util",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
-        "//runtime/src/iree/base/internal:span",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/vm",
-    ],
-)
-
 cc_test(
     name = "vm_util_test",
     srcs = ["vm_util_test.cc"],
     deps = [
         ":device_util",
-        ":vm_util_cc",
+        ":vm_util",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/testing:gtest",

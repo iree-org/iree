@@ -147,6 +147,60 @@ static void iree_flag_registry_sort(iree_flag_registry_t* registry) {
 }
 
 //===----------------------------------------------------------------------===//
+// List parsing/printing
+//===----------------------------------------------------------------------===//
+
+iree_status_t iree_flag_string_list_parse(iree_string_view_t flag_name,
+                                          void* storage,
+                                          iree_string_view_t value) {
+  iree_flag_string_list_storage_t* flag =
+      (iree_flag_string_list_storage_t*)storage;
+  if (flag->count == 0) {
+    // Inline storage (common case).
+    flag->count = 1;
+    flag->inline_value = value;
+  } else if (flag->count == 1) {
+    // Switching from inline storage to external storage.
+    iree_host_size_t new_capacity = 4;
+    iree_string_view_t* values = NULL;
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+        iree_allocator_system(), sizeof(iree_string_view_t*) * new_capacity,
+        (void**)&values));
+    values[0] = flag->inline_value;
+    flag->capacity = new_capacity;
+    flag->values = values;
+    flag->values[flag->count++] = value;
+  } else {
+    // Growing external storage list.
+    iree_host_size_t new_capacity = iree_max(4, flag->capacity * 2);
+    IREE_RETURN_IF_ERROR(iree_allocator_realloc(
+        iree_allocator_system(), sizeof(iree_string_view_t*) * new_capacity,
+        (void**)&flag->values));
+    flag->capacity = new_capacity;
+    flag->values[flag->count++] = value;
+  }
+  return iree_ok_status();
+}
+
+void iree_flag_string_list_print(iree_string_view_t flag_name, void* storage,
+                                 FILE* file) {
+  iree_flag_string_list_storage_t* flag =
+      (iree_flag_string_list_storage_t*)storage;
+  if (flag->count == 0) {
+    fprintf(file, "# --%.*s=...\n", (int)flag_name.size, flag_name.data);
+  } else if (flag->count == 1) {
+    fprintf(file, "--%.*s=%.*s\n", (int)flag_name.size, flag_name.data,
+            (int)flag->inline_value.size, flag->inline_value.data);
+  } else {
+    for (iree_host_size_t i = 0; i < flag->count; ++i) {
+      const iree_string_view_t value = flag->values[i];
+      fprintf(file, "--%.*s=%.*s\n", (int)flag_name.size, flag_name.data,
+              (int)value.size, value.data);
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Flag parsing/printing
 //===----------------------------------------------------------------------===//
 

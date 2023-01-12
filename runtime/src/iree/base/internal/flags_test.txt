@@ -68,6 +68,13 @@
 // RUN: ( flags_demo --test_callback=FORCE_FAILURE 2>&1 || [[ $? == 1 ]] ) | FileCheck --check-prefix=FLAG-CALLBACK-ERROR %s
 // FLAG-CALLBACK-ERROR: INTERNAL; callbacks can do verification
 
+// RUN: ( flags_demo ) | FileCheck --check-prefix=FLAG-LIST-0 %s
+// FLAG-LIST-0: FLAG[test_strings] = 0
+// RUN: ( flags_demo --test_strings=a ) | FileCheck --check-prefix=FLAG-LIST-1 %s
+// FLAG-LIST-1: FLAG[test_strings] = 1: a
+// RUN: ( flags_demo --test_strings=a --test_strings=b ) | FileCheck --check-prefix=FLAG-LIST-2 %s
+// FLAG-LIST-2: FLAG[test_strings] = 2: a, b
+
 // RUN: ( flags_demo arg1 ) | FileCheck --check-prefix=FLAG-POSITIONAL-1 %s
 // FLAG-POSITIONAL-1: ARG(1) = arg1
 // RUN: ( flags_demo arg1 arg2 arg3 ) | FileCheck --check-prefix=FLAG-POSITIONAL-3 %s

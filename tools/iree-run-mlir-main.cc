@@ -52,7 +52,7 @@
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
-#include "iree/tooling/vm_util_cc.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "llvm/ADT/STLExtras.h"
@@ -138,30 +138,8 @@ static llvm::cl::list<std::string> run_args_flag{
     llvm::cl::ConsumeAfter,
 };
 
-// TODO(benvanik): move --function_input= flag into a util.
-static iree_status_t parse_function_input(iree_string_view_t flag_name,
-                                          void* storage,
-                                          iree_string_view_t value) {
-  auto* list = (std::vector<std::string>*)storage;
-  list->push_back(std::string(value.data, value.size));
-  return iree_ok_status();
-}
-static void print_function_input(iree_string_view_t flag_name, void* storage,
-                                 FILE* file) {
-  auto* list = (std::vector<std::string>*)storage;
-  if (list->empty()) {
-    fprintf(file, "# --%.*s=\n", (int)flag_name.size, flag_name.data);
-  } else {
-    for (size_t i = 0; i < list->size(); ++i) {
-      fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
-              list->at(i).c_str());
-    }
-  }
-}
-static std::vector<std::string> FLAG_function_inputs;
-IREE_FLAG_CALLBACK(
-    parse_function_input, print_function_input, &FLAG_function_inputs,
-    function_input,
+IREE_FLAG_LIST(
+    string, function_input,
     "An input value or buffer of the format:\n"
     "  [shape]xtype=[value]\n"
     "  2x2xi32=1 2 3 4\n"
@@ -342,11 +320,9 @@ Status EvaluateFunction(iree_vm_context_t* context, iree_hal_device_t* device,
 
   // Parse input values from the flags.
   vm::ref<iree_vm_list_t> inputs;
-  IREE_RETURN_IF_ERROR(ParseToVariantList(
-      device_allocator,
-      iree::span<const std::string>{FLAG_function_inputs.data(),
-                                    FLAG_function_inputs.size()},
-      host_allocator, &inputs));
+  IREE_RETURN_IF_ERROR(iree_tooling_parse_to_variant_list(
+      device_allocator, FLAG_function_input_list().values,
+      FLAG_function_input_list().count, host_allocator, &inputs));
 
   // If the function is async add fences so we can invoke it synchronously.
   vm::ref<iree_hal_fence_t> finish_fence;
@@ -370,7 +346,8 @@ Status EvaluateFunction(iree_vm_context_t* context, iree_hal_device_t* device,
   }
 
   // Print outputs.
-  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get()));
+  IREE_RETURN_IF_ERROR(iree_tooling_variant_list_fprint(
+      outputs.get(), /*max_element_count=*/1024, stdout));
 
   return OkStatus();
 }

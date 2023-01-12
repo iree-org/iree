@@ -67,8 +67,9 @@ iree_cc_test(
     "comparison_test.cc"
   DEPS
     ::comparison
-    ::vm_util_cc
+    ::vm_util
     iree::base
+    iree::base::internal::span
     iree::hal
     iree::modules::hal
     iree::testing::gtest
@@ -166,23 +167,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    vm_util_cc
-  HDRS
-    "vm_util_cc.h"
-  SRCS
-    "vm_util_cc.cc"
-  DEPS
-    ::vm_util
-    iree::base
-    iree::base::internal::span
-    iree::base::tracing
-    iree::hal
-    iree::vm
-  PUBLIC
-)
-
 iree_cc_test(
   NAME
     vm_util_test
@@ -190,8 +174,9 @@ iree_cc_test(
     "vm_util_test.cc"
   DEPS
     ::device_util
-    ::vm_util_cc
+    ::vm_util
     iree::base
+    iree::base::internal::span
     iree::hal
     iree::modules::hal
     iree::testing::gtest

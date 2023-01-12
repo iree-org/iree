@@ -53,7 +53,7 @@ iree_cc_binary(
     iree::modules::hal::types
     iree::tooling::context_util
     iree::tooling::device_util
-    iree::tooling::vm_util_cc
+    iree::tooling::vm_util
     iree::vm
 )
 
@@ -94,7 +94,7 @@ iree_cc_binary(
     iree::testing::gtest
     iree::tooling::context_util
     iree::tooling::device_util
-    iree::tooling::vm_util_cc
+    iree::tooling::vm_util
     iree::vm
     iree::vm::bytecode_module
   TESTONLY
@@ -128,7 +128,7 @@ iree_cc_binary(
     iree::tooling::comparison
     iree::tooling::context_util
     iree::tooling::device_util
-    iree::tooling::vm_util_cc
+    iree::tooling::vm_util
     iree::vm
 )
 
@@ -254,7 +254,7 @@ if(IREE_BUILD_COMPILER)
       iree::modules::hal::types
       iree::tooling::context_util
       iree::tooling::device_util
-      iree::tooling::vm_util_cc
+      iree::tooling::vm_util
       iree::vm
       iree::vm::bytecode_module
     DATA
