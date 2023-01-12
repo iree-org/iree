@@ -242,23 +242,31 @@ struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
   }
 
   void runOnOperation() override {
+    SmallVector<Operation *> toDelete;
     getOperation()->walk<WalkOrder::PreOrder>([&](Operation *nestedOp) {
-      if (isa<iree_compiler::IREE::LinalgExt::DoNotDCEOperandsOp>(nestedOp))
-        nestedOp->erase();
-      if (isa<::mlir::transform::TransformOpInterface>(nestedOp)) {
-        nestedOp->erase();
+      if (isa<iree_compiler::IREE::LinalgExt::DoNotDCEOperandsOp>(nestedOp)) {
+        toDelete.push_back(nestedOp);
+      } else if (isa<::mlir::transform::TransformOpInterface>(nestedOp)) {
+        toDelete.push_back(nestedOp);
         return WalkResult::skip();
       }
       return WalkResult::advance();
     });
+    for (auto op : toDelete) {
+      op->erase();
+    }
+    SmallVector<ModuleOp> modulesToDelete;
     // Remove potential empty module after cleanup.
     getOperation()->walk([&](ModuleOp module) {
       if (module.getBodyRegion().hasOneBlock() && module.getBody()->empty()) {
-        module->erase();
+        modulesToDelete.push_back(module);
         return WalkResult::skip();
       }
       return WalkResult::advance();
     });
+    for (auto module : modulesToDelete) {
+      module->erase();
+    }
   }
 };
 } // namespace

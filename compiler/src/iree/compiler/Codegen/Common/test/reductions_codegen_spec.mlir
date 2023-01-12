@@ -4,49 +4,45 @@ transform.structured.canonicalized_sequence failures(propagate) {
 ^bb0(%arg0: !pdl.operation):
   transform.iree.register_match_callbacks
 
-  %_, %fill, %reduction, %maybe_trailing_0 =
+  %maybe_leading, %original_fill, %reduction, %maybe_trailing_0 =
     transform.iree.match_callback failures(propagate) "reduction"(%arg0)
     : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
   
-  %0, %1, %2, %combiner_op =
+  %_, %more_parallel_fill, %parallel_reduction, %combiner_op =
     transform.structured.split_reduction %reduction { split_factor = 2, insert_split_dimension = 1 }
 
+  // Step 1. Map to a single block by tiling with size 1 and fusing.
   %fusion_root_1, %fusion_group_1 = transform.iree.take_first %maybe_trailing_0, %combiner_op
     : (!pdl.operation, !pdl.operation) -> (!pdl.operation, !pdl.operation)
-  transform.structured.tile_to_foreach_thread_op %fusion_root_1 tile_sizes [1]
+  %grid_loop, %outer_tiled = transform.structured.tile_to_foreach_thread_op %fusion_root_1 tile_sizes [1]
     ( mapping = [#gpu.block<x>] )
   
-  // TODO: bubbling should be a proper transform op, at which point we will be
-  // able to preserve the handles and avoid rematching below.
   %func = transform.structured.match ops{["func.func"]} in %arg0
   %func_1 = transform.iree.apply_patterns %func { bubble_collapse_expand }
 
-  %maybe_leading, %original_fill, %more_parallel_fill, %parallel_reduction, %combiner_reduction, %maybe_trailing =
-    transform.iree.match_callback failures(propagate) "split_reduction"(%arg0)
-    : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
+  // Excessively eager canonicalization results in `fill`s being "fused" due to
+  // swapping with `extract_slice`, which confuses the fusion operation below.
+  // Wrap fusion into a non-canonicalized sequence.
+  %fused_2, %parallel_reduction_2, %more_parallel_fill_2, %original_fill_2, %maybe_leading_2 =
+    transform.sequence %arg0 : !pdl.operation -> !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation
+    failures(propagate) {
+  ^bb1(%arg1: !pdl.operation):
+    %fused_22 = transform.structured.fuse_into_containing_op %fusion_group_1 into %grid_loop
+    %parallel_reduction_22 = transform.structured.fuse_into_containing_op %parallel_reduction into %grid_loop
+    %more_parallel_fill_22 = transform.structured.fuse_into_containing_op %more_parallel_fill into %grid_loop
+    %original_fill_22 = transform.structured.fuse_into_containing_op %original_fill into %grid_loop
+    %maybe_leading_22 = transform.structured.fuse_into_containing_op %maybe_leading into %grid_loop
 
-  %fusion_root_1_updated, %fusion_group_1_updated =
-    transform.iree.take_first %maybe_trailing, %combiner_reduction
-    : (!pdl.operation, !pdl.operation) -> (!pdl.operation, !pdl.operation)
-  // TODO: we need an extra navigation op similar to get_parent_loop to avoid rematching.
-  // %grid_loop = transform.iree.get_parent_of_type("scf.foreach_thread") %fusion_root_1_updated 
-  %grid_loop = transform.structured.match ops{["scf.foreach_thread"]} in %arg0
-  %fusion_group_1_full = transform.merge_handles %fusion_group_1_updated,
-    %maybe_leading, %original_fill, %more_parallel_fill, %parallel_reduction
-    : !pdl.operation
-  transform.structured.fuse_into_containing_op %fusion_group_1_full into %grid_loop
+    transform.yield %fused_22, %parallel_reduction_22, %more_parallel_fill_22, %original_fill_22, %maybe_leading_22
+      : !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation
+  }
 
-  // Step 3.
-  %maybe_leading_2, %original_fill_2, %more_parallel_fill_2, %parallel_reduction_2, %combiner_reduction_2, %maybe_trailing_2 =
-    transform.iree.match_callback failures(propagate) "split_reduction"(%arg0)
-    : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
-  %fusion_root_22, %fusion_group_22 =
-    transform.iree.take_first %maybe_trailing_2, %combiner_reduction_2
-    : (!pdl.operation, !pdl.operation) -> (!pdl.operation, !pdl.operation)
-  %fusion_group_22_full = transform.merge_handles %fusion_group_22, %original_fill_2
+  // Step 2. Map reduction to thread X and parallel dimension to other threads.
+  // ===========================================================================
+  %fusion_group_22_full = transform.merge_handles %fused_2, %original_fill_2
     : !pdl.operation
   %block_loop_22, %fusion_root_22_tiled =
-    transform.structured.tile_to_foreach_thread_op %fusion_root_22
+    transform.structured.tile_to_foreach_thread_op %outer_tiled
     tile_sizes [1] ( mapping = [#gpu.thread<z>] )
   transform.structured.fuse_into_containing_op %fusion_group_22_full into %block_loop_22
 
@@ -57,7 +53,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
     tile_sizes [1, 1] ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
   transform.structured.fuse_into_containing_op %fusion_group_21 into %block_loop_21
   
-  // Step 4. Rank-reduce.
+  // Step 3. Rank-reduce.
   // ===========================================================================
   %func_2 = transform.iree.apply_patterns %func_1 { rank_reducing }
 

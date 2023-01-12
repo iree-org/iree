@@ -47,9 +47,6 @@ class SmallReductionStrategy : public AbstractReductionStrategy {
   SmallReductionStrategy(const SmallReductionStrategy &) = default;
   SmallReductionStrategy &operator=(const SmallReductionStrategy &) = default;
 
-  int64_t getNumThreadsXInBlock() const { return getNumThreadsInBlock()[0]; }
-  int64_t getNumThreadsYInBlock() const { return getNumThreadsInBlock()[1]; }
-  int64_t getNumThreadsZInBlock() const { return getNumThreadsInBlock()[2]; }
   std::array<int64_t, 3> getNumThreadsInBlock() const override {
     std::array<int64_t, 3> res{1, 1, 1};
     for (int64_t i = 0, e = workgroupTileSizes.size(); i < e; ++i)

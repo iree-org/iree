@@ -358,6 +358,16 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
 )
 
+# Our Emscripten library code uses dynCall, which needs these link flags.
+# TODO(scotttodd): Find a way to refactor this, this is nasty to always set :(
+if(EMSCRIPTEN)
+  iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
+    ALL
+      "-sDYNCALLS=1"
+      "-sEXPORTED_RUNTIME_METHODS=['dynCall']"
+  )
+endif()
+
 #-------------------------------------------------------------------------------
 # Size-optimized build flags
 #-------------------------------------------------------------------------------

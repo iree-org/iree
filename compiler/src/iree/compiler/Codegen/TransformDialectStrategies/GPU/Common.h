@@ -62,21 +62,25 @@ std::pair<Value, Value> buildCommonTrailingStrategy(
 //===----------------------------------------------------------------------===//
 // Mid-level problem-specific strategy builder APIs, follow MLIR-style builders.
 //===----------------------------------------------------------------------===//
-/// Given a handle `elementwiseH` to an elementwise op of rank `rank`, sizes
-/// `elementwiseSizes` mapped to `numThreadsXInBlock` threads along dimension
-/// x. Build a schedule that maps the most minor dimension to a scf.foreach op
-/// itself mapped to the `gpu.thread x` dimension.
-/// The schedule first performs a split of the largest possible multiple of
-/// `numThreadsXInBlock * maxVectorSize` to form a maximally divisible region
-/// Assumes the most minor dimension of the op is the last one.
+/// Take a handle `opH` to a Linalg op of rank `rank`, sizes `opSizes` and for
+/// which we know the most minor dimension `mostMinorDim` (assuming all accesses
+/// are contiguous along that dimension for now).
+/// Build a schedule that maps `mostMinorDim` to a `scf.foreach_thread` op.
+/// When `numThreads` > 1, the `scf.foreach_thread` is also mapped to
+/// `mappingAttr` (which must then be non-null).
+/// The constructed schedule first performs a split of the largest possible
+/// multiple of `numThreads * maxVectorSize` to form a maximally divisible
+/// region.
 // TODO: More robustness wrt selecting the most minor dimension otherwise
 // performance may suffer.
 // TODO: Split point should be dynamic and aware of future stride / alignment
-// to also guarantee proper vector alignments.
+// to also guarantee proper vector alignments. OTOH this is a non-trivial bump
+// in schedule complexity and can be handled with simple padding of the
+// underlying allocation.
 void build1DSplittingStrategyWithOptionalThreadMapping(
-    ImplicitLocOpBuilder& b, Value elementwiseH, int64_t rank,
-    SmallVector<int64_t> elementwiseSizes, int64_t numThreads,
-    int64_t maxVectorSize = 4);
+    ImplicitLocOpBuilder& b, Value opH, int64_t rank, int64_t mostMinorDim,
+    SmallVector<int64_t> opSizes, int64_t numThreads,
+    Attribute mappingAttr = Attribute(), int64_t maxVectorSize = 4);
 
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor

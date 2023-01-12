@@ -72,7 +72,7 @@ class MigFetcher():
     regions = [r.name for r in self._regions_client.list(request)]
 
     if type == "all":
-      type = r"[-\w]+"
+      type = r"\w+"
 
     if group == "all":
       group = r"\w+"

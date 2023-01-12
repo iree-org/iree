@@ -38,6 +38,7 @@ iree_lit_test_suite(
             "tile_on_tensor.mlir",
             "transform_dialect_vector_distribution.mlir",
             "transform_dialect_bufferize.mlir",
+            "transform_vector_to_mma.mlir",
             "transpose_pipeline_test.mlir",
             "vector_to_gpu.mlir",
             "workgroup_specialization_pipeline_test.mlir",

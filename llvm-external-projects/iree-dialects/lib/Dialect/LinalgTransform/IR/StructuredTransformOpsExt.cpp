@@ -354,12 +354,13 @@ static linalg::LinalgOp findSingleLinalgOpDefiningAll(ValueRange range) {
     // operands may be coming from a Linalg op. Or a completely different
     // mechanism of tracking op replacement at creation, or even different
     // patterns that identify the "main" result of a transformation.
-    while (isa<tensor::CastOp, tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
-        value.getDefiningOp())) {
+    while (isa<tensor::CastOp, tensor::CollapseShapeOp, tensor::ExpandShapeOp,
+               tensor::InsertSliceOp>(value.getDefiningOp())) {
       value = llvm::TypeSwitch<Operation *, Value>(value.getDefiningOp())
                   .Case([](tensor::CastOp op) { return op.getSource(); })
                   .Case([](tensor::CollapseShapeOp op) { return op.getSrc(); })
                   .Case([](tensor::ExpandShapeOp op) { return op.getSrc(); })
+                  .Case([](tensor::InsertSliceOp op) { return op.getSource(); })
                   .Default([](Operation *) {
                     llvm_unreachable("Wrong op type");
                     return Value();
@@ -1268,82 +1269,12 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
-/// Match callback for a reduction after splitting with optional leading and
-/// trailing elementwise operations. Matches *the first* occurrence of such a
-/// reduction within an op associated with the given handle.
-///
-/// Input handles:
-///
-///   - container op, must be associated with one operation.
-///
-/// Output handles:
-///
-///   - leading elementwise op, if any;
-///   - the "fill" op preceding the original reduction;
-///   - the "fill" op preceding the split, more parallel reduction;
-///   - the split, more parallel reduction op;
-///   - reduction op;
-///   - trailing elementwise op, if any.
-static DiagnosedSilenceableFailure
-splitReductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
-                       const mlir::transform::TransformState &state,
-                       ValueRange handles) {
-  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
-    return emitSilenceableFailure(loc)
-           << "expected one handle to one operation";
-  }
-
-  transform_ext::StructuredOpMatcher parallel_reduction, combiner_reduction,
-      parallel_fill, original_fill, leading, trailing;
-  makeSplitReductionMatcher(parallel_reduction, combiner_reduction,
-                            parallel_fill, original_fill, leading, trailing);
-
-  // TODO: need a mechanism for this to go around the entire IR,
-  // potentially with list matches for each group.
-  Operation *root = state.getPayloadOps(handles[0])[0];
-
-  WalkResult walkResult = root->walk([&](Operation *op) {
-    combiner_reduction.resetCapture();
-    if (!matchPattern(op, combiner_reduction))
-      return WalkResult::advance();
-
-    // TODO: notify properly.
-    LLVM_DEBUG({
-      DBGS() << "leading:\n";
-      if (leading.getCaptured())
-        DBGS() << leading.getCaptured() << "\n";
-      DBGS() << "original_fill: " << original_fill.getCaptured() << "\n";
-      DBGS() << "parallel_fill: " << parallel_fill.getCaptured() << "\n";
-      DBGS() << "parallel_reduction: " << parallel_reduction.getCaptured()
-             << "\n";
-      DBGS() << "combiner_reduction: " << combiner_reduction.getCaptured()
-             << "\n";
-      DBGS() << "trailing:\n";
-      if (trailing.getCaptured())
-        DBGS() << trailing.getCaptured() << "\n";
-    });
-
-    res.addPotentiallyEmptyPayloadGroup(leading.getCaptured());
-    res.addPayloadGroup({original_fill.getCaptured()});
-    res.addPayloadGroup({parallel_fill.getCaptured()});
-    res.addPayloadGroup({parallel_reduction.getCaptured()});
-    res.addPayloadGroup({combiner_reduction.getCaptured()});
-    res.addPotentiallyEmptyPayloadGroup(trailing.getCaptured());
-    return WalkResult::interrupt();
-  });
-
-  if (walkResult.wasInterrupted())
-    return DiagnosedSilenceableFailure::success();
-  return emitSilenceableFailure(loc) << "failed to match";
-}
-
 DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
     mlir::transform::TransformResults &results,
     mlir::transform::TransformState &state) {
   auto &registry = state.addExtension<transform_ext::MatchCallbacksRegistry>();
   registry.registerCallback("_test_match_callback", testMatchCallbackCallback);
   registry.registerCallback("reduction", reductionCallback);
-  registry.registerCallback("split_reduction", splitReductionCallback);
   return DiagnosedSilenceableFailure::success();
 }
 

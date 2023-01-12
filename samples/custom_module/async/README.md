@@ -1,4 +1,4 @@
-# Synchronous tensor I/O custom module sample
+# Asynchronous tensor I/O custom module sample
 
 This sample expects that you've already produced a working version of the
 [basic sample](/samples/custom_module/basic/) (including compiler installation

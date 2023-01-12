@@ -146,7 +146,8 @@ static iree_status_t iree_create_buffer_view_from_file(
 }
 
 iree_status_t iree_tooling_parse_to_variant_list(
-    iree_hal_allocator_t* device_allocator, iree_string_view_t* input_strings,
+    iree_hal_allocator_t* device_allocator,
+    const iree_string_view_t* input_strings,
     iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
     iree_vm_list_t** out_list) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -161,8 +162,7 @@ iree_status_t iree_tooling_parse_to_variant_list(
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < input_strings_count; ++i) {
     if (!iree_status_is_ok(status)) break;
-    iree_string_view_t input_view = iree_string_view_trim(
-        iree_make_string_view(input_strings[i].data, input_strings[i].size));
+    iree_string_view_t input_view = iree_string_view_trim(input_strings[i]);
     if (iree_string_view_consume_prefix(&input_view, IREE_SV("@"))) {
       status = iree_tooling_load_ndarrays_from_file(
           input_view, device_allocator, variant_list);

@@ -123,3 +123,21 @@ iree_cc_library(
     ::pack_tile_arm_64
   PUBLIC
 )
+
+###############################################################################
+# query_tile_sizes entry point
+###############################################################################
+
+iree_cc_library(
+  NAME
+  query_tile_sizes_arm_64
+  HDRS
+    "query_tile_sizes_arm_64.h"
+  SRCS
+    "query_tile_sizes_arm_64.c"
+  DEPS
+    iree::base::core_headers
+    iree::schemas::cpu_data
+    iree::builtins::ukernel::common
+  PUBLIC
+)

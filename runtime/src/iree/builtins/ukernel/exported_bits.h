@@ -34,17 +34,17 @@
 //   among many ukernels.
 // * The high 16 bits (bits 16..31) are for ukernel-specific bits.
 
-// Common bits (bits 0..15)
+// Common bits (bits 0..15).
 #define IREE_UK_FLAG_ACCUMULATE 0x1u
 #define IREE_UK_FLAG_ACCUMULATE_BIT_POS 0
 
-// `pack` ukernel-specific bits (bits 16..31)
+// `pack` ukernel-specific bits (bits 16..31).
 #define IREE_UK_FLAG_PACK_TRANSPOSE_INNER 0x10000u
 #define IREE_UK_FLAG_PACK_TRANSPOSE_INNER_BIT_POS 16
 #define IREE_UK_FLAG_PACK_TRANSPOSE_OUTER 0x20000u
 #define IREE_UK_FLAG_PACK_TRANSPOSE_OUTER_BIT_POS 17
 
-// `unpack` ukernel-specific bits (bits 16..31)
+// `unpack` ukernel-specific bits (bits 16..31).
 #define IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER 0x10000u
 #define IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER_BIT_POS 16
 #define IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER 0x20000u
@@ -56,5 +56,26 @@
 IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_ACCUMULATE);
 IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_PACK_TRANSPOSE_INNER);
 IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_PACK_TRANSPOSE_OUTER);
+
+// `query_tile_sizes` ukernel-specific bits (bits 16..31).
+// OPERAND_ROLE (bits 16..19) describes the role that a tensor plays in an
+// operation, e.g. "left-hand-size operand" (e.g. in a matmul)
+// Note: the _INTERNAL suffix conveys that the _MASK value should only be used
+// by microkernels decoding flags, not by the compiler setting flags. Masks may
+// have to change even if flag values don't.
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_MASK_INTERNAL 0xf0000u
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS 0x00000u
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS 0x10000u
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS_TRANSPOSE 0x20000u
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT 0x30000u
+// OPERATION (bits 20..31, though may be shrunk as needed as this is currently
+// only using bit 20 and will only grow as needed) describes the operation
+// owning the tensor (that we are doing a query_tile_sizes for) as an operand.
+// Note: the _INTERNAL suffix conveys that the _MASK value should only be used
+// by microkernels decoding flags, not by the compiler setting flags. Masks may
+// have to change even if flag values don't.
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MASK_INTERNAL 0xfff00000u
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32 0x000000u
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32 0x100000u
 
 #endif  // IREE_BUILTINS_UKERNEL_EXPORTED_BITS_H_

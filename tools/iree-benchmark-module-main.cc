@@ -68,7 +68,7 @@
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
-#include "iree/tooling/vm_util_cc.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 
 constexpr char kNanosecondsUnitString[] = "ns";
@@ -92,30 +92,8 @@ IREE_FLAG(string, entry_function, "",
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
-// TODO(benvanik): move --function_input= flag into a util.
-static iree_status_t parse_function_input(iree_string_view_t flag_name,
-                                          void* storage,
-                                          iree_string_view_t value) {
-  auto* list = (std::vector<std::string>*)storage;
-  list->push_back(std::string(value.data, value.size));
-  return iree_ok_status();
-}
-static void print_function_input(iree_string_view_t flag_name, void* storage,
-                                 FILE* file) {
-  auto* list = (std::vector<std::string>*)storage;
-  if (list->empty()) {
-    fprintf(file, "# --%.*s=\n", (int)flag_name.size, flag_name.data);
-  } else {
-    for (size_t i = 0; i < list->size(); ++i) {
-      fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
-              list->at(i).c_str());
-    }
-  }
-}
-static std::vector<std::string> FLAG_function_inputs;
-IREE_FLAG_CALLBACK(
-    parse_function_input, print_function_input, &FLAG_function_inputs,
-    function_input,
+IREE_FLAG_LIST(
+    string, function_input,
     "An input value or buffer of the format:\n"
     "  [shape]xtype=[value]\n"
     "  2x2xi32=1 2 3 4\n"
@@ -499,10 +477,9 @@ class IREEBenchmark {
         iree_string_view_t{function_name.data(), function_name.size()},
         &function));
 
-    IREE_CHECK_OK(ParseToVariantList(
-        device_allocator_.get(),
-        iree::span<const std::string>{FLAG_function_inputs.data(),
-                                      FLAG_function_inputs.size()},
+    IREE_CHECK_OK(iree_tooling_parse_to_variant_list(
+        device_allocator_.get(), FLAG_function_input_list().values,
+        FLAG_function_input_list().count,
         iree_vm_instance_allocator(instance_.get()), &inputs_));
 
     iree_string_view_t invocation_model = iree_vm_function_lookup_attr_by_name(

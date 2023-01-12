@@ -46,6 +46,9 @@ struct AbstractReductionStrategy : iree_compiler::AbstractReductionStrategy {
 
   virtual ~AbstractReductionStrategy() {}
 
+  int64_t getNumThreadsXInBlock() const { return getNumThreadsInBlock()[0]; }
+  int64_t getNumThreadsYInBlock() const { return getNumThreadsInBlock()[1]; }
+  int64_t getNumThreadsZInBlock() const { return getNumThreadsInBlock()[2]; }
   virtual std::array<int64_t, 3> getNumThreadsInBlock() const = 0;
 
   /// Derived quantities.

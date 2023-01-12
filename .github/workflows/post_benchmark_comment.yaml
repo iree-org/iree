@@ -1,0 +1,91 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Post benchmark comment
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+env:
+  PR_CI_STAGE: ${{ github.event.workflow_run.event == 'pull_request' && 'presubmit' || 'postsubmit' }}
+  PR_CI_RUN_ID: ${{ github.event.workflow_run.id }}
+  PR_CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+
+jobs:
+  setup:
+    # Only run the workflow if it's triggered from a pull request.
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-20.04
+    outputs:
+      should-run: ${{ steps.configure.outputs.should-run }}
+      runner-env: ${{ steps.configure.outputs.runner-env }}
+      runner-group: ${{ steps.configure.outputs.runner-group }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        with:
+          # We need the parent commit to do a diff
+          fetch-depth: 2
+      - name: "Configuring CI options"
+        id: configure
+        run: |
+          # Just informative logging. There should only be two commits in the
+          # history here, but limiting the depth helps when copying from a local
+          # repo instead of using checkout, e.g. with
+          # https://github.com/nektos/act where there will be more.
+          git log --oneline --graph --max-count=3
+          ./build_tools/github_actions/configure_ci.py
+
+  post_comment:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on: ubuntu-20.04
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+      - name: "Checking benchmark processing job"
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BENCHMARK_PROCESS_JOB: process_benchmark_results
+        run: |
+          export CONCLUSION=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs/${PR_CI_RUN_ID}/attempts/${PR_CI_RUN_ATTEMPT}/jobs" \
+            | jq --raw-output --arg job "${BENCHMARK_PROCESS_JOB}" \
+              '.jobs | map(select(.name==$job))[0] | .conclusion')
+          echo "job-conclusion=${CONCLUSION}" >> "${GITHUB_OUTPUT}"
+      - name: "Downloading artifacts"
+        if: steps.check.outputs.job-conclusion == 'success'
+        id: download
+        env:
+          # Currently GitHub managed runner doesn't have GCP credential. Fetch
+          # from public URL directly.
+          PR_CI_GCS_URL: https://storage.googleapis.com/iree-github-actions-${{ env.PR_CI_STAGE }}-artifacts/${{ env.PR_CI_RUN_ID }}/${{ env.PR_CI_RUN_ATTEMPT }}
+          BENCHMARK_COMMENT_ARTIFACT: benchmark-comment.json
+        run: |
+          wget -O "${BENCHMARK_COMMENT_ARTIFACT}" \
+            "${PR_CI_GCS_URL}/${BENCHMARK_COMMENT_ARTIFACT}"
+          echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+      - name: Posting comments
+        # TODO(#11076): Temporarily disabled until we migrate the database.
+        if: false && steps.check.outputs.job-conclusion == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIST_BOT_TOKEN: ${{ secrets.GIST_BOT_TOKEN }}
+          COMMENT_BOT_USER: iree-github-actions-bot
+          # Get PR number from the event instead of the untrusted comment
+          # artifact, to make sure we won't incorrectly update other PRs.
+          BENCHMARK_COMMENT_ARTIFACT: ${{ steps.download.outputs.benchmark-comment-artifact }}
+        run: |
+          ./build_tools/benchmarks/post_benchmark_comment.py \
+            --verbose \
+            --github_event_json="${GITHUB_EVENT_PATH}" \
+            "${BENCHMARK_COMMENT_ARTIFACT}"

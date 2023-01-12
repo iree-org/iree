@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -588,6 +589,35 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
 }
 
 void transform_dialect::VectorWarpDistributionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::VectorToMMAConversionOp::applyToOne(
+    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+    target->emitOpError(
+        "applies only to isolated-from-above targets because it needs to apply "
+        "patterns greedily");
+    return emitDefaultDefiniteFailure(target);
+  }
+  MLIRContext *ctx = target->getContext();
+  RewritePatternSet patterns(ctx);
+  mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+  populatePrepareVectorToMMAPatterns(patterns, /*llvmgpuUseMMASync=*/false);
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {
+    target->emitOpError("vector to mma patterns failed to apply");
+    return emitDefaultDefiniteFailure(target);
+  }
+  convertVectorToMMAOps(target);
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::VectorToMMAConversionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);

@@ -83,7 +83,7 @@ class AssignTargetDevicesPass
             [&os](const std::shared_ptr<
                   mlir::iree_compiler::IREE::HAL::TargetBackend>
                       b) { os << b->name(); });
-        moduleOp.emitError()
+        emitError(moduleOp.getLoc())
             << "target backend '" << targetName
             << "' not registered; registered backends: " << os.str();
         signalPassFailure();

@@ -45,11 +45,11 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   
   //         CHECK: %[[TIDX:.]] = gpu.thread_id  x
   // Local per-thread scf.for-based reduction.
-  //         CHECK: scf.for
+  //         CHECK: %[[v:.*]] = scf.for {{.*}} -> (vector<f32>) {
   //         CHECK:   vector.transfer_read %{{.*}} : memref<?x?xf32>, vector<f32>
-  //         CHECK:   vector.transfer_read %[[SHMEM_ALLOC]][%[[C0]], %[[TIDX]]], %{{.*}} : memref<1x1024xf32, 3>, vector<f32>
   //         CHECK:   arith.addf {{.*}} : f32
-  //         CHECK:   vector.transfer_write %{{.*}}, %[[SHMEM_ALLOC]][%[[C0]], %[[TIDX]]] : vector<f32>, memref<1x1024xf32, 3>
+  //         CHECK: }
+  //         CHECK: vector.transfer_write %[[v]], %[[SHMEM_ALLOC]][%[[C0]], %[[TIDX]]] : vector<f32>, memref<1x1024xf32, 3>
 
   //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
   // Distributed reduction: everyone loads then 5 xor + addf expected
