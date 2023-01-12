@@ -46,7 +46,7 @@ function(iree_import_binary)
   endif()
 
   # We can't use CMAKE_EXECUTABLE_SUFFIX for host tools when cross-compiling for
-  # platforms like Emscripten that set the suffix (e.g. to .js.)
+  # platforms like Emscripten that set the suffix (e.g. to .js).
   # https://gitlab.kitware.com/cmake/cmake/-/issues/17553
   set(_HOST_EXECUTABLE_SUFFIX "")
   if(CMAKE_HOST_WIN32)
