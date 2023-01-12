@@ -38,7 +38,7 @@ static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
   // file will be used.
   // TODO(#5724): remove this and instead provide a device set on initialize.
   iree_host_size_t device_uri_count = 0;
-  iree_string_view_t* device_uris = NULL;
+  const iree_string_view_t* device_uris = NULL;
   iree_hal_get_devices_flag_list(&device_uri_count, &device_uris);
   iree_trace_replay_set_hal_devices_override(&replay, device_uri_count,
                                              device_uris);

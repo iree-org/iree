@@ -220,6 +220,75 @@ int iree_flag_register(const char* file, int line, iree_flag_type_t type,
 #endif  // IREE_FLAGS_ENABLE_CLI
 
 //===----------------------------------------------------------------------===//
+// List flag utilities
+//===----------------------------------------------------------------------===//
+
+// A list of string views referencing flag storage.
+typedef struct iree_flag_string_list_t {
+  // Total number of values in the list.
+  iree_host_size_t count;
+  // Value list or NULL if no values.
+  const iree_string_view_t* values;
+} iree_flag_string_list_t;
+
+#if IREE_FLAGS_ENABLE_CLI == 1
+
+// Internal storage; do not use.
+typedef struct iree_flag_string_list_storage_t {
+  iree_host_size_t capacity;
+  iree_host_size_t count;
+  union {
+    iree_string_view_t inline_value;  // only if count == 1
+    iree_string_view_t* values;       // only if count > 1
+  };
+} iree_flag_string_list_storage_t;
+iree_status_t iree_flag_string_list_parse(iree_string_view_t flag_name,
+                                          void* storage,
+                                          iree_string_view_t value);
+void iree_flag_string_list_print(iree_string_view_t flag_name, void* storage,
+                                 FILE* file);
+
+// Defines a repeated flag representing a dynamically sized list of values.
+//
+// Usage:
+//   IREE_FLAG_LIST(string, foo, "hello");
+//   ...
+//   const iree_flag_string_list_t list = FLAG_foo_list();
+//   for (iree_host_size_t i = 0; i < list.count; ++i) {
+//     printf("value: %.*s", (int)list.values[i].size, list.values[i].data);
+//   }
+//   ...
+//   ./binary --foo=a --foo=b
+//   > value: a
+//   > value: b
+#define IREE_FLAG_LIST(type, name, description)                             \
+  static iree_flag_##type##_list_storage_t FLAG_##name##_storage = {        \
+      /*.capacity=*/1 /* inline by default */,                              \
+      /*.count=*/0,                                                         \
+  };                                                                        \
+  IREE_FLAG_CALLBACK(iree_flag_##type##_list_parse,                         \
+                     iree_flag_##type##_list_print, &FLAG_##name##_storage, \
+                     name, description);                                    \
+  static const iree_flag_##type##_list_t FLAG_##name##_list(void) {         \
+    const iree_flag_##type##_list_t list = {                                \
+        /*.count=*/FLAG_##name##_storage.count,                             \
+        /*.values=*/FLAG_##name##_storage.count == 1                        \
+            ? &FLAG_##name##_storage.inline_value                           \
+            : FLAG_##name##_storage.values,                                 \
+    };                                                                      \
+    return list;                                                            \
+  }
+
+#else
+
+#define IREE_FLAG_LIST(type, name, description)                     \
+  static const iree_flag_##type##_list_t FLAG_##name##_list(void) { \
+    return (iree_flag_##type##_list_t){0, NULL};                    \
+  }
+
+#endif  // IREE_FLAGS_ENABLE_CLI
+
+//===----------------------------------------------------------------------===//
 // Flag parsing
 //===----------------------------------------------------------------------===//
 
