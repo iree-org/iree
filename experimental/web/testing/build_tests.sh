@@ -59,6 +59,7 @@ emcmake "${CMAKE_BIN?}" -G Ninja .. \
     -DIREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE=ON \
     -DIREE_BUILD_SAMPLES=OFF \
     -DIREE_ENABLE_CPUINFO=OFF \
+    -DIREE_ENABLE_ASAN=OFF \
     -DIREE_BUILD_TESTS=ON
 
 echo "=== Building default targets ==="

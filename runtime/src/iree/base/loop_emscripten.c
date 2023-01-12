@@ -16,8 +16,14 @@
 // externs from loop_emscripten.js
 //===----------------------------------------------------------------------===//
 
-extern iree_status_t loop_command_call(iree_loop_callback_fn_t callback,
-                                       void* user_data, iree_loop_t loop);
+typedef uint32_t iree_loop_emscripten_scope_t;  // Opaque handle.
+
+extern iree_loop_emscripten_scope_t iree_loop_allocate_scope();
+extern void iree_loop_free_scope(iree_loop_emscripten_scope_t scope);
+
+extern iree_status_t iree_loop_command_call(iree_loop_emscripten_scope_t scope,
+                                            iree_loop_callback_fn_t callback,
+                                            void* user_data, iree_loop_t loop);
 
 //===----------------------------------------------------------------------===//
 // iree_loop_emscripten_t
@@ -25,9 +31,7 @@ extern iree_status_t loop_command_call(iree_loop_callback_fn_t callback,
 
 typedef struct iree_loop_emscripten_t {
   iree_allocator_t allocator;
-
-  // TODO(scotttodd): handle to a "scope"/object (managed in JS), so multiple
-  //                  loops can exist at once
+  iree_loop_emscripten_scope_t scope;
 } iree_loop_emscripten_t;
 
 IREE_API_EXPORT iree_status_t iree_loop_emscripten_allocate(
@@ -37,6 +41,7 @@ IREE_API_EXPORT iree_status_t iree_loop_emscripten_allocate(
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, sizeof(*loop), (void**)&loop));
   loop->allocator = allocator;
+  loop->scope = iree_loop_allocate_scope();
   *out_loop = loop;
   return iree_ok_status();
 }
@@ -45,9 +50,7 @@ IREE_API_EXPORT void iree_loop_emscripten_free(iree_loop_emscripten_t* loop) {
   IREE_ASSERT_ARGUMENT(loop);
   iree_allocator_t allocator = loop->allocator;
 
-  // TODO(scotttodd): cleanup:
-  //     abort pending operations (neuter callbacks/Promises)
-  //     assert if any work is still outstanding
+  iree_loop_free_scope(loop->scope);
 
   // After all operations are cleared we can release the data structures.
   iree_allocator_free(allocator, loop);
@@ -56,8 +59,8 @@ IREE_API_EXPORT void iree_loop_emscripten_free(iree_loop_emscripten_t* loop) {
 static iree_status_t iree_loop_emscripten_run_call(
     iree_loop_emscripten_t* loop_emscripten, iree_loop_call_params_t* params) {
   iree_loop_t loop = iree_loop_emscripten(loop_emscripten);
-  return loop_command_call(params->callback.fn, params->callback.user_data,
-                           loop);
+  return iree_loop_command_call(loop_emscripten->scope, params->callback.fn,
+                                params->callback.user_data, loop);
 }
 
 // Control function for the Emscripten loop.

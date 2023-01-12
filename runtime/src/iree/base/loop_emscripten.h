@@ -35,7 +35,6 @@ iree_loop_emscripten_ctl(void* self, iree_loop_command_t command,
                          const void* params, void** inout_ptr);
 
 // Returns a loop that uses |data|.
-// TODO(scotttodd): rework structs with "scope" so 2+ loops can exist at once
 static inline iree_loop_t iree_loop_emscripten(iree_loop_emscripten_t* data) {
   iree_loop_t loop = {
       data,
