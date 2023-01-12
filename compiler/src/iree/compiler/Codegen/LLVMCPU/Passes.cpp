@@ -289,24 +289,22 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
           .Case<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
                 linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
                 linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-                linalg::PoolingNchwMaxOp>(
-              [&](auto) {
-                // Shape: N, OH, OW, OC, KH, KW
-                khSize = shape[4];
-                kwSize = shape[5];
-                ohSize = shape[1];
-                owSize = shape[2];
-                return success();
-              })
-          .Case<linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp>(
-              [&](auto) {
-                // Shape: N, OC, OH, OW, KH, KW
-                khSize = shape[4];
-                kwSize = shape[5];
-                ohSize = shape[2];
-                owSize = shape[3];
-                return success();
-              })
+                linalg::PoolingNchwMaxOp>([&](auto) {
+            // Shape: N, OH, OW, OC, KH, KW
+            khSize = shape[4];
+            kwSize = shape[5];
+            ohSize = shape[1];
+            owSize = shape[2];
+            return success();
+          })
+          .Case<linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp>([&](auto) {
+            // Shape: N, OC, OH, OW, KH, KW
+            khSize = shape[4];
+            kwSize = shape[5];
+            ohSize = shape[2];
+            owSize = shape[3];
+            return success();
+          })
           .Default([&](auto) { return failure(); });
   if (failed(isSizeExtracted)) {
     llvm::errs() << "Murali worst\n";

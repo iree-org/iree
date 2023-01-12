@@ -1490,7 +1490,10 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 3}; })
-        .Default([&](Operation *op) { llvm::errs() << "Murail bad1\n" ; llvm_unreachable("unsupported conv"); });
+        .Default([&](Operation *op) {
+          llvm::errs() << "Murail bad1\n";
+          llvm_unreachable("unsupported conv");
+        });
   } else if (isRISCV(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
         .Case<linalg::Conv2DNhwcHwcfOp>(
@@ -1501,7 +1504,10 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize, 1, 3}; })
-        .Default([&](Operation *op) { llvm::errs() << "Murail bad2\n" ; llvm_unreachable("unsupported conv"); });
+        .Default([&](Operation *op) {
+          llvm::errs() << "Murail bad2\n";
+          llvm_unreachable("unsupported conv");
+        });
   } else if (isAArch64(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
         .Case<linalg::Conv2DNhwcHwcfOp>(
@@ -1512,24 +1518,28 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
             [&](auto op) { tileSizes = {1, 1, 32, 64, 1, 16}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 4, 4, 1, 4}; })
-        .Default([&](Operation *op) { llvm::errs() << "Murail bad3\n" ; llvm_unreachable("unsupported conv"); });
+        .Default([&](Operation *op) {
+          llvm::errs() << "Murail bad3\n";
+          llvm_unreachable("unsupported conv");
+        });
   } else {
     // Get default hard-coded tile sizes if we couldn't compute anything better.
     TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp>(
-            [&](auto op) {
-              tileSizes = {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
-            })
+        .Case<linalg::Conv2DNhwcHwcfOp>([&](auto op) {
+          tileSizes = {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
+        })
         .Case<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
               linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-              linalg::PoolingNhwcMinUnsignedOp>(
-            [&](auto op) {
-              tileSizes = {1, 1, vectorSize, vectorSize, 1, vectorSize};
-            })
+              linalg::PoolingNhwcMinUnsignedOp>([&](auto op) {
+          tileSizes = {1, 1, vectorSize, vectorSize, 1, vectorSize};
+        })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>([&](auto op) {
           tileSizes = {1, 1, vectorSize, vectorSize, 1, vectorSize};
         })
-        .Default([&](Operation *op) { llvm::errs() << "Murail bad4\n" ; llvm_unreachable("unsupported conv"); });
+        .Default([&](Operation *op) {
+          llvm::errs() << "Murail bad4\n";
+          llvm_unreachable("unsupported conv");
+        });
   }
 
   return tileSizes;
