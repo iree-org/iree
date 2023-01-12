@@ -80,7 +80,6 @@ iree_cc_library(
     CommonPasses
   HDRS
     "BufferizationAnalysis.h"
-    "EncodingInfo.h"
     "Transforms.h"
   SRCS
     "BufferizationAnalysis.cpp"
@@ -94,7 +93,6 @@ iree_cc_library(
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "IREEComprehensiveBufferizePass.cpp"
-    "MaterializeEncodingIntoPackUnPack.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PolynomialApproximationPass.cpp"
     "RematerializeParallelOps.cpp"
@@ -163,6 +161,7 @@ iree_cc_library(
   NAME
     Common
   HDRS
+    "EncodingInfo.h"
     "GPUPatterns.h"
     "LinalgOpInfo.h"
     "UserConfig.h"
@@ -177,6 +176,7 @@ iree_cc_library(
     "GPUTileReduction.cpp"
     "GPUVectorization.cpp"
     "LinalgOpInfo.cpp"
+    "MaterializeEncodingIntoPackUnPack.cpp"
     "MemrefCopyToLinalg.cpp"
     "PadDynamicAlloc.cpp"
     "RemoveTrivialLoops.cpp"

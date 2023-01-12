@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransforms
     iree::builtins::ukernel::exported_bits
+    iree::compiler::Codegen::Common
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Util::IR

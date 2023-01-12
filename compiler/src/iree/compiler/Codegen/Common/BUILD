@@ -119,7 +119,6 @@ iree_compiler_cc_library(
         "ForOpCanonicalizationPass.cpp",
         "FuseTensorPadWithConsumer.cpp",
         "IREEComprehensiveBufferizePass.cpp",
-        "MaterializeEncodingIntoPackUnPack.cpp",
         "OptimizeVectorTransferPass.cpp",
         "PolynomialApproximationPass.cpp",
         "RematerializeParallelOps.cpp",
@@ -132,7 +131,6 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "BufferizationAnalysis.h",
-        "EncodingInfo.h",
         "Transforms.h",
     ],
     deps = [
@@ -204,6 +202,7 @@ iree_compiler_cc_library(
         "GPUTileReduction.cpp",
         "GPUVectorization.cpp",
         "LinalgOpInfo.cpp",
+        "MaterializeEncodingIntoPackUnPack.cpp",
         "MemrefCopyToLinalg.cpp",
         "PadDynamicAlloc.cpp",
         "RemoveTrivialLoops.cpp",
@@ -215,6 +214,7 @@ iree_compiler_cc_library(
         "WorkGroupSwizzle.cpp",
     ],
     hdrs = [
+        "EncodingInfo.h",
         "GPUPatterns.h",
         "LinalgOpInfo.h",
         "UserConfig.h",
