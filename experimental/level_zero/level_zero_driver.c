@@ -307,7 +307,8 @@ static iree_status_t iree_hal_level_zero_driver_create_device_by_uuid(
   // Find the Level Zero device with the given UUID.
   bool is_device_found = false;
   for (uint32_t i = 0; i < device_count; ++i) {
-    ze_device_properties_t device_properties;
+    ze_device_properties_t device_properties = {
+        .stype = ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES};
     IREE_LEVEL_ZERO_TRY(LEVEL_ZERO_RESULT_TO_STATUS(
         &driver->syms, zeDeviceGetProperties(ze_devices[i], &device_properties),
         "zeDeviceGetProperties"));
