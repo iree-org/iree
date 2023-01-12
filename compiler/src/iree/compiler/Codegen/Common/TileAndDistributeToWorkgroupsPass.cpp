@@ -302,7 +302,34 @@ struct TileAndDistributeToWorkgroupsPass
 
   void runOnOperation() override;
 };
+
 }  // namespace
+
+// A MaterializeEncodingValueFn that we can call from host code, such as when
+// determining workgroup counts. This is only going to be used in the case of
+// dynamic tile sizes, which is currently only the case with VMVX.
+// The host code determining workgroup counts is currently structured in
+// such a way that it needs to know the pack op result shape, which depends on
+// the inner tile sizes. When tile sizes are dynamic, the dynamic values are
+// typically determined as the result of a vmvx.query_tile_sizes op, which is
+// a microkernel, which is device code, so we shouldn't call that from host
+// code. As a temporary work-around, we use this MaterializeEncodingValueFn
+// which always returns tile size 16. The assumption being made here is that
+// all actual dynamic tile sizes values are divisors of 16 (i.e., powers of two
+// no larger than 16). As long as that assumption holds, the resulting workgroup
+// count will be OK, just marginally underestimated to the extent that 16 is a
+// marginal overestimation of the actual tile size.
+// TODO(#11818): find a way to remove this.
+static FailureOr<IREE::LinalgExt::MaterializeEncodingValueInfo>
+chooseDynamicEncodingInfoForHost(RankedTensorType tensorType,
+                                 OpBuilder &builder, Location loc) {
+  IREE::LinalgExt::MaterializeEncodingValueInfo result;
+  for (unsigned i = 0; i < tensorType.getRank(); ++i) {
+    result.innerTileSizes.push_back(
+        builder.create<arith::ConstantIndexOp>(loc, 16));
+  }
+  return result;
+}
 
 void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -348,9 +375,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         if (failed(encodingInfo)) {
           return signalPassFailure();
         }
-        auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(packRootOp);
-        auto materializeEncodingValueFn =
-            getMaterializeEncodingValueFn(targetAttr);
+        auto materializeEncodingValueFn = chooseDynamicEncodingInfoForHost;
         auto tensorType = packRootOp.getInputType().cast<RankedTensorType>();
         // The LowerDispatchWorkgroupCountFromSetEncodingOp pattern is going to
         // call materializeEncodingValueFn, passing it a tensor type, expecting
