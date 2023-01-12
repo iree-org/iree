@@ -33,10 +33,10 @@ typedef struct iree_hal_cuda_dynamic_symbols_t {
   ncclResult_t (*ncclSymbolName)(__VA_ARGS__);
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...) \
   const char* (*ncclSymbolName)(__VA_ARGS__);
-#else
+#else  // IREE_HAL_CUDA_NCCL_ENABLE
 #define NCCL_PFN_DECL(ncclSymbolName, ...)
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
-#endif
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 #include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: export
 #undef CU_PFN_DECL
 #undef NCCL_PFN_DECL

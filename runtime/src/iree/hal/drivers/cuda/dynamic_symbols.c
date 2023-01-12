@@ -24,7 +24,7 @@ static const char* kCUDALoaderSearchNames[] = {
 static const char* kNCCLLoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_WINDOWS)
     "nccl.dll",
-#else
+#else  // IREE_HAL_CUDA_NCCL_ENABLE
     "libnccl.so",
 #endif
 };
@@ -58,10 +58,10 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(        \
         syms->nccl_library, kName, (void**)&syms->ncclSymbolName)); \
   }
-#else
+#else  // IREE_HAL_CUDA_NCCL_ENABLE
 #define NCCL_PFN_DECL(ncclSymbolName, ...)
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
-#endif
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 #include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL
 #undef NCCL_PFN_DECL
@@ -110,7 +110,7 @@ void iree_hal_cuda_dynamic_symbols_deinitialize(
   iree_dynamic_library_release(syms->cuda_library);
 #if IREE_HAL_CUDA_NCCL_ENABLE
   iree_dynamic_library_release(syms->nccl_library);
-#endif
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
   memset(syms, 0, sizeof(*syms));
   IREE_TRACE_ZONE_END(z0);
 }
