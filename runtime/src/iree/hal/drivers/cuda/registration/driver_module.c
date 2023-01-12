@@ -44,7 +44,7 @@ static iree_status_t iree_hal_cuda_init_nccl_rank_and_count(
   params->nccl_default_count = 0;
   params->nccl_default_rank = 0;
 
-  char* nprocs_str = getenv("IREE_SPMD_NPROCS");
+  char* nprocs_str = getenv("IREE_CUDA_NCCL_NPROCS");
   if (!nprocs_str) {
     return iree_ok_status();
   }
@@ -53,23 +53,23 @@ static iree_status_t iree_hal_cuda_init_nccl_rank_and_count(
   if (nprocs <= 0) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "IREE_SPMD_NPROCS has invalid value '%s'; expected integer >= 0",
+        "IREE_CUDA_NCCL_NPROCS has invalid value '%s'; expected integer >= 0",
         nprocs_str);
   }
   params->nccl_default_count = nprocs;
 
-  char* procid_str = getenv("IREE_SPMD_PROCID");
+  char* procid_str = getenv("IREE_CUDA_NCCL_PROCID");
   if (!procid_str) {
     // Expected PROCID when NPROCS is set.
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "IREE_SPMD_PROCID must be set when IREE_SPMD_NPROCS is set.");
+        "IREE_CUDA_NCCL_PROCID must be set when IREE_CUDA_NCCL_NPROCS is set.");
   }
   int procid = atoi(procid_str);
   if (procid < 0 || procid >= nprocs) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "IREE_SPMD_PROCID has invalid value '%s'; expected integer >= 0",
+        "IREE_CUDA_NCCL_PROCID has invalid value '%s'; expected integer >= 0",
         procid_str);
   }
   params->nccl_default_rank = procid;
