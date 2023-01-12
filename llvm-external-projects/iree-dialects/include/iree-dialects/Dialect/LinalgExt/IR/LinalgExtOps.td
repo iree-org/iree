@@ -1106,6 +1106,99 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
 }
 
 //===----------------------------------------------------------------------===//
+// Flash Attention ops
+//===----------------------------------------------------------------------===//
+
+def IREELinalgExt_FlashAttentionFwdOp : IREELinalgExt_Op<"flash_attention.fwd",
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
+      ["getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
+       "getTiledImplementation"]>]> {
+  let summary = "Flash Attention Forward operator";
+  let description = [{
+    This is an implementation of the forward pass of the flash attention operator.
+    The operator takes 3 inputs: the query tensor (Q), the key tensor (K) and the value tensor (V).
+    All 3 inputs have dimensions BxNxd where B is the product of the batch dimension and the
+    number of heads, N is the sequence length and d is the head dimension (often N>>>d).
+    The standard attention operator computes matmul(softmax(matmul(Q, transpose(K))), V).
+    This operator computes the same quantity above but does so in a way that requires much fewer
+    HBM accesses (in the context of a CUDA GPU device). Specifically, it uses tiling and fusion
+    to compute the two matmuls and softmax in one kernel. This operator usually also performs
+    scaling, masking and dropout, but we ignore these transformations for now.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs
+  );
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs)>
+  ];
+
+  let results = (outs Variadic<AnyRankedTensor>:$result);
+  let hasFolder = 1;
+  let assemblyFormat = [{
+    attr-dict
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`->` type($result)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value query() {
+      return getInputOperand(0)->get();
+    }
+    Value key() {
+      return getInputOperand(1)->get();
+    }
+    Value value() {
+      return getInputOperand(2)->get();
+    }
+    Value output() {
+      return getOutputOperand(0)->get();
+    }
+    ShapedType getQueryType() {
+      return query().getType().cast<ShapedType>();
+    }
+    ShapedType getKeyType() {
+      return key().getType().cast<ShapedType>();
+    }
+    ShapedType getValueType() {
+      return value().getType().cast<ShapedType>();
+    }
+    ShapedType getOutputType() {
+      return output().getType().cast<ShapedType>();
+    }
+    int64_t getQueryRank() {
+      return getQueryType().getRank();
+    }
+    int64_t getKeyRank() {
+      return getKeyType().getRank();
+    }
+    int64_t getValueRank() {
+      return getValueType().getRank();
+    }
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
+    }
+    int64_t getIterationDomainRank() {
+      return 2;
+    }
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
+      std::pair<unsigned, unsigned> outputsIndexAndLength =
+        getODSOperandIndexAndLength(1);
+      return std::make_pair<int64_t, int64_t>(
+          outputsIndexAndLength.first,
+          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Pure ops
 //===----------------------------------------------------------------------===//
 

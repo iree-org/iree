@@ -722,3 +722,12 @@ func.func @illegal_winograd_output_image_dimensions(%arg0: tensor<8x8x1x2x2x32xf
 }
 
 // -----
+
+func.func @illegal_flash_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<6x12x20x8xf32>, %value: tensor<6x12x20x8xf32>) {
+  %0 = tensor.empty() : tensor<6x12x20x8xf32>
+  // expected-error @+1 {{expected key tensor to have rank 3}}
+  %1 = iree_linalg_ext.flash_attention.fwd ins(%query, %key, %value : tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>) outs(%0 : tensor<6x12x20x8xf32>) -> tensor<6x12x20x8xf32>
+  return %1 : tensor<6x12x20x8xf32>
+}
+
+// -----

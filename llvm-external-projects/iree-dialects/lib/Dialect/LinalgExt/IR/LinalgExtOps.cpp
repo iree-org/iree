@@ -2756,6 +2756,137 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+//===----------------------------------------------------------------------===//
+// FlashAttentionFwdOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult FlashAttentionFwdOp::verify() {
+  Operation *op = getOperation();
+  if (getNumInputs() != 3) {
+    return op->emitOpError("expected three input operands");
+  }
+  if (getNumOutputs() != 1) {
+    return op->emitOpError("expected one output operand");
+  }
+  const int64_t keyRank = getKeyRank();
+  if (keyRank != 3) {
+    return op->emitError("expected key tensor to have rank 3");
+  }
+  const ShapedType queryType = getQueryType();
+  const ShapedType keyType = getKeyType();
+  const ShapedType valueType = getValueType();
+  // Check that the head dimension of the query and key are the same
+  ArrayRef<int64_t> queryShape = queryType.getShape();
+  ArrayRef<int64_t> keyShape = keyType.getShape();
+  if (queryShape.back() != keyShape.back()) {
+    return op->emitOpError("incompatible query and key head(last) dimension");
+  }
+  if (!areShapesCompatible(valueType.getShape(), keyType.getShape())) {
+    return op->emitOpError("incompatible value and key shape");
+  }
+  ShapedType outputType = getOutputType();
+  if (!areShapesCompatible(outputType.getShape(), queryType.getShape())) {
+    return op->emitOpError("incompatible output and key shape");
+  }
+  if (outputType.getElementType() != keyType.getElementType()) {
+    return op->emitOpError(
+        "expected query/key/value/output element types to be identical");
+  }
+  return success();
+}
+
+SmallVector<Range> FlashAttentionFwdOp::getIterationDomain(OpBuilder &builder) {
+  int64_t iterationDomainRank = getIterationDomainRank();
+  SmallVector<Range> loopBounds(iterationDomainRank);
+  Location loc = getLoc();
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value source = query();
+  for (auto dim : llvm::seq<int64_t>(0, iterationDomainRank)) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[dim].stride = one;
+  }
+  return loopBounds;
+}
+
+SmallVector<utils::IteratorType> FlashAttentionFwdOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getIterationDomainRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+
+SmallVector<Operation *>
+FlashAttentionFwdOp::getTiledImplementation(OpBuilder &builder,
+                                            ArrayRef<OpFoldResult> offsets,
+                                            ArrayRef<OpFoldResult> sizes) {
+
+  assert(offsets.size() == getIterationDomainRank());
+  assert(sizes.size() == getIterationDomainRank());
+
+  Location loc = getLoc();
+  auto one = builder.getIndexAttr(1);
+  auto zero = builder.getIndexAttr(0);
+
+  SmallVector<OpFoldResult> queryOutputOffsets(getQueryRank(), zero);
+  SmallVector<OpFoldResult> queryOutputStrides(getQueryRank(), one);
+  ArrayRef<int64_t> queryShape = getQueryType().getShape();
+  SmallVector<OpFoldResult> queryOutputSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(queryShape));
+  for (auto info : llvm::enumerate(llvm::zip(offsets, sizes))) {
+    queryOutputOffsets[info.index()] = std::get<0>(info.value());
+    queryOutputSizes[info.index()] = std::get<1>(info.value());
+  }
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(getSlice(builder, loc, query(), queryOutputOffsets,
+                                      queryOutputSizes, queryOutputStrides));
+  tiledOperands.emplace_back(key());
+  tiledOperands.emplace_back(value());
+  tiledOperands.emplace_back(getSlice(builder, loc, output(),
+                                      queryOutputOffsets, queryOutputSizes,
+                                      queryOutputStrides));
+
+  SmallVector<Type, 4> resultTypes;
+  if (hasTensorSemantics()) {
+    resultTypes.push_back(tiledOperands[3].getType());
+  }
+
+  Operation *tiledOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+
+  return {tiledOp};
+}
+
+LogicalResult FlashAttentionFwdOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  if (resultNumber == 0) {
+    auto resultShape = output().getType().cast<ShapedType>().getShape();
+    resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
+    resultOffsets =
+        SmallVector<OpFoldResult>(getOutputRank(), builder.getIndexAttr(0));
+    for (auto info : llvm::enumerate(llvm::zip(offsets, sizes))) {
+      resultSizes[info.index()] = std::get<0>(info.value());
+      resultOffsets[info.index()] = std::get<1>(info.value());
+    }
+    return success();
+  }
+  return failure();
+}
+
+LogicalResult FlashAttentionFwdOp::fold(ArrayRef<Attribute>,
+                                        SmallVectorImpl<OpFoldResult> &) {
+  return memref::foldMemRefCast(*this);
+}
+
+LogicalResult FlashAttentionFwdOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -2776,6 +2907,7 @@ DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradOutputTransformOp)
+DEFINE_OP_GET_EFFECTS(FlashAttentionFwdOp)
 
 //===----------------------------------------------------------------------===//
 // iree_linalg_ext.set_encoding

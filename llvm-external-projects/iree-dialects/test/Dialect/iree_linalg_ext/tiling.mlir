@@ -1505,3 +1505,75 @@ func.func @winograd_output_transform_nchw(%arg0: tensor<8x8x1x2x2x32xf32>) -> te
 // CHECK:    }
 
 // -----
+
+func.func @flash_attention_fwd(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf32>, %value: tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32> {
+  %0 = tensor.empty() : tensor<192x1024x64xf32>
+  %1 = iree_linalg_ext.flash_attention.fwd {__internal_linalg_transform__ = "tiling_winograd_input_nhwc"} ins(%query, %key, %value : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>) outs(%0 : tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32>
+  return %1 : tensor<192x1024x64xf32>
+}
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (1, -d0 + s1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
+// CHECK:      func.func @flash_attention_fwd(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<192x1024x64xf32>, %[[ARG1:[a-zA-Z0-9_]+]]:
+// CHECK-SAME:   tensor<192x1024x64xf32>, %[[ARG2:[a-zA-Z0-9_]+]]: tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32>
+// CHECK-SAME:   {
+// CHECK:        %[[C0:.+]] = arith.constant 0 : index
+// CHECK:        %[[C192:.+]] = arith.constant 192 : index
+// CHECK:        %[[C1024:.+]] = arith.constant 1024 : index
+// CHECK:        %[[C1:.+]] = arith.constant 1 : index
+// CHECK:        %[[C32:.+]] = arith.constant 32 : index
+// CHECK:        %[[D0:.+]] = tensor.empty() : tensor<192x1024x64xf32>
+// CHECK:        %[[D1:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C192]] step %[[C1]]
+// CHECK-SAME:     iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<192x1024x64xf32>) {
+// CHECK-DAG:        %[[D2:.+]] = affine.min #[[MAP]](%[[ARG3]])[%[[C1]], %[[C1]]92]
+// CHECK:          %[[D3:.+]] = scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1024]] step %[[C32]]
+// CHECK-SAME:       iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<192x1024x64xf32>) {
+// CHECK-DAG:          %[[D4:.+]] = affine.min #[[MAP1]](%[[ARG5]])[%[[C32]], %[[C1024]]]
+// CHECK:            %[[EXTRACTED_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG3]], %[[ARG5]], 0] [%[[D2]],
+// CHECK-SAME:         %[[D4]], 64] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x?x64xf32>
+// CHECK:            %[[EXTRACTED_SLICE_0:.+]] = tensor.extract_slice %[[D0]][%[[ARG3]], %[[ARG5]], 0] [%[[D2]],
+// CHECK-SAME:         %[[D4]], 64] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x?x64xf32>
+// CHECK:            %[[D5:.+]] = iree_linalg_ext.flash_attention.fwd ins(%[[EXTRACTED_SLICE]], %[[ARG1]], %[[ARG2]] :
+// CHECK-SAME:         tensor<?x?x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>) outs(%[[EXTRACTED_SLICE]]_0
+// CHECK-SAME:         : tensor<?x?x64xf32>) -> tensor<?x?x64xf32>
+// CHECK:            %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D5]] into %[[ARG6]][%[[D2]], %[[D4]], 0]
+// CHECK-SAME:         [%[[ARG3]], %[[ARG5]], 64] [1, 1, 1] : tensor<?x?x64xf32> into tensor<192x1024x64xf32>
+// CHECK:            scf.yield %[[INSERTED_SLICE]] : tensor<192x1024x64xf32>
+// CHECK:          }
+// CHECK:          scf.yield %[[D3]] : tensor<192x1024x64xf32>
+// CHECK:        }
+// CHECK:        return %[[D1]] : tensor<192x1024x64xf32>
+// CHECK:      }
+
+// -----
+
+func.func @flash_attention_fwd_memref(%query: memref<192x1024x64xf32>, %key: memref<192x1024x64xf32>, %value: memref<192x1024x64xf32>, %output: memref<192x1024x64xf32>) {
+  iree_linalg_ext.flash_attention.fwd {__internal_linalg_transform__ = "tiling_winograd_input_nhwc"} ins(%query, %key, %value : memref<192x1024x64xf32>, memref<192x1024x64xf32>, memref<192x1024x64xf32>) outs(%output : memref<192x1024x64xf32>)
+  return
+}
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (1, -d0 + s1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
+// CHECK:      func.func @flash_attention_fwd_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<192x1024x64xf32>,
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: memref<192x1024x64xf32>, %[[ARG2:[a-zA-Z0-9_]+]]: memref<192x1024x64xf32>,
+// CHECK-SAME:   %[[ARG3:[a-zA-Z0-9_]+]]: memref<192x1024x64xf32>) {
+// CHECK:        %[[C0:.+]] = arith.constant 0 : index
+// CHECK:        %[[C192:.+]] = arith.constant 192 : index
+// CHECK:        %[[C1024:.+]] = arith.constant 1024 : index
+// CHECK:        %[[C1:.+]] = arith.constant 1 : index
+// CHECK:        %[[C32:.+]] = arith.constant 32 : index
+// CHECK:        scf.for %[[ARG4:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C192]] step %[[C1]] {
+// CHECK-DAG:        %[[D0:.+]] = affine.min #[[MAP]](%[[ARG4]])[%[[C1]], %[[C1]]92]
+// CHECK:          scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1024]] step %[[C32]] {
+// CHECK-DAG:          %[[D1:.+]] = affine.min #[[MAP1]](%[[ARG5]])[%[[C32]], %[[C1024]]]
+// CHECK:            %[[SUBVIEW:.+]] = memref.subview %[[ARG0]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], 64] [1, 1,
+// CHECK-SAME:         1] : memref<192x1024x64xf32> to memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>
+// CHECK:            %[[SUBVIEW_0:.+]] = memref.subview %[[ARG3]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], 64] [1, 1,
+// CHECK-SAME:         1] : memref<192x1024x64xf32> to memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>
+// CHECK:            iree_linalg_ext.flash_attention.fwd ins(%[[SUBVIEW]], %[[ARG1]], %[[ARG2]] : memref<?x?x64xf32,
+// CHECK-SAME:         strided<[65536, 64, 1], offset: ?>>, memref<192x1024x64xf32>, memref<192x1024x64xf32>)
+// CHECK-SAME:         outs(%[[SUBVIEW]]_0 : memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>)
+// CHECK:          }
+// CHECK:        }
+// CHECK:        return
+// CHECK:      }
+
+// -----
