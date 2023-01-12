@@ -66,7 +66,7 @@ iree_cc_library(
     iree::hal::utils::semaphore_base
     iree::schemas::cuda_executable_def_c_fbs
   DEFINES
-    "IREE_HAL_DRIVER_CUDA_NCCL=${IREE_HAL_DRIVER_CUDA_NCCL_VAL}"
+    "IREE_HAL_CUDA_NCCL_ENABLE=${IREE_HAL_DRIVER_CUDA_NCCL_VAL}"
   PUBLIC
 )
 
@@ -87,7 +87,7 @@ iree_cc_library(
     iree::base::tracing
     iree_cuda::headers
   DEFINES
-    "IREE_HAL_DRIVER_CUDA_NCCL=${IREE_HAL_DRIVER_CUDA_NCCL_VAL}"
+    "IREE_HAL_CUDA_NCCL_ENABLE=${IREE_HAL_DRIVER_CUDA_NCCL_VAL}"
   PUBLIC
 )
 

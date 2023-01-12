@@ -47,7 +47,7 @@ iree_status_t iree_hal_cuda_result_to_status(
     iree_hal_cuda_dynamic_symbols_t* syms, CUresult result, const char* file,
     uint32_t line);
 
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
 // Converts a ncclResult_t to an iree_status_t.
 //
 // Usage:
@@ -79,7 +79,7 @@ iree_status_t iree_hal_nccl_result_to_status(
   IREE_IGNORE_ERROR(iree_hal_nccl_result_to_status((syms), ((syms)->expr), \
                                                    __FILE__, __LINE__))
 
-#endif  // IREE_HAL_DRIVER_CUDA_NCCL
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -10,7 +10,7 @@
 #include <iree/base/status.h>
 #include <iree/hal/command_buffer.h>
 #include <iree/hal/utils/collective_batch.h>
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
 #include <nccl.h>
 #endif
 #include <stddef.h>
@@ -20,7 +20,7 @@
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
 
 // Returns the same value as NCCL's init.cc hashUniqueId.
 // These magic constants were chosen by their implementation and unlikely to
@@ -381,7 +381,7 @@ static const iree_hal_channel_vtable_t iree_hal_cuda_nccl_channel_vtable = {
     .query_rank_and_count = iree_hal_cuda_nccl_channel_query_rank_and_count,
 };
 
-#else  // IREE_HAL_DRIVER_CUDA_NCCL
+#else  // IREE_HAL_CUDA_NCCL_ENABLE
 
 iree_status_t iree_hal_cuda_nccl_channel_create(
     iree_hal_cuda_context_wrapper_t* context_wrapper,
@@ -398,4 +398,4 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
                           "iree_hal_cuda_nccl_submit_batch()");
 }
 
-#endif  // IREE_HAL_DRIVER_CUDA_NCCL
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE

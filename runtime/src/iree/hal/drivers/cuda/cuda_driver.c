@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <iree/base/status.h>
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
 #include <nccl.h>
 #endif
 #include <stdint.h>
@@ -52,7 +52,7 @@ IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
   out_options->default_device_index = 0;
 }
 
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
 
 static iree_status_t iree_hal_nccl_get_unique_id_from_env(
     iree_hal_cuda_driver_t* driver) {
@@ -74,7 +74,7 @@ static iree_status_t iree_hal_nccl_get_unique_id_from_env(
   return iree_ok_status();
 }
 
-#endif  // IREE_HAL_DRIVER_CUDA_NCCL
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 
 static iree_status_t iree_hal_cuda_driver_create_internal(
     iree_string_view_t identifier,
@@ -102,7 +102,7 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
     return status;
   }
 
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
   // Initialize NCCL if NPROCS is set.
   if (driver->default_params.nccl_default_count > 0) {
     // get a unique ID from the environmental variable

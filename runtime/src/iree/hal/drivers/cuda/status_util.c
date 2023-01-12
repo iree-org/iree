@@ -31,7 +31,7 @@ iree_status_t iree_hal_cuda_result_to_status(
                                         error_name, result, error_string);
 }
 
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
 iree_status_t iree_hal_nccl_result_to_status(
     iree_hal_cuda_dynamic_symbols_t* syms, ncclResult_t result,
     const char* file, uint32_t line) {
@@ -44,4 +44,4 @@ iree_status_t iree_hal_nccl_result_to_status(
                                         "NCCL error %d: %s", result,
                                         error_string);
 }
-#endif  // IREE_HAL_DRIVER_CUDA_NCCL
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE

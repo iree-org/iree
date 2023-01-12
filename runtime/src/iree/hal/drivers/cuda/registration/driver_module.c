@@ -39,7 +39,7 @@ static iree_status_t iree_hal_cuda_driver_factory_enumerate(
   return iree_ok_status();
 }
 
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
 static iree_status_t iree_hal_cuda_init_nccl_rank_and_count(
     iree_hal_cuda_device_params_t* params) {
   char* nprocs_str = getenv("IREE_SPMD_NPROCS");
@@ -65,7 +65,7 @@ static iree_status_t iree_hal_cuda_init_nccl_rank_and_count(
   params->nccl_default_rank = procid;
   return iree_status_from_code(IREE_STATUS_OK);
 }
-#endif  // IREE_HAL_DRIVER_CUDA_NCCL
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 
 static iree_status_t iree_hal_cuda_driver_factory_try_create(
     void* self, iree_string_view_t driver_name, iree_allocator_t host_allocator,
@@ -86,7 +86,7 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
         IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM;
   }
   default_params.allow_inline_execution = FLAG_cuda_allow_inline_execution;
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
   iree_hal_cuda_init_nccl_rank_and_count(&default_params);
 
   // Note that nccl_default_id can't be initalized until the driver imports

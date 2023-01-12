@@ -7,9 +7,9 @@
 #ifndef IREE_HAL_DRIVERS_CUDA_DYNAMIC_SYMBOLS_H_
 #define IREE_HAL_DRIVERS_CUDA_DYNAMIC_SYMBOLS_H_
 
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
 #include <nccl.h>
-#endif
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 #include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/hal/drivers/cuda/cuda_headers.h"
@@ -28,7 +28,7 @@ typedef struct iree_hal_cuda_dynamic_symbols_t {
 
 #define CU_PFN_DECL(cudaSymbolName, ...) \
   CUresult (*cudaSymbolName)(__VA_ARGS__);
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
 #define NCCL_PFN_DECL(ncclSymbolName, ...) \
   ncclResult_t (*ncclSymbolName)(__VA_ARGS__);
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...) \

@@ -20,7 +20,7 @@ static const char* kCUDALoaderSearchNames[] = {
 #endif
 };
 
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
 static const char* kNCCLLoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_WINDOWS)
     "nccl.dll",
@@ -28,7 +28,7 @@ static const char* kNCCLLoaderSearchNames[] = {
     "libnccl.so",
 #endif
 };
-#endif  // IREE_HAL_DRIVER_CUDA_NCCL
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 
 #define concat(A, B) A B
 
@@ -45,7 +45,7 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
     iree_dynamic_library_lookup_symbol(syms->cuda_library, kNameV2, &funV2); \
     if (funV2) syms->cudaSymbolName = funV2;                                 \
   }
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
 #define NCCL_PFN_DECL(ncclSymbolName, ...)                          \
   {                                                                 \
     static const char* kName = #ncclSymbolName;                     \
@@ -83,7 +83,7 @@ iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
         IREE_STATUS_UNAVAILABLE,
         "CUDA runtime library not available; ensure installed and on path");
   }
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
   status = iree_dynamic_library_load_from_files(
       IREE_ARRAYSIZE(kNCCLLoaderSearchNames), kNCCLLoaderSearchNames,
       IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->nccl_library);
@@ -93,7 +93,7 @@ iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
         IREE_STATUS_UNAVAILABLE,
         "NCCL runtime library not available; ensure installed and on path");
   }
-#endif  // IREE_HAL_DRIVER_CUDA_NCCL
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_dynamic_symbols_resolve_all(out_syms);
   }
@@ -108,7 +108,7 @@ void iree_hal_cuda_dynamic_symbols_deinitialize(
     iree_hal_cuda_dynamic_symbols_t* syms) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_dynamic_library_release(syms->cuda_library);
-#if IREE_HAL_DRIVER_CUDA_NCCL
+#if IREE_HAL_CUDA_NCCL_ENABLE
   iree_dynamic_library_release(syms->nccl_library);
 #endif
   memset(syms, 0, sizeof(*syms));
