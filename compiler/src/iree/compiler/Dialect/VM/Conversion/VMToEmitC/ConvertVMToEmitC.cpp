@@ -3558,7 +3558,8 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
           /*operands=*/ArrayRef<Value>(unwrappedOperands),
           /*typeConverter=*/*typeConverter);
 
-      if (failed(updateResults(op.getOperation(), rewriter, resultOperands))) {
+      if (failed(
+              updateResultUsers(op.getOperation(), rewriter, resultOperands))) {
         return failure();
       }
 
@@ -3618,9 +3619,9 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
     return success();
   }
 
-  LogicalResult updateResults(Operation *op,
-                              ConversionPatternRewriter &rewriter,
-                              SmallVector<Value, 4> &results) const {
+  LogicalResult updateResultUsers(Operation *op,
+                                  ConversionPatternRewriter &rewriter,
+                                  SmallVector<Value, 4> &results) const {
     for (auto &pair : llvm::enumerate(op->getResults())) {
       size_t index = pair.index();
       OpResult result = pair.value();
@@ -3679,14 +3680,21 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
 
     auto funcOp =
         op.getOperation()->template getParentOfType<mlir::func::FuncOp>();
+
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
     const BlockArgument stateArg =
         funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
 
-    Optional<SmallVector<Value>> operands =
-        getOperands(op, adaptor, rewriter, elementType.value(), containerPtr);
+    Value allocator = emitc_builders::structPtrMember(
+        rewriter, loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_allocator_t"),
+        /*memberName=*/"allocator",
+        /*operand=*/stateArg);
+
+    Optional<SmallVector<Value>> operands = getOperands(
+        op, adaptor, rewriter, elementType.value(), containerPtr, allocator);
 
     if (!operands.has_value()) {
       return op.emitError() << "failed to build operands";
@@ -3754,97 +3762,105 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
   }
 
   Optional<SmallVector<Value, 4>> getOperands(
-      SrcOpTy op, Adaptor adaptor, ConversionPatternRewriter &rewriter,
-      Type elementType, Value containerPtr) const {
+      IREE::VM::ListAllocOp op, Adaptor adaptor,
+      ConversionPatternRewriter &rewriter, Type elementType, Value containerPtr,
+      Value allocator) const {
+    SmallVector<Value, 4> result;
+
+    Optional<emitc::ApplyOp> elementTypePtrOp =
+        createVmTypeDefPtr(rewriter, op.getOperation(), elementType);
+
+    if (!elementTypePtrOp.has_value()) {
+      return std::nullopt;
+    }
+
+    Value capacity = adaptor.getOperands()[0];
+
+    result.push_back(elementTypePtrOp.value().getResult());
+    result.push_back(capacity);
+    result.push_back(allocator);
+    result.push_back(containerPtr);
+
+    return result;
+  }
+
+  Optional<SmallVector<Value, 4>> getOperands(
+      IREE::VM::BufferAllocOp op, Adaptor adaptor,
+      ConversionPatternRewriter &rewriter, Type elementType, Value containerPtr,
+      Value allocator) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
     SmallVector<Value, 4> result;
 
-    if (isa<IREE::VM::ListAllocOp>(op)) {
-      Optional<emitc::ApplyOp> elementTypePtrOp =
-          createVmTypeDefPtr(rewriter, op.getOperation(), elementType);
+    Value access =
+        rewriter
+            .create<emitc::ConstantOp>(
+                /*location=*/loc,
+                /*resultType=*/
+                emitc::OpaqueType::get(ctx, "iree_vm_buffer_access_t"),
+                /*value=*/
+                emitc::OpaqueAttr::get(ctx,
+                                       "IREE_VM_BUFFER_ACCESS_MUTABLE | "
+                                       "IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST"))
+            .getResult();
+    Value length = adaptor.getOperands()[0];
 
-      if (!elementTypePtrOp.has_value()) {
-        return std::nullopt;
-      }
+    result.push_back(access);
+    result.push_back(length);
+    result.push_back(allocator);
+    result.push_back(containerPtr);
 
-      Value capacity = adaptor.getOperands()[0];
+    return result;
+  }
 
-      result.push_back(elementTypePtrOp.value().getResult());
-      result.push_back(capacity);
-    } else if (isa<IREE::VM::BufferAllocOp>(op)) {
-      Value access =
-          rewriter
-              .create<emitc::ConstantOp>(
-                  /*location=*/loc,
-                  /*resultType=*/
-                  emitc::OpaqueType::get(ctx, "iree_vm_buffer_access_t"),
-                  /*value=*/
-                  emitc::OpaqueAttr::get(ctx,
-                                         "IREE_VM_BUFFER_ACCESS_MUTABLE | "
-                                         "IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST"))
-              .getResult();
-      Value length = adaptor.getOperands()[0];
+  Optional<SmallVector<Value, 4>> getOperands(
+      IREE::VM::BufferCloneOp op, Adaptor adaptor,
+      ConversionPatternRewriter &rewriter, Type elementType, Value containerPtr,
+      Value allocator) const {
+    auto ctx = op.getContext();
+    auto loc = op.getLoc();
 
-      result.push_back(access);
-      result.push_back(length);
-    } else if (isa<IREE::VM::BufferCloneOp>(op)) {
-      Value access =
-          rewriter
-              .create<emitc::ConstantOp>(
-                  /*location=*/loc,
-                  /*resultType=*/
-                  emitc::OpaqueType::get(ctx, "iree_vm_buffer_access_t"),
-                  /*value=*/
-                  emitc::OpaqueAttr::get(ctx,
-                                         "IREE_VM_BUFFER_ACCESS_MUTABLE | "
-                                         "IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST"))
-              .getResult();
+    SmallVector<Value, 4> result;
 
-      Value refPtr = adaptor.getOperands()[0];
-      Value refValue = emitc_builders::contentsOf(rewriter, loc, refPtr);
+    Value access =
+        rewriter
+            .create<emitc::ConstantOp>(
+                /*location=*/loc,
+                /*resultType=*/
+                emitc::OpaqueType::get(ctx, "iree_vm_buffer_access_t"),
+                /*value=*/
+                emitc::OpaqueAttr::get(ctx,
+                                       "IREE_VM_BUFFER_ACCESS_MUTABLE | "
+                                       "IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST"))
+            .getResult();
 
-      IREE::VM::EmitCTypeConverter *typeConverter =
-          this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
+    Value refPtr = adaptor.getOperands()[0];
+    Value refValue = emitc_builders::contentsOf(rewriter, loc, refPtr);
 
-      Value source =
-          failContainerNull(
-              /*rewriter=*/rewriter,
-              /*location=*/loc,
-              /*type=*/
-              emitc::PointerType::get(
-                  emitc::OpaqueType::get(ctx, "iree_vm_buffer_t")),
-              /*callee=*/StringAttr::get(ctx, "iree_vm_buffer_deref"),
-              /*args=*/ArrayAttr{},
-              /*operands=*/ArrayRef<Value>{refValue},
-              /*typeConverter=*/*typeConverter)
-              .getResult(0);
+    IREE::VM::EmitCTypeConverter *typeConverter =
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
-      Value offset = adaptor.getOperands()[1];
-      Value length = adaptor.getOperands()[2];
+    Value source = failContainerNull(
+                       /*rewriter=*/rewriter,
+                       /*location=*/loc,
+                       /*type=*/
+                       emitc::PointerType::get(
+                           emitc::OpaqueType::get(ctx, "iree_vm_buffer_t")),
+                       /*callee=*/StringAttr::get(ctx, "iree_vm_buffer_deref"),
+                       /*args=*/ArrayAttr{},
+                       /*operands=*/ArrayRef<Value>{refValue},
+                       /*typeConverter=*/*typeConverter)
+                       .getResult(0);
 
-      result.push_back(access);
-      result.push_back(source);
-      result.push_back(offset);
-      result.push_back(length);
-    } else {
-      return std::nullopt;
-    }
+    Value offset = adaptor.getOperands()[1];
+    Value length = adaptor.getOperands()[2];
 
-    auto funcOp =
-        op.getOperation()->template getParentOfType<mlir::func::FuncOp>();
-
-    const BlockArgument stateArg =
-        funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
-
-    auto allocatorOp = emitc_builders::structPtrMember(
-        rewriter, loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_allocator_t"),
-        /*memberName=*/"allocator",
-        /*operand=*/stateArg);
-
-    result.push_back(allocatorOp);
+    result.push_back(access);
+    result.push_back(source);
+    result.push_back(offset);
+    result.push_back(length);
+    result.push_back(allocator);
     result.push_back(containerPtr);
 
     return result;
