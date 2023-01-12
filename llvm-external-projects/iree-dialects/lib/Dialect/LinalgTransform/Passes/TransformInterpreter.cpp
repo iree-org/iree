@@ -112,12 +112,16 @@ LogicalResult mlir::transform::extractTopLevelTransformOps(
 
 namespace {
 
+template <typename T>
+class PassWrapperStub : public PassWrapper<T, Pass> {};
+
 /// Pass declaration.
 /// Interpreter pass that applies transform dialect ops for codegen.
 /// This needs to be its own pass because the registration mechanism and ops
 /// available are different than for other interpreters.
 class TransformDialectInterpreter
-    : public PassWrapper<TransformDialectInterpreter, Pass> {
+    : public transform::TransformInterpreterPassBase<
+          TransformDialectInterpreter, PassWrapperStub> {
 public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TransformDialectInterpreter)
 
@@ -169,61 +173,31 @@ public:
   TransformDialectInterpreter(StringRef transformFileName = StringRef()) {
     this->transformFileName = transformFileName.str();
   }
-  TransformDialectInterpreter(const TransformDialectInterpreter &pass) {
-    this->transformFileName = pass.transformFileName;
-    // TODO: if we really don't like shared_ptr, we could also clone the
-    // transformModule here.
-    sharedTransformModule = pass.sharedTransformModule;
+  TransformDialectInterpreter(const TransformDialectInterpreter &pass)
+      : TransformInterpreterPassBase(pass) {
+    transformFileName = pass.transformFileName;
+    debugPayloadRootTag = pass.debugPayloadRootTag;
+    debugTransformRootTag = pass.debugTransformRootTag;
   }
 
-  LogicalResult initialize(MLIRContext *context) override {
-    OwningOpRef<ModuleOp> module;
-    if (failed(transform::parseTransformModuleFromFile(
-            context, transformFileName, module)))
-      return failure();
-    sharedTransformModule =
-        std::make_shared<OwningOpRef<ModuleOp>>(std::move(module));
-    return success();
-  }
-
-  void runOnOperation() override {
-    Operation *target = getOperation();
-    bool parsedTransform = (sharedTransformModule && *sharedTransformModule);
-    assert(parsedTransform || (target->getNumRegions() == 1 &&
-                               target->getRegion(0).getBlocks().size() == 1) &&
-                                  "Cannot extract transform from op");
-    Region &transformRegion = parsedTransform
-                                  ? (*sharedTransformModule)->getRegion()
-                                  : target->getRegion(0);
-    if (failed(transform::applyTransformsInRegion(transformRegion, target)))
-      return signalPassFailure();
-  }
-
-protected:
   Pass::Option<std::string> transformFileName{
       *this, "transform-file-name",
       ::llvm::cl::desc(
-          "File name containing a transform dialect specification to apply.")};
-
-private:
-  // The parsed transform module to be used for scheduling.
-  // TODO: Figure a better way to build a transform module and transport it in
-  // the proper places in the IR as it is transformed by IREE so that it is
-  // available with better ownership semantics.
-  // Note: we wrap the OwningOpRef to get the desired destruction mechanism.
-  // Note: shared_ptr is not great but we know the sharedTransformModule is
-  // readonly.
-  // Alternatives comprise:
-  //   1. no shared_ptr but copying the module with every pass clone that the
-  //      OpPassManager decides to perform.
-  //   2. lifting ownership of the parsed transform module higher up in the
-  //      IREE stack. This may be only shift the problem as we have passes
-  //      building pass managers in IREE.
-  //   3. build better support to embed the transformation module in the
-  //      input IR and transport it to the place of use in IREE. This is deemed
-  //      too intrusive atm.
-  //   4. (future) config/resources mechanism that is being proposed in core?
-  std::shared_ptr<OwningOpRef<ModuleOp>> sharedTransformModule;
+          "Optional filename containing a transform dialect specification to "
+          "apply. If left empty, the IR is assumed to contain one top-level "
+          "transform dialect operation somewhere in the module."),
+      ::llvm::cl::init("")};
+  Pass::Option<std::string> debugPayloadRootTag{
+      *this, "debug-payload-root-tag",
+      ::llvm::cl::desc("Select the operation with 'transform.iree_tag' "
+                       "attribute having the given value as payload IR root."),
+      ::llvm::cl::init("")};
+  Pass::Option<std::string> debugTransformRootTag{
+      *this, "debug-transform-root-tag",
+      ::llvm::cl::desc(
+          "Select the operation with 'transform.iree_tag' attribute having the "
+          "given value as container IR for top-level transform ops."),
+      ::llvm::cl::init("")};
 };
 
 struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
