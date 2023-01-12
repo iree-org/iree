@@ -191,7 +191,7 @@ function(iree_benchmark_suite)
 
   # Try to check if the compiler supports the TARGET_BACKEND. If
   # IREE_HOST_BIN_DIR is set, we are using a compiler binary, in which
-  # case we can't check it's supported backends just by looking at this build
+  # case we can't check its supported backends just by looking at this build
   # dir's cmake variables --- we would have to implement a configure-check
   # executing `iree-compile --iree-hal-list-target-backends`.
   if(NOT IREE_HOST_BIN_DIR)
