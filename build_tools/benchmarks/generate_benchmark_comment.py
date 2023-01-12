@@ -49,7 +49,10 @@ COMMENT_DEF_MAP = {
                    type_id="bf8cdf94-a992-466d-b11c-778cbd805a22"),
     "linux-benchmark-summary":
         CommentDef(title="Abbreviated Linux Benchmark Summary",
-                   type_id="37549014-3c67-4e74-8d88-8e929231abe3")
+                   type_id="37549014-3c67-4e74-8d88-8e929231abe3"),
+    "benchmark-summary":
+        CommentDef(title="Abbreviated Benchmark Summary",
+                   type_id="5b42cbfe-26a0-4164-a51c-07f06762e2dc")
 }
 
 
@@ -318,9 +321,11 @@ def main(args):
       comment_def=comment_def,
       commit_info_md=commit_info_md)
 
-  comment_data = benchmark_comment.CommentData(type_id=comment_def.type_id,
-                                               abbr_md=abbr_md,
-                                               full_md=full_md)
+  comment_data = benchmark_comment.CommentData(
+      type_id=comment_def.type_id,
+      abbr_md=abbr_md,
+      full_md=full_md,
+      unverified_pr_number=args.pr_number)
   comment_json_data = json.dumps(dataclasses.asdict(comment_data), indent=2)
   if args.output is None:
     print(comment_json_data)

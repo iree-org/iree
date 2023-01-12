@@ -168,11 +168,11 @@ steps:
         --build_url="$${BUILDKITE_BUILD_URL}" \
         --comment_type="linux-benchmark-summary" \
         --output="benchmark-comment.json"
-      export GIST_BOT_USER="iree-github-actions-bot"
+      export COMMENT_BOT_USER="iree-github-actions-bot"
       export GIST_BOT_TOKEN="$${GITHUB_TOKEN}"
       python3 build_tools/benchmarks/post_benchmark_comment.py \
         --verbose \
-        --pr_number="$${BUILDKITE_PULL_REQUEST}" \
+        --no_verify_pr \
         "benchmark-comment.json"
     if: >
       build.pull_request.id != null && (

@@ -7,6 +7,16 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Determines whether CI should run on a given PR.
 
+The following environment variables are required:
+- GITHUB_EVENT_NAME: GitHub event name, e.g. pull_request.
+- GITHUB_OUTPUT: path to write workflow output variables.
+
+When GITHUB_EVENT_NAME is "pull_request", there are additional environment
+variables to be set:
+- PR_TITLE (required): PR title.
+- PR_BODY (optional): PR description.
+- BASE_REF (required): base commit SHA of the PR.
+
 Exit code 0 indicates that it should and exit code 2 indicates that it should
 not.
 """
@@ -16,6 +26,7 @@ import os
 import subprocess
 from typing import Iterable, Mapping, MutableMapping
 
+PULL_REQUEST_EVENT_NAME = "pull_request"
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
 BENCHMARK_PRESET_KEY = "benchmarks"
@@ -97,9 +108,7 @@ def modifies_included_path(base_ref: str) -> bool:
 
 
 def should_run_ci(event_name, trailers) -> bool:
-  base_ref = os.environ["BASE_REF"]
-
-  if event_name != "pull_request":
+  if event_name != PULL_REQUEST_EVENT_NAME:
     print(f"Running CI independent of diff because run was not triggered by a"
           f" pull request event (event name is '{event_name}')")
     return True
@@ -108,6 +117,7 @@ def should_run_ci(event_name, trailers) -> bool:
     print(f"Not running CI because PR description has '{SKIP_CI_KEY}' trailer.")
     return False
 
+  base_ref = os.environ["BASE_REF"]
   try:
     modifies = modifies_included_path(base_ref)
   except TimeoutError as e:
@@ -135,7 +145,7 @@ def get_runner_env(trailers: Mapping[str, str]) -> str:
 
 
 def get_ci_stage(event_name):
-  return 'presubmit' if event_name == 'pull_request' else 'postsubmit'
+  return 'presubmit' if event_name == PULL_REQUEST_EVENT_NAME else 'postsubmit'
 
 
 def get_benchmark_presets(trailers: Mapping[str, str]) -> str:
@@ -168,8 +178,8 @@ def get_benchmark_presets(trailers: Mapping[str, str]) -> str:
 
 def main():
   output: MutableMapping[str, str] = {}
-  trailers = get_trailers()
   event_name = os.environ["GITHUB_EVENT_NAME"]
+  trailers = get_trailers() if event_name == PULL_REQUEST_EVENT_NAME else {}
   if should_run_ci(event_name, trailers):
     output["should-run"] = "true"
   else:
