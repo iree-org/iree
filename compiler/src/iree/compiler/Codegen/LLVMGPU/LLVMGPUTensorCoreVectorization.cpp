@@ -18,9 +18,6 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
-#include <iostream>
-
-#define DEBUG_LEVEL 0
 
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
 using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
@@ -203,7 +200,6 @@ static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(
       if (operandId == 2) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
-        // std::cout << "OperandC " << readShape[0] << "x" << readShape[1] << std::endl;
         return readShape;
       } 
 
@@ -224,14 +220,15 @@ static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(
 
         SmallVector<int64_t> readShape;
         readShape.append({16, 16});
-        // std::cout << "OperandA/B " << readShape[0] << "x" << readShape[1] << std::endl;
         return readShape;
       }
     }
     
     // Loading F32 values from Shared Memory to Registers.
     if (resultElementType.isF32()) {
-    
+      // TODO
+      op->emitError() << "TODO Implement shape for F32 loads in getMmaNativeVectorSize";
+      return std::nullopt;
     }
   }
   return std::nullopt;
@@ -264,12 +261,6 @@ struct LLVMGPUTensorCoreVectorizationPass
     MLIRContext *context = &getContext();
     {
 
-#if DEBUG_LEVEL
-      std::cout << "// ---- Before  LLVMGPUTensorCoreVectorization" << std::endl;
-      funcOp->dump();
-      std::cout << std::endl;
-#endif
-
       // Step 1. Vectorize.
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(vectorizationPatterns);
@@ -277,12 +268,6 @@ struct LLVMGPUTensorCoreVectorizationPass
               funcOp, std::move(vectorizationPatterns)))) {
         return signalPassFailure();
       }
-
-#if DEBUG_LEVEL
-      std::cout << "// ---- LLVMGPUTensorCoreVectorization (Vectorize)" << std::endl;
-      funcOp->dump();
-      std::cout << std::endl;
-#endif
 
       // Step 2. Fold consumer add ops into the contraction op itself.
       RewritePatternSet canonicalizationPatterns(context);
@@ -295,11 +280,6 @@ struct LLVMGPUTensorCoreVectorizationPass
         return signalPassFailure();
       }
 
-#if DEBUG_LEVEL
-      std::cout << "// ---- Step 3. LLVMGPUTensorCoreVectorization (Fold consumer add ops)" << std::endl;
-      funcOp->dump();
-      std::cout << std::endl;
-#endif
       // Step 3. Prepare vector operations to be lowered to GPU ops.
       RewritePatternSet vectorContractPatterns(funcOp.getContext());
       mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(vectorContractPatterns);
@@ -309,12 +289,6 @@ struct LLVMGPUTensorCoreVectorizationPass
         return signalPassFailure();
       }
 
-#if DEBUG_LEVEL
-      std::cout << "// ---- Step 3.  LLVMGPUTensorCoreVectorization (Before Break and unroll)" << std::endl;
-      funcOp->dump();
-      std::cout << std::endl;
-#endif
-
       // Step 4. Break and unroll warp tile size to native math and load sizes.
       RewritePatternSet vectorUnrollPatterns(context);
       populateVectorUnrollPatterns(vectorUnrollPatterns);
@@ -323,11 +297,6 @@ struct LLVMGPUTensorCoreVectorizationPass
         return signalPassFailure();
       }
 
-#if DEBUG_LEVEL
-      std::cout << "// ---- After LLVMGPUTensorCoreVectorization " << std::endl;
-      funcOp->dump();
-      std::cout << std::endl;
-#endif
     }
   }
 };
