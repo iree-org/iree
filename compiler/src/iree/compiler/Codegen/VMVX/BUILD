@@ -27,7 +27,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "//compiler/src/iree/compiler/Codegen/Common",
-        "//compiler/src/iree/compiler/Codegen/CommonPasses",
+        "//compiler/src/iree/compiler/Codegen/Common:CommonPasses",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
