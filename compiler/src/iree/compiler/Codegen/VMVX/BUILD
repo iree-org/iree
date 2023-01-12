@@ -27,6 +27,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/CommonPasses",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
@@ -37,6 +38,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Utils",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
+        "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",

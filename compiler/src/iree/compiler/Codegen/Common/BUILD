@@ -132,6 +132,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "BufferizationAnalysis.h",
+        "EncodingInfo.h",
         "Transforms.h",
     ],
     deps = [
@@ -215,7 +216,6 @@ iree_compiler_cc_library(
         "WorkGroupSwizzle.cpp",
     ],
     hdrs = [
-        "EncodingInfo.h",
         "GPUPatterns.h",
         "LinalgOpInfo.h",
         "UserConfig.h",
