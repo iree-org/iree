@@ -9,9 +9,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/testing/gtest.h"
-#if IREE_HAL_CUDA_NCCL_ENABLE
-#include "nccl.h"
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE
+#include "third_party/nccl/nccl.h"
 
 namespace iree {
 namespace hal {

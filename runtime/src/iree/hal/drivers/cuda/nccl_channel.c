@@ -12,11 +12,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/status_util.h"
-#if IREE_HAL_CUDA_NCCL_ENABLE
-#include "nccl.h"
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE
-
-#if IREE_HAL_CUDA_NCCL_ENABLE
+#include "third_party/nccl/nccl.h"
 
 // Returns the same value as NCCL's init.cc hashUniqueId.
 // These magic constants were chosen by their implementation and unlikely to
@@ -383,22 +379,3 @@ static const iree_hal_channel_vtable_t iree_hal_cuda_nccl_channel_vtable = {
     .destroy = iree_hal_cuda_nccl_channel_destroy,
     .query_rank_and_count = iree_hal_cuda_nccl_channel_query_rank_and_count,
 };
-
-#else  // IREE_HAL_CUDA_NCCL_ENABLE
-
-iree_status_t iree_hal_cuda_nccl_channel_create(
-    iree_hal_cuda_context_wrapper_t* context_wrapper,
-    const iree_hal_cuda_nccl_id_t* id, int rank, int count,
-    iree_hal_channel_t** out_channel) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "iree_hal_cuda_nccl_channel_create()");
-}
-
-iree_status_t iree_hal_cuda_nccl_submit_batch(
-    iree_hal_cuda_context_wrapper_t* context,
-    const iree_hal_collective_batch_t* batch, CUstream stream) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "iree_hal_cuda_nccl_submit_batch()");
-}
-
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE

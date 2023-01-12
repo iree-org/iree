@@ -14,9 +14,7 @@
 #include "iree/hal/drivers/cuda/cuda_device.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/status_util.h"
-#if IREE_HAL_CUDA_NCCL_ENABLE
-#include "nccl.h"
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE
+#include "third_party/nccl/nccl.h"
 
 // Maximum device name length we support.
 #define IREE_HAL_CUDA_MAX_DEVICE_NAME_LENGTH 128
@@ -51,8 +49,6 @@ IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
   out_options->default_device_index = 0;
 }
 
-#if IREE_HAL_CUDA_NCCL_ENABLE
-
 static iree_status_t iree_hal_nccl_get_unique_id_from_env(
     iree_hal_cuda_driver_t* driver) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -74,8 +70,6 @@ static iree_status_t iree_hal_nccl_get_unique_id_from_env(
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
-
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 
 static iree_status_t iree_hal_cuda_driver_create_internal(
     iree_string_view_t identifier,
@@ -103,7 +97,6 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
     return status;
   }
 
-#if IREE_HAL_CUDA_NCCL_ENABLE
   if (iree_status_is_ok(status)) {
     // Initialize NCCL if NPROCS is set.
     if (driver->default_params.nccl_default_count > 0) {
@@ -111,7 +104,6 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
       status = iree_hal_nccl_get_unique_id_from_env(driver);
     }
   }
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 
   if (iree_status_is_ok(status)) {
     *out_driver = (iree_hal_driver_t*)driver;

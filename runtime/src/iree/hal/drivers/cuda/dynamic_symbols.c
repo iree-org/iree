@@ -17,18 +17,16 @@ static const char* kCUDALoaderSearchNames[] = {
     "nvcuda.dll",
 #else
     "libcuda.so",
-#endif
+#endif  // IREE_PLATFORM_WINDOWS
 };
 
-#if IREE_HAL_CUDA_NCCL_ENABLE
 static const char* kNCCLLoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_WINDOWS)
     "nccl.dll",
-#else  // IREE_HAL_CUDA_NCCL_ENABLE
+#else
     "libnccl.so",
-#endif
+#endif  // IREE_PLATFORM_WINDOWS
 };
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 
 #define concat(A, B) A B
 
@@ -45,7 +43,6 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
     iree_dynamic_library_lookup_symbol(syms->cuda_library, kNameV2, &funV2); \
     if (funV2) syms->cudaSymbolName = funV2;                                 \
   }
-#if IREE_HAL_CUDA_NCCL_ENABLE
 #define NCCL_PFN_DECL(ncclSymbolName, ...)                          \
   {                                                                 \
     static const char* kName = #ncclSymbolName;                     \
@@ -58,10 +55,6 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(        \
         syms->nccl_library, kName, (void**)&syms->ncclSymbolName)); \
   }
-#else  // IREE_HAL_CUDA_NCCL_ENABLE
-#define NCCL_PFN_DECL(ncclSymbolName, ...)
-#define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 #include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL
 #undef NCCL_PFN_DECL
@@ -83,7 +76,6 @@ iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
         IREE_STATUS_UNAVAILABLE,
         "CUDA runtime library not available; ensure installed and on path");
   }
-#if IREE_HAL_CUDA_NCCL_ENABLE
   status = iree_dynamic_library_load_from_files(
       IREE_ARRAYSIZE(kNCCLLoaderSearchNames), kNCCLLoaderSearchNames,
       IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->nccl_library);
@@ -93,7 +85,6 @@ iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
         IREE_STATUS_UNAVAILABLE,
         "NCCL runtime library not available; ensure installed and on path");
   }
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_dynamic_symbols_resolve_all(out_syms);
   }
@@ -108,9 +99,7 @@ void iree_hal_cuda_dynamic_symbols_deinitialize(
     iree_hal_cuda_dynamic_symbols_t* syms) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_dynamic_library_release(syms->cuda_library);
-#if IREE_HAL_CUDA_NCCL_ENABLE
   iree_dynamic_library_release(syms->nccl_library);
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE
   memset(syms, 0, sizeof(*syms));
   IREE_TRACE_ZONE_END(z0);
 }
