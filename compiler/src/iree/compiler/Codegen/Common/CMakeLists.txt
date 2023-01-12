@@ -51,7 +51,6 @@ iree_cc_library(
     MLIRMemRefTransformOps
     MLIRPDLDialect
     MLIRPDLInterpDialect
-    MLIRParser
     MLIRPass
     MLIRRewrite
     MLIRSCFDialect
@@ -72,6 +71,7 @@ iree_cc_library(
     iree::compiler::Codegen::TransformDialectStrategies::Common::TransformDialectStrategies
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
+    iree::compiler::Utils
   PUBLIC
 )
 
