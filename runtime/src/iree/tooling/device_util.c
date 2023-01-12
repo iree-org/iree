@@ -281,6 +281,70 @@ IREE_FLAG_CALLBACK(
     "  Show all devices from a particular driver: --dump_devices=vulkan\n");
 
 //===----------------------------------------------------------------------===//
+// Allocator configuration
+//===----------------------------------------------------------------------===//
+
+IREE_FLAG_LIST(
+    string, device_allocator,
+    "Specifies one or more HAL device allocator specs to augment the base\n"
+    "device allocator. See each allocator type for supported configurations.");
+
+// Parses a single flag and wraps |base_allocator|.
+// Flag values are specifications and may include configuration values.
+// Examples:
+//   some_allocator
+//   some_allocator:key=value
+//   some_allocator:key=value,key=value
+static iree_status_t iree_hal_configure_allocator_from_spec(
+    iree_string_view_t spec, iree_hal_device_t* device,
+    iree_hal_allocator_t* base_allocator,
+    iree_hal_allocator_t** out_wrapped_allocator) {
+  iree_string_view_t allocator_name = iree_string_view_empty();
+  iree_string_view_t config_pairs = iree_string_view_empty();
+  iree_string_view_split(spec, ':', &allocator_name, &config_pairs);
+  // TODO(benvanik): switch on allocator name and then process the config.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "no allocators are implemented yet");
+}
+
+// Configures the |device| allocator based on the --device_allocator= flag.
+// This will wrap the underlying device allocator in zero or more configurable
+// allocator shims.
+//
+// WARNING: not thread-safe and must only be called immediately after device
+// creation.
+static iree_status_t iree_hal_configure_allocator_from_flags(
+    iree_hal_device_t* device) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  const iree_flag_string_list_t list = FLAG_device_allocator_list();
+
+  // The current device allocator should be the base one registered or created
+  // with the device. If no allocator flags were provided this may be no-op and
+  // we'll just pass it right back in.
+  iree_hal_allocator_t* device_allocator = iree_hal_device_allocator(device);
+  iree_hal_allocator_retain(device_allocator);
+
+  // Walk the specs provided and wrap in order from base to last specified.
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < list.count; ++i) {
+    status = iree_hal_configure_allocator_from_spec(
+        list.values[i], device, device_allocator, &device_allocator);
+    if (!iree_status_is_ok(status)) break;
+  }
+
+  // Swap the allocator on the device - this is only safe because we know no
+  // allocations have been made yet.
+  if (iree_status_is_ok(status)) {
+    iree_hal_device_replace_allocator(device, device_allocator);
+  }
+  iree_hal_allocator_release(device_allocator);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
 // Device selection
 //===----------------------------------------------------------------------===//
 
@@ -329,9 +393,19 @@ iree_status_t iree_hal_create_device_from_flags(
       z0, iree_hal_create_device(iree_hal_available_driver_registry(),
                                  device_uri, host_allocator, &device));
 
-  *out_device = device;
+  // Optionally wrap the base device allocator with caching/pooling.
+  // Doing this here satisfies the requirement that no buffers have been
+  // allocated yet - if we returned the device without doing this the caller can
+  // more easily break the rules.
+  iree_status_t status = iree_hal_configure_allocator_from_flags(device);
+
+  if (iree_status_is_ok(status)) {
+    *out_device = device;
+  } else {
+    iree_hal_device_release(device);
+  }
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
