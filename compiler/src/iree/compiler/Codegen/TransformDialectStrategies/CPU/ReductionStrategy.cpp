@@ -77,8 +77,6 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
     auto tileRes = buildTileFuseToScfFor(
         b, val, {}, getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)));
 
-    // Don't know how to mask vectorize reductions yet.
-    if (val == gridReductionH) continue;
     auto vectorTileSizes = strategy.workgroupTileSizes;
     int64_t e = std::min(
         static_cast<int64_t>(strategy.workgroupTileSizes.size()), rank - 1);
