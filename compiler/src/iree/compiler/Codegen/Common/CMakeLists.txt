@@ -80,6 +80,7 @@ iree_cc_library(
     CommonPasses
   HDRS
     "BufferizationAnalysis.h"
+    "EncodingInfo.h"
     "Transforms.h"
   SRCS
     "BufferizationAnalysis.cpp"
@@ -93,7 +94,7 @@ iree_cc_library(
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "IREEComprehensiveBufferizePass.cpp"
-    "MaterializeEncodingPass.cpp"
+    "MaterializeEncodingIntoPackUnPack.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PolynomialApproximationPass.cpp"
     "RematerializeParallelOps.cpp"
@@ -143,7 +144,6 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorTransforms
     MLIRViewLikeInterface
-    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces

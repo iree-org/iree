@@ -35,6 +35,7 @@ iree_lit_test_suite(
             "hal_interface_workgroup_info.mlir",
             "illegal_configuration.mlir",
             "materialize_aarch64_launch_configuration.mlir",
+            "materialize_encoding.mlir",
             "materialize_riscv_launch_configuration.mlir",
             "materialize_vmvx_launch_configuration.mlir",
             "materialize_x86_64_launch_configuration.mlir",

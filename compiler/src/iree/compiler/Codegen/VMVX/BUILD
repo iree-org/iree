@@ -19,6 +19,10 @@ iree_compiler_cc_library(
         "Passes.cpp",
         "VMVXAssignConstantOrdinals.cpp",
         "VMVXLinkExecutables.cpp",
+        "VMVXMaterializeEncodingPass.cpp",
+    ],
+    hdrs = [
+        "EncodingInfo.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen:PassHeaders",

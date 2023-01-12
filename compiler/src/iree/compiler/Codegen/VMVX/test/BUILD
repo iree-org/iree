@@ -17,10 +17,12 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "assign_constant_ordinals.mlir",
             "link_executables.mlir",
             "lower_linalg_microkernels.mlir",
+            "materialize_encoding.mlir",
         ],
         include = ["*.mlir"],
     ),

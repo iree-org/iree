@@ -13,11 +13,14 @@ iree_add_all_subdirs()
 iree_cc_library(
   NAME
     VMVX
+  HDRS
+    "EncodingInfo.h"
   SRCS
     "LowerLinalgMicrokernels.cpp"
     "Passes.cpp"
     "VMVXAssignConstantOrdinals.cpp"
     "VMVXLinkExecutables.cpp"
+    "VMVXMaterializeEncodingPass.cpp"
   DEPS
     IREELinalgExtDialect
     LLVMSupport

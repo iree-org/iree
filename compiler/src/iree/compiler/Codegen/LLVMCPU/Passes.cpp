@@ -720,7 +720,7 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createTypePropagationPass());
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createIREEMaterializeEncodingPass());
+      createLLVMCPUMaterializeEncodingPass());
   passManager.addNestedPass<ModuleOp>(createBufferizeCopyOnlyDispatchesPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.

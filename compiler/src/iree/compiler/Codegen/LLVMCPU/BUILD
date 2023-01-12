@@ -24,6 +24,7 @@ iree_compiler_cc_library(
         "LLVMCPUEmitVectorizationRemarks.cpp",
         "LLVMCPULinkExecutables.cpp",
         "LLVMCPULowerExecutableTarget.cpp",
+        "LLVMCPUMaterializeEncodingPass.cpp",
         "LLVMCPUSynchronizeSymbolVisibility.cpp",
         "LLVMCPUUnfuseFMAOps.cpp",
         "Passes.cpp",
