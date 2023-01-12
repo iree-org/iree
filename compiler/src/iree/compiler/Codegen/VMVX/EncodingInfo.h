@@ -7,13 +7,12 @@
 #ifndef IREE_COMPILER_CODEGEN_VMVX_ENCODINGINFO_H_
 #define IREE_COMPILER_CODEGEN_VMVX_ENCODINGINFO_H_
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree/compiler/Codegen/Common/EncodingInfo.h"
 
 namespace mlir {
 namespace iree_compiler {
-FailureOr<IREE::LinalgExt::MaterializeEncodingValueInfo>
-chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
-                                          OpBuilder &builder, Location loc);
+// A placeholder for chooseDynamicEncodingInfoVMVXMicrokernels. See
+// Common/EncodingInfo.h for more details.
 }  // namespace iree_compiler
 }  // namespace mlir
 

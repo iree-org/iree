@@ -57,6 +57,14 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
     IREE::LinalgExt::MaterializeEncodingTypeConverter &typeConverter,
     IREE::LinalgExt::MaterializeEncodingValueFn materializeEncodingValueFn);
 
+// TODO(hanchung): Move the method to VMVX/EncodingInfo.h. This is required by
+// TileAndDistributeToWorkgroupPass and VMVXMaterializeEncodingPass. It can not
+// be in VMVX/EncodingInfo.h because there is a circular dependency. The Common/
+// should not depend on other target backends.
+FailureOr<IREE::LinalgExt::MaterializeEncodingValueInfo>
+chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
+                                          OpBuilder &builder, Location loc);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 #endif  // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGINFO_H_

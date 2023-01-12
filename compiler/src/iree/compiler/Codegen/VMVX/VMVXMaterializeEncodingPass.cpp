@@ -19,7 +19,6 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "runtime/src/iree/builtins/ukernel/exported_bits.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -109,46 +108,6 @@ void VMVXMaterializeEncodingPass::runOnOperation() {
       return signalPassFailure();
     }
   }
-}
-
-FailureOr<MaterializeEncodingValueInfo>
-chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
-                                          OpBuilder &builder, Location loc) {
-  Optional<TensorEncoding> encoding = getEncoding(tensorType);
-  if (!encoding) return failure();
-  auto matmulType = getMatmulType(*encoding);
-  auto matmulOperandRole = getMatmulOperandRole(*encoding);
-  if (!matmulType || !matmulOperandRole) return failure();
-  uint32_t flags = 0;
-  if (*matmulType == MatmulType::F32F32F32) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
-  } else if (*matmulType == MatmulType::I8I8I32) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
-  } else {
-    return failure();
-  }
-  if (*matmulOperandRole == MatmulOperandRole::LHS) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
-  } else if (*matmulOperandRole == MatmulOperandRole::RHS) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
-  } else if (*matmulOperandRole == MatmulOperandRole::RHS_TRANSPOSE) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS_TRANSPOSE;
-  } else if (*matmulOperandRole == MatmulOperandRole::RESULT) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
-  } else {
-    return failure();
-  }
-  SmallVector<Type> tileSizesTypes(tensorType.getRank(),
-                                   builder.getIndexType());
-  SmallVector<Value> shapeValues;
-  for (int64_t i : tensorType.getShape()) {
-    shapeValues.push_back(builder.create<arith::ConstantIndexOp>(loc, i));
-  }
-  auto op = builder.create<IREE::VMVX::QueryTileSizesOp>(
-      loc, tileSizesTypes, shapeValues, builder.getI32IntegerAttr(flags));
-  MaterializeEncodingValueInfo result;
-  result.innerTileSizes = op.getTileSizes();
-  return result;
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

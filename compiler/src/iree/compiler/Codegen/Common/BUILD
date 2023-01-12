@@ -119,6 +119,7 @@ iree_compiler_cc_library(
         "ForOpCanonicalizationPass.cpp",
         "FuseTensorPadWithConsumer.cpp",
         "IREEComprehensiveBufferizePass.cpp",
+        "MaterializeEncodingIntoPackUnPack.cpp",
         "OptimizeVectorTransferPass.cpp",
         "PolynomialApproximationPass.cpp",
         "RematerializeParallelOps.cpp",
@@ -131,6 +132,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "BufferizationAnalysis.h",
+        "EncodingInfo.h",
         "Transforms.h",
     ],
     deps = [
@@ -149,6 +151,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
+        "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
@@ -202,7 +205,6 @@ iree_compiler_cc_library(
         "GPUTileReduction.cpp",
         "GPUVectorization.cpp",
         "LinalgOpInfo.cpp",
-        "MaterializeEncodingIntoPackUnPack.cpp",
         "MemrefCopyToLinalg.cpp",
         "PadDynamicAlloc.cpp",
         "RemoveTrivialLoops.cpp",
@@ -214,7 +216,6 @@ iree_compiler_cc_library(
         "WorkGroupSwizzle.cpp",
     ],
     hdrs = [
-        "EncodingInfo.h",
         "GPUPatterns.h",
         "LinalgOpInfo.h",
         "UserConfig.h",

@@ -35,7 +35,6 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRPass
     MLIRTransforms
-    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Utils
