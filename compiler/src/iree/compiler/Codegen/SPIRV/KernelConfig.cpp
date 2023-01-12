@@ -1433,7 +1433,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
 
     if (computeOps.empty()) {
       // No compute operations found. Allow to pass through without a config.
-      return success();
+      continue;
     }
 
     Operation *rootOperation = nullptr;
