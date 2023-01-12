@@ -159,8 +159,8 @@ static ncclComm_t iree_hal_cuda_nccl_channel_comm(
   return channel->comm;
 }
 
-static iree_status_t get_nccl_data_type(iree_hal_collective_element_type_t in,
-                                        ncclDataType_t* out) {
+static iree_status_t iree_hal_cuda_get_nccl_data_type(
+    iree_hal_collective_element_type_t in, ncclDataType_t* out) {
   switch (in) {
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_8:
       *out = ncclInt8;
@@ -205,8 +205,8 @@ static iree_status_t get_nccl_data_type(iree_hal_collective_element_type_t in,
   return iree_ok_status();
 }
 
-static iree_status_t get_nccl_red_type(iree_hal_collective_reduction_t in,
-                                       ncclRedOp_t* out) {
+static iree_status_t iree_hal_cuda_get_nccl_red_type(
+    iree_hal_collective_reduction_t in, ncclRedOp_t* out) {
   switch (in) {
     case IREE_HAL_COLLECTIVE_REDUCTION_SUM:
       *out = ncclSum;
@@ -241,7 +241,8 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
   iree_hal_cuda_dynamic_symbols_t* syms = channel->context_wrapper->syms;
   ncclComm_t comm = iree_hal_cuda_nccl_channel_comm(entry->channel);
   ncclDataType_t datatype;
-  IREE_RETURN_IF_ERROR(get_nccl_data_type(entry->op.element_type, &datatype));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_cuda_get_nccl_data_type(entry->op.element_type, &datatype));
 
   switch (entry->op.kind) {
     case IREE_HAL_COLLECTIVE_KIND_ALL_GATHER: {
@@ -274,7 +275,8 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       ncclRedOp_t redop;
-      IREE_RETURN_IF_ERROR(get_nccl_red_type(entry->op.reduction, &redop));
+      IREE_RETURN_IF_ERROR(
+          iree_hal_cuda_get_nccl_red_type(entry->op.reduction, &redop));
       NCCL_RETURN_IF_ERROR(
           syms,
           ncclAllReduce((const void*)sendbuff, (void*)recvbuff,
@@ -312,7 +314,8 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       ncclRedOp_t redop;
-      IREE_RETURN_IF_ERROR(get_nccl_red_type(entry->op.reduction, &redop));
+      IREE_RETURN_IF_ERROR(
+          iree_hal_cuda_get_nccl_red_type(entry->op.reduction, &redop));
       NCCL_RETURN_IF_ERROR(syms,
                            ncclReduce((const void*)sendbuff, (void*)recvbuff,
                                       entry->element_count, datatype, redop,
@@ -332,7 +335,8 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       ncclRedOp_t redop;
-      IREE_RETURN_IF_ERROR(get_nccl_red_type(entry->op.reduction, &redop));
+      IREE_RETURN_IF_ERROR(
+          iree_hal_cuda_get_nccl_red_type(entry->op.reduction, &redop));
       NCCL_RETURN_IF_ERROR(
           syms,
           ncclReduceScatter((const void*)sendbuff, (void*)recvbuff,
