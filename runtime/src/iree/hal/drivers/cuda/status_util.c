@@ -30,3 +30,18 @@ iree_status_t iree_hal_cuda_result_to_status(
                                         "CUDA driver error '%s' (%d): %s",
                                         error_name, result, error_string);
 }
+
+#if IREE_HAL_DRIVER_CUDA_NCCL
+iree_status_t iree_hal_nccl_result_to_status(
+    iree_hal_cuda_dynamic_symbols_t* syms, ncclResult_t result,
+    const char* file, uint32_t line) {
+  if (IREE_LIKELY(result == ncclSuccess)) {
+    return iree_ok_status();
+  }
+
+  const char* error_string = syms->ncclGetErrorString(result);
+  return iree_make_status_with_location(file, line, IREE_STATUS_INTERNAL,
+                                        "NCCL error %d: %s", result,
+                                        error_string);
+}
+#endif  // IREE_HAL_DRIVER_CUDA_NCCL

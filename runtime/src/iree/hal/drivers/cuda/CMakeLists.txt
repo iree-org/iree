@@ -10,6 +10,12 @@
 
 iree_add_all_subdirs()
 
+if(IREE_HAL_DRIVER_CUDA_NCCL)
+  set(IREE_HAL_DRIVER_CUDA_NCCL_VAL 1)
+else()
+  set(IREE_HAL_DRIVER_CUDA_NCCL_VAL 0)
+endif()
+
 iree_cc_library(
   NAME
     cuda
@@ -59,6 +65,8 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::cuda_executable_def_c_fbs
+  DEFINES
+    "IREE_HAL_DRIVER_CUDA_NCCL=${IREE_HAL_DRIVER_CUDA_NCCL_VAL}"
   PUBLIC
 )
 
@@ -78,6 +86,8 @@ iree_cc_library(
     iree::base::internal::dynamic_library
     iree::base::tracing
     iree_cuda::headers
+  DEFINES
+    "IREE_HAL_DRIVER_CUDA_NCCL=${IREE_HAL_DRIVER_CUDA_NCCL_VAL}"
   PUBLIC
 )
 
@@ -96,3 +106,19 @@ iree_cc_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(IREE_HAL_DRIVER_CUDA_NCCL)
+iree_cc_test(
+  NAME
+    dynamic_symbols_test_for_nccl
+  SRCS
+    "dynamic_symbols_test_for_nccl.cc"
+  DEPS
+    ::dynamic_symbols
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=cuda"
+)
+endif()
