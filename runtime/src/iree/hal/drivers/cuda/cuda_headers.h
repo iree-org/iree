@@ -10,5 +10,5 @@
 #include "cuda.h"  // IWYU pragma: export
 #if IREE_HAL_CUDA_NCCL_ENABLE
 #include "nccl.h"  // IWYU pragma: export
-#endif             // IREE_HAL_CUDA_NCCL_ENABLE
-#endif             // IREE_HAL_DRIVERS_CUDA_CUDA_HEADERS_H_
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
+#endif  // IREE_HAL_DRIVERS_CUDA_CUDA_HEADERS_H_

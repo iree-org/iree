@@ -7,12 +7,12 @@
 #ifndef IREE_HAL_DRIVERS_CUDA_DYNAMIC_SYMBOLS_H_
 #define IREE_HAL_DRIVERS_CUDA_DYNAMIC_SYMBOLS_H_
 
-#if IREE_HAL_CUDA_NCCL_ENABLE
-#include <nccl.h>
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 #include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/hal/drivers/cuda/cuda_headers.h"
+#if IREE_HAL_CUDA_NCCL_ENABLE
+#include "nccl.h"
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 
 #ifdef __cplusplus
 extern "C" {

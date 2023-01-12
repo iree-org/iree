@@ -6,19 +6,15 @@
 
 #include "iree/hal/drivers/cuda/nccl_channel.h"
 
-#include <iree/base/config.h>
-#include <iree/base/status.h>
-#include <iree/hal/command_buffer.h>
-#include <iree/hal/utils/collective_batch.h>
-#if IREE_HAL_CUDA_NCCL_ENABLE
-#include <nccl.h>
-#endif
 #include <stddef.h>
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/status_util.h"
+#if IREE_HAL_CUDA_NCCL_ENABLE
+#include "nccl.h"
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 
 #if IREE_HAL_CUDA_NCCL_ENABLE
 

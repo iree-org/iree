@@ -7,10 +7,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#if IREE_HAL_CUDA_NCCL_ENABLE
-#include "nccl.h"
-#endif  // IREE_HAL_CUDA_NCCL_ENABLE
-
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
@@ -18,6 +14,9 @@
 #include "iree/hal/drivers/cuda/cuda_device.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/status_util.h"
+#if IREE_HAL_CUDA_NCCL_ENABLE
+#include "nccl.h"
+#endif  // IREE_HAL_CUDA_NCCL_ENABLE
 
 // Maximum device name length we support.
 #define IREE_HAL_CUDA_MAX_DEVICE_NAME_LENGTH 128
