@@ -85,10 +85,7 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
       context_wrapper->syms,
       ncclCommInitRankConfig(&comm, count, *((const ncclUniqueId*)id), rank,
                              &config));
-  if (!iree_status_is_ok(status)) {
-    IREE_TRACE_ZONE_END(z0);
-    return status;
-  }
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, status, "ncclCommInitRankConfig");
 
   iree_hal_cuda_nccl_channel_t* channel = NULL;
   status = iree_allocator_malloc(context_wrapper->host_allocator,
