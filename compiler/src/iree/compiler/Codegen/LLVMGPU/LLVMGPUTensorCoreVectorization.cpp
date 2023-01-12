@@ -77,9 +77,8 @@ static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
   return order;
 }
 
-// Helper function to return native size for WMMA-based operations.
-static Optional<SmallVector<int64_t, 4>> getWmmaNativeVectorSize(
-    Operation *op) {
+/// Helper function to return native size for WMMA-based operations.
+static Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
   // Currently hardcode the size of wmma operation. When more cases are
   // supported this should be picked based on what the backend supports.
   int64_t m = 16;
@@ -119,29 +118,33 @@ static Optional<SmallVector<int64_t, 4>> getWmmaNativeVectorSize(
   return std::nullopt;
 }
 
-static int getVectorContractOpOperandId(vector::ContractionOp contractOp,
-                                        Operation *op) {
-  if (contractOp.getLhs() == op->getResult(0)) return 0;
-  if (contractOp.getRhs() == op->getResult(0)) return 1;
-  if (contractOp.getAcc() == op->getResult(0)) return 2;
-  return -1;
+/// Returns vector::ContractionOp operand's index where the result is used.
+static Optional<int> getVectorContractOpOperandId(
+    vector::ContractionOp contractOp, OpResult result) {
+  if (contractOp.getLhs() == result) return 0;
+  if (contractOp.getRhs() == result) return 1;
+  if (contractOp.getAcc() == result) return 2;
+  return std::nullopt;
 }
 
-// Returns operand id for vector::ContractOp where the vector::TransferReadOp
-// is consumed.
-static int getVectorContractOpOperandIdForVectorReadOp(Operation *op) {
+/// Returns vector::ContractionOp operand's index  where the
+/// vector::TransferReadOp is consumed either consumed directly or via
+/// vector::ExtractStridedSliceOp.
+static Optional<int> getVectorContractOpOperandIdForVectorReadOp(
+    Operation *op) {
   vector::ContractionOp contractOp;
 
   Operation *firstLevelUser = *((op->getUsers()).begin());
   if (auto contractOp = dyn_cast<vector::ContractionOp>(firstLevelUser))
-    return getVectorContractOpOperandId(contractOp, op);
+    return getVectorContractOpOperandId(contractOp, op->getResult(0));
   Operation *secondLevelUser = *((firstLevelUser->getUsers()).begin());
   if (auto contractOp = dyn_cast<vector::ContractionOp>(secondLevelUser))
-    return getVectorContractOpOperandId(contractOp, firstLevelUser);
-  return -1;
+    return getVectorContractOpOperandId(contractOp,
+                                        firstLevelUser->getResult(0));
+  return std::nullopt;
 }
 
-// Helper function to return native size for MMA.SYNC-based operations.
+/// Helper function to return native size for MMA.SYNC-based operations.
 static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
   // Shape of native Tensor Core GPU mma.sync operations.
   int64_t mmaShapeM = 16;
@@ -150,7 +153,7 @@ static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
 
   // Shape the mma.sync warp-level operation.
   if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
-    auto sourceType = contract.getLhsType().getElementType();
+    Type sourceType = contract.getLhsType().getElementType();
 
     // Set mmaShapeK based on sourceType.
     if (sourceType.isInteger(4))
@@ -181,10 +184,10 @@ static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
   // Shape of warp-level vector read (load) operation.
   if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
     auto resultVectorType = readOp.getVector().getType().cast<VectorType>();
-    auto resultElementType = resultVectorType.getElementType();
+    Type resultElementType = resultVectorType.getElementType();
 
-    int operandId = getVectorContractOpOperandIdForVectorReadOp(op);
-    if (operandId == -1) {
+    Optional<int> operandId = getVectorContractOpOperandIdForVectorReadOp(op);
+    if (!operandId) {
       op->emitError() << "Cannot determine operandId this "
                          "vector::TransferReadOp is used as in the "
                          "vector::TransferContractOp";
@@ -194,14 +197,14 @@ static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     // Loading F16 values from Shared Memory to Registers.
     if (resultElementType.isF16() || resultElementType.isBF16()) {
       // For matrixC.
-      if (operandId == 2) {
+      if (*operandId == 2) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
         return readShape;
       }
 
       // For matrixA and matrixB.
-      if (operandId == 0 || operandId == 1) {
+      if (*operandId == 0 || *operandId == 1) {
         // MmaSyncOp input operands: matrixA and matrixB.
         // LDSMx1, x2, x4:
         // - LDSMx1 loads a 1 tile  of 8x8.

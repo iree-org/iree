@@ -137,7 +137,7 @@ def get_test_shapes(shapes_id: ShapesId):
         # (see get_test_generators).
     ]
   if shapes_id == ShapesId.GPU_LARGE:
-    return [TestShape(m=512, k=128, n=256)]
+    return [TestShape(m=256, k=128, n=512)]
   raise ValueError(shapes_id)
 
 

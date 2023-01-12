@@ -124,10 +124,9 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
     SmallVector<Attribute> idDims;
     auto getThreadMapping = [&](int64_t dim) {
       return mlir::gpu::GPUThreadMappingAttr::get(
-          tilingOp->getContext(),
-          dim == 0
-              ? mlir::gpu::Threads::DimX
-              : dim == 1 ? mlir::gpu::Threads::DimY : mlir::gpu::Threads::DimZ);
+          tilingOp->getContext(), dim == 0   ? mlir::gpu::Threads::DimX
+                                  : dim == 1 ? mlir::gpu::Threads::DimY
+                                             : mlir::gpu::Threads::DimZ);
     };
     for (unsigned loop : llvm::reverse(partitionedLoops)) {
       int64_t num = elementPerWorkgroup[id++];
