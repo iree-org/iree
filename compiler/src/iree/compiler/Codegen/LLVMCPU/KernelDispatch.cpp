@@ -1475,7 +1475,6 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
                      is2DPoolingOp(op);
   (void)isSupported;
   assert(isSupported && "conv op is not supported");
-  llvm::errs() << "Murali started\n";
 
   SmallVector<int64_t> tileSizes;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
@@ -1491,7 +1490,6 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 3}; })
         .Default([&](Operation *op) {
-          llvm::errs() << "Murail bad1\n";
           llvm_unreachable("unsupported conv");
         });
   } else if (isRISCV(targetAttr)) {
@@ -1505,7 +1503,6 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize, 1, 3}; })
         .Default([&](Operation *op) {
-          llvm::errs() << "Murail bad2\n";
           llvm_unreachable("unsupported conv");
         });
   } else if (isAArch64(targetAttr)) {
@@ -1519,7 +1516,6 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 4, 4, 1, 4}; })
         .Default([&](Operation *op) {
-          llvm::errs() << "Murail bad3\n";
           llvm_unreachable("unsupported conv");
         });
   } else {
@@ -1537,7 +1533,6 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
           tileSizes = {1, 1, vectorSize, vectorSize, 1, vectorSize};
         })
         .Default([&](Operation *op) {
-          llvm::errs() << "Murail bad4\n";
           llvm_unreachable("unsupported conv");
         });
   }

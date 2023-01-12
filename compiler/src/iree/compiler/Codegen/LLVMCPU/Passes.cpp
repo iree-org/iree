@@ -269,7 +269,11 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
   int64_t khSize, kwSize, ohSize, owSize;
   auto isSizeExtracted =
       TypeSwitch<Operation *, LogicalResult>(op)
-          .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+          .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
+                linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+                linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+                linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
+                linalg::PoolingNchwMaxOp>(
               [&](auto) {
                 // Shape: N, OH, OW, OC, KH, KW, (IC)
                 khSize = shape[4];
@@ -286,17 +290,6 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
             owSize = shape[3];
             return success();
           })
-          .Case<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-                linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-                linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-                linalg::PoolingNchwMaxOp>([&](auto) {
-            // Shape: N, OH, OW, OC, KH, KW
-            khSize = shape[4];
-            kwSize = shape[5];
-            ohSize = shape[1];
-            owSize = shape[2];
-            return success();
-          })
           .Case<linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp>([&](auto) {
             // Shape: N, OC, OH, OW, KH, KW
             khSize = shape[4];
@@ -307,7 +300,6 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
           })
           .Default([&](auto) { return failure(); });
   if (failed(isSizeExtracted)) {
-    llvm::errs() << "Murali worst\n";
     return op->emitOpError("unsupported conv types");
   }
 
