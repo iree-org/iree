@@ -1037,7 +1037,6 @@ jobs:
         # TODO(#11076): Temporarily disabled until we migrate the database.
         if: false && needs.setup.outputs.ci-stage == 'postsubmit'
         env:
-          # Wildcard pattern to match all execution benchmark results.
           EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
           IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
         run: |
