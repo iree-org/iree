@@ -1851,15 +1851,14 @@ hal.executable private @pack_lowering {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> ((s0 ceildiv 8) ceildiv 64)
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> ((s0 ceildiv 4) ceildiv 64)
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.export public @gemm_lhs_pack
 // CHECK-NEXT:   %[[ARG0:.+]]: !hal.device
 // CHECK-SAME:   %[[ARG1:.+]]: index,
 // CHECK-SAME:   %[[ARG2:.+]]: index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[W0:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
-//  CHECK-DAG:   %[[W1:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]]]
+//  CHECK-DAG:   %[[W1:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]]]
 //      CHECK:   hal.return %[[W1]], %[[W0]], %[[C1]]
 
 // -----
@@ -1896,15 +1895,14 @@ hal.executable private @pack_lowering {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> ((s0 ceildiv 8) ceildiv 64)
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> ((s0 ceildiv 4) ceildiv 64)
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.export public @gemm_rhs_transpose_pack
 // CHECK-NEXT:   %[[ARG0:.+]]: !hal.device
 // CHECK-SAME:   %[[ARG1:.+]]: index,
 // CHECK-SAME:   %[[ARG2:.+]]: index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[W0:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]]]
-//  CHECK-DAG:   %[[W1:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
+//  CHECK-DAG:   %[[W0:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
+//  CHECK-DAG:   %[[W1:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]]]
 //      CHECK:   hal.return %[[W1]], %[[W0]], %[[C1]]
 
 // -----
