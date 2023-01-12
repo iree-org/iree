@@ -79,8 +79,7 @@ static VectorType flattenVectorType(Type type) {
   if (vecTy.isScalable() || vecTy.getRank() <= 1) return nullptr;
 
   int64_t totalElements = vecTy.getNumElements();
-  return VectorType::get(llvm::ArrayRef(totalElements),
-                         vecTy.getElementType());
+  return VectorType::get(llvm::ArrayRef(totalElements), vecTy.getElementType());
 }
 
 // Flattens 2+-D elementwise vector ops into ops over 1-D vectors by inserting
