@@ -106,7 +106,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     for (const auto &entryPoint : entryPointNames) {
       llvm::Optional<MetalShader> mslShader = crossCompileSPIRVToMSL(
           // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
-          llvm::makeArrayRef(spvBinary.data(), spvBinary.size()), entryPoint);
+          llvm::ArrayRef(spvBinary.data(), spvBinary.size()), entryPoint);
       if (!mslShader) {
         return variantOp.emitError()
                << "failed to cross compile SPIR-V to Metal shader";

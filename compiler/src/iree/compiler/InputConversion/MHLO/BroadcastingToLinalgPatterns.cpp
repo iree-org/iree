@@ -123,7 +123,7 @@ Value broadcast(OpBuilder &builder, Location loc, Value operand,
   auto generic = builder.create<linalg::GenericOp>(
       loc, TypeRange{init.getType()}, ValueRange{operand},
       /*outputBuffers=*/ValueRange{init},
-      llvm::makeArrayRef({
+      llvm::ArrayRef({
           AffineMap::get(/*dimCount=*/nloops, /*symbolCount=*/0, dimExprs,
                          builder.getContext()),
           builder.getMultiDimIdentityMap(nloops),

@@ -99,7 +99,7 @@ struct FoldBlockArgumentsPattern
                                         region.getBlocks().end())) {
       unsigned numArgs = block.getNumArguments();
       if (numArgs == 0) continue;
-      auto blockSources = llvm::makeArrayRef(blockSourceMap[&block]);
+      auto blockSources = llvm::ArrayRef(blockSourceMap[&block]);
       if (blockSources.size() == 0) continue;
 
       // Which args we'll end up erasing.
@@ -211,7 +211,7 @@ struct ElideBranchOperandsPattern
                                         region.getBlocks().end())) {
       unsigned numArgs = block.getNumArguments();
       if (numArgs == 0) continue;
-      auto blockSources = llvm::makeArrayRef(blockSourceMap[&block]);
+      auto blockSources = llvm::ArrayRef(blockSourceMap[&block]);
       if (blockSources.size() == 0) continue;
 
       // Which args we'll end up erasing.

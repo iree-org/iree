@@ -42,7 +42,7 @@ struct AllDimsExcept {
     llvm::append_range(exceptions, range);
   }
   ArrayRef<int64_t> getExcluded() const {
-    return llvm::makeArrayRef(exceptions);
+    return llvm::ArrayRef(exceptions);
   }
 
 private:

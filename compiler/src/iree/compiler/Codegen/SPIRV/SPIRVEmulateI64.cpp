@@ -79,7 +79,7 @@ static VectorType flattenVectorType(Type type) {
   if (vecTy.isScalable() || vecTy.getRank() <= 1) return nullptr;
 
   int64_t totalElements = vecTy.getNumElements();
-  return VectorType::get(llvm::makeArrayRef(totalElements),
+  return VectorType::get(llvm::ArrayRef(totalElements),
                          vecTy.getElementType());
 }
 

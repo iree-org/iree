@@ -570,7 +570,7 @@ TileAndFuseDispatchUsingSCFForOp::returningMatchAndRewrite(
   tileAndFuseResult.loops.append(tilingResult->loops);
 
   // Get all ops to tile and fuse.
-  auto fusableProducersRef = llvm::makeArrayRef(fusableProducers);
+  auto fusableProducersRef = llvm::ArrayRef(fusableProducers);
   while (!fusableProducersRef.empty()) {
     auto fusableProducer = cast<TilingInterface>(fusableProducersRef.back());
     fusableProducersRef = fusableProducersRef.drop_back();
