@@ -242,10 +242,11 @@ void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
 }
 
 void iree_tracing_set_plot_type_impl(const char* name_literal,
-                                     uint8_t plot_type) {
+                                     uint8_t plot_type, bool step, bool fill,
+                                     uint32_t color) {
   tracy::Profiler::ConfigurePlot(name_literal,
                                  static_cast<tracy::PlotFormatType>(plot_type),
-                                 false, true, 0);
+                                 step, fill, color);
 }
 
 void iree_tracing_plot_value_i64_impl(const char* name_literal, int64_t value) {

@@ -10,6 +10,7 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
+#include "iree/hal/utils/caching_allocator.h"
 
 //===----------------------------------------------------------------------===//
 // Shared driver registry
@@ -289,6 +290,22 @@ IREE_FLAG_LIST(
     "Specifies one or more HAL device allocator specs to augment the base\n"
     "device allocator. See each allocator type for supported configurations.");
 
+// Configures a new caching allocator with the given key-value |config_pairs|.
+static iree_status_t iree_hal_configure_caching_allocator(
+    iree_string_view_t config_pairs, iree_hal_device_t* device,
+    iree_hal_allocator_t* base_allocator,
+    iree_hal_allocator_t** out_wrapped_allocator) {
+  // TODO(benvanik): support caching allocator pool config.
+  if (!iree_string_view_is_empty(config_pairs)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "caching allocator pool configuration not yet implemented");
+  }
+  return iree_hal_caching_allocator_create_unbounded(
+      base_allocator, iree_hal_allocator_host_allocator(base_allocator),
+      out_wrapped_allocator);
+}
+
 // Parses a single flag and wraps |base_allocator|.
 // Flag values are specifications and may include configuration values.
 // Examples:
@@ -302,9 +319,20 @@ static iree_status_t iree_hal_configure_allocator_from_spec(
   iree_string_view_t allocator_name = iree_string_view_empty();
   iree_string_view_t config_pairs = iree_string_view_empty();
   iree_string_view_split(spec, ':', &allocator_name, &config_pairs);
-  // TODO(benvanik): switch on allocator name and then process the config.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "no allocators are implemented yet");
+  iree_status_t status = iree_ok_status();
+  if (iree_string_view_equal(allocator_name, IREE_SV("caching"))) {
+    status = iree_hal_configure_caching_allocator(
+        config_pairs, device, base_allocator, out_wrapped_allocator);
+  } else {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unrecognized allocator '%.*s'",
+                            (int)allocator_name.size, allocator_name.data);
+  }
+  if (iree_status_is_ok(status)) {
+    // New wrapping allocator has taken ownership of the base allocator.
+    iree_hal_allocator_release(base_allocator);
+  }
+  return status;
 }
 
 // Configures the |device| allocator based on the --device_allocator= flag.
