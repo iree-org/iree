@@ -104,14 +104,14 @@ struct ExecutableDispatchOpConversion
         static_cast<int16_t>(adaptor.getBindingBuffers().size()),
     };
     callOperands.append(pushConstants.begin(), pushConstants.end());
-    for (auto it : llvm::zip_equal(adaptor.getBindingBuffers(),
-                                   adaptor.getBindingOffsets(),
-                                   adaptor.getBindingLengths())) {
-      callOperands.push_back(std::get<0>(it));
+    for (auto [bindingBuffer, bindingOffset, bindingLength] : llvm::zip_equal(
+             adaptor.getBindingBuffers(), adaptor.getBindingOffsets(),
+             adaptor.getBindingLengths())) {
+      callOperands.push_back(bindingBuffer);
       callOperands.push_back(
-          castToImportType(std::get<1>(it), rewriter.getI64Type(), rewriter));
+          castToImportType(bindingOffset, rewriter.getI64Type(), rewriter));
       callOperands.push_back(
-          castToImportType(std::get<2>(it), rewriter.getI64Type(), rewriter));
+          castToImportType(bindingLength, rewriter.getI64Type(), rewriter));
     }
     auto importType = importOp.getFunctionType();
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(

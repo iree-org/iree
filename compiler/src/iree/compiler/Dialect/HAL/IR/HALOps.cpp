@@ -140,13 +140,12 @@ LogicalResult ReturnOp::verify() {
                               << op.getNumOperands() << ", expected "
                               << expectedTypes.size() << ")";
     }
-    for (auto pair :
+    for (auto &&[index, values] :
          llvm::enumerate(llvm::zip_equal(op.getOperands(), expectedTypes))) {
-      auto operand = std::get<0>(pair.value());
-      auto expectedType = std::get<1>(pair.value());
+      auto [operand, expectedType] = values;
       if (operand.getType() != expectedType) {
         return op.emitOpError()
-               << "parent expected result " << pair.index() << " to be "
+               << "parent expected result " << index << " to be "
                << expectedType << " but returning " << operand.getType();
       }
     }

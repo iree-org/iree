@@ -299,14 +299,14 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   newResults.set_subtract(newClosureResults);
   assert(oldResults.size() == newResults.size() &&
          "expected non-closure results to match");
-  for (auto oldNewResult : llvm::zip_equal(oldResults, newResults)) {
-    std::get<0>(oldNewResult).replaceAllUsesWith(std::get<1>(oldNewResult));
+  for (auto [oldResult, newResult] : llvm::zip_equal(oldResults, newResults)) {
+    oldResult.replaceAllUsesWith(newResult);
   }
 
   // Replace original uses of the closure results.
-  for (auto oldNewResult :
+  for (auto [oldResult, newResult] :
        llvm::zip_equal(preservedResults, newOp.getClosureResults())) {
-    std::get<0>(oldNewResult).replaceAllUsesWith(std::get<1>(oldNewResult));
+    oldResult.replaceAllUsesWith(newResult);
   }
 
   // Erase the original op.
