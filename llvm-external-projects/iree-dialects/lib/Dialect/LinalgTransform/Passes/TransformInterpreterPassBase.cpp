@@ -4,18 +4,25 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterUtils.h"
+#include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterPassBase.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/FileUtilities.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
 
+#define DEBUG_TYPE "transform-dialect-interpreter"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 #define DEBUG_TYPE_DUMP_STDERR "iree-transform-dialect-dump-repro"
 #define DEBUG_TYPE_DUMP_FILE "iree-transform-dialect-save-repro"
 
@@ -30,6 +37,84 @@ constexpr static llvm::StringLiteral kTransformIreeTagPayloadRootValue =
 /// (containing the top-level transform operation).
 constexpr static llvm::StringLiteral kTransformIreeTagTransformContainerValue =
     "iree_transform_container";
+
+/// Utility to parse the content of a `transformFileName` mlir file containing
+/// a transform dialect specification.
+static LogicalResult
+parseTransformModuleFromFile(MLIRContext *context,
+                             llvm::StringRef transformFileName,
+                             OwningOpRef<ModuleOp> &transformModule) {
+  if (transformFileName.empty()) {
+    LLVM_DEBUG(
+        DBGS() << "no transform file name specified, assuming the transform "
+                  "module is embedded in the IR next to the top-level\n");
+    return success();
+  }
+  // Parse transformFileName content into a ModuleOp.
+  std::string errorMessage;
+  auto memoryBuffer = mlir::openInputFile(transformFileName, &errorMessage);
+  if (!memoryBuffer) {
+    llvm::errs() << "failed to parse transform file: " << transformFileName
+                 << "\n";
+    return failure();
+  }
+  // Tell sourceMgr about this buffer, the parser will pick it up.
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
+  transformModule =
+      OwningOpRef<ModuleOp>(parseSourceFile<ModuleOp>(sourceMgr, context));
+  return success();
+}
+
+/// Utility to extract the `TransformOpInterface` ops that have the trait
+/// `PossibleTopLevelTransformOpTrait`.
+static LogicalResult extractTopLevelTransformOps(
+    Region &r, SmallVectorImpl<transform::TransformOpInterface> &res) {
+  assert(r.getBlocks().size() == 1 &&
+         "Expected single-block region to extract transform ops from");
+  r.walk<WalkOrder::PreOrder>([&](transform::TransformOpInterface transform) {
+    if (transform->hasTrait<transform::PossibleTopLevelTransformOpTrait>()) {
+      assert(llvm::none_of(res, [&](transform::TransformOpInterface seen) {
+        return seen->isAncestor(transform);
+      }));
+      res.push_back(transform);
+      return WalkResult::skip();
+    }
+    return WalkResult::advance();
+  });
+  return success();
+}
+
+/// Utility to run a transform dialect specification contained in a
+/// `transformRegion`, on a `target` op.
+/// Since the transform dialect may use PDL which may modify the IR, the
+/// underlying implementation clones the transform dialect operations before
+/// applying them.
+static LogicalResult applyTransformsInRegion(Region &transformRegion,
+                                             Operation *target) {
+  SmallVector<transform::TransformOpInterface> transforms;
+  if (failed(extractTopLevelTransformOps(transformRegion, transforms)))
+    return failure();
+
+  for (transform::TransformOpInterface transform : transforms) {
+    // TransformState::applyTransform requires that the parent region is a
+    // proper ancestor of the transform op to perform SSA liveness assertions.
+    // In multithreaded state however, we cannot clone into `transformRegion` so
+    // we build a new single-block region and clone the transform op into it.
+    Region r;
+    OpBuilder b(target->getContext());
+    b.createBlock(&r);
+    transform::TransformOptions options;
+#ifndef NDEBUG
+    options = options.enableExpensiveChecks();
+#endif
+    auto xform = cast<transform::TransformOpInterface>(b.clone(*transform));
+    auto g = llvm::make_scope_exit([&]() { xform->erase(); });
+    if (failed(transform::applyTransforms(target, xform, options)))
+      return failure();
+  }
+  return success();
+}
 
 /// Finds the single top-level transform operation with `root` as ancestor.
 /// Reports an error if there is more than one such operation and returns the
@@ -299,9 +384,8 @@ LogicalResult transform::detail::interpreterBaseRunOnOperationImpl(
   // TODO: lift this assertion.
   assert(transformRegion->getBlocks().size() == 1 &&
          "expected single-region block");
-  if (failed(
-          transform::applyTransformsInRegion(*transformRegion, payloadRoot))) {
-    payloadRoot->emitOpError() << "transform dialect interpreter failed";
+  if (failed(applyTransformsInRegion(*transformRegion, payloadRoot))) {
+    payloadRoot->emitError() << "transform dialect interpreter failed";
     return failure();
   }
 
@@ -312,8 +396,7 @@ LogicalResult transform::detail::interpreterBaseInitializeImpl(
     MLIRContext *context, StringRef transformFileName,
     std::shared_ptr<OwningOpRef<ModuleOp>> &module) {
   OwningOpRef<ModuleOp> parsed;
-  if (failed(transform::parseTransformModuleFromFile(context, transformFileName,
-                                                     parsed)))
+  if (failed(parseTransformModuleFromFile(context, transformFileName, parsed)))
     return failure();
 
   module = std::make_shared<OwningOpRef<ModuleOp>>(std::move(parsed));

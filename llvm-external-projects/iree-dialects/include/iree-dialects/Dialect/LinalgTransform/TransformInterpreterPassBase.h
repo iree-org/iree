@@ -21,28 +21,6 @@ class OwningOpRef;
 class Region;
 
 namespace transform {
-class TransformOpInterface;
-
-/// Utility to parse the content of a `transformFileName` mlir file containing
-/// a transform dialect specification.
-LogicalResult
-parseTransformModuleFromFile(MLIRContext *context, StringRef transformFileName,
-                             OwningOpRef<ModuleOp> &transformModule);
-
-/// Utility to extract the `TransformOpInterface` ops that have the trait
-/// `PossibleTopLevelTransformOpTrait`. Such ops are
-LogicalResult
-extractTopLevelTransformOps(Region &r,
-                            SmallVectorImpl<TransformOpInterface> &res);
-
-/// Utility to run a transform dialect specification contained in a
-/// `transformRegion`, on a `target` op.
-/// Since the transform dialect may use PDL which may modify the IR, the
-/// underlying implementation clones the transform dialect operations before
-/// applying them.
-LogicalResult applyTransformsInRegion(Region &transformRegion,
-                                      Operation *target);
-
 namespace detail {
 /// Template-free implementation of TransformInterpreterPassBase::initialize.
 LogicalResult
@@ -88,6 +66,9 @@ LogicalResult interpreterBaseRunOnOperationImpl(
 /// or `runOnOperation`. They *are* expected to call the copy constructor of
 /// this class in their copy constructors, short of which the file-based
 /// transform dialect script injection facility will become nonoperational.
+///
+/// Concrete passes may implement the `runBeforeInterpreter` and
+/// `runAfterInterpreter` to customize the behavior of the pass.
 template <typename Concrete, template <typename> typename GeneratedBase>
 class TransformInterpreterPassBase : public GeneratedBase<Concrete> {
 public:
@@ -117,16 +98,30 @@ public:
     StringRef transformFileName =
         static_cast<Concrete *>(this)->transformFileName;
     return detail::interpreterBaseInitializeImpl(context, transformFileName,
-                                  sharedTransformModule);
+                                                 sharedTransformModule);
   }
+
+  /// Hook for passes to run additional logic in the pass before the
+  /// interpreter. If failure is returned, the pass fails and the interpreter is
+  /// not run.
+  LogicalResult runBeforeInterpreter(Operation *) { return success(); }
+
+  /// Hook for passes to run additional logic in the pass after the interpreter.
+  /// Only runs if everything succeeded before. If failure is returned, the pass
+  /// fails.
+  LogicalResult runAfterInterpreter(Operation *) { return success(); }
 
   void runOnOperation() final {
     auto *pass = static_cast<Concrete *>(this);
-    if (failed(detail::interpreterBaseRunOnOperationImpl(
-            pass->getOperation(), pass->getArgument(), sharedTransformModule,
+    Operation *op = pass->getOperation();
+    if (failed(pass->runBeforeInterpreter(op)) ||
+        failed(detail::interpreterBaseRunOnOperationImpl(
+            op, pass->getArgument(), sharedTransformModule,
             pass->transformFileName, pass->debugPayloadRootTag,
-            pass->debugTransformRootTag)))
+            pass->debugTransformRootTag)) ||
+        failed(pass->runAfterInterpreter(op))) {
       return pass->signalPassFailure();
+    }
   }
 
 private:
