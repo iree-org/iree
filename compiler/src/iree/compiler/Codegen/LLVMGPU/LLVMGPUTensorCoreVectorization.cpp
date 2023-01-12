@@ -11,9 +11,9 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "mlir/Dialect/NVGPU/Utils/MMAUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/NVGPU/Utils/MMAUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -77,10 +77,9 @@ static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
   return order;
 }
 
-
 // Helper function to return native size for WMMA-based operations.
-static Optional<SmallVector<int64_t, 4>> getWmmaNativeVectorSize(    
-  Operation *op) {
+static Optional<SmallVector<int64_t, 4>> getWmmaNativeVectorSize(
+    Operation *op) {
   // Currently hardcode the size of wmma operation. When more cases are
   // supported this should be picked based on what the backend supports.
   int64_t m = 16;
@@ -120,8 +119,8 @@ static Optional<SmallVector<int64_t, 4>> getWmmaNativeVectorSize(
   return std::nullopt;
 }
 
-static int getVectorContractOpOperandId(
-  vector::ContractionOp contractOp, Operation *op) {
+static int getVectorContractOpOperandId(vector::ContractionOp contractOp,
+                                        Operation *op) {
   if (contractOp.getLhs() == op->getResult(0)) return 0;
   if (contractOp.getRhs() == op->getResult(0)) return 1;
   if (contractOp.getAcc() == op->getResult(0)) return 2;
@@ -129,23 +128,21 @@ static int getVectorContractOpOperandId(
 }
 
 // Returns operand id for vector::ContractOp where the vector::TransferReadOp
-// is consumed. 
+// is consumed.
 static int getVectorContractOpOperandIdForVectorReadOp(Operation *op) {
   vector::ContractionOp contractOp;
 
   Operation *firstLevelUser = *((op->getUsers()).begin());
   if (auto contractOp = dyn_cast<vector::ContractionOp>(firstLevelUser))
-      return getVectorContractOpOperandId(contractOp, op);
+    return getVectorContractOpOperandId(contractOp, op);
   Operation *secondLevelUser = *((firstLevelUser->getUsers()).begin());
   if (auto contractOp = dyn_cast<vector::ContractionOp>(secondLevelUser))
-      return getVectorContractOpOperandId(contractOp, firstLevelUser);
+    return getVectorContractOpOperandId(contractOp, firstLevelUser);
   return -1;
 }
 
 // Helper function to return native size for MMA.SYNC-based operations.
-static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(
-    Operation *op) {
-  
+static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
   // Shape of native Tensor Core GPU mma.sync operations.
   int64_t mmaShapeM = 16;
   int64_t mmaShapeN = 8;
@@ -157,27 +154,26 @@ static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(
 
     // Set mmaShapeK based on sourceType.
     if (sourceType.isInteger(4))
-      mmaShapeK = 64;  
+      mmaShapeK = 64;
     else if (sourceType.isInteger(8))
-      mmaShapeK = 32;   
+      mmaShapeK = 32;
     else if (sourceType.isF16() || sourceType.isBF16())
-       mmaShapeK = 16;  
+      mmaShapeK = 16;
     else if (sourceType.isF32())
-      mmaShapeK = 8;   
+      mmaShapeK = 8;
     else
       return std::nullopt;
 
-    // Initialize/set the starting dims of the ranked shape, such as batch, to 1. 
-    SmallVector<int64_t> mmaShape(contract.getIteratorTypes().size() - 3,
-                                       1);
+    // Initialize/set the starting dims of the ranked shape, such as batch,
+    // to 1.
+    SmallVector<int64_t> mmaShape(contract.getIteratorTypes().size() - 3, 1);
     mmaShape.append({mmaShapeM, mmaShapeN, mmaShapeK});
     return mmaShape;
   }
 
   // Shape of warp-level vector write operation.
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
-    SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2,
-                                       1);
+    SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2, 1);
     outputShape.append({mmaShapeM, mmaShapeN});
     return outputShape;
   }
@@ -190,10 +186,11 @@ static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(
     int operandId = getVectorContractOpOperandIdForVectorReadOp(op);
     if (operandId == -1) {
       op->emitError() << "Cannot determine operandId this "
-        "vector::TransferReadOp is used as in the vector::TransferContractOp";
+                         "vector::TransferReadOp is used as in the "
+                         "vector::TransferContractOp";
       return std::nullopt;
     }
-    
+
     // Loading F16 values from Shared Memory to Registers.
     if (resultElementType.isF16() || resultElementType.isBF16()) {
       // For matrixC.
@@ -201,33 +198,34 @@ static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
         return readShape;
-      } 
+      }
 
       // For matrixA and matrixB.
       if (operandId == 0 || operandId == 1) {
-        // MmaSyncOp input operands: matrixA and matrixB. 
+        // MmaSyncOp input operands: matrixA and matrixB.
         // LDSMx1, x2, x4:
         // - LDSMx1 loads a 1 tile  of 8x8.
         // - LDSMx2 loads a 2 tiles of 8x8.
         // - LDSMx4 loads a 4 tiles of 8x8. (in use)
-        // IREE uses the largest tiled load, i.e., LDSMx4. 
+        // IREE uses the largest tiled load, i.e., LDSMx4.
 
         // MmaSyncOp source operand: matrixC.
-        // matrixC is also read/written in tiled block of 16x16. In the pass 
-        // OptimizeVectorTransfer, matrixC reads are moved above the mainloop 
-        // and writes are moved below the mainloop. Thus, mma.sync read/write 
-        // accumulator inplace. 
+        // matrixC is also read/written in tiled block of 16x16. In the pass
+        // OptimizeVectorTransfer, matrixC reads are moved above the mainloop
+        // and writes are moved below the mainloop. Thus, mma.sync read/write
+        // accumulator inplace.
 
         SmallVector<int64_t> readShape;
         readShape.append({16, 16});
         return readShape;
       }
     }
-    
+
     // Loading F32 values from Shared Memory to Registers.
     if (resultElementType.isF32()) {
       // TODO
-      op->emitError() << "TODO Implement shape for F32 loads in getMmaNativeVectorSize";
+      op->emitError()
+          << "TODO Implement shape for F32 loads in getMmaNativeVectorSize";
       return std::nullopt;
     }
   }
@@ -236,9 +234,8 @@ static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(
 
 static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeVectorSize(
     Operation *op) {
-  if (llvmgpuUseMMASync)
-    return getMmaNativeVectorSize(op);
-  
+  if (llvmgpuUseMMASync) return getMmaNativeVectorSize(op);
+
   return getWmmaNativeVectorSize(op);
 }
 
@@ -260,7 +257,6 @@ struct LLVMGPUTensorCoreVectorizationPass
     auto funcOp = getOperation();
     MLIRContext *context = &getContext();
     {
-
       // Step 1. Vectorize.
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(vectorizationPatterns);
@@ -282,10 +278,12 @@ struct LLVMGPUTensorCoreVectorizationPass
 
       // Step 3. Prepare vector operations to be lowered to GPU ops.
       RewritePatternSet vectorContractPatterns(funcOp.getContext());
-      mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(vectorContractPatterns);
-      mlir::populatePrepareVectorToMMAPatterns(vectorContractPatterns, llvmgpuUseMMASync);
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(vectorContractPatterns)))) {
+      mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(
+          vectorContractPatterns);
+      mlir::populatePrepareVectorToMMAPatterns(vectorContractPatterns,
+                                               llvmgpuUseMMASync);
+      if (failed(applyPatternsAndFoldGreedily(
+              getOperation(), std::move(vectorContractPatterns)))) {
         return signalPassFailure();
       }
 
@@ -296,7 +294,6 @@ struct LLVMGPUTensorCoreVectorizationPass
               funcOp, std::move(vectorUnrollPatterns)))) {
         return signalPassFailure();
       }
-
     }
   }
 };
