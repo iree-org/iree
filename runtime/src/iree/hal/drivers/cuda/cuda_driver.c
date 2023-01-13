@@ -92,11 +92,6 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
 
   iree_status_t status =
       iree_hal_cuda_dynamic_symbols_initialize(host_allocator, &driver->syms);
-  if (!iree_status_is_ok(status)) {
-    iree_hal_driver_release((iree_hal_driver_t*)driver);
-    return status;
-  }
-
   if (iree_status_is_ok(status)) {
     // Initialize NCCL if NPROCS is set.
     if (driver->default_params.nccl_default_count > 0) {

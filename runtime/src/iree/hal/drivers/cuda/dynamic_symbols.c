@@ -85,10 +85,10 @@ iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
       IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->cuda_library);
   if (iree_status_is_not_found(status)) {
     iree_status_ignore(status);
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_make_status(IREE_STATUS_UNAVAILABLE,
-                             "CUDA runtime library not available; ensure "
-                             "installed and on path"));
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "CUDA runtime library not available; ensure "
+                            "installed and on path");
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_dynamic_symbols_resolve_all(out_syms);
@@ -114,20 +114,20 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
   }
 
   out_syms->nccl_library = NULL;
-  iree_status_t status = iree_ok_status();
-  status = iree_dynamic_library_load_from_files(
+  iree_status_t status = iree_dynamic_library_load_from_files(
       IREE_ARRAYSIZE(kNCCLLoaderSearchNames), kNCCLLoaderSearchNames,
       IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->nccl_library);
   if (iree_status_is_not_found(status)) {
     iree_status_ignore(status);
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_make_status(IREE_STATUS_UNAVAILABLE,
-                             "NCCL runtime library not available; ensure "
-                             "installed and on path"));
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "NCCL runtime library not available; ensure "
+                            "installed and on path");
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_nccl_dynamic_symbols_resolve_all(out_syms);
-  } else {
+  }
+  if (!iree_status_is_ok(status)) {
     iree_hal_cuda_dynamic_symbols_deinitialize(out_syms);
   }
   IREE_TRACE_ZONE_END(z0);
