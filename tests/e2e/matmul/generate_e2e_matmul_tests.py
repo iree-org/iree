@@ -214,7 +214,8 @@ def get_test_compilation_infos(
     tile_workgroup_size_pairs = [
         ## WarpShape = 2x2
         TileWorkgroupSizePair([[64, 64, 64]], [64, 2, 1]),
-        TileWorkgroupSizePair([[128, 128, 64]], [64, 2, 1]), # needs larger shared Memory and only runs on A100.
+        # Needs larger shared Memory and only runs on A100.
+        TileWorkgroupSizePair([[128, 128, 64]], [64, 2, 1]),
 
         ## WarpShape = 4x1
         TileWorkgroupSizePair([[32, 32, 32]], [64, 1, 1]),
