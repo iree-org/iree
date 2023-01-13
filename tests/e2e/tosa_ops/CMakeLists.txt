@@ -194,6 +194,7 @@ iree_check_single_backend_test_suite(
     "log.mlir"
     "logical_left_shift.mlir"
     "logical_right_shift.mlir"
+    "logical_right_shift_16.mlir"
     "matmul.mlir"
     "max_pool.mlir"
     "maximum.mlir"
