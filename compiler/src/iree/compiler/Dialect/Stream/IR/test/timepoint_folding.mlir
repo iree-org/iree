@@ -210,6 +210,37 @@ func.func @GroupAwaitsByTimepointUnsafe(
 
 // -----
 
+// Tests that the pattern doesn't kick in when the same timepoint are waited in
+// different blocks.
+
+func.func private @materializeResource() -> !stream.resource<*>
+
+// CHECK-LABEL: @DontGroupAwaitsByTimepointAcrossBlocks
+func.func @DontGroupAwaitsByTimepointAcrossBlocks(
+  %arg0: !stream.timepoint,
+  %arg1: !stream.resource<*>,
+  %arg2: i1
+) -> !stream.resource<*> {
+  %c100 = arith.constant 100 : index
+  %c101 = arith.constant 101 : index
+  %0 = stream.timepoint.await %arg0 => %arg1 : !stream.resource<*>{%c100}
+  // CHECK: cf.cond_br
+  cf.cond_br %arg2, ^bb0, ^bb1
+// CHECK: ^bb
+^bb0:
+  // CHECK: stream.timepoint.await %arg0 => %arg1
+  return %0 : !stream.resource<*>
+// CHECK: ^bb
+^bb1:
+  // CHECK: %[[R:.+]] = call @materializeResource
+  %r = call @materializeResource() : () -> !stream.resource<*>
+  // CHECK: stream.timepoint.await %arg0 => %[[R]]
+  %1 = stream.timepoint.await %arg0 => %r : !stream.resource<*>{%c101}
+  return %1 : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @FoldDuplicateAwaitResources
 func.func @FoldDuplicateAwaitResources(
   %arg0: !stream.timepoint,

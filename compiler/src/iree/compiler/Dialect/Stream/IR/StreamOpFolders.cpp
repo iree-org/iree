@@ -2584,6 +2584,7 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
       // there. We rely on other canonicalizers to sink things such that
       // (hopefully) we get them directly accessible here.
       if (use.getOwner() == op) continue;
+      if (op->getBlock() != use.getOwner()->getBlock()) continue;
       if (dominanceInfo.dominates(use.getOwner(), op)) continue;
       auto awaitOp = dyn_cast<TimepointAwaitOp>(use.getOwner());
       if (!awaitOp ||
