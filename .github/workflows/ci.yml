@@ -571,7 +571,7 @@ jobs:
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
             --env "IREE_BUILD_BENCHMARKS_DIR=${BUILD_BENCHMARKS_DIR}" \
             gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
             build_tools/cmake/build_benchmarks.sh
@@ -777,7 +777,7 @@ jobs:
             --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
             --env "IREE_TARGET_ARCH=${ARCH}" \
             --env "BUILD_PRESET=benchmark" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build"
       - name: "Compiling the benchmark tools with tracing"
         id: build-with-tracing
@@ -786,7 +786,7 @@ jobs:
             --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
             --env "IREE_TARGET_ARCH=${ARCH}" \
             --env "BUILD_PRESET=benchmark-with-tracing" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
       - name: "Creating the benchmark tools archive"
         id: archive
@@ -847,7 +847,7 @@ jobs:
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
             gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
@@ -1108,7 +1108,7 @@ jobs:
             --env "IREE_TARGET_ABI=${ABI}" \
             --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
             --env "BUILD_PRESET=test" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
             "${DOCKER_IMAGE}" \
             "${BUILD_SCRIPT}"
       - name: "Test cross-compiling target"
@@ -1147,7 +1147,7 @@ jobs:
       - name: "Building the runtime for the web using Emscripten"
         run: |
           build_tools/github_actions/docker_run.sh \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
             gcr.io/iree-oss/emscripten@sha256:fdb2bf6b0701a6de80f4f708ea86b001279c8acd904c34ef4d05ee3802711e45 \
             build_tools/cmake/build_runtime_emscripten.sh
 
@@ -1213,7 +1213,7 @@ jobs:
             --env "IREE_TARGET_ARCH=${ARCH}" \
             --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
             --env "BUILD_PRESET=benchmark-suite-test" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BUILD_DIR}/install" \
+            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
             --env "E2E_TEST_ARTIFACTS_DIR=${E2E_TEST_ARTIFACTS_DIR}" \
             "${DOCKER_IMAGE}" \
             bash -euo pipefail -c \

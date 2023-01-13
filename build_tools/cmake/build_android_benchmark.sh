@@ -99,7 +99,7 @@ cd build-android
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI=arm64-v8a \
   -DANDROID_PLATFORM=android-29 \
-  -DIREE_HOST_BINARY_ROOT="${PWD}/../build-host/install" \
+  -DIREE_HOST_BIN_DIR="${PWD}/../build-host/install/bin" \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=OFF
@@ -124,7 +124,7 @@ cd build-android-trace
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI=arm64-v8a \
   -DANDROID_PLATFORM=android-29 \
-  -DIREE_HOST_BINARY_ROOT="${PWD}/../build-host/install" \
+  -DIREE_HOST_BIN_DIR="${PWD}/../build-host/install/bin" \
   -DIREE_ENABLE_RUNTIME_TRACING=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=ON \
