@@ -31,6 +31,7 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "extract_slice.mlir"
+    "pack.mlir"
     "tensor_insert_slice.mlir"
   TARGET_BACKEND
     "llvm-cpu"
