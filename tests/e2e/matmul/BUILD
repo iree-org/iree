@@ -181,7 +181,7 @@ py_binary(
 ]]
 
 # Testing Ampere + TensorCore path.
-# WMMA TensorCore(F32): wmma.161616.f32.tf32 
+# WMMA TensorCore(F32): wmma.161616.f32.tf32
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_gpu_large_%s" % compilation_info,
     compiler_flags = [
