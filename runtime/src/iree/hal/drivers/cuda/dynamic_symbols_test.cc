@@ -10,7 +10,6 @@
 
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
-#include "third_party/nccl/nccl.h"
 
 namespace iree {
 namespace hal {

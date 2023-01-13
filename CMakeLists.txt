@@ -614,6 +614,10 @@ endif()
 
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 
+if(IREE_HAL_DRIVER_CUDA)
+  add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)
+endif()
+
 if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 endif()
