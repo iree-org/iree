@@ -168,7 +168,9 @@ createFormDispatchWorkgroupsPass(bool generateWorkloadRegion = true);
 // that is parsed from `transformFileName`.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDispatchWithTransformDialect(
-    llvm::StringRef transformFileName = llvm::StringRef());
+    llvm::StringRef transformFileName = llvm::StringRef(),
+    llvm::StringRef debugPayloadRootTag = llvm::StringRef(),
+    llvm::StringRef debugTransformRootTag = llvm::StringRef());
 
 // Captures dynamic shape dimensions required by dispatch operands.
 std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();

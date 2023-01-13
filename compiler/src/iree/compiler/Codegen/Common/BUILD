@@ -73,7 +73,6 @@ iree_compiler_cc_library(
         # IR
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Rewrite",
         # Interfaces
@@ -85,6 +84,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:VectorTransforms",
         # Other Stuff
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:DialectUtils",
