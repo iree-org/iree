@@ -46,6 +46,7 @@ iree_lit_test_suite(
     "transform_ops_invalid.mlir"
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"
+    "vectorize_pack_unpack_ops.mlir"
     "vectorize_tensor_pad.mlir"
     "warp_reduction.mlir"
     "workgroup_specialization.mlir"
