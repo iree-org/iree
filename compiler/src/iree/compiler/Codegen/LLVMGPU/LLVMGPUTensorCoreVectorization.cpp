@@ -279,15 +279,18 @@ struct LLVMGPUTensorCoreVectorizationPass
         return signalPassFailure();
       }
 
-      // Step 3. Prepare vector operations to be lowered to GPU ops.
-      RewritePatternSet vectorContractPatterns(funcOp.getContext());
-      mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(
-          vectorContractPatterns);
-      mlir::populatePrepareVectorToMMAPatterns(vectorContractPatterns,
-                                               llvmgpuUseMMASync);
-      if (failed(applyPatternsAndFoldGreedily(
-              getOperation(), std::move(vectorContractPatterns)))) {
-        return signalPassFailure();
+      // Step 3. Prepare vector operations to be lowered to native tensor core
+      // operations (nvgpu.mmasync, nvgpu.ldmatrix).
+      if (llvmgpuUseMMASync) {
+        RewritePatternSet vectorContractPatterns(funcOp.getContext());
+        mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(
+            vectorContractPatterns);
+        mlir::populatePrepareVectorToMMAPatterns(vectorContractPatterns,
+                                                 llvmgpuUseMMASync);
+        if (failed(applyPatternsAndFoldGreedily(
+                getOperation(), std::move(vectorContractPatterns)))) {
+          return signalPassFailure();
+        }
       }
 
       // Step 4. Break and unroll warp tile size to native math and load sizes.
