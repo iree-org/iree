@@ -16,9 +16,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/FunctionInterfaces.h"
@@ -26,7 +24,6 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-flow-collapse-dimensions"
 
@@ -220,25 +217,10 @@ void CollapseDimensionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
 
-  auto walkResult = funcOp->walk([&](DispatchRegionOp regionOp) {
+  funcOp->walk([&](DispatchRegionOp regionOp) {
     if (failed(collapseDimensions(rewriter, regionOp)))
-      return WalkResult::interrupt();
-    return WalkResult::advance();
+      return signalPassFailure();
   });
-  if (walkResult.wasInterrupted()) {
-    funcOp->emitOpError("failed in collapsing dimensions pass");
-    return signalPassFailure();
-  }
-
-  RewritePatternSet canonicalizationPatterns(&getContext());
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(
-      canonicalizationPatterns);
-  tensor::populateFoldTensorEmptyPatterns(canonicalizationPatterns);
-  if (failed(applyPatternsAndFoldGreedily(
-          funcOp, std::move(canonicalizationPatterns)))) {
-    funcOp->emitOpError("failed to apply cleanup patterns");
-    return signalPassFailure();
-  }
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
