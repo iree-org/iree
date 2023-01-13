@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/ADTExtras.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -64,14 +65,12 @@ static LogicalResult verifyDispatchWorkload(
              << workgroupCount.getNumArguments()
              << " arguments but dispatch provides " << workload.size();
     }
-    for (auto it : llvm::enumerate(llvm::zip_equal(
-             workgroupCount.getArgumentTypes(), workload.getTypes()))) {
-      auto expectedType = std::get<0>(it.value());
-      auto actualType = std::get<1>(it.value());
+    for (auto [idx, expectedType, actualType] : enumerate_zip_equal(
+             workgroupCount.getArgumentTypes(), workload.getTypes())) {
       if (expectedType != actualType) {
-        return op->emitOpError() << "workload operand " << it.index()
-                                 << " type mismatch; expected " << expectedType
-                                 << " but passed " << actualType;
+        return op->emitOpError()
+               << "workload operand " << idx << " type mismatch; expected "
+               << expectedType << " but passed " << actualType;
       }
     }
   }
