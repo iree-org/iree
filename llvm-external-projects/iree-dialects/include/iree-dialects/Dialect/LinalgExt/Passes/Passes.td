@@ -90,6 +90,14 @@ def TileAndDecomposeWinogradTransform :
                     "createTileAndDecomposeWinogradTransformPass()";
 }
 
+def TileAndDecomposeFlashAttentionTransform :
+    Pass<"iree-linalg-ext-tile-and-decompose-flash-attention", "func::FuncOp"> {
+  let summary =
+      "Tiles and decomposes flash attention ops into linalg ops";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createTileAndDecomposeFlashAttentionTransformPass()";
+}
+
 def ConvertConv2DToWinograd :
     Pass<"iree-linalg-ext-convert-conv2d-to-winograd", ""> {
   let summary = "Convert linalg convolution ops to winograd based implementation";

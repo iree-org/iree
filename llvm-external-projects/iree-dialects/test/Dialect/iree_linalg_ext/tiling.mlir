@@ -1530,11 +1530,15 @@ func.func @flash_attention_fwd(%query: tensor<192x1024x64xf32>, %key: tensor<192
 // CHECK-DAG:          %[[D4:.+]] = affine.min #[[MAP1]](%[[ARG5]])[%[[C32]], %[[C1024]]]
 // CHECK:            %[[EXTRACTED_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG3]], %[[ARG5]], 0] [%[[D2]],
 // CHECK-SAME:         %[[D4]], 64] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x?x64xf32>
-// CHECK:            %[[EXTRACTED_SLICE_0:.+]] = tensor.extract_slice %[[D0]][%[[ARG3]], %[[ARG5]], 0] [%[[D2]],
+// CHECK:            %[[EXTRACTED_SLICE_0:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG3]], 0, 0] [%[[D2]], 1024, 64] [1,
+// CHECK-SAME:         1, 1] : tensor<192x1024x64xf32> to tensor<?x1024x64xf32>
+// CHECK:            %[[EXTRACTED_SLICE_1:.+]] = tensor.extract_slice %[[ARG2]][%[[ARG3]], 0, 0] [%[[D2]], 1024, 64] [1,
+// CHECK-SAME:         1, 1] : tensor<192x1024x64xf32> to tensor<?x1024x64xf32>
+// CHECK:            %[[EXTRACTED_SLICE_2:.+]] = tensor.extract_slice %[[D0]][%[[ARG3]], %[[ARG5]], 0] [%[[D2]],
 // CHECK-SAME:         %[[D4]], 64] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x?x64xf32>
-// CHECK:            %[[D5:.+]] = iree_linalg_ext.flash_attention.fwd ins(%[[EXTRACTED_SLICE]], %[[ARG1]], %[[ARG2]] :
-// CHECK-SAME:         tensor<?x?x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>) outs(%[[EXTRACTED_SLICE]]_0
-// CHECK-SAME:         : tensor<?x?x64xf32>) -> tensor<?x?x64xf32>
+// CHECK:            %[[D5:.+]] = iree_linalg_ext.flash_attention.fwd ins(%[[EXTRACTED_SLICE]], %[[EXTRACTED_SLICE]]_0,
+// CHECK-SAME:         %[[EXTRACTED_SLICE]]_1 : tensor<?x?x64xf32>, tensor<?x1024x64xf32>, tensor<?x1024x64xf32>)
+// CHECK-SAME:         outs(%[[EXTRACTED_SLICE]]_2 : tensor<?x?x64xf32>) -> tensor<?x?x64xf32>
 // CHECK:            %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D5]] into %[[ARG6]][%[[D2]], %[[D4]], 0]
 // CHECK-SAME:         [%[[ARG3]], %[[ARG5]], 64] [1, 1, 1] : tensor<?x?x64xf32> into tensor<192x1024x64xf32>
 // CHECK:            scf.yield %[[INSERTED_SLICE]] : tensor<192x1024x64xf32>
@@ -1566,11 +1570,16 @@ func.func @flash_attention_fwd_memref(%query: memref<192x1024x64xf32>, %key: mem
 // CHECK-DAG:          %[[D1:.+]] = affine.min #[[MAP1]](%[[ARG5]])[%[[C32]], %[[C1024]]]
 // CHECK:            %[[SUBVIEW:.+]] = memref.subview %[[ARG0]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], 64] [1, 1,
 // CHECK-SAME:         1] : memref<192x1024x64xf32> to memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>
-// CHECK:            %[[SUBVIEW_0:.+]] = memref.subview %[[ARG3]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], 64] [1, 1,
+// CHECK:            %[[SUBVIEW_0:.+]] = memref.subview %[[ARG1]][%[[ARG4]], 0, 0] [%[[D0]], 1024, 64] [1, 1, 1] :
+// CHECK-SAME:         memref<192x1024x64xf32> to memref<?x1024x64xf32, strided<[65536, 64, 1], offset: ?>>
+// CHECK:            %[[SUBVIEW_1:.+]] = memref.subview %[[ARG2]][%[[ARG4]], 0, 0] [%[[D0]], 1024, 64] [1, 1, 1] :
+// CHECK-SAME:         memref<192x1024x64xf32> to memref<?x1024x64xf32, strided<[65536, 64, 1], offset: ?>>
+// CHECK:            %[[SUBVIEW_2:.+]] = memref.subview %[[ARG3]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], 64] [1, 1,
 // CHECK-SAME:         1] : memref<192x1024x64xf32> to memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>
-// CHECK:            iree_linalg_ext.flash_attention.fwd ins(%[[SUBVIEW]], %[[ARG1]], %[[ARG2]] : memref<?x?x64xf32,
-// CHECK-SAME:         strided<[65536, 64, 1], offset: ?>>, memref<192x1024x64xf32>, memref<192x1024x64xf32>)
-// CHECK-SAME:         outs(%[[SUBVIEW]]_0 : memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>)
+// CHECK:            iree_linalg_ext.flash_attention.fwd ins(%[[SUBVIEW]], %[[SUBVIEW]]_0, %[[SUBVIEW]]_1 :
+// CHECK-SAME:         memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>, memref<?x1024x64xf32, strided<[65536, 64,
+// CHECK-SAME:         1], offset: ?>>, memref<?x1024x64xf32, strided<[65536, 64, 1], offset: ?>>) outs(%[[SUBVIEW]]_2 :
+// CHECK-SAME:         memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>)
 // CHECK:          }
 // CHECK:        }
 // CHECK:        return

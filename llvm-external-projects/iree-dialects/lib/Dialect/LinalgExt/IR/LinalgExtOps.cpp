@@ -2838,11 +2838,21 @@ FlashAttentionFwdOp::getTiledImplementation(OpBuilder &builder,
     queryOutputSizes[info.index()] = std::get<1>(info.value());
   }
 
+  SmallVector<OpFoldResult> keyValueOffsets(getKeyRank(), zero);
+  SmallVector<OpFoldResult> keyValueStrides(getKeyRank(), one);
+  ArrayRef<int64_t> keyShape = getKeyType().getShape();
+  SmallVector<OpFoldResult> keyValueSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(keyShape));
+  keyValueSizes[0] = sizes[0];
+  keyValueOffsets[0] = offsets[0];
+
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(getSlice(builder, loc, query(), queryOutputOffsets,
                                       queryOutputSizes, queryOutputStrides));
-  tiledOperands.emplace_back(key());
-  tiledOperands.emplace_back(value());
+  tiledOperands.emplace_back(getSlice(builder, loc, key(), keyValueOffsets,
+                                      keyValueSizes, keyValueStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, value(), keyValueOffsets,
+                                      keyValueSizes, keyValueStrides));
   tiledOperands.emplace_back(getSlice(builder, loc, output(),
                                       queryOutputOffsets, queryOutputSizes,
                                       queryOutputStrides));

@@ -6,6 +6,7 @@ add_mlir_library(IREELinalgExtPasses
   PadContractionToBlockSize.cpp
   Passes.cpp
   SplitReduction.cpp
+  TileAndDecomposeFlashAttentionPass.cpp
   TileAndDecomposeWinogradPass.cpp
   Tiling.cpp
 
