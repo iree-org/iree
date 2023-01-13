@@ -67,6 +67,7 @@ iree_compiler_cc_library(
         ":FlowOpsGen",
         ":FlowTypesGen",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
