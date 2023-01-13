@@ -79,8 +79,8 @@ external_cc_library(
   PUBLIC
 )
 
-if(DEFINED IREE_HOST_BINARY_ROOT)
-  # Just import if IREE_HOST_BINARY_ROOT is set (e.g. when cross-compiling).
+if(IREE_HOST_BIN_DIR)
+  # Just import if IREE_HOST_BIN_DIR is set (e.g. when cross-compiling).
   iree_import_binary(NAME iree-flatcc-cli)
   return()
 endif()

@@ -51,7 +51,7 @@ function(iree_bytecode_module)
   endif()
 
   if(_RULE_STATIC_LIB_PATH AND
-     NOT (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT))
+     NOT (IREE_TARGET_BACKEND_LLVM_CPU OR IREE_HOST_BIN_DIR))
     message(SEND_ERROR "Static library only supports llvm-cpu backend")
   endif()
 
@@ -122,8 +122,6 @@ function(iree_bytecode_module)
     get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
-  # Depending on the binary instead of the target here given we might not have
-  # a target in this CMake invocation when cross-compiling.
   add_custom_command(
     OUTPUT
       ${_OUTPUT_FILES}

@@ -48,11 +48,11 @@ function(iree_static_linker_test)
   endif()
 
   # See comment in iree_check_test about this condition.
-  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BINARY_ROOT)
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BIN_DIR)
     return()
   endif()
 
-  if(NOT (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT) OR
+  if(NOT (IREE_TARGET_BACKEND_LLVM_CPU OR IREE_HOST_BIN_DIR) OR
      NOT IREE_HAL_DRIVER_LOCAL_SYNC)
     return()
   endif()
@@ -66,7 +66,7 @@ function(iree_static_linker_test)
   )
 
   if(_RULE_EMITC AND
-     NOT (IREE_OUTPUT_FORMAT_C OR DEFINED IREE_HOST_BINARY_ROOT))
+     NOT (IREE_OUTPUT_FORMAT_C OR IREE_HOST_BIN_DIR))
     return()
   endif()
 
