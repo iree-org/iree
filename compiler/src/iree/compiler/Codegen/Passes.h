@@ -199,14 +199,6 @@ createFuseTensorPadWithConsumerPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConcretizePadResultShapePass();
 
-IREE::LinalgExt::MaterializeEncodingValueFn getMaterializeEncodingValueFn(
-    IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Materialize the encoding of operations. The layout to use for the encoded
-/// operations are backend specific.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createIREEMaterializeEncodingPass();
-
 /// Erases #hal.descriptor_type as MemRef memory space.
 LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp);
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -273,6 +265,11 @@ createLLVMCPUCheckIRBeforeLLVMConversionPass();
 /// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass();
+
+/// Materialize the encoding of operations. The layout to use for the encoded
+/// operations are LLVMCPU specific.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUMaterializeEncodingPass();
 
 /// Synchronizes LLVM linkage with MLIR symbol visibility.
 std::unique_ptr<OperationPass<ModuleOp>>
@@ -612,6 +609,11 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
 //------------------------------------------------------------------------------
 // VMVX passes
 //------------------------------------------------------------------------------
+
+/// Materialize the encoding of operations. The layout to use for the encoded
+/// operations are VMVX specific.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createVMVXMaterializeEncodingPass();
 
 // Lowers high level library calls from named ops and generics. This operates
 // at the bufferized linalg level.

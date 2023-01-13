@@ -35,7 +35,6 @@ iree_lit_test_suite(
             "gpu_vectorization.mlir",
             "iree_comprehensive_bufferize.mlir",
             "pad_dynamic_alloc.mlir",
-            "materialize_encoding.mlir",
             "rematerialize_parallel_ops.mlir",
             "reduce_bank_conflicts.mlir",
             "reductions.mlir",

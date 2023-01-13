@@ -119,7 +119,7 @@ iree_compiler_cc_library(
         "ForOpCanonicalizationPass.cpp",
         "FuseTensorPadWithConsumer.cpp",
         "IREEComprehensiveBufferizePass.cpp",
-        "MaterializeEncodingPass.cpp",
+        "MaterializeEncodingIntoPackUnPack.cpp",
         "OptimizeVectorTransferPass.cpp",
         "PolynomialApproximationPass.cpp",
         "RematerializeParallelOps.cpp",
@@ -132,6 +132,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "BufferizationAnalysis.h",
+        "EncodingInfo.h",
         "Transforms.h",
     ],
     deps = [

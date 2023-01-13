@@ -39,7 +39,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createEraseHALDescriptorTypeFromMemRefPass());
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createIREEMaterializeEncodingPass());
+      createVMVXMaterializeEncodingPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();

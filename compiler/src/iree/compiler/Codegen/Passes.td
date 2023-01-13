@@ -100,12 +100,6 @@ def IREEComprehensiveBufferize :
   ];
 }
 
-def IREEMaterializeEncoding :
-    Pass<"iree-codegen-materialize-encoding", "func::FuncOp"> {
-  let summary = "Materialize the encoding for tensor as specified by the backend";
-  let constructor = "mlir::iree_compiler::createIREEMaterializeEncodingPass()";
-}
-
 def OptimizeVectorTransfer :
     Pass<"iree-codegen-optimize-vector-transfer", "func::FuncOp"> {
   let summary =
@@ -361,6 +355,12 @@ def LLVMCPULowerExecutableTarget :
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
 }
 
+def LLVMCPUMaterializeEncoding :
+    Pass<"iree-llvmcpu-materialize-encoding", "func::FuncOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend";
+  let constructor = "mlir::iree_compiler::createLLVMCPUMaterializeEncodingPass()";
+}
+
 def LLVMCPUSynchronizeSymbolVisibility :
     Pass<"iree-llvmcpu-synchronize-symbol-visibility", "ModuleOp"> {
   let summary = "Synchronizes LLVM linkage with MLIR symbol visibility";
@@ -604,6 +604,13 @@ def SPIRVAnnotateWinogradLoops : Pass<"iree-spirv-annotate-winograd-loops", "fun
 //------------------------------------------------------------------------------
 // VMVX Passes
 //------------------------------------------------------------------------------
+
+def VMVXMaterializeEncoding :
+    Pass<"iree-vmvx-materialize-encoding", "func::FuncOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend";
+  let constructor = "mlir::iree_compiler::createVMVXMaterializeEncodingPass()";
+}
+
 
 def VMVXLowerLinalgMicrokernels :
     Pass<"iree-vmvx-lower-linalg-microkernels", ""> {
