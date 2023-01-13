@@ -247,20 +247,17 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
   LowerDispatchWorkgroupCountFromSetEncodingOp(
       MLIRContext *context,
       IREE::LinalgExt::MaterializeEncodingInfo encodingInfo,
-      RankedTensorType inputType, IREE::HAL::ExecutableTargetAttr targetAttr,
-      PatternBenefit benefit = 1)
+      RankedTensorType inputType, PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
         materializeEncodingInfo(std::move(encodingInfo)),
         inputType(inputType) {
-    if (isVMVXBackend(targetAttr) && hasMicrokernels(targetAttr)) {
-      for (int64_t &s : materializeEncodingInfo.innerTileSizes) {
-        if (s == ShapedType::kDynamic) {
-          // VMVX+microkernels does produce dynamic tile sizes. The actual
-          // values can only be queried in device code, not here, so we
-          // use an approximation here. They are currently powers of two <= 16,
-          // so this value works for now.
-          s = 16;
-        }
+    for (int64_t &s : materializeEncodingInfo.innerTileSizes) {
+      if (s == ShapedType::kDynamic) {
+        // Dynamic tile sizes. The actual values can only be queried in device
+        // code, not here, so we use an approximation here. They are currently
+        // powers of two <= 16, so this value works for now. This is also
+        // consistent with the default padding in SetEncoding.
+        s = 16;
       }
     }
   }
@@ -357,7 +354,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         if (failed(encodingInfo)) {
           return signalPassFailure();
         }
-        auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(packRootOp);
         auto tensorType = packRootOp.getInputType().cast<RankedTensorType>();
         // The LowerDispatchWorkgroupCountFromSetEncodingOp pattern is going to
         // call materializeEncodingValueFn, passing it a tensor type, expecting
@@ -376,7 +372,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         auto tensorTypeWithEncoding = RankedTensorType::Builder(
             tensorType.getShape(), tensorType.getElementType(), encodingAttr);
         patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
-            context, encodingInfo.value(), tensorTypeWithEncoding, targetAttr);
+            context, encodingInfo.value(), tensorTypeWithEncoding);
       }
       if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
         exportOp.emitOpError("failed to lower number of workgroups");
