@@ -53,14 +53,14 @@ function(iree_import_binary)
   endif()
 
   set(_FULL_BINARY_NAME "${_RULE_NAME}${_HOST_EXECUTABLE_SUFFIX}")
-  set(_BINARY_PATH "${IREE_HOST_BINARY_ROOT}/${_FULL_BINARY_NAME}")
+  set(_BINARY_PATH "${IREE_HOST_BIN_DIR}/${_FULL_BINARY_NAME}")
   file(REAL_PATH "${_BINARY_PATH}" _BINARY_PATH
        BASE_DIRECTORY ${IREE_ROOT_DIR} EXPAND_TILDE)
 
   if(NOT EXISTS ${_BINARY_PATH})
     message(FATAL_ERROR "Could not find '${_FULL_BINARY_NAME}' under "
             "'${IREE_HOST_BIN_DIR}'\n(Expanded to '${_BINARY_PATH}').\n"
-            "Ensure that IREE_HOST_BINARY_ROOT points to a complete install directory.")
+            "Ensure that IREE_HOST_BIN_DIR points to a complete binary directory.")
   endif()
 
   add_executable(${_RULE_NAME} IMPORTED GLOBAL)

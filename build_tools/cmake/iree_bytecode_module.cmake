@@ -122,8 +122,6 @@ function(iree_bytecode_module)
     get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
-  # Depending on the binary instead of the target here given we might not have
-  # a target in this CMake invocation when cross-compiling.
   add_custom_command(
     OUTPUT
       ${_OUTPUT_FILES}
