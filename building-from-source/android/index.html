@@ -1230,7 +1230,7 @@ cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/<span 
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build-android/<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DCMAKE_TOOLCHAIN_FILE<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">ANDROID_NDK</span><span class="p">?</span><span class="si">}</span><span class="s2">/build/cmake/android.toolchain.cmake&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DIREE_HOST_BINARY_ROOT<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/../iree-build/install&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/../iree-build/install/bin&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DANDROID_ABI<span class="o">=</span><span class="s2">&quot;arm64-v8a&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DANDROID_PLATFORM<span class="o">=</span><span class="s2">&quot;android-29&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DIREE_BUILD_COMPILER<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
@@ -1241,7 +1241,7 @@ cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build-androi
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build-android/<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DCMAKE_TOOLCHAIN_FILE<span class="o">=</span><span class="s2">&quot;%ANDROID_NDK%/build/cmake/android.toolchain.cmake&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DIREE_HOST_BINARY_ROOT<span class="o">=</span><span class="s2">&quot;%CD%/../iree-build/install&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="s2">&quot;%CD%/../iree-build/install/bin&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DANDROID_ABI<span class="o">=</span><span class="s2">&quot;arm64-v8a&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DANDROID_PLATFORM<span class="o">=</span><span class="s2">&quot;android-29&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DIREE_BUILD_COMPILER<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>

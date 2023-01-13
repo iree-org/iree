@@ -1307,7 +1307,7 @@ as a reference of how to set up the cmake configuration.</p>
 <h4 id="risc-v-64-bit-linux-target">RISC-V 64-bit Linux target<a class="headerlink" href="#risc-v-64-bit-linux-target" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build-riscv/<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DCMAKE_TOOLCHAIN_FILE<span class="o">=</span><span class="s2">&quot;./build_tools/cmake/riscv.toolchain.cmake&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DIREE_HOST_BINARY_ROOT<span class="o">=</span><span class="k">$(</span>realpath<span class="w"> </span>../iree-build/install<span class="k">)</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="k">$(</span>realpath<span class="w"> </span>../iree-build/install/bin<span class="k">)</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DRISCV_CPU<span class="o">=</span>linux-riscv_64<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DIREE_BUILD_COMPILER<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DRISCV_TOOLCHAIN_ROOT<span class="o">=</span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
