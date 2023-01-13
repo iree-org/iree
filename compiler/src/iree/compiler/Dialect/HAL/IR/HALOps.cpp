@@ -1060,6 +1060,19 @@ void ExecutableLookupOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
+void InterfaceBindingSubspanOp::build(
+    OpBuilder &builder, OperationState &result, Type resultType, APInt set,
+    APInt binding, IREE::HAL::DescriptorType descriptor_type, Value byte_offset,
+    ValueRange dynamic_dims, IntegerAttr alignment,
+    Optional<DescriptorFlags> flags) {
+  IREE::HAL::DescriptorFlagsAttr descriptorAttr;
+  if (flags.has_value()) {
+    descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),
+                                                         flags.value());
+  }
+  build(builder, result, resultType, set, binding, descriptor_type, byte_offset,
+        dynamic_dims, alignment, descriptorAttr);
+}
 
 LogicalResult InterfaceBindingSubspanOp::verify() {
   InterfaceBindingSubspanOp op = *this;
