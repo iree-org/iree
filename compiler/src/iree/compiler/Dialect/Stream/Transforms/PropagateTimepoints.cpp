@@ -529,10 +529,8 @@ static void expandAsyncExecuteOp(IREE::Stream::AsyncExecuteOp op,
   if (op.getAwaitTimepoint()) {
     newTimepoints.insert(op.getAwaitTimepoint());
   }
-  for (auto it : llvm::zip_equal(op.getResourceOperands(),
-                                 op.getResourceOperandSizes())) {
-    auto operand = std::get<0>(it);
-    auto operandSize = std::get<1>(it);
+  for (auto [operand, operandSize] : llvm::zip_equal(
+           op.getResourceOperands(), op.getResourceOperandSizes())) {
     auto timepointOperand =
         consumeTimepoint(op.getLoc(), operand, resourceTimepointMap, builder);
     if (newTimepoints.insert(timepointOperand.first)) {

@@ -84,18 +84,17 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       }
 
       SmallVector<Binding> bindings;
-      for (auto it :
-           llvm::zip_equal(bindingAttrs, dispatchOp.getResourceLengths())) {
-        auto bindingAttr =
-            std::get<0>(it).cast<IREE::HAL::InterfaceBindingAttr>();
-        APInt resourceLength;
-        if (!matchPattern(std::get<1>(it), m_ConstantInt(&resourceLength))) {
+      for (auto [bindingAttr, resourceLength] : llvm::zip_equal(
+               bindingAttrs.getAsRange<IREE::HAL::InterfaceBindingAttr>(),
+               dispatchOp.getResourceLengths())) {
+        APInt resourceLengthInt;
+        if (!matchPattern(resourceLength, m_ConstantInt(&resourceLengthInt))) {
           // Non-constant resource length; skip this dispatch.
           return;
         }
         bindings.push_back({(unsigned)bindingAttr.getSet(),
                             (unsigned)bindingAttr.getBinding(),
-                            resourceLength.getSExtValue()});
+                            resourceLengthInt.getSExtValue()});
       }
 
       // Work around needing a mutable key for the set; C++ was a mistake.

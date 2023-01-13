@@ -43,10 +43,10 @@ namespace Stream {
 static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
                        ArrayRef<Type> types,
                        SmallVector<OpAsmParser::Argument> &args) {
-  for (auto argAndType : llvm::zip_equal(operands, types)) {
+  for (auto [operand, type] : llvm::zip_equal(operands, types)) {
     auto &arg = args.emplace_back();
-    arg.ssaName = std::get<0>(argAndType);
-    arg.type = std::get<1>(argAndType);
+    arg.ssaName = operand;
+    arg.type = type;
   }
 }
 
@@ -170,19 +170,16 @@ static LogicalResult verifyEscapingResources(Region &region,
       return yieldOp.emitOpError()
              << "yield result count mismatch with parent op";
     }
-    for (auto it : llvm::zip_equal(results, yieldOp.getResourceOperands())) {
-      auto outerValue = std::get<0>(it);
-      auto innerValue = std::get<1>(it);
+    for (auto [outerValue, innerValue] :
+         llvm::zip_equal(results, yieldOp.getResourceOperands())) {
       if (outerValue.getType() != innerValue.getType()) {
         return yieldOp.emitOpError()
                << "result type mismatch: expected " << outerValue.getType()
                << " but got " << innerValue.getType();
       }
     }
-    for (auto it :
+    for (auto [outerSize, innerSize] :
          llvm::zip_equal(resultSizes, yieldOp.getResourceOperandSizes())) {
-      auto outerSize = std::get<0>(it);
-      auto innerSize = std::get<1>(it);
       if (outerSize != innerSize) {
         return yieldOp.emitOpError() << "result size mismatch";
       }
@@ -574,8 +571,9 @@ static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
 
   // Verify the return types match.
   for (auto returnOp : body.getOps<IREE::Stream::ReturnOp>()) {
-    for (auto it : llvm::zip_equal(returnTypes, returnOp.getOperandTypes())) {
-      if (std::get<0>(it) != std::get<1>(it)) {
+    for (auto [returnType, operandType] :
+         llvm::zip_equal(returnTypes, returnOp.getOperandTypes())) {
+      if (returnType != operandType) {
         return returnOp.emitOpError()
                << "operands do not match expected region return types";
       }

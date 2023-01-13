@@ -2880,11 +2880,8 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
       destDispatch = rewriter.createBlock(dest);
 
       BlockAndValueMapping refMapping;
-      for (auto pair :
+      for (auto [operand, blockArg] :
            llvm::zip_equal(op.getOperands(), dest->getArguments())) {
-        Value operand = std::get<0>(pair);
-        BlockArgument blockArg = std::get<1>(pair);
-
         if (isNotRefOperand(operand)) {
           continue;
         }

@@ -638,8 +638,9 @@ struct CanonicalizeResourcePackIntervals
 
     // See if the sorted order is different than how they are stored in the op.
     bool orderChanged = false;
-    for (auto it : llvm::zip_equal(slices, op.getPackedOffsets())) {
-      if (std::get<0>(it).packedOffset != std::get<1>(it)) {
+    for (auto [slice, packedOffset] :
+         llvm::zip_equal(slices, op.getPackedOffsets())) {
+      if (slice.packedOffset != packedOffset) {
         orderChanged = true;
         break;
       }
@@ -2651,12 +2652,9 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
     SmallVector<std::pair<Value, unsigned>> replacements;
     SmallVector<Value> newOperands;
     SmallVector<Value> newOperandSizes;
-    for (auto it :
+    for (auto [operand, operandSize, result] :
          llvm::zip_equal(op.getResourceOperands(), op.getResourceOperandSizes(),
                          op.getResults())) {
-      auto operand = std::get<0>(it);
-      auto operandSize = std::get<1>(it);
-      auto result = std::get<2>(it);
       auto insertion =
           baseMap.insert(std::make_pair(operand, newOperands.size()));
       if (insertion.second) {

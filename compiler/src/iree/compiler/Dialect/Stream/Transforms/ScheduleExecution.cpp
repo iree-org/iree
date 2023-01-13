@@ -111,16 +111,16 @@ struct ExecutePartitionBuilder {
     // Add entry block and arguments.
     auto &entryBlock = executeOp.getBody().emplaceBlock();
     SmallVector<Location> operandLocs(operandTypes.size(), executeOp.getLoc());
-    for (auto args : llvm::zip_equal(
+    for (auto [operand, arg] : llvm::zip_equal(
              operands, entryBlock.addArguments(operandTypes, operandLocs))) {
-      mapping.map(std::get<0>(args), std::get<1>(args));
+      mapping.map(operand, arg);
     }
     builder = OpBuilder::atBlockBegin(&entryBlock);
 
     // Remap results for escaping outputs.
-    for (auto results :
+    for (auto [operand, result] :
          llvm::zip_equal(partition->outs, executeOp.getResults())) {
-      parentMapping.map(std::get<0>(results), std::get<1>(results));
+      parentMapping.map(operand, result);
     }
   }
 
@@ -279,13 +279,9 @@ class ScheduleExecutionPass
 
         OpBuilder builder(executeOp);
         builder.setInsertionPointAfter(executeOp);
-        for (auto it : llvm::zip_equal(partitionBuilder.partition->outs,
-                                       executeOp.getResults(),
-                                       executeOp.getResultSizes())) {
-          auto oldResult = std::get<0>(it);
-          auto newResult = std::get<1>(it);
-          auto newResultSize = std::get<2>(it);
-
+        for (auto [oldResult, newResult, newResultSize] : llvm::zip_equal(
+                 partitionBuilder.partition->outs, executeOp.getResults(),
+                 executeOp.getResultSizes())) {
           // Insert one await per result. We could batch them all but that would
           // prematurely tie their lifetimes together. By having unique awaits
           // we allow propagation to move the waits further to where the values
