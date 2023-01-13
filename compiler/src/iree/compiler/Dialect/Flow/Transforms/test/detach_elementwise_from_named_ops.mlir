@@ -150,3 +150,33 @@ func.func @fft_cst_output(%arg0 : tensor<3x2190x1x512xf32>)
 //       CHECK:   %[[FFT:.+]]:2 = iree_linalg_ext.fft
 //  CHECK-SAME:       outs(%[[ARG0]], %[[FILL]] :
 //       CHECK:   return %[[FFT]]#0, %[[FFT]]#1
+
+// -----
+
+/// Generic op with const operand.
+
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0 * 2 + d3, d1 * 2 + d4, d2)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+func.func @generic_cst_output(%arg0 : tensor<114x114x64xf32>) -> tensor<56x56x64xf32> {
+  %cst = arith.constant dense<0xFF800000> : tensor<56x56x64xf32>
+  %1 = tensor.empty() : tensor<3x3xf32>
+  %2 = linalg.generic {
+      indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]}
+      ins(%arg0, %1 : tensor<114x114x64xf32>, tensor<3x3xf32>) outs(%cst : tensor<56x56x64xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.maxf %out, %in : f32
+    linalg.yield %3 : f32
+  } -> tensor<56x56x64xf32>
+  return %2 : tensor<56x56x64xf32>
+}
+// CHECK-LABEL: func @generic_cst_output
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<114x114x64xf32>
+//       CHECK:   %[[CST:.+]] = arith.constant 0xFF800000 : f32
+//       CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<56x56x64xf32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:       ins(%[[CST]] :
+//  CHECK-SAME:       outs(%[[INIT]] :
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       outs(%[[FILL]] :
+//       CHECK:   return %[[GENERIC]]
