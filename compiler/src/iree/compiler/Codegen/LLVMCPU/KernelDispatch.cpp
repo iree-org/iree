@@ -1489,9 +1489,7 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 3}; })
-        .Default([&](Operation *op) {
-          llvm_unreachable("unsupported conv");
-        });
+        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   } else if (isRISCV(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
         .Case<linalg::Conv2DNhwcHwcfOp>(
@@ -1502,9 +1500,7 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize, 1, 3}; })
-        .Default([&](Operation *op) {
-          llvm_unreachable("unsupported conv");
-        });
+        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   } else if (isAArch64(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
         .Case<linalg::Conv2DNhwcHwcfOp>(
@@ -1515,9 +1511,7 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
             [&](auto op) { tileSizes = {1, 1, 32, 64, 1, 16}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 4, 4, 1, 4}; })
-        .Default([&](Operation *op) {
-          llvm_unreachable("unsupported conv");
-        });
+        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   } else {
     // Get default hard-coded tile sizes if we couldn't compute anything better.
     TypeSwitch<Operation *>(op.getOperation())
@@ -1532,9 +1526,7 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>([&](auto op) {
           tileSizes = {1, 1, vectorSize, vectorSize, 1, vectorSize};
         })
-        .Default([&](Operation *op) {
-          llvm_unreachable("unsupported conv");
-        });
+        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   }
 
   return tileSizes;
