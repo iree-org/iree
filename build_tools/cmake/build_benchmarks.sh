@@ -8,7 +8,7 @@
 
 # Build benchmark suites using a host tools directory.
 #
-# The required IREE_HOST_BINARY_ROOT environment variable indicates the location
+# The required IREE_HOST_BIN_DIR environment variable indicates the location
 # of the precompiled IREE binaries.
 #
 # Designed for CI, but can be run locally. The desired build directory can be
@@ -21,7 +21,7 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_BUILD_BENCHMARKS_DIR:-build-benchmarks}}"
-IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
+IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/iree_tf_compiler}"
 
 source build_tools/cmake/setup_build.sh
@@ -31,7 +31,7 @@ echo "Configuring to build benchmarks"
   -G Ninja \
   -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
-  -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}" \
+  -DIREE_HOST_BIN_DIR="${IREE_HOST_BIN_DIR}" \
   -DIREE_BUILD_BENCHMARKS=ON \
   -DIREE_BUILD_MICROBENCHMARKS=ON \
   -DIREE_BUILD_COMPILER=OFF \

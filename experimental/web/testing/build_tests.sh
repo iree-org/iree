@@ -50,7 +50,7 @@ pushd ${ROOT_DIR?}/build-emscripten > /dev/null
 # Configure using Emscripten's CMake wrapper, then build.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -DIREE_HOST_BINARY_ROOT=${INSTALL_ROOT} \
+    -DIREE_HOST_BIN_DIR="${INSTALL_ROOT}/bin" \
     -DIREE_BUILD_COMPILER=OFF \
     -DIREE_HAL_DRIVER_DEFAULTS=OFF \
     -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \

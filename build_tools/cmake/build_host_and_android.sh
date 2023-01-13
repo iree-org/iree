@@ -73,7 +73,7 @@ cd build-android
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI="${ANDROID_ABI}" \
   -DANDROID_PLATFORM=android-29 \
-  -DIREE_HOST_BINARY_ROOT="${PWD}/../build-host/install" \
+  -DIREE_HOST_BIN_DIR="${PWD}/../build-host/install/bin" \
   -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=ON \
