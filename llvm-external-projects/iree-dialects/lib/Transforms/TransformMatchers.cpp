@@ -534,7 +534,7 @@ transform_ext::MatchCallbackResult::getPayloadGroup(int64_t position) const {
   for (int64_t i = 0; i < position; ++i) {
     start += payloadGroupLengths[i];
   }
-  return llvm::makeArrayRef(payloadOperations)
+  return llvm::ArrayRef(payloadOperations)
       .slice(start, payloadGroupLengths[position]);
 }
 

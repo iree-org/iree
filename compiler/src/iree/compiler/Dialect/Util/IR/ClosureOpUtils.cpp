@@ -49,7 +49,7 @@ void excludeClosureOperandsAndResults(
   SmallVector<Value, 4> oldOperandDims = operandDims;
   operandValues.clear();
   operandDims.clear();
-  auto remainingOperandDims = llvm::makeArrayRef(oldOperandDims);
+  auto remainingOperandDims = llvm::ArrayRef(oldOperandDims);
   for (auto it : llvm::enumerate(oldOperandValues)) {
     unsigned numDynamicDims = 0;
     auto type = it.value().getType();
@@ -71,7 +71,7 @@ void excludeClosureOperandsAndResults(
   SmallVector<Value, 4> oldResultDims = resultDims;
   resultTypes.clear();
   resultDims.clear();
-  auto remainingResultDims = llvm::makeArrayRef(oldResultDims);
+  auto remainingResultDims = llvm::ArrayRef(oldResultDims);
   for (auto it : llvm::enumerate(oldResultTypes)) {
     unsigned numDynamicDims = 0;
     auto type = it.value();

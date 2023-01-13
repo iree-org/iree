@@ -41,9 +41,7 @@ struct AllDimsExcept {
   explicit AllDimsExcept(std::initializer_list<int64_t> range) {
     llvm::append_range(exceptions, range);
   }
-  ArrayRef<int64_t> getExcluded() const {
-    return llvm::makeArrayRef(exceptions);
-  }
+  ArrayRef<int64_t> getExcluded() const { return llvm::ArrayRef(exceptions); }
 
 private:
   SmallVector<int64_t> exceptions;

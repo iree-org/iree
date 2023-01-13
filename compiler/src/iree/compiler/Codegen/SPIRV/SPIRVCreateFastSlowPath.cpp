@@ -97,7 +97,7 @@ struct CreateFastSlowPath final : public OpRewritePattern<scf::ForOp> {
       }
     }
     Value ifCond = eqZeroCmpVals.front();
-    for (Value cmp : llvm::makeArrayRef(eqZeroCmpVals).drop_front())
+    for (Value cmp : llvm::ArrayRef(eqZeroCmpVals).drop_front())
       ifCond = rewriter.create<arith::AndIOp>(loc, ifCond, cmp);
 
     SmallVector<Operation *> cloneOps;
