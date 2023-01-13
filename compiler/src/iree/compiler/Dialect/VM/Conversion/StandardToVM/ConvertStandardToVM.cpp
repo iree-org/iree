@@ -741,11 +741,11 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
     }
     switch (adaptor.getLhs().getType().getIntOrFloatBitWidth()) {
       case 32:
-        rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, srcOp.getType(),
+        rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, rewriter.getI32Type(),
                                                adaptor.getLhs(), amount);
         break;
       case 64:
-        rewriter.replaceOpWithNewOp<Dst64OpTy>(srcOp, srcOp.getType(),
+        rewriter.replaceOpWithNewOp<Dst64OpTy>(srcOp, rewriter.getI64Type(),
                                                adaptor.getLhs(), amount);
         break;
       default:
