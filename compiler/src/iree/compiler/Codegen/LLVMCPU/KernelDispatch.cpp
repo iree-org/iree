@@ -1481,40 +1481,48 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
 
   if (isX86(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
-              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
-              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp>(
+        .Case<linalg::Conv2DNhwcHwcfOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8}; })
+        .Case<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+              linalg::PoolingNhwcMinUnsignedOp>(
+            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 3}; })
         .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   } else if (isRISCV(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
-              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
-              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp>(
+        .Case<linalg::Conv2DNhwcHwcfOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8}; })
+        .Case<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+              linalg::PoolingNhwcMinUnsignedOp>(
+            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize, 1, 3}; })
         .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   } else if (isAArch64(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
-              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
-              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp>(
+        .Case<linalg::Conv2DNhwcHwcfOp>(
             [&](auto op) { tileSizes = {1, 1, 32, 64, 1, 1, 16}; })
+        .Case<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+              linalg::PoolingNhwcMinUnsignedOp>(
+            [&](auto op) { tileSizes = {1, 1, 32, 64, 1, 16}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { tileSizes = {1, 1, 4, 4, 1, 4}; })
         .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   } else {
     // Get default hard-coded tile sizes if we couldn't compute anything better.
     TypeSwitch<Operation *>(op.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
-              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
-              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp>(
-            [&](auto op) {
-              tileSizes = {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
-            })
+        .Case<linalg::Conv2DNhwcHwcfOp>([&](auto op) {
+          tileSizes = {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
+        })
+        .Case<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+              linalg::PoolingNhwcMinUnsignedOp>([&](auto op) {
+          tileSizes = {1, 1, vectorSize, vectorSize, 1, vectorSize};
+        })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>([&](auto op) {
           tileSizes = {1, 1, vectorSize, vectorSize, 1, vectorSize};
         })
@@ -1677,7 +1685,10 @@ static LogicalResult setRootConfigImpl(
         .Case<IREE::LinalgExt::FftOp, IREE::LinalgExt::PackOp,
               IREE::LinalgExt::UnPackOp, linalg::Mmt4DOp,
               linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-              linalg::DepthwiseConv2DNhwcHwcOp>(
+              linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+              linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
+              linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<linalg::ContractionOpInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
