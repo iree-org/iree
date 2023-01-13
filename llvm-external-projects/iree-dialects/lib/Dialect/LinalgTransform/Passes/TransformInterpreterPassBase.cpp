@@ -245,6 +245,60 @@ void saveReproToTempFile(
   os << "===================================\n";
 }
 
+namespace {
+/// Position of an op within a containing op.
+struct OpPosition {
+  /// Number of the containing region in the parent op.
+  size_t regionNumber;
+  /// Offset of the containing block in the list of blocks of the parent region.
+  size_t blockOffset;
+  /// Offset of the operation in the list of operations of the parent block.
+  size_t opOffset;
+};
+} // namespace
+
+/// Populates `positions` with the relative positions of `target` in its
+/// ancestors.
+static void findOpPositionInRoot(Operation *target,
+                                 SmallVectorImpl<OpPosition> &positions) {
+  // Root operation may or may not have a parent block and has no parent
+  // region. Even if it has a parent block, we don't need its position in the
+  // block because we will have a pointer to root.
+  for (; target->getParentOp() != nullptr; target = target->getParentOp()) {
+    size_t posInBlock =
+        std::distance(target->getBlock()->begin(), target->getIterator());
+    size_t blockPos = std::distance(target->getParentRegion()->begin(),
+                                    target->getBlock()->getIterator());
+    size_t regionNo = target->getParentRegion()->getRegionNumber();
+    positions.emplace_back(OpPosition{regionNo, blockPos, posInBlock});
+  }
+}
+
+/// Finds an op located at the given stack of positions (e.g., the last position
+/// is at the root, and the first position is at the immediate parent) relative
+/// to the given root operation. Expects the location to exist.
+static Operation *getOpAtPosition(Operation *root,
+                                  ArrayRef<OpPosition> positions) {
+  Operation *op = root;
+  for (const OpPosition &pos : llvm::reverse(positions)) {
+    Region &region = op->getRegion(pos.regionNumber);
+    Block &block = *std::next(region.begin(), pos.blockOffset);
+    op = &*std::next(block.begin(), pos.opOffset);
+  }
+  return op;
+}
+
+/// Finds the clone of `original` in the cloned copy of the root operation, i.e.
+/// the operation with no parent, using its relative offsets in the parent
+/// parent lists of blocks and regions. Note that this performs linear
+/// traversals of blocks and regions along the path to root, but is arguably
+/// preferable to storing the entire mapping between all cloned operations.
+static Operation *findCloned(Operation *original, Operation *cloneRoot) {
+  SmallVector<OpPosition> opPositions;
+  findOpPositionInRoot(original, opPositions);
+  return getOpAtPosition(cloneRoot, opPositions);
+}
+
 // Optionally perform debug actions requested by the user to dump IR and a
 // repro to stderr and/or a file.
 static void performOptionalDebugActions(
@@ -253,41 +307,63 @@ static void performOptionalDebugActions(
     const Pass::Option<std::string> &debugTransformRootTag) {
   MLIRContext *context = target->getContext();
 
+  // If we are not planning to print, bail before we start doing expensive
+  // copying.
+  bool hasDebugFlags = false;
+  DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_STDERR, { hasDebugFlags = true; });
+  DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_FILE, { hasDebugFlags = true; });
+  if (!hasDebugFlags)
+    return;
+
+  // Since the pass may be running in parallel on multiple parts of the same
+  // root operation, clone it before attaching debug attributes as it would
+  // otherwise create a race. While we could avoid cloning when multithreading
+  // is disabled or when the attributes are already present, this is only
+  // necessary in debug builds that are not performance-critical and can afford
+  // an extra copy.
+  Operation *root = getRootOperation(target);
+  OwningOpRef<Operation *> rootClone(root->clone());
+  Operation *debugRoot = rootClone.get();
+  Operation *debugTarget = findCloned(target, debugRoot);
+
+  Operation *transformContainer = transformRegion->getParentOp();
+  assert(transformContainer && "unexpected detached transform region");
+  OwningOpRef<Operation *> maybeTransformContainerClone;
+  Operation *debugTransformContainer;
+  if (root->isAncestor(transformContainer)) {
+    debugTransformContainer = findCloned(transformContainer, debugRoot);
+  } else {
+    maybeTransformContainerClone =
+        OwningOpRef<Operation *>(transformContainer->clone());
+    debugTransformContainer = maybeTransformContainerClone.get();
+  }
+
   // Add temporary debug / repro attributes, these must never leak out.
   if (debugPayloadRootTag.empty()) {
-    target->setAttr(
+    debugTarget->setAttr(
         kTransformIreeTagAttrName,
         StringAttr::get(context, kTransformIreeTagPayloadRootValue));
   }
   if (debugTransformRootTag.empty()) {
-    transformRegion->getParentOp()->setAttr(
+    debugTransformContainer->setAttr(
         kTransformIreeTagAttrName,
         StringAttr::get(context, kTransformIreeTagTransformContainerValue));
   }
 
   DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_STDERR, {
-    Operation *root = getRootOperation(target);
     llvm::dbgs() << "=== Transform Interpreter Repro ===\n";
     printIreeOptReproCall(llvm::dbgs() << "cat <<EOF | ",
-                          root->getName().getStringRef(), passName,
-                          debugPayloadRootTag, debugTransformRootTag);
-    printModuleForRepro(llvm::dbgs(), root, transformRegion->getParentOp());
+                          debugRoot->getName().getStringRef(), passName,
+                          debugPayloadRootTag, debugTransformRootTag)
+        << "\n";
+    printModuleForRepro(llvm::dbgs(), debugRoot, debugTransformContainer);
     llvm::dbgs() << "\nEOF\n";
     llvm::dbgs() << "===================================\n";
   });
   DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_FILE, {
-    saveReproToTempFile(llvm::dbgs(), target, transformRegion->getParentOp(),
+    saveReproToTempFile(llvm::dbgs(), debugTarget, debugTransformContainer,
                         passName, debugPayloadRootTag, debugTransformRootTag);
   });
-
-  // Drop the temporary debug / repro attributes, these must never leak out.
-  if (debugTransformRootTag.empty()) {
-    transformRegion->getParentOp()->removeAttr(
-        kTransformIreeTagTransformContainerValue);
-  }
-  if (debugPayloadRootTag.empty()) {
-    target->removeAttr(kTransformIreeTagAttrName);
-  }
 }
 
 LogicalResult transform::detail::interpreterBaseRunOnOperationImpl(
@@ -374,7 +450,7 @@ LogicalResult transform::detail::interpreterBaseRunOnOperationImpl(
   // Step 4
   // ------
   // Optionally perform debug actions requested by the user to dump IR and a
-  // repro to stderr and/or a fie.
+  // repro to stderr and/or a file.
   performOptionalDebugActions(target, transformRegion, passName,
                               debugPayloadRootTag, debugTransformRootTag);
 
