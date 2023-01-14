@@ -35,15 +35,14 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG: %[[C12:.*]] = arith.constant 12 : index
 //     CHECK-NOT:   memref.alloc()
 //         CHECK: gpu.thread_id  x
-//         CHECK: %[[v:.*]] = scf.for %{{.*}} = %[[C0]] to %[[C12]] step %[[C4]] {{.*}} -> (vector<f32>) {
-//         CHECK:   vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<4xf32>
-//         CHECK:   vector.multi_reduction <add>, %{{.*}} : vector<4xf32> to f32
+//         CHECK: %[[v:.*]] = scf.for %{{.*}} = %[[C0]] to %[[C12]] step %[[C4]] {{.*}} -> (vector<1xf32>) {
+//         CHECK:   vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<1x4xf32>
+//         CHECK:   vector.multi_reduction <add>, %{{.*}} : vector<1x4xf32> to vector<1xf32>
 //         CHECK: }
 //     CHECK-NOT: gpu.barrier
-//         CHECK: %[[r:.*]] = vector.transfer_read {{.*}}: memref<f32{{.*}}>, vector<f32>
-//     CHECK-DAG: %[[s0:.*]] = vector.extractelement %[[r]]
-//     CHECK-DAG: %[[s1:.*]] = vector.extractelement %[[v]]
-//         CHECK: arith.addf %[[s0]], %[[s1]] : f32
+//         CHECK: %[[r:.*]] = vector.transfer_read {{.*}}: memref<1024x13xf32>, vector<1x1xf32>
+//         CHECK: %[[r1:.*]] = vector.shape_cast %[[r:.*]] : vector<1x1xf32> to vector<1xf32>
+//         CHECK: arith.addf %[[v]], %[[r1]] : vector<1xf32>
 
 // -----
 
@@ -79,19 +78,25 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, 3>
-//     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
+// No allocation created for the per thread data.
+//     CHECK-NOT:   memref.alloc() {{.*}} : memref<1x64xf32, 3>
 
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
+// TODO: Fill op still creates a transfer op and cannot be removed by propagation
+// since the last store is within control flow.
+//         CHECK: vector.transfer_write {{.*}} : vector<1xf32>, memref<8xf32>
+//         CHECK: %[[TIDX:.]] = gpu.thread_id  x
+
 // Local per-thread scf.for-based reduction.
-//         CHECK: %[[v:.*]] = scf.for {{.*}} -> (vector<f32>) {
-//         CHECK:   vector.transfer_read {{.*}} memref<8x64xf32>, vector<f32>
-//         CHECK:   arith.addf {{.*}} : f32
+//         CHECK: %[[v:.*]] = scf.for {{.*}} -> (vector<1xf32>) {
+//         CHECK:   vector.transfer_read {{.*}} memref<8x64xf32>, vector<1xf32>
+//         CHECK:   arith.addf {{.*}} : vector<1xf32>
 // No barrier within the loop.
 //     CHECK-NOT:   gpu.barrier
 //         CHECK:   }
-//         CHECK:   vector.transfer_write %[[v]]{{.*}} vector<f32>
+// No store after the loop, the data are kept in register.
+//     CHECK-NOT:   vector.transfer_write
 // Barrier after the loop.
 //         CHECK:   gpu.barrier
 
@@ -100,12 +105,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK-COUNT-5:   gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
 //         CHECK:   %[[RES:.*]] = arith.addf %{{.*}} : f32
-//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %{{.*}} : f32 to vector<f32>
+//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %{{.*}} : f32 to vector<1xf32>
 //         CHECK:   %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
 //         CHECK:   scf.if %[[CONDXIS0]]
 //         CHECK:     vector.transfer_write %[[RES_VEC]]
 //         CHECK:   gpu.barrier
-//         CHECK:   memref.dealloc %[[SHMEM_ALLOC]]
 
 // -----
 
@@ -148,35 +152,29 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, 3>
-//     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
+//     CHECK-NOT:   memref.alloc() {{.*}} : memref<1x64xf32, 3>
 
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
 // Local per-thread scf.for-based reduction.
-//         CHECK: %[[v:.*]] = scf.for {{.*}} -> (vector<f32>)
-//         CHECK:   vector.transfer_read {{.*}} vector<f32>
-//         CHECK:   arith.addf{{.*}} : f32
-//         CHECK:   arith.addf{{.*}} : f32
-//         CHECK:   arith.addf{{.*}} : f32
-//         CHECK:   vector.broadcast {{.*}} : f32 to vector<f32>
+//         CHECK:   %[[TIDX:.]] = gpu.thread_id  x
+//         CHECK: %[[v:.*]] = scf.for {{.*}} -> (vector<1xf32>)
+//         CHECK:   vector.transfer_read {{.*}} vector<1xf32>
+//         CHECK:   arith.addf{{.*}} : vector<1xf32>
+//         CHECK:   arith.addf{{.*}} : vector<1xf32>
+//         CHECK:   arith.addf{{.*}} : vector<1xf32>
 // No barrier within the loop
 //     CHECK-NOT:   gpu.barrier
 //         CHECK: }
-//         CHECK: vector.transfer_write %[[v]]{{.*}} vector<f32>
-//         CHECK: }
+//     CHECK-NOT: vector.transfer_write
 // Barrier after the loop
 //         CHECK:   gpu.barrier
 
-//         CHECK: %[[FIRST_32_TIDX:.*]] = arith.cmpi ult, %[[TIDX]], %[[C32]] : index
-//         CHECK: scf.if %[[FIRST_32_TIDX]] {
-// Distributed reduction: everyone <= 32 loads then 5 xor + addf expected.
-//         CHECK:   vector.transfer_read %{{.*}} memref<1xf32, 3>, vector<f32>
-//         CHECK:   vector.transfer_read %{{.*}} memref<1x64xf32, 3>, vector<2xf32>
+//     CHECK-NOT:   vector.transfer_read
 // CHECK-COUNT-5:   gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
 //         CHECK:   %[[PARTIAL:.*]] = arith.addf %{{.*}}
-//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[PARTIAL]] : f32 to vector<f32>
+//         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[PARTIAL]] : f32 to vector<1xf32>
 //         CHECK:   %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
 //         CHECK:   scf.if %[[CONDXIS0]]
 //         CHECK:     vector.transfer_write %[[RES_VEC]]
