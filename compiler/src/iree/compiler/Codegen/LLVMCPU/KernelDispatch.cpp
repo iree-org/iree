@@ -678,7 +678,7 @@ static LogicalResult setMatmulPadRootConfig(
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
-      DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert);
+      DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert);
 }
 
 // Returns true if all the tiling sizes are divisible by the next level of
