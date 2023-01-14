@@ -182,7 +182,8 @@ struct Source {
   Source(Session &session) : session(session) {}
 
   Error *openFile(const char *filePath);
-  Error *wrapBuffer(const char *bufferName, const char *buffer, size_t length);
+  Error *wrapBuffer(const char *bufferName, const char *buffer, size_t length,
+                    bool isNullTerminated);
   Error *split(void (*callback)(iree_compiler_source_t *source, void *userData),
                void *userData);
   const llvm::MemoryBuffer *getMemoryBuffer() {
@@ -205,20 +206,28 @@ Error *Source::openFile(const char *filePath) {
 }
 
 Error *Source::wrapBuffer(const char *bufferName, const char *buffer,
-                          size_t length) {
-  // Sharp edge: MemoryBuffer::getMemBuffer will peek one past the passed length
-  // to verify a nul terminator, but this makes the API really hard to ensure
-  // memory safety for. For our API, we just require that the buffer is nul
-  // terminated and that the nul is included in the length. We then subtract
-  // by 1 when constructing the underlying MemoryBuffer. This is quite sad :(
-  if (length == 0 || buffer[length - 1] != 0) {
-    return new Error("expected nul terminated buffer");
+                          size_t length, bool isNullTerminated) {
+  std::unique_ptr<llvm::MemoryBuffer> memoryBuffer;
+  if (isNullTerminated) {
+    // Sharp edge: MemoryBuffer::getMemBuffer will peek one past the passed
+    // length to verify a null terminator, but this makes the API really hard to
+    // ensure memory safety for. For our API, we just require that the buffer is
+    // null terminated and that the null is included in the length. We then
+    // subtract by 1 when constructing the underlying MemoryBuffer. This is
+    // quite sad :(
+    if (length == 0 || buffer[length - 1] != 0) {
+      return new Error("expected null terminated buffer");
+    }
+    memoryBuffer = llvm::MemoryBuffer::getMemBuffer(
+        StringRef(buffer, length - 1),
+        StringRef(bufferName, strlen(bufferName)),
+        /*RequiresNullTerminator=*/true);
+  } else {
+    // Not a null terminated buffer.
+    memoryBuffer = llvm::MemoryBuffer::getMemBuffer(
+        StringRef(buffer, length), StringRef(bufferName, strlen(bufferName)),
+        /*RequiresNullTerminator=*/false);
   }
-  std::unique_ptr<llvm::MemoryBuffer> memoryBuffer =
-      llvm::MemoryBuffer::getMemBuffer(
-          StringRef(buffer, length - 1),
-          StringRef(bufferName, strlen(bufferName)),
-          /*RequiresNullTerminator=*/true);
   sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
   return nullptr;
 }
@@ -684,10 +693,11 @@ iree_compiler_error_t *ireeCompilerSourceOpenFile(
 
 iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
     iree_compiler_session_t *session, const char *bufferName,
-    const char *buffer, size_t length, iree_compiler_source_t **out_source) {
+    const char *buffer, size_t length, bool isNullTerminated,
+    iree_compiler_source_t **out_source) {
   auto source = new Source(*unwrap(session));
   *out_source = wrap(source);
-  return wrap(source->wrapBuffer(bufferName, buffer, length));
+  return wrap(source->wrapBuffer(bufferName, buffer, length, isNullTerminated));
 }
 
 iree_compiler_error_t *ireeCompilerSourceSplit(
