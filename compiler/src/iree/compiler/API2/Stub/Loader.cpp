@@ -241,9 +241,10 @@ iree_compiler_error_t *ireeCompilerSourceOpenFile(
 
 iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
     iree_compiler_session_t *session, const char *bufferName,
-    const char *buffer, size_t length, iree_compiler_source_t **out_source) {
+    const char *buffer, size_t length, bool isNullTerminated,
+    iree_compiler_source_t **out_source) {
   return __ireeCompilerSourceWrapBuffer(session, bufferName, buffer, length,
-                                        out_source);
+                                        isNullTerminated, out_source);
 }
 
 iree_compiler_error_t *ireeCompilerSourceSplit(

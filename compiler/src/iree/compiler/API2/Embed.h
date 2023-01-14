@@ -240,12 +240,15 @@ IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerSourceOpenFile(
     iree_compiler_session_t *session, const char *filePath,
     iree_compiler_source_t **out_source);
 
-// Wraps an existing buffer in memory. The |buffer| must be null terminated, and
-// the null must be accounted for in the |length|.
+// Wraps an existing buffer in memory.
+// If |isNullTerminated| is true, then the null must be accounted for in the
+// length. This is required for text buffers and it is permitted for binary
+// buffers.
 // Must be destroyed with ireeCompilerSourceDestroy().
 IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
     iree_compiler_session_t *session, const char *bufferName,
-    const char *buffer, size_t length, iree_compiler_source_t **out_source);
+    const char *buffer, size_t length, bool isNullTerminated,
+    iree_compiler_source_t **out_source);
 
 // Splits the current source buffer, invoking a callback for each "split"
 // within it. This is per the usual MLIR split rules (see
