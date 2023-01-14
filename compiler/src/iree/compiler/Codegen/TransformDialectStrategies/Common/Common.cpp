@@ -23,6 +23,7 @@ using namespace mlir;
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 // TODO: significantly better namespacing.
+using iree_compiler::IREE::transform_dialect::ApplyBufferOptimizationsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
@@ -395,4 +396,13 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
       b, tileResult.resultingFusedOpsHandles.front(), tileResult.tiledOpH);
   return std::make_tuple(maybeLeadingH, fillH, blockReductionH,
                          maybeBlockTrailingH);
+}
+
+void mlir::iree_compiler::buildMemoryOptimizations(ImplicitLocOpBuilder &b,
+                                                   Value funcH) {
+  ApplyPatternsOpPatterns patterns;
+  patterns.lowerTransferOpPermutations = true;
+  patterns.rankReducing = true;
+  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+  b.create<ApplyBufferOptimizationsOp>(funcH);
 }

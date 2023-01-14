@@ -95,11 +95,8 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Barrier after the loop.
 //         CHECK:   gpu.barrier
 
-//         CHECK: %[[FIRST_32_TIDX:.*]] = arith.cmpi ult, %[[TIDX]], %[[C32]] : index
-//         CHECK: scf.if %[[FIRST_32_TIDX]] {
 // Distributed reduction: everyone <= 32 loads then 5 xor + addf expected.
-//         CHECK:   vector.transfer_read %{{.*}} memref<8xf32>, vector<f32>
-//         CHECK:   vector.transfer_read %{{.*}} memref<1x64xf32, 3>, vector<2xf32>
+//     CHECK-NOT:   vector.transfer_read
 // CHECK-COUNT-5:   gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
 //         CHECK:   %[[RES:.*]] = arith.addf %{{.*}} : f32

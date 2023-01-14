@@ -205,6 +205,9 @@ std::tuple<Value, Value, Value, Value> buildReductionStrategyBlockDistribution(
     ImplicitLocOpBuilder &b, Value variantH,
     const AbstractReductionStrategy &strategy);
 
+/// Build transform IR  that applies memory optimizations.
+void buildMemoryOptimizations(ImplicitLocOpBuilder &b, Value funcH);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

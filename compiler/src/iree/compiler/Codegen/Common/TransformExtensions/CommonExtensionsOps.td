@@ -47,6 +47,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
       extract_slice ops with reassociative reshape ops.
+      - lower_transfer_op_permutations: Lower transfer ops to transfer ops
+      with minor identity permutations.
       - promote_foreach_thread_capture_to_shared: adds patterns that rewrite
       uses of values captured by scf.foreach_thread with the matching
       shared_outs bbarg. This checks that the values captured are
@@ -87,6 +89,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$erase_unnecessary_tensor_operands,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
+                       UnitAttr:$lower_transfer_op_permutations,                       
                        UnitAttr:$promote_foreach_thread_capture_to_shared,
                        UnitAttr:$rank_reducing,
                        UnitAttr:$expand_memref_strided_metadata,
@@ -364,6 +367,37 @@ def ConfigExtractPart :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
         ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def ApplyBufferOptimizationsOp : Op<Transform_Dialect, "iree.apply_buffer_optimizations",
+    [TransformEachOpTrait,
+     TransformOpInterface,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let description = [{
+    This applies memory optimization on memref. In particular it does store to
+    load forwarding, dead store elimination and dead alloc elimination.
+
+    #### Return modes
+
+    This transform consumes the target handle and produces a result handle.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
 }

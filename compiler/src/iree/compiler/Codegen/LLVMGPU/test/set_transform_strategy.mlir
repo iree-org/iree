@@ -49,7 +49,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   transform.iree.apply_patterns %{{.*}} {fold_memref_aliases, rank_reducing}
 //         CHECK:   transform.structured.match ops{["scf.if"]} in %{{.*}}
 //         CHECK:   sequence {{.*}} failures(suppress) {
-//         CHECK:     transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 32 : i64}
+//         CHECK:     transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 64 : i64}
 //         CHECK:   }
 //         CHECK:   transform.iree.vector.warp_distribute
 
@@ -190,4 +190,4 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   transform.structured.split %{{.*}} after 8192  {dimension = 1 : i64}
 //         CHECK:   transform.structured.tile %{{.*}}[0, 8192]
 //         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [1024, 1, 1]}
-//         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0{{.*}}{warp_size = 64 : i64}
+//         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0{{.*}}{warp_size = 1024 : i64}

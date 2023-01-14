@@ -201,7 +201,8 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
   assert(strategy.getNumThreadsXInBlock() % kCudaWarpSize == 0 &&
          "strategy requires full warps");
   int64_t numWarpsToUse = strategy.getNumThreadsXInBlock() / kCudaWarpSize;
-  int64_t bitWidth = strategy.captures.reductionOutputElementalTypeBitWidth;
-  numWarpsToUse = adjustNumberOfWarpsForBlockShuffle(numWarpsToUse, bitWidth);
   buildDistributeVectors(b, variantH2, funcH, numWarpsToUse * kCudaWarpSize);
+
+  funcH = b.create<MatchOp>(variantH2, func::FuncOp::getOperationName());
+  iree_compiler::buildMemoryOptimizations(b, funcH);
 }
