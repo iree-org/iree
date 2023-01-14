@@ -189,6 +189,15 @@ void ireeCompilerInvocationDestroy(iree_compiler_invocation_t *run) {
   __ireeCompilerInvocationDestroy(run);
 }
 
+void ireeCompilerInvocationSetCrashHandler(
+    iree_compiler_invocation_t *inv, bool genLocalReproducer,
+    iree_compiler_error_t *(*onCrashCallback)(
+        iree_compiler_output_t **outOutput, void *userData),
+    void *userData) {
+  __ireeCompilerInvocationSetCrashHandler(inv, genLocalReproducer,
+                                          onCrashCallback, userData);
+}
+
 bool ireeCompilerInvocationParseSource(iree_compiler_invocation_t *run,
                                        iree_compiler_source_t *source) {
   return __ireeCompilerInvocationParseSource(run, source);

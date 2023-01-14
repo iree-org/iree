@@ -270,13 +270,18 @@ struct Output {
   // If the output was configured to a file, this is it.
   std::unique_ptr<llvm::ToolOutputFile> outputFile;
 
+  // Description of the output. If a file, this will be the file path.
+  // Otherwise, it will be some debug-quality description.
+  std::string description;
+
   // If streaming, this is the stream.
-  llvm::raw_fd_ostream *outputStream;
+  llvm::raw_fd_ostream *outputStream = nullptr;
 };
 
 Error *Output::openFile(const char *filePath) {
   std::string err;
-  outputFile = mlir::openOutputFile(filePath, &err);
+  description = filePath;
+  outputFile = mlir::openOutputFile(description, &err);
   if (!outputFile) {
     return new Error(std::move(err));
   }
@@ -285,7 +290,9 @@ Error *Output::openFile(const char *filePath) {
 }
 
 Error *Output::openFD(int fd) {
-  outputFile = std::make_unique<llvm::ToolOutputFile>("output_file", fd);
+  description = "fd-";
+  description.append(std::to_string(fd));
+  outputFile = std::make_unique<llvm::ToolOutputFile>(description, fd);
   // Don't try to delete, etc.
   outputFile->keep();
   outputStream = &outputFile->os();
@@ -648,6 +655,46 @@ void ireeCompilerInvocationEnableConsoleDiagnostics(
 
 void ireeCompilerInvocationDestroy(iree_compiler_invocation_t *inv) {
   delete unwrap(inv);
+}
+
+void ireeCompilerInvocationSetCrashHandler(
+    iree_compiler_invocation_t *inv, bool genLocalReproducer,
+    iree_compiler_error_t *(*onCrashCallback)(
+        iree_compiler_output_t **outOutput, void *userData),
+    void *userData) {
+  struct StreamImpl : public mlir::PassManager::ReproducerStream {
+    StreamImpl(iree_compiler_output_t *output) : output(output) {
+      unwrap(output)->keep();
+    }
+    ~StreamImpl() { ireeCompilerOutputDestroy(output); }
+
+    llvm::StringRef description() override {
+      return unwrap(output)->description;
+    }
+
+    llvm::raw_ostream &os() override { return *unwrap(output)->outputStream; }
+
+    iree_compiler_output_t *output;
+  };
+
+  unwrap(inv)->passManager.enableCrashReproducerGeneration(
+      [&](std::string &errorMessage)
+          -> std::unique_ptr<mlir::PassManager::ReproducerStream> {
+        iree_compiler_output_t *output = nullptr;
+        auto error = onCrashCallback(&output, userData);
+        if (error) {
+          errorMessage = ireeCompilerErrorGetMessage(error);
+          return nullptr;
+        }
+
+        if (!output) {
+          errorMessage = "callback did not set output";
+          return nullptr;
+        }
+
+        return std::make_unique<StreamImpl>(output);
+      },
+      /*genLocalReproducer=*/genLocalReproducer);
 }
 
 bool ireeCompilerInvocationParseSource(iree_compiler_invocation_t *inv,
