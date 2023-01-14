@@ -166,3 +166,10 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
         build_file = iree_repo_alias + "//:build_tools/third_party/tracy_client/BUILD.overlay",
         path = paths.join(iree_path, "third_party/tracy"),
     )
+
+    maybe(
+        native.new_local_repository,
+        name = "nccl",
+        build_file = iree_repo_alias + "//:build_tools/third_party/nccl/BUILD.overlay",
+        path = paths.join(iree_path, "third_party/nccl"),
+    )

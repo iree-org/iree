@@ -258,16 +258,6 @@ static iree_status_t iree_hal_cuda_device_create_channel(
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
 
-  // TODO(#9580): check if nccl symbols are available - if not then we fail
-  // here and have the error propagated up to users. If we wanted to delay load
-  // NCCL we'd want to take a lock here, load it, and merge the symbols into the
-  // dynamic symbol table.
-  if (true) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "NCCL unavailable and collective operations cannot be performed");
-  }
-
   // Try to use the ID specified in the parameters and fall back to the default.
   iree_hal_cuda_nccl_id_t id;
   if (iree_const_byte_span_is_empty(params.id)) {
