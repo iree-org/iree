@@ -360,7 +360,7 @@ iree_benchmark_suite(
 #     "CPU-ARM64-v8A"
 #   COMPILATION_FLAGS
 #     ${ANDROID_CPU_COMPILATION_FLAGS}
-#     "--iree-flow-mmt4d-target-options=arch=aarch64"
+#     "--iree-flow-enable-data-tiling"
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG
@@ -392,7 +392,7 @@ iree_benchmark_suite(
 #     "CPU-ARM64-v8A"
 #   COMPILATION_FLAGS
 #     ${ANDROID_CPU_COMPILATION_FLAGS}
-#     "--iree-flow-mmt4d-target-options=arch=aarch64"
+#     "--iree-flow-enable-data-tiling"
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG

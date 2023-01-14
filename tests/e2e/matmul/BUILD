@@ -140,7 +140,7 @@ py_binary(
     name = "e2e_matmul_mmt4d_%s_small_ukernel" % lhs_rhs_type,
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
-        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
+        "--iree-flow-enable-data-tiling",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -150,10 +150,6 @@ py_binary(
     target_backends_and_drivers = [
         ("vmvx", "local-task"),
     ],
-    target_cpu_features_variants = ["default"] + ([
-        "aarch64:+dotprod",
-        "aarch64:+i8mm",
-    ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",

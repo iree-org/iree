@@ -736,7 +736,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_collective,  //
       .length = iree_hal_cast_device_size(args->i9),
   };
   IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_check_deref_or_null(args->r7, &send_binding.buffer));
+      iree_hal_buffer_check_deref_or_null(args->r7, &recv_binding.buffer));
   iree_device_size_t element_count = iree_hal_cast_device_size(args->i10);
   return iree_hal_command_buffer_collective(command_buffer, channel, op, param,
                                             send_binding, recv_binding,

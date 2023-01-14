@@ -106,6 +106,9 @@ EXPLICIT_TARGET_MAPPING = {
     "@mlir-hlo//:stablehlo_legalize_to_hlo_pass": ["StablehloToMhlo",],
     "@mlir-hlo//stablehlo:broadcast_utils": ["StablehloBroadcastUtils",],
 
+    # NCCL
+    "@nccl//:headers": ["nccl::headers",],
+
     # Torch-MLIR.
     "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
         "TorchMLIRTMTensorDialect"

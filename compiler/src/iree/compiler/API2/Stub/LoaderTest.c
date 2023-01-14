@@ -143,7 +143,7 @@ int main(int argc, char **argv) {
   const char sourceWithErrorsStr[] = "}}}}FOOBAR\0";
   error = ireeCompilerSourceWrapBuffer(
       session, "foobar.mlir", sourceWithErrorsStr, sizeof(sourceWithErrorsStr),
-      &sourceWithErrors);
+      /*isNullTerminated=*/true, &sourceWithErrors);
   if (error) {
     printf("ERROR: ireeCompilerSourceWrapBuffer failed: %s\n",
            ireeCompilerErrorGetMessage(error));
