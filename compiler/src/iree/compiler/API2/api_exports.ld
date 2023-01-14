@@ -19,6 +19,7 @@ VER_0 {
     ireeCompilerInvocationParseSource;
     ireeCompilerInvocationPipeline;
     ireeCompilerInvocationSetCompileToPhase;
+    ireeCompilerInvocationSetCrashHandler;
     ireeCompilerInvocationSetVerifyIR;
     ireeCompilerOptionsCreate;
     ireeCompilerOptionsDestroy;
