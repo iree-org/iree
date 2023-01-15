@@ -2,147 +2,147 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://iree-org.github.io/iree/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/bindings/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/bindings/c-api/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/bindings/python/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/bindings/tensorflow-lite/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/blog/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/blog/2021-07-19-tflite-tosa/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/blog/2021-10-13-mmt4d/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/blog/2021-10-15-cuda-backend/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/building-from-source/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/building-from-source/android/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/building-from-source/getting-started/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/building-from-source/ios/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/building-from-source/python-bindings-and-importers/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/building-from-source/riscv/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/community/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/deployment-configurations/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/deployment-configurations/bare-metal/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/deployment-configurations/cpu/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/deployment-configurations/gpu-cuda-rocm/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/deployment-configurations/gpu-vulkan/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/extensions/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/getting-started/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/getting-started/jax/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/getting-started/pytorch/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/getting-started/tensorflow/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/getting-started/tflite/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/reference/glossary/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree-org.github.io/iree/reference/optimization-options/</loc>
-         <lastmod>2023-01-14</lastmod>
+         <lastmod>2023-01-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
 </urlset>
