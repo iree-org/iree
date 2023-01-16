@@ -122,6 +122,11 @@ bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return triple && triple.value().isX86();
 }
 
+bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().getArch() == llvm::Triple::x86_64;
+}
+
 bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
   Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
   return triple && triple.value().isAArch64();
