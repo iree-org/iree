@@ -162,25 +162,20 @@ jobs:
           tar -xf ${BENCHMARK_TOOLS_ARCHIVE}
           echo "normal-benchmark-tools-dir=${BENCHMARK_TOOLS_DIR}/build/tools" >> "${GITHUB_OUTPUT}"
           echo "traced-benchmark-tools-dir=${BENCHMARK_TOOLS_DIR}/build-traced/tools" >> "${GITHUB_OUTPUT}"
+          echo "tracy-capture-tool=${BENCHMARK_TOOLS_DIR}/build-traced/tracy-capture" >> "${GITHUB_OUTPUT}"
       - name: "Running benchmarks"
-        id: run
         env:
           IREE_EXECUTION_BENCHMARK_CONFIG: ${{ steps.download-assets.outputs.benchmark-config }}
           IREE_DOCKER_WRAPPER: ./build_tools/github_actions/docker_run.sh
           IREE_NORMAL_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.normal-benchmark-tools-dir }}
           IREE_TRACED_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.traced-benchmark-tools-dir }}
+          IREE_TRACY_CAPTURE_TOOL: ${{ steps.unpack-tools.outputs.tracy-capture-tool }}
           IREE_TARGET_DEVICE_NAME: ${{ env.DEVICE_NAME }}
           IREE_E2E_TEST_ARTIFACTS_DIR: ${{ env.E2E_TEST_ARTIFACTS_DIR }}
           IREE_BENCHMARK_RESULTS: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-results-${{ matrix.benchmark.device_name }}.json
+          IREE_BENCHMARK_TRACES: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-traces-${{ matrix.benchmark.device_name }}.tar.gz
         run: |
           mkdir -p ${BENCHMARK_RESULTS_DIR}
           ./build_tools/benchmarks/run_benchmarks.sh
-          echo "benchmark-results=${IREE_BENCHMARK_RESULTS}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading benchmark results"
-        id: upload
-        env:
-          BENCHMARK_RESULTS: ${{ steps.run.outputs.benchmark-results }}
-        run: |
-          gcloud storage cp \
-            "${BENCHMARK_RESULTS}" \
-            "${GCS_DIR}/${BENCHMARK_RESULTS}"
+        run: gcloud storage cp -r "${BENCHMARK_RESULTS_DIR}" "${GCS_DIR}/"

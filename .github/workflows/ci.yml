@@ -923,13 +923,15 @@ jobs:
         target:
           - platform: "linux"
             arch: "x86_64"
-            docker_image: "gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8"
+            docker_image: "gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd"
             # Builds tools on the host and assumes the builder is Linux x86_64.
             build_script: "./build_tools/cmake/build_runtime.sh"
+            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88.tgz"
           - platform: "linux"
             arch: "riscv_64"
             docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
             build_script: "./build_tools/cmake/build_riscv.sh"
+            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88.tgz"
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
@@ -948,6 +950,13 @@ jobs:
         run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting host binaries"
         run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Downloading pre-built tracy capture tool"
+        id: download-tracy-capture
+        env:
+          TRACY_CAPTURE_GCS_ARTIFACT: ${{ matrix.target.tracy_capture }}
+        run: |
+          gcloud storage cp "${TRACY_CAPTURE_GCS_ARTIFACT}" "tracy-capture.tgz"
+          echo "tracy-capture-archive=tracy-capture.tgz" >> "${GITHUB_OUTPUT}"
       - name: "Compiling the benchmark tools"
         id: build
         run: |
@@ -966,14 +975,21 @@ jobs:
             --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
+      - name: "Unpacking tracy capture"
+        env:
+          TRACY_CAPTURE_ARCHIVE: ${{ steps.download-tracy-capture.outputs.tracy-capture-archive }}
+        run: |
+          tar -C "${BUILD_TOOLS_DIR}/build-traced" \
+            -xvf "${TRACY_CAPTURE_ARCHIVE}"
       - name: "Creating the benchmark tools archive"
         id: archive
         env:
-          BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools.tar
+          BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM }}-${{ env.ARCH }}-benchmark-tools.tar
         run: |
           tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
             "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module \
-            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt
+            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt \
+            "${BUILD_TOOLS_DIR}/build-traced/tracy-capture"
           echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading the benchmark tools archive"
         id: upload
