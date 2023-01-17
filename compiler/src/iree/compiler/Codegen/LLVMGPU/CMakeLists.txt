@@ -61,7 +61,6 @@ iree_cc_library(
     MLIRLLVMCommonConversion
     MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMMAUtils
     MLIRMathDialect
     MLIRMathToLLVM
     MLIRMemRefDialect
@@ -70,6 +69,7 @@ iree_cc_library(
     MLIRNVGPUDialect
     MLIRNVGPUToNVVM
     MLIRNVGPUTransforms
+    MLIRNVGPUUtils
     MLIRNVVMDialect
     MLIRPDLDialect
     MLIRPDLInterpDialect
