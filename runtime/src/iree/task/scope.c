@@ -48,7 +48,13 @@ void iree_task_scope_deinitialize(iree_task_scope_t* scope) {
   // In most cases the status will have been consumed by the scope owner.
   iree_status_t status = (iree_status_t)iree_atomic_exchange_intptr(
       &scope->permanent_status, (intptr_t)NULL, iree_memory_order_acquire);
-  IREE_IGNORE_ERROR(status);
+  if (!iree_status_is_ok(status)) {
+    fprintf(
+        stderr,
+        "%s:%d: %s: warning: a task scope had the following non-OK status:\n",
+        __FILE__, __LINE__, __func__);
+    iree_status_fprint(stderr, status);
+  }
 
   while (iree_atomic_load_int32(&scope->pending_idle_notification_posts,
                                 iree_memory_order_acquire)) {
