@@ -9,7 +9,6 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/Utils/InferCustomKernelsTargetInfoFromParent.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
@@ -94,16 +93,11 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
   {
     // Special-case vector.contract codegen paths. This needs to happen
     // just before the generic vector ops lowerings.
-    CustomKernelsTargetInfo info;
-    if (succeeded(InferCustomKernelsTargetInfoFromParent(funcOp, info))) {
-      if (clMmt4dUseIntrinsics) {
-        info.add(CustomKernelTargetFeature::Intrinsics);
-      }
-      RewritePatternSet patterns(context);
-      populateVectorContractCustomKernelsPatterns(info, patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
+    RewritePatternSet patterns(context);
+    auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+    populateVectorContractCustomKernelsPatterns(target, patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
     }
   }
 
