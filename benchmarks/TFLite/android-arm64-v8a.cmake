@@ -254,6 +254,8 @@ iree_benchmark_suite(
     ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-enable-data-tiling"
     "--iree-llvm-target-cpu-features=+dotprod"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
