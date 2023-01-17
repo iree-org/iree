@@ -28,12 +28,6 @@ using namespace mlir::tosa;
 namespace mlir {
 namespace iree_compiler {
 
-static SmallVector<utils::IteratorType> getNParallelLoopsAttrs(
-    unsigned nParallelLoops) {
-  return SmallVector<utils::IteratorType>(nParallelLoops,
-                                          utils::IteratorType::parallel);
-}
-
 // Converts tosa.scatter to the iree_linalg_ext.scatter operation. As the
 // LinalgExt version is not batched therefore we materialize the batch index
 // for each update.
@@ -46,16 +40,19 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
     auto values = op.getValuesIn();
     auto indices = op.getIndices();
     auto updates = op.getInput();
-    auto valuesTy = values.getType().cast<ShapedType>();
-    auto indicesTy = indices.getType().cast<ShapedType>();
-    auto updatesTy = updates.getType().cast<ShapedType>();
+    auto valuesTy = values.getType().dyn_cast<RankedTensorType>();
+    auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();
+    auto updatesTy = updates.getType().dyn_cast<RankedTensorType>();
     ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
 
-    if (!valuesTy.hasRank() || !indicesTy.getRank() || !updatesTy.getRank())
+    if (!valuesTy || !indicesTy || !updatesTy)
       return rewriter.notifyMatchFailure(op,
                                          "tosa.gather has unknown input rank");
 
-    // Materialize the unary index dimension.
+    // TOSA's scatter does not include a index dimension, instead it implicitly
+    // supporteds an index depth of one. We materialize that implicit index of
+    // one as follows: [batch, updates] -> [batch, updates, index_depth=1] With
+    // a indexing map of [[0], [1, 2]].
     llvm::SmallVector<int64_t> expandIndShape{indicesTy.getDimSize(0),
                                               indicesTy.getDimSize(1), 1};
     SmallVector<ReassociationExprs, 4> expandIndMap;
@@ -69,20 +66,17 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
 
     indices = builder.create<tensor::ExpandShapeOp>(
         indicesTy.clone(expandIndShape), indices, expandIndMap);
-    indicesTy = indices.getType().cast<ShapedType>();
+    indicesTy = indices.getType().dyn_cast<RankedTensorType>();
 
     // Materialize the batch indice as LinalgExt scatter is not batched.
     {
       llvm::SmallVector<Value> dynDims;
-      for (int i = 0; i < indicesTy.getRank(); i++)
+      for (int i = 0, s = indicesTy.getRank(); i < s; ++i)
         if (indicesTy.isDynamicDim(i))
           dynDims.push_back(builder.create<tensor::DimOp>(indices, i));
 
-      auto empty =
-          builder
-              .create<tensor::EmptyOp>(indicesTy.getShape(),
-                                       indicesTy.getElementType(), dynDims)
-              .getResult();
+      Value empty = builder.create<tensor::EmptyOp>(
+          indicesTy.getShape(), indicesTy.getElementType(), dynDims);
 
       Value batchIdx = nullptr;
 
@@ -91,12 +85,13 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
             rewriter.getZeroAttr(indicesTy.getElementType()));
         batchIdx = builder.create<linalg::FillOp>(zero, empty).getResult(0);
       } else {
+        SmallVector<utils::IteratorType> iterators(
+            indicesTy.getRank(), utils::IteratorType::parallel);
         SmallVector<AffineMap, 3> indexingMaps(
             2, builder.getMultiDimIdentityMap(indicesTy.getRank()));
         batchIdx = builder
                        .create<linalg::GenericOp>(
-                           indicesTy, indices, empty, indexingMaps,
-                           getNParallelLoopsAttrs(indicesTy.getRank()),
+                           indicesTy, indices, empty, indexingMaps, iterators,
                            [&](OpBuilder &nestedBuilder, Location nestedLoc,
                                ValueRange blockArgs) {
                              ImplicitLocOpBuilder b(op.getLoc(), nestedBuilder);
@@ -108,8 +103,9 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
                        .getResult(0);
       }
 
-      indicesTy = indicesTy.clone(
-          {indicesTy.getDimSize(0), indicesTy.getDimSize(1), 2});
+      indicesTy =
+          indicesTy.clone({indicesTy.getDimSize(0), indicesTy.getDimSize(1), 2})
+              .cast<RankedTensorType>();
       indices = builder.create<tosa::ConcatOp>(indicesTy,
                                                ValueRange{batchIdx, indices},
                                                rewriter.getI64IntegerAttr(2));
@@ -121,7 +117,7 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
       llvm::SmallVector<ReassociationExprs, 4> collapseMap(valueTy.getRank() -
                                                            1);
       collapseMap.front().push_back(b.getAffineDimExpr(0));
-      for (int i = 0; i < collapseMap.size(); i++) {
+      for (int i = 0, s = collapseMap.size(); i < s; ++i) {
         collapseMap[i].push_back(b.getAffineDimExpr(i + 1));
       }
 
@@ -145,10 +141,10 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
         ValueRange{values}, builder.getDenseI64ArrayAttr({0, 1}),
         builder.getBoolAttr(true));
 
-    llvm::SmallVector<Location> argLocs(2, op.getLoc());
     llvm::SmallVector<Type> args(2, valuesTy.getElementType());
     Block *scatterBody =
-        builder.createBlock(&scatter.getRegion(), {}, args, argLocs);
+        builder.createBlock(&scatter.getRegion(), {}, args,
+                            llvm::SmallVector<Location>(2, op.getLoc()));
     builder.setInsertionPointToStart(scatterBody);
     builder.create<IREE::LinalgExt::YieldOp>(scatterBody->getArgument(0));
     rewriter.replaceOp(op, scatter.getResult(0));
@@ -160,11 +156,6 @@ struct TosaToLinalgExtPass : public TosaToLinalgExtBase<TosaToLinalgExtPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     ConversionTarget target(getContext());
-    target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect,
-                           linalg::LinalgDialect, tensor::TensorDialect,
-                           tosa::TosaDialect>();
-
-    // Not every TOSA op can be legalized to linalg_ext.
     target.addIllegalOp<tosa::ScatterOp>();
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
