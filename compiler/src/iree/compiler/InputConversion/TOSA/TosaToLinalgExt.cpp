@@ -50,7 +50,7 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
                                          "tosa.gather has unknown input rank");
 
     // TOSA's scatter does not include a index dimension, instead it implicitly
-    // supporteds an index depth of one. We materialize that implicit index of
+    // supports an index depth of one. We materialize that implicit index of
     // one as follows: [batch, updates] -> [batch, updates, index_depth=1] With
     // a indexing map of [[0], [1, 2]].
     llvm::SmallVector<int64_t> expandIndShape{indicesTy.getDimSize(0),
@@ -89,17 +89,19 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
             indicesTy.getRank(), utils::IteratorType::parallel);
         SmallVector<AffineMap, 3> indexingMaps(
             2, builder.getMultiDimIdentityMap(indicesTy.getRank()));
+
+        auto blockBuilder = [&](OpBuilder &nestedBuilder, Location nestedLoc,
+                                ValueRange blockArgs) {
+          ImplicitLocOpBuilder b(op.getLoc(), nestedBuilder);
+          auto index = b.create<linalg::IndexOp>(0);
+          auto cast =
+              b.create<arith::IndexCastOp>(indicesTy.getElementType(), index);
+          b.create<linalg::YieldOp>(cast.getResult());
+        };
         batchIdx = builder
-                       .create<linalg::GenericOp>(
-                           indicesTy, indices, empty, indexingMaps, iterators,
-                           [&](OpBuilder &nestedBuilder, Location nestedLoc,
-                               ValueRange blockArgs) {
-                             ImplicitLocOpBuilder b(op.getLoc(), nestedBuilder);
-                             auto index = b.create<linalg::IndexOp>(0);
-                             auto cast = b.create<arith::IndexCastOp>(
-                                 indicesTy.getElementType(), index);
-                             b.create<linalg::YieldOp>(cast.getResult());
-                           })
+                       .create<linalg::GenericOp>(indicesTy, indices, empty,
+                                                  indexingMaps, iterators,
+                                                  blockBuilder)
                        .getResult(0);
       }
 
@@ -123,8 +125,8 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
 
       int64_t batch = valueTy.getShape().front();
       int64_t rows = collapseShape.front();
-      int64_t batchDyn = batch == ShapedType::kDynamic;
-      int64_t rowsDyn = rows == ShapedType::kDynamic;
+      bool batchDyn = batch == ShapedType::kDynamic;
+      bool rowsDyn = rows == ShapedType::kDynamic;
       collapseShape[0] =
           (batchDyn || rowsDyn) ? ShapedType::kDynamic : batch * rows;
 
