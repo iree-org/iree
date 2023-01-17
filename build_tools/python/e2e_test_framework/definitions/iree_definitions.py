@@ -95,20 +95,20 @@ MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
 }
 
 
-@serialization.serializable
+@serialization.serializable(type_key="iree_imported_models")
 @dataclass(frozen=True)
 class ImportedModel(object):
   """Describes an imported MLIR model."""
+  id: str
   model: common_definitions.Model
   dialect_type: MLIRDialectType
 
   @staticmethod
   def from_model(model: common_definitions.Model):
-    # Currently we assume the model source type and its imported dialect is an
-    # 1-1 mapping.
-    return ImportedModel(
-        model=model,
-        dialect_type=MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type])
+    dialect_type = MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type]
+    return ImportedModel(id=f"{model.id}-{dialect_type}",
+                         model=model,
+                         dialect_type=dialect_type)
 
 
 @serialization.serializable
@@ -117,6 +117,9 @@ class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
   imported_model: ImportedModel
   compile_config: CompileConfig
+
+  def composite_id(self):
+    return f"{self.imported_model.obj_key()}/{self.compile_config.obj_key()}"
 
 
 @serialization.serializable
@@ -127,3 +130,11 @@ class E2EModelRunConfig(object):
   module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
   input_data: common_definitions.ModelInputData
+
+  def composite_id(self):
+    return "/".join([
+        self.module_generation_config.composite_id(),
+        self.module_execution_config.obj_key(),
+        self.target_device_spec.obj_key(),
+        self.input_data.obj_key()
+    ])

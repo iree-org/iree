@@ -14,6 +14,7 @@ import typing
 NONE_TYPE = type(None)
 SERIALIZE_FUNC_NAME = "__serialize__"
 DESERIALIZE_FUNC_NAME = "__deserialize__"
+OBJ_KEY_FUNC_NAME = "obj_key"
 SUPPORTED_DICT_KEY_TYPES = {str, int, float, bool}
 SUPPORTED_PRIMITIVE_TYPES = {str, int, float, bool, NONE_TYPE}
 
@@ -198,25 +199,30 @@ def serializable(cls=None,
     if type_key is not None and all(field.name != id_field for field in fields):
       raise ValueError(f'Id field "{id_field}" not found in the class {cls}.')
 
+    def get_obj_key(self):
+      if type_key is None:
+        raise ValueError(f"No type key for {cls}.")
+      obj_id = getattr(self, id_field)
+      return f"{type_key}:{obj_id}"
+
     def serialize(self, keyed_obj_map: Dict[str, Any]):
       if type_key is None:
         return _fields_to_dict(self, fields, keyed_obj_map)
 
-      obj_id = getattr(self, id_field)
-      obj_key = f"{type_key}:{obj_id}"
+      obj_key = self.get_obj_key()
       if obj_key in keyed_obj_map:
         # If the value in the map is None, it means we have visited this object
         # before but not yet finished serializing it. This will only happen if
         # there is a circular reference.
         if keyed_obj_map[obj_key] is None:
           raise ValueError(f"Circular reference is not supported: {obj_key}.")
-        return obj_id
+        return obj_key
 
       # Populate the keyed_obj_map with None first to detect circular reference.
       keyed_obj_map[obj_key] = None
       obj_dict = _fields_to_dict(self, fields, keyed_obj_map)
       keyed_obj_map[obj_key] = obj_dict
-      return obj_id
+      return obj_key
 
     def deserialize(data, keyed_obj_map: Dict[str, Any], obj_cache: Dict[str,
                                                                          Any]):
@@ -225,8 +231,7 @@ def serializable(cls=None,
                                           obj_cache)
         return cls(**field_value_map)
 
-      obj_id = data
-      obj_key = f"{type_key}:{obj_id}"
+      obj_key = data
       if obj_key in obj_cache:
         return obj_cache[obj_key]
 
@@ -236,6 +241,7 @@ def serializable(cls=None,
       obj_cache[obj_key] = derialized_obj
       return derialized_obj
 
+    setattr(cls, OBJ_KEY_FUNC_NAME, get_obj_key)
     setattr(cls, SERIALIZE_FUNC_NAME, serialize)
     setattr(cls, DESERIALIZE_FUNC_NAME, deserialize)
     return cls
