@@ -179,7 +179,10 @@ def get_benchmark_presets(trailers: Mapping[str, str]) -> str:
 def main():
   output: MutableMapping[str, str] = {}
   event_name = os.environ["GITHUB_EVENT_NAME"]
-  trailers = get_trailers() if event_name == PULL_REQUEST_EVENT_NAME else {}
+  trailers = get_trailers() if event_name == PULL_REQUEST_EVENT_NAME else {
+      # Run all benchmarks if it isn't a pull request event.
+      BENCHMARK_PRESET_KEY: "all"
+  }
   if should_run_ci(event_name, trailers):
     output["should-run"] = "true"
   else:
