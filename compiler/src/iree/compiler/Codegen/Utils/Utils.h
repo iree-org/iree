@@ -67,6 +67,7 @@ Optional<StringRef> getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Methods to get target information.
 bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);

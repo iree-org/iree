@@ -33,9 +33,50 @@ static MatmulTileParams chooseMatmulTileParamsAArch64(
     case MatmulType::F32F32F32:
       return {8, 1, 8};
     case MatmulType::I8I8I32:
-      if (hasFeature(target, "+i8mm")) return {8, 8, 8};
-      if (hasFeature(target, "+dotprod")) return {8, 4, 8};
+      if (hasFeature(target, "+i8mm")) {
+        // Aim to use SMMLA.
+        return {8, 8, 8};
+      }
+      if (hasFeature(target, "+dotprod")) {
+        // Aim to use SDOT.
+        return {8, 4, 8};
+      }
       return {8, 1, 8};
+    default:
+      assert(false);
+      return {};
+  }
+}
+
+static MatmulTileParams chooseMatmulTileParamsX86_64(
+    MatmulType type, ExecutableTargetAttr target) {
+  switch (type) {
+    case MatmulType::F32F32F32:
+      if (hasFeature(target, "+avx512f")) return {16, 1, 16};
+      if (hasFeature(target, "+avx2")) {
+        // Note: for good performance, most +avx2 users will also want to add
+        // +fma, but that's a local instruction selection detail and the tile
+        // layout is unaffected, as there are enough registers even with the
+        // need for intermediate product registers when +fma is not used.
+        return {8, 1, 8};
+      }
+      // SSE fallback.
+      return {8, 1, 4};
+    case MatmulType::I8I8I32:
+      if (hasFeature(target, "+avx512vnni")) {
+        // Aim to use VPDPWSSD.
+        return {16, 4, 16};
+      }
+      if (hasFeature(target, "+avx512bw")) {
+        // Aim to use VPMADDWD (zmm).
+        return {16, 2, 16};
+      }
+      if (hasFeature(target, "+avx2")) {
+        // Aim to use VPMADDWD (ymm).
+        return {8, 2, 8};
+      }
+      // SSE fallback. Aim to use PMADDWD (xmm).
+      return {8, 2, 4};
     default:
       assert(false);
       return {};
@@ -46,6 +87,9 @@ static MatmulTileParams chooseMatmulTileParams(MatmulType type,
                                                ExecutableTargetAttr target) {
   if (isAArch64(target)) {
     return chooseMatmulTileParamsAArch64(type, target);
+  }
+  if (isX86_64(target)) {
+    return chooseMatmulTileParamsX86_64(type, target);
   }
   return chooseMatmulTileParamsGeneric();
 }
