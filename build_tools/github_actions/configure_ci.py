@@ -148,7 +148,7 @@ def get_ci_stage(event_name):
   return 'presubmit' if event_name == PULL_REQUEST_EVENT_NAME else 'postsubmit'
 
 
-def get_benchmark_presets(trailers: Mapping[str, str]) -> str:
+def get_benchmark_presets(ci_stage: str, trailers: Mapping[str, str]) -> str:
   """Parses and validates the benchmark presets from trailers.
 
   Args:
@@ -158,12 +158,15 @@ def get_benchmark_presets(trailers: Mapping[str, str]) -> str:
     A comma separated preset string, which later will be parsed by
     build_tools/benchmarks/export_benchmark_config.py.
   """
-  trailer = trailers.get(BENCHMARK_PRESET_KEY)
-  if trailer is None:
-    return ""
-  print(f"Using benchmark preset '{trailer}' from PR description trailers")
+  if ci_stage == "postsubmit":
+    preset_options = ["all"]
+  else:
+    trailer = trailers.get(BENCHMARK_PRESET_KEY)
+    if trailer is None:
+      return ""
+    print(f"Using benchmark preset '{trailer}' from PR description trailers")
+    preset_options = [option.strip() for option in trailer.split(",")]
 
-  preset_options = [option.strip() for option in trailer.split(",")]
   for preset_option in preset_options:
     if preset_option not in BENCHMARK_PRESET_OPTIONS:
       raise ValueError(f"Unknown benchmark preset option: '{preset_option}'.\n"
@@ -179,10 +182,7 @@ def get_benchmark_presets(trailers: Mapping[str, str]) -> str:
 def main():
   output: MutableMapping[str, str] = {}
   event_name = os.environ["GITHUB_EVENT_NAME"]
-  trailers = get_trailers() if event_name == PULL_REQUEST_EVENT_NAME else {
-      # Run all benchmarks if it isn't a pull request event.
-      BENCHMARK_PRESET_KEY: "all"
-  }
+  trailers = get_trailers() if event_name == PULL_REQUEST_EVENT_NAME else {}
   if should_run_ci(event_name, trailers):
     output["should-run"] = "true"
   else:
@@ -195,7 +195,7 @@ def main():
   if ci_stage == "postsubmit":
     write_caches = "1"
   output["write-caches"] = write_caches
-  output["benchmark-presets"] = get_benchmark_presets(trailers)
+  output["benchmark-presets"] = get_benchmark_presets(ci_stage, trailers)
 
   set_output(output)
 
