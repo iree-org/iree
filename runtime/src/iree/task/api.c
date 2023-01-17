@@ -25,6 +25,16 @@ IREE_FLAG(
     "when latency is the #1 priority (vs. thermals, system-wide scheduling,\n"
     "etc).");
 
+IREE_FLAG(
+    int32_t, task_worker_stack_size, 128 * 1024,
+    "Minimum size in bytes of each worker thread stack.\n"
+    "The underlying platform may allocate more stack space but _should_\n"
+    "guarantee that the available stack space is near this amount. Note that\n"
+    "the task system will take some stack space and not all bytes should be\n"
+    "assumed usable. Note that as much as possible users should not rely on\n"
+    "the stack for storage over ~16-32KB and instead use local workgroup\n"
+    "memory.");
+
 // TODO(benvanik): enable this when we use it - though hopefully we don't!
 IREE_FLAG(
     int32_t, task_worker_local_memory, 0,  // 64 * 1024,
@@ -39,13 +49,12 @@ iree_status_t iree_task_executor_options_initialize_from_flags(
     iree_task_executor_options_t* out_options) {
   IREE_ASSERT_ARGUMENT(out_options);
   iree_task_executor_options_initialize(out_options);
-
   out_options->worker_spin_ns =
       (iree_duration_t)FLAG_task_worker_spin_us * 1000;
-
+  out_options->worker_stack_size =
+      (iree_host_size_t)FLAG_task_worker_stack_size;
   out_options->worker_local_memory_size =
       (iree_host_size_t)FLAG_task_worker_local_memory;
-
   return iree_ok_status();
 }
 
