@@ -380,6 +380,9 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
 
   {
     LinalgSingleTilingExpertPassOptions options;
+    // Explicitly set anchor op to matmul because only the op contains the
+    // reduction loops. Otherwise, it could try to tile tensor.pad ops.
+    options.anchorOpName = "linalg.matmul";
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(
