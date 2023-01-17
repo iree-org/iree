@@ -205,7 +205,7 @@ function create_image() {
   # -t forces a pseudo-tty which allows us to run tail with a follow
   gcloud compute ssh "${INSTANCE_NAME}" --zone="${ZONE}" \
       --no-user-output-enabled --ssh-flag="-t" \
-      --command="tail --follow=name --retry --lines=+1 --pid=${startup_pid} /startup.log"
+      --command="tail --follow=name --retry --lines=+1 --pid=${startup_pid} /startup.log" \
       | tee "${log_file}"
 
   echo "*******************"
