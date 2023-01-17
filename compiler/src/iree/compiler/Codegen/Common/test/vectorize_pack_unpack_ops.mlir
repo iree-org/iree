@@ -240,9 +240,9 @@ func.func @simple_CNnc_to_NC(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<32x8xf32
 
 // -----
 
-func.func @KCRSsr_to_KCRS(%arg0: tensor<1x1x4x8x8x32xf32>, %arg1: tensor<1x1x128x64xf32>) -> tensor<1x1x128x64xf32> {
-  %0 = tensor.unpack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<1x1x4x8x8x32xf32> -> tensor<1x1x128x64xf32>
-  return %0 : tensor<1x1x128x64xf32>
+func.func @KCRSsr_to_KCRS(%arg0: tensor<13x12x4x8x8x32xf32>, %arg1: tensor<13x12x128x64xf32>) -> tensor<13x12x128x64xf32> {
+  %0 = tensor.unpack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<13x12x4x8x8x32xf32> -> tensor<13x12x128x64xf32>
+  return %0 : tensor<13x12x128x64xf32>
 }
 // CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0) -> (d0 floordiv 32)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0) -> (d0 floordiv 8)>
@@ -250,32 +250,41 @@ func.func @KCRSsr_to_KCRS(%arg0: tensor<1x1x4x8x8x32xf32>, %arg1: tensor<1x1x128
 // CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG:     %[[C12:.+]] = arith.constant 12 : index
+// CHECK-DAG:     %[[C13:.+]] = arith.constant 13 : index
 // CHECK-DAG:     %[[C32:.+]] = arith.constant 32 : index
 // CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
 // CHECK-DAG:     %[[C128:.+]] = arith.constant 128 : index
 // CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
-// CHECK:         %[[RES0:.+]] = scf.for %[[R:.+]] = %[[C0]] to %[[C128]] step %[[C32]]
+// CHECK:         %[[RES0:.+]] = scf.for %[[K:.+]] = %[[C0]] to %[[C13]] step %[[C1]]
 // CHECK-SAME:      iter_args(%[[ITER0:.+]] = %[[OUT]])
-// CHECK:           %[[RES1:.+]] = scf.for %[[S:.+]] = %[[C0]] to %[[C64]] step %[[C8]]
-// CHECK-SAME:        iter_args(%[[ITER1:.+]] = %[[ITER0]])
+// CHECK:         %[[RES1:.+]] = scf.for %[[C:.+]] = %[[C0]] to %[[C12]] step %[[C1]]
+// CHECK-SAME:      iter_args(%[[ITER1:.+]] = %[[ITER0]])
+// CHECK:         %[[RES2:.+]] = scf.for %[[R:.+]] = %[[C0]] to %[[C128]] step %[[C32]]
+// CHECK-SAME:      iter_args(%[[ITER2:.+]] = %[[ITER1]])
+// CHECK:           %[[RES3:.+]] = scf.for %[[S:.+]] = %[[C0]] to %[[C64]] step %[[C8]]
+// CHECK-SAME:        iter_args(%[[ITER3:.+]] = %[[ITER2]])
 // CHECK-DAG:         %[[IN_R:.+]] = affine.apply #[[MAP0]](%[[R]])
 // CHECK-DAG:         %[[IN_S:.+]] = affine.apply #[[MAP1]](%[[S]])
-// CHECK-DAG:         %[[ITER1_SLICE:.+]] = tensor.extract_slice %[[ITER1]]
-// CHECK-SAME:          [0, 0, %[[R]], %[[S]]] [1, 1, 32, 8] [1, 1, 1, 1]
+// CHECK-DAG:         %[[ITER3_SLICE:.+]] = tensor.extract_slice %[[ITER3]]
+// CHECK-SAME:          [%[[K]], %[[C]], %[[R]], %[[S]]] [1, 1, 32, 8] [1, 1, 1, 1]
 // CHECK:             %[[READ:.+]] = vector.transfer_read %[[IN]]
-// CHECK-SAME:          [%[[C0]], %[[C0]], %[[IN_R]], %[[IN_S]], %[[C0]], %[[C0]]], %[[ZERO]]
-// CHECK-SAME:          {in_bounds = [true, true]} : tensor<1x1x4x8x8x32xf32>, vector<8x32xf32>
+// CHECK-SAME:          [%[[K]], %[[C]], %[[IN_R]], %[[IN_S]], %[[C0]], %[[C0]]], %[[ZERO]]
+// CHECK-SAME:          {in_bounds = [true, true]} : tensor<13x12x4x8x8x32xf32>, vector<8x32xf32>
 // CHECK:             %[[TRANSP:.+]] = vector.transpose %[[READ]], [1, 0]
 // CHECK:             %[[WRITE:.+]] = vector.transfer_write %[[TRANSP]]
-// CHECK-SAME:          %[[ITER1_SLICE]][%[[C0]], %[[C0]], %[[C0]], %[[C0]]]
+// CHECK-SAME:          %[[ITER3_SLICE]][%[[C0]], %[[C0]], %[[C0]], %[[C0]]]
 // CHECK-SAME:          {in_bounds = [true, true]} : vector<32x8xf32>, tensor<1x1x32x8xf32>
 // CHECK:             %[[INSERT:.+]] = tensor.insert_slice %[[WRITE]]
-// CHECK-SAME:          into %[[ITER1]][0, 0, %[[R]], %[[S]]] [1, 1, 32, 8] [1, 1, 1, 1]
+// CHECK-SAME:          into %[[ITER3]][%[[K]], %[[C]], %[[R]], %[[S]]] [1, 1, 32, 8] [1, 1, 1, 1]
 // CHECK:             scf.yield %[[INSERT]]
 // CHECK:           }
-// CHECK:           scf.yield %[[RES1]]
+// CHECK:           scf.yield %[[RES3]]
 // CHECK:         }
+// CHECK:         scf.yield %[[RES2]]
+// CHECK:         scf.yield %[[RES1]]
 // CHECK:         return %[[RES0]]
 
 // -----

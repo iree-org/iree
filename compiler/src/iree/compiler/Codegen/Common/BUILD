@@ -166,6 +166,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMCommonConversion",
         "@llvm-project//mlir:LLVMDialect",

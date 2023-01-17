@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Matchers.h"
@@ -24,12 +25,6 @@
 namespace mlir {
 namespace iree_compiler {
 namespace {
-
-/// A simple pattern rewriter that implements no special logic.
-class SimpleRewriter : public PatternRewriter {
- public:
-  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
-};
 
 struct VectorizePackUnPackOpsPass
     : public VectorizePackUnPackOpsBase<VectorizePackUnPackOpsPass> {
@@ -45,7 +40,7 @@ struct VectorizePackUnPackOpsPass
 
     // Apply tiling to make outer dims be all 1s.
     {
-      SimpleRewriter rewriter(ctx);
+      transform::TrivialPatternRewriter rewriter(ctx);
       auto packOptions = scf::SCFTileAndFuseOptions().setTilingOptions(
           scf::SCFTilingOptions().setTileSizeComputationFunction(
               [](OpBuilder &builder, Operation *op) -> SmallVector<Value> {
@@ -61,7 +56,7 @@ struct VectorizePackUnPackOpsPass
                 int inputRank = packOp.getSourceRank();
                 SmallVector<Value> tileSizes(
                     inputRank,
-                    builder.create<arith::ConstantIndexOp>(op->getLoc(), 1));
+                    builder.create<arith::ConstantIndexOp>(packOp.getLoc(), 1));
                 return tileSizes;
               }));
       funcOp->walk([&](tensor::PackOp op) {
@@ -86,8 +81,8 @@ struct VectorizePackUnPackOpsPass
                     tileSizes.push_back(getValueOrCreateConstantIndexOp(
                         builder, loc, dimAndTileMapping[i]));
                   } else {
-                    tileSizes.push_back(builder.createOrFold<tensor::DimOp>(
-                        loc, unpackOp.getDest(), i));
+                    tileSizes.push_back(
+                        builder.create<arith::ConstantIndexOp>(loc, 1));
                   }
                 }
                 return tileSizes;
