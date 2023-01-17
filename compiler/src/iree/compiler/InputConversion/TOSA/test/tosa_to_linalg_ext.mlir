@@ -1,5 +1,4 @@
 // RUN: iree-opt --split-input-file --iree-tosa-to-linalg-ext --verify-diagnostics %s | FileCheck %s
-// -verify-diagnostics
 
 // CHECK-LABEL: @scatter_static
 func.func @scatter_static(%arg0 : tensor<1x4x5xf32>, %arg1 : tensor<1x2xi32>, %arg2 : tensor<1x2x5xf32>) ->  tensor<1x4x5xf32> {
