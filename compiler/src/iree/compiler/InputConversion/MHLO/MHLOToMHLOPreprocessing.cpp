@@ -517,7 +517,7 @@ struct ScatterImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
     if (!indicesTy) return failure();
     if (indicesTy.getRank() != 1 || indexVectorDim != 0) {
       return rewriter.notifyMatchFailure(op,
-                                         "No implicit batch dimension to add.");
+                                         "no implicit batch dimension to add.");
     }
 
     indices = addUnitBatchDim(op.getLoc(), indices, rewriter);
@@ -789,12 +789,13 @@ struct ScatterMaterializeInsertedDim
     auto operand = op.getInputs().front();
     auto indicesTy = indices.getType().cast<ShapedType>();
     auto operandTy = operand.getType().cast<ShapedType>();
-    auto dimNumbers = op.getScatterDimensionNumbers();
-    auto updateDims = dimNumbers.getUpdateWindowDims();
 
     if (!operandTy.hasRank() || !indicesTy.hasRank()) {
       return rewriter.notifyMatchFailure(op, "operand/indices have no rank");
     }
+
+    auto dimNumbers = op.getScatterDimensionNumbers();
+    auto updateDims = dimNumbers.getUpdateWindowDims();
 
     if (indicesTy.getRank() != 2 || dimNumbers.getIndexVectorDim() != 1) {
       return rewriter.notifyMatchFailure(
