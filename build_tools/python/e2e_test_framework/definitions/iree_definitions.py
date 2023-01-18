@@ -96,7 +96,11 @@ class ModuleExecutionConfig(object):
 
 
 class MLIRDialectType(Enum):
-  """Imported MLIR dialect type."""
+  """Imported MLIR dialect type.
+
+  These strings are used as part of imported model id. They shouldn't be changed
+  unless it's necessary.
+  """
   LINALG = "linalg"
   TOSA = "tosa"
   MHLO = "mhlo"
