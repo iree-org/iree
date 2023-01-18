@@ -257,7 +257,8 @@ mlir::iree_compiler::
 Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b,
                                           Value funcH) {
   ApplyPatternsOpPatterns patterns;
-  patterns.rankReducing = true;
+  patterns.rankReducingVector = true;
+  patterns.rankReducingLinalg = true;
   funcH = b.create<ApplyPatternsOp>(funcH, patterns);
   return b.create<VectorizeOp>(funcH);
 }

@@ -72,9 +72,12 @@ void transform_dialect::ApplyPatternsOp::build(
               getEraseUnnecessaryTensorOperandsAttrName)
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
+  ADD_PATTERN(lowerTransferOpPermutations,
+              getLowerTransferOpPermutationsAttrName)
   ADD_PATTERN(promoteForeachThreadCaptureToShared,
               getPromoteForeachThreadCaptureToSharedAttrName)
-  ADD_PATTERN(rankReducing, getRankReducingAttrName)
+  ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
+  ADD_PATTERN(rankReducingVector, getRankReducingVectorAttrName)
   ADD_PATTERN(expandMemrefStridedMetadata,
               getExpandMemrefStridedMetadataAttrName)
   ADD_PATTERN(swapPaddingElideConditional,
@@ -163,6 +166,11 @@ struct PromoteCaptureToSharedOut
 };
 }  // namespace
 
+static void addLowerTransferOpPermutationsPatterns(
+    RewritePatternSet &patterns) {
+  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+}
+
 static void addFoldMemrefAliasPatterns(RewritePatternSet &patterns) {
   memref::populateFoldMemRefAliasOpPatterns(patterns);
 }
@@ -181,10 +189,13 @@ static void addEraseUnnecessaryTensorOperandsPatterns(
   linalg::populateEraseUnnecessaryInputsPatterns(patterns);
 }
 
-static void addRankReducingPatterns(RewritePatternSet &patterns) {
+static void addRankReducingLinalgPatterns(RewritePatternSet &patterns) {
   populateReshapeToInterfaceTensorPatterns(patterns);
-  vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
   linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
+}
+
+static void addRankReducingVectorPatterns(RewritePatternSet &patterns) {
+  vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
 }
 
 static void addSwappingPatterns(RewritePatternSet &patterns,
@@ -221,13 +232,16 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
+  if (getLowerTransferOpPermutations())
+    addLowerTransferOpPermutationsPatterns(patterns);
   if (getEraseUnnecessaryTensorOperands())
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getPromoteForeachThreadCaptureToShared())
     addForeachThreadCapturePromotionPatterns(patterns);
-  if (getRankReducing()) addRankReducingPatterns(patterns);
+  if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
+  if (getRankReducingVector()) addRankReducingVectorPatterns(patterns);
   if (getExpandMemrefStridedMetadata())
     memref::populateExpandStridedMetadataPatterns(patterns);
   if (getSwappingPatterns())

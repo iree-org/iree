@@ -55,7 +55,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   
   // Step 3. Rank-reduce.
   // ===========================================================================
-  %func_2 = transform.iree.apply_patterns %func_1 { rank_reducing }
+  %func_2 = transform.iree.apply_patterns %func_1 {  rank_reducing_linalg, rank_reducing_vector }
 
   // We don't perform any following transformation (vectorization, bufferizaton,
   // mapping) because this schedule is applied to Linalg-only code without the

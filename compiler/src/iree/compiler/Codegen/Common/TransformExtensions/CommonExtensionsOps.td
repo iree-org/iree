@@ -47,14 +47,18 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
       extract_slice ops with reassociative reshape ops.
+      - lower_transfer_op_permutations: Lower transfer ops to transfer ops
+      with minor identity permutations.
       - promote_foreach_thread_capture_to_shared: adds patterns that rewrite
       uses of values captured by scf.foreach_thread with the matching
       shared_outs bbarg. This checks that the values captured are
       tensor.extract_slice with a matching tensor.parallel_insert_slice to
       approximate the lack of cross-thread dependences. However this can still
       be unsafe wrt parallelism so use carefully!
-      - rank_reducing: adds patterns that results in rank-reducing behavior on
-      subset-based operations.
+      - rank_reducing_linalg: adds patterns that results in rank-reducing
+      behavior on subset-based linalg operations.
+      - rank_reducing_vector: adds patterns that results in rank-reducing 
+      behavior on subset-based vector operations.
       - expand_memref_strided_metadata: adds patterns that expand memref
       operations into extract_strided_metadata operations and a materialization
       of their effect on the metadata (sizes, offset, strides).
@@ -87,8 +91,10 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$erase_unnecessary_tensor_operands,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
+                       UnitAttr:$lower_transfer_op_permutations,
                        UnitAttr:$promote_foreach_thread_capture_to_shared,
-                       UnitAttr:$rank_reducing,
+                       UnitAttr:$rank_reducing_linalg,
+                       UnitAttr:$rank_reducing_vector,
                        UnitAttr:$expand_memref_strided_metadata,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns);
