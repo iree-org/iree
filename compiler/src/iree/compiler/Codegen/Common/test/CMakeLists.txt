@@ -40,6 +40,7 @@ iree_lit_test_suite(
     "test_partitionable_loops_interface.mlir"
     "tile_and_distribute_to_workgroups.mlir"
     "tile_reduction.mlir"
+    "transform_buffer_opt.mlir"
     "transform_dialect_apply_pattern_op.mlir"
     "transform_ops_invalid.mlir"
     "transpose_canonicalization.mlir"

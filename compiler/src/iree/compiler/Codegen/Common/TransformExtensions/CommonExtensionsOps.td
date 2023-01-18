@@ -374,4 +374,40 @@ def ConfigExtractPart :
   }];
 }
 
+def ApplyBufferOptimizationsOp :
+  Op<Transform_Dialect, "iree.apply_buffer_optimizations",
+    [TransformEachOpTrait,
+     TransformOpInterface,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let description = [{
+    This applies memory optimization on memref. In particular it does store to
+    load forwarding, dead store elimination and dead alloc elimination.
+
+    #### Return modes
+
+    This operation applies a set of memory optimization on the whole region of
+    the operand.
+
+    If the transformation is successful it returns the handle to the
+    same payload as its operand to allow for simpler composition.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$result);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS
