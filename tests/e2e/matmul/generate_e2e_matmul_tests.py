@@ -214,7 +214,10 @@ def get_test_compilation_infos(
     tile_workgroup_size_pairs = []
     ## WarpShape = 2x2
     tile_workgroup_size_pairs.append(
+        TileWorkgroupSizePair([[32, 32, 16]], [64, 2, 1]))
+    tile_workgroup_size_pairs.append(
         TileWorkgroupSizePair([[64, 64, 64]], [64, 2, 1]))
+
     ## WarpShape = 4x1
     tile_workgroup_size_pairs.append(
         TileWorkgroupSizePair([[32, 32, 32]], [64, 1, 1]))
