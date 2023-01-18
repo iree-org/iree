@@ -212,7 +212,7 @@ func.func @scatter_operand_map(%arg0: tensor<5x4x1xi32>, %arg1: tensor<1x2xi32>,
 
 // -----
 
-func.func @scatter_operand_insert(%a: tensor<16x16x8x384xf32>, %b: tensor<16x1xi32>, %c: tensor<16x16x16x384xf32>) -> tensor<16x16x8x384xf32>
+func.func @scatter_update_transpose(%a: tensor<16x17x8x384xf32>, %b: tensor<15x1xi32>, %c: tensor<16x17x15x384xf32>) -> tensor<16x17x8x384xf32>
 {
   %out = "mhlo.scatter"(%a, %b, %c) ({
     ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
@@ -223,15 +223,17 @@ func.func @scatter_operand_insert(%a: tensor<16x16x8x384xf32>, %b: tensor<16x1xi
         inserted_window_dims = [2],
         scatter_dims_to_operand_dims = [2],
         index_vector_dim = 1>,
-        unique_indices = false} : (tensor<16x16x8x384xf32>, tensor<16x1xi32>, tensor<16x16x16x384xf32>) -> tensor<16x16x8x384xf32>
-  return %out : tensor<16x16x8x384xf32>
+        unique_indices = false} : (tensor<16x17x8x384xf32>, tensor<15x1xi32>, tensor<16x17x15x384xf32>) -> tensor<16x17x8x384xf32>
+  return %out : tensor<16x17x8x384xf32>
 }
 
-// CHECK-LABEL: @scatter_test
-// CHECK-SAME: %[[ARG0:.+]]: tensor<16x16x8x384xf32>
-// CHECK-SAME: %[[ARG1:.+]]: tensor<16x1xi32>
-// CHECK-SAME: %[[ARG2:.+]]: tensor<16x16x16x384xf32>
-// CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG2]] [[0], [1], [2, 3], [4]] : tensor<16x16x16x384xf32> into tensor<16x16x16x1x384xf32>
+// CHECK-LABEL: @scatter_update_transpose
+// CHECK-SAME: %[[ARG0:.+]]: tensor<16x17x8x384xf32>
+// CHECK-SAME: %[[ARG1:.+]]: tensor<15x1xi32>
+// CHECK-SAME: %[[ARG2:.+]]: tensor<16x17x15x384xf32>
+// CHECK:   %[[TRANSPOSE:.+]] = "mhlo.transpose"(%[[ARG2]]) {permutation = dense<[2, 0, 1, 3]> : tensor<4xi64>}
+// CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[TRANSPOSE]]
+// CHECK-NEXT{literal}: [[0], [1], [2, 3], [4]] : tensor<15x16x17x384xf32> into tensor<15x16x17x1x384xf32>
 // CHECK:   %[[SCATTER:.+]] = "mhlo.scatter"(%[[ARG0]], %[[ARG1]], %[[EXPANDED]]) ({
 // CHECK:   ^bb0(%[[ARG3:.+]]: tensor<f32>, %[[ARG4:.+]]: tensor<f32>):
 // CHECK:     %[[ADD:.+]] = mhlo.add %[[ARG3]], %[[ARG4]] : tensor<f32>
@@ -241,3 +243,32 @@ func.func @scatter_operand_insert(%a: tensor<16x16x8x384xf32>, %b: tensor<16x1xi
 // CHECK-SAME: scatter_dimension_numbers = #mhlo.scatter<update_window_dims = [1, 2, 3, 4], scatter_dims_to_operand_dims = [2], index_vector_dim = 1>
 // CHECK-SAME: unique_indices = false
 // CHECK:   return %[[SCATTER]]
+
+// -----
+
+func.func @scatter_transpose_indices(%arg0: tensor<1x64x32x640xf32>, %arg1: tensor<1x44xi32>, %arg2: tensor<44x1x64x640xf32>) -> tensor<1x64x32x640xf32> {
+  %0 = "mhlo.transpose"(%arg1) {permutation = dense<[1, 0]> : tensor<2xi64>} : (tensor<1x44xi32>) -> tensor<44x1xi32>
+  %expanded = tensor.expand_shape %arg2 [[0], [1], [2, 3], [4]] : tensor<44x1x64x640xf32> into tensor<44x1x64x1x640xf32>
+  %1 = "mhlo.scatter"(%arg0, %0, %expanded) ({
+  ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+    %2 = mhlo.add %arg3, %arg4 : tensor<f32>
+    mhlo.return %2 : tensor<f32>
+  }) {indices_are_sorted = false, scatter_dimension_numbers = #mhlo.scatter<update_window_dims = [1, 2, 3, 4], scatter_dims_to_operand_dims = [2], index_vector_dim = 1>, unique_indices = false} : (tensor<1x64x32x640xf32>, tensor<44x1xi32>, tensor<44x1x64x1x640xf32>) -> tensor<1x64x32x640xf32>
+  return %1 : tensor<1x64x32x640xf32>
+}
+
+// CHECK-LABEL: @scatter_transpose_indices
+// CHECK-SAME: %[[ARG0:.+]]: tensor<1x64x32x640xf32>
+// CHECK-SAME: %[[ARG1:.+]]: tensor<1x44xi32>
+// CHECK-SAME: %[[ARG2:.+]]: tensor<44x1x64x640xf32>
+// CHECK: %[[TRANSPOSE:.+]] = "mhlo.transpose"(%[[ARG1]]) {permutation = dense<[1, 0]> : tensor<2xi64>}
+// CHECK: %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG2]]
+// CHECK-SAME{literal}: [[0], [1], [2, 3], [4]] : tensor<44x1x64x640xf32> into tensor<44x1x64x1x640xf32>
+// CHECK: %[[SCATTER:.+]] = "mhlo.scatter"(%[[ARG0]], %[[TRANSPOSE]], %[[EXPANDED]])
+// CHECK: ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+// CHECK:   %2 = mhlo.add %arg3, %arg4 : tensor<f32>
+// CHECK:   mhlo.return %2 : tensor<f32>
+// CHECK: indices_are_sorted = false
+// CHECK-SAME: scatter_dimension_numbers = #mhlo.scatter<update_window_dims = [1, 2, 3, 4], scatter_dims_to_operand_dims = [2], index_vector_dim = 1>
+// CHECK-SAME: unique_indices = false
+// CHECK: return %[[SCATTER]] : tensor<1x64x32x640xf32>

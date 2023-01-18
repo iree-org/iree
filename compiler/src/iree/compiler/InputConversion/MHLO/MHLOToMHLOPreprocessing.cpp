@@ -438,7 +438,7 @@ class TransposeReshapeGenericDotGeneral
 
 // If the indices tensor has an implicit index vector dim we expand and make it
 // an explicit dim.
-struct ScatterOpImplicitIndex : public OpRewritePattern<mhlo::ScatterOp> {
+struct ScatterImplicitIndex : public OpRewritePattern<mhlo::ScatterOp> {
   using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(mhlo::ScatterOp op,
@@ -481,7 +481,7 @@ struct ScatterOpImplicitIndex : public OpRewritePattern<mhlo::ScatterOp> {
   }
 };
 
-struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
+struct ScatterImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
   using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
 
   static Value addUnitBatchDim(Location loc, Value value,
@@ -511,11 +511,11 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
     auto indices = op.getScatterIndices();
-    auto indicesTy = indices.getType().cast<ShapedType>();
+    auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();
 
     // Check whether indices has no batch dimension.
-    if (!indicesTy.hasRank()) return failure();
-    if (indicesTy.getRank() != 1 && indexVectorDim != 0) {
+    if (!indicesTy) return failure();
+    if (indicesTy.getRank() != 1 || indexVectorDim != 0) {
       return rewriter.notifyMatchFailure(op,
                                          "No implicit batch dimension to add.");
     }
@@ -559,7 +559,7 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
   }
 };
 
-struct ScatterOpCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
+struct ScatterCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
   using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
 
   static Value collapseBatchDims(Location loc, Value value, int64_t batchCount,
@@ -656,6 +656,101 @@ struct ScatterOpCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
   }
 };
 
+// Ensure the batch dimensions of both the indices and updates are the first
+// dimensions. If they are not, transpose them to the start.
+struct ScatterBatchFirst : public OpRewritePattern<mhlo::ScatterOp> {
+  using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::ScatterOp op,
+                                PatternRewriter &rewriter) const final {
+    ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
+    auto dimNumbers = op.getScatterDimensionNumbers();
+
+    // If the index vector dim is not implicitly or explicitly at the end
+    // we need to transpose the batch dimensions to the start.
+    Value indices = op.getScatterIndices();
+    auto indicesTy = indices.getType().cast<ShapedType>();
+    auto indexVectorDim = dimNumbers.getIndexVectorDim();
+    if (indexVectorDim < indicesTy.getRank() - 1) {
+      llvm::SmallVector<int64_t> perm;
+      perm.reserve(indicesTy.getRank());
+      for (int i = 0, s = indicesTy.getRank(); i < s; ++i)
+        if (i != indexVectorDim) perm.push_back(i);
+
+      if (perm.size() < indicesTy.getRank()) perm.push_back(indexVectorDim);
+
+      llvm::SmallVector<int64_t> newShape;
+      for (int i = 0, s = perm.size(); i < s; ++i)
+        newShape.push_back(indicesTy.getDimSize(perm[i]));
+
+      indices = builder.create<mhlo::TransposeOp>(
+          indicesTy.clone(newShape), indices, builder.getI64TensorAttr(perm));
+      indicesTy = indices.getType().cast<RankedTensorType>();
+      indexVectorDim = indicesTy.getRank() - 1;
+    }
+
+    // Compute the permutation require to transpose the batch dimensions to
+    // the beginning.
+    auto updates = op.getUpdates();
+    auto updates0 = updates.front();
+    auto updates0Ty = updates0.getType().cast<ShapedType>();
+    auto updatedWindowDims = dimNumbers.getUpdateWindowDims();
+
+    // Determine which dimensions are batch dimensions.
+    llvm::SmallVector<bool> isBatch(updates0Ty.getRank(), true);
+    for (int i = 0, s = updatedWindowDims.size(); i < s; ++i)
+      isBatch[updatedWindowDims[i]] = false;
+
+    // Permute batch dimensions to the start of the update tensor.
+    llvm::SmallVector<int64_t> updatePerm;
+    updatePerm.reserve(updates0Ty.getRank());
+    for (int i = 0, s = isBatch.size(); i < s; ++i)
+      if (isBatch[i]) updatePerm.push_back(i);
+    updatePerm.append(updatedWindowDims.begin(), updatedWindowDims.end());
+
+    llvm::SmallVector<int64_t> newUpdatedWindowDims;
+    int64_t batchCount = updates0Ty.getRank() - updatedWindowDims.size();
+    for (int i = batchCount, s = updates0Ty.getRank(); i < s; i++)
+      newUpdatedWindowDims.push_back(i);
+
+    bool indicesChanged = indices != op.getScatterIndices();
+    bool updatesChanged =
+        llvm::any_of(llvm::enumerate(updatePerm),
+                     [](auto it) { return it.index() != it.value(); });
+    llvm::SmallVector<Value> newUpdates(updates.begin(), updates.end());
+    if (updatesChanged) {
+      for (Value &update : newUpdates) {
+        auto updateTy = update.getType().cast<ShapedType>();
+        llvm::SmallVector<int64_t> newShape;
+        newShape.reserve(updateTy.getRank());
+        for (int i = 0, s = updatePerm.size(); i < s; i++)
+          newShape.push_back(updateTy.getDimSize(updatePerm[i]));
+        update = builder.create<mhlo::TransposeOp>(
+            updateTy.clone(newShape), update,
+            builder.getI64TensorAttr(updatePerm));
+      }
+    }
+
+    if (!indicesChanged && !updatesChanged)
+      return rewriter.notifyMatchFailure(
+          op, "batch dimensions are already leading");
+
+    auto newDimNumbers = mhlo::ScatterDimensionNumbersAttr::get(
+        op.getContext(), newUpdatedWindowDims,
+        dimNumbers.getInsertedWindowDims(),
+        dimNumbers.getScatterDimsToOperandDims(),
+        /*indexVectorDim=*/indexVectorDim);
+
+    auto newScatter = rewriter.create<mhlo::ScatterOp>(
+        op.getLoc(), op.getResultTypes(), op.getInputs(), indices, newUpdates,
+        newDimNumbers, op.getIndicesAreSorted(), op.getUniqueIndices());
+    Region &region = newScatter.getUpdateComputation();
+    rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
+    rewriter.replaceOp(op, newScatter.getResults());
+    return success();
+  }
+};
+
 // mhlo.scatter can materialize a unit dimension at both indexed dimensions or
 // at unary dimensions in the destination matrix. linalg_ext.scatter only
 // allows unit dimensions at indexed dimensions. This pattern inserts all
@@ -695,6 +790,7 @@ struct ScatterMaterializeInsertedDim
     auto indicesTy = indices.getType().cast<ShapedType>();
     auto operandTy = operand.getType().cast<ShapedType>();
     auto dimNumbers = op.getScatterDimensionNumbers();
+    auto updateDims = dimNumbers.getUpdateWindowDims();
 
     if (!operandTy.hasRank() || !indicesTy.hasRank()) {
       return rewriter.notifyMatchFailure(op, "operand/indices have no rank");
@@ -703,6 +799,11 @@ struct ScatterMaterializeInsertedDim
     if (indicesTy.getRank() != 2 || dimNumbers.getIndexVectorDim() != 1) {
       return rewriter.notifyMatchFailure(
           op, "indices is not of shape [batch, indices]");
+    }
+
+    if (!updateDims.empty() && updateDims.front() == 0) {
+      return rewriter.notifyMatchFailure(
+          op, "updates is not of shape [batch, ...]");
     }
 
     auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
@@ -1301,9 +1402,9 @@ struct MHLOToMHLOPreprocessingPass
     patterns.insert<ExpandRngNormal, MulCastOfBool>(context);
 
     // scatter canonicalization patterns
-    patterns.insert<ScatterOpImplicitIndex, ScatterOpImplicitBatch,
-                    ScatterMaterializeInsertedDim, ScatterOpCollapseBatch>(
-        context);
+    patterns.insert<ScatterImplicitIndex, ScatterImplicitBatch,
+                    ScatterMaterializeInsertedDim, ScatterCollapseBatch,
+                    ScatterBatchFirst>(context);
 
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);
