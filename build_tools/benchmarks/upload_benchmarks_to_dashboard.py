@@ -351,6 +351,7 @@ def main(args):
     add_new_iree_series(series_id=series_id,
                         series_unit="ns",
                         series_description=description,
+                        series_config_id=benchmark_info.run_config_id,
                         override=True,
                         dry_run=args.dry_run,
                         verbose=args.verbose)
@@ -377,12 +378,14 @@ def main(args):
       series_unit = mapper.get_unit()
 
       # Override by default to allow updates to the series.
-      add_new_iree_series(series_id=series_id,
-                          series_unit=series_unit,
-                          series_description=description,
-                          override=True,
-                          dry_run=args.dry_run,
-                          verbose=args.verbose)
+      add_new_iree_series(
+          series_id=series_id,
+          series_unit=series_unit,
+          series_description=description,
+          series_config_id=compile_metrics.compilation_info.gen_config_id,
+          override=True,
+          dry_run=args.dry_run,
+          verbose=args.verbose)
       add_new_sample(series_id=series_id,
                      build_id=commit_count,
                      sample_unit=series_unit,

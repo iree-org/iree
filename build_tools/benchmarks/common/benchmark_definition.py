@@ -399,7 +399,8 @@ class BenchmarkInfo:
                          compile_tags=json_object.get("compile_tags"),
                          driver_info=driver_info,
                          device_info=DeviceInfo.from_json_object(
-                             json_object["device_info"]))
+                             json_object["device_info"]),
+                         run_config_id=json_object.get("run_config_id"))
 
 
 @dataclass
