@@ -30,7 +30,7 @@ from common.benchmark_definition import (BenchmarkResults,
                                          execute_cmd_and_get_output)
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
 
-IREE_DASHBOARD_URL = "https://perf.iree.dev/apis/v2"
+IREE_DASHBOARD_URL = "https://perf.iree.dev"
 IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/iree-org/iree/commit'
 IREE_PROJECT_ID = 'IREE'
 THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
