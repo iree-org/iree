@@ -10,8 +10,8 @@
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SetVector.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/RegionGraphTraits.h"
 #include "mlir/Pass/Pass.h"
 
@@ -38,9 +38,9 @@ bool compare_ranges(Range &&lhs, Range &&rhs, Pred pred) {
 }
 
 static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
-                                       BlockAndValueMapping &parentMapping);
+                                       IRMapping &parentMapping);
 static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
-                                       BlockAndValueMapping &parentMapping);
+                                       IRMapping &parentMapping);
 
 // Recursively compares two regions for structural equivalence.
 // Structural equivalence ensures that operations on both the |lhs| and |rhs|
@@ -61,14 +61,14 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
 //   assert(isStructurallyEquivalentTo(lhs.getBody(), rhs.getBody()));
 //
 // TODO(#3996): upstream into mlir::OperationEquivalence if this works.
-// TODO(#3996): add symbol ref comparison (add to BlockAndValueMapping).
+// TODO(#3996): add symbol ref comparison (add to IRMapping).
 static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs) {
-  BlockAndValueMapping mapping;
+  IRMapping mapping;
   return isStructurallyEquivalentTo(lhs, rhs, mapping);
 }
 
 static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
-                                       BlockAndValueMapping &mapping) {
+                                       IRMapping &mapping) {
   // Use compare_ranges to walk the block list in parallel and get a boolean in
   // the case of size mismatch without an O(N) linked-list size query.
   if (!compare_ranges(
@@ -118,7 +118,7 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
 }
 
 static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
-                                       BlockAndValueMapping &parentMapping) {
+                                       IRMapping &parentMapping) {
   // Check operation metadata for early-exit opportunities.
   if (lhs.getName() != rhs.getName()) return false;
   if (lhs.getNumOperands() != rhs.getNumOperands()) return false;
@@ -169,10 +169,10 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
        llvm::zip_equal(lhs.getRegions(), rhs.getRegions())) {
     // If the region is isolated we don't want to reuse any parent mapping or
     // pollute it with our mappings.
-    BlockAndValueMapping scopedRegionMapping;
-    BlockAndValueMapping regionMapping =
-        lhs.hasTrait<OpTrait::IsIsolatedFromAbove>() ? scopedRegionMapping
-                                                     : parentMapping;
+    IRMapping scopedRegionMapping;
+    IRMapping regionMapping = lhs.hasTrait<OpTrait::IsIsolatedFromAbove>()
+                                  ? scopedRegionMapping
+                                  : parentMapping;
     if (!isStructurallyEquivalentTo(lhsRegion, rhsRegion, regionMapping)) {
       return false;
     }

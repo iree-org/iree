@@ -56,13 +56,13 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
   }
 
   bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
-                       BlockAndValueMapping &valueMapping) const final {
+                       IRMapping &valueMapping) const final {
     // Sure!
     return true;
   }
 
   bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
-                       BlockAndValueMapping &valueMapping) const final {
+                       IRMapping &valueMapping) const final {
     // Sure!
     return true;
   }

@@ -13,10 +13,10 @@
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {

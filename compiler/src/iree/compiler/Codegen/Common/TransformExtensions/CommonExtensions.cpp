@@ -408,7 +408,7 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   }
 
   // Step 4. Create the workgroup id and count ops.
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   SmallVector<Value> workgroupIdOps, workgroupCountOps;
   for (Attribute attr : blockMapping) {
     auto idx =
