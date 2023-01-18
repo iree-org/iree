@@ -694,21 +694,15 @@ struct ScatterMaterializeInsertedDim
     auto operand = op.getInputs().front();
     auto indicesTy = indices.getType().cast<ShapedType>();
     auto operandTy = operand.getType().cast<ShapedType>();
+    auto dimNumbers = op.getScatterDimensionNumbers();
+
     if (!operandTy.hasRank() || !indicesTy.hasRank()) {
       return rewriter.notifyMatchFailure(op, "operand/indices have no rank");
     }
 
-    auto dimNumbers = op.getScatterDimensionNumbers();
-    auto updateDims = dimNumbers.getUpdateWindowDims();
-
     if (indicesTy.getRank() != 2 || dimNumbers.getIndexVectorDim() != 1) {
       return rewriter.notifyMatchFailure(
           op, "indices is not of shape [batch, indices]");
-    }
-
-    if (!updateDims.empty() && updateDims.front() == 0) {
-      return rewriter.notifyMatchFailure(
-          op, "updates is not of shape [batch, ...]");
     }
 
     auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
