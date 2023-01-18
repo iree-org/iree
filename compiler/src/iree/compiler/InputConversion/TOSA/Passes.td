@@ -9,6 +9,18 @@
 
 include "mlir/Pass/PassBase.td"
 
+def TosaToLinalgExt :
+    Pass<"iree-tosa-to-linalg-ext", "mlir::func::FuncOp"> {
+  let summary = "Convert TOSA operations to their equivalent linalg-ext operations.";
+  let constructor = "mlir::iree_compiler::createTosaToLinalgExt()";
+  let dependentDialects = [
+    "arith::ArithDialect",
+    "linalg::LinalgDialect",
+    "tensor::TensorDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
+  ];
+}
+
 def VerifyCompilerTOSAInputLegality :
     Pass<"iree-tosa-verify-compiler-input-legality", "ModuleOp"> {
   let summary = "Verifies that only supported IR constructs are passed to the compiler.";

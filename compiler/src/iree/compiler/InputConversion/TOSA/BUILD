@@ -37,7 +37,12 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":PassesIncGen",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
     ],
 )
@@ -46,6 +51,7 @@ iree_compiler_cc_library(
     name = "TOSA",
     srcs = [
         "Passes.cpp",
+        "TosaToLinalgExt.cpp",
         "VerifyCompilerTOSAInputLegality.cpp",
     ],
     hdrs = [
@@ -59,9 +65,14 @@ iree_compiler_cc_library(
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Dialect/Flow/Transforms",
         "//compiler/src/iree/compiler/InputConversion/Common",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFToControlFlow",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:TosaToArith",
         "@llvm-project//mlir:TosaToLinalg",

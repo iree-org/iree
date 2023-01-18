@@ -18,6 +18,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "tosa_to_linalg_ext.mlir",
             "verify_compiler_tosa_input_legality.mlir",
         ],
         include = ["*.mlir"],
