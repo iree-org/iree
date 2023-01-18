@@ -96,11 +96,7 @@ class ModuleExecutionConfig(object):
 
 
 class MLIRDialectType(Enum):
-  """Imported MLIR dialect type.
-
-  These strings are used as part of imported model id. They shouldn't be changed
-  unless it's necessary.
-  """
+  """Imported MLIR dialect type."""
   LINALG = "linalg"
   TOSA = "tosa"
   MHLO = "mhlo"
@@ -115,6 +111,15 @@ MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
         MLIRDialectType.MHLO,
 }
 
+# Map to provide stable artificial id of dialect type. Please use and update the
+# next id when adding a new dialect, so we won't reuse the old deprecated id.
+# Next ID: 4
+DIALECT_TYPE_TO_DIALECT_ID_MAP = {
+    MLIRDialectType.LINALG: 1,
+    MLIRDialectType.TOSA: 2,
+    MLIRDialectType.MHLO: 3,
+}
+
 
 @serialization.serializable(type_key="iree_imported_models")
 @dataclass(frozen=True)
@@ -127,9 +132,10 @@ class ImportedModel(object):
   @staticmethod
   def from_model(model: common_definitions.Model):
     dialect_type = MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type]
-    return ImportedModel(id=f"{model.id}-{dialect_type.value}",
-                         model=model,
-                         dialect_type=dialect_type)
+    return ImportedModel(
+        id=f"{model.id}-{DIALECT_TYPE_TO_DIALECT_ID_MAP[dialect_type]}",
+        model=model,
+        dialect_type=dialect_type)
 
 
 @serialization.serializable
