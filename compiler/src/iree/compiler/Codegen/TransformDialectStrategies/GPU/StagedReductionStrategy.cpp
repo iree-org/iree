@@ -113,8 +113,9 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
 }
 
 static void buildStagedReductionStrategyThreadLevel(
-    ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledLeadingH,
-    Value maybeTiledTrailingH, const StagedReductionStrategy &strategy) {
+    ImplicitLocOpBuilder &b, Value gridReductionH, Value gridFillH,
+    Value maybeTiledLeadingH, Value maybeTiledTrailingH,
+    const StagedReductionStrategy &strategy) {
   // Map the potential maybeTiledLeadingH.
   // TODO: Consider fusing leading elementwise into threads.
   if (strategy.captures.maybeLeadingRank > 0) {
@@ -152,7 +153,7 @@ static void buildStagedReductionStrategyThreadLevel(
   iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
       /*b=*/b,
       /*rootH=*/blockCombinerOpH,
-      /*opsToFuse=*/{},
+      /*opsToFuse=*/{gridFillH},
       /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({1})),
       /*mappingAttr=*/b.getArrayAttr(strategy.allThreadAttrs[1]));
 
@@ -188,8 +189,8 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
 
   // Step 2. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
-  // TODO: consider fusing gridFillH.
-  buildStagedReductionStrategyThreadLevel(b, gridReductionH, maybeLeadingHBlock,
+  buildStagedReductionStrategyThreadLevel(b, gridReductionH, gridFillH,
+                                          maybeLeadingHBlock,
                                           maybeTiledTrailingHBlock, strategy);
 
   // Step 3-4. Common trailing steps.
