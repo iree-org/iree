@@ -239,14 +239,40 @@ static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
   return loopNest;
 }
 
-class ReifyFlashAttentionFwdTransform final
-    : public OpRewritePattern<FlashAttentionFwdOp> {
-public:
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(FlashAttentionFwdOp attnOp,
-                                PatternRewriter &rewriter) const override {
+/// This is an implementation of flash attention which
+/// is a tiled and fused implementation of the attention operator.
+/// The attention operator computes:
+/// matmul(softmax(matmul(Q, transpose(K))), V)
+/// where: Q is the query matrix [B x N x d]
+///        K is the key matrix   [B x N x d]
+///        V is the value matrix [B x N x d]
+///
+/// The core algorithm is as follows:
+/// For each element in B,
+/// 1. Load a tile from the Q matrix of size T x d -> q
+/// 2. Initialize statistics: running_sum, running_max
+/// 3. for i = 0 to N with step T
+///    a. Load a tile from the K matrix of size T x d -> k
+///    a. Load a tile from the V matrix of size T x d -> v
+///    b. Transpose(k) -> kT
+///    c. Compute matmul(q, kT) -> qkT
+///    d. Compute sum(qkT) along rows -> current_sum
+///    e. Compute max(qkT) along rows -> current_max
+///    f. Compute new max: max(current_max, running_max)
+///    g. Compute new sum: alpha * running_sum + beta * current_sum
+///    h. Compute curent estimate of softmax: exp(qKT - current_max) -> s
+///    i. Scale softmax estimate and current value of result by
+///       appropriate factors
+///    j. Compute matmul(s, v) and add to accumulator
+///
+///
+/// TODO: Add more concrete details
+///
+LogicalResult reifyFlashAttentionFwdTransform(func::FuncOp funcOp) {
+  IRRewriter rewriter(funcOp.getContext());
+  funcOp.walk([&](IREE::LinalgExt::FlashAttentionFwdOp attnOp) {
     Location loc = attnOp.getLoc();
+    OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(attnOp);
 
     Value query = attnOp.query();
@@ -277,6 +303,7 @@ public:
                        ValueRange({output}), loc, rewriter);
     Value iterArg = firstLoopNest.loops.back().getRegionIterArg(0);
 
+    OpBuilder::InsertionGuard guardFirstLoop(rewriter);
     rewriter.setInsertionPointToStart(firstLoopNest.loops.back().getBody());
 
     // Create max and sum statistics
@@ -302,6 +329,7 @@ public:
     Value iterArgMax = secondLoopNest.loops.back().getRegionIterArg(1);
     Value iterArgSum = secondLoopNest.loops.back().getRegionIterArg(2);
 
+    OpBuilder::InsertionGuard guardSecondLoop(rewriter);
     rewriter.setInsertionPointToStart(secondLoopNest.loops.back().getBody());
 
     auto [keySlice, valueSlice, querySlice, outputSlice] =
@@ -361,9 +389,9 @@ public:
                        .getResult(0);
 
     // Insert slices
-    auto [updatedAcc, updatedMax, updatedSum] =
-        insertSlices(result, iterArgResult, newMax, max, newSum, sum,
-                     queryShape, ivs, sequenceTileLength, loc, rewriter);
+    auto [updatedAcc, updatedMax, updatedSum] = insertSlices(
+        result, iterArgResult, newMax, iterArgMax, newSum, iterArgSum,
+        queryShape, ivs, sequenceTileLength, loc, rewriter);
 
     if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
             secondLoopNest.loops.back().getBody()->getTerminator())) {
@@ -373,15 +401,17 @@ public:
 
     if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
             firstLoopNest.loops.back().getBody()->getTerminator())) {
+      OpBuilder::InsertionGuard yieldGuard(rewriter);
       rewriter.setInsertionPoint(yieldOp);
       rewriter.replaceOpWithNewOp<scf::YieldOp>(
           yieldOp, ValueRange{secondLoopNest.results[0]});
     }
 
     attnOp.getResults()[0].replaceAllUsesWith(firstLoopNest.results[0]);
-    return success();
-  }
-};
+    return WalkResult::advance();
+  });
+  return success();
+}
 
 } // namespace
 
@@ -401,12 +431,9 @@ struct TileAndDecomposeFlashAttentionTransformPass
 
 void TileAndDecomposeFlashAttentionTransformPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  RewritePatternSet patterns(&getContext());
-  patterns.insert<ReifyFlashAttentionFwdTransform>(context);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+  IRRewriter rewriter(context);
+  if (failed(reifyFlashAttentionFwdTransform(getOperation())))
     return signalPassFailure();
-  }
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

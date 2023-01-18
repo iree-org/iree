@@ -2768,13 +2768,13 @@ LogicalResult FlashAttentionFwdOp::verify() {
   if (getNumOutputs() != 1) {
     return op->emitOpError("expected one output operand");
   }
-  const int64_t keyRank = getKeyRank();
+  int64_t keyRank = getKeyRank();
   if (keyRank != 3) {
     return op->emitError("expected key tensor to have rank 3");
   }
-  const ShapedType queryType = getQueryType();
-  const ShapedType keyType = getKeyType();
-  const ShapedType valueType = getValueType();
+  ShapedType queryType = getQueryType();
+  ShapedType keyType = getKeyType();
+  ShapedType valueType = getValueType();
   // Check that the head dimension of the query and key are the same
   ArrayRef<int64_t> queryShape = queryType.getShape();
   ArrayRef<int64_t> keyShape = keyType.getShape();
