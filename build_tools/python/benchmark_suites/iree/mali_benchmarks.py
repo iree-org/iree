@@ -104,7 +104,7 @@ class Android_Mali_Benchmarks(object):
       quant_models: Sequence[common_definitions.Model]
   ) -> List[iree_definitions.ModuleGenerationConfig]:
     demote_compile_config = iree_definitions.CompileConfig(
-        id=compile_config.id + "_demote_f32_to_16",
+        id=compile_config.id + "-demote-f32-to-16",
         tags=compile_config.tags + ["demote-f32-to-f16"],
         compile_targets=compile_config.compile_targets,
         extra_flags=compile_config.extra_flags +
