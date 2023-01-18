@@ -57,8 +57,9 @@ class Linux_RV32_Benchmarks(object):
       tags=["default-flags"],
       compile_targets=[RV32_CPU_TARGET])
   MODELS = [
-      tflite_models.PERSON_DETECT_INT8,
       tflite_models.EFFICIENTNET_INT8,
+      tflite_models.MOBILEBERT_INT8,
+      tflite_models.PERSON_DETECT_INT8,
   ]
 
   def generate(
