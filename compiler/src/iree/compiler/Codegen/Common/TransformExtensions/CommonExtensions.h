@@ -41,8 +41,10 @@ struct ApplyPatternsOpPatterns {
   bool eraseUnnecessaryTensorOperands = false;
   bool foldMemrefAliases = false;
   bool foldReassociativeReshapes = false;
+  bool lowerTransferOpPermutations = false;
   bool promoteForeachThreadCaptureToShared = false;
-  bool rankReducing = false;
+  bool rankReducingLinalg = false;
+  bool rankReducingVector = false;
   bool expandMemrefStridedMetadata = false;
   bool swapPaddingElideConditional = false;
   bool swappingPatterns = false;

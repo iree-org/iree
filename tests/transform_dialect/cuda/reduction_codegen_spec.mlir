@@ -38,7 +38,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op
-  %func_2 = transform.iree.apply_patterns %func { rank_reducing }
+  %func_2 = transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector }
   %func_3 = transform.structured.vectorize %func_2
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
@@ -58,7 +58,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   // Step 7. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================
-  %func_8 = transform.iree.apply_patterns %func_7 { rank_reducing, fold_memref_aliases }
+  %func_8 = transform.iree.apply_patterns %func_7 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases }
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3
   // Don't complain about unsupported if (threadIdx.x == 0 && threadIdx.y == 0)
   // at this point.

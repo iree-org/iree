@@ -34,7 +34,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %func = transform.structured.match ops{["func.func"]} in %variant_op
   // TODO: masked vectorization on block_more_parallel_op_2 if we want 
   // vector<4> to work as intended.
-  %func_2 = transform.iree.apply_patterns %func { rank_reducing }
+  %func_2 = transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector }
   %func_3 = transform.structured.vectorize %func_2
 
   // Step 4. Bufferize and drop HAL descriptor from memref ops.
@@ -56,7 +56,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================
-  %func_10 = transform.iree.apply_patterns %func_9 { rank_reducing, fold_memref_aliases }
+  %func_10 = transform.iree.apply_patterns %func_9 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases }
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
   transform.iree.vector.warp_distribute %func_10
