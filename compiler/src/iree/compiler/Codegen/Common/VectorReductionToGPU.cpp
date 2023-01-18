@@ -30,13 +30,15 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
                                         vector::WarpExecuteOnLane0Op warpOp,
                                         Type type) {
   MemRefType memrefType;
+  auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
+      builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
   if (auto vectorType = type.dyn_cast<VectorType>()) {
     memrefType =
-        MemRefType::get(vectorType.getShape(), vectorType.getElementType(), {},
-                        gpu::GPUDialect::getWorkgroupAddressSpace());
+        MemRefType::get(vectorType.getShape(), vectorType.getElementType(),
+                        MemRefLayoutAttrInterface{}, addressSpaceAttr);
   } else {
-    memrefType = MemRefType::get({1}, type, {},
-                                 gpu::GPUDialect::getWorkgroupAddressSpace());
+    memrefType = MemRefType::get({1}, type, MemRefLayoutAttrInterface{},
+                                 addressSpaceAttr);
   }
   return builder.create<memref::AllocOp>(loc, memrefType);
 }

@@ -46,7 +46,8 @@ static bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
   if (!addrSpace) return false;
   auto intAttr = addrSpace.dyn_cast<IntegerAttr>();
   if (!intAttr) return false;
-  return intAttr.getInt() == gpu::GPUDialect::getWorkgroupAddressSpace();
+  return static_cast<unsigned int>(intAttr.getInt()) ==
+         static_cast<unsigned int>(gpu::GPUDialect::getWorkgroupAddressSpace());
 }
 
 // Returns a new predicated operation to support unpeeled epilogue. Unpeeled

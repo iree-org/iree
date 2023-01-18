@@ -31,7 +31,8 @@ static void createAsyncGroups(func::FuncOp funcOp) {
     if (!writeOp.getPermutationMap().isMinorIdentity() ||
         writeOp.getVectorType().getRank() != 1 || !writeOp.isDimInBounds(0) ||
         writeOp.getShapedType().cast<MemRefType>().getMemorySpaceAsInt() !=
-            gpu::GPUDialect::getWorkgroupAddressSpace())
+            static_cast<unsigned int>(
+                gpu::GPUDialect::getWorkgroupAddressSpace()))
       return WalkResult::advance();
     auto read = writeOp.getVector().getDefiningOp<vector::TransferReadOp>();
     if (!read || read.getVectorType() != writeOp.getVectorType() ||
@@ -64,7 +65,8 @@ static void createAsyncGroups(func::FuncOp funcOp) {
       // ignore read from a different address space.
       if (readOp &&
           readOp.getShapedType().cast<MemRefType>().getMemorySpaceAsInt() !=
-              gpu::GPUDialect::getWorkgroupAddressSpace()) {
+              static_cast<unsigned int>(
+                  gpu::GPUDialect::getWorkgroupAddressSpace())) {
         continue;
       }
       auto nextWriteOp = dyn_cast<vector::TransferWriteOp>(nextNode);
@@ -110,7 +112,8 @@ static void swizzleSharedMemory(func::FuncOp funcOp) {
     auto memrefType = allocOp.getMemref().getType().cast<MemRefType>();
     // Only apply it to shared memory of input operands.
     if (memrefType.getMemorySpaceAsInt() !=
-            gpu::GPUDialect::getWorkgroupAddressSpace() ||
+            static_cast<unsigned int>(
+                gpu::GPUDialect::getWorkgroupAddressSpace()) ||
         memrefType.getRank() < 3)
       return;
     shmAllocOps.push_back(allocOp);
