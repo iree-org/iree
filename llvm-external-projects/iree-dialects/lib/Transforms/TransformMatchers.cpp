@@ -7,10 +7,7 @@
 #include "iree-dialects/Transforms/TransformMatchers.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -646,6 +643,5 @@ void transform_ext::makeReductionMatcher(
           // Capture output elemental type.
           .output(0, CaptureElementTypeBitWidth(
                          captures.maybeTrailingOutputElementalTypeBitWidth));
-  reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch())
-                  .allTilableOpsCaptured<func::FuncOp>();
+  reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch());
 }

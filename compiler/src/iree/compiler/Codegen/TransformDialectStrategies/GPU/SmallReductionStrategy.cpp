@@ -100,7 +100,7 @@ static void buildSmallReductionStrategyThreadDistribution(
     ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
     Value maybeTrailingH, const AbstractReductionStrategy &strategy) {
   auto [fusionTargetH, fusionGroupH] =
-      iree_compiler::buildSelectFirstNonEmpty(b, maybeTrailingH, reductionH);
+      buildSelectFirstNonEmpty(b, maybeTrailingH, reductionH);
   ArrayRef<Attribute> allThreadsRef(strategy.allThreadAttrs);
   iree_compiler::TileToForeachThreadAndFuseAndDistributeResult tileResult =
       iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
@@ -124,7 +124,7 @@ static void buildSmallReductionStrategyThreadDistribution(
   Value fusedH = b.create<ScalarizeOp>(
       pdlOperation, tileResult.resultingFusedOpsHandles.front());
   auto [blockReductionH, maybeBlockTrailingH] =
-      iree_compiler::buildSelectFirstNonEmpty(b, fusedH, tiledH);
+      buildSelectFirstNonEmpty(b, fusedH, tiledH);
 
   // 2. Apply the 1d splitting strategy to the reduction part while specifying
   // a single thread. This triggers the splitting but not the thread mapping

@@ -43,6 +43,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",

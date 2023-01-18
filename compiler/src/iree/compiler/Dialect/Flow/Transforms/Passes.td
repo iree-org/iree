@@ -123,7 +123,11 @@ def DispatchWithTransformDialect :
             "mode, without requiring intimate knowledge of the IREE nested "
             "pass pipeline.\\n"
             "If empty (normal operation mode), select the container of the "
-            "top-level transform op.">
+            "top-level transform op.">,
+    Option<"debugEmitRemarkOnMatch", "debug-emit-remark-on-match", "bool",
+            /*default=*/"false",
+            "Emit remarks when on the root operation of a successful match "
+            "when running matchers in the transform dialect.">
   ];
 }
 

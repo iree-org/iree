@@ -589,6 +589,12 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
   return DiagnosedSilenceableFailure::success();
 }
 
+void transform_dialect::MovePrecedingOpIntoDispatchRegionOp::build(
+    OpBuilder &builder, OperationState &state, Value target,
+    Value dispatchRegion) {
+  build(builder, state, dispatchRegion.getType(), target, dispatchRegion);
+}
+
 void transform_dialect::MovePrecedingOpIntoDispatchRegionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);

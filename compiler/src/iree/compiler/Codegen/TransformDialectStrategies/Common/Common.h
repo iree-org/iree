@@ -56,18 +56,6 @@ void createTransformRegion(func::FuncOp entryPoint,
 /// `handles` is empty.
 void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 
-/// Build transform IR to dynamically selects the first non-empty handle; i.e.
-/// if (h1, h2) is:
-///   - (non-empty, non-empty), returns (h1, h2)
-///   - (empty, non-empty), returns (h2, empty)
-///   - (non-empty, empty), returns (h1, empty)
-///   - (empty, empty), returns (empty, empty)
-/// This is used as a normalization operation that replaces conditionals, either
-/// in C++ or in transform IR.
-/// This can be thought of as a control-flow -> data-dependent conversion.
-std::pair<Value, Value> buildSelectFirstNonEmpty(ImplicitLocOpBuilder &b,
-                                                 Value handle1, Value handle2);
-
 /// Result of the combined transform performing tiling, fusion and
 /// distribution to parallel constructs.
 struct TileToScfForAndFuseResult {

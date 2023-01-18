@@ -165,12 +165,13 @@ createFormDispatchWorkgroupsPass(bool generateWorkloadRegion = true);
 
 // Pass to perform dispatch of Linalg on tensor ops by using the transform
 // dialect. Dispatch regions are created as specified by the transform module
-// that is parsed from `transformFileName`.
+// that is parsed from `transformFileName` or on-the-fly by the pass otherwise.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDispatchWithTransformDialect(
     llvm::StringRef transformFileName = llvm::StringRef(),
     llvm::StringRef debugPayloadRootTag = llvm::StringRef(),
-    llvm::StringRef debugTransformRootTag = llvm::StringRef());
+    llvm::StringRef debugTransformRootTag = llvm::StringRef(),
+    bool debugEmitRemarkOnMatch = false);
 
 // Captures dynamic shape dimensions required by dispatch operands.
 std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();

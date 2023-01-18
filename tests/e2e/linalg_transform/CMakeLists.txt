@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     check_linalg_transform
   SRCS
+    "dispatch_formation_flow.mlir"
     "linalg_transform.mlir"
   TOOLS
     ${IREE_LLD_TARGET}

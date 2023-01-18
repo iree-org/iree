@@ -13,7 +13,10 @@ package(
 
 iree_lit_test_suite(
     name = "check_linalg_transform",
-    srcs = ["linalg_transform.mlir"],
+    srcs = [
+        "dispatch_formation_flow.mlir",
+        "linalg_transform.mlir",
+    ],
     cfg = "//tests:lit.cfg.py",
     # transform_dialect_xxx_spec are MLIR files that specify a transformation,
     # they need to be included as data.

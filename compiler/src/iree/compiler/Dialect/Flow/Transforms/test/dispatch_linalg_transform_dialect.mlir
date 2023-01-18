@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-flow-dispatch-with-transform-dialect{transform-file-name=%p/transform_dialect_dispatch_spec.mlir}))" %s | \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-flow-dispatch-with-transform-dialect{transform-file-name=%p/transform_dialect_dispatch_spec.mlir}),canonicalize,cse)" %s | \
 // RUN: FileCheck %s
 
 func.func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,

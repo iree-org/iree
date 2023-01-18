@@ -172,6 +172,9 @@ def MovePrecedingOpIntoDispatchRegionOp : Op<
   let results = (outs PDL_Operation:$transformed);
   let assemblyFormat = "$target `into` $dispatch_region attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let builders = [
+    OpBuilder<(ins "Value":$target, "Value":$dispatchRegion)>
+  ];
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
         ::mlir::transform::TransformResults &transformResults,
@@ -222,7 +225,7 @@ def MoveSucceedingOpIntoDispatchRegionOp : Op<
 
     All operands of the target are replaced with values that are defined inside
     of the dispatch region when possible. All uses of the target op are
-    replaced with a newly ammended results of the dispatch region op.
+    replaced with a newly amended results of the dispatch region op.
 
     #### Return modes
 

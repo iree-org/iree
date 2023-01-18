@@ -68,6 +68,23 @@
 using namespace mlir;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgEnablingOptions;
 
+/// Dynamically selects the first non-empty handle; i.e. if (h1, h2) is:
+///   - (non-empty, non-empty), returns (h1, h2)
+///   - (empty, non-empty), returns (h2, empty)
+///   - (non-empty, empty), returns (h1, empty)
+///   - (empty, empty), returns (empty, empty)
+/// This is used as a normalization operation that replaces conditionals, either
+/// in C++ or in transform IR.
+/// This can be thought of as a control-flow -> data-dependent conversion.
+std::pair<Value, Value> mlir::buildSelectFirstNonEmpty(ImplicitLocOpBuilder &b,
+                                                       Value handle1,
+                                                       Value handle2) {
+  auto pdlOperation = pdl::OperationType::get(b.getContext());
+  auto selector = b.create<transform_ext::TakeFirstOp>(
+      pdlOperation, pdlOperation, ArrayRef<Value>{handle1, handle2});
+  return std::make_pair(selector.getFirst(), selector.getRest());
+}
+
 //===----------------------------------------------------------------------===//
 // Additional constraints for PDLMatchOp.
 //===----------------------------------------------------------------------===//
@@ -1223,10 +1240,17 @@ testMatchCallbackCallback(transform_ext::MatchCallbackResult &res, Location loc,
 ///   - the "fill" op preceding the reduction;
 ///   - reduction op;
 ///   - trailing elementwise op, if any.
+///
+/// This callback can be used for both exact (mustExactlyMatchAllTileableOps is
+/// set) and partial (mustExactlyMatchAllTileableOps is unset) matches. In the
+/// former case, an additional constraint is added to the matcher to ensure that
+/// it captured all tilable operations in the parent function. In the latter
+/// case, no such constraint is added and the matched part is interpreted as a
+/// subgraph in a potentially container (graph).
 static DiagnosedSilenceableFailure
-reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
-                  const mlir::transform::TransformState &state,
-                  ValueRange handles) {
+reductionCallbackImpl(transform_ext::MatchCallbackResult &res, Location loc,
+                      const mlir::transform::TransformState &state,
+                      ValueRange handles, bool mustExactlyMatchAllTileableOps) {
   if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
     return emitSilenceableFailure(loc)
            << "expected one handle to one operation";
@@ -1235,6 +1259,8 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   transform_ext::StructuredOpMatcher pattern, fill, leading, trailing;
   transform_ext::MatchedReductionCaptures ignore;
   makeReductionMatcher(pattern, fill, leading, trailing, ignore);
+  if (mustExactlyMatchAllTileableOps)
+    pattern = pattern.allTilableOpsCaptured<func::FuncOp>();
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
@@ -1269,12 +1295,39 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
+/// Wraps the given matcher callback to indicate that it must capture all
+/// tilable ops in the parent function. Expects the callback to accept the same
+/// arguments as what is expected by MatchCallbacksRegistry::register, followed
+/// by a bool.
+template <typename Fn>
+auto wrapAsExactMatch(Fn &&fn) {
+  return [fn = std::move(fn)](
+             transform_ext::MatchCallbackResult &res, Location loc,
+             const mlir::transform::TransformState &state,
+             ValueRange handles) { return fn(res, loc, state, handles, true); };
+}
+
+/// Wraps the given matcher callback to indicate that it can match subgraphs.
+/// Expects the callback to accept the same arguments as what is expected by
+/// MatchCallbacksRegistry::register, followed by a bool.
+template <typename Fn>
+auto wrapAsPartialMatch(Fn &&fn) {
+  return [fn = std::move(fn)](
+             transform_ext::MatchCallbackResult &res, Location loc,
+             const mlir::transform::TransformState &state, ValueRange handles) {
+    return fn(res, loc, state, handles, false);
+  };
+}
+
 DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
     mlir::transform::TransformResults &results,
     mlir::transform::TransformState &state) {
   auto &registry = state.addExtension<transform_ext::MatchCallbacksRegistry>();
   registry.registerCallback("_test_match_callback", testMatchCallbackCallback);
-  registry.registerCallback("reduction", reductionCallback);
+  registry.registerCallback("reduction",
+                            wrapAsExactMatch(reductionCallbackImpl));
+  registry.registerCallback("reduction_partial",
+                            wrapAsPartialMatch(reductionCallbackImpl));
   return DiagnosedSilenceableFailure::success();
 }
 

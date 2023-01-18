@@ -187,7 +187,8 @@ printIreeOptReproCall(llvm::raw_ostream &os, StringRef rootOpName,
                       StringRef passName,
                       const Pass::Option<std::string> &debugPayloadRootTag,
                       const Pass::Option<std::string> &debugTransformRootTag) {
-  os << llvm::formatv("iree-opt --pass-pipeline=\"{0}({1}{{{2}={3} {4}={5}})\"",
+  os << llvm::formatv("iree-opt --pass-pipeline=\"{0}({1}{{{2}={3} {4}={5}})\" "
+                      "-mlir-disable-threading",
                       rootOpName, passName, debugPayloadRootTag.getArgStr(),
                       debugPayloadRootTag.empty()
                           ? StringRef(kTransformIreeTagPayloadRootValue)
@@ -257,51 +258,9 @@ struct OpPosition {
 };
 } // namespace
 
-/// Populates `positions` with the relative positions of `target` in its
-/// ancestors.
-static void findOpPositionInRoot(Operation *target,
-                                 SmallVectorImpl<OpPosition> &positions) {
-  // Root operation may or may not have a parent block and has no parent
-  // region. Even if it has a parent block, we don't need its position in the
-  // block because we will have a pointer to root.
-  for (; target->getParentOp() != nullptr; target = target->getParentOp()) {
-    size_t posInBlock =
-        std::distance(target->getBlock()->begin(), target->getIterator());
-    size_t blockPos = std::distance(target->getParentRegion()->begin(),
-                                    target->getBlock()->getIterator());
-    size_t regionNo = target->getParentRegion()->getRegionNumber();
-    positions.emplace_back(OpPosition{regionNo, blockPos, posInBlock});
-  }
-}
-
-/// Finds an op located at the given stack of positions (e.g., the last position
-/// is at the root, and the first position is at the immediate parent) relative
-/// to the given root operation. Expects the location to exist.
-static Operation *getOpAtPosition(Operation *root,
-                                  ArrayRef<OpPosition> positions) {
-  Operation *op = root;
-  for (const OpPosition &pos : llvm::reverse(positions)) {
-    Region &region = op->getRegion(pos.regionNumber);
-    Block &block = *std::next(region.begin(), pos.blockOffset);
-    op = &*std::next(block.begin(), pos.opOffset);
-  }
-  return op;
-}
-
-/// Finds the clone of `original` in the cloned copy of the root operation, i.e.
-/// the operation with no parent, using its relative offsets in the parent
-/// parent lists of blocks and regions. Note that this performs linear
-/// traversals of blocks and regions along the path to root, but is arguably
-/// preferable to storing the entire mapping between all cloned operations.
-static Operation *findCloned(Operation *original, Operation *cloneRoot) {
-  SmallVector<OpPosition> opPositions;
-  findOpPositionInRoot(original, opPositions);
-  return getOpAtPosition(cloneRoot, opPositions);
-}
-
 // Optionally perform debug actions requested by the user to dump IR and a
 // repro to stderr and/or a file.
-static void performOptionalDebugActions(
+static LogicalResult performOptionalDebugActions(
     Operation *target, Region *transformRegion, StringRef passName,
     const Pass::Option<std::string> &debugPayloadRootTag,
     const Pass::Option<std::string> &debugTransformRootTag) {
@@ -313,39 +272,27 @@ static void performOptionalDebugActions(
   DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_STDERR, { hasDebugFlags = true; });
   DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_FILE, { hasDebugFlags = true; });
   if (!hasDebugFlags)
-    return;
+    return success();
 
-  // Since the pass may be running in parallel on multiple parts of the same
-  // root operation, clone it before attaching debug attributes as it would
-  // otherwise create a race. While we could avoid cloning when multithreading
-  // is disabled or when the attributes are already present, this is only
-  // necessary in debug builds that are not performance-critical and can afford
-  // an extra copy.
+  if (target->getContext()->isMultithreadingEnabled()) {
+    return emitError(UnknownLoc::get(target->getContext()))
+           << "reproducers cannot be generated in multi-threaded mode, disable "
+              "it (-mlir-disable-threading) to generate reproducers";
+  }
+
   Operation *root = getRootOperation(target);
-  OwningOpRef<Operation *> rootClone(root->clone());
-  Operation *debugRoot = rootClone.get();
-  Operation *debugTarget = findCloned(target, debugRoot);
-
+  (void)root;
   Operation *transformContainer = transformRegion->getParentOp();
   assert(transformContainer && "unexpected detached transform region");
-  OwningOpRef<Operation *> maybeTransformContainerClone;
-  Operation *debugTransformContainer;
-  if (root->isAncestor(transformContainer)) {
-    debugTransformContainer = findCloned(transformContainer, debugRoot);
-  } else {
-    maybeTransformContainerClone =
-        OwningOpRef<Operation *>(transformContainer->clone());
-    debugTransformContainer = maybeTransformContainerClone.get();
-  }
 
   // Add temporary debug / repro attributes, these must never leak out.
   if (debugPayloadRootTag.empty()) {
-    debugTarget->setAttr(
+    target->setAttr(
         kTransformIreeTagAttrName,
         StringAttr::get(context, kTransformIreeTagPayloadRootValue));
   }
   if (debugTransformRootTag.empty()) {
-    debugTransformContainer->setAttr(
+    transformContainer->setAttr(
         kTransformIreeTagAttrName,
         StringAttr::get(context, kTransformIreeTagTransformContainerValue));
   }
@@ -353,17 +300,24 @@ static void performOptionalDebugActions(
   DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_STDERR, {
     llvm::dbgs() << "=== Transform Interpreter Repro ===\n";
     printIreeOptReproCall(llvm::dbgs() << "cat <<EOF | ",
-                          debugRoot->getName().getStringRef(), passName,
+                          root->getName().getStringRef(), passName,
                           debugPayloadRootTag, debugTransformRootTag)
         << "\n";
-    printModuleForRepro(llvm::dbgs(), debugRoot, debugTransformContainer);
+    printModuleForRepro(llvm::dbgs(), root, transformContainer);
     llvm::dbgs() << "\nEOF\n";
     llvm::dbgs() << "===================================\n";
   });
   DEBUG_WITH_TYPE(DEBUG_TYPE_DUMP_FILE, {
-    saveReproToTempFile(llvm::dbgs(), debugTarget, debugTransformContainer,
-                        passName, debugPayloadRootTag, debugTransformRootTag);
+    saveReproToTempFile(llvm::dbgs(), target, transformContainer, passName,
+                        debugPayloadRootTag, debugTransformRootTag);
   });
+
+  return success();
+}
+
+bool transform::detail::hasSharedTransformModuleImpl(
+    const std::shared_ptr<OwningOpRef<ModuleOp>> &module) {
+  return module && *module;
 }
 
 LogicalResult transform::detail::interpreterBaseRunOnOperationImpl(
@@ -372,8 +326,6 @@ LogicalResult transform::detail::interpreterBaseRunOnOperationImpl(
     const Pass::Option<std::string> &transformFileName,
     const Pass::Option<std::string> &debugPayloadRootTag,
     const Pass::Option<std::string> &debugTransformRootTag) {
-  bool parsedTransform = (sharedTransformModule && *sharedTransformModule);
-
   // Step 1
   // ------
   // Get the default payloadRoot and transformRegion that one expects
@@ -383,7 +335,7 @@ LogicalResult transform::detail::interpreterBaseRunOnOperationImpl(
   // If a parsed transform was specified separately, use it immediately.
   // Otherwise, the transform is embedded in the IR: go inspect the IR and
   // get the first top-level transform we find.
-  if (parsedTransform) {
+  if (hasSharedTransformModuleImpl(sharedTransformModule)) {
     transformRegion = &(*sharedTransformModule)->getRegion();
   } else {
     // TODO: In large IR we will likely want more control in selecting a
@@ -451,8 +403,10 @@ LogicalResult transform::detail::interpreterBaseRunOnOperationImpl(
   // ------
   // Optionally perform debug actions requested by the user to dump IR and a
   // repro to stderr and/or a file.
-  performOptionalDebugActions(target, transformRegion, passName,
-                              debugPayloadRootTag, debugTransformRootTag);
+  if (failed(performOptionalDebugActions(target, transformRegion, passName,
+                                         debugPayloadRootTag,
+                                         debugTransformRootTag)))
+    return failure();
 
   // Step 5
   // ------
@@ -470,11 +424,18 @@ LogicalResult transform::detail::interpreterBaseRunOnOperationImpl(
 
 LogicalResult transform::detail::interpreterBaseInitializeImpl(
     MLIRContext *context, StringRef transformFileName,
-    std::shared_ptr<OwningOpRef<ModuleOp>> &module) {
+    std::shared_ptr<OwningOpRef<ModuleOp>> &module,
+    function_ref<OwningOpRef<ModuleOp>(Location)> transformConstructor) {
   OwningOpRef<ModuleOp> parsed;
   if (failed(parseTransformModuleFromFile(context, transformFileName, parsed)))
     return failure();
 
-  module = std::make_shared<OwningOpRef<ModuleOp>>(std::move(parsed));
+  if (parsed) {
+    module = std::make_shared<OwningOpRef<ModuleOp>>(std::move(parsed));
+  } else {
+    // TODO: better location story for runtime-constructed schedules.
+    module = std::make_shared<OwningOpRef<ModuleOp>>(
+        transformConstructor(UnknownLoc::get(context)));
+  }
   return success();
 }

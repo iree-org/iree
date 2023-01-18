@@ -131,6 +131,19 @@ static llvm::cl::opt<std::string> clDispatchTransformFileName(
                    "the transformations to apply to form dispatch regions."),
     llvm::cl::init(""));
 
+static llvm::cl::opt<bool> clDispatchTransformJIT(
+    "iree-flow-dispatch-use-transform-dialect-jit",
+    llvm::cl::desc(
+        "Form dispatch regions using transform dialect produced on the fly"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clDispatchTransformDebugEmitRemarks(
+    "iree-flow-dispatch-use-transform-dialect-debug-emit-remarks",
+    llvm::cl::desc(
+        "Emit remarks when the transform dialect interpreter matches a root "
+        "operation around which the dispatch region is formed"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clZeroFillEmptyTensors(
     "iree-flow-zero-fill-empty-tensors",
     llvm::cl::desc(
@@ -283,11 +296,13 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPredicatedPass(clEnableDataTiling, createSetEncodingPass)
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
-      .addPredicatedPass(!clDispatchTransformFileName.empty(),
-                         [&]() {
-                           return createDispatchWithTransformDialect(
-                               clDispatchTransformFileName);
-                         })
+      .addPredicatedPass(
+          clDispatchTransformJIT || !clDispatchTransformFileName.empty(),
+          [&]() {
+            return createDispatchWithTransformDialect(
+                clDispatchTransformFileName, "", "",
+                clDispatchTransformDebugEmitRemarks);
+          })
       // Only want use the transform dialect for some dispatch regions and let
       // the FormDispatchRegions handle the rest.
       .addPass([&]() {

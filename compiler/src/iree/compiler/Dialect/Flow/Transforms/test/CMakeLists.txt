@@ -44,6 +44,7 @@ iree_lit_test_suite(
     "strip_and_splat_constant_variables.mlir"
     "strip_signedness.mlir"
     "tensor_pad_to_tensor_insert_slice.mlir"
+    "transform_dialect_reduction_dispatch.mlir"
     "transform_dispatch_region_formation.mlir"
     "transformation_pipeline.mlir"
     "verify_input_ir.mlir"
