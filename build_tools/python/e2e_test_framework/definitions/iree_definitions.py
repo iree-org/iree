@@ -106,7 +106,7 @@ class ImportedModel(object):
   @staticmethod
   def from_model(model: common_definitions.Model):
     dialect_type = MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type]
-    return ImportedModel(id=f"{model.id}-{dialect_type}",
+    return ImportedModel(id=f"{model.id}-{dialect_type.value}",
                          model=model,
                          dialect_type=dialect_type)
 
