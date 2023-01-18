@@ -21,7 +21,7 @@ import os
 import pathlib
 import requests
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 from common.common_arguments import expand_and_check_file_paths
 from common.benchmark_presentation import (COMPILATION_METRICS_TO_TABLE_MAPPERS,
@@ -114,8 +114,9 @@ def get_git_commit_info(commit: str, verbose: bool = False) -> Dict[str, str]:
 def compose_series_payload(project_id: str,
                            series_id: str,
                            series_unit: str,
-                           series_description: bool = None,
-                           average_range: str = '5%',
+                           series_description: Optional[str] = None,
+                           series_config_id: Optional[str] = None,
+                           average_range: Union[int, str] = '5%',
                            average_min_count: int = 3,
                            better_criterion: str = 'smaller',
                            override: bool = False) -> Dict[str, Any]:
@@ -135,6 +136,8 @@ def compose_series_payload(project_id: str,
   }
   if series_description is not None:
     payload['description'] = series_description
+  if series_config_id is not None:
+    payload['infos'] = {"config_id": series_config_id}
   return payload
 
 
@@ -211,6 +214,7 @@ def post_to_dashboard(url: str,
 def add_new_iree_series(series_id: str,
                         series_unit: str,
                         series_description: Optional[str] = None,
+                        series_config_id: Optional[str] = None,
                         override: bool = False,
                         dry_run: bool = False,
                         verbose: bool = False):
@@ -227,6 +231,7 @@ def add_new_iree_series(series_id: str,
                                    series_id,
                                    series_unit,
                                    series_description,
+                                   series_config_id=series_config_id,
                                    average_range=average_range,
                                    override=override)
   post_to_dashboard(f'{IREE_DASHBOARD_URL}/apis/v2/addSerie',
