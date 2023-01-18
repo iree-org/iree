@@ -28,6 +28,7 @@
 #include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
@@ -67,7 +68,8 @@ int main(int argc, char **argv) {
       mlir::pdl_interp::PDLInterpDialect,
       mlir::scf::SCFDialect,
       mlir::tensor::TensorDialect,
-      mlir::transform::TransformDialect
+      mlir::transform::TransformDialect,
+      mlir::vector::VectorDialect
       // clang-format on
       >();
 
@@ -91,6 +93,7 @@ int main(int argc, char **argv) {
                          transform_ext::StructuredTransformOpsExtension>();
   mlir::linalg::registerTransformDialectExtension(registry);
   mlir::scf::registerTransformDialectExtension(registry);
+  mlir::vector::registerTransformDialectExtension(registry);
 
   return mlir::asMainReturnCode(
       mlir::MlirOptMain(argc, argv, "MLIR modular optimizer driver\n", registry,

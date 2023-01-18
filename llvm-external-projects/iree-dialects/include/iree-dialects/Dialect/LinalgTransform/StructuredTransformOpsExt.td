@@ -70,28 +70,6 @@ def BufferizeOp : Op<Transform_Dialect, "bufferize",
   let cppNamespace = "mlir::transform_ext";
 }
 
-def LowerVectorsOp : Op<Transform_Dialect, "lower_vectors",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let description = [{Indicates that the vector operations in the entire
-  module should be lowered to simpler primitives (multiple stages of lowering
-  be executed at once).}];
-
-  let arguments =
-    (ins DefaultValuedAttr<I64ArrayAttr, "{0, 1, 2, 3, 4, 5, 6}">:$stages,
-     DefaultValuedAttr<StrAttr, "\"outerproduct\"">:$contraction_lowering,
-     DefaultValuedAttr<StrAttr, "\"innerparallel\"">:$multireduction_lowering,
-     DefaultValuedAttr<StrAttr, "\"linalg-copy\"">:$split_transfers,
-     DefaultValuedAttr<BoolAttr, "true">:$unroll_vector_transfers,
-     DefaultValuedAttr<StrAttr, "\"eltwise\"">:$transpose_lowering,
-     DefaultValuedAttr<BoolAttr, "false">:$transpose_avx2_lowering
-    );
-
-  let assemblyFormat = "attr-dict";
-  let cppNamespace = "mlir::transform_ext";
-}
-
 def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
