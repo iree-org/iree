@@ -101,8 +101,7 @@ class CollectCompilationStatistics(unittest.TestCase):
         source_url="https://example.com/xyz.tflite",
         entry_function="main",
         input_types=["1xf32"])
-    imported_model_a = iree_definitions.ImportedModel(
-        model=model_a, dialect_type=iree_definitions.MLIRDialectType.TOSA)
+    imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
     compile_config_a = iree_definitions.CompileConfig(
         id="config_a",
         tags=["defaults"],

@@ -199,7 +199,7 @@ def serializable(cls=None,
     if type_key is not None and all(field.name != id_field for field in fields):
       raise ValueError(f'Id field "{id_field}" not found in the class {cls}.')
 
-    def get_obj_key(self):
+    def obj_key(self):
       if type_key is None:
         raise ValueError(f"No type key for {cls}.")
       obj_id = getattr(self, id_field)
@@ -209,7 +209,7 @@ def serializable(cls=None,
       if type_key is None:
         return _fields_to_dict(self, fields, keyed_obj_map)
 
-      obj_key = self.get_obj_key()
+      obj_key = self.obj_key()
       if obj_key in keyed_obj_map:
         # If the value in the map is None, it means we have visited this object
         # before but not yet finished serializing it. This will only happen if
@@ -241,7 +241,7 @@ def serializable(cls=None,
       obj_cache[obj_key] = derialized_obj
       return derialized_obj
 
-    setattr(cls, OBJ_KEY_FUNC_NAME, get_obj_key)
+    setattr(cls, OBJ_KEY_FUNC_NAME, obj_key)
     setattr(cls, SERIALIZE_FUNC_NAME, serialize)
     setattr(cls, DESERIALIZE_FUNC_NAME, deserialize)
     return cls
