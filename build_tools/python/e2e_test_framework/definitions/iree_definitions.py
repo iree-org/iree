@@ -5,13 +5,30 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Classes for IREE compilation and run definitions."""
 
+import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-from typing import List
-import dataclasses
+import hashlib
+from typing import List, Sequence
 
 from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework import serialization
+
+
+def _hash_composite_id(keys: Sequence[str]) -> str:
+  """Computes the composite hash id from string keys.
+
+  String keys are the component ids that compose this composite object. We hash
+  the composite id since the id isn't designed to be inspected and insufficient
+  to reconstruct the original composite object.
+
+  Args:
+    keys: list of string keys.
+
+  Returns:
+    Unique hash id.
+  """
+  return hashlib.sha256(":".join(keys).encode("utf-8")).hexdigest()
 
 
 class TargetBackend(Enum):
@@ -119,7 +136,9 @@ class ModuleGenerationConfig(object):
   compile_config: CompileConfig
 
   def composite_id(self):
-    return f"{self.imported_model.obj_key()}/{self.compile_config.obj_key()}"
+    return _hash_composite_id(
+        [self.imported_model.obj_key(),
+         self.compile_config.obj_key()])
 
 
 @serialization.serializable
@@ -132,7 +151,7 @@ class E2EModelRunConfig(object):
   input_data: common_definitions.ModelInputData
 
   def composite_id(self):
-    return "/".join([
+    return _hash_composite_id([
         self.module_generation_config.composite_id(),
         self.module_execution_config.obj_key(),
         self.target_device_spec.obj_key(),
