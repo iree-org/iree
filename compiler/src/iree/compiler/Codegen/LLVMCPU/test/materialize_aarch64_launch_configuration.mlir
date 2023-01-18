@@ -340,6 +340,43 @@ hal.executable private @matmul_aarch_i8_i8_i32_dynamic  {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
+hal.executable private @pack  {
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {
+    data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-none-linux-android30"
+  }> {
+  hal.executable.export public @pack layout(#pipeline_layout)
+    builtin.module {
+      func.func @pack() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<20x40xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<4x48x8x1xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 40], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<20x40xf32>> -> tensor<20x40xf32>
+        %3 = tensor.empty() : tensor<4x48x8x1xf32>
+        %4 = iree_linalg_ext.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %3 : (tensor<20x40xf32> tensor<4x48x8x1xf32>) -> tensor<4x48x8x1xf32>
+        flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [4, 48, 8, 1], strides = [1, 1, 1, 1] : tensor<4x48x8x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x48x8x1xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 64]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
+//      CHECK: hal.executable.export public @pack
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   iree_linalg_ext.pack
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @unpack_outer_dynamic  {
   hal.executable.variant public @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {
     data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
