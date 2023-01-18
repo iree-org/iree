@@ -2878,8 +2878,8 @@ LogicalResult FlashAttentionFwdOp::getResultTilePosition(
     resultOffsets =
         SmallVector<OpFoldResult>(getOutputRank(), builder.getIndexAttr(0));
     for (auto info : llvm::enumerate(llvm::zip(offsets, sizes))) {
-      resultSizes[info.index()] = std::get<0>(info.value());
-      resultOffsets[info.index()] = std::get<1>(info.value());
+      resultOffsets[info.index()] = std::get<0>(info.value());
+      resultSizes[info.index()] = std::get<1>(info.value());
     }
     return success();
   }

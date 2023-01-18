@@ -180,9 +180,7 @@ extractSlices(Value key, Value value, Value query, Value output,
   sizes[2] = headDimension;
   offsets[0] = ivs[0];
   offsets[1] = ivs[1];
-  SmallVector<int64_t> tensorShape;
-  for (int i = 1; i < queryShape.size(); i++)
-    tensorShape.push_back(queryShape[i]);
+  SmallVector<int64_t> tensorShape{ShapedType::kDynamic, queryShape.back()};
   auto tensorType = RankedTensorType::get(tensorShape, elementType);
   Value keySlice = builder.create<tensor::ExtractSliceOp>(
       loc, tensorType, key, offsets, sizes, strides);
@@ -249,12 +247,6 @@ public:
   LogicalResult matchAndRewrite(FlashAttentionFwdOp attnOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = attnOp.getLoc();
-    auto funcOp = attnOp->getParentOfType<func::FuncOp>();
-    if (!funcOp) {
-      return rewriter.notifyMatchFailure(attnOp,
-                                         "Could not find parent of type ");
-    }
-
     rewriter.setInsertionPoint(attnOp);
 
     Value query = attnOp.query();
@@ -327,7 +319,7 @@ public:
     Value emptySquare =
         rewriter.create<tensor::EmptyOp>(loc, resultShape, elementType);
     auto tensorType = RankedTensorType::get(
-        SmallVector<int64_t>(2, queryShape[1]), elementType);
+        SmallVector<int64_t>(2, ShapedType::kDynamic), elementType);
     Value qkTranspose =
         computeQKTranspose(querySlice, keySlice, empty, emptySquare, zeroF32,
                            tensorType, loc, rewriter);

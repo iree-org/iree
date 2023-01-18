@@ -458,6 +458,8 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         LinalgExtOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(*ctx);
     IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
+    IREE::LinalgExt::FlashAttentionFwdOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::FlashAttentionFwdOp>>(*ctx);
   });
 }
 

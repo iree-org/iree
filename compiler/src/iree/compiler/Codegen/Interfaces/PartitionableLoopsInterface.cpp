@@ -236,6 +236,9 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
     IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
         AllParallelAsPartitionableLoops<
             IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
+    IREE::LinalgExt::FlashAttentionFwdOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::FlashAttentionFwdOp>>(
+        *ctx);
   });
 }
 

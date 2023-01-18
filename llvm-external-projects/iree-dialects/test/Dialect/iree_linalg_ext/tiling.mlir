@@ -1524,7 +1524,7 @@ func.func @flash_attention_fwd(%query: tensor<192x1024x64xf32>, %key: tensor<192
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<192x1024x64xf32>
 // CHECK:        %[[D1:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C192]] step %[[C1]]
 // CHECK-SAME:     iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<192x1024x64xf32>) {
-// CHECK-DAG:        %[[D2:.+]] = affine.min #[[MAP]](%[[ARG3]])[%[[C1]], %[[C1]]92]
+// CHECK-DAG:        %[[D2:.+]] = affine.min #[[MAP]](%[[ARG3]])[%[[C1]], %[[C192]]]
 // CHECK:          %[[D3:.+]] = scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1024]] step %[[C32]]
 // CHECK-SAME:       iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<192x1024x64xf32>) {
 // CHECK-DAG:          %[[D4:.+]] = affine.min #[[MAP1]](%[[ARG5]])[%[[C32]], %[[C1024]]]
@@ -1536,11 +1536,11 @@ func.func @flash_attention_fwd(%query: tensor<192x1024x64xf32>, %key: tensor<192
 // CHECK-SAME:         1, 1] : tensor<192x1024x64xf32> to tensor<?x1024x64xf32>
 // CHECK:            %[[EXTRACTED_SLICE_2:.+]] = tensor.extract_slice %[[D0]][%[[ARG3]], %[[ARG5]], 0] [%[[D2]],
 // CHECK-SAME:         %[[D4]], 64] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x?x64xf32>
-// CHECK:            %[[D5:.+]] = iree_linalg_ext.flash_attention.fwd ins(%[[EXTRACTED_SLICE]], %[[EXTRACTED_SLICE]]_0,
-// CHECK-SAME:         %[[EXTRACTED_SLICE]]_1 : tensor<?x?x64xf32>, tensor<?x1024x64xf32>, tensor<?x1024x64xf32>)
-// CHECK-SAME:         outs(%[[EXTRACTED_SLICE]]_2 : tensor<?x?x64xf32>) -> tensor<?x?x64xf32>
-// CHECK:            %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D5]] into %[[ARG6]][%[[D2]], %[[D4]], 0]
-// CHECK-SAME:         [%[[ARG3]], %[[ARG5]], 64] [1, 1, 1] : tensor<?x?x64xf32> into tensor<192x1024x64xf32>
+// CHECK:            %[[D5:.+]] = iree_linalg_ext.flash_attention.fwd ins(%[[EXTRACTED_SLICE]], %[[EXTRACTED_SLICE_0]],
+// CHECK-SAME:         %[[EXTRACTED_SLICE_1]] : tensor<?x?x64xf32>, tensor<?x1024x64xf32>, tensor<?x1024x64xf32>)
+// CHECK-SAME:         outs(%[[EXTRACTED_SLICE_2]] : tensor<?x?x64xf32>) -> tensor<?x?x64xf32>
+// CHECK:            %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D5]] into %[[ARG6]][%[[ARG3]], %[[ARG5]], 0]
+// CHECK-SAME:         [%[[D2]], %[[D4]], 64] [1, 1, 1] : tensor<?x?x64xf32> into tensor<192x1024x64xf32>
 // CHECK:            scf.yield %[[INSERTED_SLICE]] : tensor<192x1024x64xf32>
 // CHECK:          }
 // CHECK:          scf.yield %[[D3]] : tensor<192x1024x64xf32>
@@ -1565,7 +1565,7 @@ func.func @flash_attention_fwd_memref(%query: memref<192x1024x64xf32>, %key: mem
 // CHECK:        %[[C1:.+]] = arith.constant 1 : index
 // CHECK:        %[[C32:.+]] = arith.constant 32 : index
 // CHECK:        scf.for %[[ARG4:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C192]] step %[[C1]] {
-// CHECK-DAG:        %[[D0:.+]] = affine.min #[[MAP]](%[[ARG4]])[%[[C1]], %[[C1]]92]
+// CHECK-DAG:        %[[D0:.+]] = affine.min #[[MAP]](%[[ARG4]])[%[[C1]], %[[C192]]]
 // CHECK:          scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1024]] step %[[C32]] {
 // CHECK-DAG:          %[[D1:.+]] = affine.min #[[MAP1]](%[[ARG5]])[%[[C32]], %[[C1024]]]
 // CHECK:            %[[SUBVIEW:.+]] = memref.subview %[[ARG0]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], 64] [1, 1,
@@ -1576,9 +1576,9 @@ func.func @flash_attention_fwd_memref(%query: memref<192x1024x64xf32>, %key: mem
 // CHECK-SAME:         memref<192x1024x64xf32> to memref<?x1024x64xf32, strided<[65536, 64, 1], offset: ?>>
 // CHECK:            %[[SUBVIEW_2:.+]] = memref.subview %[[ARG3]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], 64] [1, 1,
 // CHECK-SAME:         1] : memref<192x1024x64xf32> to memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>
-// CHECK:            iree_linalg_ext.flash_attention.fwd ins(%[[SUBVIEW]], %[[SUBVIEW]]_0, %[[SUBVIEW]]_1 :
+// CHECK:            iree_linalg_ext.flash_attention.fwd ins(%[[SUBVIEW]], %[[SUBVIEW_0]], %[[SUBVIEW_1]] :
 // CHECK-SAME:         memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>, memref<?x1024x64xf32, strided<[65536, 64,
-// CHECK-SAME:         1], offset: ?>>, memref<?x1024x64xf32, strided<[65536, 64, 1], offset: ?>>) outs(%[[SUBVIEW]]_2 :
+// CHECK-SAME:         1], offset: ?>>, memref<?x1024x64xf32, strided<[65536, 64, 1], offset: ?>>) outs(%[[SUBVIEW_2]] :
 // CHECK-SAME:         memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>)
 // CHECK:          }
 // CHECK:        }
