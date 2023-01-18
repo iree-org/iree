@@ -47,6 +47,11 @@ fi
 # Run with SHARK-Runtime.
 PYTHON=python3.10 VENV_DIR=shark.venv BENCHMARK=1 IMPORTER=1 ./setup_venv.sh
 source shark.venv/bin/activate
+
+# Revert Torch version due to https://github.com/nod-ai/SHARK/issues/824.
+pip uninstall -y torch torchvision
+pip install --no-deps https://download.pytorch.org/whl/nightly/cu117/torch-2.0.0.dev20230113%2Bcu117-cp310-cp310-linux_x86_64.whl https://download.pytorch.org/whl/nightly/cu117/torchvision-0.15.0.dev20230114%2Bcu117-cp310-cp310-linux_x86_64.whl
+
 export SHARK_VERSION=`pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g"`
 pytest "${args[@]}" tank/test_models.py || true
 
@@ -64,6 +69,11 @@ rm -rf ~/.local/shark_tank
 # Run with IREE.
 PYTHON=python3.10 VENV_DIR=iree.venv BENCHMARK=1 IMPORTER=1 USE_IREE=1 ./setup_venv.sh
 source iree.venv/bin/activate
+
+# Revert Torch version due to https://github.com/nod-ai/SHARK/issues/824.
+pip uninstall -y torch torchvision
+pip install --no-deps https://download.pytorch.org/whl/nightly/cu117/torch-2.0.0.dev20230113%2Bcu117-cp310-cp310-linux_x86_64.whl https://download.pytorch.org/whl/nightly/cu117/torchvision-0.15.0.dev20230114%2Bcu117-cp310-cp310-linux_x86_64.whl
+
 export IREE_VERSION=`pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g"`
 pytest "${args[@]}" tank/test_models.py || true
 

@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: '0 10 * * *'
   workflow_dispatch:
+  pull_request:
 
 jobs:
   setup:
@@ -71,7 +72,6 @@ jobs:
         with:
           submodules: true
       - name: "Benchmarking SHARK tank on CPU"
-        # Only Tensorflow is working at the moment so limit benchmarking to TF models.
         run: |
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/shark@sha256:1fa2d51110c47ac12826754b66d95e3d68336a8ecf141db8be1eec74f39c42e2 \
@@ -99,7 +99,6 @@ jobs:
         with:
           submodules: true
       - name: "Benchmarking SHARK tank on CUDA"
-        # Only Tensorflow is working at the moment so limit benchmarking to TF models.
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --gpus all \
