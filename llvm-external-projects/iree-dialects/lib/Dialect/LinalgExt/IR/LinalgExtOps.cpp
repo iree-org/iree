@@ -394,7 +394,7 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 
   Value init = b.create<memref::LoadOp>(loc, original(), starts);
 
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   Block &block = getRegion().front();
   bvm.map(block.getArgument(0), update);
   bvm.map(block.getArgument(1), init);
@@ -567,7 +567,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
 
   auto &srcBlock = getRegion().front();
   Region &region = scfFor.getRegion();
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   {
     OpBuilder::InsertionGuard guard(b);
     auto &block = region.front();
@@ -1000,7 +1000,7 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
 
   auto &srcBlock = getRegion().front();
   Region &region = scfIf.getElseRegion();
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   {
     OpBuilder::InsertionGuard guard(b);
     auto &block = region.front();
@@ -1392,8 +1392,8 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
 
   // Retrieve region as black box comparision function f(x,y). Plug into op.
   auto &srcBlock = getRegion().front();
-  BlockAndValueMapping bvmF; // f(x,y)
-  BlockAndValueMapping bvmR; // f(y,x)
+  IRMapping bvmF; // f(x,y)
+  IRMapping bvmR; // f(y,x)
   {
     // Save previous insertion point. Continue within loop body.
     OpBuilder::InsertionGuard guard(b);

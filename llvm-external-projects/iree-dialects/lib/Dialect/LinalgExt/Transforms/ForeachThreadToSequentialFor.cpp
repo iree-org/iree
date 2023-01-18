@@ -12,7 +12,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
-#include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -74,7 +74,7 @@ FailureOr<scf::ForOp> ForeachThreadOpToScfForRewriter::returningMatchAndRewrite(
   }
 
   rewriter.setInsertionPointToStart(body);
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   bvm.map(valuesToYield, forOp.getRegionIterArgs());
 
   // Create sequential insertSlice ops.
