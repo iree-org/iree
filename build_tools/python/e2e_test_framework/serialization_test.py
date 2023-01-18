@@ -81,11 +81,11 @@ class SerializationTest(unittest.TestCase):
     self.assertEqual(
         results, {
             "main_obj": [
-                dict(b_list=["test_b:id_a", "test_b:id_b"],
+                dict(b_list=["id_a", "id_b"],
                      c_obj=dict(float_val=0.1),
                      str_val="test1",
                      enum_val="OPTION_B"),
-                dict(b_list=["test_b:id_a"],
+                dict(b_list=["id_a"],
                      c_obj=dict(float_val=0.2),
                      str_val=None,
                      enum_val="OPTION_C")

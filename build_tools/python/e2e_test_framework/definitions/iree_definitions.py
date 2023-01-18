@@ -140,9 +140,7 @@ class ModuleGenerationConfig(object):
   compile_config: CompileConfig
 
   def composite_id(self):
-    return _hash_composite_id(
-        [self.imported_model.obj_key(),
-         self.compile_config.obj_key()])
+    return _hash_composite_id([self.imported_model.id, self.compile_config.id])
 
 
 @serialization.serializable
@@ -157,7 +155,6 @@ class E2EModelRunConfig(object):
   def composite_id(self):
     return _hash_composite_id([
         self.module_generation_config.composite_id(),
-        self.module_execution_config.obj_key(),
-        self.target_device_spec.obj_key(),
-        self.input_data.obj_key()
+        self.module_execution_config.id, self.target_device_spec.id,
+        self.input_data.id
     ])
