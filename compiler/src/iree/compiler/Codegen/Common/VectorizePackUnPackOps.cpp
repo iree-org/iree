@@ -13,7 +13,6 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Matchers.h"
@@ -25,6 +24,14 @@
 namespace mlir {
 namespace iree_compiler {
 namespace {
+
+/// A simple pattern rewriter that implements no special logic.
+/// TODO(hanchung): Use the rewriter in TransformUtils.h after the commit is
+/// cherry-picked into IREE.
+class SimpleRewriter : public PatternRewriter {
+ public:
+  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
+};
 
 struct VectorizePackUnPackOpsPass
     : public VectorizePackUnPackOpsBase<VectorizePackUnPackOpsPass> {
@@ -40,7 +47,7 @@ struct VectorizePackUnPackOpsPass
 
     // Apply tiling to make outer dims be all 1s.
     {
-      transform::TrivialPatternRewriter rewriter(ctx);
+      SimpleRewriter rewriter(ctx);
       auto packOptions = scf::SCFTileAndFuseOptions().setTilingOptions(
           scf::SCFTilingOptions().setTileSizeComputationFunction(
               [](OpBuilder &builder, Operation *op) -> SmallVector<Value> {

@@ -196,9 +196,7 @@ static bool isRootOp(Operation *op) {
     }
     return !isa<linalg::FillOp>(op);
   }
-  // tensor::PadOp fusion is not ready. Explicitly marking it not a root op for
-  // now.
-  return (isa<TilingInterface>(op) && !isa<tensor::PadOp>(op)) ||
+  return isa<TilingInterface>(op) ||
          isa<LinalgExt::SetEncodingOp, LinalgExt::UnsetEncodingOp>(op);
 }
 
