@@ -228,7 +228,7 @@ iree_status_t iree_hal_command_buffer_fill_buffer_validation(
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
       command_buffer, validation_state, target_buffer,
       IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
+      IREE_HAL_BUFFER_USAGE_TRANSFER));
 
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(target_buffer),
@@ -238,7 +238,7 @@ iree_status_t iree_hal_command_buffer_fill_buffer_validation(
       IREE_HAL_MEMORY_ACCESS_WRITE));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
       iree_hal_buffer_allowed_usage(target_buffer),
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
+      IREE_HAL_BUFFER_USAGE_TRANSFER));
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_validate_range(target_buffer, target_offset, length));
 
@@ -274,7 +274,7 @@ iree_status_t iree_hal_command_buffer_update_buffer_validation(
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
       command_buffer, validation_state, target_buffer,
       IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
+      IREE_HAL_BUFFER_USAGE_TRANSFER));
 
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(target_buffer),
@@ -284,7 +284,7 @@ iree_status_t iree_hal_command_buffer_update_buffer_validation(
       IREE_HAL_MEMORY_ACCESS_WRITE));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
       iree_hal_buffer_allowed_usage(target_buffer),
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
+      IREE_HAL_BUFFER_USAGE_TRANSFER));
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_validate_range(target_buffer, target_offset, length));
 
@@ -302,24 +302,24 @@ iree_status_t iree_hal_command_buffer_copy_buffer_validation(
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
       command_buffer, validation_state, source_buffer,
       IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
-      IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE));
+      IREE_HAL_BUFFER_USAGE_TRANSFER));
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
       command_buffer, validation_state, target_buffer,
       IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
+      IREE_HAL_BUFFER_USAGE_TRANSFER));
 
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
       iree_hal_buffer_allowed_access(source_buffer),
       IREE_HAL_MEMORY_ACCESS_READ));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
       iree_hal_buffer_allowed_usage(source_buffer),
-      IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE));
+      IREE_HAL_BUFFER_USAGE_TRANSFER));
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_validate_range(source_buffer, source_offset, length));
 
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
       iree_hal_buffer_allowed_usage(target_buffer),
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
+      IREE_HAL_BUFFER_USAGE_TRANSFER));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
       iree_hal_buffer_allowed_access(target_buffer),
       IREE_HAL_MEMORY_ACCESS_WRITE));
