@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "illegal_configuration.mlir"
     "legalize.mlir"
     "linalg_transform.mlir"
+    "materialize_encoding.mlir"
     "nvvm_pipeline_test.mlir"
     "reduction_pipeline.mlir"
     "reduction_pipeline_transform.mlir"

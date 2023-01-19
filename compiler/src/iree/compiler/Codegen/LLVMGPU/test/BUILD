@@ -30,6 +30,7 @@ iree_lit_test_suite(
             "rocdl_pipeline_test.mlir",
             "set_transform_strategy.mlir",
             "illegal_configuration.mlir",
+            "materialize_encoding.mlir",
             "linalg_transform.mlir",
             "legalize.mlir",
             "tensor_alloc.mlir",
