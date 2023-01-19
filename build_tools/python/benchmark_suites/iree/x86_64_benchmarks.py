@@ -26,7 +26,10 @@ class Linux_x86_64_Benchmarks(object):
   CASCADELAKE_COMPILE_CONFIG = iree_definitions.CompileConfig(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE,
       tags=["default-flags"],
-      compile_targets=[CASCADELAKE_CPU_TARGET])
+      compile_targets=[CASCADELAKE_CPU_TARGET],
+      extra_flags=[
+          "--iree-flow-enable-data-tiling"
+      ])
   CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_FUSE_PADDING,
       tags=["experimental-flags", "fuse-padding"],

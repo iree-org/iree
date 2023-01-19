@@ -153,6 +153,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -168,6 +169,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -183,6 +185,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -198,6 +201,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -213,6 +217,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -228,6 +233,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -243,6 +249,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -258,6 +265,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -273,6 +281,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -288,6 +297,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -303,6 +313,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -318,6 +329,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -333,6 +345,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -348,6 +361,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -363,6 +377,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
   PUBLIC
 )
 
@@ -1672,6 +1687,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1689,6 +1705,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1706,6 +1723,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1723,6 +1741,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1740,6 +1759,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1757,6 +1777,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1774,6 +1795,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1791,6 +1813,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1808,6 +1831,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1825,6 +1849,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1842,6 +1867,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1859,6 +1885,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1876,6 +1903,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1893,6 +1921,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -1910,6 +1939,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-data-tiling"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
