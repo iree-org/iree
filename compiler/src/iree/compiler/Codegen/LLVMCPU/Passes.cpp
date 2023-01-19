@@ -128,6 +128,8 @@ static void addTileAndDistributePasses(
     OpPassManager &pm, bool useFuseTensorPadWithConsumerPass = true) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createTileAndDecomposeFlashAttentionTransformPass());
   if (clEnablePadConsumerFusion && useFuseTensorPadWithConsumerPass) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createFuseTensorPadWithConsumerPass());

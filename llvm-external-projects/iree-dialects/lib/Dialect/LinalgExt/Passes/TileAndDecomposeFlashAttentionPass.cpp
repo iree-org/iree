@@ -99,8 +99,7 @@ static Value subtractAndExponentiate1D(Value a, Value b, Value output,
   return genericOp.getResult(0);
 }
 
-static Value computeSoftmax(Value qkTranspose, Value currentMax,
-                            Value currentWeight, Value newSum, Value output,
+static Value computeSoftmax(Value qkTranspose, Value currentMax, Value output,
                             Location loc, OpBuilder &builder) {
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(2, builder.getContext());
@@ -108,19 +107,37 @@ static Value computeSoftmax(Value qkTranspose, Value currentMax,
   bindDims(builder.getContext(), d0, d1);
   // (d0, d1) -> (d0)
   auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
-  SmallVector<AffineMap> indexingMaps{identityMap, rowMap, rowMap, rowMap,
-                                      identityMap};
+  SmallVector<AffineMap> indexingMaps{identityMap, rowMap, identityMap};
   SmallVector<utils::IteratorType> iteratorTypes(2,
                                                  utils::IteratorType::parallel);
   auto genericOp = builder.create<linalg::GenericOp>(
-      loc, qkTranspose.getType(),
-      ValueRange{qkTranspose, currentMax, currentWeight, newSum}, output,
+      loc, qkTranspose.getType(), ValueRange{qkTranspose, currentMax}, output,
       indexingMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value diff = b.create<arith::SubFOp>(loc, args[0], args[1]);
         Value result = b.create<math::ExpOp>(loc, diff);
-        Value scaledResult = b.create<arith::MulFOp>(loc, result, args[2]);
-        Value finalResult = b.create<arith::DivFOp>(loc, scaledResult, args[3]);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  return genericOp.getResult(0);
+}
+
+static Value scaleSoftmax(Value softmax, Value currentWeight, Value newSum,
+                          Value output, Location loc, OpBuilder &builder) {
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(2, builder.getContext());
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  // (d0, d1) -> (d0)
+  auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{identityMap, rowMap, rowMap, identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(2,
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, softmax.getType(), ValueRange{softmax, currentWeight, newSum},
+      output, indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value scaledResult = b.create<arith::MulFOp>(loc, args[0], args[1]);
+        Value finalResult = b.create<arith::DivFOp>(loc, scaledResult, args[2]);
         b.create<linalg::YieldOp>(loc, finalResult);
       });
   return genericOp.getResult(0);
@@ -357,9 +374,11 @@ LogicalResult reifyFlashAttentionFwdTransform(func::FuncOp funcOp) {
 
     // Compute current statistics
     Value currentMax = computeRowwiseReduction<arith::MaxFOp>(
-        qkTranspose, empty, loc, rewriter);
-    Value currentSum = computeRowwiseReduction<arith::AddFOp>(
-        qkTranspose, empty, loc, rewriter);
+        qkTranspose, negativeMax, loc, rewriter);
+    Value softmax =
+        computeSoftmax(qkTranspose, currentMax, emptySquare, loc, rewriter);
+    Value currentSum =
+        computeRowwiseReduction<arith::AddFOp>(softmax, zeroSum, loc, rewriter);
 
     // Update global statistics
     Value newMax = computeNewMax(iterArgMax, currentMax, empty, loc, rewriter);
@@ -370,9 +389,9 @@ LogicalResult reifyFlashAttentionFwdTransform(func::FuncOp funcOp) {
     Value newSum = computeNewSum(iterArgSum, currentSum, oldWeight,
                                  currentWeight, empty, loc, rewriter);
 
-    // Compute softmax
-    Value softmax = computeSoftmax(qkTranspose, currentMax, currentWeight,
-                                   newSum, emptySquare, loc, rewriter);
+    // Scale softmax
+    softmax = scaleSoftmax(softmax, currentWeight, newSum, emptySquare, loc,
+                           rewriter);
 
     // Update accumulator
     empty = rewriter.create<tensor::EmptyOp>(
