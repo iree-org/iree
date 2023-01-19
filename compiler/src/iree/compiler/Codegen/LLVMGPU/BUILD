@@ -21,6 +21,7 @@ iree_compiler_cc_library(
         "KernelConfig.cpp",
         "LLVMGPUDistribute.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
+        "LLVMGPUMaterializeEncoding.cpp",
         "LLVMGPUTensorAlloc.cpp",
         "LLVMGPUTensorCoreVectorization.cpp",
         "LLVMGPUTensorPad.cpp",
