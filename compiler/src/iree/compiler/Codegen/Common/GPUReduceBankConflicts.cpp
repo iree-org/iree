@@ -61,8 +61,9 @@ struct GPUReduceBankConflictsPass
     SmallVector<memref::AllocOp> sharedMemAllocs;
     // Collect all the alloc operations.
     funcOp.walk([&](memref::AllocOp allocOp) {
-      auto addressSpaceAttr =
-          allocOp.getType().getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
+      auto addressSpaceAttr = allocOp.getType()
+                                  .getMemorySpace()
+                                  .dyn_cast_or_null<gpu::AddressSpaceAttr>();
       if (addressSpaceAttr &&
           addressSpaceAttr.getValue() ==
               gpu::GPUDialect::getWorkgroupAddressSpace() &&

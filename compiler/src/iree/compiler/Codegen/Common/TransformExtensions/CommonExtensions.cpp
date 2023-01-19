@@ -831,8 +831,9 @@ static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
     ValueRange dynamicSizes, unsigned alignment) {
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
       builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-  MemRefType allocType = MemRefType::get(memRefType.getShape(),
-                                         memRefType.getElementType(), AffineMap(), addressSpaceAttr);
+  MemRefType allocType =
+      MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
+                      AffineMap(), addressSpaceAttr);
   return builder
       .create<memref::AllocOp>(loc, allocType, dynamicSizes,
                                builder.getI64IntegerAttr(alignment))
