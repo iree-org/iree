@@ -73,8 +73,8 @@ hal.executable @matmul_f32_256x1024x128 {
 //  CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 //  CHECK-DAG: %[[C128:.+]] = arith.constant 128 : index
 
-//  CHECK-DAG: %[[MEM_A:.+]] = memref.alloc() : memref<128x32xf32, 3>
-//  CHECK-DAG: %[[MEM_B:.+]] = memref.alloc() : memref<32x128xf32, 3>
+//  CHECK-DAG: %[[MEM_A:.+]] = memref.alloc() : memref<128x32xf32, #gpu.address_space<workgroup>>
+//  CHECK-DAG: %[[MEM_B:.+]] = memref.alloc() : memref<32x128xf32, #gpu.address_space<workgroup>>
 
 //  CHECK-DAG: %[[BUFFER_A:.+]] = hal.interface.binding.subspan set(0) binding(0) {{.+}} : memref<256x128xf32>
 //  CHECK-DAG: %[[BUFFER_B:.+]] = hal.interface.binding.subspan set(0) binding(1) {{.+}} : memref<128x1024xf32>
@@ -201,8 +201,8 @@ hal.executable @batch_matmul_16x1024x1024x80 {
 // CHECK-LABEL: func.func @batch_matmul_16x1024x1024x80()
 
 //  CHECK-NOT: memref.alloc
-//  CHECK-DAG: %[[LHS_MEM:.+]] = memref.alloc() : memref<1x64x16xf16, 3>
-//  CHECK-DAG: %[[RHS_MEM:.+]] = memref.alloc() : memref<1x16x256xf16, 3>
+//  CHECK-DAG: %[[LHS_MEM:.+]] = memref.alloc() : memref<1x64x16xf16, #gpu.address_space<workgroup>>
+//  CHECK-DAG: %[[RHS_MEM:.+]] = memref.alloc() : memref<1x16x256xf16, #gpu.address_space<workgroup>>
 //  CHECK-NOT: memref.alloc
 
 //      CHECK:       gpu.barrier
@@ -277,8 +277,8 @@ hal.executable @batch_matmul_f32_16x4096x40x4096 {
 // CHECK-LABEL: func.func @batch_matmul_f32_16x4096x40x4096()
 
 //   CHECK-NOT: memref.alloc()
-//  CHECK-DAG: %[[MEM_A:.+]] = memref.alloc() : memref<1x512x16xf32, 3>
-//  CHECK-DAG: %[[MEM_B:.+]] = memref.alloc() : memref<1x16x8xf32, 3>
+//  CHECK-DAG: %[[MEM_A:.+]] = memref.alloc() : memref<1x512x16xf32, #gpu.address_space<workgroup>>
+//  CHECK-DAG: %[[MEM_B:.+]] = memref.alloc() : memref<1x16x8xf32, #gpu.address_space<workgroup>>
 //   CHECK-NOT: memref.alloc()
 
 //      CHECK:       gpu.barrier
