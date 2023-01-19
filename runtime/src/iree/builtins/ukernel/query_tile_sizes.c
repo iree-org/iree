@@ -15,26 +15,20 @@ static bool iree_uk_query_tile_sizes_operation_is_matmul(
          op == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
 }
 
-static iree_uk_status_t iree_uk_query_tile_sizes_2d_validate(
+static void iree_uk_query_tile_sizes_2d_validate(
     const iree_uk_query_tile_sizes_2d_params_t* params) {
-#ifdef IREE_UK_ENABLE_VALIDATION
-  if (!iree_uk_query_tile_sizes_operation_is_matmul(params->flags)) {
-    return iree_uk_status_bad_flags;
-  }
+#ifdef IREE_UK_ENABLE_ASSERTS
+  IREE_UK_ASSERT(iree_uk_query_tile_sizes_operation_is_matmul(params->flags));
   iree_uk_uint32_t role = iree_uk_query_tile_sizes_operand_role(params->flags);
-  if (!(role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS ||
-        role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS ||
-        role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS_TRANSPOSE ||
-        role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT)) {
-    return iree_uk_status_bad_flags;
-  }
+  IREE_UK_ASSERT(role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS ||
+                 role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS ||
+                 role ==
+                     IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS_TRANSPOSE ||
+                 role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT);
   const iree_uk_int64_t kDynamic = IREE_UK_INT64_MIN;
-  if ((params->size0 < 0 && params->size0 != kDynamic) ||
-      (params->size1 < 0 && params->size1 != kDynamic)) {
-    return iree_uk_status_unsupported_huge_or_negative_dimension;
-  }
-#endif  // IREE_UK_ENABLE_VALIDATION
-  return iree_uk_status_ok;
+  IREE_UK_ASSERT((params->size0 >= 0 || params->size0 == kDynamic) ||
+                 (params->size1 >= 0 || params->size1 == kDynamic));
+#endif  // IREE_UK_ENABLE_ASSERTS
 }
 
 static iree_uk_matmul_tile_sizes_t iree_uk_query_matmul_tile_sizes_generic(
@@ -72,10 +66,10 @@ static void iree_uk_query_tile_sizes_2d_matmul(
   }
 }
 
-iree_uk_status_t iree_uk_query_tile_sizes_2d(
+IREE_UK_EXPORT void iree_uk_query_tile_sizes_2d(
     const iree_uk_query_tile_sizes_2d_params_t* params,
     iree_uk_query_tile_sizes_2d_out_params_t* out_params) {
-  IREE_UK_RETURN_IF_ERROR(iree_uk_query_tile_sizes_2d_validate(params));
+  iree_uk_query_tile_sizes_2d_validate(params);
 
   if (iree_uk_query_tile_sizes_operation_is_matmul(params->flags)) {
     iree_uk_query_tile_sizes_2d_matmul(params, out_params);
@@ -83,6 +77,4 @@ iree_uk_status_t iree_uk_query_tile_sizes_2d(
     // Can't happen, validated earlier.
     IREE_UK_ASSUME_UNREACHABLE;
   }
-
-  return iree_uk_status_ok;
 }

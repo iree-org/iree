@@ -697,12 +697,8 @@ static iree_status_t iree_vmvx_mmt4d(iree_uk_mmt4d_type_t type,
       .K0 = K0,
       .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };
-  iree_uk_status_t status = iree_uk_mmt4d(&ukernel_params);
+  iree_uk_mmt4d(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
-  if (status != iree_uk_status_ok) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            iree_uk_status_message(status));
-  }
   return iree_ok_status();
 }
 
@@ -790,12 +786,8 @@ static iree_status_t iree_vmvx_pack_f(iree_uk_pack_type_t type,
       .padding_value = &args->padding_value,
       .flags = args->flags,
   };
-  iree_uk_status_t status = iree_uk_pack(&ukernel_params);
+  iree_uk_pack(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
-  if (status != iree_uk_status_ok) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            iree_uk_status_message(status));
-  }
   return iree_ok_status();
 }
 
@@ -835,12 +827,8 @@ static iree_status_t iree_vmvx_pack_i(iree_uk_pack_type_t type,
       .padding_value = &args->padding_value,
       .flags = args->flags,
   };
-  iree_uk_status_t status = iree_uk_pack(&ukernel_params);
+  iree_uk_pack(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
-  if (status != iree_uk_status_ok) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            iree_uk_status_message(status));
-  }
   return iree_ok_status();
 }
 
@@ -912,12 +900,8 @@ static iree_status_t iree_vmvx_unpack(iree_uk_unpack_type_t type,
       .out_size1 = args->out_size1,
       .flags = args->flags,
   };
-  iree_uk_status_t status = iree_uk_unpack(&ukernel_params);
+  iree_uk_unpack(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
-  if (status != iree_uk_status_ok) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            iree_uk_status_message(status));
-  }
   return iree_ok_status();
 }
 
@@ -953,15 +937,10 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_query_tile_sizes_2d, query_tile_sizes_2d, II) {
       .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };
   iree_uk_query_tile_sizes_2d_out_params_t ukernel_out_params;
-  iree_uk_status_t status =
-      iree_uk_query_tile_sizes_2d(&ukernel_params, &ukernel_out_params);
-  IREE_TRACE_ZONE_END(z0);
-  if (status != iree_uk_status_ok) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            iree_uk_status_message(status));
-  }
+  iree_uk_query_tile_sizes_2d(&ukernel_params, &ukernel_out_params);
   rets->i0 = ukernel_out_params.tile_size0;
   rets->i1 = ukernel_out_params.tile_size1;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 

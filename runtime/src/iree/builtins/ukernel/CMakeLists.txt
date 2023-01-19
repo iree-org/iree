@@ -39,13 +39,23 @@ iree_cc_library(
     "pack_types.h"
     "query_tile_sizes_types.h"
     "unpack_types.h"
-  SRCS
-    "common.c"
   DEPS
     ::exported_bits
     ::static_assert
     iree::base::core_headers
     iree::builtins::ukernel::arch::config
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    assert_fail
+  HDRS
+    "common.h"
+  SRCS
+    "assert_fail.c"
+  DEPS
+    ::common
   PUBLIC
 )
 

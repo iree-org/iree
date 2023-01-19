@@ -14,7 +14,7 @@ extern "C" {
 #endif  // __cplusplus
 
 // Main entry point.
-IREE_UK_EXPORT iree_uk_status_t iree_uk_query_tile_sizes_2d(
+IREE_UK_EXPORT void iree_uk_query_tile_sizes_2d(
     const iree_uk_query_tile_sizes_2d_params_t* params,
     iree_uk_query_tile_sizes_2d_out_params_t* out_params);
 

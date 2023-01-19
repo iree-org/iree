@@ -19,6 +19,7 @@ cc_library(
     hdrs = ["ukernel_test_utils.h"],
     deps = [
         "//runtime/src/iree/base",
+        "//runtime/src/iree/builtins/ukernel:assert_fail",
         "//runtime/src/iree/builtins/ukernel:common",
         "//runtime/src/iree/schemas:cpu_data",
     ],

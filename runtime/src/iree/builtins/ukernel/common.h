@@ -278,67 +278,25 @@ static inline void iree_uk_ssize_swap(iree_uk_ssize_t* a, iree_uk_ssize_t* b) {
 #endif
 
 //===----------------------------------------------------------------------===//
-// Status codes returned by microkernels.
+// Local replacement for <assert.h>
 //===----------------------------------------------------------------------===//
 
-// When IREE_UK_ENABLE_VALIDATION is defined, ukernels validate their inputs and
-// may return statuses other than iree_uk_status_ok.
-//
-// When IREE_UK_ENABLE_VALIDATION is not defined, statuses other than
-// iree_uk_status_ok are not even defined.
-//
-// Currently IREE_UK_ENABLE_VALIDATION is defined if and only if NDEBUG is not,
-// that is, validation treated as assertions, disabling them in release.
-//
-// This actually enables more thorough validation as it removes optimization
-// concerns from the validation code. Microkernels take raw
-// pointers/sizes/strides anyway, so if params are incorrect, UB will happen no
-// matter how much we try to validate.
+// See comment in assert_fail.c.
+extern void iree_uk_assert_fail(const char* file, int line,
+                                const char* function, const char* condition);
+
 #ifndef NDEBUG
-#define IREE_UK_ENABLE_VALIDATION
+#define IREE_UK_ENABLE_ASSERTS
 #endif
 
-// Status codes that ukernels may return.
-typedef enum iree_uk_status_e {
-  iree_uk_status_ok = 0,
-#ifdef IREE_UK_ENABLE_VALIDATION
-  iree_uk_status_bad_type,
-  iree_uk_status_bad_flags,
-  iree_uk_status_unsupported_huge_or_negative_dimension,
-  iree_uk_status_unsupported_generic_tile_size,
-  iree_uk_status_shapes_mismatch,
-#endif
-} iree_uk_status_t;
-
-#ifdef IREE_UK_ENABLE_VALIDATION
-// Convert a status code to a human-readable string.
-IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status);
-#else
-static inline const char* iree_uk_status_message(iree_uk_status_t status) {
-  // Typical callers do:
-  //
-  //   iree_uk_status_t status = iree_uk_someukernel(&ukernel_params);
-  //   if (status != iree_uk_status_ok) {
-  //     return iree_make_status(IREE_STATUS_INTERNAL,
-  //                             iree_uk_status_message(status));
-  //   }
-  //
-  // The below UNREACHABLE actually helps Clang 16 elide the caller's
-  // `if (status != iree_uk_status_ok)` branch: https://godbolt.org/z/xoanddxrv
-  if (status != iree_uk_status_ok) {
-    IREE_UK_ASSUME_UNREACHABLE;
-  }
-  return "OK";
-}
-#endif
-
-#define IREE_UK_RETURN_IF_ERROR(X)     \
-  do {                                 \
-    iree_uk_status_t status = (X);     \
-    if (status != iree_uk_status_ok) { \
-      return status;                   \
-    }                                  \
+#ifdef IREE_UK_ENABLE_ASSERTS
+#define IREE_UK_ASSERT(COND)                                               \
+  do {                                                                     \
+    if (!(COND)) iree_uk_assert_fail(__FILE__, __LINE__, __func__, #COND); \
   } while (0)
+#else
+#define IREE_UK_ASSERT(COND)
+#endif
 
 //===----------------------------------------------------------------------===//
 // Element type IDs for the data accessed by microkernels.
