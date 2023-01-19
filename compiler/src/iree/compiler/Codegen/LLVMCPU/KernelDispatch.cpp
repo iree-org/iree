@@ -913,6 +913,12 @@ static LogicalResult setRootConfig(
 
   SmallVector<int64_t> workgroupTileSizes =
       getMatmulWorkgroupSizes(entryPointFn, linalgOp, vectorSize, isQuantized);
+  for (auto [index, shape] : llvm::enumerate(linalgOp.getStaticShape())) {
+    if (index >= workgroupTileSizes.size()) break;
+    if (shape == ShapedType::kDynamic) continue;
+    workgroupTileSizes[index] =
+        getMaxTileSize(0, shape, workgroupTileSizes[index], vectorSize);
+  }
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
