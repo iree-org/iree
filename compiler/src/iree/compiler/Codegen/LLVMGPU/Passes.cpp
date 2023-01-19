@@ -432,6 +432,8 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
+  pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(
+      createLLVMGPUMaterializeEncoding());
   pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.

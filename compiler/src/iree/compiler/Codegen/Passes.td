@@ -437,6 +437,12 @@ def LLVMGPUTileAndDistribute :
   let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistribute()";
 }
 
+def LLVMGPUMaterializeEncoding :
+    Pass<"iree-llvmgpu-materialize-encoding", "func::FuncOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend";
+  let constructor = "mlir::iree_compiler::createLLVMGPUMaterializeEncoding()";
+}
+
 def LLVMGPUTileTensor :
     Pass<"iree-llvmgpu-tile-tensor", "func::FuncOp"> {
   let summary = "Pass to tile linalg on tensor ops within a workgroup.";

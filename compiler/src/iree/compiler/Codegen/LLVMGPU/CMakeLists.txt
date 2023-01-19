@@ -30,6 +30,7 @@ iree_cc_library(
     "LLVMGPUTensorPad.cpp"
     "LLVMGPUTileAndDistribute.cpp"
     "LLVMGPUTileTensor.cpp"
+    "LLVMGPUMaterializeEncoding.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
     "Passes.cpp"

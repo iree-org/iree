@@ -438,6 +438,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
     bool distributeToWarp = false);
 
+/// Perform materialize encoding
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUMaterializeEncoding();
+
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
     bool distributeToWarp = false);
 
