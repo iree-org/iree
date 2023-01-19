@@ -155,7 +155,7 @@ jobs:
           BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
           BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
         run: |
-          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
+          gcloud storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
           echo "build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
   build_test_all_windows:
@@ -236,7 +236,7 @@ jobs:
         with:
           submodules: true
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing all"
@@ -270,7 +270,7 @@ jobs:
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing with GPU"
@@ -391,7 +391,7 @@ jobs:
           BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
           BINARIES_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
         run: |
-          gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${BINARIES_GCS_ARTIFACT}"
+          gcloud storage cp "${BINARIES_ARCHIVE}" "${BINARIES_GCS_ARTIFACT}"
           echo "binaries-gcs-artifact=${BINARIES_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
   test_tf_integrations:
@@ -416,14 +416,14 @@ jobs:
         with:
           submodules: true
       - name: "Downloading TF binaries archive"
-        run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xvf "${TF_BINARIES_ARCHIVE}"
       - name: "Symlinking TF binaries"
         run: |
           ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Running TF integrations tests"
@@ -455,14 +455,14 @@ jobs:
         with:
           submodules: true
       - name: "Downloading TF binaries archive"
-        run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xvf "${TF_BINARIES_ARCHIVE}"
       - name: "Symlinking TF binaries"
         run: |
           ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Running TF integrations tests"
@@ -503,14 +503,14 @@ jobs:
         with:
           submodules: true
       - name: "Downloading TF binaries archive"
-        run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
       - name: "Symlinking TF binaries"
         run: |
           ./integrations/tensorflow/symlink_binaries.sh "$(realpath "${TF_BINARIES_DIR}")"
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Downloading SHARK"
@@ -559,11 +559,11 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting install from build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Downloading TF binaries archive"
-        run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
       - name: "Building benchmarks"
@@ -767,7 +767,7 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting host binaries"
         run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Compiling the benchmark tools"
@@ -803,7 +803,7 @@ jobs:
           BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}
           BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/benchmark-tools
         run: |
-          gcloud alpha storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}/"
+          gcloud storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}/"
           echo "benchmark-tools-gcs-artifact-dir=${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
 
   build_e2e_test_artifacts:
@@ -833,11 +833,11 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
       - name: "Extracting install from build dir archive"
         run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
       - name: "Downloading TF binaries archive"
-        run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
       - name: "Building e2e test artifacts"
@@ -867,9 +867,9 @@ jobs:
           # separately.
           find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 \
             -name "iree_*" -o -name "model_*.mlir" | \
-            gcloud alpha storage cp --read-paths-from-stdin -r \
+            gcloud storage cp --read-paths-from-stdin -r \
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
-          gcloud alpha storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
+          gcloud storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
               "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
           echo "e2e-test-artifacts-build-log-gcs-artifact=${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
@@ -908,7 +908,7 @@ jobs:
         env:
           COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
         run: |
-          gcloud alpha storage cp \
+          gcloud storage cp \
             "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" \
             "${E2E_TEST_ARTIFACTS_BUILD_LOG}"
           mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
@@ -916,7 +916,7 @@ jobs:
             --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
             '.module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
             "${COMPILATION_CONFIG}" | \
-            gcloud alpha storage cp -r --read-paths-from-stdin \
+            gcloud storage cp -r --read-paths-from-stdin \
               "${E2E_TEST_ARTIFACTS_DIR}"
       - name: "Collecting compilation statistics"
         id: collect
@@ -939,7 +939,7 @@ jobs:
           COMPILE_STATS_RESULTS: ${{ steps.collect.outputs.compile-stats-results }}
           COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.collect.outputs.compile-stats-results }}
         run: |
-          gcloud alpha storage cp \
+          gcloud storage cp \
             "${COMPILE_STATS_RESULTS}" \
             "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
           echo "compile-stats-results-gcs-artifact=${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
@@ -986,14 +986,14 @@ jobs:
           fetch-depth: 0
       - name: Downloading compilation benchmark results
         run: |
-          gcloud alpha storage cp \
+          gcloud storage cp \
             "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" \
             "${COMPILE_STATS_RESULTS}"
       - name: Downloading execution benchmark results
         id: download-execution-results
         if: needs.execution_benchmarks.result == 'success'
         run: |
-          gcloud alpha storage cp -r \
+          gcloud storage cp -r \
             "${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/benchmark-results-*.json" \
             "${EXECUTION_BENCHMARK_RESULTS_DIR}"
           echo "execution-benchmark-results-pattern=${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-*.json" >> "${GITHUB_OUTPUT}"
@@ -1030,7 +1030,7 @@ jobs:
           BENCHMARK_COMMENT_ARTIFACT: ${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
           BENCHMARK_COMMENT_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
         run: |
-          gcloud alpha storage cp \
+          gcloud storage cp \
             "${BENCHMARK_COMMENT_ARTIFACT}" \
             "${BENCHMARK_COMMENT_GCS_ARTIFACT}"
       - name: Uploading results to dashboard
@@ -1105,7 +1105,7 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
       - name: "Build cross-compiling target"
@@ -1152,7 +1152,7 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
       - name: "Extracting install from build dir archive"
         run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
       - name: "Building the runtime for the web using Emscripten"
@@ -1203,20 +1203,20 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
       # TODO(#11136): Only download the needed artifacts instead of everything.
       - name: "Downloading e2e test artifacts"
         run: |
           mkdir -p ${E2E_TEST_ARTIFACTS_DIR}
-          gcloud alpha storage cp -r "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/*" "${E2E_TEST_ARTIFACTS_DIR}"
+          gcloud storage cp -r "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/*" "${E2E_TEST_ARTIFACTS_DIR}"
       - name: "Download benchmark expected output"
         env:
           EXPECTED_OUTPUT_GSC_ARTIFACT: gs://iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy
           EXPECTED_OUTPUT_FILE: deeplab_v3_fp32_input_0_expected_output.npy
         run: |
-          gcloud alpha storage cp "${EXPECTED_OUTPUT_GSC_ARTIFACT}" "${E2E_TEST_ARTIFACTS_DIR}/${EXPECTED_OUTPUT_FILE}"
+          gcloud storage cp "${EXPECTED_OUTPUT_GSC_ARTIFACT}" "${E2E_TEST_ARTIFACTS_DIR}/${EXPECTED_OUTPUT_FILE}"
       - name: "Build iree-run-module and test benchmark suite modules"
         run: |
           ./build_tools/github_actions/docker_run.sh \
