@@ -21,6 +21,6 @@ transform.structured.canonicalized_sequence failures(propagate) {
   transform.structured.vectorize %2 { vectorize_padding }
   bufferize
   %3 = transform.structured.match ops{["func.func"]} in %module_op
-  transform.vector.lower_vectors %3 { multireduction_lowering = "innerreduce"}
+  transform.vector.lower_vectors %3 multireduction_lowering = "innerreduction"
   lower_to_llvm
 }
