@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
@@ -23,14 +24,25 @@ namespace {
 
 Optional<spirv::StorageClass> mapHALDescriptorTypeForVulkan(Attribute attr) {
   auto dtAttr = attr.dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>();
-  if (!dtAttr) return spirv::mapMemorySpaceToVulkanStorageClass(attr);
-  switch (dtAttr.getValue()) {
-    case IREE::HAL::DescriptorType::UniformBuffer:
-      return spirv::StorageClass::Uniform;
-    case IREE::HAL::DescriptorType::StorageBuffer:
-      return spirv::StorageClass::StorageBuffer;
+  if (dtAttr) {
+    switch (dtAttr.getValue()) {
+      case IREE::HAL::DescriptorType::UniformBuffer:
+        return spirv::StorageClass::Uniform;
+      case IREE::HAL::DescriptorType::StorageBuffer:
+        return spirv::StorageClass::StorageBuffer;
+      default:
+        return std::nullopt;
+    }
   }
-  return std::nullopt;
+  if (auto gpuAttr = attr.dyn_cast_or_null<gpu::AddressSpaceAttr>()) {
+    switch (gpuAttr.getValue()) {
+      case gpu::AddressSpace::Workgroup:
+        return spirv::StorageClass::Workgroup;
+      default:
+        return std::nullopt;
+    }
+  };
+  return spirv::mapMemorySpaceToVulkanStorageClass(attr);
 }
 
 Optional<spirv::StorageClass> mapHALDescriptorTypeForOpenCL(Attribute attr) {
