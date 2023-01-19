@@ -37,6 +37,7 @@
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -242,17 +243,22 @@ struct LowerDispatchWorkgroupCountForDagRootOp
 /// the logical shape to the physical shape. It lowers to
 /// a `flow.dispatch.workgroup_count_from_root_dag` where the root
 /// is the `pack` op that materialized the encoding.
+/// If encodingInfo and inputType are null, we don't need to change the
+/// workgroup. In this case, it just
+/// rewrites `DispatchWorkgroupCountFromSetEncodingOp` into
+/// `DispatchWorkgroupCountFromDagRootOp`.
 struct LowerDispatchWorkgroupCountFromSetEncodingOp
     : public OpRewritePattern<
           IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp> {
   LowerDispatchWorkgroupCountFromSetEncodingOp(
       MLIRContext *context,
-      IREE::LinalgExt::MaterializeEncodingInfo encodingInfo,
-      RankedTensorType inputType, PatternBenefit benefit = 1)
+      Optional<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo,
+      Optional<RankedTensorType> inputType, PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
         materializeEncodingInfo(std::move(encodingInfo)),
         inputType(inputType) {
-    for (int64_t &s : materializeEncodingInfo.innerTileSizes) {
+    if (!materializeEncodingInfo.has_value()) return;
+    for (int64_t &s : materializeEncodingInfo->innerTileSizes) {
       if (s == ShapedType::kDynamic) {
         // Dynamic tile sizes. The actual values can only be queried in device
         // code, not here, so we use an approximation here. They are currently
@@ -270,26 +276,31 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
     // The workload represents the unpacked shape. Get the workload of the
     // packed shape.
     Location loc = workgroupCountOp.getLoc();
-    auto innerTileSizes = getInnerTileSizesOfr(rewriter, loc, inputType,
-                                               materializeEncodingInfo, {});
-    if (failed(innerTileSizes)) return failure();
-    SmallVector<OpFoldResult> resultShape =
-        IREE::LinalgExt::PackOp::getResultShape(
-            rewriter, loc, getAsOpFoldResult(workload), *innerTileSizes,
-            materializeEncodingInfo.innerDimsPos,
-            materializeEncodingInfo.outerDimsPerm);
-    resultShape.resize(materializeEncodingInfo.srcRank);
+    SmallVector<Value> operands = workgroupCountOp.getOperands();
+    if (materializeEncodingInfo.has_value() && inputType.has_value()) {
+      auto innerTileSizes =
+          getInnerTileSizesOfr(rewriter, loc, inputType.value(),
+                               materializeEncodingInfo.value(), {});
+      if (failed(innerTileSizes)) return failure();
+      SmallVector<OpFoldResult> resultShape =
+          IREE::LinalgExt::PackOp::getResultShape(
+              rewriter, loc, getAsOpFoldResult(workload), *innerTileSizes,
+              materializeEncodingInfo->innerDimsPos,
+              materializeEncodingInfo->outerDimsPerm);
+      resultShape.resize(materializeEncodingInfo->srcRank);
+      operands = getValueOrCreateConstantIndexOp(rewriter, loc, resultShape);
+    }
 
     rewriter
         .replaceOpWithNewOp<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(
-            workgroupCountOp,
-            getValueOrCreateConstantIndexOp(rewriter, loc, resultShape));
+            workgroupCountOp, operands);
+
     return success();
   }
 
  private:
-  IREE::LinalgExt::MaterializeEncodingInfo materializeEncodingInfo;
-  RankedTensorType inputType;
+  Optional<IREE::LinalgExt::MaterializeEncodingInfo> materializeEncodingInfo;
+  Optional<RankedTensorType> inputType;
 };
 
 //===---------------------------------------------------------------------===//
@@ -348,13 +359,16 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       patterns.insert<LowerDispatchWorkgroupCountForDagRootOp>(
           context, tileSizes, staticLoopRanges, interchange,
           partitionableLoops);
+      Optional<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
+          std::nullopt;
+      Optional<RankedTensorType> tensorTypeWithEncoding = std::nullopt;
       if (auto packRootOp =
               dyn_cast_or_null<IREE::LinalgExt::PackOp>(dispatchRootOp)) {
-        FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
-            getMaterializationInfo(packRootOp);
-        if (failed(encodingInfo)) {
+        auto info = getMaterializationInfo(packRootOp);
+        if (failed(info)) {
           return signalPassFailure();
         }
+        encodingInfo = info.value();
         auto tensorType = packRootOp.getInputType().cast<RankedTensorType>();
         // The LowerDispatchWorkgroupCountFromSetEncodingOp pattern is going to
         // call materializeEncodingValueFn, passing it a tensor type, expecting
@@ -370,11 +384,11 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         // materializeEncodingValueFn.
         Attribute encodingAttr =
             packRootOp->getAttr(StringAttr::get(context, "encoding"));
-        auto tensorTypeWithEncoding = RankedTensorType::Builder(
+        tensorTypeWithEncoding = RankedTensorType::Builder(
             tensorType.getShape(), tensorType.getElementType(), encodingAttr);
-        patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
-            context, encodingInfo.value(), tensorTypeWithEncoding);
       }
+      patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
+          context, encodingInfo, tensorTypeWithEncoding);
       if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
         exportOp.emitOpError("failed to lower number of workgroups");
         return signalPassFailure();
