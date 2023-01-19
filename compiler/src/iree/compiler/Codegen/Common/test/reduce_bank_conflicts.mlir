@@ -4,19 +4,19 @@
 
 // CHECK-LABEL: func.func @pad_alloc
 func.func @pad_alloc(%a: memref<1024x1024xf32>) {
-// CHECK: %[[A:.*]] = memref.alloc() : memref<4x32x68xf32, 3>
-  %0 = memref.alloc() : memref<4x32x64xf32, 3>
+// CHECK: %[[A:.*]] = memref.alloc() : memref<4x32x68xf32, #gpu.address_space<workgroup>>
+  %0 = memref.alloc() : memref<4x32x64xf32, #gpu.address_space<workgroup>>
 // CHECK: %[[S1:.*]] = memref.subview %[[A]][0, 0, 0] [4, 32, 64] [1, 1, 1] : memref<4x32x68xf32, 3> to memref<4x32x64xf32, strided<[2176, 68, 1]>, 3>
 // CHECK: %[[S2:.*]] = memref.subview %[[S1]][0, 0, 0] [1, 32, 64] [1, 1, 1] : memref<4x32x64xf32, strided<[2176, 68, 1]>, 3> to memref<1x32x64xf32, strided<[2176, 68, 1]>, 3>
   %1 = memref.subview %0[0, 0, 0] [1, 32, 64] [1, 1, 1] :
-    memref<4x32x64xf32, 3> to memref<1x32x64xf32, #map, 3>
+    memref<4x32x64xf32, #gpu.address_space<workgroup>> to memref<1x32x64xf32, #map, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0.000000e+00 : f32
   %2 = vector.transfer_read %a[%c0, %c0], %cst_0 {in_bounds = [true]} :
     memref<1024x1024xf32>, vector<4xf32>
 // CHECK: vector.transfer_write %{{.*}}, %[[S2]][%{{.*}}, %{{.*}}, %{{.*}}] {in_bounds = [true]} : vector<4xf32>, memref<1x32x64xf32, strided<[2176, 68, 1]>, 3>
   vector.transfer_write %2, %1[%c0, %c0, %c0] {in_bounds = [true]} :
-    vector<4xf32>, memref<1x32x64xf32, #map, 3>
+    vector<4xf32>, memref<1x32x64xf32, #map, #gpu.address_space<workgroup>>
   return
 }
 

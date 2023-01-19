@@ -201,12 +201,12 @@ hal.executable @shared_memory_lowering {
       func.func @shared_memory_lowering() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant dense<0.000000e+00> : vector<4xf32>
-        %0 = memref.alloc() : memref<1x16x32xf32, 3>
-        %1 = memref.alloc() : memref<1x32x16xf32, 3>
-        %2 = memref.alloc() : memref<1x8x16xf32, 3>
-        vector.store %cst, %1[%c0, %c0, %c0] : memref<1x32x16xf32, 3>, vector<4xf32>
-        vector.store %cst, %2[%c0, %c0, %c0] : memref<1x8x16xf32, 3>, vector<4xf32>
-        vector.store %cst, %0[%c0, %c0, %c0] : memref<1x16x32xf32, 3>, vector<4xf32>
+        %0 = memref.alloc() : memref<1x16x32xf32, #gpu.address_space<workgroup>>
+        %1 = memref.alloc() : memref<1x32x16xf32, #gpu.address_space<workgroup>>
+        %2 = memref.alloc() : memref<1x8x16xf32, #gpu.address_space<workgroup>>
+        vector.store %cst, %1[%c0, %c0, %c0] : memref<1x32x16xf32, #gpu.address_space<workgroup>>, vector<4xf32>
+        vector.store %cst, %2[%c0, %c0, %c0] : memref<1x8x16xf32, #gpu.address_space<workgroup>>, vector<4xf32>
+        vector.store %cst, %0[%c0, %c0, %c0] : memref<1x16x32xf32, #gpu.address_space<workgroup>>, vector<4xf32>
         return
       }
     }
@@ -214,21 +214,21 @@ hal.executable @shared_memory_lowering {
 }
 // CHECK-LABEL: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
 // CHECK-LABEL: llvm.func @shared_memory_lowering() {
-//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x array<16 x array<32 x f32>>>, 3>
-//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>, i64, i64) -> !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>> to !llvm.ptr<array<1 x array<16 x array<32 x f32>>>, #gpu.address_space<workgroup>>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(2048 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x array<32 x array<16 x f32>>>, 3>
-//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>, i64, i64) -> !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>> to !llvm.ptr<array<1 x array<32 x array<16 x f32>>>, #gpu.address_space<workgroup>>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4096 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x array<8 x array<16 x f32>>>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>, i64, i64) -> !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>> to !llvm.ptr<array<1 x array<8 x array<16 x f32>>>, #gpu.address_space<workgroup>>
 
 // -----
 
@@ -245,11 +245,11 @@ hal.executable @shared_memory_dealloc_elision {
       func.func @shared_memory_dealloc_elision() {
         %f0 = arith.constant 0.0 : f32
         %c0 = arith.constant 0 : index
-        //     CHECK: llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
-        %0 = memref.alloc() : memref<1xf32, 3>
-        memref.store %f0, %0[%c0] : memref<1xf32, 3>
+        //     CHECK: llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
+        %0 = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+        memref.store %f0, %0[%c0] : memref<1xf32, #gpu.address_space<workgroup>>
         // CHECK-NOT: free
-        memref.dealloc %0 : memref<1xf32, 3>
+        memref.dealloc %0 : memref<1xf32, #gpu.address_space<workgroup>>
         return
       }
     }
@@ -271,10 +271,10 @@ hal.executable @shared_memory_lowering_aligned_alloc {
         %c0 = arith.constant 0 : index
         %cst_f32 = arith.constant 0.000000e+00 : f32
         %cst_i8 = arith.constant 0 : i8
-        %0 = memref.alloc() : memref<1xi8, 3>
-        %1 = memref.alloc() : memref<32xf32, 3>
-        memref.store %cst_i8, %0[%c0] : memref<1xi8, 3>
-        memref.store %cst_f32, %1[%c0] : memref<32xf32, 3>
+        %0 = memref.alloc() : memref<1xi8, #gpu.address_space<workgroup>>
+        %1 = memref.alloc() : memref<32xf32, #gpu.address_space<workgroup>>
+        memref.store %cst_i8, %0[%c0] : memref<1xi8, #gpu.address_space<workgroup>>
+        memref.store %cst_f32, %1[%c0] : memref<32xf32, #gpu.address_space<workgroup>>
         return
       }
     }
@@ -282,17 +282,16 @@ hal.executable @shared_memory_lowering_aligned_alloc {
 }
 // CHECK-LABEL: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
 // CHECK-LABEL: llvm.func @shared_memory_lowering_aligned_alloc() {
-//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x i8>, 3>
-//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>, i64, i64) -> !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>> to !llvm.ptr<array<1 x i8>, #gpu.address_space<workgroup>>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<32 x f32>, 3>
-
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>, i64, i64) -> !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>> to !llvm.ptr<array<32 x f32>, #gpu.address_space<workgroup>>
 
 // -----
 
@@ -336,4 +335,3 @@ hal.executable @check_not_readonly {
 }
 // CHECK-LABEL: llvm.func @check_not_readonly
 //  CHECK-NOT: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
-

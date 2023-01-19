@@ -25,8 +25,9 @@ static void padAlloc(memref::AllocOp allocOp, int64_t paddingSizeBits) {
   int64_t paddingSize = paddingSizeBits / bitwidth;
   SmallVector<int64_t> shape = llvm::to_vector(allocOp.getType().getShape());
   shape.back() = shape.back() + paddingSize;
-  MemRefType allocType = MemRefType::get(
-      shape, elType, {}, allocOp.getType().getMemorySpaceAsInt());
+  MemRefType allocType =
+      MemRefType::get(shape, elType, MemRefLayoutAttrInterface{},
+                      allocOp.getType().getMemorySpace());
   OpBuilder builder(allocOp);
   Location loc = allocOp.getLoc();
   Value paddedAlloc = builder.create<memref::AllocOp>(loc, allocType);
