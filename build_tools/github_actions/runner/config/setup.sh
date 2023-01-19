@@ -35,14 +35,6 @@ fi
 cp -r "${SCRIPT_DIR}" /runner-root/config
 chown -R runner:runner /runner-root/
 
-echo "Installing ops agent and turning on systemd logging"
-# TODO(gcmn): This should probably be baked into the image.
-curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh
-chmod +x add-google-cloud-ops-agent-repo.sh
-./add-google-cloud-ops-agent-repo.sh --also-install
-cp /runner-root/config/google-cloud-ops-agent/config.yaml /etc/google-cloud-ops-agent/config.yaml
-service google-cloud-ops-agent restart
-
 echo "Fetching the runner archive"
 RUNNER_VERSION="$(get_attribute github-runner-version)"
 RUNNER_ARCHIVE="actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
