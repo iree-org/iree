@@ -154,7 +154,7 @@ static SmallVector<int64_t> getVectorSizes(
 
   // TODO: Support masking for static shapes.
   if (llvm::any_of(linalgOp.getStaticLoopRanges(), [](int64_t dimSize) {
-        return !ShapedType::isDynamicShape(dimSize);
+        return !ShapedType::isDynamicShape(dimSize) && dimSize != 1;
       })) {
     return {};
   }
