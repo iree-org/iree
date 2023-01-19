@@ -155,15 +155,25 @@ iree_hal_cuda_allocator_query_compatibility(
 }
 
 static void iree_hal_cuda_buffer_free(iree_hal_cuda_context_wrapper_t* context,
-                                      iree_hal_memory_type_t memory_type,
+                                      iree_hal_cuda_buffer_type_t buffer_type,
                                       CUdeviceptr device_ptr, void* host_ptr) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
-    // Device local.
-    CUDA_IGNORE_ERROR(context->syms, cuMemFree(device_ptr));
-  } else {
-    // Host local.
-    CUDA_IGNORE_ERROR(context->syms, cuMemFreeHost(host_ptr));
+  switch (buffer_type) {
+    case IREE_HAL_CUDA_BUFFER_TYPE_DEVICE: {
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, "cuMemFree");
+      CUDA_IGNORE_ERROR(context->syms, cuMemFree(device_ptr));
+      break;
+    }
+    case IREE_HAL_CUDA_BUFFER_TYPE_HOST: {
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, "cuMemFreeHost");
+      CUDA_IGNORE_ERROR(context->syms, cuMemFreeHost(host_ptr));
+      break;
+    }
+    case IREE_HAL_CUDA_BUFFER_TYPE_HOST_REGISTERED: {
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, "cuMemHostUnregister");
+      CUDA_IGNORE_ERROR(context->syms, cuMemHostUnregister(host_ptr));
+      break;
+    }
   }
   IREE_TRACE_ZONE_END(z0);
 }
@@ -196,6 +206,7 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   }
 
   iree_status_t status = iree_ok_status();
+  iree_hal_cuda_buffer_type_t buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_DEVICE;
   void* host_ptr = NULL;
   CUdeviceptr device_ptr = 0;
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_cuda_buffer_allocate");
@@ -203,6 +214,7 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local case.
     if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+      buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_DEVICE;
       status =
           CU_RESULT_TO_STATUS(allocator->context->syms,
                               cuMemAllocManaged(&device_ptr, allocation_size,
@@ -218,10 +230,12 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
       host_ptr = (void*)device_ptr;
     } else {
       // Device only.
+      buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_DEVICE;
       status = CU_RESULT_TO_STATUS(allocator->context->syms,
                                    cuMemAlloc(&device_ptr, allocation_size));
     }
   } else {
+    buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_HOST;
     unsigned int flags = CU_MEMHOSTALLOC_DEVICEMAP;
     if (!iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
       flags |= CU_MEMHOSTALLOC_WRITECOMBINED;
@@ -243,7 +257,8 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
         base_allocator, memory_type, params->access, params->usage,
         allocation_size,
         /*byte_offset=*/0,
-        /*byte_length=*/allocation_size, device_ptr, host_ptr, &buffer);
+        /*byte_length=*/allocation_size, buffer_type, device_ptr, host_ptr,
+        iree_hal_buffer_release_callback_null(), &buffer);
   }
 
   // Copy the initial contents into the buffer. This may require staging.
@@ -267,7 +282,7 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
     *out_buffer = buffer;
   } else {
     if (!buffer) {
-      iree_hal_cuda_buffer_free(allocator->context, memory_type, device_ptr,
+      iree_hal_cuda_buffer_free(allocator->context, buffer_type, device_ptr,
                                 host_ptr);
     } else {
       iree_hal_buffer_release(buffer);
@@ -281,17 +296,43 @@ static void iree_hal_cuda_allocator_deallocate_buffer(
     iree_hal_buffer_t* IREE_RESTRICT base_buffer) {
   iree_hal_cuda_allocator_t* allocator =
       iree_hal_cuda_allocator_cast(base_allocator);
-  iree_hal_memory_type_t memory_type = iree_hal_buffer_memory_type(base_buffer);
-  iree_hal_cuda_buffer_free(allocator->context, memory_type,
+
+  const iree_hal_cuda_buffer_type_t buffer_type =
+      iree_hal_cuda_buffer_type(base_buffer);
+
+  // WARNING: we may be called from a random thread and need to ensure that we
+  // have an active CUDA context. Unfortunately CUDA is CUDA and trying to
+  // change the context here will result in full device synchronization. In the
+  // future we'll need to do something fairly complex such as having a dedicated
+  // thread with a persistently bound context that does nothing but free
+  // buffers. The load on this will be lighter when queue-ordered allocations
+  // are used or any sort of pooling policy is applied.
+  //
+  // WARNING: with CUDA's lazy error propagation it's possible that by the time
+  // this code is running something else has triggered device loss and we can't
+  // actually use the context. In that case we can't perform the frees and want
+  // to silently ignore them: whatever the user tries to do next will fail in
+  // the same way and if we were deallocating this buffer as part of a tear-down
+  // on failure we don't want to end up dying during cleanup.
+  iree_hal_cuda_buffer_free(allocator->context, buffer_type,
                             iree_hal_cuda_buffer_device_pointer(base_buffer),
                             iree_hal_cuda_buffer_host_pointer(base_buffer));
 
-  IREE_TRACE_FREE_NAMED(
-      IREE_HAL_CUDA_ALLOCATOR_ID,
-      (void*)iree_hal_cuda_buffer_device_pointer(base_buffer));
-  IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
-      &allocator->statistics, memory_type,
-      iree_hal_buffer_allocation_size(base_buffer)));
+  switch (buffer_type) {
+    case IREE_HAL_CUDA_BUFFER_TYPE_DEVICE:
+    case IREE_HAL_CUDA_BUFFER_TYPE_HOST: {
+      IREE_TRACE_FREE_NAMED(
+          IREE_HAL_CUDA_ALLOCATOR_ID,
+          (void*)iree_hal_cuda_buffer_device_pointer(base_buffer));
+      IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
+          &allocator->statistics, iree_hal_buffer_memory_type(base_buffer),
+          iree_hal_buffer_allocation_size(base_buffer)));
+      break;
+    }
+    default:
+      // Buffer type not tracked.
+      break;
+  }
 
   iree_hal_buffer_destroy(base_buffer);
 }
@@ -302,8 +343,76 @@ static iree_status_t iree_hal_cuda_allocator_import_buffer(
     iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
     iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "importing from external buffers not supported");
+  iree_hal_cuda_allocator_t* allocator =
+      iree_hal_cuda_allocator_cast(base_allocator);
+
+  iree_status_t status = iree_ok_status();
+  iree_hal_cuda_buffer_type_t buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_DEVICE;
+  void* host_ptr = NULL;
+  CUdeviceptr device_ptr = 0;
+
+  switch (external_buffer->type) {
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION: {
+      if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "unable to register host allocations as device-local memory");
+      }
+      buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_HOST_REGISTERED;
+      host_ptr = external_buffer->handle.host_allocation.ptr;
+      uint32_t register_flags = 0;
+      if (params->access == IREE_HAL_MEMORY_ACCESS_READ) {
+        register_flags = CU_MEMHOSTREGISTER_READ_ONLY;
+      }
+      if (iree_any_bit_set(params->usage,
+                           IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
+                               IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
+                               IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                               IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE)) {
+        register_flags = CU_MEMHOSTREGISTER_DEVICEMAP;
+      }
+      status = CU_RESULT_TO_STATUS(
+          allocator->context->syms,
+          cuMemHostRegister(host_ptr, external_buffer->size, register_flags),
+          "cuMemHostRegister");
+      if (iree_status_is_ok(status)) {
+        status = CU_RESULT_TO_STATUS(
+            allocator->context->syms,
+            cuMemHostGetDevicePointer(&device_ptr, host_ptr, 0),
+            "cuMemHostGetDevicePointer");
+      }
+      break;
+    }
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD:
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_WIN32:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "handle-based imports not yet implemented");
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "external buffer type not supported");
+  }
+
+  iree_hal_buffer_t* buffer = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cuda_buffer_wrap(
+        base_allocator, params->type, params->access, params->usage,
+        external_buffer->size,
+        /*byte_offset=*/0,
+        /*byte_length=*/external_buffer->size, buffer_type, device_ptr,
+        host_ptr, release_callback, &buffer);
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_buffer = buffer;
+  } else {
+    if (!buffer) {
+      iree_hal_cuda_buffer_free(allocator->context, buffer_type, device_ptr,
+                                host_ptr);
+    } else {
+      iree_hal_buffer_release(buffer);
+    }
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_cuda_allocator_export_buffer(
