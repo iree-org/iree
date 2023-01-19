@@ -211,7 +211,7 @@ EOF
   ########################### Install the ops agent ############################
 
   nice_curl https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh \
-    | bash -s -- --also-install --remove-repo --version 2.24.0
+    | bash -s -- --also-install --remove-repo --version=2.24.0
   cat <<EOF >> /etc/google-cloud-ops-agent/config.yaml
 logging:
   receivers:
