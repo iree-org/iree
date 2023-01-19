@@ -60,9 +60,11 @@ struct GPUReduceBankConflictsPass
     SmallVector<memref::AllocOp> sharedMemAllocs;
     // Collect all the alloc operations.
     funcOp.walk([&](memref::AllocOp allocOp) {
-      if (allocOp.getType().getMemorySpaceAsInt() ==
-              static_cast<unsigned int>(
-                  gpu::GPUDialect::getWorkgroupAddressSpace()) &&
+      auto addressSpaceAttr =
+          allocOp.getType().getMemorySpace().dyn_cast<gpu::AddressSpaceAttr>();
+      if (addressSpaceAttr &&
+          addressSpaceAttr.getValue() ==
+              gpu::GPUDialect::getWorkgroupAddressSpace() &&
           allocOp.getType().hasStaticShape()) {
         sharedMemAllocs.push_back(allocOp);
       }

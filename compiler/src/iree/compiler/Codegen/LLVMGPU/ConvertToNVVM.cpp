@@ -42,10 +42,13 @@ struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
 
   LogicalResult matchAndRewrite(memref::DeallocOp op,
                                 PatternRewriter &rewriter) const override {
-    unsigned addressSpace =
-        op.getMemref().getType().cast<MemRefType>().getMemorySpaceAsInt();
-    if (addressSpace ==
-        static_cast<unsigned>(gpu::GPUDialect::getWorkgroupAddressSpace())) {
+    auto addressSpaceAttr = op.getMemref()
+                                .getType()
+                                .cast<MemRefType>()
+                                .getMemorySpace()
+                                .dyn_cast<gpu::AddressSpaceAttr>();
+    if (addressSpaceAttr && addressSpaceAttr.getValue() ==
+                                gpu::GPUDialect::getWorkgroupAddressSpace()) {
       rewriter.eraseOp(op);
       return success();
     }

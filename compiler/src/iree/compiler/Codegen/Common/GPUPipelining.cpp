@@ -42,12 +42,10 @@ static bool hasDefaultOrHALAddressSpace(MemRefType memrefType) {
 /// Returns true if the given `memrefType` has the numeric address space for
 /// GPU shared memory.
 static bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
-  Attribute addrSpace = memrefType.getMemorySpace();
-  if (!addrSpace) return false;
-  auto intAttr = addrSpace.dyn_cast<IntegerAttr>();
-  if (!intAttr) return false;
-  return static_cast<unsigned int>(intAttr.getInt()) ==
-         static_cast<unsigned int>(gpu::GPUDialect::getWorkgroupAddressSpace());
+  auto addrSpace =
+      memrefType.getMemorySpace().dyn_cast<gpu::AddressSpaceAttr>();
+  return addrSpace &&
+         addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
 }
 
 // Returns a new predicated operation to support unpeeled epilogue. Unpeeled
