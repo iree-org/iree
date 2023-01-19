@@ -46,6 +46,7 @@ iree_cc_library(
     iree::compiler::Bindings::Native::Transforms
     iree::compiler::Bindings::TFLite::Transforms
     iree::compiler::Dialect::Flow::Transforms
+    iree::compiler::Dialect::Flow::Transforms::Passes
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::Stream::Transforms

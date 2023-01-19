@@ -29,6 +29,61 @@ iree_gentbl_cc_library(
 )
 
 iree_compiler_cc_library(
+    name = "DispatchWithTransformDialect",
+    srcs = [
+        "DispatchWithTransformDialect.cpp",
+    ],
+    deps = [
+        ":PassesIncGen",
+        ":Transforms",
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:PDLDialect",
+        "@llvm-project//mlir:PDLInterpDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformDialect",
+    ],
+)
+
+# Separate pass registration from pass definition. This is necessary to a avoid
+# a circular dependency between Flow TransformExtensions and Flow Transforms.
+#
+# TODO: better layering requires separating Flow Transforms from Flow Passes so
+# that TransformExtensions can depend on Transforms and Passes can depend on
+# both Transforms and TransformExtensions in order to run the Flow-specific
+# Transform dialect interpreter pass.
+iree_compiler_cc_library(
+    name = "Passes",
+    srcs = [
+        "Passes.cpp",
+    ],
+    deps = [
+        ":DispatchWithTransformDialect",
+        ":PassesIncGen",
+        ":Transforms",
+        "//compiler/src/iree/compiler/Dialect/Util/Transforms",
+        "//compiler/src/iree/compiler/Utils",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:MemRefTransforms",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Transforms",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "CaptureDispatchDynamicDims.cpp",
@@ -43,7 +98,6 @@ iree_compiler_cc_library(
         "ConvertToFlow.cpp",
         "DeduplicateExecutables.cpp",
         "DetachElementwiseFromNamedOps.cpp",
-        "DispatchWithTransformDialect.cpp",
         "DumpDispatchGraph.cpp",
         "ExpandTensorShapes.cpp",
         "ExportBenchmarkFuncs.cpp",
@@ -58,8 +112,6 @@ iree_compiler_cc_library(
         "OptimizeNumerics.cpp",
         "OutlineDispatchRegions.cpp",
         "PadLinalgOps.cpp",
-        "PassDetail.h",
-        "Passes.cpp",
         "RegionOpUtils.cpp",
         "SetEncoding.cpp",
         "SplitReduction.cpp",
@@ -71,6 +123,7 @@ iree_compiler_cc_library(
     hdrs = [
         "ConvertRegionToWorkgroups.h",
         "FormDispatchRegions.h",
+        "PassDetail.h",
         "Passes.h",
         "Passes.h.inc",
         "RegionOpUtils.h",
@@ -108,8 +161,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransforms",
-        "@llvm-project//mlir:PDLDialect",
-        "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
@@ -119,7 +170,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TosaDialect",
-        "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
