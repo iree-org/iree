@@ -38,10 +38,6 @@
 #include "mlir/Target/LLVMIR/Dialect/NVVM/NVVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
-static llvm::cl::opt<bool> dumpPtx(
-    "iree-hal-cuda-dump-ptx", llvm::cl::init(false),
-    llvm::cl::desc("Dump ptx to the debug stream."));
-
 // TODO: remove this workaround altogether once we decide not to support
 // CUDA 11.3
 static llvm::cl::opt<bool> clDisableLoopNounrollWa(
@@ -355,9 +351,6 @@ class CUDATargetBackend final : public TargetBackend {
       ptxImage = translateModuleToISA(*llvmModule, *targetMachine);
     }
 
-    if (dumpPtx) {
-      llvm::dbgs() << ptxImage;
-    }
     if (!options.dumpBinariesPath.empty()) {
       dumpDataToPath(options.dumpBinariesPath, options.dumpBaseName,
                      variantOp.getName(), ".ptx", ptxImage);
