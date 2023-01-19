@@ -45,8 +45,6 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "assert_fail",
     srcs = ["assert_fail.c"],
-    hdrs = ["common.h"],
-    deps = [":common"],
 )
 
 # :generic contains non-architecture-specific implementations.

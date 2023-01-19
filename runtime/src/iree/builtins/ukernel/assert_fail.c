@@ -15,9 +15,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "iree/builtins/ukernel/common.h"
-
-#ifdef IREE_UK_ENABLE_ASSERTS
 void iree_uk_assert_fail(const char* file, int line, const char* function,
                          const char* condition) {
   fflush(stdout);
@@ -26,4 +23,3 @@ void iree_uk_assert_fail(const char* file, int line, const char* function,
   fflush(stderr);
   abort();
 }
-#endif  // IREE_UK_ENABLE_ASSERTS

@@ -50,12 +50,10 @@ iree_cc_library(
 iree_cc_library(
   NAME
     assert_fail
-  HDRS
-    "common.h"
   SRCS
     "assert_fail.c"
   DEPS
-    ::common
+
   PUBLIC
 )
 
