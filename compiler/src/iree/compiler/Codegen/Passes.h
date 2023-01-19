@@ -275,7 +275,7 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUAArch64VectorLoweringPass();
+createLLVMCPUMmt4dVectorLoweringPass();
 
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
@@ -351,7 +351,7 @@ void addTransformDialectPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
-void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager);
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.

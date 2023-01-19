@@ -17,7 +17,7 @@ iree_compiler_cc_library(
     srcs = [
         "ConvertToLLVM.cpp",
         "KernelDispatch.cpp",
-        "LLVMCPUAArch64VectorLowering.cpp",
+        "LLVMCPUMmt4dVectorLowering.cpp",
         "LLVMCPUAssignConstantOrdinals.cpp",
         "LLVMCPUAssignImportOrdinals.cpp",
         "LLVMCPUCheckIRBeforeLLVMConversion.cpp",

@@ -594,7 +594,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -635,7 +635,7 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   addBufferizePasses(nestedModulePM);
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUAArch64VectorLoweringPass());
+      createLLVMCPUMmt4dVectorLoweringPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass(/*flatten=*/true));
 }

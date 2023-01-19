@@ -72,8 +72,7 @@ LogicalResult verifyLoweringConfiguration(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
   switch (translationInfo.getDispatchLoweringPassPipeline()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::
-        CPUAArchDoubleTilingExpert:
+    case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert:
       return verifyDoubleTilingExpertPassPipelineConfig(op, loweringConfig,
                                                         translationInfo);
     case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
