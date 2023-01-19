@@ -158,7 +158,7 @@ class WGSLReplacePushConstantsPass
         /*set=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX),
         /*binding=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX),
         IREE::HAL::DescriptorType::UniformBuffer,
-        /*byte_offset=*/maxConstantValue, dynamicDims, alignmentAttr);
+        /*byte_offset=*/maxConstantValue, dynamicDims, alignmentAttr, nullptr);
 
     // flow.dispatch.tensor.load -> tensor<Nxvector<4xi32>>
     auto tensorType =

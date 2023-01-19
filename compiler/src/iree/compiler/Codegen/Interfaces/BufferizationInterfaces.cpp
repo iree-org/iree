@@ -92,7 +92,7 @@ static Value findOrCreateSubspanBuffer(
       subspanOp->getLoc(), memRefType, subspanOp.getSet(),
       subspanOp.getBinding(), subspanOp.getDescriptorType(),
       subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
-      subspanOp.getAlignmentAttr());
+      subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
   if (subspanOp.getAlignment()) {
     b.create<memref::AssumeAlignmentOp>(
         subspanOp->getLoc(), buffer, subspanOp.getAlignment()->getZExtValue());

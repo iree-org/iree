@@ -2191,8 +2191,24 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     HAL_DescriptorTypeAttr:$descriptor_type,
     Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
-    OptionalAttr<IndexAttr>:$alignment
+    OptionalAttr<IndexAttr>:$alignment,
+    OptionalAttr<HAL_DescriptorFlagsAttr>:$descriptor_flags
   );
+  
+let builders = [
+    OpBuilder<(ins
+      "Type":$resultType,
+      "APInt":$set,
+      "APInt":$binding,
+      "IREE::HAL::DescriptorType":$descriptor_type,
+      "Value":$byte_offset,
+      "ValueRange":$dynamic_dims,
+      "IntegerAttr":$alignment,
+      CArg<"mlir::Optional<DescriptorFlags>", "llvm::None">:$flags
+    )>,
+  ];
+
+
   let results = (outs
     Res<AnyType, "", [MemAlloc]>:$result
   );
@@ -2203,6 +2219,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     `type` `(` custom<DescriptorType>($descriptor_type) `)`
     (`offset` `(` $byte_offset^ `)`)?
     (`alignment` `(` $alignment^ `)`)?
+    (`flags` `(` $descriptor_flags^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];
 
