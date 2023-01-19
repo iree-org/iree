@@ -72,6 +72,7 @@ static void createAsyncGroups(func::FuncOp funcOp) {
       if (readOp) {
         auto addressSpaceAttr = readOp.getShapedType()
                                     .cast<MemRefType>()
+                                    .getMemorySpace()
                                     .dyn_cast<gpu::AddressSpaceAttr>();
         if (addressSpaceAttr &&
             addressSpaceAttr.getValue() !=
