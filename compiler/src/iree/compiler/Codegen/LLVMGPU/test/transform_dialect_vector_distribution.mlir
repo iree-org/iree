@@ -39,13 +39,13 @@ hal.executable private @reduce_dispatch_0 {
         // Single-warp guard filters out threads 32-63.
         // CHECK: scf.if %[[COND32]] {
         // CHECK:   %[[COND1:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
-        // CHECK:   %[[ALLOC:.*]] = memref.alloc() : memref<128xf32, 3>
+        // CHECK:   %[[ALLOC:.*]] = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
         // Single-thread guard runs on thread 0 only.
         // CHECK:   scf.if %[[COND1]] {
         // CHECK:     %[[V:.*]] = "some_def"() : () -> vector<128xf32>
-        // CHECK:     vector.transfer_write %[[V]], %{{.*}} : vector<128xf32>, memref<128xf32, 3>
+        // CHECK:     vector.transfer_write %[[V]], %{{.*}} : vector<128xf32>, memref<128xf32, #gpu.address_space<workgroup>>
         // CHECK:   %[[IDX:.*]] = affine.apply #[[MAP]]()[%[[TIDX]]]
-        // CHECK:   %[[LOADED:.*]] = vector.transfer_read %{{.*}}[%[[IDX]]], %{{.*}} {in_bounds = [true]} : memref<128xf32, 3>, vector<4xf32>
+        // CHECK:   %[[LOADED:.*]] = vector.transfer_read %{{.*}}[%[[IDX]]], %{{.*}} {in_bounds = [true]} : memref<128xf32, #gpu.address_space<workgroup>>, vector<4xf32>
         // CHECK:   vector.transfer_write %[[LOADED]], %{{.*}} {in_bounds = [true]} : vector<4xf32>, memref<128xf32>
         scf.if %2 {
           %v = "some_def"() : () -> (vector<128xf32>)

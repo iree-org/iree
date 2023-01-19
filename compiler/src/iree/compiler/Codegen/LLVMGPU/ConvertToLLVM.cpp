@@ -135,12 +135,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
 
   LogicalResult matchAndRewrite(memref::AllocOp allocOp,
                                 PatternRewriter &rewriter) const override {
-    auto addressSpaceAttr =
-        allocOp.getType().getMemorySpace().dyn_cast<gpu::AddressSpaceAttr>();
-    if (!addressSpaceAttr || addressSpaceAttr.getValue() !=
-                                 gpu::GPUDialect::getWorkgroupAddressSpace()) {
-      return failure();
-    }
+    if (allocOp.getType().getMemorySpaceAsInt() != 3) return failure();
     ArrayRef<int64_t> shape = allocOp.getType().getShape();
     if (llvm::any_of(shape,
                      [](int64_t dim) { return dim == ShapedType::kDynamic; })) {

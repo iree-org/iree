@@ -79,7 +79,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, 3>
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, #gpu.address_space<workgroup>>
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
 
 // Fusion occurred, no barrier before the loop
@@ -99,7 +99,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK: scf.if %[[FIRST_32_TIDX]] {
 // Distributed reduction: everyone <= 32 loads then 5 xor + addf expected.
 //         CHECK:   vector.transfer_read %{{.*}} memref<8xf32>, vector<f32>
-//         CHECK:   vector.transfer_read %{{.*}} memref<1x64xf32, 3>, vector<2xf32>
+//         CHECK:   vector.transfer_read %{{.*}} memref<1x64xf32, #gpu.address_space<workgroup>>, vector<2xf32>
 // CHECK-COUNT-5:   gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
 //         CHECK:   %[[RES:.*]] = arith.addf %{{.*}} : f32
@@ -151,7 +151,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, 3>
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x64xf32, #gpu.address_space<workgroup>>
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
 
 // Fusion occurred, no barrier before the loop
@@ -174,8 +174,8 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK: %[[FIRST_32_TIDX:.*]] = arith.cmpi ult, %[[TIDX]], %[[C32]] : index
 //         CHECK: scf.if %[[FIRST_32_TIDX]] {
 // Distributed reduction: everyone <= 32 loads then 5 xor + addf expected.
-//         CHECK:   vector.transfer_read %{{.*}} memref<1xf32, 3>, vector<f32>
-//         CHECK:   vector.transfer_read %{{.*}} memref<1x64xf32, 3>, vector<2xf32>
+//         CHECK:   vector.transfer_read %{{.*}} memref<1xf32, #gpu.address_space<workgroup>>, vector<f32>
+//         CHECK:   vector.transfer_read %{{.*}} memref<1x64xf32, #gpu.address_space<workgroup>>, vector<2xf32>
 // CHECK-COUNT-5:   gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
 //         CHECK:   %[[PARTIAL:.*]] = arith.addf %{{.*}}
@@ -223,7 +223,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[C64:.*]] = arith.constant 64 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x256xf32, 3>
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x256xf32, #gpu.address_space<workgroup>>
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
 //     CHECK-DAG:   %[[TIDX_TIMES_4:.]] = affine.apply{{.*}}[%[[TIDX]]]
 
@@ -238,13 +238,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-NOT:   gpu.barrier
 //         CHECK: }
 //         CHECK: vector.transfer_write {{.*}} vector<f32>
-
-//     CHECK-DAG:   %[[TIDY:.]] = gpu.thread_id  y
 //         CHECK: %[[FIRST_64_TIDX:.*]] = arith.cmpi ult, %[[TIDX]], %[[C64]] : index
 //         CHECK: scf.if %[[FIRST_64_TIDX]] {
 // Distributed reduction: everyone <= 64 loads then 5 xor + addf expected.
 //         CHECK:   vector.transfer_read %{{.*}} memref<33xf32>, vector<f32>
-//         CHECK:   vector.transfer_read %{{.*}}[%[[TIDY]], %[[TIDX_TIMES_4]]]{{.*}} memref<1x256xf32, 3>, vector<4xf32>
+//         CHECK:   vector.transfer_read %{{.*}}[%[[C0]], %[[TIDX_TIMES_4]]]{{.*}} memref<1x256xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 // CHECK-COUNT-5:   gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
 //         CHECK: arith.minui
@@ -381,7 +379,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[C64:.*]] = arith.constant 64 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x1024xi8, 3>
+//     CHECK-DAG:   %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x1024xi8, #gpu.address_space<workgroup>>
 //     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
 
 // Local per-thread scf.for-based reduction.
@@ -400,8 +398,8 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK: %[[FIRST_64_TIDX:.*]] = arith.cmpi ult, %[[TIDX]], %[[C64]] : index
 //         CHECK: scf.if %[[FIRST_64_TIDX]] {
 // Distributed reduction: everyone <= 64 loads then 5 xor + addf expected.
-//         CHECK:   vector.transfer_read %{{.*}} memref<1xi8, 3>, vector<i8>
-//         CHECK:   vector.transfer_read %{{.*}} memref<1x1024xi8, 3>, vector<16xi8>
+//         CHECK:   vector.transfer_read %{{.*}} memref<1xi8, #gpu.address_space<workgroup>>, vector<i8>
+//         CHECK:   vector.transfer_read %{{.*}} memref<1x1024xi8, #gpu.address_space<workgroup>>, vector<16xi8>
 // CHECK-COUNT-4:   vector.reduction <add>, %{{.*}} : vector<4xi8> into i8
 // CHECK-COUNT-5:   gpu.shuffle  xor{{.*}}{{[[:space:]].*}}vector.broadcast{{.*}}{{[[:space:]].*}}vector.bitcast{{.*}}{{[[:space:]].*}}arith.addi{{.*}}vector<4xi8>
 

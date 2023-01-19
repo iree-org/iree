@@ -42,13 +42,9 @@ struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
 
   LogicalResult matchAndRewrite(memref::DeallocOp op,
                                 PatternRewriter &rewriter) const override {
-    auto addressSpaceAttr = op.getMemref()
-                                .getType()
-                                .cast<MemRefType>()
-                                .getMemorySpace()
-                                .dyn_cast<gpu::AddressSpaceAttr>();
-    if (addressSpaceAttr && addressSpaceAttr.getValue() ==
-                                gpu::GPUDialect::getWorkgroupAddressSpace()) {
+    unsigned addressSpace =
+        op.getMemref().getType().cast<MemRefType>().getMemorySpaceAsInt();
+    if (addressSpace == NVVM::NVVMMemorySpace::kSharedMemorySpace) {
       rewriter.eraseOp(op);
       return success();
     }

@@ -35,7 +35,7 @@ static void createAsyncGroups(func::FuncOp funcOp) {
     auto addressSpaceAttr = writeOp.getShapedType()
                                 .cast<MemRefType>()
                                 .getMemorySpace()
-                                .dyn_cast<gpu::AddressSpaceAttr>();
+                                .dyn_cast_or_null<gpu::AddressSpaceAttr>();
     if (!addressSpaceAttr || addressSpaceAttr.getValue() !=
                                  gpu::GPUDialect::getWorkgroupAddressSpace()) {
       return WalkResult::advance();
@@ -73,8 +73,8 @@ static void createAsyncGroups(func::FuncOp funcOp) {
         auto addressSpaceAttr = readOp.getShapedType()
                                     .cast<MemRefType>()
                                     .getMemorySpace()
-                                    .dyn_cast<gpu::AddressSpaceAttr>();
-        if (addressSpaceAttr &&
+                                    .dyn_cast_or_null<gpu::AddressSpaceAttr>();
+        if (!addressSpaceAttr ||
             addressSpaceAttr.getValue() !=
                 gpu::GPUDialect::getWorkgroupAddressSpace()) {
           continue;
@@ -122,7 +122,7 @@ static void swizzleSharedMemory(func::FuncOp funcOp) {
   funcOp->walk([&](memref::AllocOp allocOp) {
     auto memrefType = allocOp.getMemref().getType().cast<MemRefType>();
     auto addressSpaceAttr =
-        memrefType.getMemorySpace().dyn_cast<gpu::AddressSpaceAttr>();
+        memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
     // Only apply it to shared memory of input operands.
     if (!addressSpaceAttr ||
         addressSpaceAttr.getValue() !=
