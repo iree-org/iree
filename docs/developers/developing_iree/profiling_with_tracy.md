@@ -241,6 +241,25 @@ Internally, Tracy executes `su` commands to perform certain actions, so it too
 relies on the device being *rooted* without relying on the benchmark process
 being run as root.
 
+## "RESOURCE_EXHAUSTED; failed to open file" issue
+
+This is a
+[known issue with how tracy operates](https://github.com/wolfpld/tracy/issues/512).
+One way to workaround it is to manually increase the total number of files
+that can be kept opened simultanously and run the benchmark command with that
+setting:
+```
+sudo sh -c "ulimit -n <bigNum> && <myTracyInstrumentedProgram>"
+```
+
+**Explanation:**
+
+Tracy keeps a number of file descriptors open that, depending on the machine and
+its settings, may exceed the limit allowed by the system resulting in `iree`
+to fail to open more files.
+In particular, it is commom to have a relatively low limit when running
+with `sudo`.
+
 ## Running the Tracy Capture CLI, connecting and saving profiles
 
 While the program that you want to profile is still running (thanks to
