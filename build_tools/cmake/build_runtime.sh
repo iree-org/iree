@@ -76,6 +76,6 @@ case "${BUILD_PRESET}" in
     ;;
 esac
 
-if (( IREE_READ_REMOTE_CCACHE == 1 || IREE_USE_LOCAL_CCACHE == 1 )); then
+if (( IREE_USE_CCACHE == 1 ));
   ccache --show-stats
 fi
