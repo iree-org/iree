@@ -141,6 +141,9 @@ jobs:
           IREE_WRITE_LOCAL_CCACHE: 1
           # IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
           CCACHE_DIR: ${{ github.workspace }}/.ccache
+          # A full build is around 2.5GB, but uploads/downloads are slow and
+          # we have a limit of 10GB per repository
+          CCACHE_MAXSIZE: 3G
         run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
