@@ -9,6 +9,7 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
@@ -23,8 +24,9 @@ namespace cpu {
 /// Return the handles to the updated variant and the func::FuncOp ops under
 /// the variant op.
 // TODO: pass control to LowerVectorsOp once the builder allows it.
-std::pair<Value, Value> buildCommonTrailingStrategy(ImplicitLocOpBuilder& b,
-                                                    Value variantH);
+std::pair<Value, Value> buildCommonTrailingStrategy(
+    ImplicitLocOpBuilder& b, Value variantH,
+    const vector::LowerVectorsOptions& lowerVectorsOpts);
 
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor
