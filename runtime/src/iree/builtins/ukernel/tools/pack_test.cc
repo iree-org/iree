@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/pack.h"
-
 #include <algorithm>
 #include <cstring>
 #include <vector>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
+#include "iree/builtins/ukernel/api.h"
 #include "iree/builtins/ukernel/tools/ukernel_test_utils.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"

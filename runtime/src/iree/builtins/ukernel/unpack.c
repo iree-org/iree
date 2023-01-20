@@ -66,10 +66,6 @@ static void iree_unpack_reference(const iree_uk_unpack_params_t* params) {
     iree_uk_ssize_swap(&tile_size0, &tile_size1);
     iree_uk_ssize_swap(&in_stride_l2, &in_stride_l3);
   }
-  assert(outer_size0 * tile_size0 >= params->out_size0);
-  assert(outer_size1 * tile_size1 >= params->out_size1);
-  assert((outer_size0 - 1) * tile_size0 < params->out_size0);
-  assert((outer_size1 - 1) * tile_size1 < params->out_size1);
   for (iree_uk_ssize_t outer_i0 = 0; outer_i0 < outer_size0; ++outer_i0) {
     for (iree_uk_ssize_t outer_i1 = 0; outer_i1 < outer_size1; ++outer_i1) {
       for (iree_uk_ssize_t tile_i0 = 0; tile_i0 < tile_size0; ++tile_i0) {

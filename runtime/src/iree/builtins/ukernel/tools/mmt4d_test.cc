@@ -43,12 +43,11 @@
 // things that we would otherwise prefer to keep internal in the mmt4d builtin
 // implementation, and would make e2e/matmul tests even more expensive.
 
-#include "iree/builtins/ukernel/mmt4d.h"
-
 #include <vector>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
+#include "iree/builtins/ukernel/api.h"
 #include "iree/builtins/ukernel/tools/ukernel_test_utils.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"

@@ -7,7 +7,7 @@
 #ifndef IREE_BUILTINS_UKERNEL_ARCH_MMT4D_ARCH_H_
 #define IREE_BUILTINS_UKERNEL_ARCH_MMT4D_ARCH_H_
 
-#include "iree/builtins/ukernel/mmt4d_types.h"
+#include "iree/builtins/ukernel/mmt4d.h"
 
 // Returns the architecture-specific tile function to use for the mmt4d with
 // given params, or NULL if no suitable architecture-specific tile function

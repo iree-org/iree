@@ -7,7 +7,7 @@
 #ifndef IREE_BUILTINS_UKERNEL_ARCH_QUERY_TILE_SIZES_ARCH_H_
 #define IREE_BUILTINS_UKERNEL_ARCH_QUERY_TILE_SIZES_ARCH_H_
 
-#include "iree/builtins/ukernel/query_tile_sizes_types.h"
+#include "iree/builtins/ukernel/query_tile_sizes.h"
 
 bool iree_uk_query_matmul_tile_sizes_arch(
     const iree_uk_query_tile_sizes_2d_params_t* params,
