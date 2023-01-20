@@ -1,4 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-hal-dump-executable-binaries-to=%t %s && \
+// RUN:   cat %t/module_add_dispatch_0_cuda_nvptx_fb.ptx | FileCheck %s --check-prefix=PTX
 
 #map = affine_map<(d0) -> (d0)>
 
@@ -38,6 +40,10 @@ stream.executable public @add_dispatch_0 {
 }
 
 }
+
+// PTX: .entry add_dispatch_0
+// PTX: .maxntid 64, 1, 1
+// PTX:   add.rn.f32
 
 //      CHECK:   hal.executable.binary public @cuda_nvptx_fb attributes {
 // CHECK-SAME:     data = dense
