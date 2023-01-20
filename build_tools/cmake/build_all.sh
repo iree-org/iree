@@ -75,5 +75,4 @@ echo "------------------"
 
 if (( IREE_READ_REMOTE_CCACHE == 1 || IREE_USE_LOCAL_CCACHE == 1 )); then
   ccache --show-stats
-  ccache --show-compression  # DO NOT SUBMIT
 fi

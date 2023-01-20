@@ -137,7 +137,6 @@ jobs:
           IREE_USE_LOCAL_CCACHE: 1
           IREE_READ_REMOTE_CCACHE: 0
           CCACHE_DIR: ${{ github.workspace }}/.ccache
-          CCACHE_COMPRESSLEVEL: 5
         run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
