@@ -44,7 +44,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   //     CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
   //     CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x2xf32, 3>
+  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x2xf32, #gpu.address_space<workgroup>>
   //     CHECK-DAG: %[[TIDX:.]] = gpu.thread_id  x
   //     CHECK-DAG: %[[TIDY:.]] = gpu.thread_id  y
   //     CHECK-DAG: %[[TIDZ:.]] = gpu.thread_id  z
@@ -71,7 +71,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //         CHECK:   vector.reduction <add>
   //         CHECK:   vector.transfer_write
   //         CHECK: gpu.barrier
-  //         CHECK: memref.dealloc %[[SHMEM_ALLOC]] : memref<1x2xf32, 3>
+  //         CHECK: memref.dealloc %[[SHMEM_ALLOC]] : memref<1x2xf32, #gpu.address_space<workgroup>>
 
 
 //      EXEC: result[0]: hal.buffer_view
