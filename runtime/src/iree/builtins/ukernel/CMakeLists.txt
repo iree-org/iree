@@ -49,16 +49,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    assert_fail
-  SRCS
-    "assert_fail.c"
-  DEPS
-
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     generic
   HDRS
     "mmt4d_generic.h"

@@ -19,7 +19,6 @@ iree_cc_library(
     "ukernel_test_utils.cc"
   DEPS
     iree::base
-    iree::builtins::ukernel::assert_fail
     iree::builtins::ukernel::common
     iree::schemas::cpu_data
   PUBLIC
