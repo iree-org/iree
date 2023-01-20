@@ -360,51 +360,18 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-      # Restore caches.
-      - name: "Fetching cache (git submodules)"
-        uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
-        with:
-          path: .git/modules
-          key: gitmodules_runtime_windows_${{ github.sha }}
-          restore-keys: gitmodules_runtime_windows
-      - name: "Fetching cache (CMake/ccache)"
-        uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache_runtime_windows_${{ github.sha }}
-          restore-keys: ccache_runtime_windows
-      # Fetch deps.
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Configuring MSVC"
         uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
-      - name: "Installing requirements"
-        run: |
-          pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-          choco install ccache --yes
-      # Finally: build and run tests.
+      - name: "Installing Python requirements"
+        run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: "Building runtime"
         env:
           BUILD_PRESET: "test"
-          IREE_USE_LOCAL_CCACHE: 1
-          IREE_READ_REMOTE_CCACHE: 0
-          CCACHE_DIR: ${{ github.workspace }}/.ccache
         run: ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
       - name: "Testing runtime"
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-      # Write caches (if configured to) after all other steps are finished.
-      - name: "Saving cache (git submodules)"
-        if: needs.setup.outputs.write-caches == 'true'
-        uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
-        with:
-          path: .git/modules
-          key: gitmodules_runtime_windows_${{ github.sha }}
-      - name: "Saving cache (CMake/ccache)"
-        if: needs.setup.outputs.write-caches == 'true'
-        uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache_runtime_windows_${{ github.sha }}
 
   ################################# Tensorflow #################################
   # Jobs that build the IREE-Tensorflow integrations
