@@ -811,3 +811,41 @@ func.func @reduce_broadcast_generic() {
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       ins(%[[RESULT]]#0, %[[RESULT]]#1 :
 //  CHECK-SAME:       outs(%[[OUT]] :
+
+// -----
+
+func.func @pack() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<4x4xi32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<2x2x2x2xi32>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4x4xi32>> -> tensor<4x4xi32>
+  %3 = tensor.empty() : tensor<2x2x2x2xi32>
+  %pack = tensor.pack %2 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %3 : tensor<4x4xi32> -> tensor<2x2x2x2xi32>
+  flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [2, 2, 2, 2], strides = [1, 1, 1, 1] : tensor<2x2x2x2xi32> -> !flow.dispatch.tensor<writeonly:tensor<2x2x2x2xi32>>
+  return
+}
+// CHECK-LABEL: func.func @pack
+// CHECK-DAG:     %[[IN_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
+// CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1)
+// CHECK-DAG:     %[[IN:.+]] = flow.dispatch.tensor.load %[[IN_BINDING]]
+// CHECK-DAG:     %[[OUT:.+]] = flow.dispatch.tensor.load %[[OUT_BINDING]]
+// CHECK:         tensor.pack %[[IN]] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %[[OUT]]
+
+// -----
+
+func.func @unpack() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<2x2x2x2xi32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<4x4xi32>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 2, 2, 2], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x2x2x2xi32>> -> tensor<2x2x2x2xi32>
+  %3 = tensor.empty() : tensor<4x4xi32>
+  %4 = tensor.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %3 : tensor<2x2x2x2xi32> -> tensor<4x4xi32>
+  flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : tensor<4x4xi32> -> !flow.dispatch.tensor<writeonly:tensor<4x4xi32>>
+  return
+}
+// CHECK-LABEL: func.func @unpack
+// CHECK-DAG:     %[[IN_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
+// CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1)
+// CHECK-DAG:     %[[IN:.+]] = flow.dispatch.tensor.load %[[IN_BINDING]]
+// CHECK-DAG:     %[[OUT:.+]] = flow.dispatch.tensor.load %[[OUT_BINDING]]
+// CHECK:         tensor.unpack %[[IN]] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %[[OUT]]
