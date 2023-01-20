@@ -1109,8 +1109,12 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
 // Softmax
 //===----------------------------------------------------------------------===//
 
+class CheckNumOperands<int i> : CPred<"$_op.getNumOperands() == " # i>;
+
 def IREELinalgExt_SoftmaxOp : IREELinalgExt_Op<"softmax",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+    [PredOpTrait<"only one input and one output",  CheckNumOperands<2>>,
+     PredOpTrait<"input and output have same element type", TCopVTEtIsSameAs<0, 1>>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",

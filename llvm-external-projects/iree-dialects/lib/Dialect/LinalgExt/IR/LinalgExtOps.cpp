@@ -2762,19 +2762,9 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 
 LogicalResult SoftmaxOp::verify() {
   Operation *op = getOperation();
-  if (getNumInputs() != 1) {
-    return op->emitOpError("expected one input operand");
-  }
-  if (getNumOutputs() != 1) {
-    return op->emitOpError("expected one output operand");
-  }
   auto inputType = input().getType().cast<ShapedType>();
   auto outputType = output().getType().cast<ShapedType>();
-  if (outputType.getElementType() != inputType.getElementType()) {
-    return op->emitOpError(
-        "expected input/output element types to be identical");
-  }
-  SmallVector<int64_t> inputShape(inputType.getShape());
+  ArrayRef<int64_t> inputShape = inputType.getShape();
   ArrayRef<int64_t> outputShape = outputType.getShape();
   if (!areShapesCompatible(inputShape, outputShape)) {
     return op->emitOpError("incompatible output shape");
