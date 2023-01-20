@@ -6,11 +6,25 @@
 
 #include "iree/builtins/ukernel/tools/ukernel_test_utils.h"
 
-#include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <random>
 
 #include "iree/schemas/cpu_data.h"
+
+// Implementation of iree_uk_assert_fail failure is deferred to users code, i.e.
+// to us here, as core ukernel/ code can't use the standard library.
+extern "C" void iree_uk_assert_fail(const char* file, int line,
+                                    const char* function,
+                                    const char* condition) {
+  fflush(stdout);
+  // Must be a single fprintf call (which must make a single write) - typically
+  // called from multiple worker threads concurrently.
+  fprintf(stderr, "%s:%d: %s: assertion failed: %s\n", file, line, function,
+          condition);
+  fflush(stderr);
+  abort();
+}
 
 iree_uk_ssize_t iree_uk_test_2d_buffer_length(iree_uk_type_t type,
                                               iree_uk_ssize_t size0,
@@ -54,7 +68,7 @@ static void iree_uk_test_write_random_buffer(
     T* buffer, iree_uk_ssize_t size_in_bytes,
     iree_uk_test_random_engine_t* engine) {
   iree_uk_ssize_t size_in_elems = size_in_bytes / sizeof(T);
-  assert(size_in_elems * sizeof(T) == size_in_bytes && "bad size");
+  IREE_UK_ASSERT(size_in_elems * sizeof(T) == size_in_bytes && "bad size");
   for (iree_uk_ssize_t i = 0; i < size_in_elems; ++i) {
     // Small integers, should work for now for all the types we currently have
     // and enable exact float arithmetic, allowing to keep tests simpler for
@@ -82,7 +96,7 @@ void iree_uk_test_write_random_buffer(void* buffer,
                                        size_in_bytes, engine);
       return;
     default:
-      assert(false && "unknown type");
+      IREE_UK_ASSERT(false && "unknown type");
   }
 }
 
@@ -101,7 +115,7 @@ static const char* iree_uk_test_type_category_str(const iree_uk_type_t type) {
     case IREE_UK_TYPE_CATEGORY_FLOAT_BRAIN:
       return "bf";
     default:
-      assert(false && "unknown type category");
+      IREE_UK_ASSERT(false && "unknown type category");
       return "(?)";
   }
 }
@@ -143,13 +157,13 @@ int iree_uk_test_cpu_features_str(char* buf, int buf_length,
                                   int cpu_data_length) {
   // In the future there will be multiple cpu data words. For now there's only
   // one. We assert that and take advantage to simplify the code.
-  assert(cpu_data_length == 1);
+  IREE_UK_ASSERT(cpu_data_length == 1);
   // We set only one feature bit at a time for now in this test. Not an actual
   // detected cpu data field. This might have to change in the future if some
   // code path relies on the combination of two features.
   // For now, asserting only one bit set, and taking advantage of that to work
   // with plain string literals.
-  assert(0 == (cpu_data[0] & (cpu_data[0] - 1)));
+  IREE_UK_ASSERT(0 == (cpu_data[0] & (cpu_data[0] - 1)));
   if (cpu_data[0] == 0) {
     return snprintf(buf, buf_length, "(none)");
   }
@@ -161,6 +175,6 @@ int iree_uk_test_cpu_features_str(char* buf, int buf_length,
     return snprintf(buf, buf_length, "dotprod");
   }
 #endif  // defined(IREE_UK_ARCH_ARM_64)
-  assert(false && "unknown CPU feature");
+  IREE_UK_ASSERT(false && "unknown CPU feature");
   return snprintf(buf, buf_length, "(unknown CPU feature)");
 }

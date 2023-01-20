@@ -27,7 +27,6 @@ iree_runtime_cc_library(
 # internal implementation functions.
 iree_runtime_cc_library(
     name = "common",
-    srcs = ["common.c"],
     hdrs = [
         "common.h",
         "mmt4d_types.h",

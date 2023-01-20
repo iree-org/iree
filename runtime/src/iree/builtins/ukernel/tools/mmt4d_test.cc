@@ -124,12 +124,7 @@ static void test_one_matmul_using_given_lhs_rhs(
          out_buffer_size);
 
   iree_mmt4d_reference(reference_params);
-  iree_uk_status_t status = iree_uk_mmt4d(&actual_params);
-  if (status != iree_uk_status_ok) {
-    fprintf(stderr, "FATAL: iree_uk_mmt4d failed: %s\n",
-            iree_uk_status_message(status));
-    iree_abort();
-  }
+  iree_uk_mmt4d(&actual_params);
 
   // For now we use exact comparisons, even for float, even though the reference
   // code accumulates in a different order compared to the actual code. This

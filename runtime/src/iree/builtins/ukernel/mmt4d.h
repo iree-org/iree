@@ -14,8 +14,7 @@ extern "C" {
 #endif  // __cplusplus
 
 // Main entry point.
-IREE_UK_EXPORT iree_uk_status_t
-iree_uk_mmt4d(const iree_uk_mmt4d_params_t* params);
+IREE_UK_EXPORT void iree_uk_mmt4d(const iree_uk_mmt4d_params_t* params);
 
 #ifdef __cplusplus
 }  // extern "C"
