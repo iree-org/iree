@@ -40,7 +40,7 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
 }
 
 # A map of canonical microarchitecture names.
-CANONICAL_MICROARCHITECTURE_NAMES = {"CascadeLake", "Zen2"}
+CANONICAL_MICROARCHITECTURE_NAMES = {"CascadeLake", "Zen2", "host"}
 
 
 @dataclass

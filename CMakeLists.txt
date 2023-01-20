@@ -88,6 +88,27 @@ option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
 # IREE_BUILD_BENCHMARKS. Eventually we will decouple them.
 cmake_dependent_option(IREE_ENABLE_COMPILATION_BENCHMARKS "Builds IREE benchmark suites for compilation statistics." OFF ${IREE_BUILD_BENCHMARKS} OFF)
 
+if (IREE_BUILD_BENCHMARKS)
+  set(IREE_BUILD_BENCHMARKS_FOR_X86_TARGETS_DEFAULT "CascadeLake")
+endif()
+set(IREE_BUILD_BENCHMARKS_FOR_X86_TARGETS
+      ${IREE_BUILD_BENCHMARKS_FOR_X86_TARGETS_DEFAULT}
+      CACHE STRING
+      "Builds IREE benchmark suites for the given x86 architectures."
+)
+
+# List the x86_64 targets supported by the benchmark script.
+set(IREE_BUILD_BENCHMARKS_FOR_X86_SUPPORTED_TARGETS
+  "host"
+  "CascadeLake"
+)
+
+foreach(TARGET ${IREE_BUILD_BENCHMARKS_FOR_X86_TARGETS})
+  if (NOT ${TARGET} IN_LIST IREE_BUILD_BENCHMARKS_FOR_X86_SUPPORTED_TARGETS)
+    message(WARNING "${TARGET} is not in the list of x86 supported targets (${IREE_BUILD_BENCHMARKS_FOR_X86_SUPPORTED_TARGETS})")
+  endif()
+endforeach()
+
 option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 
 #-------------------------------------------------------------------------------

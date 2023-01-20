@@ -16,122 +16,22 @@
 #                                                                              #
 ################################################################################
 
-set(LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS
-  "--iree-input-type=mhlo"
-  "--iree-llvm-target-cpu=cascadelake"
-  "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-)
+include(../linux-x86_64-common.cmake)
 
-# CPU, LLVM, local-sync, x86_64, full-inference
-iree_benchmark_suite(
-  GROUP_NAME
-    "linux-x86_64"
-
-  MODULES
-    "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
-    "${RESNET50_TF_FP32_MODULE}"
-    "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
-    "${EFFICIENTNET_V2_S_TF_FP32_MODULE}"
-
-  BENCHMARK_MODES
-    "full-inference,default-flags"
-  TARGET_BACKEND
-    "llvm-cpu"
-  TARGET_ARCHITECTURE
-    "CPU-x86_64-CascadeLake"
-  COMPILATION_FLAGS
-    ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
-  BENCHMARK_TOOL
-    iree-benchmark-module
-  CONFIG
-    "iree-llvm-cpu-sync"
-  DRIVER
-    "local-sync"
-)
-
-# CPU, LLVM, local-task, 1 thread, x86_64, full-inference
-iree_benchmark_suite(
-  GROUP_NAME
-    "linux-x86_64"
-
-  MODULES
-    "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
-    "${RESNET50_TF_FP32_MODULE}"
-    "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
-    "${EFFICIENTNET_V2_S_TF_FP32_MODULE}"
-
-  BENCHMARK_MODES
-    "1-thread,full-inference,default-flags"
-  TARGET_BACKEND
-    "llvm-cpu"
-  TARGET_ARCHITECTURE
-    "CPU-x86_64-CascadeLake"
-  COMPILATION_FLAGS
-    ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
-  BENCHMARK_TOOL
-    iree-benchmark-module
-  CONFIG
-    "iree-llvm-cpu"
-  DRIVER
-    "local-task"
-  RUNTIME_FLAGS
-    "--task_topology_group_count=1"
-)
-
-# CPU, LLVM, local-task, 4 threads, x86_64, full-inference
-iree_benchmark_suite(
-  GROUP_NAME
-    "linux-x86_64"
-
-  MODULES
-    "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
-    "${RESNET50_TF_FP32_MODULE}"
-    "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
-    "${EFFICIENTNET_V2_S_TF_FP32_MODULE}"
-
-  BENCHMARK_MODES
-    "4-thread,full-inference,default-flags"
-  TARGET_BACKEND
-    "llvm-cpu"
-  TARGET_ARCHITECTURE
-    "CPU-x86_64-CascadeLake"
-  COMPILATION_FLAGS
-    ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
-  BENCHMARK_TOOL
-    iree-benchmark-module
-  CONFIG
-    "iree-llvm-cpu"
-  DRIVER
-    "local-task"
-  RUNTIME_FLAGS
-    "--task_topology_group_count=4"
-)
-
-# CPU, LLVM, local-task, 8 threads, x86_64, full-inference
-iree_benchmark_suite(
-  GROUP_NAME
-    "linux-x86_64"
-
-  MODULES
-    "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
-    "${RESNET50_TF_FP32_MODULE}"
-    "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
-    "${EFFICIENTNET_V2_S_TF_FP32_MODULE}"
-
-  BENCHMARK_MODES
-    "8-thread,full-inference,default-flags"
-  TARGET_BACKEND
-    "llvm-cpu"
-  TARGET_ARCHITECTURE
-    "CPU-x86_64-CascadeLake"
-  COMPILATION_FLAGS
-    ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
-  BENCHMARK_TOOL
-    iree-benchmark-module
-  CONFIG
-    "iree-llvm-cpu"
-  DRIVER
-    "local-task"
-  RUNTIME_FLAGS
-    "--task_topology_group_count=8"
-)
+# Produce all the configurations we care about.
+foreach(TARGET ${IREE_BUILD_BENCHMARKS_FOR_X86_TARGETS})
+  # local-sync run ("") then multi-threaded runs.
+  foreach(NUM_OF_THREADS "" 1 4 8)
+    iree_benchmark_suite_x86(
+      TARGET_ARCHITECTURE "${TARGET}"
+      NUM_OF_THREADS "${NUM_OF_THREADS}"
+      USE_EXPERIMENTAL_FLAGS FALSE
+      MODULES
+        "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
+        "${RESNET50_TF_FP32_MODULE}"
+        "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
+        "${EFFICIENTNET_V2_S_TF_FP32_MODULE}"
+      INPUT_TYPE mhlo
+    )
+  endforeach()
+endforeach()
