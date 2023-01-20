@@ -28,6 +28,21 @@
 #define IREE_VMVX_MODULE_VERSION_0_0 0x00000000u
 #define IREE_VMVX_MODULE_VERSION_LATEST IREE_VMVX_MODULE_VERSION_0_0
 
+// Implementation of iree_uk_assert_fail failure is deferred to users code, i.e.
+// to us here, as core ukernel/ code can't do I/O or depend on anything.
+void iree_uk_assert_fail(const char* file, int line, const char* function,
+                         const char* condition) {
+#if (!defined(NDEBUG)) && (IREE_FILE_IO_ENABLE == 1)
+  fflush(stdout);
+  // Must be a single fprintf call (which must make a single write) - typically
+  // called from multiple worker threads concurrently.
+  fprintf(stderr, "%s:%d: %s: assertion failed: %s\n", file, line, function,
+          condition);
+  fflush(stderr);
+#endif  // (!defined(NDEBUG)) && (IREE_FILE_IO_ENABLE == 1)
+  iree_abort();
+}
+
 //===----------------------------------------------------------------------===//
 // Module type definitions
 //===----------------------------------------------------------------------===//

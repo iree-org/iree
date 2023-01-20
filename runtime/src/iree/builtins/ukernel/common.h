@@ -281,7 +281,10 @@ static inline void iree_uk_ssize_swap(iree_uk_ssize_t* a, iree_uk_ssize_t* b) {
 // Local replacement for <assert.h>
 //===----------------------------------------------------------------------===//
 
-// See comment in assert_fail.c.
+// Microkernel code needs to be stand-alone, not including the standard library
+// (see comment in common.h). But it's hard to implement assertion failure
+// without the standard library. So it's up to each piece of code that uses
+// microkernels, to provide its own implementation of this function.
 extern void iree_uk_assert_fail(const char* file, int line,
                                 const char* function, const char* condition);
 

@@ -4,7 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Standard implementation of iree_uk_assert_impl.
+// Implementation of iree_uk_assert_fail for use in tests and tools where it is
+// OK to rely on the standard C library.
+//
 // Microkernel code needs to be stand-alone, not including the standard library
 // (see comment in common.h). But it's hard to implement assertion failure
 // without the standard library. So this implementation is kept in a separate

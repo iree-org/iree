@@ -42,11 +42,6 @@ iree_runtime_cc_library(
     ],
 )
 
-iree_runtime_cc_library(
-    name = "assert_fail",
-    srcs = ["assert_fail.c"],
-)
-
 # :generic contains non-architecture-specific implementations.
 iree_runtime_cc_library(
     name = "generic",

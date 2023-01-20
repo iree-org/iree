@@ -31,7 +31,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/builtins/ukernel",
-        "//runtime/src/iree/builtins/ukernel:assert_fail",
         "//runtime/src/iree/vm",
     ],
 )
