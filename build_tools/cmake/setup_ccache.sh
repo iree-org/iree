@@ -13,9 +13,9 @@
 # Local caches can also be used to interface with external remote caches
 # (like https://github.com/actions/cache) by
 #   1. downloading the cache directory
-#   2. sourcing this file with IREE_USE_LOCAL_CCACHE=1 IREE_READ_REMOTE_CCACHE=0
+#   2. sourcing with IREE_READ_LOCAL_CCACHE=1 IREE_WRITE_LOCAL_CCACHE=[0,1]
 #   3. building with CMake
-#   4. uploading the cache directory (optionally)
+#   4. uploading the cache directory (if writing)
 #
 # Note: this file must be *sourced* not executed.
 
@@ -24,18 +24,19 @@ set -euo pipefail
 # Configuration environment variables.
 IREE_READ_REMOTE_CCACHE="${IREE_READ_REMOTE_CCACHE:-1}"
 IREE_WRITE_REMOTE_CCACHE="${IREE_WRITE_REMOTE_CCACHE:-0}"
-IREE_USE_LOCAL_CCACHE="${IREE_USE_LOCAL_CCACHE:-0}"
+IREE_READ_LOCAL_CCACHE="${IREE_READ_LOCAL_CCACHE:-0}"
+IREE_WRITE_LOCAL_CCACHE="${IREE_WRITE_LOCAL_CCACHE:-0}"
 
 if (( ${IREE_WRITE_REMOTE_CCACHE} == 1 && ${IREE_READ_REMOTE_CCACHE} != 1 )); then
   echo "Can't have 'IREE_WRITE_REMOTE_CCACHE' (${IREE_WRITE_REMOTE_CCACHE})" \
        " set without 'IREE_READ_REMOTE_CCACHE' (${IREE_READ_REMOTE_CCACHE})"
 fi
-if (( ${IREE_USE_LOCAL_CCACHE} == 1 && ${IREE_READ_REMOTE_CCACHE} == 1)); then
-  echo "Can't have 'IREE_USE_LOCAL_CCACHE' (${IREE_USE_LOCAL_CCACHE})" \
-       " set with 'IREE_READ_REMOTE_CCACHE' (${IREE_READ_REMOTE_CCACHE})"
+if (( ${IREE_WRITE_LOCAL_CCACHE} == 1 && ${IREE_READ_LOCAL_CCACHE} != 1 )); then
+  echo "Can't have 'IREE_WRITE_LOCAL_CCACHE' (${IREE_WRITE_LOCAL_CCACHE})" \
+       " set without 'IREE_READ_LOCAL_CCACHE' (${IREE_READ_LOCAL_CCACHE})"
 fi
 
-if (( IREE_READ_REMOTE_CCACHE == 1 || IREE_USE_LOCAL_CCACHE == 1 )); then
+if (( IREE_READ_REMOTE_CCACHE == 1 || IREE_READ_LOCAL_CCACHE == 1 )); then
   export IREE_USE_CCACHE=1
   export CMAKE_C_COMPILER_LAUNCHER=$(which ccache)
   export CMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)
@@ -44,9 +45,16 @@ else
   export IREE_USE_CCACHE=0
 fi
 
+if (( IREE_READ_LOCAL_CCACHE == 1 && IREE_WRITE_LOCAL_CCACHE == 0 )); then
+  export CCACHE_READONLY=1
+fi
+
+if (( IREE_READ_REMOTE_CCACHE == 1 && IREE_READ_LOCAL_CCACHE == 0 )); then
+  export CCACHE_REMOTE_ONLY=1
+fi
+
 if (( IREE_READ_REMOTE_CCACHE == 1 )); then
   export CCACHE_REMOTE_STORAGE="http://storage.googleapis.com/iree-sccache/ccache"
-  export CCACHE_REMOTE_ONLY=1
   if (( IREE_WRITE_REMOTE_CCACHE == 1 )); then
     set +x # Don't leak the token (even though it's short-lived)
     export CCACHE_REMOTE_STORAGE="${CCACHE_REMOTE_STORAGE}|bearer-token=${IREE_CCACHE_GCP_TOKEN}"

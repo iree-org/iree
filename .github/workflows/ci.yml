@@ -171,7 +171,7 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-      # Restore caches.
+      # Restore caches unconditionally. Cache misses are okay.
       - name: "Fetching cache (git submodules)"
         uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
         with:
@@ -184,7 +184,8 @@ jobs:
           path: ${{ github.workspace }}/.ccache
           key: ccache_all_windows_${{ github.sha }}
           restore-keys: ccache_all_windows
-      # Fetch deps.
+      # Fetch dependencies.
+      # TODO(scotttodd): Move these into a Docker image.
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
       - name: "Setting up Python"
@@ -203,8 +204,10 @@ jobs:
       # Finally: build and run tests.
       - name: "Building IREE"
         env:
-          IREE_USE_LOCAL_CCACHE: 1
           IREE_READ_REMOTE_CCACHE: 0
+          IREE_WRITE_REMOTE_CCACHE: 0
+          IREE_READ_LOCAL_CCACHE: 1
+          IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
           CCACHE_DIR: ${{ github.workspace }}/.ccache
         run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
