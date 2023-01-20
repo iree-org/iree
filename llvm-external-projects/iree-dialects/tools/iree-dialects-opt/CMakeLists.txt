@@ -28,6 +28,7 @@ set(LIBS
   MLIRSCFTransforms
   MLIRTensorDialect
   MLIRTransforms
+  MLIRVectorTransformOps
 )
 
 add_llvm_tool(iree-dialects-opt

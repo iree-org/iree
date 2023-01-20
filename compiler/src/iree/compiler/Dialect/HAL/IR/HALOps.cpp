@@ -140,13 +140,12 @@ LogicalResult ReturnOp::verify() {
                               << op.getNumOperands() << ", expected "
                               << expectedTypes.size() << ")";
     }
-    for (auto pair :
+    for (auto &&[index, values] :
          llvm::enumerate(llvm::zip_equal(op.getOperands(), expectedTypes))) {
-      auto operand = std::get<0>(pair.value());
-      auto expectedType = std::get<1>(pair.value());
+      auto [operand, expectedType] = values;
       if (operand.getType() != expectedType) {
         return op.emitOpError()
-               << "parent expected result " << pair.index() << " to be "
+               << "parent expected result " << index << " to be "
                << expectedType << " but returning " << operand.getType();
       }
     }
@@ -1061,6 +1060,19 @@ void ExecutableLookupOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
+void InterfaceBindingSubspanOp::build(
+    OpBuilder &builder, OperationState &result, Type resultType, APInt set,
+    APInt binding, IREE::HAL::DescriptorType descriptor_type, Value byte_offset,
+    ValueRange dynamic_dims, IntegerAttr alignment,
+    Optional<DescriptorFlags> flags) {
+  IREE::HAL::DescriptorFlagsAttr descriptorAttr;
+  if (flags.has_value()) {
+    descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),
+                                                         flags.value());
+  }
+  build(builder, result, resultType, set, binding, descriptor_type, byte_offset,
+        dynamic_dims, alignment, descriptorAttr);
+}
 
 LogicalResult InterfaceBindingSubspanOp::verify() {
   InterfaceBindingSubspanOp op = *this;

@@ -229,13 +229,6 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
            << *subgroupSize;
   }
 
-  // Verify the total workgroup size should be equal or larger than 2 *
-  // subgroupSize.
-  if (totalWorkgroupSize / *subgroupSize < 2) {
-    return op->emitOpError("expected total workgroup size to be >= ")
-           << 2 * *subgroupSize;
-  }
-
   // Verify that there are four level of tile sizes.
   if (loweringConfig.getTileSizes().size() != 4) {
     return op->emitOpError("expected 4 levels of tiling sizes, got ")

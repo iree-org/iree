@@ -10,7 +10,6 @@ This script is meant to be used by Buildkite for automation.
 
 Example usage:
   # Export necessary environment variables:
-  export IREE_DASHBOARD_URL=...
   export IREE_DASHBOARD_API_TOKEN=...
   # Then run the script:
   python3 upload_benchmarks.py /path/to/benchmark/json/file
@@ -31,6 +30,7 @@ from common.benchmark_definition import (BenchmarkResults,
                                          execute_cmd_and_get_output)
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
 
+IREE_DASHBOARD_URL = "https://perf.iree.dev"
 IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/iree-org/iree/commit'
 IREE_PROJECT_ID = 'IREE'
 THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
@@ -215,8 +215,6 @@ def add_new_iree_series(series_id: str,
                         dry_run: bool = False,
                         verbose: bool = False):
   """Posts a new series to the dashboard."""
-  url = get_required_env_var('IREE_DASHBOARD_URL')
-
   average_range = None
   for threshold in BENCHMARK_THRESHOLDS:
     if threshold.regex.match(series_id):
@@ -231,7 +229,7 @@ def add_new_iree_series(series_id: str,
                                    series_description,
                                    average_range=average_range,
                                    override=override)
-  post_to_dashboard(f'{url}/apis/v2/addSerie',
+  post_to_dashboard(f'{IREE_DASHBOARD_URL}/apis/v2/addSerie',
                     payload,
                     dry_run=dry_run,
                     verbose=verbose)
@@ -243,11 +241,10 @@ def add_new_iree_build(build_id: int,
                        dry_run: bool = False,
                        verbose: bool = False):
   """Posts a new build to the dashboard."""
-  url = get_required_env_var('IREE_DASHBOARD_URL')
   payload = compose_build_payload(IREE_PROJECT_ID,
                                   IREE_GITHUB_COMMIT_URL_PREFIX, build_id,
                                   commit, override)
-  post_to_dashboard(f'{url}/apis/addBuild',
+  post_to_dashboard(f'{IREE_DASHBOARD_URL}/apis/addBuild',
                     payload,
                     dry_run=dry_run,
                     verbose=verbose)
@@ -261,10 +258,9 @@ def add_new_sample(series_id: str,
                    dry_run: bool = False,
                    verbose: bool = False):
   """Posts a new sample to the dashboard."""
-  url = get_required_env_var('IREE_DASHBOARD_URL')
   payload = compose_sample_payload(IREE_PROJECT_ID, series_id, build_id,
                                    sample_unit, sample_value, override)
-  post_to_dashboard(f'{url}/apis/v2/addSample',
+  post_to_dashboard(f'{IREE_DASHBOARD_URL}/apis/v2/addSample',
                     payload,
                     dry_run=dry_run,
                     verbose=verbose)

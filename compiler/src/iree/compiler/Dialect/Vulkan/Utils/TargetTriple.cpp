@@ -228,12 +228,24 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
   switch (triple.getArch()) {
     case TargetTripleArch::AMD_RDNAv3: {
+      auto i8t = builder.getIntegerType(8);
+      auto i32t = builder.getIntegerType(32);
       auto f16t = builder.getF16Type();
+      auto f32t = builder.getF32Type();
       auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
+
+      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+          context,
+          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/i8t,
+          /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, scope));
       coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
           context,
           /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
           /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
+      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+          context,
+          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
+          /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope));
     }
       LLVM_FALLTHROUGH;
     case TargetTripleArch::AMD_RDNAv1:

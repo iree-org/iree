@@ -9,7 +9,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 2. Rank reduce and bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op
-  transform.iree.apply_patterns %func { rank_reducing }
+  transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector }
   %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op_2
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3

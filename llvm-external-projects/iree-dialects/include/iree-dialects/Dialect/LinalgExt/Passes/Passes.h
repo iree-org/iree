@@ -172,6 +172,10 @@ createTileAndDecomposeWinogradTransformPass();
 // tranformation.
 std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
 
+// Creates a pass to convert the softmax op into a sequence of
+// linalg generic ops.
+std::unique_ptr<Pass> createDecomposeSoftmaxPass();
+
 // Marker used as attribute the depth of the split reduction transformations.
 const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 

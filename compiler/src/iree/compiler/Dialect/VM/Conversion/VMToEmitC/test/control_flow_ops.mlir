@@ -264,7 +264,7 @@ vm.module @my_module {
   vm.func @cond_branch_ref_args(%arg0 : i32, %arg1 : !vm.ref<?>, %arg2 : !vm.ref<?>) -> !vm.ref<?> {
     // CHECK: cf.cond_br {{%.}}, ^bb1, ^bb4
     // CHECK: cf.br ^bb2
-    // CHEKC: cf.br ^bb3
+    // CHECK: cf.br ^bb3
     vm.cond_br %arg0, ^bb1(%arg1 : !vm.ref<?>), ^bb2(%arg2 : !vm.ref<?>)
   ^bb1(%0 : !vm.ref<?>):
     // CHECK: return

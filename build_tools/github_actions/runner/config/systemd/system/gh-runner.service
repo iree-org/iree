@@ -5,6 +5,7 @@ After=network.target
 [Service]
 User=runner
 Group=runner
+EnvironmentFile=/etc/environment
 ExecStart=/runner-root/config/systemd/scripts/start_runner.sh
 Restart=no
 KillMode=process

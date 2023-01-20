@@ -648,6 +648,10 @@ endif()
 # This defines the iree-flatcc-cli target, so we don't use EXCLUDE_FROM_ALL.
 add_subdirectory(build_tools/third_party/flatcc)
 
+if(IREE_HAL_DRIVER_CUDA)
+  add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)
+endif()
+
 if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 endif()

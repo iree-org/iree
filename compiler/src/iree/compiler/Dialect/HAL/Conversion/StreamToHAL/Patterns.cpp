@@ -140,7 +140,8 @@ static IREE::HAL::CommandCategoryBitfield deriveCommandCategories(
   auto bits = IREE::HAL::CommandCategoryBitfield::None;
   for (auto &block : region) {
     for (auto &op : block) {
-      if (isa<IREE::Stream::CmdDispatchOp>(op)) {
+      if (isa<IREE::Stream::CmdDispatchOp>(op) ||
+          isa<IREE::Stream::CmdCollectiveOp>(op)) {
         bits = bits | IREE::HAL::CommandCategoryBitfield::Dispatch;
       } else {
         bits = bits | IREE::HAL::CommandCategoryBitfield::Transfer;
@@ -297,12 +298,10 @@ struct ResourceAllocOpPattern
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
     SmallVector<Value> results;
-    for (auto it :
+    for (auto [resourceResult, storageSize] :
          llvm::zip_equal(allocOp.getResults(), allocOp.getStorageSizes())) {
-      auto resourceResult = std::get<0>(it);
       auto resourceType =
           resourceResult.getType().cast<IREE::Stream::ResourceType>();
-      auto storageSize = std::get<1>(it);
 
       auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
       auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;

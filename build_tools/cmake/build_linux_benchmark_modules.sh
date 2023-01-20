@@ -7,7 +7,7 @@
 #
 # Imports models and generates compiled VMFB modules. The first argument should
 # point to a IREE installation directory (contains IREE tools). Default points
-# to "build-host/install".
+# to "build-host/install/bin".
 
 set -xeuo pipefail
 
@@ -27,8 +27,8 @@ git submodule sync
 git submodule update --init --jobs 8 --depth 1
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
-# Get the root of host binaries, or default to "${ROOT_DIR}/build-host/install".
-HOST_BINARY_ROOT="$(realpath ${1:-${ROOT_DIR}/build-host/install})"
+# Get the root of host binaries, or default to "${ROOT_DIR}/build-host/install/bin".
+HOST_BIN_DIR="$(realpath ${1:-${ROOT_DIR}/build-host/install/bin})"
 
 cd "${ROOT_DIR}"
 
@@ -59,7 +59,7 @@ fi
 cd build-targets/linux-x86_64
 
 "${CMAKE_BIN}" -G Ninja ../.. \
-  -DIREE_HOST_BINARY_ROOT="${HOST_BINARY_ROOT}" \
+  -DIREE_HOST_BIN_DIR="${HOST_BIN_DIR}" \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
@@ -85,7 +85,7 @@ fi
 cd build-targets/linux-riscv
 
 "${CMAKE_BIN}" -G Ninja ../.. \
-  -DIREE_HOST_BINARY_ROOT="${HOST_BINARY_ROOT}" \
+  -DIREE_HOST_BIN_DIR="${HOST_BIN_DIR}" \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
@@ -110,7 +110,7 @@ fi
 cd build-targets/linux-cuda
 
 "${CMAKE_BIN}" -G Ninja ../.. \
-  -DIREE_HOST_BINARY_ROOT="${HOST_BINARY_ROOT}" \
+  -DIREE_HOST_BIN_DIR="${HOST_BIN_DIR}" \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF \

@@ -298,10 +298,10 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
   auto &expandedGlobal = globalMap[op.getGlobal()];
   builder.create<IREE::Util::GlobalStoreOp>(op.getLoc(), expandedValue.tensor,
                                             expandedGlobal.tensorOp.getName());
-  for (auto it : llvm::zip_equal(expandedValue.dynamicDims,
-                                 expandedGlobal.dynamicDimOps)) {
-    builder.create<IREE::Util::GlobalStoreOp>(op.getLoc(), std::get<0>(it),
-                                              std::get<1>(it).getName());
+  for (auto [valueDynamicDims, globalDynamicDimOps] : llvm::zip_equal(
+           expandedValue.dynamicDims, expandedGlobal.dynamicDimOps)) {
+    builder.create<IREE::Util::GlobalStoreOp>(op.getLoc(), valueDynamicDims,
+                                              globalDynamicDimOps.getName());
   }
   op.erase();
 }
@@ -458,12 +458,12 @@ static void expandSelectOp(mlir::arith::SelectOp op, IndexSet &indexSet,
       op.getLoc(), op.getCondition(), op.getTrueValue(), op.getFalseValue());
 
   SmallVector<Value> selectedDims;
-  for (auto it :
+  for (auto [trueDynamicDims, falseDynamicDims] :
        llvm::zip_equal(trueValue.dynamicDims, falseValue.dynamicDims)) {
     selectedDims.push_back(
         builder
             .create<arith::SelectOp>(op.getLoc(), op.getCondition(),
-                                     std::get<0>(it), std::get<1>(it))
+                                     trueDynamicDims, falseDynamicDims)
             .getResult());
   }
   auto tieShapeOp = builder.create<IREE::Flow::TensorTieShapeOp>(

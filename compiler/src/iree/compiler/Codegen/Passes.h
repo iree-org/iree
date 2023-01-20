@@ -12,7 +12,6 @@
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -276,7 +275,7 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUAArch64VectorLoweringPass();
+createLLVMCPUMmt4dVectorLoweringPass();
 
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
@@ -292,7 +291,7 @@ createVectorContractCustomKernelsPass();
 /// Populates `patterns` to convert certain vector.contract ops to special
 /// "kernels" written either in SIMD intrinsics or inline assembly.
 void populateVectorContractCustomKernelsPatterns(
-    const CustomKernelsTargetInfo &targetInfo, RewritePatternSet &patterns);
+    IREE::HAL::ExecutableTargetAttr target, RewritePatternSet &patterns);
 
 void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
                                        RewritePatternSet &patterns);
@@ -352,7 +351,7 @@ void addTransformDialectPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
-void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager);
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.

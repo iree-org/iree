@@ -36,7 +36,6 @@ iree_lit_test_suite(
     "inject_dispatch_tracing.mlir"
     "interchange_generic_ops.mlir"
     "interchange_transpose_generic_ops.mlir"
-    "matmul_to_mmt4d.mlir"
     "optimize_numerics.mlir"
     "outline_dispatch_regions.mlir"
     "pad_linalg_ops.mlir"

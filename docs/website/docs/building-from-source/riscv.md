@@ -76,7 +76,7 @@ as a reference of how to set up the cmake configuration.
 ```shell
 cmake -GNinja -B ../iree-build-riscv/ \
   -DCMAKE_TOOLCHAIN_FILE="./build_tools/cmake/riscv.toolchain.cmake" \
-  -DIREE_HOST_BINARY_ROOT=$(realpath ../iree-build/install) \
+  -DIREE_HOST_BIN_DIR=$(realpath ../iree-build/install/bin) \
   -DRISCV_CPU=linux-riscv_64 \
   -DIREE_BUILD_COMPILER=OFF \
   -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT} \

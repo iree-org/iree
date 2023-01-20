@@ -17,7 +17,7 @@ hal.executable @abs_ex_dispatch_0 {
       func.func @abs_ex_dispatch_0() {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
-        %0 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) offset(%c128) : memref<16xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) offset(%c128) flags(ReadOnly) : memref<16xf32>
         %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<16xi32>
         %2 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<16xf32>
         %3 = gpu.block_id x
@@ -36,9 +36,9 @@ hal.executable @abs_ex_dispatch_0 {
   }
 }
 // CHECK-LABEL: llvm.func @abs_ex_dispatch_0
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32},
-//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32},
-//  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32})
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
+//  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias})
 //       CHECK:   %[[C128:.+]] = llvm.mlir.constant(128 : index) : i64
 //       CHECK:   %[[PTRI8:.+]] = llvm.bitcast %[[ARG1]] : !llvm.ptr<f32> to !llvm.ptr<i8>
 //       CHECK:   %[[OFF:.+]] = llvm.getelementptr %[[PTRI8]][%[[C128]]] : (!llvm.ptr<i8>, i64) -> !llvm.ptr<i8>
@@ -86,8 +86,8 @@ hal.executable @abs_dynamic {
   }
 }
 // CHECK-LABEL: llvm.func @abs_dynamic
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32},
-//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32}, %[[ARG2:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32},
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias}, %[[ARG2:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias},
 //  CHECK-SAME:  %[[ARG3:.+]]: i32, %[[ARG4:.+]]: i32)
 //       CHECK:   %[[C128:.+]] = llvm.mlir.constant(128 : index) : i64
 //       CHECK:   %{{.*}} = llvm.zext %[[ARG4]] : i32 to i64
@@ -135,8 +135,8 @@ hal.executable @dead_symbol {
   }
 }
 // CHECK-LABEL: llvm.func @dead_symbol
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32},
-//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32})
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias})
 //      CHECK:    llvm.fadd
 
 // -----
@@ -176,8 +176,8 @@ hal.executable @mixed_type {
 }
 
 // CHECK-LABEL: llvm.func @mixed_type
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32},
-//  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32})
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias})
 //       CHECK:   %[[C128:.+]] = llvm.mlir.constant(128 : index) : i64
 //       CHECK:   %[[PTRI8:.+]] = llvm.bitcast %[[ARG0]] : !llvm.ptr<i32> to !llvm.ptr<i8>
 //       CHECK:   %[[OFF:.+]] = llvm.getelementptr %[[PTRI8]][%[[C128]]] : (!llvm.ptr<i8>, i64) -> !llvm.ptr<i8>
@@ -292,3 +292,48 @@ hal.executable @shared_memory_lowering_aligned_alloc {
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
 //  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<32 x f32>, 3>
+
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>,
+  #hal.descriptor_set.layout<1, bindings = [
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @check_not_readonly {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.export @check_not_readonly layout(#pipeline_layout)
+    builtin.module {
+      func.func @check_not_readonly() {
+        %c0 = arith.constant 0 : index
+        %c128 = arith.constant 128 : index
+        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<16xi32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c128) flags(ReadOnly) : memref<16xf32>        
+        %b11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) flags(ReadOnly) : memref<16xi32>
+        %b12 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c128) : memref<16xf32>        
+        %b21 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) flags(ReadOnly) : memref<16xi32>
+        %b22 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c128) flags(ReadOnly) : memref<16xf32>        
+        %2 = hal.interface.binding.subspan set(1) binding(3) type(storage_buffer) : memref<16xf32>
+        %3 = gpu.block_id x
+        %4 = gpu.block_dim x
+        %5 = gpu.thread_id x
+        %6 = arith.muli %3, %4 : index
+        %7 = arith.addi %6, %5 : index
+        %9 = memref.load %0[%7] : memref<16xf32>
+        %10 = memref.load %1[%7] : memref<16xi32>
+        %11 = arith.sitofp %10 : i32 to f32
+        %12 = arith.addf %9, %11 : f32
+        memref.store %12, %2[%7] : memref<16xf32>
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: llvm.func @check_not_readonly
+//  CHECK-NOT: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
+

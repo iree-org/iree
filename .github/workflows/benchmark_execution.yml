@@ -85,7 +85,7 @@ jobs:
           BENCHMARK_CONFIG: ${{ steps.export.outputs.benchmark-config }}
           BENCHMARK_CONFIG_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.export.outputs.benchmark-config }}
         run: |
-          gcloud alpha storage cp \
+          gcloud storage cp \
             "${BENCHMARK_CONFIG}" \
             "${BENCHMARK_CONFIG_GCS_ARTIFACT}"
           echo "benchmark-config-gcs-artifact=${BENCHMARK_CONFIG_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
@@ -128,7 +128,7 @@ jobs:
           BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM_ARCH }}-benchmark-tools.tar
           BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ inputs.benchmark-tools-gcs-artifact-dir }}/${{ env.PLATFORM_ARCH }}-benchmark-tools.tar
         run: |
-          gcloud alpha storage cp "${BENCHMARK_TOOLS_GCS_ARTIFACT}" "${BENCHMARK_TOOLS_ARCHIVE}"
+          gcloud storage cp "${BENCHMARK_TOOLS_GCS_ARTIFACT}" "${BENCHMARK_TOOLS_ARCHIVE}"
           echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
       - name: "Downloading benchmark assets"
         id: download-assets
@@ -136,14 +136,14 @@ jobs:
           BENCHMARK_CONFIG: ${{ needs.export_benchmark_config.outputs.benchmark-config }}
           BENCHMARK_CONFIG_GCS_ARTIFACT: ${{ needs.export_benchmark_config.outputs.benchmark-config-gcs-artifact }}
         run: |
-          gcloud alpha storage cp "${BENCHMARK_CONFIG_GCS_ARTIFACT}" "${BENCHMARK_CONFIG}"
+          gcloud storage cp "${BENCHMARK_CONFIG_GCS_ARTIFACT}" "${BENCHMARK_CONFIG}"
           mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
           jq -r \
             --arg DEVICE_NAME "${DEVICE_NAME}" \
             --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
             '.[$DEVICE_NAME] | .module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
             "${BENCHMARK_CONFIG}" | \
-            gcloud alpha storage cp -r --read-paths-from-stdin "${E2E_TEST_ARTIFACTS_DIR}"
+            gcloud storage cp -r --read-paths-from-stdin "${E2E_TEST_ARTIFACTS_DIR}"
           echo "benchmark-config=${BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"
       - name: "Unpacking benchmark tools"
         id: unpack-tools
@@ -179,6 +179,6 @@ jobs:
         env:
           BENCHMARK_RESULTS: ${{ steps.run.outputs.benchmark-results }}
         run: |
-          gcloud alpha storage cp \
+          gcloud storage cp \
             "${BENCHMARK_RESULTS}" \
             "${GCS_DIR}/${BENCHMARK_RESULTS}"

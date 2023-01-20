@@ -122,6 +122,11 @@ bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return triple && triple.value().isX86();
 }
 
+bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().getArch() == llvm::Triple::x86_64;
+}
+
 bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
   Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
   return triple && triple.value().isAArch64();
@@ -139,6 +144,12 @@ bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
 bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto enableMicrokernels = getConfigBoolAttr(targetAttr, "ukernels");
   return enableMicrokernels && enableMicrokernels->getValue();
+}
+
+bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  auto intrinsicsAttr =
+      getConfigBoolAttr(targetAttr, "prefer_intrinsics_over_asm");
+  return intrinsicsAttr && intrinsicsAttr->getValue();
 }
 
 // TODO(dcaballe): If we have to check for a significantly large number of

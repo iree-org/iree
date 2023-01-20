@@ -14,8 +14,8 @@ iree_cc_library(
   NAME
     Utils
   HDRS
+    "ADTExtras.h"
     "ConversionUtils.h"
-    "CustomKernelsTargetInfo.h"
     "FlatbufferUtils.h"
     "IndexSet.h"
     "ModuleUtils.h"
@@ -26,7 +26,6 @@ iree_cc_library(
     "TracingUtils.h"
   SRCS
     "ConversionUtils.cpp"
-    "CustomKernelsTargetInfo.cpp"
     "FlatbufferUtils.cpp"
     "ModuleUtils.cpp"
     "OptionUtils.cpp"
@@ -49,6 +48,17 @@ iree_cc_library(
     iree::base::tracing
     iree::compiler::Dialect::Util::IR
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    UtilsTest
+  SRCS
+    "ADTExtrasTest.cpp"
+  DEPS
+    ::Utils
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -17,9 +17,9 @@ TESTING="${TEMPLATE_TESTING:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 TESTING_SELF_DELETER="${TESTING_SELF_DELETER:-0}"
 
-GPU_IMAGE="github-runner-gpu-2022-09-29-1664451806"
+GPU_IMAGE="github-runner-gpu-2023-01-16-1673899774"
 GPU_DISK_SIZE_GB=100
-CPU_IMAGE="github-runner-cpu-2022-09-29-1664451255"
+CPU_IMAGE="github-runner-cpu-2023-01-16-1673899332"
 CPU_DISK_SIZE_GB=100
 
 PROD_TEMPLATE_BASE_NAME="github-runner"
@@ -149,7 +149,7 @@ function create_template() {
       --maintenance-policy=MIGRATE
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
     )
-  elif [[ "${type}" == cpu-c2-16 ]]; then
+  elif [[ "${type}" == c2s16 ]]; then
     cmd+=(
       --machine-type=c2-standard-16
       --maintenance-policy=MIGRATE
@@ -169,7 +169,7 @@ function create_template() {
 }
 
 for group in presubmit postsubmit; do
-  for type in gpu cpu cpu-c2-16; do
+  for type in gpu cpu c2s16; do
     create_template "${group}" "${type}"
   done
 done

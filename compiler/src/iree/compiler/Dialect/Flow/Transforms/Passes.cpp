@@ -105,12 +105,6 @@ static llvm::cl::opt<bool> clEnableDataTiling(
     "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<std::string> clMmt4dTargetOptions(
-    "iree-flow-mmt4d-target-options",
-    llvm::cl::desc("Convert linalg.matmul ops to MMT4D ops targetting the "
-                   "given architecture"),
-    llvm::cl::init(""));
-
 static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     "iree-flow-normalize-input-indexing-map",
     llvm::cl::desc("Enable normalizing input indexing map to identity"),
@@ -197,12 +191,6 @@ static void buildOptionalPreprocessingPassPipeline(OpPassManager &passManager) {
                          IREE::LinalgExt::createConvertConv2DToWinogradPass)
       .addPredicatedPass(clEnableConvToImg2Col,
                          IREE::Flow::createConvertConv2DToImg2ColPass)
-      .addPredicatedPass(
-          !clMmt4dTargetOptions.empty(),
-          []() {
-            return IREE::Flow::createConvertLinalgMatmulToMmt4DPass(
-                clMmt4dTargetOptions);
-          })
       .addPredicatedPass(clEnablePaddingLinalgOps, []() {
         return IREE::Flow::createPadLinalgOpsToIntegerMultiplePass(
             clLinalgOpsPaddingSize);

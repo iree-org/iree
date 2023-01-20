@@ -302,6 +302,26 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
       : ConvertToLLVMPattern(
             IREE::HAL::InterfaceBindingSubspanOp::getOperationName(), context,
             converter) {}
+
+  /// Checks all subspanOps with the same binding has readonly attribute
+  static bool checkAllSubspansReadonly(LLVM::LLVMFuncOp llvmFuncOp,
+                                       APInt binding) {
+    bool allReadOnly = false;
+    llvmFuncOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp op) {
+      if (op.getBinding() == binding) {
+        if (!bitEnumContainsAny(op.getDescriptorFlags().value_or(
+                                    IREE::HAL::DescriptorFlags::None),
+                                IREE::HAL::DescriptorFlags::ReadOnly)) {
+          allReadOnly = false;
+          return WalkResult::interrupt();
+        }
+        allReadOnly = true;
+      }
+      return WalkResult::advance();
+    });
+    return allReadOnly;
+  }
+
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
@@ -324,6 +344,18 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
     llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
                           LLVM::LLVMDialect::getAlignAttrName(),
                           rewriter.getI32IntegerAttr(16));
+    // It is safe to set the noalias attribute as it is guaranteed that the
+    // ranges within bindings won't alias.
+    llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
+                          LLVM::LLVMDialect::getNoAliasAttrName(),
+                          rewriter.getUnitAttr());
+    if (checkAllSubspansReadonly(llvmFuncOp, subspanOp.getBinding())) {
+      // Setting the readonly attribute here will generate non-coherent cache
+      // loads.
+      llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
+                            LLVM::LLVMDialect::getReadonlyAttrName(),
+                            rewriter.getUnitAttr());
+    }
     // Add the byte offset.
     Value llvmBufferBasei8Ptr = rewriter.create<LLVM::BitcastOp>(
         loc,

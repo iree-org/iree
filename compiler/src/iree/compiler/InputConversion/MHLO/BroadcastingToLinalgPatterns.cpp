@@ -570,11 +570,9 @@ struct ConvertTrivialNonBroadcastBinaryOp : public ConversionPattern {
     if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape())
       return rewriter.notifyMatchFailure(op, "not static shapes");
 
-    for (auto extents :
+    for (auto [lhsExtent, rhsExtent] :
          llvm::zip_equal(lhsType.getShape(), rhsType.getShape())) {
-      auto lhs_extent = std::get<0>(extents);
-      auto rhs_extent = std::get<1>(extents);
-      if (lhs_extent != rhs_extent) {
+      if (lhsExtent != rhsExtent) {
         return rewriter.notifyMatchFailure(op, "not equal extents");
       }
     }

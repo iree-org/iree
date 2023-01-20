@@ -10,6 +10,9 @@
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/cuda/cuda_buffer.h"
+#include "iree/hal/drivers/cuda/status_util.h"
+#include "nccl.h"
 
 // Returns the same value as NCCL's init.cc hashUniqueId.
 // These magic constants were chosen by their implementation and unlikely to
@@ -62,29 +65,24 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
   IREE_ASSERT_ARGUMENT(out_channel);
   *out_channel = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+
   const uint64_t id_hash = iree_hal_cuda_nccl_hash_id(id);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, id_hash);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, rank);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, count);
 
-  // TODO(#9580): actually use nccl to create a communicator.
-  // Something like:
-  //  ncclConfig_t config = NCCL_CONFIG_INITIALIZER;
-  //  config.blocking = 0;
-  //  syms->ncclCommInitRankConfig(&comm, count, *id, rank, &config);
-  // NOTE: CHECK ERRORS! we can safely return here as we haven't allocated the
-  // channel wrapper yet.
   ncclComm_t comm = NULL;
-  if (!comm) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_INTERNAL,
-        "failed to create NCCL communicator for rank=%d count=%d", rank, count);
-  }
+  ncclConfig_t config = NCCL_CONFIG_INITIALIZER;
+  config.blocking = 1;  // FIXME: use async to check a timeout
+  iree_status_t status = NCCL_RESULT_TO_STATUS(
+      context_wrapper->syms,
+      ncclCommInitRankConfig(&comm, count, *((const ncclUniqueId*)id), rank,
+                             &config));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, status, "ncclCommInitRankConfig");
 
   iree_hal_cuda_nccl_channel_t* channel = NULL;
-  iree_status_t status = iree_allocator_malloc(
-      context_wrapper->host_allocator, sizeof(*channel), (void**)&channel);
+  status = iree_allocator_malloc(context_wrapper->host_allocator,
+                                 sizeof(*channel), (void**)&channel);
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_cuda_nccl_channel_vtable,
                                  &channel->resource);
@@ -110,7 +108,7 @@ static void iree_hal_cuda_nccl_channel_destroy(
   IREE_TRACE_ZONE_APPEND_VALUE(z0, channel->rank);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, channel->count);
 
-  // TODO(#9580): tear down nccl - blocking if needed.
+  // TODO(#9580): support async tear down
   // We could be smarter about starting finalization of all channels async and
   // then waiting for them to complete but we aren't currently optimizing for
   // lifetime performance. To do that we'd probably want to track each open
@@ -122,9 +120,11 @@ static void iree_hal_cuda_nccl_channel_destroy(
   //  syms->ncclCommDestroy(channel->comm)
   // Should work the same (as we are doing a blocking teardown):
   //  syms->ncclCommDestroy(channel->comm)
-
+  NCCL_IGNORE_ERROR(channel->context_wrapper->syms,
+                    ncclCommFinalize(channel->comm));
+  NCCL_IGNORE_ERROR(channel->context_wrapper->syms,
+                    ncclCommDestroy(channel->comm));
   iree_allocator_free(host_allocator, channel);
-
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -140,11 +140,227 @@ void iree_hal_cuda_nccl_channel_query_rank_and_count(
   *out_count = channel->count;
 }
 
-ncclComm_t iree_hal_cuda_nccl_channel_comm(iree_hal_channel_t* base_channel) {
+// Returns the NCCL communicator for the given |channel|, if available.
+static ncclComm_t iree_hal_cuda_nccl_channel_comm(
+    iree_hal_channel_t* base_channel) {
   IREE_ASSERT_ARGUMENT(base_channel);
   iree_hal_cuda_nccl_channel_t* channel =
       iree_hal_cuda_nccl_channel_cast(base_channel);
   return channel->comm;
+}
+
+static iree_status_t iree_hal_cuda_get_nccl_data_type(
+    iree_hal_collective_element_type_t in, ncclDataType_t* out) {
+  switch (in) {
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_8:
+      *out = ncclInt8;
+      break;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_8:
+      *out = ncclUint8;
+      break;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_16:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "SINT16 is not supported for collective op");
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_16:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "UINT16 is not supported for collective op");
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_32:
+      *out = ncclInt32;
+      break;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_32:
+      *out = ncclUint32;
+      break;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_64:
+      *out = ncclInt64;
+      break;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_64:
+      *out = ncclUint64;
+      break;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_16:
+      *out = ncclFloat16;
+      break;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_32:
+      *out = ncclFloat32;
+      break;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_64:
+      *out = ncclFloat64;
+      break;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_BFLOAT_16:
+      *out = ncclFloat64;
+      break;
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unhandled element type for collective op");
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_cuda_get_nccl_red_type(
+    iree_hal_collective_reduction_t in, ncclRedOp_t* out) {
+  switch (in) {
+    case IREE_HAL_COLLECTIVE_REDUCTION_SUM:
+      *out = ncclSum;
+      break;
+    case IREE_HAL_COLLECTIVE_REDUCTION_PRODUCT:
+      *out = ncclProd;
+      break;
+    case IREE_HAL_COLLECTIVE_REDUCTION_MINIMUM:
+      *out = ncclMin;
+      break;
+    case IREE_HAL_COLLECTIVE_REDUCTION_MAXIMUM:
+      *out = ncclMax;
+      break;
+    case IREE_HAL_COLLECTIVE_REDUCTION_AVERAGE:
+      *out = ncclAvg;
+      break;
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unhandled reduction type for collective op");
+  }
+
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
+    const iree_hal_collective_batch_entry_t* entry, CUstream stream) {
+  IREE_ASSERT_ARGUMENT(entry);
+  IREE_ASSERT_ARGUMENT(stream);
+
+  iree_hal_cuda_nccl_channel_t* channel =
+      iree_hal_cuda_nccl_channel_cast(entry->channel);
+  iree_hal_cuda_dynamic_symbols_t* syms = channel->context_wrapper->syms;
+  ncclComm_t comm = iree_hal_cuda_nccl_channel_comm(entry->channel);
+  ncclDataType_t datatype;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_cuda_get_nccl_data_type(entry->op.element_type, &datatype));
+
+  switch (entry->op.kind) {
+    case IREE_HAL_COLLECTIVE_KIND_ALL_GATHER: {
+      CUdeviceptr sendbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
+          entry->send_binding.offset;
+      CUdeviceptr recvbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
+          entry->recv_binding.offset;
+      NCCL_RETURN_IF_ERROR(
+          syms,
+          ncclAllGather((const void*)sendbuff, (void*)recvbuff,
+                        entry->element_count, datatype, comm, stream),
+          "ncclAllGather");
+      break;
+    }
+    case IREE_HAL_COLLECTIVE_KIND_ALL_REDUCE: {
+      CUdeviceptr sendbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
+          entry->send_binding.offset;
+      CUdeviceptr recvbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
+          entry->recv_binding.offset;
+      ncclRedOp_t redop;
+      IREE_RETURN_IF_ERROR(
+          iree_hal_cuda_get_nccl_red_type(entry->op.reduction, &redop));
+      NCCL_RETURN_IF_ERROR(
+          syms,
+          ncclAllReduce((const void*)sendbuff, (void*)recvbuff,
+                        entry->element_count, datatype, redop, comm, stream),
+          "ncclAllReduce");
+      break;
+    }
+    case IREE_HAL_COLLECTIVE_KIND_BROADCAST: {
+      CUdeviceptr sendbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
+          entry->send_binding.offset;
+      CUdeviceptr recvbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
+          entry->recv_binding.offset;
+      NCCL_RETURN_IF_ERROR(syms,
+                           ncclBroadcast((const void*)sendbuff, (void*)recvbuff,
+                                         entry->element_count, datatype,
+                                         entry->param, comm, stream),
+                           "ncclBroadcast");
+      break;
+    }
+    case IREE_HAL_COLLECTIVE_KIND_REDUCE: {
+      CUdeviceptr sendbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
+          entry->send_binding.offset;
+      CUdeviceptr recvbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
+          entry->recv_binding.offset;
+      ncclRedOp_t redop;
+      IREE_RETURN_IF_ERROR(
+          iree_hal_cuda_get_nccl_red_type(entry->op.reduction, &redop));
+      NCCL_RETURN_IF_ERROR(syms,
+                           ncclReduce((const void*)sendbuff, (void*)recvbuff,
+                                      entry->element_count, datatype, redop,
+                                      entry->param, comm, stream),
+                           "ncclReduce");
+      break;
+    }
+    case IREE_HAL_COLLECTIVE_KIND_REDUCE_SCATTER: {
+      CUdeviceptr sendbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
+          entry->send_binding.offset;
+      CUdeviceptr recvbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
+          entry->recv_binding.offset;
+      ncclRedOp_t redop;
+      IREE_RETURN_IF_ERROR(
+          iree_hal_cuda_get_nccl_red_type(entry->op.reduction, &redop));
+      NCCL_RETURN_IF_ERROR(
+          syms,
+          ncclReduceScatter((const void*)sendbuff, (void*)recvbuff,
+                            entry->element_count, datatype, redop, comm,
+                            stream),
+          "ncclReduceScatter");
+      break;
+    }
+    case IREE_HAL_COLLECTIVE_KIND_SEND: {
+      CUdeviceptr sendbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
+          entry->send_binding.offset;
+      NCCL_RETURN_IF_ERROR(syms,
+                           ncclSend((const void*)sendbuff, entry->element_count,
+                                    datatype, entry->param, comm, stream),
+                           "ncclSend");
+      break;
+    }
+    case IREE_HAL_COLLECTIVE_KIND_RECV: {
+      CUdeviceptr recvbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
+          entry->recv_binding.offset;
+      NCCL_RETURN_IF_ERROR(syms,
+                           ncclRecv((void*)recvbuff, entry->element_count,
+                                    datatype, entry->param, comm, stream),
+                           "ncclRecv");
+      break;
+    }
+  }  // switch
+  return iree_ok_status();
 }
 
 iree_status_t iree_hal_cuda_nccl_submit_batch(
@@ -153,20 +369,11 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(batch);
   IREE_ASSERT_ARGUMENT(stream);
-
-  // TODO(#9580): issue the operations in the batch. Note that the channel may
-  // change between ops and the communicator should be retrieved from each.
-  //
-  // Something like:
-  //  make context->cu_context active (for when using multiple devices)
-  //  syms->ncclGroupStart();
-  //  for each entry in batch:
-  //    ncclComm_t comm = iree_hal_cuda_nccl_channel_comm(entry->channel);
-  //    syms->nccl*(comm, ...);
-  //  syms->ncclGroupEnd();
-
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "NCCL submission not yet implemented");
+  NCCL_RETURN_IF_ERROR(context->syms, ncclGroupStart(), "ncclGroupStart");
+  for (IREE_HOST_SIZE_T i = 0; i < batch->count; ++i) {
+    iree_hal_cuda_nccl_submit_batch_entry(&batch->entries[i], stream);
+  }
+  return NCCL_RESULT_TO_STATUS(context->syms, ncclGroupEnd(), "ncclGroupEnd");
 }
 
 static const iree_hal_channel_vtable_t iree_hal_cuda_nccl_channel_vtable = {

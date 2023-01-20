@@ -45,7 +45,7 @@ $ cmake --build ../iree-build-host/ --target install
 ```shell
 $ emcmake cmake -G Ninja -B ../iree-build-emscripten/ \
   -DCMake_BUILD_TYPE=Release \
-  -DIREE_HOST_BINARY_ROOT=$(realpath ../iree-build-host/install) \
+  -DIREE_HOST_BIN_DIR=$(realpath ../iree-build-host/install/bin) \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_COMPILER=OFF \
   .

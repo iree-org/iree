@@ -92,7 +92,7 @@ static Value findOrCreateSubspanBuffer(
       subspanOp->getLoc(), memRefType, subspanOp.getSet(),
       subspanOp.getBinding(), subspanOp.getDescriptorType(),
       subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
-      subspanOp.getAlignmentAttr());
+      subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
   if (subspanOp.getAlignment()) {
     b.create<memref::AssumeAlignmentOp>(
         subspanOp->getLoc(), buffer, subspanOp.getAlignment()->getZExtValue());
@@ -458,6 +458,8 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         LinalgExtOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(*ctx);
     IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
+    IREE::LinalgExt::SoftmaxOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::SoftmaxOp>>(*ctx);
   });
 }
 

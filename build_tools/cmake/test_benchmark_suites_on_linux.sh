@@ -17,7 +17,7 @@ set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-benchmark-suites-test}}"
 E2E_TEST_ARTIFACTS_DIR="$(realpath ${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts})"
-IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
+IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 
 source build_tools/cmake/setup_build.sh
 
@@ -29,7 +29,7 @@ declare -a CMAKE_ARGS=(
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
   "-DIREE_BUILD_COMPILER=OFF"
-  "-DIREE_HOST_BINARY_ROOT=${IREE_HOST_BINARY_ROOT}"
+  "-DIREE_HOST_BIN_DIR=${IREE_HOST_BIN_DIR}"
   "-DIREE_BUILD_TESTS=ON"
   "-DIREE_BUILD_SAMPLES=OFF"
   "-DIREE_E2E_TEST_ARTIFACTS_DIR=${E2E_TEST_ARTIFACTS_DIR}"

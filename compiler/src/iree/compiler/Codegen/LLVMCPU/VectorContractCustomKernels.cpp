@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
@@ -208,8 +208,6 @@ static Value flatten(PatternRewriter &rewriter, Location loc, Value vector) {
 //         "calling convention".
 struct MMTKernel {
   enum class ScalarType : int8_t { None, I8, I32, F32 };
-  // Target architecture. Needed to generate inline asm constraints.
-  CustomKernelTargetArch arch = CustomKernelTargetArch::None;
   // Element type of the LHS vectors.
   ScalarType lhsType = ScalarType::None;
   // Element type of the RHS vectors.
@@ -291,7 +289,6 @@ struct MMTKernel {
 // https://github.com/google/ruy/blob/2d950b3bfa7ebfbe7a97ecb44b1cc4da5ac1d6f0/ruy/kernel_arm64.cc#L93
 MMTKernel MMTKernel_8x1x8_i8i8i32_Aarch64_Baseline_InlineAsm() {
   MMTKernel kernel;
-  kernel.arch = CustomKernelTargetArch::Aarch64;
   kernel.lhsType = MMTKernel::ScalarType::I8;
   kernel.rhsType = MMTKernel::ScalarType::I8;
   kernel.accType = MMTKernel::ScalarType::I32;
@@ -337,7 +334,6 @@ MMTKernel MMTKernel_8x1x8_i8i8i32_Aarch64_Baseline_InlineAsm() {
 // 177 instructions for this kernel (not peeled).
 MMTKernel MMTKernel_8x8x1_i8i8i32_Aarch64_Baseline_InlineAsm() {
   MMTKernel kernel;
-  kernel.arch = CustomKernelTargetArch::Aarch64;
   kernel.lhsType = MMTKernel::ScalarType::I8;
   kernel.rhsType = MMTKernel::ScalarType::I8;
   kernel.accType = MMTKernel::ScalarType::I32;
@@ -408,7 +404,6 @@ MMTKernel MMTKernel_8x8x1_i8i8i32_Aarch64_Baseline_InlineAsm() {
 // make use of dotprod instructions.
 MMTKernel MMTKernel_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm() {
   MMTKernel kernel;
-  kernel.arch = CustomKernelTargetArch::Aarch64;
   kernel.lhsType = MMTKernel::ScalarType::I8;
   kernel.rhsType = MMTKernel::ScalarType::I8;
   kernel.accType = MMTKernel::ScalarType::I32;
@@ -452,7 +447,6 @@ MMTKernel MMTKernel_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm() {
 // make use of dotprod instructions.
 MMTKernel MMTKernel_8x4x1_i8i8i32_Aarch64Dotprod_InlineAsm() {
   MMTKernel kernel;
-  kernel.arch = CustomKernelTargetArch::Aarch64;
   kernel.lhsType = MMTKernel::ScalarType::I8;
   kernel.rhsType = MMTKernel::ScalarType::I8;
   kernel.accType = MMTKernel::ScalarType::I32;
@@ -482,7 +476,6 @@ MMTKernel MMTKernel_8x4x1_i8i8i32_Aarch64Dotprod_InlineAsm() {
 // make use of i8mm instructions.
 MMTKernel MMTKernel_8x8x8_i8i8i32_Aarch64I8mm_InlineAsm() {
   MMTKernel kernel;
-  kernel.arch = CustomKernelTargetArch::Aarch64;
   kernel.lhsType = MMTKernel::ScalarType::I8;
   kernel.rhsType = MMTKernel::ScalarType::I8;
   kernel.accType = MMTKernel::ScalarType::I32;
@@ -598,7 +591,6 @@ MMTKernel MMTKernel_8x8x8_i8i8i32_Aarch64I8mm_InlineAsm() {
 // now for completeness, as we need the f32 matrix*vector kernel below anyway.
 MMTKernel MMTKernel_8x1x8_f32f32f32_Aarch64_Baseline_InlineAsm() {
   MMTKernel kernel;
-  kernel.arch = CustomKernelTargetArch::Aarch64;
   kernel.lhsType = MMTKernel::ScalarType::F32;
   kernel.rhsType = MMTKernel::ScalarType::F32;
   kernel.accType = MMTKernel::ScalarType::F32;
@@ -663,7 +655,6 @@ MMTKernel MMTKernel_8x1x8_f32f32f32_Aarch64_Baseline_InlineAsm() {
 // the first lane of v18.4s and zeroed the other 3 lanes).
 MMTKernel MMTKernel_8x1x1_f32f32f32_Aarch64_Baseline_InlineAsm() {
   MMTKernel kernel;
-  kernel.arch = CustomKernelTargetArch::Aarch64;
   kernel.lhsType = MMTKernel::ScalarType::F32;
   kernel.rhsType = MMTKernel::ScalarType::F32;
   kernel.accType = MMTKernel::ScalarType::F32;
@@ -703,8 +694,9 @@ Type mlirType(MLIRContext *context, MMTKernel::ScalarType t) {
 // MMTKernel structs.
 class MMTKernelGenerator {
  public:
-  MMTKernelGenerator(MLIRContext *context, MMTKernel kernel)
-      : context(context), kernel(kernel) {
+  MMTKernelGenerator(MLIRContext *context, MMTKernel kernel,
+                     IREE::HAL::ExecutableTargetAttr target)
+      : context(context), kernel(kernel), target(target) {
     kernel.validate();
   }
   // Generates the kernel. Returns the output accumulator values.
@@ -741,8 +733,9 @@ class MMTKernelGenerator {
   }
 
  private:
-  MLIRContext *context;
-  MMTKernel kernel;
+  MLIRContext *const context;
+  const MMTKernel kernel;
+  const IREE::HAL::ExecutableTargetAttr target;
 
   // Helper for generate(). Asserts sanity of the vector-of-register-vectors.
   void validateOperands(ArrayRef<Value> lhs, ArrayRef<Value> rhs,
@@ -763,13 +756,10 @@ class MMTKernelGenerator {
   }
   // Helper for generateAsmCodeAndConstraints
   std::string getConstraintCode() const {
-    switch (kernel.arch) {
-      case CustomKernelTargetArch::Aarch64:
-        return "w";
-      case CustomKernelTargetArch::None:
-        break;
+    if (isAArch64(target)) {
+      return "w";
     }
-    assert(false && "Unhandled CustomKernelTargetArch value");
+    assert(false && "what constraint code to use on this arch?");
     return {};
   }
   // Helper class to build the constraints string of an inline_asm op.
@@ -928,7 +918,8 @@ class MMTCustomKernelPattern : public OpRewritePattern<vector::ContractionOp> {
                   &transposeKernel)) {
       return failure();
     }
-    MMTKernelGenerator generator(rewriter.getContext(), kernel);
+    auto target = IREE::HAL::ExecutableTargetAttr::lookup(contractionOp);
+    MMTKernelGenerator generator(rewriter.getContext(), kernel, target);
     Type lhsElemType = generator.getLhsType();
     Type rhsElemType = generator.getRhsType();
     Type accElemType = generator.getAccType();
@@ -1127,45 +1118,30 @@ class VectorContractCustomKernelsPass
     : public VectorContractCustomKernelsBase<VectorContractCustomKernelsPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<vector::VectorDialect, LLVM::LLVMDialect>();
-    if (targetInfo.has(CustomKernelTargetFeature::Intrinsics)) {
-      registry.insert<arm_neon::ArmNeonDialect>();
-    }
-  }
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) {
-      return failure();
-    }
-    if (failed(ParseCustomKernelsTargetInfo(arch, features, targetInfo))) {
-      llvm::errs() << "Bad options `" << options << "` for pass `"
-                   << getArgument() << "`\n";
-      return failure();
-    }
-    if (intrinsics) {
-      targetInfo.add(CustomKernelTargetFeature::Intrinsics);
-    }
-    return success();
+    registry.insert<vector::VectorDialect, LLVM::LLVMDialect,
+                    arm_neon::ArmNeonDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    populateVectorContractCustomKernelsPatterns(targetInfo, patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    auto funcOp = getOperation();
+    auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+    populateVectorContractCustomKernelsPatterns(target, patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       signalPassFailure();
     }
   }
 
  private:
-  CustomKernelsTargetInfo targetInfo;
+  IREE::HAL::ExecutableTargetAttr target;
 };
 
 }  // namespace
 
 void populateVectorContractCustomKernelsPatterns(
-    const CustomKernelsTargetInfo &targetInfo, RewritePatternSet &patterns) {
+    IREE::HAL::ExecutableTargetAttr target, RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
-  if (targetInfo.is(CustomKernelTargetArch::Aarch64)) {
+  if (isAArch64(target)) {
     // TODO: add a "kernel benefit" system whereby if two kernels are available
     // for the same shape and same data types, the fastest one (ie the one
     // using the most powerful available SIMD instructions) is selected.
@@ -1179,8 +1155,8 @@ void populateVectorContractCustomKernelsPatterns(
         context, MMTKernel_8x1x8_i8i8i32_Aarch64_Baseline_InlineAsm());
     patterns.add<MMTCustomKernelPattern>(
         context, MMTKernel_8x8x1_i8i8i32_Aarch64_Baseline_InlineAsm());
-    if (targetInfo.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
-      if (targetInfo.has(CustomKernelTargetFeature::Intrinsics)) {
+    if (hasFeature(target, "+dotprod")) {
+      if (preferIntrinsicsOverAsm(target)) {
         patterns.add<MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics>(context);
       } else {
         patterns.add<MMTCustomKernelPattern>(
@@ -1189,7 +1165,7 @@ void populateVectorContractCustomKernelsPatterns(
             context, MMTKernel_8x4x1_i8i8i32_Aarch64Dotprod_InlineAsm());
       }
     }
-    if (targetInfo.has(CustomKernelTargetFeature::Aarch64I8mm)) {
+    if (hasFeature(target, "+i8mm")) {
       patterns.add<MMTCustomKernelPattern>(
           context, MMTKernel_8x8x8_i8i8i32_Aarch64I8mm_InlineAsm());
     }

@@ -10,7 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
 #include "iree/base/internal/flags.h"
-#include "iree/builtins/ukernel/pack.h"
+#include "iree/builtins/ukernel/api.h"
 #include "iree/builtins/ukernel/tools/ukernel_test_utils.h"
 #include "iree/testing/benchmark.h"
 
@@ -139,12 +139,7 @@ static iree_status_t iree_pack_benchmark(
   while (iree_benchmark_keep_running(benchmark_state,
                                      /*batch_count=*/batch_count)) {
     for (int i = 0; i < batch_count; ++i) {
-      iree_uk_status_t status = iree_uk_pack(&params);
-      if (status != iree_uk_status_ok) {
-        fprintf(stderr, "FATAL: iree_uk_pack failed: %s\n",
-                iree_uk_status_message(status));
-        iree_abort();
-      }
+      iree_uk_pack(&params);
     }
     total_iterations += batch_count;
   }

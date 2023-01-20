@@ -20,6 +20,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
   transform.structured.vectorize %2 { vectorize_padding }
   bufferize
-  lower_vectors { multireduction_lowering = "innerreduce"}
+  %3 = transform.structured.match ops{["func.func"]} in %module_op
+  transform.vector.lower_vectors %3 { multireduction_lowering = "innerreduce"}
   lower_to_llvm
 }

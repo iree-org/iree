@@ -190,9 +190,8 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
     lengths.reserve(op.getLengths().size());
     int64_t constantMin = INT64_MAX;
     int64_t constantMax = INT64_MIN;
-    for (auto range : llvm::zip_equal(op.getOffsets(), op.getLengths())) {
-      auto offset = std::get<0>(range);
-      auto length = std::get<1>(range);
+    for (auto [offset, length] :
+         llvm::zip_equal(op.getOffsets(), op.getLengths())) {
       APInt rangeOffset, rangeLength;
       if (matchPattern(offset, m_ConstantInt(&rangeOffset)) &&
           matchPattern(length, m_ConstantInt(&rangeLength))) {
@@ -290,9 +289,9 @@ struct DeduplicateRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
     SmallVector<Value> lengths;
     offsets.reserve(ranges.size());
     lengths.reserve(ranges.size());
-    for (auto range : llvm::enumerate(ranges)) {
-      offsets.push_back(std::get<0>(range.value()));
-      lengths.push_back(std::get<1>(range.value()));
+    for (auto [offset, length] : ranges) {
+      offsets.push_back(offset);
+      lengths.push_back(length);
     }
     rewriter.replaceOpWithNewOp<RangeExtentsOp>(
         op, op.getMin().getType(), op.getMax().getType(), offsets, lengths);

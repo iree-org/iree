@@ -222,11 +222,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-    "aarch64:+dotprod"
-    "aarch64:+i8mm"
+    "--iree-flow-enable-data-tiling"
 )
 
 iree_generated_trace_runner_test(
@@ -245,9 +241,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "--iree-flow-enable-data-tiling"
 )
 
 iree_generated_trace_runner_test(

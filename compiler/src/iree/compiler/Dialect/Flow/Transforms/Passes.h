@@ -10,7 +10,6 @@
 #include <functional>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -86,13 +85,6 @@ std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 // tensor.insert_slice.
 std::unique_ptr<Pass> createTensorPadToTensorInsertSlicePass(
     bool skipSingleLinalgOpUses = false);
-
-// Pass to convert a linalg.matmul into linalg.mmt4d given some target ISA
-// information currently passed as pass options.
-std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass();
-std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(
-    CustomKernelsTargetInfo targetInfo);
-std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(StringRef options);
 
 // Create a pass to detach elementwise ops from named Linalg ops.
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();

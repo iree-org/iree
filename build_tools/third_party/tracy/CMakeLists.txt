@@ -154,6 +154,24 @@ target_link_libraries(IREETracyCaptureServer
 )
 
 #-------------------------------------------------------------------------------
+# CSV Export Tool
+#-------------------------------------------------------------------------------
+
+add_executable(IREETracyCSVExport
+  ${TRACY_SOURCE_DIR}/csvexport/src/csvexport.cpp
+)
+set_target_properties(IREETracyCSVExport
+  PROPERTIES
+    OUTPUT_NAME "iree-tracy-csvexport"
+)
+setup_cxx_options(IREETracyCSVExport)
+target_link_libraries(IREETracyCSVExport
+  PRIVATE
+    IREETracyCommon
+    IREETracyServer
+)
+
+#-------------------------------------------------------------------------------
 # Graphical frontends
 #-------------------------------------------------------------------------------
 
@@ -189,6 +207,9 @@ if(TRACY_GTK_DEPS_FOUND)
   #-----------------------------------------------------------------------------
 
   file(GLOB PROFILER_SRCS ${TRACY_SOURCE_DIR}/profiler/src/*.cpp)
+  # Remove the source files for Wayland backend; right now we just use GLFW.
+  list(REMOVE_ITEM PROFILER_SRCS
+       "${TRACY_SOURCE_DIR}/profiler/src/BackendWayland.cpp")
   add_executable(IREETracyProfiler
     ${PROFILER_SRCS}
   )

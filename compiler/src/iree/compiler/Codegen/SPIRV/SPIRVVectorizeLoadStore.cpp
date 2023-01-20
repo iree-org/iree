@@ -473,7 +473,8 @@ class ProcessInterfaceBindingSubspan final
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp, *vecMemRef, subspanOp.getSet(), subspanOp.getBinding(),
         subspanOp.getDescriptorType(), subspanOp.getByteOffset(),
-        subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr());
+        subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+        subspanOp.getDescriptorFlagsAttr());
     return success();
   }
 };
