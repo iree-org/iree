@@ -36,3 +36,18 @@ func.func @all_reduce_sum(%arg0: !hal.buffer_view) -> !hal.buffer_view attribute
   %3 = hal.tensor.export %2 : tensor<2304xf32> -> !hal.buffer_view
   return %3 : !hal.buffer_view
 }
+
+//-----
+
+// CHECK-LABEL: @allgather
+func.func @allgather(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
+  // CHECK: stream.channel.default
+  // CHECK: stream.tensor.empty : tensor<1024xf32>
+  // CHECK: stream.async.collective<all_gather : f32>
+  %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<512xf32>
+  %channel_default = flow.channel.default : !flow.channel
+  %1 = flow.tensor.empty : tensor<1024xf32>
+  %2 = flow.allgather f32, %1, %0, %channel_default : (tensor<1024xf32>, tensor<512xf32>, !flow.channel) -> tensor<1024xf32>
+  %3 = hal.tensor.export %2 : tensor<1024xf32> -> !hal.buffer_view
+  return %3 : !hal.buffer_view
+}
