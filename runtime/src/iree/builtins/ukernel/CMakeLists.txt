@@ -71,7 +71,11 @@ iree_cc_library(
     "unpack.c"
     "unpack.h"
   DEPS
+    ::exported_bits
     ::headers
+    ::static_assert
+    iree::base::core_headers
+    iree::builtins::ukernel::arch::config
     iree::builtins::ukernel::arch::ukernel_arch
   PUBLIC
 )

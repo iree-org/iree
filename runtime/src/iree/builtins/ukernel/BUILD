@@ -25,11 +25,11 @@ iree_runtime_cc_library(
 
 ukernel_headers = [
     "common.h",
+    "elementwise.h",
     "mmt4d.h",
     "pack.h",
     "query_tile_sizes.h",
     "unpack.h",
-    "elementwise.h",
 ]
 
 # :types is the type declarations used by both the entry points and the
@@ -62,7 +62,11 @@ iree_runtime_cc_library(
     ] + ukernel_headers,
     hdrs = ["api.h"],
     deps = [
+        ":exported_bits",
         ":headers",
+        ":static_assert",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/builtins/ukernel/arch:config",
         "//runtime/src/iree/builtins/ukernel/arch:ukernel_arch",
     ],
 )
