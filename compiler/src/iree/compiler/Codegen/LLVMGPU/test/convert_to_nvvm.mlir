@@ -290,8 +290,8 @@ hal.executable @shared_memory_lowering_aligned_alloc {
 //       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>, i64, i64) -> !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>>
-//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, #gpu.address_space<workgroup>> to !llvm.ptr<array<32 x f32>, #gpu.address_space<workgroup>>
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<32 x f32>, 3>
 
 // -----
 
