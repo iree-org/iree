@@ -29,6 +29,6 @@ source build_tools/cmake/setup_ccache.sh
   -DIREE_BUILD_COMPILER=OFF
 "${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0
 
-if (( IREE_USE_CCACHE == 1 ));
+if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats
 fi

@@ -73,6 +73,6 @@ echo "Building sample deps"
 echo "------------------"
 "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-sample-deps -- -k 0
 
-if (( IREE_USE_CCACHE == 1 ));
+if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats
 fi
