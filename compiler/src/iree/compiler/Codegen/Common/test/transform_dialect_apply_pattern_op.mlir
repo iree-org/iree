@@ -54,8 +54,9 @@ func.func @promote() -> (tensor<16x128xf32>) {
 
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["func.func"]} in %arg1
-  transform.iree.apply_patterns %0 { promote_foreach_thread_capture_to_shared }
+  %0 = transform.structured.match ops{["scf.foreach_thread"]} in %arg1
+  %1 = transform.cast %0 : !pdl.operation to !transform.op<"scf.foreach_thread">
+  transform.iree.share_foreach_thread_operands %1 share_operands = [0] : (!transform.op<"scf.foreach_thread">) -> !transform.op<"scf.foreach_thread">
 }
 
 // -----

@@ -220,27 +220,31 @@ transform_dialect::ShareForeachThreadOperandsOp::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   IRRewriter rewriter(getContext());
-  scf::ForeachThreadOp foreachThreadOp =
-      extractSliceOp->getParentOfType<scf::ForeachThreadOp>();
-
-  for (int64_t operandIdx : getShareOperands()) {
-    if (0 < operandIdx || operandIdx >= foreachThreadOp.getNumOperands())
+  for (int64_t outputIdx : getShareOperands()) {
+    if (outputIdx < 0 || outputIdx >= foreachThreadOp.getOutputs().size())
       return mlir::emitDefiniteFailure(foreachThreadOp, "operand idx overflow");
-
-    Value toShare = foreachThreadOp.getOperand(operandIdx);
-    if (!toShare.hasOneUse()) {
-      // TODO: notifyMatchFailure("shared operands must be single-use");
+    Value toShare = foreachThreadOp.getOutputs()[outputIdx];
+    if (std::distance(toShare.getUses().begin(), toShare.getUses().end()) !=
+        2) {
+      /*return mlir::emitSilenceableFailure(
+          foreachThreadOp,
+          "operand to share must have exactly 2 uses, the foreach_thread op "
+          "and an extract_slice op.");*/
       continue;
     }
-    auto extractSliceOp =
-        dyn_cast<tensor::ExtractSliceOp>(toShare.getUsers().front());
+    tensor::ExtractSliceOp extractSliceOp;
+    for (Operation *user : toShare.getUsers()) {
+      extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user);
+      if (extractSliceOp) break;
+    }
     if (!extractSliceOp) {
-      // TODO: notifyMatchFailure("shared operands use must be extractSliceOp");
+      /*return mlir::emitSilenceableFailure(
+        foreachThreadOp,
+        "shared operands use must be extractSliceOp.");*/
       continue;
     }
-
     // Get the corresponding bbArg.
-    BlockArgument bbArg = foreachThreadOp.getOutputBlockArguments()[operandIdx];
+    BlockArgument bbArg = foreachThreadOp.getOutputBlockArguments()[outputIdx];
 
     // Check if the extract_slice has a matching parallel_insert_slice
     // (i.e., same source/target, offsets, sizes and strides).
@@ -257,10 +261,6 @@ transform_dialect::ShareForeachThreadOperandsOp::applyToOne(
     };
     if (llvm::none_of(foreachThreadOp.getTerminator().getYieldingOps(),
                       isMatchingParallelInsertSlice)) {
-      foreachThreadOp =
-          foreachThreadOp->getParentOfType<scf::ForeachThreadOp>();
-      // TODO: notifyMatchFailure("shared operands must have a matching
-      // parallel_insert_slice");
       continue;
     }
 
@@ -270,7 +270,7 @@ transform_dialect::ShareForeachThreadOperandsOp::applyToOne(
     });
   }
 
-  transformResults.set(getForeachThreadOp().cast<OpResult>(), foreachThreadOp);
+  results.push_back(foreachThreadOp);
   return DiagnosedSilenceableFailure::success();
 }
 
