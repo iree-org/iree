@@ -40,7 +40,7 @@ void iree_uk_assert_fail(const char* file, int line, const char* function,
           condition);
   fflush(stderr);
 #endif  // (!defined(NDEBUG)) && (IREE_FILE_IO_ENABLE == 1)
-  iree_abort();
+  IREE_ASSERT(false);
 }
 
 //===----------------------------------------------------------------------===//
