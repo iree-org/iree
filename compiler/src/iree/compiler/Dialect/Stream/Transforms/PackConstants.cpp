@@ -18,9 +18,9 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -325,7 +325,7 @@ static UploadResult buildStagingUpload(
   uploadResult.timepoint = executeOp.getResultTimepoint();
 
   // Map captured resources into the execution region.
-  BlockAndValueMapping mapping;
+  IRMapping mapping;
   auto *entryBlock = new Block();
   executeOp.getBody().push_back(entryBlock);
   for (auto outerValue : capturedResources) {

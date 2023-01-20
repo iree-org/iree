@@ -35,7 +35,7 @@ static SliceAndDynamicDims cloneOffsetsSizesAndStridesImpl(
   getBackwardSlice(baseOp, &slice, [&](Operation *op) {
     return sliceFilter(op, nonIndexComputationOperands, baseOp);
   });
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   for (auto origOp : slice) {
     builder.clone(*origOp, bvm);
   }

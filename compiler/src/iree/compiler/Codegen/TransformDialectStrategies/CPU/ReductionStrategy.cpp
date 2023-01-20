@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 
@@ -78,5 +79,14 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
   }
 
   // Step 3-5. Common trailing steps.
-  buildCommonTrailingStrategy(b, variantH);
+  vector::LowerVectorsOptions lowerVectorsOptions;
+  lowerVectorsOptions
+      .setVectorTransformsOptions(vector::VectorContractLowering::OuterProduct)
+      .setVectorMultiReductionLowering(
+          vector::VectorMultiReductionLowering::InnerParallel)
+      .setVectorTransferSplit(vector::VectorTransferSplit::LinalgCopy)
+      .setVectorTransposeLowering(vector::VectorTransposeLowering::EltWise)
+      .setTransposeAVX2Lowering(false)
+      .setUnrollVectorTransfers(true);
+  buildCommonTrailingStrategy(b, variantH, lowerVectorsOptions);
 }

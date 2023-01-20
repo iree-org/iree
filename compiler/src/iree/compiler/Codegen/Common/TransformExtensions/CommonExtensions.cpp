@@ -408,7 +408,7 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   }
 
   // Step 4. Create the workgroup id and count ops.
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   SmallVector<Value> workgroupIdOps, workgroupCountOps;
   for (Attribute attr : blockMapping) {
     auto idx =
@@ -829,10 +829,11 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
     ValueRange dynamicSizes, unsigned alignment) {
-  // TODO: use gpu::GPUDialect::getWorkgroupAddressSpace() but this requires
-  // moving out of CommonExtensions.
-  MemRefType allocType = MemRefType::get(memRefType.getShape(),
-                                         memRefType.getElementType(), {}, 3);
+  auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
+      builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  MemRefType allocType =
+      MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
+                      AffineMap(), addressSpaceAttr);
   return builder
       .create<memref::AllocOp>(loc, allocType, dynamicSizes,
                                builder.getI64IntegerAttr(alignment))

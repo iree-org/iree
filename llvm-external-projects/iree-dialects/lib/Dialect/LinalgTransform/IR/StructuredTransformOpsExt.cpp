@@ -87,12 +87,12 @@ static LogicalResult nestedInFunc(PatternRewriter &rewriter,
   return success(functionSymbol.getLeafReference() == func.getName());
 }
 
-/// Construct a BlockAndValueMapping from `linalgOp` to `genericLinalgModelOp`.
+/// Construct a IRMapping from `linalgOp` to `genericLinalgModelOp`.
 /// Walk both ops and check whether all subops are the same.
 static LogicalResult
 haveIdenticalBodiesImpl(linalg::LinalgOp linalgOp,
                         linalg::LinalgOp genericLinalgModelOp) {
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   bvm.map(linalgOp.getBlock()->getArguments(),
           genericLinalgModelOp.getBlock()->getArguments());
   SmallVector<Operation *> linalgBodyOps;

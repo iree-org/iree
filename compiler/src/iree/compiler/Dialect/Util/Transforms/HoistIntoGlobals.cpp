@@ -11,8 +11,8 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 
 #define DEBUG_TYPE "iree-util-hoist-into-globals"
@@ -104,7 +104,7 @@ class HoistIntoGlobalsPass : public HoistIntoGlobalsBase<HoistIntoGlobalsPass> {
       auto initializerOp = builder.create<InitializerOp>(loc);
       Block *entryBlock = initializerOp.addEntryBlock();
       OpBuilder initBuilder = OpBuilder::atBlockEnd(entryBlock);
-      BlockAndValueMapping valueMapping;
+      IRMapping valueMapping;
       cloneConstExprInto(initializerOp.getLoc(), initBuilder, originalValue,
                          hoistedMap, moduleSymbols, valueMapping, constExprs);
 
@@ -118,7 +118,7 @@ class HoistIntoGlobalsPass : public HoistIntoGlobalsBase<HoistIntoGlobalsPass> {
 
   void cloneProducerTreeInto(
       OpBuilder &builder, const ConstExprAnalysis::ConstValueInfo *producerInfo,
-      HoistedValueMap &hoistedMap, BlockAndValueMapping &cloneMapping,
+      HoistedValueMap &hoistedMap, IRMapping &cloneMapping,
       const ConstExprAnalysis &constExprs) {
     if (cloneMapping.contains(producerInfo->constValue)) return;
 
@@ -151,8 +151,7 @@ class HoistIntoGlobalsPass : public HoistIntoGlobalsBase<HoistIntoGlobalsPass> {
   // a minimum, a mapping will be created for the requested value.
   void cloneConstExprInto(Location loc, OpBuilder &builder,
                           Value constExprValue, HoistedValueMap &hoistedMap,
-                          SymbolTable &moduleSymbols,
-                          BlockAndValueMapping &cloneMapping,
+                          SymbolTable &moduleSymbols, IRMapping &cloneMapping,
                           const ConstExprAnalysis &constExprs) {
     // Do a depth first traversal of the producers, emitting them in a valid
     // def-use order.

@@ -71,16 +71,16 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    %[[R5:.+]] = arith.addf %[[R4]], %[[S3]] : f32
 //         CHECK:    %[[S4:.+]], %{{.*}} = gpu.shuffle  xor %[[R5]], %[[C16]], %[[C32]] : f32
 //         CHECK:    %[[R6:.+]] = arith.addf %[[R5]], %[[S4]] : f32
-//         CHECK:    %[[ALLOC:.+]] = memref.alloc() : memref<16xf32, 3>
+//         CHECK:    %[[ALLOC:.+]] = memref.alloc() : memref<16xf32, #gpu.address_space<workgroup>>
 //         CHECK:    %[[WID:.+]] = arith.divui %{{.*}}, %{{.*}} : index
 //         CHECK:    %[[LANE_ID:.*]] = arith.remui %[[TID]], %[[C32I]] : index
 //         CHECK:    %[[LANE0:.*]] = arith.cmpi eq, %[[LANE_ID]], %[[C0]] : index
 //         CHECK:    scf.if %[[LANE0]] { 
-//         CHECK:      memref.store %[[R6]], %[[ALLOC]][%[[WID]]] : memref<16xf32, 3>
+//         CHECK:      memref.store %[[R6]], %[[ALLOC]][%[[WID]]] : memref<16xf32, #gpu.address_space<workgroup>>
 //         CHECK:    }
 //         CHECK:    gpu.barrier
 //         CHECK:    %[[LANE_ID_IN_BOUNDS:.*]] = arith.minui %[[LANE_ID]]
-//         CHECK:    %[[LOAD_VAL:.+]] = memref.load %[[ALLOC]][%[[LANE_ID_IN_BOUNDS]]] : memref<16xf32, 3>
+//         CHECK:    %[[LOAD_VAL:.+]] = memref.load %[[ALLOC]][%[[LANE_ID_IN_BOUNDS]]] : memref<16xf32, #gpu.address_space<workgroup>>
 //         CHECK:    %[[S5:.+]], %{{.*}} = gpu.shuffle  xor %[[LOAD_VAL]], %[[C1]], %[[C32]] : f32
 //         CHECK:    %[[R7:.+]] = arith.addf %[[LOAD_VAL]], %[[S5]] : f32
 //         CHECK:    %[[S6:.+]], %{{.*}} = gpu.shuffle  xor %[[R7]], %[[C2]], %[[C32]] : f32
@@ -167,7 +167,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    arith.addf
 //         CHECK:    arith.remui
 //         CHECK:    scf.if
-//         CHECK:      memref.store {{.*}} : memref<16xf32, 3>
+//         CHECK:      memref.store {{.*}} : memref<16xf32, #gpu.address_space<workgroup>>
 //         CHECK:    }
 //         CHECK:    gpu.barrier
 //         CHECK:    arith.minui
@@ -263,7 +263,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    arith.maxf
 //         CHECK:    arith.remui
 //         CHECK:    scf.if
-//         CHECK:      memref.store {{.*}} : memref<32xf32, 3>
+//         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
 //         CHECK:    }
 //         CHECK:    gpu.barrier
 //         CHECK:    arith.minui
@@ -298,7 +298,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.addf
 //         CHECK:    scf.if
-//         CHECK:      memref.store {{.*}} : memref<32xf32, 3>
+//         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
 //         CHECK:    }
 //         CHECK:    gpu.barrier
 //         CHECK:    memref.load

@@ -1285,10 +1285,10 @@ func.func @winograd_input_transform(%arg0: tensor<1x10x10x1280xf32>) -> tensor<8
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
 // CHECK:      func.func @winograd_input_transform(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x10x10x1280xf32>) ->
 // CHECK-SAME:   tensor<8x8x1x2x2x1280xf32> {
-// CHECK:        %[[C0:.+]] = arith.constant 0 : index
-// CHECK:        %[[C1:.+]] = arith.constant 1 : index
-// CHECK:        %[[C1280:.+]] = arith.constant 1280 : index
-// CHECK:        %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[C1280:.+]] = arith.constant 1280 : index
+// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
 // CHECK:        %[[D1:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1]] step %[[C1]]
 // CHECK-SAME:     iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<8x8x1x2x2x1280xf32>) {
@@ -1326,10 +1326,10 @@ func.func @winograd_input_transform_memref(%arg0: memref<1x10x10x1280xf32>, %arg
 // CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
 // CHECK:      func.func @winograd_input_transform_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<1x10x10x1280xf32>,
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: memref<8x8x1x2x2x1280xf32>) {
-// CHECK:        %[[C0:.+]] = arith.constant 0 : index
-// CHECK:        %[[C1:.+]] = arith.constant 1 : index
-// CHECK:        %[[C1280:.+]] = arith.constant 1280 : index
-// CHECK:        %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[C1280:.+]] = arith.constant 1280 : index
+// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
 // CHECK:        scf.for %[[ARG2:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1]] step %[[C1]] {
 // CHECK-DAG:        %[[D0:.+]] = affine.min #[[MAP2]](%[[ARG2]])[%[[C1]], %[[C1]]]
 // CHECK:          scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1280]] step %[[C32]] {
@@ -1362,9 +1362,9 @@ func.func @winograd_output_transform(%arg0: tensor<8x8x1x2x2x32xf32>) -> tensor<
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
 // CHECK:      func.func @winograd_output_transform(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<8x8x1x2x2x32xf32>) ->
 // CHECK-SAME:   tensor<1x12x12x32xf32> {
-// CHECK:        %[[C0:.+]] = arith.constant 0 : index
-// CHECK:        %[[C1:.+]] = arith.constant 1 : index
-// CHECK:        %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<1x12x12x32xf32>
 // CHECK:        %[[D1:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1]] step %[[C1]]
 // CHECK-SAME:     iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<1x12x12x32xf32>) {
@@ -1400,9 +1400,9 @@ func.func @winograd_output_transform_memref(%arg0: memref<8x8x1x2x2x32xf32>, %ar
 // CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
 // CHECK:      func.func @winograd_output_transform_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<8x8x1x2x2x32xf32>,
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: memref<1x12x12x32xf32>) {
-// CHECK:        %[[C0:.+]] = arith.constant 0 : index
-// CHECK:        %[[C1:.+]] = arith.constant 1 : index
-// CHECK:        %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
 // CHECK:        scf.for %[[ARG2:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1]] step %[[C1]] {
 // CHECK-DAG:        %[[D0:.+]] = affine.min #[[MAP2]](%[[ARG2]])[%[[C1]], %[[C1]]]
 // CHECK:          scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C32]] step %[[C32]] {
@@ -1434,10 +1434,10 @@ func.func @winograd_input_transform_nchw(%arg0: tensor<1x1280x10x10xf32>) -> ten
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
 // CHECK:      func.func @winograd_input_transform_nchw(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x1280x10x10xf32>) ->
 // CHECK-SAME:   tensor<8x8x1x2x2x1280xf32> {
-// CHECK:        %[[C0:.+]] = arith.constant 0 : index
-// CHECK:        %[[C1:.+]] = arith.constant 1 : index
-// CHECK:        %[[C1280:.+]] = arith.constant 1280 : index
-// CHECK:        %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[C1280:.+]] = arith.constant 1280 : index
+// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
 // CHECK:        %[[D1:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1]] step %[[C1]]
 // CHECK-SAME:     iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<8x8x1x2x2x1280xf32>) {
@@ -1477,9 +1477,9 @@ func.func @winograd_output_transform_nchw(%arg0: tensor<8x8x1x2x2x32xf32>) -> te
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
 // CHECK:      func.func @winograd_output_transform_nchw(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<8x8x1x2x2x32xf32>) ->
 // CHECK-SAME:   tensor<1x32x12x12xf32> {
-// CHECK:        %[[C0:.+]] = arith.constant 0 : index
-// CHECK:        %[[C1:.+]] = arith.constant 1 : index
-// CHECK:        %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<1x32x12x12xf32>
 // CHECK:        %[[D1:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1]] step %[[C1]]
 // CHECK-SAME:     iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<1x32x12x12xf32>) {
@@ -1517,16 +1517,16 @@ func.func @softmax(%arg0: tensor<16x64x256xf32>) -> tensor<16x64x256xf32> {
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 30)>
 // CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0)[s0, s1] -> (30, -d0 + s1)>
 // CHECK:      func.func @softmax(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x64x256xf32>) -> tensor<16x64x256xf32> {
-// CHECK:        %[[C16:.+]] = arith.constant 16 : index
-// CHECK:        %[[C64:.+]] = arith.constant 64 : index
-// CHECK:        %[[C256:.+]] = arith.constant 256 : index
-// CHECK:        %[[C10:.+]] = arith.constant 10 : index
-// CHECK:        %[[C30:.+]] = arith.constant 30 : index
-// CHECK:        %[[D0:.+]] = tensor.empty() : tensor<16x64x256xf32>
-// CHECK:        %[[D1:.+]] = iree_input.dispatch.workgroup.id[0] : index
-// CHECK:        %[[D2:.+]] = iree_input.dispatch.workgroup.count[0] : index
-// CHECK:        %[[D3:.+]] = iree_input.dispatch.workgroup.id[1] : index
-// CHECK:        %[[D4:.+]] = iree_input.dispatch.workgroup.count[1] : index
+// CHECK-DAG:        %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG:        %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG:        %[[C256:.+]] = arith.constant 256 : index
+// CHECK-DAG:        %[[C10:.+]] = arith.constant 10 : index
+// CHECK-DAG:        %[[C30:.+]] = arith.constant 30 : index
+// CHECK-DAG:        %[[D0:.+]] = tensor.empty() : tensor<16x64x256xf32>
+// CHECK-DAG:        %[[D1:.+]] = iree_input.dispatch.workgroup.id[0] : index
+// CHECK-DAG:        %[[D2:.+]] = iree_input.dispatch.workgroup.count[0] : index
+// CHECK-DAG:        %[[D3:.+]] = iree_input.dispatch.workgroup.id[1] : index
+// CHECK-DAG:        %[[D4:.+]] = iree_input.dispatch.workgroup.count[1] : index
 // CHECK-DAG:      %[[D5:.+]] = affine.apply #[[MAP]]()[%[[D3]]]
 // CHECK-DAG:      %[[D6:.+]] = affine.apply #[[MAP]]()[%[[D4]]]
 // CHECK:        %[[D7:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[D5]] to %[[C16]] step %[[D6]]
@@ -1566,11 +1566,11 @@ func.func @softmax_memref(%arg0: memref<16x64x256xf32>, %arg1: memref<16x64x256x
 // CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0)[s0, s1] -> (30, -d0 + s1)>
 // CHECK:      func.func @softmax_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<16x64x256xf32>, %[[ARG1:[a-zA-Z0-9_]+]]:
 // CHECK-SAME:   memref<16x64x256xf32>) {
-// CHECK:        %[[C16:.+]] = arith.constant 16 : index
-// CHECK:        %[[C64:.+]] = arith.constant 64 : index
-// CHECK:        %[[C256:.+]] = arith.constant 256 : index
-// CHECK:        %[[C10:.+]] = arith.constant 10 : index
-// CHECK:        %[[C30:.+]] = arith.constant 30 : index
+// CHECK-DAG:    %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG:    %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG:    %[[C256:.+]] = arith.constant 256 : index
+// CHECK-DAG:    %[[C10:.+]] = arith.constant 10 : index
+// CHECK-DAG:    %[[C30:.+]] = arith.constant 30 : index
 // CHECK:        %[[D0:.+]] = iree_input.dispatch.workgroup.id[0] : index
 // CHECK:        %[[D1:.+]] = iree_input.dispatch.workgroup.count[0] : index
 // CHECK:        %[[D2:.+]] = iree_input.dispatch.workgroup.id[1] : index
@@ -1594,5 +1594,3 @@ func.func @softmax_memref(%arg0: memref<16x64x256xf32>, %arg1: memref<16x64x256x
 // CHECK:        }
 // CHECK:        return
 // CHECK:      }
-
-// -----

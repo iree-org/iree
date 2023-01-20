@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -44,8 +45,11 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
                                         ValueRange dynamicSizes,
                                         unsigned alignment) {
-  MemRefType allocType = MemRefType::get(memRefType.getShape(),
-                                         memRefType.getElementType(), {}, 3);
+  auto workgroupSpace = gpu::AddressSpaceAttr::get(
+      builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  MemRefType allocType =
+      MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
+                      AffineMap(), workgroupSpace);
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
       .getResult();
 }
@@ -61,11 +65,15 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   auto toType = to.getType().cast<MemRefType>();
 
   bool needsBarrier = false;
-  if (auto attr = fromType.getMemorySpace().dyn_cast_or_null<IntegerAttr>()) {
-    if (attr.getInt() == 3) needsBarrier = true;
+  if (auto attr =
+          fromType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>()) {
+    if (attr.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace())
+      needsBarrier = true;
   }
-  if (auto attr = toType.getMemorySpace().dyn_cast_or_null<IntegerAttr>()) {
-    if (attr.getInt() == 3) needsBarrier = true;
+  if (auto attr =
+          toType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>()) {
+    if (attr.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace())
+      needsBarrier = true;
   }
   if (needsBarrier) builder.create<gpu::BarrierOp>(loc);
   Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
@@ -400,7 +408,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createLowerAffinePass());
-
+  pm.addPass(createGPULowerMemorySpaceAttributesPass());
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
   pm.addPass(createStripDebugInfoPass());

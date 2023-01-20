@@ -15,10 +15,10 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 
@@ -193,7 +193,7 @@ static mlir::func::FuncOp createWorkgroupFunc(Location loc,
 
   // Clone region into the function body.
   auto funcOp = mlir::func::FuncOp::create(loc, functionName, functionType);
-  BlockAndValueMapping mapping;
+  IRMapping mapping;
   region.cloneInto(&funcOp.getFunctionBody(), mapping);
 
   // Replace flow.return with std.return.

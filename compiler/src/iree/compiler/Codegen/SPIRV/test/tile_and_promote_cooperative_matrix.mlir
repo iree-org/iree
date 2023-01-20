@@ -206,8 +206,8 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
 
 // CHECK-LABEL: func.func @generic_batch_matmul_f16_32x128x512x64()
 
-//      CHECK: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, 3>
-//      CHECK: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x1x32xf16, 3>
+//      CHECK: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, #gpu.address_space<workgroup>>
+//      CHECK: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x1x32xf16, #gpu.address_space<workgroup>>
 
 //      CHECK: linalg.fill
 // CHECK-SAME:   __internal_linalg_transform__ = "workgroup_memory"
@@ -228,9 +228,9 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
 
 // PROMOTEC-LABEL: func.func @generic_batch_matmul_f16_32x128x512x64()
 
-//      PROMOTEC: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, 3>
-//      PROMOTEC: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x1x32xf16, 3>
-//      PROMOTEC: %[[C_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, 3>
+//      PROMOTEC: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, #gpu.address_space<workgroup>>
+//      PROMOTEC: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x1x32xf16, #gpu.address_space<workgroup>>
+//      PROMOTEC: %[[C_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, #gpu.address_space<workgroup>>
 
 //      PROMOTEC: linalg.fill
 // PROMOTEC-SAME:   __internal_linalg_transform__ = "workgroup_memory"
@@ -355,8 +355,8 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
 
 // PROMOTEC-LABEL: func.func @generic_batch_matmul_f16_32x128x512x64()
 
-//      PROMOTEC: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, 3>
-//      PROMOTEC: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x1x32xf16, 3>
+//      PROMOTEC: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, #gpu.address_space<workgroup>>
+//      PROMOTEC: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x1x32xf16, #gpu.address_space<workgroup>>
 
 //      PROMOTEC: linalg.fill
 // PROMOTEC-SAME:   __internal_linalg_transform__ = "workgroup_memory"
@@ -465,8 +465,8 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
 // PROMOTEC-LABEL: func.func @generic_batch_matmul_f16_32x128x512x64()
 
 //  PROMOTEC-NOT: memref.alloc()
-//      PROMOTEC: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, 3>
-//      PROMOTEC: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x1x32xf16, 3>
+//      PROMOTEC: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, #gpu.address_space<workgroup>>
+//      PROMOTEC: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x1x32xf16, #gpu.address_space<workgroup>>
 //  PROMOTEC-NOT: memref.alloc()
 
 //      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -547,15 +547,15 @@ hal.executable @batch_matmul_f16_1x64x128x512 {
             %subview = memref.subview %2[0, %arg0, %arg1] [1, 64, 128] [1, 1, 1] : memref<1x4096x4096xf32> to memref<1x64x128xf32, strided<[16777216, 4096, 1], offset: ?>>
             %subview_0 = memref.subview %0[0, %arg0, 0] [1, 64, 512] [1, 1, 1] : memref<1x4096x512xf16> to memref<1x64x512xf16, strided<[2097152, 512, 1], offset: ?>>
             %subview_1 = memref.subview %1[0, 0, %arg1] [1, 512, 128] [1, 1, 1] : memref<1x512x4096xf16> to memref<1x512x128xf16, strided<[2097152, 4096, 1], offset: ?>>
-            %alloc = memref.alloc() {alignment = 128 : i64} : memref<1x64x128xf16, 3>
-            linalg.fill ins(%cst : f16) outs(%alloc : memref<1x64x128xf16, 3>)
+            %alloc = memref.alloc() {alignment = 128 : i64} : memref<1x64x128xf16, #gpu.address_space<workgroup>>
+            linalg.fill ins(%cst : f16) outs(%alloc : memref<1x64x128xf16, #gpu.address_space<workgroup>>)
             linalg.batch_matmul {lowering_config = #config}
               ins(%subview_0, %subview_1 : memref<1x64x512xf16, strided<[2097152, 512, 1], offset: ?>>, memref<1x512x128xf16, strided<[2097152, 4096, 1], offset: ?>>)
-              outs(%alloc : memref<1x64x128xf16, 3>)
+              outs(%alloc : memref<1x64x128xf16, #gpu.address_space<workgroup>>)
             linalg.generic {
                 indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
                 iterator_types = ["parallel", "parallel", "parallel"]}
-              ins(%alloc : memref<1x64x128xf16, 3>)
+              ins(%alloc : memref<1x64x128xf16, #gpu.address_space<workgroup>>)
               outs(%subview : memref<1x64x128xf32, strided<[16777216, 4096, 1], offset: ?>>) {
             ^bb0(%in: f16, %out: f32):
               %7 = arith.extf %in : f16 to f32
@@ -571,9 +571,9 @@ hal.executable @batch_matmul_f16_1x64x128x512 {
 
 // PROMOTEC-LABEL: func.func @batch_matmul_f16_1x64x128x512()
 
-//  PROMOTEC-DAG: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<1x64x32xf16, 3>
-//  PROMOTEC-DAG: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x128xf16, 3>
-//  PROMOTEC-DAG: %[[C_ALLOC:.+]] = memref.alloc() {alignment = 128 : i64} : memref<1x64x128xf16, 3>
+//  PROMOTEC-DAG: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<1x64x32xf16, #gpu.address_space<workgroup>>
+//  PROMOTEC-DAG: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x128xf16, #gpu.address_space<workgroup>>
+//  PROMOTEC-DAG: %[[C_ALLOC:.+]] = memref.alloc() {alignment = 128 : i64} : memref<1x64x128xf16, #gpu.address_space<workgroup>>
 
 //      PROMOTEC: linalg.fill
 // PROMOTEC-SAME:   __internal_linalg_transform__ = "workgroup_memory"
@@ -681,8 +681,8 @@ hal.executable @matmul_f16_f512x4096x64 {
 // PROMOTEC-LABEL: func.func @matmul_f16_f512x4096x64()
 
 //  PROMOTEC-NOT: memref.alloc()
-//  PROMOTEC-DAG: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<64x32xf16, 3>
-//  PROMOTEC-DAG: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x128xf16, 3>
+//  PROMOTEC-DAG: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<64x32xf16, #gpu.address_space<workgroup>>
+//  PROMOTEC-DAG: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x128xf16, #gpu.address_space<workgroup>>
 //  PROMOTEC-NOT: memref.alloc()
 
 //      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -798,9 +798,9 @@ hal.executable @matmul_f16_f512x4096x64 {
 
 // PROMOTEC-LABEL: func.func @matmul_f16_f512x4096x64()
 
-//  PROMOTEC-DAG: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<64x32xf16, 3>
-//  PROMOTEC-DAG: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x128xf16, 3>
-//  PROMOTEC-DAG: %[[C_ALLOC:.+]] = memref.alloc() : memref<64x128xf16, 3>
+//  PROMOTEC-DAG: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<64x32xf16, #gpu.address_space<workgroup>>
+//  PROMOTEC-DAG: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x128xf16, #gpu.address_space<workgroup>>
+//  PROMOTEC-DAG: %[[C_ALLOC:.+]] = memref.alloc() : memref<64x128xf16, #gpu.address_space<workgroup>>
 
 //      PROMOTEC: linalg.fill
 // PROMOTEC-SAME:   __internal_linalg_transform__ = "workgroup_memory"
