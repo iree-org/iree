@@ -32,13 +32,14 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    common
+    headers
   HDRS
     "common.h"
-    "mmt4d_types.h"
-    "pack_types.h"
-    "query_tile_sizes_types.h"
-    "unpack_types.h"
+    "elementwise.h"
+    "mmt4d.h"
+    "pack.h"
+    "query_tile_sizes.h"
+    "unpack.h"
   DEPS
     ::exported_bits
     ::static_assert
@@ -49,49 +50,28 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    generic
-  HDRS
-    "mmt4d_generic.h"
-    "pack_generic.h"
-  SRCS
-    "mmt4d_generic.c"
-    "pack_generic.c"
-  DEPS
-    ::common
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    elementwise
-  HDRS
-    "elementwise.h"
-  SRCS
-    "elementwise_generic.c"
-    "elementwise_impl.c.inc"
-  DEPS
-    ::common
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     ukernel
   HDRS
-    "elementwise.h"
-    "mmt4d.h"
-    "pack.h"
-    "query_tile_sizes.h"
-    "unpack.h"
+    "api.h"
   SRCS
+    "common.h"
+    "elementwise.h"
+    "elementwise_generic.c"
+    "elementwise_impl.c.inc"
     "mmt4d.c"
+    "mmt4d.h"
+    "mmt4d_generic.c"
+    "mmt4d_generic.h"
     "pack.c"
+    "pack.h"
+    "pack_generic.c"
+    "pack_generic.h"
     "query_tile_sizes.c"
+    "query_tile_sizes.h"
     "unpack.c"
+    "unpack.h"
   DEPS
-    ::common
-    ::elementwise
-    ::generic
+    ::headers
     iree::builtins::ukernel::arch::ukernel_arch
   PUBLIC
 )

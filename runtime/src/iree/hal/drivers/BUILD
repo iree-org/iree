@@ -16,7 +16,7 @@ package(
 string_list_flag(
     name = "enabled_drivers",
     build_setting_default = [
-        "cuda",
+        #"cuda",
         "local-sync",
         "local-task",
         "vulkan",

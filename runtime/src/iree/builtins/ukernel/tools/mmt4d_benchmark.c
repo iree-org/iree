@@ -10,7 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
 #include "iree/base/internal/flags.h"
-#include "iree/builtins/ukernel/mmt4d.h"
+#include "iree/builtins/ukernel/api.h"
 #include "iree/builtins/ukernel/tools/ukernel_test_utils.h"
 #include "iree/testing/benchmark.h"
 
