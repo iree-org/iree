@@ -24,7 +24,6 @@ iree_cc_library(
     iree::base
     iree::base::tracing
     iree::builtins::ukernel
-    iree::builtins::ukernel::assert_fail
     iree::base::internal::cpu
     iree::vm
     ${_VMVX_OPTIONAL_DEPS}
