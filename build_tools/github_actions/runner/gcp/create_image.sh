@@ -31,6 +31,7 @@ CPU_MACHINE_TYPE="e2-medium"
 CPU_IMAGE_SIZE_GB=10
 # We need enough space to fetch Docker images that we test with
 # TODO(gcmn): See if we can make the image smaller, e.g. by resizing after setup
+# or using a local ssd for scratch space during setup.
 GPU_IMAGE_SIZE_GB=50
 
 # It takes a little bit to bring up ssh on the instance. I haven't found a
