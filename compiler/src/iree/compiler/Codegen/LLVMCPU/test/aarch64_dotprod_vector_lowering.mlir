@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmcpu-aarch64-vector-lowering,iree-codegen-optimize-vector-transfer{flatten=true})))))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmcpu-mmt4d-vector-lowering,iree-codegen-optimize-vector-transfer{flatten=true})))))' --split-input-file %s | FileCheck %s
 
 // -----
 

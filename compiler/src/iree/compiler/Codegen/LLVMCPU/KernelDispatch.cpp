@@ -816,7 +816,7 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
-      DispatchLoweringPassPipeline::CPUAArchDoubleTilingExpert);
+      DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
 /// Returns default hard-coded workgroup sizes for a give target. No smartness
@@ -1034,7 +1034,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, tileSizes,
-      DispatchLoweringPassPipeline::CPUAArchDoubleTilingExpert);
+      DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
 static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
