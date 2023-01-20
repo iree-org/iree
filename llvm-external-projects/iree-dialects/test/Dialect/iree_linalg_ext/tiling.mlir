@@ -1566,11 +1566,11 @@ func.func @softmax_memref(%arg0: memref<16x64x256xf32>, %arg1: memref<16x64x256x
 // CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0)[s0, s1] -> (30, -d0 + s1)>
 // CHECK:      func.func @softmax_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<16x64x256xf32>, %[[ARG1:[a-zA-Z0-9_]+]]:
 // CHECK-SAME:   memref<16x64x256xf32>) {
-// CHECK:        %[[C16:.+]] = arith.constant 16 : index
-// CHECK:        %[[C64:.+]] = arith.constant 64 : index
-// CHECK:        %[[C256:.+]] = arith.constant 256 : index
-// CHECK:        %[[C10:.+]] = arith.constant 10 : index
-// CHECK:        %[[C30:.+]] = arith.constant 30 : index
+// CHECK-DAG:    %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG:    %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG:    %[[C256:.+]] = arith.constant 256 : index
+// CHECK-DAG:    %[[C10:.+]] = arith.constant 10 : index
+// CHECK-DAG:    %[[C30:.+]] = arith.constant 30 : index
 // CHECK:        %[[D0:.+]] = iree_input.dispatch.workgroup.id[0] : index
 // CHECK:        %[[D1:.+]] = iree_input.dispatch.workgroup.count[0] : index
 // CHECK:        %[[D2:.+]] = iree_input.dispatch.workgroup.id[1] : index
