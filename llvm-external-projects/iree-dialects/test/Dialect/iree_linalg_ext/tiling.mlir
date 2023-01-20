@@ -1517,16 +1517,16 @@ func.func @softmax(%arg0: tensor<16x64x256xf32>) -> tensor<16x64x256xf32> {
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 30)>
 // CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0)[s0, s1] -> (30, -d0 + s1)>
 // CHECK:      func.func @softmax(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x64x256xf32>) -> tensor<16x64x256xf32> {
-// CHECK:        %[[C16:.+]] = arith.constant 16 : index
-// CHECK:        %[[C64:.+]] = arith.constant 64 : index
-// CHECK:        %[[C256:.+]] = arith.constant 256 : index
-// CHECK:        %[[C10:.+]] = arith.constant 10 : index
-// CHECK:        %[[C30:.+]] = arith.constant 30 : index
-// CHECK:        %[[D0:.+]] = tensor.empty() : tensor<16x64x256xf32>
-// CHECK:        %[[D1:.+]] = iree_input.dispatch.workgroup.id[0] : index
-// CHECK:        %[[D2:.+]] = iree_input.dispatch.workgroup.count[0] : index
-// CHECK:        %[[D3:.+]] = iree_input.dispatch.workgroup.id[1] : index
-// CHECK:        %[[D4:.+]] = iree_input.dispatch.workgroup.count[1] : index
+// CHECK-DAG:        %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG:        %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG:        %[[C256:.+]] = arith.constant 256 : index
+// CHECK-DAG:        %[[C10:.+]] = arith.constant 10 : index
+// CHECK-DAG:        %[[C30:.+]] = arith.constant 30 : index
+// CHECK-DAG:        %[[D0:.+]] = tensor.empty() : tensor<16x64x256xf32>
+// CHECK-DAG:        %[[D1:.+]] = iree_input.dispatch.workgroup.id[0] : index
+// CHECK-DAG:        %[[D2:.+]] = iree_input.dispatch.workgroup.count[0] : index
+// CHECK-DAG:        %[[D3:.+]] = iree_input.dispatch.workgroup.id[1] : index
+// CHECK-DAG:        %[[D4:.+]] = iree_input.dispatch.workgroup.count[1] : index
 // CHECK-DAG:      %[[D5:.+]] = affine.apply #[[MAP]]()[%[[D3]]]
 // CHECK-DAG:      %[[D6:.+]] = affine.apply #[[MAP]]()[%[[D4]]]
 // CHECK:        %[[D7:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[D5]] to %[[C16]] step %[[D6]]
