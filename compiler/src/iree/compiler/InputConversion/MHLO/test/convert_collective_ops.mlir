@@ -86,3 +86,39 @@ func.func @all_reduce_maximum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
         use_global_device_ids} : (tensor<2304xf32>) -> tensor<2304xf32>
   return %out : tensor<2304xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @all_gather_dim_0
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<512xf32>) -> tensor<1024xf32>
+func.func @all_gather_dim_0(%input : tensor<512xf32>) -> tensor<1024xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<1024xf32>
+  // CHECK: [[OP:%.+]] = flow.allgather f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<1024xf32>, tensor<512xf32>, !flow.channel) -> tensor<1024xf32>
+  // CHECK: return [[OP]] : tensor<1024xf32>
+  %out = "mhlo.all_gather"(%input) {all_gather_dim = 0 : i64,
+     channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+     replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+     use_global_device_ids} : (tensor<512xf32>) -> tensor<1024xf32>
+  return %out : tensor<1024xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @all_gather_dim_1
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<2x2xf32>) -> tensor<2x4xf32>
+func.func @all_gather_dim_1(%input : tensor<2x2xf32>) -> tensor<2x4xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: tensor.empty() : tensor<2x2xf32>
+  // CHECK: [[TRANSPOSE_ARG:%.+]] = linalg.generic
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<4x2xf32>
+  // CHECK: [[OP:%.+]] = flow.allgather f32, [[EMPTY]], [[TRANSPOSE_ARG]], %channel_default  : (tensor<4x2xf32>, tensor<2x2xf32>, !flow.channel) -> tensor<4x2xf32>
+  // CHECK: tensor.empty() : tensor<2x4xf32>
+  // CHECK: [[TRANSPOSE_OUT:%.+]] = linalg.generic
+  // CHECK: return [[TRANSPOSE_OUT]] : tensor<2x4xf32>
+  %out = "mhlo.all_gather"(%input) {all_gather_dim = 1 : i64,
+     channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+     replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+     use_global_device_ids} : (tensor<2x2xf32>) -> tensor<2x4xf32>
+  return %out : tensor<2x4xf32>
+}

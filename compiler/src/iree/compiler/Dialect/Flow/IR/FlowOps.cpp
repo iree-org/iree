@@ -1570,6 +1570,22 @@ void ChannelRankOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// flow.allgather
+//===----------------------------------------------------------------------===//
+Value AllGatherOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
+}
+
+::llvm::Optional<unsigned> AllGatherOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // target
+}
+
+SmallVector<int64_t, 4> AllGatherOp::getTiedResultOperandIndices() {
+  return {0};  // target
+}
+
+//===----------------------------------------------------------------------===//
 // flow.allreduce
 //===----------------------------------------------------------------------===//
 Value AllReduceOp::getTiedResult(unsigned resultIndex) {

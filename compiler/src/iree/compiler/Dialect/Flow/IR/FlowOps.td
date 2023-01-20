@@ -1369,6 +1369,26 @@ def FLOW_ChannelCountOp : FLOW_Op<"channel.count", [
   }];
 }
 
+def FLOW_AllGatherOp : FLOW_Op<"allgather", [
+  AllTypesMatch<["target", "result"]>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let arguments = (ins
+    FLOW_CollectiveElementTypeAttr:$element_type,
+    AnyTypeOf<[AnyTensor, AnyMemRef]>:$target,
+    AnyTypeOf<[AnyTensor, AnyMemRef]>:$source,
+    FLOW_Channel:$channel
+  );
+  let results = (outs
+    AnyTypeOf<[AnyTensor, AnyMemRef]>:$result
+  );
+  let assemblyFormat = "$element_type `,` operands attr-dict `:` functional-type(operands, results)";
+}
+
 def FLOW_AllReduceOp : FLOW_Op<"allreduce", [
   AllTypesMatch<["source", "target", "result"]>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
