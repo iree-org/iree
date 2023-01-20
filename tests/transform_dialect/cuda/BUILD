@@ -26,11 +26,12 @@ endif()
 iree_lit_test_suite(
     name = "lit",
     srcs = [
-        "reduction.mlir",
-        "reduction_eltwise.mlir",
-        "reduction_v2.mlir",
-        "reduction_v2_uneven.mlir",
-        "reduction_v3.mlir",
+        # Re-enable after #11921 is fixed.
+        # "reduction.mlir",
+        # "reduction_eltwise.mlir",
+        # "reduction_v2.mlir",
+        # "reduction_v2_uneven.mlir",
+        # "reduction_v3.mlir",
         "softmax.mlir",
         "softmax_v2.mlir",
         # First few ops of softmax only, acts as a proxy example.
