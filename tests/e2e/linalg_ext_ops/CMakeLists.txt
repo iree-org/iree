@@ -17,6 +17,7 @@ iree_check_single_backend_test_suite(
     "reverse.mlir"
     "scan.mlir"
     "scatter.mlir"
+    "softmax.mlir"
     "sort.mlir"
     "top-k.mlir"
   TARGET_BACKEND
@@ -77,6 +78,7 @@ iree_check_single_backend_test_suite(
     "reverse.mlir"
     "scan.mlir"
     "scatter.mlir"
+    "softmax.mlir"
     "sort.mlir"
     "top-k.mlir"
     "unpack.mlir"

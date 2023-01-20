@@ -96,6 +96,13 @@ def ConvertConv2DToWinograd :
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createConvertConv2DToWinogradPass()";
 }
 
+def DecomposeSoftmax :
+    Pass<"iree-linalg-ext-decompose-softmax", "func::FuncOp"> {
+  let summary =
+      "Decomposes softmax op into a sequence of linalg ops";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createDecomposeSoftmaxPass()";
+}
 
 //===---------------------------------------------------------------------====//
 // Codegen Strategy passes moved into IREE

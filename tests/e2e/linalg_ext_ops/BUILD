@@ -20,6 +20,7 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",
             "scan.mlir",
             "scatter.mlir",
+            "softmax.mlir",
             "sort.mlir",
             "top-k.mlir",
         ],
@@ -88,6 +89,7 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",
             "scan.mlir",
             "scatter.mlir",
+            "softmax.mlir",
             "sort.mlir",
             "top-k.mlir",
             "unpack.mlir",
@@ -135,6 +137,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "softmax.mlir",
             "winograd_input.mlir",
             "winograd_output.mlir",
         ],
@@ -164,6 +167,7 @@ iree_check_single_backend_test_suite(
             # Re-enable this once we have new devices with up-to-date drivers.
             "top-k.mlir",
             "scan.mlir",
+            "softmax.mlir",
         ],
     ),
     driver = "vulkan",
