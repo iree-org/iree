@@ -160,6 +160,7 @@ jobs:
 
   build_test_all_windows:
     needs: setup
+    # DO NOT SUBMIT - keep running on postsubmit only
     if: needs.setup.outputs.should-run == 'true'
     runs-on: managed-windows-cpu
     defaults:
