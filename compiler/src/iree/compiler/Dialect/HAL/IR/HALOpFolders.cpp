@@ -32,7 +32,7 @@ namespace HAL {
 // hal.tensor.import/export
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TensorImportOp::fold(FoldAdaptor operands) {
   if (auto exportOp = getSource().getDefiningOp<TensorExportOp>()) {
     if (exportOp.getSource().getType() == getTarget().getType() &&
         exportOp.getSourceEncoding() == getTargetEncoding()) {
@@ -42,7 +42,7 @@ OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
   return {};
 }
 
-OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
   if (auto importOp = getSource().getDefiningOp<TensorImportOp>()) {
     if (importOp.getSource().getType() == getTarget().getType() &&
         importOp.getTargetEncoding() == getSourceEncoding()) {
