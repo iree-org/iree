@@ -1,5 +1,4 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline)))" %s | FileCheck %s
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline)))" -iree-codegen-llvmgpu-use-mma-sync %s | FileCheck %s -check-prefix=MMASYNC
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
@@ -413,6 +412,89 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
+hal.executable @mma_fused {
+  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @_large_aligned_dispatch_0() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0.000000e+00 : f32
+      %c2048 = arith.constant 2048 : index
+      %c512 = arith.constant 512 : index
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<2048x1024xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<1024x512xf32>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<2048x512xf32>>
+      %di = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<2048x512xf32>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 1024], strides = [1, 1]
+          : !flow.dispatch.tensor<readonly:tensor<2048x1024xf32>> -> tensor<2048x1024xf32>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1]
+          : !flow.dispatch.tensor<readonly:tensor<1024x512xf32>> -> tensor<1024x512xf32>
+      %d = flow.dispatch.tensor.load %di, offsets = [0, 0], sizes = [2048, 512], strides = [1, 1]
+          : !flow.dispatch.tensor<readonly:tensor<2048x512xf32>> -> tensor<2048x512xf32>
+      %init = tensor.empty() : tensor<2048x512xf32>
+      %f = linalg.fill ins(%cst : f32) outs(%init : tensor<2048x512xf32>) -> tensor<2048x512xf32>
+      %m = linalg.matmul ins(%3, %4 : tensor<2048x1024xf32>, tensor<1024x512xf32>) outs(%f : tensor<2048x512xf32>) -> tensor<2048x512xf32>
+      %init2 = tensor.empty() : tensor<2048x512xf32>
+      %a = linalg.generic {
+          indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+          iterator_types = ["parallel", "parallel"]}
+          ins(%m, %d : tensor<2048x512xf32>, tensor<2048x512xf32>) outs(%init2 : tensor<2048x512xf32>) {
+        ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
+          %19 = arith.addf %arg3, %arg4 : f32
+          linalg.yield %19 : f32
+        } -> (tensor<2048x512xf32>)
+        flow.dispatch.tensor.store %a, %2, offsets = [0, 0], sizes = [2048, 512], strides = [1, 1]
+          : tensor<2048x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<2048x512xf32>>
+      return
+    }
+  }
+}
+}
+
+// case with larger pipeline depth
+//     CHECK-LABEL: hal.executable public @mma_fused
+//           CHECK:   hal.executable.variant public @cuda
+//       CHECK-NOT:   llvm.store
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//           CHECK:   llvm.br
+//           CHECK:   nvvm.cp.async.wait.group 3
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
+//           CHECK:   nvvm.cp.async.commit.group
+//           CHECK:   llvm.br
+//       CHECK-NOT:   nvvm.wmma.mma
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           CHECK:   vvm.barrier0
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+
+
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @mma_fused_fp16 {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
   hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
@@ -483,32 +565,157 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<8xf16>>
 //           CHECK:   vvm.barrier0
 
-// mma.sync case:
-//    MMASYNC-LABEL: hal.executable public @mma_fused_fp16
-//          MMASYNC:   hal.executable.variant public @cuda
-//      MMASYNC-NOT:   llvm.store
-//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//          MMASYNC:   nvvm.cp.async.commit.group
-//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//          MMASYNC:   nvvm.cp.async.commit.group
-//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//          MMASYNC:   nvvm.cp.async.commit.group
-//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//          MMASYNC:   nvvm.cp.async.commit.group
-//          MMASYNC:   llvm.br
-//          MMASYNC:   nvvm.cp.async.wait.group 3
-//  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
-//  MMASYNC-COUNT-4:   nvvm.mma.sync
-//  MMASYNC-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
-//          MMASYNC:   nvvm.cp.async.commit.group
-//          MMASYNC:   llvm.br
-//      MMASYNC-NOT:   nvvm.mma.sync
-//  MMASYNC-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf16>, 3>
-//          MMASYNC:   llvm.load {{.*}} : !llvm.ptr<vector<8xf16>, 3>
-//          MMASYNC:   llvm.store {{.*}} : !llvm.ptr<vector<8xf16>>
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 4)>
+#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 32)>
+#map3 = affine_map<(d0)[s0] -> (s0, -d0 + 64)>
+#map4 = affine_map<(d0)[s0] -> (-d0 + 4, s0)>
+#map5 = affine_map<(d0)[s0] -> (-d0 + 32, s0)>
+#map6 = affine_map<(d0)[s0] -> (-d0 + 64, s0)>
+  hal.executable @large_dot_general_dispatch_0 {
+    hal.executable.variant public @cuda, target = #executable_target_cuda_nvptx_fb {
+      hal.executable.export @large_dot_general_dispatch_0 layout(#pipeline_layout) {
+      ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index):
+        %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
+        hal.return %x, %y, %z : index, index, index
+      }
+      builtin.module {
+        func.func @large_dot_general_dispatch_0() {
+          %c64 = arith.constant 64 : index
+          %c32 = arith.constant 32 : index
+          %c4 = arith.constant 4 : index
+          %cst = arith.constant 0.000000e+00 : f32
+          %c0 = arith.constant 0 : index
+          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32)
+              : !flow.dispatch.tensor<readonly:tensor<4x32x1024xf32>>
+          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32)
+              : !flow.dispatch.tensor<readonly:tensor<4x1024x64xf32>>
+          %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32)
+              : !flow.dispatch.tensor<writeonly:tensor<4x32x64xf32>>
+          %11 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4, 32, 1024], strides = [1, 1, 1]
+              : !flow.dispatch.tensor<readonly:tensor<4x32x1024xf32>> -> tensor<4x32x1024xf32>
+          %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4, 1024, 64], strides = [1, 1, 1]
+              : !flow.dispatch.tensor<readonly:tensor<4x1024x64xf32>> -> tensor<4x1024x64xf32>
+          %17 = tensor.empty() : tensor<4x32x64xf32>
+          %18 = linalg.fill ins(%cst : f32) outs(%17 : tensor<4x32x64xf32>) -> tensor<4x32x64xf32>
+          %19 = linalg.batch_matmul ins(%11, %13 : tensor<4x32x1024xf32>, tensor<4x1024x64xf32>)
+              outs(%18 : tensor<4x32x64xf32>) -> tensor<4x32x64xf32>
+          flow.dispatch.tensor.store %19, %2, offsets = [0, 0, 0], sizes = [4, 32, 64], strides = [1, 1, 1]
+              : tensor<4x32x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x32x64xf32>>
+          return
+        }
+      }
+    }
+  }
+
+// case with larger pipeline depth
+//     CHECK-LABEL: hal.executable public @large_dot_general_dispatch_0
+//           CHECK:   hal.executable.variant public @cuda
+//       CHECK-NOT:   llvm.store
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//           CHECK:   llvm.br
+//           CHECK:   nvvm.cp.async.wait.group 3
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
+//           CHECK:   nvvm.cp.async.commit.group
+//           CHECK:   llvm.br
+//       CHECK-NOT:   nvvm.wmma.mma
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           CHECK:   vvm.barrier0
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#map0 = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map4 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map5 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map6 = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
+  hal.executable public @split_k_gemm {
+    hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+      hal.executable.export public @split_k_gemm ordinal(0) layout(#pipeline_layout) {
+      ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
+        %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
+        hal.return %x, %y, %z : index, index, index
+      }
+      builtin.module {
+        func.func @split_k_gemm() {
+          %cst = arith.constant 0.000000e+00 : f32
+          %c0 = arith.constant 0 : index
+          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<2048x4x256xf32>>
+          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<4x256x512xf32>>
+          %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<4x2048x512xf32>>
+          %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [2048, 4, 256], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2048x4x256xf32>> -> tensor<2048x4x256xf32>
+          %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4, 256, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x256x512xf32>> -> tensor<4x256x512xf32>
+          %5 = tensor.empty() : tensor<4x2048x512xf32>
+          %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<4x2048x512xf32>) -> tensor<4x2048x512xf32>
+          %7 = linalg.generic {indexing_maps = [#map0, #map1, #map2],
+          iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+          ins(%3, %4 : tensor<2048x4x256xf32>, tensor<4x256x512xf32>)
+          outs(%6 : tensor<4x2048x512xf32>) {
+          ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+            %8 = arith.mulf %arg0, %arg1 : f32
+            %9 = arith.addf %arg2, %8 : f32
+            linalg.yield %9 : f32
+          } -> tensor<4x2048x512xf32>
+          flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [4, 2048, 512], strides = [1, 1, 1] : tensor<4x2048x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x2048x512xf32>>
+          return
+        }
+      }
+    }
+  }
+//     CHECK-LABEL: hal.executable public @split_k_gemm
+//           CHECK:   hal.executable.variant public @cuda
+//       CHECK-NOT:   llvm.store
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//           CHECK:   llvm.br
+//           CHECK:   nvvm.cp.async.wait.group 3
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//           CHECK:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
+//           CHECK:   nvvm.cp.async.commit.group
+//           CHECK:   llvm.br
+//       CHECK-NOT:   nvvm.wmma.mma
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           CHECK:   vvm.barrier0
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+
+// -----
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

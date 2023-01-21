@@ -25,6 +25,7 @@ iree_lit_test_suite(
             "distribute_foreach.mlir",
             "gpu_set_num_workgroups.mlir",
             "nvvm_pipeline_test.mlir",
+            "nvvm_mma_sync_pipeline_test.mlir",
             "reduction_pipeline_transform.mlir",
             "reduction_pipeline.mlir",
             "rocdl_pipeline_test.mlir",
