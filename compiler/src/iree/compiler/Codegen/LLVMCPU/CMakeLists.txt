@@ -14,10 +14,12 @@ iree_cc_library(
   NAME
     LLVMCPU
   HDRS
+    "DispatchABI.h"
     "KernelDispatch.h"
     "TargetMLTransformInfo.h"
   SRCS
     "ConvertToLLVM.cpp"
+    "DispatchABI.cpp"
     "KernelDispatch.cpp"
     "LLVMCPUAssignConstantOrdinals.cpp"
     "LLVMCPUAssignImportOrdinals.cpp"
@@ -38,6 +40,7 @@ iree_cc_library(
     IREELinalgExtPasses
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
+    LLVMBinaryFormat
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineToStandard

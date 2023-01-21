@@ -43,7 +43,8 @@ struct LLVMTargetOptions {
   // Include debug information in output files (PDB, DWARF, etc).
   // Though this can be set independently from the optLevel (so -O3 with debug
   // information is valid) it may significantly change the output program
-  // and benchmarking
+  // contents and benchmarking of binary sizes and to some extent execution
+  // time should be avoided with symbols present.
   bool debugSymbols = true;
 
   // Sanitizer Kind for CPU Kernels
