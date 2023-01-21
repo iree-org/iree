@@ -1181,6 +1181,103 @@ def IREELinalgExt_SoftmaxOp : IREELinalgExt_Op<"softmax",
 }
 
 //===----------------------------------------------------------------------===//
+// Attention
+//===----------------------------------------------------------------------===//
+
+class CheckShapedOperandOfRank3<int i> : And<[
+         CPred<"$_op.getNumOperands() > " # i>,
+         SubstLeaves<"$_self", "$_op.getOperand(" # i # ").getType()",
+           IsShapedTypePred>,
+         CPred<"$_op.getOperand(" # i # ").getType().cast<::mlir::ShapedType>().getRank() == 3">]>;
+
+def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
+    [PredOpTrait<"only 3 inputs and 1 output",  CheckNumOperands<4>>,
+     PredOpTrait<"all operands have same element type", TCopVTEtAreSameAt<[0, 1, 2, 3]>>,
+     PredOpTrait<"query has shaped type of rank 3", CheckShapedOperandOfRank3<0>>,
+     PredOpTrait<"key has shaped type of rank 3", CheckShapedOperandOfRank3<1>>,
+     PredOpTrait<"value has shaped type of rank 3", CheckShapedOperandOfRank3<2>>,
+     PredOpTrait<"output has shaped type of rank 3", CheckShapedOperandOfRank3<3>>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
+      ["getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
+       "getTiledImplementation"]>]> {
+  let summary = "Attention operator";
+  let description = [{
+    This operator takes in 3 tensors: query(Q), key(K) and value(V) and computes
+    the attention. Each of the inputs has shape BxNxd where B is the
+    of the batch dimension, N is the sequence length and d is head dimension.
+    Typically N >>> d. Mathematically, the attention is defined as
+    matmul(softmax(matmul(Q, transpose(K))), V) and has shape BxNxd. Usually,
+    this operator also performs scaling, masking and dropout, but we leave
+    that out of the current implementation.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs
+  );
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs)>
+  ];
+
+  let results = (outs Variadic<AnyRankedTensor>:$result);
+  let hasFolder = 1;
+  let assemblyFormat = [{
+    attr-dict
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`->` type($result)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value query() {
+      return getInputOperand(0)->get();
+    }
+    Value key() {
+      return getInputOperand(1)->get();
+    }
+    Value value() {
+      return getInputOperand(2)->get();
+    }
+    Value output() {
+      return getOutputOperand(0)->get();
+    }
+    ShapedType getQueryType() {
+      return query().getType().cast<ShapedType>();
+    }
+    ShapedType getKeyType() {
+      return key().getType().cast<ShapedType>();
+    }
+    ShapedType getValueType() {
+      return value().getType().cast<ShapedType>();
+    }
+    ShapedType getOutputType() {
+      return output().getType().cast<ShapedType>();
+    }
+    int64_t getQueryRank() {
+      return getQueryType().getRank();
+    }
+    int64_t getKeyRank() {
+      return getKeyType().getRank();
+    }
+    int64_t getValueRank() {
+      return getValueType().getRank();
+    }
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
+      std::pair<unsigned, unsigned> outputsIndexAndLength =
+        getODSOperandIndexAndLength(1);
+      return std::make_pair<int64_t, int64_t>(
+          outputsIndexAndLength.first,
+          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Pure ops
 //===----------------------------------------------------------------------===//
 
