@@ -1463,3 +1463,50 @@ hal.executable private @pack  {
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   iree_linalg_ext.pack
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+hal.executable private @quant_model {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
+    hal.executable.export public @quant_model ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer, ReadOnly>, <3, storage_buffer, ReadOnly>, <4, storage_buffer, ReadOnly>, <5, storage_buffer, ReadOnly>, <6, storage_buffer>]>]>) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @quant_model() {
+        %c0 = arith.constant 0 : index
+        %c12_i32 = arith.constant 12 : i32
+        %c-128_i32 = arith.constant -128 : i32
+        %c127_i32 = arith.constant 127 : i32
+        %c0_i32 = arith.constant 0 : i32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<2304x24xi8>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<24x144xi8>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<144xi32>>
+        %6 = hal.interface.binding.subspan set(0) binding(6) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<2304x144xi8>>
+        %7 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2304, 24], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2304x24xi8>> -> tensor<2304x24xi8>
+        %8 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [24, 144], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<24x144xi8>> -> tensor<24x144xi8>
+        %9 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [144], strides = [1] : !flow.dispatch.tensor<readonly:tensor<144xi32>> -> tensor<144xi32>
+        %13 = tensor.empty() : tensor<2304x144xi8>
+        %14 = tensor.empty() : tensor<2304x144xi32>
+        %15 = linalg.fill ins(%c0_i32 : i32) outs(%14 : tensor<2304x144xi32>) -> tensor<2304x144xi32>
+        %16 = linalg.matmul ins(%7, %8 : tensor<2304x24xi8>, tensor<24x144xi8>) outs(%15 : tensor<2304x144xi32>) -> tensor<2304x144xi32>
+        %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%9, %16 : tensor<144xi32>, tensor<2304x144xi32>) outs(%13 : tensor<2304x144xi8>) {
+        ^bb0(%in: i32, %in_0: i32, %out: i8):
+          %19 = arith.subi %in_0, %c12_i32 : i32
+          %20 = arith.addi %in, %19 : i32
+          %27 = arith.trunci %20 : i32 to i8
+          linalg.yield %27 : i8
+        } -> tensor<2304x144xi8>
+        flow.dispatch.tensor.store %17, %6, offsets = [0, 0], sizes = [2304, 144], strides = [1, 1] : tensor<2304x144xi8> -> !flow.dispatch.tensor<writeonly:tensor<2304x144xi8>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[256, 72, 0], [8, 24, 0], [0, 0, 12]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
+//      CHECK: hal.executable.export public @quant_model
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.matmul
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
