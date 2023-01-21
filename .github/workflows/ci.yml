@@ -185,7 +185,7 @@ jobs:
           key: ccache_all_windows_${{ github.sha }}
           restore-keys: ccache_all_windows
       # Fetch dependencies.
-      # TODO(scotttodd): Move these into a Docker image.
+      # TODO(scotttodd): Move some of these into a Docker image / add to PATH.
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
       - name: "Setting up Python"
