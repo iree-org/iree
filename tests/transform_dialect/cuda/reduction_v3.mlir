@@ -51,9 +51,8 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //         CHECK: }
   //         CHECK: vector.transfer_write %[[v]], %[[SHMEM_ALLOC]][%[[C0]], %[[TIDX]]] : vector<f32>, memref<1x1024xf32, #gpu.address_space<workgroup>>
 
-  //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
   // Distributed reduction: everyone loads then 5 xor + addf expected
-  //         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %{{.*}}]
+  //         CHECK: vector.transfer_read %{{.*}}[%[[C0]], %{{.*}}]
   // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
   //         CHECK: %[[RES:.*]] = arith.addf %{{.*}}

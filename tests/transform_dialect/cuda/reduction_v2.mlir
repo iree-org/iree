@@ -56,9 +56,8 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   // TODO: remote unnecessary barrier within the loop
   //         CHECK:   gpu.barrier
 
-  //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
   // Distributed reduction: everyone loads then 5 xor + addf expected
-  //         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %[[IDX]]]
+  //         CHECK: vector.transfer_read %{{.*}}[%[[C0]], %[[IDX]]]
   // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
   //         CHECK: %[[RES:.*]] = arith.addf %{{.*}}
