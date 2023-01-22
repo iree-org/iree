@@ -95,11 +95,23 @@ class ModuleExecutionConfig(object):
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
-class MLIRDialectType(Enum):
+@dataclass(frozen=True)
+class _MLIRDialectPair(object):
+  """MLIR dialect with its unique artificial id."""
+  # Unique artificial id.
+  id: int
+  # Name of an IREE supported input type (--iree-input-type).
+  dialect_name: str
+
+
+# Please use and update the next id when adding a new dialect, so we won't reuse
+# the old deprecated id.
+# Next ID: 4
+class MLIRDialectType(_MLIRDialectPair, Enum):
   """Imported MLIR dialect type."""
-  LINALG = "linalg"
-  TOSA = "tosa"
-  MHLO = "mhlo"
+  LINALG = (1, "linalg")
+  TOSA = (2, "tosa")
+  MHLO = (3, "mhlo")
 
 
 MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
@@ -109,15 +121,6 @@ MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
         MLIRDialectType.TOSA,
     common_definitions.ModelSourceType.EXPORTED_TF:
         MLIRDialectType.MHLO,
-}
-
-# Map to provide stable artificial id of dialect type. Please use and update the
-# next id when adding a new dialect, so we won't reuse the old deprecated id.
-# Next ID: 4
-DIALECT_TYPE_TO_DIALECT_ID_MAP = {
-    MLIRDialectType.LINALG: 1,
-    MLIRDialectType.TOSA: 2,
-    MLIRDialectType.MHLO: 3,
 }
 
 
@@ -132,10 +135,9 @@ class ImportedModel(object):
   @staticmethod
   def from_model(model: common_definitions.Model):
     dialect_type = MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type]
-    return ImportedModel(
-        id=f"{model.id}-{DIALECT_TYPE_TO_DIALECT_ID_MAP[dialect_type]}",
-        model=model,
-        dialect_type=dialect_type)
+    return ImportedModel(id=f"{model.id}-{dialect_type.id}",
+                         model=model,
+                         dialect_type=dialect_type)
 
 
 @serialization.serializable

@@ -92,7 +92,7 @@ class IreeRuleBuilder(object):
 
     compile_flags = self._generate_compile_flags(
         compile_config=compile_config,
-        mlir_dialect_type=imported_model.dialect_type.value
+        mlir_dialect_type=imported_model.dialect_type.dialect_name
     ) + compile_config.extra_flags
 
     # Module target name: iree-module-<model_id>-<compile_config_id>
