@@ -66,15 +66,24 @@ class WindowsLinkerTool : public LinkerTool {
       builder.CreateRet(one);
     }
 
-    // For now we ensure that our entry points are exported (via linker
-    // directives embedded in the object file) and in a compatible calling
-    // convention.
-    // TODO(benvanik): switch to executable libraries w/ internal functions.
-    for (auto func : exportedFuncs) {
-      func->setCallingConv(llvm::CallingConv::X86_StdCall);
-      func->setDLLStorageClass(
-          llvm::GlobalValue::DLLStorageClassTypes::DLLExportStorageClass);
-      func->setUWTableKind(llvm::UWTableKind::Default);
+    // Since all exports are fetched via the executable library query function
+    // we don't need to make them publicly exported on the module. This has
+    // the downside of making some tooling (disassemblers/decompilers/binary
+    // size analysis tools/etc) a bit harder to work with, though, so when
+    // compiling in debug mode we export all the functions.
+    if (targetOptions.debugSymbols) {
+      for (auto *llvmFunc : exportedFuncs) {
+        llvmFunc->setVisibility(
+            llvm::GlobalValue::VisibilityTypes::DefaultVisibility);
+        llvmFunc->setLinkage(llvm::GlobalValue::LinkageTypes::ExternalLinkage);
+        llvmFunc->setDLLStorageClass(
+            llvm::GlobalValue::DLLStorageClassTypes::DLLExportStorageClass);
+
+        // In debug modes we need unwind tables in order to get proper stacks on
+        // all platforms. We don't support exceptions so unless debugging is
+        // requested we omit them to reduce code size.
+        llvmFunc->setUWTableKind(llvm::UWTableKind::Async);
+      }
     }
 
     return success();

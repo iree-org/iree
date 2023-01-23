@@ -327,11 +327,13 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     auto *queryLibraryFunc = libraryBuilder.build(queryFunctionName);
 
     // The query function must be exported for dynamic libraries.
+    queryLibraryFunc->setDSOLocal(false);
     queryLibraryFunc->setVisibility(
         llvm::GlobalValue::VisibilityTypes::DefaultVisibility);
     queryLibraryFunc->setLinkage(
         llvm::GlobalValue::LinkageTypes::ExternalLinkage);
-    queryLibraryFunc->setDSOLocal(false);
+    queryLibraryFunc->setDLLStorageClass(
+        llvm::GlobalValue::DLLStorageClassTypes::DLLExportStorageClass);
 
     // If linking dynamically, find a suitable linker tool and configure the
     // module with any options that tool requires.
