@@ -64,7 +64,7 @@ iree_status_t iree_hal_nccl_result_to_status(
       code = IREE_STATUS_INTERNAL;
       break;
   }
-  const char* error_string = syms->ncclGetErrorString(result);
   return iree_make_status_with_location(file, line, code, "NCCL error %d: %s",
-                                        result, error_string);
+                                        result,
+                                        syms->ncclGetErrorString(result));
 }
