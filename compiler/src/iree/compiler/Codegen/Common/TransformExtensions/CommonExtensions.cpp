@@ -74,8 +74,6 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(lowerTransferOpPermutations,
               getLowerTransferOpPermutationsAttrName)
-  ADD_PATTERN(promoteForeachThreadCaptureToShared,
-              getPromoteForeachThreadCaptureToSharedAttrName)
   ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
   ADD_PATTERN(rankReducingVector, getRankReducingVectorAttrName)
   ADD_PATTERN(expandMemrefStridedMetadata,
@@ -108,62 +106,6 @@ struct GenerateToConstant : public OpRewritePattern<tensor::GenerateOp> {
     return success();
   }
 };
-
-struct PromoteCaptureToSharedOut
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
-                                PatternRewriter &rewriter) const override {
-    scf::ForeachThreadOp foreachThreadOp =
-        extractSliceOp->getParentOfType<scf::ForeachThreadOp>();
-
-    while (foreachThreadOp) {
-      // Check if the extract_slice source is a shared output.
-      auto outputIt =
-          llvm::find(foreachThreadOp.getOutputs(), extractSliceOp.getSource());
-      if (outputIt == foreachThreadOp.getOutputs().end()) {
-        foreachThreadOp =
-            foreachThreadOp->getParentOfType<scf::ForeachThreadOp>();
-        continue;
-      }
-
-      // Get the corresponding bbArg of the loop body.
-      BlockArgument bbArg =
-          foreachThreadOp.getOutputBlockArguments()[std::distance(
-              foreachThreadOp.getOutputs().begin(), outputIt)];
-
-      // Check if the extract_slice has a matching parallel_insert_slice (i.e.,
-      // same source/target, offsets, sizes and strides).
-      auto isMatchingParallelInsertSlice = [&](Operation &op) {
-        auto insertSlice = dyn_cast<tensor::ParallelInsertSliceOp>(&op);
-        if (!insertSlice) return false;
-        if (insertSlice.getDest() != bbArg) return false;
-        return llvm::equal(insertSlice.getMixedOffsets(),
-                           extractSliceOp.getMixedOffsets()) &&
-               llvm::equal(insertSlice.getMixedSizes(),
-                           extractSliceOp.getMixedSizes()) &&
-               llvm::equal(insertSlice.getMixedStrides(),
-                           extractSliceOp.getMixedStrides());
-      };
-      if (llvm::none_of(foreachThreadOp.getTerminator().getYieldingOps(),
-                        isMatchingParallelInsertSlice)) {
-        foreachThreadOp =
-            foreachThreadOp->getParentOfType<scf::ForeachThreadOp>();
-        continue;
-      }
-
-      // Promote extract_slice source to bbArg.
-      rewriter.updateRootInPlace(extractSliceOp, [&]() {
-        extractSliceOp.getSourceMutable().assign(bbArg);
-      });
-
-      return success();
-    }
-
-    return failure();
-  }
-};
 }  // namespace
 
 static void addLowerTransferOpPermutationsPatterns(
@@ -173,11 +115,6 @@ static void addLowerTransferOpPermutationsPatterns(
 
 static void addFoldMemrefAliasPatterns(RewritePatternSet &patterns) {
   memref::populateFoldMemRefAliasOpPatterns(patterns);
-}
-
-static void addForeachThreadCapturePromotionPatterns(
-    RewritePatternSet &patterns) {
-  patterns.add<PromoteCaptureToSharedOut>(patterns.getContext());
 }
 
 static void addReassociativeReshapePatterns(RewritePatternSet &patterns) {
@@ -238,8 +175,6 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
-  if (getPromoteForeachThreadCaptureToShared())
-    addForeachThreadCapturePromotionPatterns(patterns);
   if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
   if (getRankReducingVector()) addRankReducingVectorPatterns(patterns);
   if (getExpandMemrefStridedMetadata())
@@ -273,6 +208,76 @@ void transform_dialect::ApplyPatternsOp::getEffects(
   transform::onlyReadsHandle(getTarget(), effects);
   transform::producesHandle(getResult(), effects);
   transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
+// ShareForeachThreadOperandsOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::ShareForeachThreadOperandsOp::applyToOne(
+    scf::ForeachThreadOp foreachThreadOp,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  SmallVector<int64_t> shareOperands(getShareOperands());
+  // Empty case: consider all operands need to be shared.
+  if (shareOperands.empty()) {
+    shareOperands = llvm::to_vector(
+        llvm::seq<int64_t>(0, foreachThreadOp.getOutputs().size()));
+  }
+  for (int64_t outputIdx : getShareOperands()) {
+    if (outputIdx < 0 || outputIdx >= foreachThreadOp.getOutputs().size())
+      return mlir::emitDefiniteFailure(foreachThreadOp, "operand idx overflow");
+    Value toShare = foreachThreadOp.getOutputs()[outputIdx];
+    if (std::distance(toShare.getUses().begin(), toShare.getUses().end()) !=
+        2) {
+      /*return mlir::emitSilenceableFailure(
+          foreachThreadOp,
+          "operand to share must have exactly 2 uses, the foreach_thread op "
+          "and an extract_slice op.");*/
+      continue;
+    }
+    tensor::ExtractSliceOp extractSliceOp;
+    for (Operation *user : toShare.getUsers()) {
+      extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user);
+      if (extractSliceOp) break;
+    }
+    if (!extractSliceOp) {
+      /*return mlir::emitSilenceableFailure(
+        foreachThreadOp,
+        "shared operands use must be extractSliceOp.");*/
+      continue;
+    }
+    // Get the corresponding bbArg.
+    BlockArgument bbArg = foreachThreadOp.getOutputBlockArguments()[outputIdx];
+
+    // Check if the extract_slice has a matching parallel_insert_slice
+    // (i.e., same source/target, offsets, sizes and strides).
+    auto isMatchingParallelInsertSlice = [&](Operation &op) {
+      auto insertSlice = dyn_cast<tensor::ParallelInsertSliceOp>(&op);
+      if (!insertSlice) return false;
+      if (insertSlice.getDest() != bbArg) return false;
+      return llvm::equal(insertSlice.getMixedOffsets(),
+                         extractSliceOp.getMixedOffsets()) &&
+             llvm::equal(insertSlice.getMixedSizes(),
+                         extractSliceOp.getMixedSizes()) &&
+             llvm::equal(insertSlice.getMixedStrides(),
+                         extractSliceOp.getMixedStrides());
+    };
+    if (llvm::none_of(foreachThreadOp.getTerminator().getYieldingOps(),
+                      isMatchingParallelInsertSlice)) {
+      continue;
+    }
+
+    // Promote extract_slice source to bbArg.
+    rewriter.updateRootInPlace(extractSliceOp, [&]() {
+      extractSliceOp.getSourceMutable().assign(bbArg);
+    });
+  }
+
+  results.push_back(foreachThreadOp);
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
