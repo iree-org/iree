@@ -11,17 +11,35 @@
 #
 # Usage:
 #    ./run_shark.sh \
-#        <SHA of https://github.com/nod-ai/SHARK.git to pin to> \
-#        <pytest regex> e.g. "cpu", "cuda", "cuda and torch".
-#        <driver> e.g. "cpu", "cuda", "vulkan"
-#        <output directory>
+#        --sha <SHA of https://github.com/nod-ai/SHARK.git to pin to> \
+#        --pytest-regex e.g. "cpu", "cuda", "cuda and torch". \
+#        --driver e.g. "cpu", "cuda", "vulkan" \
+#        --output-dir <local output dir> \
+#        --save-version-info <true|false>
 
 set -xeuo pipefail
 
-export SHARK_SHA=$1
-export BENCHMARK_REGEX=$2
-export DRIVER=$3
-export SHARK_OUTPUT_DIR=`pwd`/$4
+export SAVE_VERSION_INFO=false
+export BENCHMARK_REGEX="cpu"
+export DRIVER="cpu"
+
+while [[ "$#" -gt 0 ]]; do
+  case $1 in
+    -s|--sha) SHARK_SHA="$2"
+    shift;;
+    -r|--pytest-regex) BENCHMARK_REGEX="$2"
+    shift;;
+    -d|--driver) DRIVER="$2"
+    shift;;
+    -o|--output-dir) SHARK_OUTPUT_DIR="$(pwd)/$2"
+    shift;;
+    -v|--save-version-info) SAVE_VERSION_INFO="$2"
+    shift;;
+    *) echo "Unknown parameter passed: $1"
+    exit 1;;
+esac
+shift
+done
 
 mkdir "${SHARK_OUTPUT_DIR}"
 
@@ -47,6 +65,7 @@ fi
 # Run with SHARK-Runtime.
 PYTHON=python3.10 VENV_DIR=shark.venv BENCHMARK=1 IMPORTER=1 ./setup_venv.sh
 source shark.venv/bin/activate
+
 export SHARK_VERSION=`pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g"`
 pytest "${args[@]}" tank/test_models.py || true
 
@@ -64,6 +83,7 @@ rm -rf ~/.local/shark_tank
 # Run with IREE.
 PYTHON=python3.10 VENV_DIR=iree.venv BENCHMARK=1 IMPORTER=1 USE_IREE=1 ./setup_venv.sh
 source iree.venv/bin/activate
+
 export IREE_VERSION=`pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g"`
 pytest "${args[@]}" tank/test_models.py || true
 
@@ -72,4 +92,18 @@ echo "Benchmarks for IREE Complete"
 cat bench_results.csv
 mv bench_results.csv "${SHARK_OUTPUT_DIR}/${DRIVER}_iree_${IREE_VERSION}.csv"
 echo "######################################################"
+
+# Save version info.
+if [[ "${SAVE_VERSION_INFO}" == true ]]; then
+  touch "${SHARK_OUTPUT_DIR}/version_info.txt"
+  echo "iree=${IREE_VERSION}" >> "${SHARK_OUTPUT_DIR}/version_info.txt"
+  echo "shark=${SHARK_VERSION}" >> "${SHARK_OUTPUT_DIR}/version_info.txt"
+
+  export TF_VERSION=$(pip show tensorflow | grep "Version" | awk '{print $NF}')
+  echo "tf=Tensorflow XLA ${TF_VERSION}" >> "${SHARK_OUTPUT_DIR}/version_info.txt"
+
+  export TORCH_VERSION=$(pip show torch | grep "Version" | awk '{print $NF}')
+  echo "torch=Torch Inductor ${TORCH_VERSION}" >> "${SHARK_OUTPUT_DIR}/version_info.txt"
+fi
+
 deactivate
