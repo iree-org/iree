@@ -51,6 +51,6 @@ declare -a CMAKE_ARGS=(
 "${CMAKE_BIN}" "${CMAKE_ARGS[@]}"
 "${CMAKE_BIN}" --build "${BUILD_DIR}" --target install -- -k 0
 
-if (( IREE_READ_REMOTE_CCACHE == 1 )); then
+if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats
 fi
