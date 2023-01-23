@@ -57,7 +57,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BENCHMARK_PROCESS_JOB: process_benchmark_results
         run: |
-          # Assume the workflow has less then 100 jobs.
+          # Assume the workflow has fewer than 100 jobs.
           export CONCLUSION=$(gh api \
             "/repos/${GITHUB_REPOSITORY}/actions/runs/${PR_CI_RUN_ID}/attempts/${PR_CI_RUN_ATTEMPT}/jobs?per_page=100" \
             | jq --raw-output --arg job "${BENCHMARK_PROCESS_JOB}" \
