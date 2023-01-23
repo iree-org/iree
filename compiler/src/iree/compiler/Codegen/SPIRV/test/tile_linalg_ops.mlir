@@ -106,3 +106,4 @@ func.func @has_scf_if() {
 // CHECK-SAME:         outs(%{{.+}} : tensor<4xi32>)
 //      CHECK: scf.if
 //      CHECK: scf.if
+//      CHECK: linalg.yield %{{.*}} : i32

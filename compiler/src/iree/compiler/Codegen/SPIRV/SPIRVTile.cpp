@@ -51,7 +51,7 @@ static FailureOr<IREE::Codegen::LoweringConfigAttr> collectComputeOps(
   // discover such computation ops so that we can tile and fuse both regions.
   SmallVector<scf::IfOp, 1> ifOps;
   funcOp.walk<WalkOrder::PreOrder>([&ifOps](Operation *op) -> WalkResult {
-    if (isa<linalg::LinalgOp, TilingInterface>(op)) {
+    if (isa<linalg::LinalgOp>(op)) {
       // Exclude scf.if in linalg op
       return WalkResult::skip();
     } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
