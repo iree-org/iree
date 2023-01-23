@@ -475,6 +475,13 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+
+  // This is a temporary solution for handling aggressive fusion heuristics.
+  // This rematerializes parallel ops into the consumers to avoid stack
+  // allocation.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
+
   {
     LinalgFusePassOptions options;
     // Run SplitReductionPass before the final reduction Fuse pass, because
