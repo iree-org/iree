@@ -18,6 +18,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetOperations.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -25,20 +27,26 @@
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
+// #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Transforms/DialectConversion.h"
+
+#define DEBUG_TYPE "iree-common-extensions-transforms"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
+
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
+#define DBGSNL() (llvm::dbgs() << "\n")
 
 iree_compiler::IREE::transform_dialect::CommonExtensions::CommonExtensions() {
   registerTransformOps<
@@ -457,6 +465,231 @@ LogicalResult rewriteForeachThreadToWorkgroup(
 }
 
 //===---------------------------------------------------------------------===//
+// PackGreedilyOp.
+//===---------------------------------------------------------------------===//
+
+namespace {
+auto par = utils::IteratorType::parallel;
+auto red = utils::IteratorType::reduction;
+}  // namespace
+
+static int64_t numResultsFunctionOf(AffineMap map, AffineDimExpr d) {
+  int64_t count = 0;
+  for (AffineExpr e : map.getResults())
+    if (e.isFunctionOfDim(d.getPosition())) ++count;
+  return count;
+}
+
+/// Return the set of AffineDimExpr
+static DenseSet<int64_t> findPermutationsIndexingOperand(
+    linalg::LinalgOp linalgOp, OpOperand *opOperand, utils::IteratorType iter) {
+  DenseSet<int64_t> res;
+  assert(linalgOp == opOperand->getOwner() && "expected linalgOp owner");
+  AffineMap indexingMap = linalgOp.getMatchingIndexingMap(opOperand);
+  for (AffineExpr e : indexingMap.getResults()) {
+    if (auto d = e.dyn_cast<AffineDimExpr>()) {
+      if (linalgOp.getIteratorTypesArray()[d.getPosition()] == iter &&
+          numResultsFunctionOf(indexingMap, d) == 1)
+        res.insert(d.getPosition());
+    }
+  }
+  return res;
+}
+
+struct ContractionDimsForPacking {
+  int64_t mPos, nPos, kPos;
+};
+/// Greedily look for 2 parallel (m and n) and 1 reduction (k) dimension that
+/// form a contraction. Such dimensions are such that:
+///   1. The m dimension is involved in an outer-product along LHS
+///      (i.e. it is a permutation on RES and LHS and does not appear in RHS).
+///   2. The n dimension is involved in an outer-product along RHS
+///      (i.e. it is a permutation on RES and RHS and does not appear in LHS).
+///   3. The k dimension appears as a permutation on LHS and RHS.
+///   4. m, n and k appear only once in any given indexing.
+///
+/// This allows detecting that some contraction is embedded within `linalgOp`.
+///
+/// When multiple possibilities for selecting m, n and k appear, we just pick
+/// an arbitrary one (i.e. the first in a DenseSet).
+// TODO: Better heuristic (e.g pick dims based on packing-based metric).
+static FailureOr<ContractionDimsForPacking> getContractionDims(
+    linalg::LinalgOp linalgOp) {
+  assert(linalgOp.getNumDpsInits() == 1 && "wrong number of dps inits");
+  assert(linalgOp.getNumDpsInputs() == 2 && "wrong number of dps inputs");
+
+  DenseSet<int64_t> a = findPermutationsIndexingOperand(
+      linalgOp, linalgOp.getDpsInputOperand(0), par);
+  DenseSet<int64_t> b = findPermutationsIndexingOperand(
+      linalgOp, linalgOp.getDpsInputOperand(1), par);
+  DenseSet<int64_t> c = findPermutationsIndexingOperand(
+      linalgOp, linalgOp.getDpsInitOperand(0), par);
+
+  // A & C - B are the iterators involved in an outer-product along A (the LHS).
+  DenseSet<int64_t> ac = a;
+  llvm::set_intersect(ac, c);
+  llvm::set_subtract(ac, b);
+  // B & C - A are the iterators involved in an outer-product along B (the RHS).
+  DenseSet<int64_t> bc = b;
+  llvm::set_intersect(bc, c);
+  llvm::set_subtract(bc, a);
+
+  // Note: if we ever need them, A & B & C would be "batch" dimensions.
+
+  // A & B red are the reduction dimensions.
+  DenseSet<int64_t> ra = findPermutationsIndexingOperand(
+      linalgOp, linalgOp.getDpsInputOperand(0), red);
+  DenseSet<int64_t> rb = findPermutationsIndexingOperand(
+      linalgOp, linalgOp.getDpsInputOperand(1), red);
+  llvm::set_intersect(ra, rb);
+
+  if (ac.empty() || bc.empty() || ra.empty()) return failure();
+
+  // Pick the first one in each set.
+  // TODO: Better heuristic (e.g pick dims based on packing-based metric).
+  return ContractionDimsForPacking{*ac.begin(), *bc.begin(), *ra.begin()};
+}
+
+/// Return a permutation vector of size permSize that would result in moving
+/// positions into desiredPositions.
+///
+/// For example, permSize == 5, positions = {2, 4}, desiredPositions = {1, 0}
+/// would result in a {4, 2, 0, 1, 3} permutation vector.
+static SmallVector<int64_t> computePermutationVector(
+    int64_t permSize, ArrayRef<int64_t> positions,
+    ArrayRef<int64_t> desiredPositions) {
+  SmallVector<int64_t> res(permSize, -1);
+  DenseSet<int64_t> seen;
+  for (auto [pos, desiredPos] : llvm::zip(positions, desiredPositions)) {
+    res[desiredPos] = pos;
+    seen.insert(pos);
+  }
+  int64_t nextPos = 0;
+  for (int64_t &entry : res) {
+    if (entry != -1) continue;
+    while (seen.contains(nextPos)) ++nextPos;
+    entry = nextPos;
+    ++nextPos;
+  }
+  return res;
+}
+
+/// Pack a LinalgOp by greedily inferring 2-D contraction dimensions (m, n, k)
+/// where m and n are proper parallel dimensions and k is a proper reduction
+/// dimension.
+/// Packing occurs by rewriting the op as a linalg.generic and calling
+/// linalg::pack by `mnkPackingSizes`.
+/// The order of the packed dimensions is customizable: the `mnkOrder` is a
+/// permutation of {0, 1, 2} to reorder {m, n, k} into one of the 8 possible
+/// forms.
+/// The outer dimensions of the operands are not permuted at this time, this is
+/// left for future work.
+static LogicalResult packContractionGreedily(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+    ArrayRef<OpFoldResult> mnkPackingSizes, ArrayRef<int64_t> mnkOrder) {
+  assert(mnkPackingSizes.size() == 3 && "unexpected num of packing sizes");
+  assert(mnkOrder.size() == 3 && "unexpected mnkOrder size");
+
+  int64_t numLoops = linalgOp.getNumLoops();
+  if (numLoops <= 2)
+    return rewriter.notifyMatchFailure(linalgOp,
+                                       "need 3+ loops to pack a contraction");
+
+  // Locally adjust the desired iterator position of mnk and packing sizes.
+  int64_t numPackedDims = mnkPackingSizes.size();
+  SmallVector<int64_t> mmnnkkPos(numPackedDims);
+  for (int64_t i = 0, e = numPackedDims; i < e; ++i)
+    mmnnkkPos[i] = numLoops - numPackedDims + mnkOrder[i];
+  SmallVector<OpFoldResult> packingSizes(mnkPackingSizes.size());
+  for (int64_t i = 0, e = numPackedDims; i < e; ++i)
+    packingSizes[mnkOrder[i]] = mnkPackingSizes[i];
+
+  // 1. Infer dims that are important for contraction.
+  FailureOr<ContractionDimsForPacking> res = getContractionDims(linalgOp);
+  if (failed(res)) {
+    return rewriter.notifyMatchFailure(linalgOp,
+                                       "couldn't infer contraction iterators");
+  }
+
+  // 2. Normalize linalgOp to an kmn-matmul-like with [red, par, par] most
+  // minor iterators. If we wanted a different normalization order, this is
+  // where it would have to start.
+  int64_t mPos = res->mPos, nPos = res->nPos, kPos = res->kPos;
+  LLVM_DEBUG(DBGSNL(); DBGSNL(); DBGSNL();
+             DBGS() << "Start packing generic op greedily with (m@" << mPos
+                    << ", n@" << nPos << ", k@" << kPos << "): " << linalgOp
+                    << "\n";);
+
+  // 2.a. Rewrite as a generic.
+  auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation());
+  if (!genericOp) {
+    FailureOr<linalg::GenericOp> generalizeResult =
+        generalizeNamedOp(rewriter, linalgOp);
+    assert(succeeded(generalizeResult) && "unexpected failure generalizing op");
+    genericOp = *generalizeResult;
+  }
+
+  // 2.b. Interchange to move the dimensions (k, m, n) as most-minor iterators.
+  // Note that this only normalized the iteration order and does not change the
+  // indexings of any operand.
+  SmallVector<int64_t> permutation =
+      computePermutationVector(numLoops, {mPos, nPos, kPos}, mmnnkkPos);
+  LLVM_DEBUG(llvm::interleaveComma(permutation, DBGS() << "perm: "); DBGSNL(););
+  // Sign .. unsigned pollution.
+  SmallVector<unsigned> unsignedPerm(permutation.begin(), permutation.end());
+  FailureOr<linalg::GenericOp> interchangeResult =
+      interchangeGenericOp(rewriter, genericOp, unsignedPerm);
+  assert(succeeded(interchangeResult) && "unexpected failure interchanging op");
+  genericOp = *interchangeResult;
+  LLVM_DEBUG(DBGS() << "Generalized Op to pack: " << genericOp << "\n";);
+
+  // At this point, the op iterators are normalized to {leading, k, m, n}.
+  // The layouts induced by packing will always be:
+  //   - LHS{leading_lhs, kk, mm}
+  //   - RHS{leading_rhs, kk, nn}
+  //   - RES{leading_res, mm, nn}
+  // If we wanted to change the packed order, we would reorder (k, m, n) to
+  // something else above.
+  //
+  // Additional permutations of the outer dims of the operands (i.e.
+  // leading_lhs, leading_rhs and leading_res) could follow by computing the
+  // desired outerPerm for each operand. This is left for future work.
+
+  // Add leading zeros to match numLoops.
+  SmallVector<OpFoldResult> adjustedPackingSizes(numLoops - packingSizes.size(),
+                                                 rewriter.getIndexAttr(0));
+  llvm::append_range(adjustedPackingSizes, packingSizes);
+
+  // TODO: If we wanted to give the genericOp a name after packing, after
+  // calling `pack` would be a good time.
+  return linalg::pack(rewriter, genericOp, adjustedPackingSizes);
+}
+
+DiagnosedSilenceableFailure transform_dialect::PackGreedilyOp::applyToOne(
+    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  target->walk([&](linalg::LinalgOp linalgOp) {
+    // linalgOp will be replaced and the insertion point may be invalidated if
+    // we set it before -> set it after.
+    rewriter.setInsertionPointAfter(linalgOp);
+    // Failing to pack greedily is perfectly fine.
+    // In the future we will want to order packings according to some metric.
+    // For now we just pack contractions embedded in ops in the order:
+    //   {kk, mm, nn} by size {32, 8, 16}.
+    (void)packContractionGreedily(
+        /*rewriter=*/rewriter,
+        /*linalgOp=*/linalgOp,
+        /*mnkPackingSizes=*/
+        getAsOpFoldResult(
+            rewriter.getI64ArrayAttr({/*m=*/8, /*n=*/16, /*k=*/32})),
+        /*mnkOrder=*/{1, 2, 0});
+  });
+  results.push_back(target);
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
 // IREE-specific transformations defined outside of iree_linalg_transform.
 //===---------------------------------------------------------------------===//
 
@@ -530,9 +763,9 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
   dispatchIndexOpFoldResults(mixedTileSizes, dynamicTileSizes, staticTileSizes);
-  // Call the default builder which sets up the proper operands segment sizes
-  // attributes for multiple variadic operands. In the absence of this, horrible
-  // bugs ensue.
+  // Call the default builder which sets up the proper operands segment
+  // sizes attributes for multiple variadic operands. In the absence of
+  // this, horrible bugs ensue.
   MLIRContext *ctx = builder.getContext();
   auto operationType = pdl::OperationType::get(ctx);
 
@@ -567,9 +800,9 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   SmallVector<Value> dynamicNumThreads;
   dispatchIndexOpFoldResults(mixedNumThreads, dynamicNumThreads,
                              staticNumThreads);
-  // Call the default builder which sets up the proper operands segment sizes
-  // attributes for multiple variadic operands. In the absence of this, horrible
-  // bugs ensue.
+  // Call the default builder which sets up the proper operands segment
+  // sizes attributes for multiple variadic operands. In the absence of
+  // this, horrible bugs ensue.
   MLIRContext *ctx = builder.getContext();
   auto operationType = pdl::OperationType::get(ctx);
   build(builder, result,
@@ -759,10 +992,10 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
 // Important note: this transform is load-bearing and is the glue between
 // different dialects that want to operate on tensors.
 // Originaly, it used to just call `addIREEComprehensiveBufferizePasses` but
-// this introduces a lot of complexity in the registration process due to the
-// use of nested pass pipelines, to a point that it is a major endeavor to
-// connect a new dialect.
-// Instead, avoid calling the passes and only take what we need from them.
+// this introduces a lot of complexity in the registration process due to
+// the use of nested pass pipelines, to a point that it is a major endeavor
+// to connect a new dialect. Instead, avoid calling the passes and only take
+// what we need from them.
 //
 // TODO: Maybe we need both a transform.iree.cpu.bufferize and a
 // transform.iree.gpu.bufferize rather than a single common bufferize op?
@@ -799,8 +1032,8 @@ void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 // TODO: register the bufferization behavior in a target-specific way.
-// TODO: Maybe bufferize should have a separate cpu and a gpu version. This is
-// unclear though: what happens on heterogeneous HW ?
+// TODO: Maybe bufferize should have a separate cpu and a gpu version. This
+// is unclear though: what happens on heterogeneous HW ?
 //===---------------------------------------------------------------------===//
 
 // Allocation callbacks to use with upstream comprehensive bufferization
@@ -823,9 +1056,9 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
   // TODO: ideally we should use linalg.copy which was recently reintroduced
-  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
-  // post-bufferization copies do not trigger properly.
-  // So we keep using `createLinalgCopyOp` which builds a GenericOp.
+  // as an OpDSL named op. However, IREE-specific patterns to cleanup
+  // spurious post-bufferization copies do not trigger properly. So we keep
+  // using `createLinalgCopyOp` which builds a GenericOp.
   // builder.create<linalg::CopyOp>(loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   return success();
@@ -856,9 +1089,9 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
   // TODO: ideally we should use linalg.copy which was recently reintroduced
-  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
-  // post-bufferization copies do not trigger properly.
-  // So we keep using `createLinalgCopyOp` which builds a GenericOp.
+  // as an OpDSL named op. However, IREE-specific patterns to cleanup
+  // spurious post-bufferization copies do not trigger properly. So we keep
+  // using `createLinalgCopyOp` which builds a GenericOp.
   // builder.create<linalg::CopyOp>(loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   return success();
@@ -869,9 +1102,10 @@ static OneShotBufferizationOptions getBufferizationOptions() {
   // options.testAnalysisOnly = testAnalysisOnly;
   // options.printConflicts = printConflicts;
 
-  // bufferization.to_memref is used to bufferize constants in IREE. IREE has
-  // it's own logic to handle constants. We'd like to leave the arith.constant
-  // as is and insert bufferization.to_memref to convert the tensor to memref.
+  // bufferization.to_memref is used to bufferize constants in IREE. IREE
+  // has it's own logic to handle constants. We'd like to leave the
+  // arith.constant as is and insert bufferization.to_memref to convert the
+  // tensor to memref.
   options.opFilter.denyOperation<arith::ConstantOp>();
   options.opFilter.denyOperation<bufferization::ToMemrefOp>();
 
@@ -881,8 +1115,8 @@ static OneShotBufferizationOptions getBufferizationOptions() {
                                       const BufferizationOptions &options) {
     auto tensorType = value.getType().cast<TensorType>();
 
-    // Special rule for ConstantOps: These always lower to some memref with a
-    // static identity layout.
+    // Special rule for ConstantOps: These always lower to some memref with
+    // a static identity layout.
     if (value.getDefiningOp<arith::ConstantOp>())
       return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
                                                                   memorySpace);
@@ -922,8 +1156,8 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   }
 
   //===-------------------------------------------------------------------===//
-  // DO NOT JUST CALL `addIREEComprehensiveBufferizePasses` as this results in
-  // a lot of registration issues due to nested pass pipeline mess.
+  // DO NOT JUST CALL `addIREEComprehensiveBufferizePasses` as this results
+  // in a lot of registration issues due to nested pass pipeline mess.
   // Instead, take what we need from it.
   //===-------------------------------------------------------------------===//
   // Bufferize the dispatch.
@@ -1182,6 +1416,5 @@ void transform_dialect::ApplyBufferOptimizationsOp::build(
   result.addOperands(target);
   result.addTypes({pdl::OperationType::get(target.getContext())});
 }
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.cpp.inc"

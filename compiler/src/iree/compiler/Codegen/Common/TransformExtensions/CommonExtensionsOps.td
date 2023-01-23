@@ -475,4 +475,39 @@ def ApplyBufferOptimizationsOp :
   }];
 }
 
+def PackGreedilyOp : Op<Transform_Dialect,
+    "iree.pack_greedily",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait]> {
+  let description = [{
+    Target the whole func op and rewrite known LinalgOp to packed form greedily.
+
+    Return modes:
+    =============
+    This operation ignores non-Func ops and drops them in the return.
+
+    It returns the same Func ops where all supported containing LinalgOps are
+    packed.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$transformed);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::func::FuncOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS
