@@ -260,6 +260,11 @@ EOF
   # Make sure the runner user can use docker
   runuser --user runner -- docker ps
 
+  #################################### Benchmarks ##############################
+
+  # Allow non-privileged users (runner) to access the perf counters.
+  echo "kernel.perf_event_paranoid=-1" > /etc/sysctl.d/99-unpriv-perf.conf
+
   #################################### GPU #####################################
 
   if [[ "${RUNNER_TYPE^^}" == GPU ]]; then
