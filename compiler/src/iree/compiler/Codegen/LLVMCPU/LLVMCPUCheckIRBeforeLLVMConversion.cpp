@@ -56,18 +56,20 @@ static LogicalResult checkStackAllocationSize(func::FuncOp funcOp) {
         allocaSize *= ub.value();
         continue;
       }
-      return allocaOp.emitOpError("expoected no unbounded stack allocations");
+      return allocaOp.emitOpError("expected no unbounded stack allocations");
     }
     allocaSize *= allocaType.getElementType().getIntOrFloatBitWidth();
     if (allocaOp.getAlignment()) {
       int64_t alignmentInBits = *allocaOp.getAlignment() * 8;
       allocaSize =
-          llvm::divideCeil(allocaSize, alignmentInBits) * alignmentInBits / 8;
+          (llvm::divideCeil(allocaSize, alignmentInBits) * alignmentInBits);
     }
-    cumSize += allocaSize;
+    cumSize += allocaSize / 8;
   }
   if (cumSize > clMaxAllocationSizeInBytes) {
-    return funcOp.emitOpError("exceeded static allocation limit for function");
+    return funcOp.emitOpError("exceeded stack allocation limit of ")
+           << clMaxAllocationSizeInBytes.getValue()
+           << " bytes for function. Got " << cumSize << " bytes";
   }
   return success();
 }
