@@ -160,8 +160,7 @@ jobs:
 
   build_test_all_windows:
     needs: setup
-    # DO NOT SUBMIT - keep running on postsubmit only
-    if: needs.setup.outputs.should-run == 'true'
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
     runs-on: managed-windows-cpu
     defaults:
       run:
@@ -212,7 +211,7 @@ jobs:
           IREE_READ_REMOTE_CCACHE: 0
           IREE_WRITE_REMOTE_CCACHE: 0
           IREE_READ_LOCAL_CCACHE: 1
-          IREE_WRITE_LOCAL_CCACHE: 1
+          IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
           CCACHE_DIR: ${{ github.workspace }}/.ccache
           # A full build is around 2.5GB, but uploads/downloads are slow and
           # we have a limit of 10GB per repository
