@@ -18,6 +18,7 @@ iree_lit_test_suite(
     srcs = [
         "eltwise_reduction_eltwise.mlir",
         "matmul.mlir",
+        "packing.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
     # transform dialect spec files are MLIR files that specify a transformation,

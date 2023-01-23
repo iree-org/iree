@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -25,6 +26,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -34,11 +36,15 @@
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Transforms/DialectConversion.h"
+
+#define DEBUG_TYPE "iree-common-extensions-transforms"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
+
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
+#define DBGSNL() (llvm::dbgs() << "\n")
 
 iree_compiler::IREE::transform_dialect::CommonExtensions::CommonExtensions() {
   registerTransformOps<
@@ -457,6 +463,271 @@ LogicalResult rewriteForeachThreadToWorkgroup(
 }
 
 //===---------------------------------------------------------------------===//
+// PackGreedilyOp.
+//===---------------------------------------------------------------------===//
+
+using PackPermType = SmallVector<SmallVector<int64_t>>;
+
+/// Build transform IR .
+/// Needs to know number of opH input operands.
+static LogicalResult applyPackAndTranspose(RewriterBase &rewriter,
+                                           linalg::LinalgOp linalgOp,
+                                           ArrayRef<OpFoldResult> packingSizes,
+                                           PackPermType &outerPermutations,
+                                           PackPermType &innerPermutations) {
+  FailureOr<linalg::LinalgOp> packedLinalgOp =
+      linalg::pack(rewriter, linalgOp, packingSizes);
+  if (failed(packedLinalgOp))
+    return rewriter.notifyMatchFailure(linalgOp, "could not pack");
+
+  int64_t idx = -1;
+  for (auto [outerPerm, innerPerm] :
+       llvm::zip_equal(outerPermutations, innerPermutations)) {
+    ++idx;
+    if (outerPerm.empty() && innerPerm.empty()) continue;
+
+    tensor::PackOp packOp;
+    tensor::UnPackOp maybeUnPackOp;
+    if (idx < packedLinalgOp->getNumDpsInputs()) {
+      auto packOpOperand = packedLinalgOp->getDpsInputOperand(idx);
+      packOp = packOpOperand->get().getDefiningOp<tensor::PackOp>();
+    } else {
+      auto packOpOperand = packedLinalgOp->getDpsInitOperand(
+          idx - packedLinalgOp->getNumDpsInputs());
+      packOp = packOpOperand->get().getDefiningOp<tensor::PackOp>();
+    }
+    Value packResult = packOp.getResult();
+    if (!packOp || !packResult.hasOneUse()) {
+      return rewriter.notifyMatchFailure(
+          *packedLinalgOp, "could not find pack op with single use");
+    }
+    if (idx >= packedLinalgOp->getNumDpsInputs()) {
+      OpResult toPack = packedLinalgOp->getTiedOpResult(
+          packResult.getUses().begin().getOperand());
+      if (!toPack.hasOneUse()) {
+        return rewriter.notifyMatchFailure(
+            *packedLinalgOp, "could not find unpack op with single use");
+      }
+      maybeUnPackOp = dyn_cast<tensor::UnPackOp>(*toPack.getUsers().begin());
+      if (!maybeUnPackOp) {
+        return rewriter.notifyMatchFailure(
+            *packedLinalgOp, "could not find unpack op with single use");
+      }
+    }
+
+    // clang-format off
+    LLVM_DEBUG(
+      DBGSNL(); DBGSNL(); DBGSNL();
+      DBGS() << "In module: " << (*packedLinalgOp)->getParentOfType<ModuleOp>();
+      DBGSNL();
+      DBGS() << "Call packTranspose with:\n";
+      DBGS() << "\tpackOp: " << packOp << "\n";
+      DBGS() << "\tlinalgOp: " << *packedLinalgOp << "\n";
+      if (maybeUnPackOp) {
+        DBGS() << "\tmaybeUnPackOp: " << maybeUnPackOp << "\n";
+      }
+      llvm::interleaveComma(outerPerm, DBGS() << "outerPerm: "); DBGSNL();
+      llvm::interleaveComma(innerPerm, DBGS() << "innerPerm: "); DBGSNL();
+    );
+    // clang-format on
+
+    FailureOr<linalg::PackTransposeResult> packTransposeResult =
+        linalg::packTranspose(rewriter, packOp, *packedLinalgOp, maybeUnPackOp,
+                              outerPerm, innerPerm);
+    if (failed(packTransposeResult))
+      llvm_unreachable("unexpected failure to packTranspose");
+
+    // Update the packedLinalgOp for the next iteration.
+    packedLinalgOp = packTransposeResult->transposedLinalgOp;
+  }
+  return success();
+}
+
+static LogicalResult bindDimsAs(linalg::LinalgOp linalgOp,
+                                ArrayRef<AffineExpr *> dims,
+                                ArrayRef<utils::IteratorType> iters) {
+  if (dims.size() != iters.size()) return failure();
+  if (dims.size() != linalgOp.getNumLoops()) return failure();
+
+  MLIRContext *ctx = linalgOp->getContext();
+  auto par = utils::IteratorType::parallel;
+  auto red = utils::IteratorType::reduction;
+  for (auto iterType : {par, red}) {
+    SmallVector<int64_t> indices1, indices2;
+    indices1.reserve(dims.size());
+    indices2.reserve(dims.size());
+    // Collect the indices of `iters` of type `iterType`.
+    for (auto en : llvm::enumerate(iters))
+      if (en.value() == iterType) indices1.push_back(en.index());
+    // Collect the indices of `linalgOp.iterator_types` of type `iterType`.
+    for (auto en : llvm::enumerate(linalgOp.getIteratorTypesArray()))
+      if (en.value() == iterType) indices2.push_back(en.index());
+    // Ensure well-formedness.
+    if (indices1.size() != indices2.size()) return failure();
+    // Bind dims[indices1] to loop[indices2].
+    for (auto it : llvm::zip(indices1, indices2))
+      *dims[std::get<0>(it)] = getAffineDimExpr(std::get<1>(it), ctx);
+  }
+  return success();
+}
+
+/// Pack a 2-D contraction into.
+static LogicalResult packContractionGreedily(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+    ArrayRef<OpFoldResult> packingSizes) {
+  assert(linalg::isaContractionOpInterface(linalgOp) && "not a contraction");
+
+  MLIRContext *ctx = rewriter.getContext();
+  auto par = utils::IteratorType::parallel;
+  auto red = utils::IteratorType::reduction;
+  int64_t numLoops = linalgOp.getNumLoops();
+  if (numLoops <= 2)
+    return rewriter.notifyMatchFailure(
+        linalgOp, "unexpected numLoops <= 2 in a contraction");
+
+  // 1. Bind dims according to the linalgOp parallel/reduction structure.
+  AffineExpr m, n, k;
+  if (failed(bindDimsAs(linalgOp, {&m, &n, &k}, {par, par, red}))) {
+    return rewriter.notifyMatchFailure(
+        linalgOp, "couldn't bind [par, par, red] iterators");
+  }
+
+  // 2. Normalize linalgOp to an mnk-matmul-like with [par, par, red] most-minor
+  // iterators.
+  int64_t mPos = m.cast<AffineDimExpr>().getPosition();
+  int64_t nPos = n.cast<AffineDimExpr>().getPosition();
+  int64_t kPos = k.cast<AffineDimExpr>().getPosition();
+  int64_t mDesiredPos = numLoops - 3;
+  int64_t nDesiredPos = numLoops - 2;
+  int64_t kDesiredPos = numLoops - 1;
+
+  // clang-format off
+  LLVM_DEBUG(
+    DBGSNL(); DBGSNL(); DBGSNL();
+    DBGS() << "Start packing generic op greedily with (m@" << m << ", n@" << n << ", k@"
+           << k << "): " << linalgOp << "\n";);
+  // clang-format on
+  auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation());
+  if (!genericOp) {
+    FailureOr<linalg::GenericOp> generalizeResult =
+        generalizeNamedOp(rewriter, linalgOp);
+    assert(succeeded(generalizeResult) && "unexpected failure generalizing op");
+    genericOp = *generalizeResult;
+  }
+
+  SmallVector<int64_t> pos{mPos, nPos, kPos};
+  std::sort(pos.begin(), pos.end());
+  auto permutation = llvm::to_vector(llvm::seq<unsigned>(0, numLoops));
+  for (int64_t p : llvm::reverse(pos))
+    permutation.erase(permutation.begin() + p);
+  permutation.append({(unsigned)mPos, (unsigned)nPos, (unsigned)kPos});
+  LLVM_DEBUG(llvm::interleaveComma(permutation, DBGS() << "perm: "); DBGSNL(););
+  FailureOr<linalg::GenericOp> interchangeResult =
+      interchangeGenericOp(rewriter, genericOp, permutation);
+  assert(succeeded(interchangeResult) && "unexpected failure interchanging op");
+  genericOp = *interchangeResult;
+
+  // Reassign the m, n, k dimensions which are now unsurprisingly last.
+  m = getAffineDimExpr(mDesiredPos, ctx);
+  n = getAffineDimExpr(nDesiredPos, ctx);
+  k = getAffineDimExpr(kDesiredPos, ctx);
+
+  LLVM_DEBUG(DBGS() << "Generalized Op: " << genericOp << "\n";);
+  LLVM_DEBUG(DBGS() << "Start packing op greedily with (m@" << m << ", n@" << n
+                    << ", k@" << k << "): " << genericOp << "\n";);
+
+  // 3. Stupidly brute-force packing mxnxk to 8x16x32 for now.
+  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+  SmallVector<AffineMap, 4> maps = genericOp.getIndexingMapsArray();
+  SmallVector<SmallVector<int64_t>> outerPerm, innerPerm;
+  // clang-format off
+  if (maps == infer({{m, k}, {k, n}, {m, n}})) {
+    //  {m, k, mm, kk}, {k, n, nn, kk}, {m, n, mm, nn}
+    // ->
+    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
+    outerPerm = PackPermType{{    }, {1, 0}, {    }};
+    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
+  } else if (maps == infer({{m, k}, {n, k}, {m, n}})) {
+    //  {m, k, mm, kk}, {n, k, nn, kk}, {m, n, mm, nn}
+    // ->
+    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
+    outerPerm = PackPermType{{    }, {    }, {    }};
+    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
+  } else if (maps == infer({{k, m}, {k, n}, {m, n}})) {
+    //  {k, m, mm, kk}, {k, n, nn, kk}, {m, n, mm, nn}
+    // ->
+    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
+    outerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
+    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
+  } else if (maps == infer({{k, m}, {n, k}, {m, n}})) {
+    //  {k, m, mm, kk}, {n, k, nn, kk}, {m, n, mm, nn}
+    // ->
+    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
+    outerPerm = PackPermType{{1, 0}, {    }, {    }};
+    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
+  } else if (maps == infer({{m, k}, {k, n}, {n, m}})) {
+    //  {m, k, mm, kk}, {k, n, nn, kk}, {n, m, mm, nn}
+    // ->
+    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
+    outerPerm = PackPermType{{    }, {1, 0}, {1, 0}};
+    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
+  } else if (maps == infer({{m, k}, {n, k}, {n, m}})) {
+    //  {m, k, mm, kk}, {n, k, nn, kk}, {n, m, mm, nn}
+    // ->
+    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
+    outerPerm = PackPermType{{    }, {    }, {1, 0}};
+    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
+  } else if (maps == infer({{k, m}, {k, n}, {n, m}})) {
+    //  {k, m, mm, kk}, {k, n, nn, kk}, {n, m, mm, nn}
+    // ->
+    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
+    outerPerm = PackPermType{{1, 0}, {1, 0}, {1, 0}};
+    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
+  } else if (maps == infer({{k, m}, {n, k}, {n, m}})) {
+    //  {k, m, mm, kk}, {n, k, nn, kk}, {n, m, mm, nn}
+    // ->
+    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
+    outerPerm = PackPermType{{1, 0}, {    }, {1, 0}};
+    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
+  }  else {
+    llvm_unreachable("unexpected contraction case");
+  }
+  // clang-format on
+
+  // TODO: If we want to give the genericOp a name after packing, here would be
+  // a good place.
+  return applyPackAndTranspose(rewriter, genericOp,
+                               /*packingSizes=*/packingSizes,
+                               /*outerPermutations=*/outerPerm,
+                               /*innerPermutations=*/innerPerm);
+}
+
+static LogicalResult packKnownOperationsGreedily(RewriterBase &rewriter,
+                                                 linalg::LinalgOp linalgOp) {
+  if (linalg::isaContractionOpInterface(linalgOp)) {
+    return packContractionGreedily(
+        rewriter, linalgOp,
+        getAsOpFoldResult(rewriter.getI64ArrayAttr({8, 16, 32})));
+  }
+  return failure();
+}
+
+DiagnosedSilenceableFailure transform_dialect::PackGreedilyOp::applyToOne(
+    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  target->walk([&](linalg::LinalgOp linalgOp) {
+    // linalgOp will be replaced and the insertion point may be invalidated if
+    // we set it before -> set it after.
+    rewriter.setInsertionPointAfter(linalgOp);
+    (void)packKnownOperationsGreedily(rewriter, linalgOp);
+  });
+  results.push_back(target);
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
 // IREE-specific transformations defined outside of iree_linalg_transform.
 //===---------------------------------------------------------------------===//
 
@@ -530,9 +801,9 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
   dispatchIndexOpFoldResults(mixedTileSizes, dynamicTileSizes, staticTileSizes);
-  // Call the default builder which sets up the proper operands segment sizes
-  // attributes for multiple variadic operands. In the absence of this, horrible
-  // bugs ensue.
+  // Call the default builder which sets up the proper operands segment
+  // sizes attributes for multiple variadic operands. In the absence of
+  // this, horrible bugs ensue.
   MLIRContext *ctx = builder.getContext();
   auto operationType = pdl::OperationType::get(ctx);
 
@@ -567,9 +838,9 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   SmallVector<Value> dynamicNumThreads;
   dispatchIndexOpFoldResults(mixedNumThreads, dynamicNumThreads,
                              staticNumThreads);
-  // Call the default builder which sets up the proper operands segment sizes
-  // attributes for multiple variadic operands. In the absence of this, horrible
-  // bugs ensue.
+  // Call the default builder which sets up the proper operands segment
+  // sizes attributes for multiple variadic operands. In the absence of
+  // this, horrible bugs ensue.
   MLIRContext *ctx = builder.getContext();
   auto operationType = pdl::OperationType::get(ctx);
   build(builder, result,
@@ -759,10 +1030,10 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
 // Important note: this transform is load-bearing and is the glue between
 // different dialects that want to operate on tensors.
 // Originaly, it used to just call `addIREEComprehensiveBufferizePasses` but
-// this introduces a lot of complexity in the registration process due to the
-// use of nested pass pipelines, to a point that it is a major endeavor to
-// connect a new dialect.
-// Instead, avoid calling the passes and only take what we need from them.
+// this introduces a lot of complexity in the registration process due to
+// the use of nested pass pipelines, to a point that it is a major endeavor
+// to connect a new dialect. Instead, avoid calling the passes and only take
+// what we need from them.
 //
 // TODO: Maybe we need both a transform.iree.cpu.bufferize and a
 // transform.iree.gpu.bufferize rather than a single common bufferize op?
@@ -799,8 +1070,8 @@ void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 // TODO: register the bufferization behavior in a target-specific way.
-// TODO: Maybe bufferize should have a separate cpu and a gpu version. This is
-// unclear though: what happens on heterogeneous HW ?
+// TODO: Maybe bufferize should have a separate cpu and a gpu version. This
+// is unclear though: what happens on heterogeneous HW ?
 //===---------------------------------------------------------------------===//
 
 // Allocation callbacks to use with upstream comprehensive bufferization
@@ -823,9 +1094,9 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
   // TODO: ideally we should use linalg.copy which was recently reintroduced
-  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
-  // post-bufferization copies do not trigger properly.
-  // So we keep using `createLinalgCopyOp` which builds a GenericOp.
+  // as an OpDSL named op. However, IREE-specific patterns to cleanup
+  // spurious post-bufferization copies do not trigger properly. So we keep
+  // using `createLinalgCopyOp` which builds a GenericOp.
   // builder.create<linalg::CopyOp>(loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   return success();
@@ -856,9 +1127,9 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
   // TODO: ideally we should use linalg.copy which was recently reintroduced
-  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
-  // post-bufferization copies do not trigger properly.
-  // So we keep using `createLinalgCopyOp` which builds a GenericOp.
+  // as an OpDSL named op. However, IREE-specific patterns to cleanup
+  // spurious post-bufferization copies do not trigger properly. So we keep
+  // using `createLinalgCopyOp` which builds a GenericOp.
   // builder.create<linalg::CopyOp>(loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   return success();
@@ -869,9 +1140,10 @@ static OneShotBufferizationOptions getBufferizationOptions() {
   // options.testAnalysisOnly = testAnalysisOnly;
   // options.printConflicts = printConflicts;
 
-  // bufferization.to_memref is used to bufferize constants in IREE. IREE has
-  // it's own logic to handle constants. We'd like to leave the arith.constant
-  // as is and insert bufferization.to_memref to convert the tensor to memref.
+  // bufferization.to_memref is used to bufferize constants in IREE. IREE
+  // has it's own logic to handle constants. We'd like to leave the
+  // arith.constant as is and insert bufferization.to_memref to convert the
+  // tensor to memref.
   options.opFilter.denyOperation<arith::ConstantOp>();
   options.opFilter.denyOperation<bufferization::ToMemrefOp>();
 
@@ -881,8 +1153,8 @@ static OneShotBufferizationOptions getBufferizationOptions() {
                                       const BufferizationOptions &options) {
     auto tensorType = value.getType().cast<TensorType>();
 
-    // Special rule for ConstantOps: These always lower to some memref with a
-    // static identity layout.
+    // Special rule for ConstantOps: These always lower to some memref with
+    // a static identity layout.
     if (value.getDefiningOp<arith::ConstantOp>())
       return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
                                                                   memorySpace);
@@ -922,8 +1194,8 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   }
 
   //===-------------------------------------------------------------------===//
-  // DO NOT JUST CALL `addIREEComprehensiveBufferizePasses` as this results in
-  // a lot of registration issues due to nested pass pipeline mess.
+  // DO NOT JUST CALL `addIREEComprehensiveBufferizePasses` as this results
+  // in a lot of registration issues due to nested pass pipeline mess.
   // Instead, take what we need from it.
   //===-------------------------------------------------------------------===//
   // Bufferize the dispatch.
@@ -1182,6 +1454,5 @@ void transform_dialect::ApplyBufferOptimizationsOp::build(
   result.addOperands(target);
   result.addTypes({pdl::OperationType::get(target.getContext())});
 }
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.cpp.inc"
