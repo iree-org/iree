@@ -221,13 +221,13 @@ jobs:
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
       # Write caches (if configured to) after all other steps are finished.
       - name: "Saving cache (git submodules)"
-        if: needs.setup.outputs.write-caches == 'true'
+        if: needs.setup.outputs.write-caches == '1'
         uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
         with:
           path: .git/modules
           key: gitmodules_all_windows_${{ github.sha }}
       - name: "Saving cache (CMake/ccache)"
-        if: needs.setup.outputs.write-caches == 'true'
+        if: needs.setup.outputs.write-caches == '1'
         uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
         with:
           path: ${{ github.workspace }}/.ccache
