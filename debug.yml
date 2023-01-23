@@ -1,0 +1,46 @@
+name: IREE Build and Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: IREE Build (Release Asserts)
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Set up Python
+      uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # v4.3.0
+      with:
+        python-version: 3.9
+
+    - name: Checkout project
+      uses: actions/checkout@v3
+      with:
+        path: sandbox
+        submodules: recursive
+
+    - name: Install Python depends
+      run: |
+        python -m pip install -r ${GITHUB_WORKSPACE}/sandbox/requirements.txt
+
+    - name: Install Ninja
+      uses: llvm/actions/install-ninja@6a57890d0e3f9f35dfc72e7e48bc5e1e527cdd6c # Jan 17
+
+    - name: Build
+      run: |
+        cd ${GITHUB_WORKSPACE}/sandbox
+        cmake -GNinja -B ../iree-build/ -S . \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBUILD_SHARED_LIBS=ON \
+            -DIREE_ENABLE_ASSERTIONS=ON \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DIREE_ENABLE_LLD=ON
+        cmake --build ../iree-build/ --targets IREELinalgExtTransforms
+
