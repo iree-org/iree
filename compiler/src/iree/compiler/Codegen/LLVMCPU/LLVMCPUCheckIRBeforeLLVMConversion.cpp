@@ -34,8 +34,14 @@ struct LLVMCPUCheckIRBeforeLLVMConversionPass
 /// Returns success if the cummulative stack allocation size is less than the
 /// limit set by clMaxAllocationSizeInBytes.
 static LogicalResult checkStackAllocationSize(func::FuncOp funcOp) {
-  auto allocaOps = funcOp.getOps<memref::AllocaOp>();
   if (funcOp.getBody().empty()) return success();
+
+  SmallVector<memref::AllocaOp> allocaOps;
+  funcOp.walk(
+      [&](memref::AllocaOp allocaOp) { allocaOps.push_back(allocaOp); });
+  if (allocaOps.empty()) {
+    return success();
+  }
 
   int cumSize = 0;
   for (auto allocaOp : allocaOps) {

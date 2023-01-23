@@ -53,3 +53,19 @@ module {
     return
   }
 }
+
+// -----
+
+#map = affine_map<(d0) -> (d0, 16)>
+module {
+  func.func @nested_op_alloca(%arg0 : index) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    scf.for %iv = %c0 to %arg0 step %c1 {
+      %0 = affine.min #map(%iv)
+      // expected-error @+1 {{all stack allocations need to be hoisted to the entry block of the function}}
+      %1 = memref.alloca(%0) : memref<?xi32>
+    }
+    return
+  }
+}
