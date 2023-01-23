@@ -228,8 +228,8 @@ set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register
 #-------------------------------------------------------------------------------
 # Compiler Target Options
 # By default, all compiler targets supported by the current platform are
-# enabled by default. Some compiler targets like CUDA will install external
-# deps as needed at configure time. This can be changed with:
+# enabled. Some compiler targets like CUDA will install external deps as
+# needed at configure time. This can be changed with:
 #   -DIREE_TARGET_BACKEND_DEFAULTS=OFF
 #-------------------------------------------------------------------------------
 
