@@ -42,6 +42,8 @@ iree_runtime_cc_library(
         "status_util.h",
         "stream_command_buffer.c",
         "stream_command_buffer.h",
+        "tracing.c",
+        "tracing.h",
     ],
     hdrs = [
         "api.h",
