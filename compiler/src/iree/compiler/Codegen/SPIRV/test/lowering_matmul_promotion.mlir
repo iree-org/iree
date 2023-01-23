@@ -41,7 +41,7 @@ hal.executable @matmul_f32_128x256x64 {
         %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [128, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x256xf32>> -> tensor<128x256xf32>
         %7 = tensor.empty() : tensor<128x256xf32>
         %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<128x256xf32>) -> tensor<128x256xf32>
-        %9 = linalg.matmul {__internal_linalg_transform__ = "workgroup", compilation_info = #compilation}
+        %9 = linalg.matmul {compilation_info = #compilation}
            ins(%4, %5 : tensor<128x512xf32>, tensor<512x256xf32>) outs(%8 : tensor<128x256xf32>) -> tensor<128x256xf32>
         %10 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]}
                 ins(%9, %6 : tensor<128x256xf32>, tensor<128x256xf32>) outs(%7 : tensor<128x256xf32>) {
