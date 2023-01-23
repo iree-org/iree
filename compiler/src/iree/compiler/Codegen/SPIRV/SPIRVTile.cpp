@@ -50,14 +50,14 @@ static FailureOr<IREE::Codegen::LoweringConfigAttr> collectComputeOps(
   // slow paths for padding handling. Then we need to scan both regions to
   // discover such computation ops so that we can tile and fuse both regions.
   SmallVector<scf::IfOp, 1> ifOps;
-  funcOp.walk<WalkOrder::PreOrder>([&ifOps](Operation *op) -> WalkResult {
-    if (isa<linalg::LinalgOp>(op)) {
+  funcOp.walk<WalkOrder::PreOrder>([&ifOps](scf::IfOp ifOp) -> WalkResult {
+    if (ifOp->getParentOfType<linalg::LinalgOp>()) {
       // Exclude scf.if in linalg op
       return WalkResult::skip();
-    } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+    } else {
       ifOps.push_back(ifOp);
+      return WalkResult::advance();
     }
-    return WalkResult::advance();
   });
 
   SmallVector<IREE::Codegen::LoweringConfigAttr> configs;
