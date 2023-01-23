@@ -310,8 +310,8 @@ def ShareForeachThreadOperandsOp : Op<
     into the matching `shared_outs` bbarg.
 
     Only those operands whose indices are specified in `share_operands` are
-    shared. An missing `share_operands` specification will trigger al operands
-    to be shared.
+    shared. An empty `share_operands` specification considers all operands to
+    be shared.
 
     #### Return modes
 

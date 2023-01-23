@@ -220,6 +220,12 @@ transform_dialect::ShareForeachThreadOperandsOp::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   IRRewriter rewriter(getContext());
+  SmallVector<int64_t> shareOperands(getShareOperands());
+  // Empty case: consider all operands need to be shared.
+  if (shareOperands.empty()) {
+    shareOperands = llvm::to_vector(
+        llvm::seq<int64_t>(0, foreachThreadOp.getOutputs().size()));
+  }
   for (int64_t outputIdx : getShareOperands()) {
     if (outputIdx < 0 || outputIdx >= foreachThreadOp.getOutputs().size())
       return mlir::emitDefiniteFailure(foreachThreadOp, "operand idx overflow");
