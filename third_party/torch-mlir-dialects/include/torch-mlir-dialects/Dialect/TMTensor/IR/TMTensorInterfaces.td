@@ -418,7 +418,7 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
       (ins "OpBuilder &":$b, "Location":$loc, "TypeRange":$resultTypes,
            "ValueRange":$operands),
       [{
-        BlockAndValueMapping bvm;
+        IRMapping bvm;
         OperationState state(
           loc, ConcreteOp::getOperationName(), operands, resultTypes,
           $_op->getAttrs());

@@ -19,7 +19,7 @@ iree_cc_library(
     "ukernel_test_utils.cc"
   DEPS
     iree::base
-    iree::builtins::ukernel::common
+    iree::builtins::ukernel::headers
     iree::schemas::cpu_data
   PUBLIC
 )

@@ -227,10 +227,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addConvTileAndDecomposeExpertPassPipeline(
                 executableLoweringPipeline);
             break;
-          case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUAArchDoubleTilingExpert:
-            addCPUAArchDoubleTilingExpertPassPipeline(
-                executableLoweringPipeline);
+          case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert:
+            addMmt4dTilingExpertPassPipeline(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling:
             addCPUDataTilingPipeline(executableLoweringPipeline);

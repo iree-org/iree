@@ -77,7 +77,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
   }
 
   bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
-                       BlockAndValueMapping &valueMapping) const final {
+                       IRMapping &valueMapping) const final {
     // TODO(benvanik): disallow inlining across async calls.
 
     // Don't inline functions with the 'noinline' attribute.
@@ -92,7 +92,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
   }
 
   bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
-                       BlockAndValueMapping &valueMapping) const final {
+                       IRMapping &valueMapping) const final {
     // TODO(benvanik): disallow inlining across async calls.
     return true;
   }

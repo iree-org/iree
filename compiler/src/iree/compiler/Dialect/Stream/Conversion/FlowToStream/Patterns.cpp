@@ -14,7 +14,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/IRMapping.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -416,7 +416,7 @@ struct ConvertExecutableOp
           exportOp.getFunctionRefAttr());
       newOp->setDialectAttrs(exportOp->getDialectAttrs());
       if (!exportOp.getWorkgroupCount().empty()) {
-        mlir::BlockAndValueMapping mapper;
+        mlir::IRMapping mapper;
         exportOp.getWorkgroupCount().cloneInto(&newOp.getWorkgroupCount(),
                                                mapper);
         convertReturnOps(newOp.getWorkgroupCount());

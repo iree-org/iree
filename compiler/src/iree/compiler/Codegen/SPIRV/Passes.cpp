@@ -50,10 +50,11 @@ static FailureOr<Value> gpuAllocateWorkgroupMemoryFn(OpBuilder &builder,
                                                      MemRefType memRefType,
                                                      ValueRange dynamicSizes,
                                                      unsigned alignment) {
-  Optional<unsigned> space =
-      spirv::mapVulkanStorageClassToMemorySpace(spirv::StorageClass::Workgroup);
-  MemRefType allocType = MemRefType::get(
-      memRefType.getShape(), memRefType.getElementType(), {}, *space);
+  auto workgroupSpace = gpu::AddressSpaceAttr::get(
+      builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  MemRefType allocType =
+      MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
+                      AffineMap(), workgroupSpace);
   return builder
       .create<memref::AllocOp>(loc, allocType, dynamicSizes,
                                builder.getI64IntegerAttr(alignment))

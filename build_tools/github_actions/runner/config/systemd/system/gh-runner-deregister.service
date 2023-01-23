@@ -7,6 +7,7 @@ Before=halt.target shutdown.target reboot.target
 User=runner
 Group=runner
 Type=oneshot
+EnvironmentFile=/etc/environment
 ExecStart=/runner-root/config/systemd/scripts/deregister.sh
 RemainAfterExit=yes
 

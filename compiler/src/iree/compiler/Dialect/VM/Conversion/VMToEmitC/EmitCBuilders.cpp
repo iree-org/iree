@@ -24,6 +24,9 @@ std::string mapUnaryOperator(UnaryOperator op) {
       return "~";
     case UnaryOperator::LOGICAL_NOT:
       return "!";
+    default:
+      llvm_unreachable("unsupported unary operator");
+      return "XXX";
   }
 }
 
@@ -65,6 +68,9 @@ std::string mapBinaryOperator(BinaryOperator op) {
       return "<=";
     case BinaryOperator::GREATER_THAN_OR_EQUAL:
       return ">=";
+    default:
+      llvm_unreachable("unsupported binary operator");
+      return "XXX";
   }
 }
 }  // namespace

@@ -296,7 +296,7 @@ static LogicalResult declareEntryPointOps(
 
       // Clone the workgroup count calculation function.
       if (!exportOp.getWorkgroupCount().empty()) {
-        mlir::BlockAndValueMapping mapper;
+        mlir::IRMapping mapper;
         exportOp.getWorkgroupCount().cloneInto(&newExportOp.getWorkgroupCount(),
                                                mapper);
         // Insert the !hal.device argument.

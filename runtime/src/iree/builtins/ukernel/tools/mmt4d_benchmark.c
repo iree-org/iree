@@ -10,7 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
 #include "iree/base/internal/flags.h"
-#include "iree/builtins/ukernel/mmt4d.h"
+#include "iree/builtins/ukernel/api.h"
 #include "iree/builtins/ukernel/tools/ukernel_test_utils.h"
 #include "iree/testing/benchmark.h"
 
@@ -89,12 +89,7 @@ static iree_status_t iree_mmt4d_benchmark(
   while (iree_benchmark_keep_running(benchmark_state,
                                      /*batch_count=*/FLAG_batch_count)) {
     for (int i = 0; i < FLAG_batch_count; ++i) {
-      iree_uk_status_t status = iree_uk_mmt4d(&params);
-      if (status != iree_uk_status_ok) {
-        fprintf(stderr, "FATAL: iree_uk_mmt4d failed: %s\n",
-                iree_uk_status_message(status));
-        iree_abort();
-      }
+      iree_uk_mmt4d(&params);
     }
     total_iterations += FLAG_batch_count;
   }

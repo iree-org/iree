@@ -292,7 +292,7 @@ EOF
         | gpg --dearmor -o "${nvidia_gpg_file}"
     nice_curl \
         "https://nvidia.github.io/libnvidia-container/${distribution}/libnvidia-container.list" | \
-        sed 's#deb https://#deb [signed-by=${nvidia_gpg_file}] https://#g' \
+        sed "s#deb https://#deb [signed-by=${nvidia_gpg_file}] https://#g" \
         > "${nvidia_apt_file}"
 
     apt-get update

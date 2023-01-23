@@ -75,7 +75,7 @@ def VMVX_GetRawInterfaceBindingBufferOp : VMVX_PureOp<
   }];
 }
 
-def VMVX_QueryTileSizesOp : VMVX_PureOp<"query_tile_sizes"> {
+def VMVX_QueryTileSizesOp : VMVX_PureOp<"query_tile_sizes", [Pure]> {
   let summary = "Returns tile sizes to use to materialize the given encoding, based on runtime CPU capabilities.";
   let description = [{
     TODO write me

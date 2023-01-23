@@ -27,8 +27,9 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // to shared as this involves a cross-thread dependence analysis.
   // Instead, we activate it explicitly post-hoc to promote all the extract_slice
   // ops that we find and match the prerequisites
-  %func = transform.structured.match ops{["func.func"]} in %variant_op
-  %funcx = transform.iree.apply_patterns %func { promote_foreach_thread_capture_to_shared }
+  %foreach_thread_with_type = transform.cast %foreach_thread : !pdl.operation to !transform.op<"scf.foreach_thread">
+  transform.iree.share_foreach_thread_operands %foreach_thread_with_type
+    : (!transform.op<"scf.foreach_thread">) -> !transform.op<"scf.foreach_thread">
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   // ================================================================

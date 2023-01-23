@@ -39,6 +39,6 @@ iree_runtime_cc_library(
         "query_tile_sizes_arch.h",
     ],
     deps = [
-        "//runtime/src/iree/builtins/ukernel:common",
+        "//runtime/src/iree/builtins/ukernel:headers",
     ],
 )

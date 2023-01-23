@@ -14,7 +14,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-llvmcpu-aarch64-vector-lowering"
+#define DEBUG_TYPE "iree-llvmcpu-mmt4d-vector-lowering"
 
 // A flag to switch between inline asm and intrinsics while we develop these two
 // parallel paths.
@@ -29,9 +29,8 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LLVMCPUAArch64VectorLoweringPass
-    : public LLVMCPUAArch64VectorLoweringBase<
-          LLVMCPUAArch64VectorLoweringPass> {
+struct LLVMCPUMmt4dVectorLoweringPass
+    : public LLVMCPUMmt4dVectorLoweringBase<LLVMCPUMmt4dVectorLoweringPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -39,7 +38,7 @@ struct LLVMCPUAArch64VectorLoweringPass
 };
 }  // namespace
 
-void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
+void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
@@ -155,8 +154,8 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUAArch64VectorLoweringPass() {
-  return std::make_unique<LLVMCPUAArch64VectorLoweringPass>();
+createLLVMCPUMmt4dVectorLoweringPass() {
+  return std::make_unique<LLVMCPUMmt4dVectorLoweringPass>();
 }
 
 }  // namespace iree_compiler

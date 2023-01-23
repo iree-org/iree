@@ -24,7 +24,7 @@ linalg::transform::ScopeOp linalg::transform::wrapInScope(Operation *op) {
       op->getLoc(), op->getResultTypes(), op->getOperands());
   Region &body = scope.getBody();
   rewriter.setInsertionPointToStart(&body.emplaceBlock());
-  BlockAndValueMapping bv;
+  IRMapping bv;
   SmallVector<Location> locs(op->getOperandTypes().size(), op->getLoc());
   bv.map(op->getOperands(), body.addArguments(op->getOperandTypes(), locs));
 
@@ -47,11 +47,11 @@ struct ScopeInliner : public InlinerInterface {
     return true;
   }
   bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
-                       BlockAndValueMapping &valueMapping) const override {
+                       IRMapping &valueMapping) const override {
     return true;
   }
   bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
-                       BlockAndValueMapping &valueMapping) const override {
+                       IRMapping &valueMapping) const override {
     return true;
   }
 

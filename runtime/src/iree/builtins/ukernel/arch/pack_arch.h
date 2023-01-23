@@ -7,7 +7,7 @@
 #ifndef IREE_BUILTINS_UKERNEL_ARCH_PACK_ARCH_H_
 #define IREE_BUILTINS_UKERNEL_ARCH_PACK_ARCH_H_
 
-#include "iree/builtins/ukernel/pack_types.h"
+#include "iree/builtins/ukernel/pack.h"
 
 // Returns the architecture-specific tile function to use for the pack op with
 // given params, or NULL if no suitable architecture-specific tile function

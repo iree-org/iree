@@ -212,7 +212,7 @@ hal.executable @shared_memory_lowering {
     }
   }
 }
-// CHECK-LABEL: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
+//       CHECK: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
 // CHECK-LABEL: llvm.func @shared_memory_lowering() {
 //       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
@@ -293,7 +293,6 @@ hal.executable @shared_memory_lowering_aligned_alloc {
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
 //  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<32 x f32>, 3>
 
-
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -336,4 +335,3 @@ hal.executable @check_not_readonly {
 }
 // CHECK-LABEL: llvm.func @check_not_readonly
 //  CHECK-NOT: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
-

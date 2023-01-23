@@ -17,10 +17,10 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -42,7 +42,7 @@ namespace {
 struct ExecutePartitionBuilder {
   explicit ExecutePartitionBuilder(Block *parentBlock, size_t ordinal,
                                    Partition *partition,
-                                   BlockAndValueMapping &parentMapping,
+                                   IRMapping &parentMapping,
                                    MLIRContext *context)
       : ordinal(ordinal), partition(partition), builder(context) {
     // Fuse the location of all ops we'll be putting in the partition.
@@ -177,7 +177,7 @@ struct ExecutePartitionBuilder {
   Partition *partition = nullptr;
   IREE::Stream::AsyncExecuteOp executeOp;
   OpBuilder builder;
-  BlockAndValueMapping mapping;
+  IRMapping mapping;
 };
 
 // Sorts blocks in dominance order such that the entry block is first and
@@ -247,7 +247,7 @@ class ScheduleExecutionPass
       // Create partition builders for each partition.
       // We'll clone ops into each and insert them into the block at the
       // appropriate position (first use... probably).
-      BlockAndValueMapping mapping;
+      IRMapping mapping;
       SmallVector<ExecutePartitionBuilder> partitionBuilders;
       partitionBuilders.reserve(partitionSet.size());
       for (auto partition : llvm::enumerate(partitionSet.partitions)) {

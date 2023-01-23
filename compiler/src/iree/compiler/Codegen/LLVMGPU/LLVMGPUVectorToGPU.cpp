@@ -29,10 +29,17 @@ static void createAsyncGroups(func::FuncOp funcOp) {
   // Look for all the copy that can be converted to async copy ops.
   funcOp.walk([&](vector::TransferWriteOp writeOp) {
     if (!writeOp.getPermutationMap().isMinorIdentity() ||
-        writeOp.getVectorType().getRank() != 1 || !writeOp.isDimInBounds(0) ||
-        writeOp.getShapedType().cast<MemRefType>().getMemorySpaceAsInt() !=
-            gpu::GPUDialect::getWorkgroupAddressSpace())
+        writeOp.getVectorType().getRank() != 1 || !writeOp.isDimInBounds(0)) {
       return WalkResult::advance();
+    }
+    auto addressSpaceAttr = writeOp.getShapedType()
+                                .cast<MemRefType>()
+                                .getMemorySpace()
+                                .dyn_cast_or_null<gpu::AddressSpaceAttr>();
+    if (!addressSpaceAttr || addressSpaceAttr.getValue() !=
+                                 gpu::GPUDialect::getWorkgroupAddressSpace()) {
+      return WalkResult::advance();
+    }
     auto read = writeOp.getVector().getDefiningOp<vector::TransferReadOp>();
     if (!read || read.getVectorType() != writeOp.getVectorType() ||
         !read.isDimInBounds(0) || !read.getPermutationMap().isMinorIdentity())
@@ -62,10 +69,16 @@ static void createAsyncGroups(func::FuncOp funcOp) {
         continue;
       auto readOp = dyn_cast<vector::TransferReadOp>(nextNode);
       // ignore read from a different address space.
-      if (readOp &&
-          readOp.getShapedType().cast<MemRefType>().getMemorySpaceAsInt() !=
-              gpu::GPUDialect::getWorkgroupAddressSpace()) {
-        continue;
+      if (readOp) {
+        auto addressSpaceAttr = readOp.getShapedType()
+                                    .cast<MemRefType>()
+                                    .getMemorySpace()
+                                    .dyn_cast_or_null<gpu::AddressSpaceAttr>();
+        if (!addressSpaceAttr ||
+            addressSpaceAttr.getValue() !=
+                gpu::GPUDialect::getWorkgroupAddressSpace()) {
+          continue;
+        }
       }
       auto nextWriteOp = dyn_cast<vector::TransferWriteOp>(nextNode);
       if (nextWriteOp && copyToSharedMem.count(nextWriteOp)) {
@@ -108,11 +121,15 @@ static void swizzleSharedMemory(func::FuncOp funcOp) {
   SmallVector<memref::AllocOp> shmAllocOps;
   funcOp->walk([&](memref::AllocOp allocOp) {
     auto memrefType = allocOp.getMemref().getType().cast<MemRefType>();
+    auto addressSpaceAttr =
+        memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
     // Only apply it to shared memory of input operands.
-    if (memrefType.getMemorySpaceAsInt() !=
+    if (!addressSpaceAttr ||
+        addressSpaceAttr.getValue() !=
             gpu::GPUDialect::getWorkgroupAddressSpace() ||
-        memrefType.getRank() < 3)
+        memrefType.getRank() < 3) {
       return;
+    }
     shmAllocOps.push_back(allocOp);
   });
   for (auto allocOp : shmAllocOps) {
@@ -137,6 +154,7 @@ struct LLVMGPUVectorToGPUPass
                                             std::move(flatternpatterns)))) {
       return signalPassFailure();
     }
+
     RewritePatternSet patterns(funcOp.getContext());
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
     populatePrepareVectorToMMAPatterns(patterns, llvmgpuUseMMASync);
@@ -149,7 +167,7 @@ struct LLVMGPUVectorToGPUPass
       if (failed(convertVectorToNVVMCompatibleMMASync(funcOp))) {
         return signalPassFailure();
       }
-      // Use TF32 for float32 case for now.
+      // Using TF32 for Float.
       RewritePatternSet f32ToTF32patterns(funcOp.getContext());
       nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
                                               nvgpu::MmaSyncF32Lowering::TF32);

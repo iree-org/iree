@@ -7,7 +7,7 @@
 #ifndef IREE_BUILTINS_UKERNEL_MMT4D_GENERIC_H_
 #define IREE_BUILTINS_UKERNEL_MMT4D_GENERIC_H_
 
-#include "iree/builtins/ukernel/mmt4d_types.h"
+#include "iree/builtins/ukernel/mmt4d.h"
 
 // Returns the generic tile function to use to perform the mmt4d with the given
 // *params. The caller may want to first try to get an optimized

@@ -367,11 +367,11 @@ def LLVMCPUSynchronizeSymbolVisibility :
   let constructor = "mlir::iree_compiler::createLLVMCPUSynchronizeSymbolVisibilityPass()";
 }
 
-def LLVMCPUAArch64VectorLowering
-    : Pass<"iree-llvmcpu-aarch64-vector-lowering", "func::FuncOp"> {
+def LLVMCPUMmt4dVectorLowering
+    : Pass<"iree-llvmcpu-mmt4d-vector-lowering", "func::FuncOp"> {
   let summary = "Apply vector lowering logic to vector ops";
   let constructor =
-      "mlir::iree_compiler::createLLVMCPUAArch64VectorLoweringPass()";
+      "mlir::iree_compiler::createLLVMCPUMmt4dVectorLoweringPass()";
 }
 
 def LLVMCPUUnfuseFMAOps :

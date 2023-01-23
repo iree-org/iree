@@ -14,10 +14,10 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/FunctionImplementation.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -815,7 +815,7 @@ static std::array<Value, 3> calculateWorkgroupCountFromRegion(
     Location loc, Block *body, Value device, ValueRange workload,
     OpBuilder &builder) {
   // TODO(benvanik): replace with region inlining util.
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   bvm.map(body->getArgument(0), device);
   // For now use the number of args to minimum of number of args used by
   // the body, and number of workload entries. When there is a more explicit

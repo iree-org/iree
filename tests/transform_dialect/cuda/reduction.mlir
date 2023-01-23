@@ -44,22 +44,20 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   //     CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
   //     CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x2xf32, 3>
+  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x2xf32, #gpu.address_space<workgroup>>
   //     CHECK-DAG: %[[TIDX:.]] = gpu.thread_id  x
   //     CHECK-DAG: %[[TIDY:.]] = gpu.thread_id  y
-  //     CHECK-DAG: %[[TIDZ:.]] = gpu.thread_id  z
   //     CHECK-DAG: %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
-  //     CHECK-DAG: %[[ADDED:.*]] = arith.addi %[[TIDZ]], %[[workgroup_id_x]]
 
   // Distributed reduction: everyone loads then 5 xor + addf expected
-  //         CHECK: vector.transfer_read %{{.*}}[%[[ADDED]], %[[TIDY]], %[[TIDX]]]
+  //         CHECK: vector.transfer_read %{{.*}}[%[[workgroup_id_x]], %[[TIDY]], %[[TIDX]]]
   // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
   //         CHECK: %[[RES:.*]] = arith.addf %{{.*}}
 
   //         CHECK: %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
   //         CHECK: scf.if %[[CONDXIS0]]
-  //         CHECK:   vector.transfer_write %[[RES_VEC]], %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]
+  //         CHECK:   vector.transfer_write %[[RES_VEC]], %[[SHMEM_ALLOC]][%[[C0]], %[[TIDY]]]
   //         CHECK: gpu.barrier
 
   // Last part is not distributed atm and is only ran by threadIdx.x == 0 and threadIdx.y == 0.
@@ -71,7 +69,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //         CHECK:   vector.reduction <add>
   //         CHECK:   vector.transfer_write
   //         CHECK: gpu.barrier
-  //         CHECK: memref.dealloc %[[SHMEM_ALLOC]] : memref<1x2xf32, 3>
+  //         CHECK: memref.dealloc %[[SHMEM_ALLOC]] : memref<1x2xf32, #gpu.address_space<workgroup>>
 
 
 //      EXEC: result[0]: hal.buffer_view
