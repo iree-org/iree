@@ -46,11 +46,19 @@ namespace iree_compiler {
 /// Collects computation ops which we will use as anchor to tile and fuse.
 static FailureOr<IREE::Codegen::LoweringConfigAttr> collectComputeOps(
     func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps) {
-  // If there are `scf.if` ops, we have both a fast and slow paths for
-  // padding handling. Then we need to scan both regions to discover such
-  // computation ops so that we can tile and fuse both regions.
+  // If there are `scf.if` ops which have linalg ops, we have both a fast and
+  // slow paths for padding handling. Then we need to scan both regions to
+  // discover such computation ops so that we can tile and fuse both regions.
   SmallVector<scf::IfOp, 1> ifOps;
-  funcOp.walk([&ifOps](scf::IfOp ifOp) { ifOps.push_back(ifOp); });
+  funcOp.walk<WalkOrder::PreOrder>([&ifOps](Operation *op) -> WalkResult {
+    if (isa<linalg::LinalgOp, TilingInterface>(op)) {
+      // Exclude scf.if in linalg op
+      return WalkResult::skip();
+    } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+      ifOps.push_back(ifOp);
+    }
+    return WalkResult::advance();
+  });
 
   SmallVector<IREE::Codegen::LoweringConfigAttr> configs;
   if (ifOps.empty()) {
