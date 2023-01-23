@@ -25,6 +25,8 @@ __all__ = [
     "CompilerOptions",
     "InputType",
     "OutputFormat",
+    "preprocess_file",
+    "preprocess_str",
 ]
 
 # Default testing backend for invoking the compiler.
@@ -297,3 +299,116 @@ def query_available_targets():
   target_backends = [target for target in target_backends if target]
 
   return target_backends
+
+
+
+# Preprocessing for SHARK (for now simply exposes iree-opt)
+
+def build_opt_command_line(input_file: str, tfs: TempFileSaver,
+                               options: CompilerOptions) -> List[str]:
+  """Builds a command line for applying specified patterns.
+
+  Args:
+    input_file: The input file name.
+    tfs: TempFileSaver.
+    options: Compiler options.
+  Returns:
+    List of strings of command line.
+  """
+  iree_opt = find_tool("iree-opt")
+  cl = [
+      iree_opt,
+      input_file,
+  ]
+
+  # Output file.
+  if options.output_file:
+    cl.append(f"-o={options.output_file}")
+
+  # Tool paths.
+  lld_path = find_tool("iree-lld")
+  cl.append(f"--iree-llvm-embedded-linker-path={lld_path}")
+
+  crash_reproducer_path = tfs.alloc_optional(
+      "core-reproducer.mlir", export_as=options.crash_reproducer_path)
+  if crash_reproducer_path:
+    cl.append(f"--mlir-pass-pipeline-crash-reproducer={crash_reproducer_path}")
+
+  cl.extend(options.extra_args)
+  print(cl)
+  return cl
+
+def preprocess_file(input_file: str, **kwargs):
+  """Invokes iree-opt on an input file.
+
+  Args:
+    input_file: File containing MLIR assembly to compile.
+    **kwargs: Keyword arguments corresponding to CompilerOptions.
+  Returns:
+    Either a byte buffer of the compiled content or None if output_file
+    was specified in the options.
+  """
+  with TempFileSaver.implicit() as tfs:
+    options = CompilerOptions(**kwargs)
+    retained_output_file = tfs.alloc_optional("core-output.bin",
+                                              export_as=options.output_file)
+    if options.output_file:
+      options.output_file = retained_output_file
+    cl = build_opt_command_line(input_file, tfs, options)
+
+    # Save a temp file with the command line.
+    retained_cl = tfs.alloc_optional("core-command-line.txt")
+    if retained_cl:
+      with open(retained_cl, "wt") as f:
+        f.write(" ".join(cl))
+
+    result = invoke_immediate(cl)
+    if options.output_file:
+      return None
+    # Output as string needs to write to the retained output file itself.
+    if retained_output_file:
+      with open(retained_output_file, "wb") as f:
+        f.write(result)
+    return result
+
+
+def preprocess_str(input_str: Union[str, bytes], **kwargs):
+  """Invokes the IREE compiler with an input string.
+
+  Args:
+    input_str: MLIR assembly to parse/compile (str or bytes).
+    **kwargs: Keyword arguments corresponding to CompilerOptions.
+  Returns:
+    Either a byte buffer of the compiled content or None if output_file
+    was specified in the options.
+  """
+  with TempFileSaver.implicit() as tfs:
+    retained_input_file = tfs.alloc_optional("core-input.mlir")
+    if retained_input_file:
+      with open(retained_input_file,
+                "wt" if isinstance(input_str, str) else "wb") as f:
+        f.write(input_str)
+    options = CompilerOptions(**kwargs)
+    retained_output_file = tfs.alloc_optional("core-output.bin",
+                                              export_as=options.output_file)
+    if options.output_file:
+      options.output_file = retained_output_file
+    cl = build_opt_command_line("-", tfs, options)
+    input_bytes = input_str.encode("utf-8") if isinstance(input_str,
+                                                          str) else input_str
+
+    # Save a temp file with the command line.
+    retained_cl = tfs.alloc_optional("core-command-line.txt")
+    if retained_cl:
+      with open(retained_cl, "wt") as f:
+        f.write(" ".join(cl))
+
+    result = invoke_immediate(cl, immediate_input=input_bytes)
+    if options.output_file:
+      return None
+
+    # Output as string needs to write to the retained output file itself.
+    if retained_output_file:
+      with open(retained_output_file, "wb") as f:
+        f.write(result)
+    return result
