@@ -195,7 +195,7 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
   // Step 1. Match and tile to introduce the top-level scf.foreach_thread for
   // the block/workgroup level. Keep everything fused.
   auto [maybeLeadingHBlock, gridFillH, gridReductionH, maybeTiledTrailingHBlock,
-        foreachThreadH] =
+        commonEnclosingForeachThreadH] =
       buildReductionStrategyBlockDistribution(b, variantH, strategy);
 
   // Step 2. Split the reduction and tile the pieces to ensure vector
@@ -204,21 +204,31 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
                                           maybeLeadingHBlock,
                                           maybeTiledTrailingHBlock, strategy);
 
-  // Make sure we don't create allocation by sharing foreach_thread output.
-  shareForeachArgument(b, foreachThreadH, ArrayRef<int64_t>({0}));
+  // Step 3. Make sure we don't create allocation by sharing foreach_thread
+  // output. This amounts to injecting user-defined static information that each
+  // thread accesses only a private slice. This needs to be added late, once we
+  // don't need handles anymore, because contained handles are currently always
+  // invalidated, even when modified inplace.
+  // TODO: Relax nested invalidation for transforms that only move or modify
+  // contained ops inplace.
+  shareForeachArgument(b, commonEnclosingForeachThreadH,
+                       ArrayRef<int64_t>({0}));
 
-  // Step 3-4. Common trailing steps.
+  // Step 4-5. Common trailing steps.
   auto [variantH2, funcH] = buildCommonTrailingStrategy(b, variantH, strategy);
 
-  // Step 5. The staged strategy has a post-bufferization vector distribution
+  // Step 6. The staged strategy has a post-bufferization vector distribution
   // with rank-reduction. The vector distribution occurs on multiple warps and
   // is itself internally staged in 2 stages.
   assert(strategy.getNumThreadsXInBlock() % kCudaWarpSize == 0 &&
          "strategy requires full warps");
   int64_t numWarpsToUse = strategy.getNumThreadsXInBlock() / kCudaWarpSize;
+  // Distribute the reduction on all the threads of the group. This allows us
+  // to have the same data layout for the partial reduction and the merge and
+  // therefore we can optimize away the temporary memory usage.
   buildDistributeVectors(b, variantH2, funcH, numWarpsToUse * kCudaWarpSize);
 
-  // Step 6. Apply clean up of memory operations.
+  // Step 7. Apply clean up of memory operations.
   funcH = b.create<MatchOp>(variantH2, func::FuncOp::getOperationName());
   iree_compiler::buildMemoryOptimizations(b, funcH);
 }

@@ -207,7 +207,7 @@ buildReductionStrategyBlockDistribution(
     ImplicitLocOpBuilder &b, Value variantH,
     const AbstractReductionStrategy &strategy);
 
-/// Build transform IR  that applies memory optimizations.
+/// Build transform IR that applies memory optimizations.
 Value buildMemoryOptimizations(ImplicitLocOpBuilder &b, Value funcH);
 
 }  // namespace iree_compiler
