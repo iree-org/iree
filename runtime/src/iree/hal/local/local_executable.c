@@ -72,13 +72,16 @@ iree_status_t iree_hal_local_executable_issue_dispatch_inline(
   const uint32_t workgroup_count_y = dispatch_state->workgroup_count_y;
   const uint32_t workgroup_count_z = dispatch_state->workgroup_count_z;
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  char xyz_string[32];
-  int xyz_string_length =
-      snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
-               workgroup_count_x, workgroup_count_y, workgroup_count_z);
-  IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, xyz_string, xyz_string_length);
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_HAL_VERBOSE_TRACING_ENABLE
+  // TODO(benvanik): tracing.h helper that speeds this up; too slow.
+  IREE_TRACE({
+    char xyz_string[32];
+    int xyz_string_length =
+        snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
+                 workgroup_count_x, workgroup_count_y, workgroup_count_z);
+    IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, xyz_string, xyz_string_length);
+  });
+#endif  // IREE_HAL_VERBOSE_TRACING_ENABLE
 
   iree_status_t status = iree_ok_status();
 

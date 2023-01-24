@@ -24,6 +24,7 @@
 #include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 #include "iree/hal/drivers/cuda/stream_command_buffer.h"
+#include "iree/hal/drivers/cuda/tracing.h"
 #include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 
@@ -51,6 +52,7 @@ typedef struct iree_hal_cuda_device_t {
   // TODO: support multiple streams.
   CUstream stream;
   iree_hal_cuda_context_wrapper_t context_wrapper;
+  iree_hal_cuda_tracing_context_t* tracing_context;
   iree_hal_allocator_t* device_allocator;
 
   // Cache of the direct stream command buffer initialized when in stream mode.
@@ -73,6 +75,7 @@ void iree_hal_cuda_device_params_initialize(
   out_params->queue_count = 1;
   out_params->command_buffer_mode = IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH;
   out_params->allow_inline_execution = false;
+  out_params->stream_tracing = false;
 }
 
 static iree_status_t iree_hal_cuda_device_check_params(
@@ -113,14 +116,25 @@ static iree_status_t iree_hal_cuda_device_create_internal(
                                    &device->block_pool);
   device->context_wrapper.syms = syms;
 
-  iree_status_t status = iree_hal_cuda_allocator_create(
-      (iree_hal_device_t*)device, &device->context_wrapper, cu_device, stream,
-      &device->device_allocator);
+  // Enable tracing for the (currently only) stream - no-op if disabled.
+  iree_status_t status = iree_ok_status();
+  if (device->params.stream_tracing) {
+    status = iree_hal_cuda_tracing_context_allocate(
+        &device->context_wrapper, device->identifier, stream,
+        &device->block_pool, host_allocator, &device->tracing_context);
+  }
+
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cuda_allocator_create((iree_hal_device_t*)device,
+                                            &device->context_wrapper, cu_device,
+                                            stream, &device->device_allocator);
+  }
 
   if (iree_status_is_ok(status) &&
       params->command_buffer_mode == IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM) {
     status = iree_hal_cuda_stream_command_buffer_create(
         (iree_hal_device_t*)device, &device->context_wrapper,
+        device->tracing_context,
         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
         IREE_HAL_COMMAND_CATEGORY_ANY, /*binding_capacity=*/0, device->stream,
         &device->block_pool, &device->stream_command_buffer);
@@ -173,9 +187,13 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // There should be no more buffers live that use the allocator.
   iree_hal_command_buffer_release(device->stream_command_buffer);
+
+  // There should be no more buffers live that use the allocator.
   iree_hal_allocator_release(device->device_allocator);
+
+  // TODO: support multiple streams.
+  iree_hal_cuda_tracing_context_free(device->tracing_context);
   CUDA_IGNORE_ERROR(device->context_wrapper.syms,
                     cuStreamDestroy(device->stream));
 
@@ -323,9 +341,9 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
     // need to be persisted. This lets us lower the execution delay as we can
     // directly route commands to a CUDA stream and let it eagerly flush.
     return iree_hal_cuda_stream_command_buffer_create(
-        base_device, &device->context_wrapper, mode, command_categories,
-        binding_capacity, device->stream, &device->block_pool,
-        out_command_buffer);
+        base_device, &device->context_wrapper, device->tracing_context, mode,
+        command_categories, binding_capacity, device->stream,
+        &device->block_pool, out_command_buffer);
   }
   switch (device->params.command_buffer_mode) {
     case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH:
@@ -404,6 +422,7 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   // TODO(benvanik): queue-ordered allocations.
+  // TODO(benvanik): tracing of the allocations (just for sequencing).
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
                                                     iree_infinite_timeout()));
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
@@ -419,6 +438,7 @@ static iree_status_t iree_hal_cuda_device_queue_dealloca(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* buffer) {
   // TODO(benvanik): queue-ordered allocations.
+  // TODO(benvanik): tracing of the allocations (just for sequencing).
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_barrier(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list));
   return iree_ok_status();
@@ -431,6 +451,9 @@ static iree_status_t iree_hal_cuda_device_queue_execute(
     iree_host_size_t command_buffer_count,
     iree_hal_command_buffer_t* const* command_buffers) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+
+  // TODO(benvanik): trace around the entire submission.
+
   for (iree_host_size_t i = 0; i < command_buffer_count; i++) {
     iree_hal_command_buffer_t* command_buffer = command_buffers[i];
     if (iree_hal_cuda_stream_command_buffer_isa(command_buffer)) {
@@ -450,11 +473,16 @@ static iree_status_t iree_hal_cuda_device_queue_execute(
           iree_hal_buffer_binding_table_empty()));
     }
   }
+
   // TODO(thomasraoux): implement semaphores - for now this conservatively
   // synchronizes after every submit.
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "cuStreamSynchronize");
   CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
                        cuStreamSynchronize(device->stream),
                        "cuStreamSynchronize");
+  iree_hal_cuda_tracing_context_collect(device->tracing_context);
+  IREE_TRACE_ZONE_END(z0);
+
   return iree_ok_status();
 }
 

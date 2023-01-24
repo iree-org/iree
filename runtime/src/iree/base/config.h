@@ -171,6 +171,16 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // This will only work for default drivers and otherwise users can explicitly
 // specify the provider when creating the executable loaders themselves.
 
+#if !defined(IREE_HAL_VERBOSE_TRACING_ENABLE)
+// Whether to enable additional HAL tracing that is known to have non-trivial
+// overheads (more memory consumption, device concurrency impacts, etc).
+#ifdef NDEBUG
+#define IREE_HAL_VERBOSE_TRACING_ENABLE 0
+#else
+#define IREE_HAL_VERBOSE_TRACING_ENABLE 1
+#endif  // NDEBUG
+#endif  // IREE_HAL_VERBOSE_TRACING_ENABLE
+
 #if !defined(IREE_HAL_HEAP_BUFFER_ALIGNMENT)
 // Power of two byte alignment required on all host heap buffers.
 // Executables are compiled with alignment expectations and the runtime

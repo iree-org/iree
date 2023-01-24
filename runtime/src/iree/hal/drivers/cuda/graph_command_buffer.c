@@ -613,39 +613,36 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
   IREE_RETURN_IF_ERROR(
       iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
 
+  // Lookup kernel parameters used for side-channeling additional launch
+  // information from the compiler.
+  iree_hal_cuda_kernel_params_t kernel_params;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_cuda_native_executable_entry_point_kernel_params(
+          executable, entry_point, &kernel_params));
+
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &executable));
-  iree_hal_pipeline_layout_t* layout =
-      iree_hal_cuda_executable_get_layout(executable, entry_point);
-  iree_host_size_t num_constants =
-      iree_hal_cuda_pipeline_layout_num_constants(layout);
-  iree_host_size_t constant_base_index =
-      iree_hal_cuda_push_constant_index(layout);
 
   // Patch the push constants in the kernel arguments.
+  iree_host_size_t num_constants =
+      iree_hal_cuda_pipeline_layout_num_constants(kernel_params.layout);
+  iree_host_size_t constant_base_index =
+      iree_hal_cuda_push_constant_index(kernel_params.layout);
   for (iree_host_size_t i = 0; i < num_constants; i++) {
     *((uint32_t*)command_buffer->current_descriptor[i + constant_base_index]) =
         command_buffer->push_constant[i];
   }
 
-  int32_t block_size_x, block_size_y, block_size_z;
-  int32_t shared_memory_size;
-  IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_block_size(
-      executable, entry_point, &block_size_x, &block_size_y, &block_size_z));
-  IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_shared_memory_size(
-      executable, entry_point, &shared_memory_size));
-
   CUDA_KERNEL_NODE_PARAMS params = {
-      .func = iree_hal_cuda_native_executable_for_entry_point(executable,
-                                                              entry_point),
-      .blockDimX = block_size_x,
-      .blockDimY = block_size_y,
-      .blockDimZ = block_size_z,
+      .func = kernel_params.function,
+      .blockDimX = kernel_params.block_size[0],
+      .blockDimY = kernel_params.block_size[1],
+      .blockDimZ = kernel_params.block_size[2],
       .gridDimX = workgroup_x,
       .gridDimY = workgroup_y,
       .gridDimZ = workgroup_z,
       .kernelParams = command_buffer->current_descriptor,
-      .sharedMemBytes = shared_memory_size,
+      .sharedMemBytes = kernel_params.shared_memory_size,
   };
 
   // Serialize all the nodes for now.

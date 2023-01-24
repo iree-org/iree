@@ -217,6 +217,9 @@ typedef struct ___tracy_source_location_data iree_tracing_location_t;
   (TracyCZoneCtx) { zone_id, 1 }
 #endif  // __cplusplus
 
+int64_t iree_tracing_time(void);
+int64_t iree_tracing_frequency(void);
+
 IREE_MUST_USE_RESULT iree_zone_id_t
 iree_tracing_zone_begin_impl(const iree_tracing_location_t* src_loc,
                              const char* name, size_t name_length);
@@ -225,6 +228,40 @@ IREE_MUST_USE_RESULT iree_zone_id_t iree_tracing_zone_begin_external_impl(
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length);
 void iree_tracing_zone_end(iree_zone_id_t zone_id);
+
+// Matches GpuContextType.
+// TODO(benvanik): upstream a few more enum values for CUDA/Metal/etc.
+// The only real behavior that changes in tracy is around whether multi-threaded
+// recording is assumed and IREE_TRACING_GPU_CONTEXT_TYPE_VULKAN is a safe
+// default choice - the context name provided during creation should be
+// descriptive enough for the user.
+typedef enum iree_tracing_gpu_context_type_e {
+  IREE_TRACING_GPU_CONTEXT_TYPE_INVALID = 0,
+  IREE_TRACING_GPU_CONTEXT_TYPE_OPENGL,
+  IREE_TRACING_GPU_CONTEXT_TYPE_VULKAN,
+  IREE_TRACING_GPU_CONTEXT_TYPE_OPENCL,
+  IREE_TRACING_GPU_CONTEXT_TYPE_DIRECT3D12,
+  IREE_TRACING_GPU_CONTEXT_TYPE_DIRECT3D11,
+} iree_tracing_gpu_context_type_t;
+
+uint8_t iree_tracing_gpu_context_allocate(iree_tracing_gpu_context_type_t type,
+                                          const char* name, size_t name_length,
+                                          bool is_calibrated,
+                                          uint64_t cpu_timestamp,
+                                          uint64_t gpu_timestamp,
+                                          float timestamp_period);
+void iree_tracing_gpu_context_calibrate(uint8_t context_id, int64_t cpu_delta,
+                                        int64_t cpu_timestamp,
+                                        int64_t gpu_timestamp);
+void iree_tracing_gpu_zone_begin(uint8_t context_id, uint16_t query_id,
+                                 const iree_tracing_location_t* src_loc);
+void iree_tracing_gpu_zone_begin_external(
+    uint8_t context_id, uint16_t query_id, const char* file_name,
+    size_t file_name_length, uint32_t line, const char* function_name,
+    size_t function_name_length, const char* name, size_t name_length);
+void iree_tracing_gpu_zone_end(uint8_t context_id, uint16_t query_id);
+void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
+                                  int64_t gpu_timestamp);
 
 void iree_tracing_set_plot_type_impl(const char* name_literal,
                                      uint8_t plot_type);

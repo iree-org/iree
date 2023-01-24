@@ -374,6 +374,12 @@ iree_status_t iree_hal_command_buffer_collective_validation(
   if (op.kind > IREE_HAL_COLLECTIVE_KIND_MAX_VALUE) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unknown collective operation");
+  } else if (op.reduction > IREE_HAL_COLLECTIVE_REDUCTION_MAX_VALUE) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unknown collective reduction");
+  } else if (op.element_type > IREE_HAL_COLLECTIVE_ELEMENT_TYPE_MAX_VALUE) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unknown collective element type");
   }
   enum iree_hal_collective_info_bits_t {
     IREE_HAL_COLLECTIVE_IS_REDUCTION = 1u << 0,
