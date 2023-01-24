@@ -24,7 +24,7 @@ typedef struct iree_hal_cuda_kernel_params_t {
   CUfunction function;
   uint32_t block_size[3];
   uint32_t shared_memory_size;
-  IREE_TRACE(iree_string_view_t function_name);
+  IREE_TRACE(iree_string_view_t function_name;)
 } iree_hal_cuda_kernel_params_t;
 
 // Creates an executable from a PTX module. The module may contain several
