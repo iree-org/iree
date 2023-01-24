@@ -51,3 +51,18 @@ func.func @allgather(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {ir
   %3 = hal.tensor.export %2 : tensor<1024xf32> -> !hal.buffer_view
   return %3 : !hal.buffer_view
 }
+
+//-----
+
+// CHECK-LABEL: @reduce_scatter
+func.func @reduce_scatter(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
+  // CHECK: stream.channel.default
+  // CHECK: stream.tensor.empty : tensor<2x2xf32>
+  // CHECK: stream.async.collective<reduce_scatter with sum : f32>
+  %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<4x2xf32>
+  %channel_default = flow.channel.default : !flow.channel
+  %1 = flow.tensor.empty : tensor<2x2xf32>
+  %2 = flow.reduce_scatter sum, f32, %1, %0, %channel_default : (tensor<2x2xf32>, tensor<4x2xf32>, !flow.channel) -> tensor<2x2xf32>
+  %3 = hal.tensor.export %2 : tensor<2x2xf32> -> !hal.buffer_view
+  return %3 : !hal.buffer_view
+}
