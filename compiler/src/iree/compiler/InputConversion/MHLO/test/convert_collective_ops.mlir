@@ -122,3 +122,46 @@ func.func @all_gather_dim_1(%input : tensor<2x2xf32>) -> tensor<2x4xf32> {
      use_global_device_ids} : (tensor<2x2xf32>) -> tensor<2x4xf32>
   return %out : tensor<2x4xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @reduce_scatter_dim_0
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<4x2xf32>) -> tensor<2x2xf32>
+func.func @reduce_scatter_dim_0(%input : tensor<4x2xf32>) -> tensor<2x2xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2x2xf32>
+  // CHECK: [[OP:%.+]] = flow.reduce_scatter sum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2x2xf32>, tensor<4x2xf32>, !flow.channel) -> tensor<2x2xf32>
+  // CHECK: return [[OP]] : tensor<2x2xf32>
+  %out = "mhlo.reduce_scatter"(%input) ({
+  ^bb0(%arg0: tensor<f32> , %arg1: tensor<f32>) :
+    %sum = mhlo.add %arg0, %arg1 : tensor<f32>
+    mhlo.return %sum : tensor<f32>
+  }) {scatter_dimension = 0 : i64,
+      channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+      use_global_device_ids} : (tensor<4x2xf32>) -> tensor<2x2xf32>
+  return %out : tensor<2x2xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @reduce_scatter_dim_1
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<2x4xf32>) -> tensor<2x2xf32>
+func.func @reduce_scatter_dim_1(%input : tensor<2x4xf32>) -> tensor<2x2xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: tensor.empty() : tensor<4x2xf32>
+  // CHECK: [[TRANSPOSE_ARG:%.+]] = linalg.generic
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2x2xf32>
+  // CHECK: [[OP:%.+]] = flow.reduce_scatter sum, f32, [[EMPTY]], [[TRANSPOSE_ARG]], %channel_default  : (tensor<2x2xf32>, tensor<4x2xf32>, !flow.channel) -> tensor<2x2xf32>
+  // CHECK: [[TRANSPOSE_OUT:%.+]] = linalg.generic
+  // CHECK: return [[TRANSPOSE_OUT]] : tensor<2x2xf32>
+  %out = "mhlo.reduce_scatter"(%input) ({
+  ^bb0(%arg0: tensor<f32> , %arg1: tensor<f32>) :
+    %sum = mhlo.add %arg0, %arg1 : tensor<f32>
+    mhlo.return %sum : tensor<f32>
+  }) {scatter_dimension = 1 : i64,
+      channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+      use_global_device_ids} : (tensor<2x4xf32>) -> tensor<2x2xf32>
+  return %out : tensor<2x2xf32>
+}

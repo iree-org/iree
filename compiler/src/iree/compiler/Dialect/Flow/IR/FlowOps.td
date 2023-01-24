@@ -1410,4 +1410,25 @@ def FLOW_AllReduceOp : FLOW_Op<"allreduce", [
   let assemblyFormat = "$reduction_op `,` $element_type `,` operands attr-dict `:` functional-type(operands, results)";
 }
 
+def FLOW_ReduceScatterOp : FLOW_Op<"reduce_scatter", [
+  AllTypesMatch<["target", "result"]>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let arguments = (ins
+    FLOW_CollectiveReductionOpAttr:$reduction_op,
+    FLOW_CollectiveElementTypeAttr:$element_type,
+    AnyTypeOf<[AnyTensor, AnyMemRef]>:$target,
+    AnyTypeOf<[AnyTensor, AnyMemRef]>:$source,
+    FLOW_Channel:$channel
+  );
+  let results = (outs
+    AnyTypeOf<[AnyTensor, AnyMemRef]>:$result
+  );
+  let assemblyFormat = "$reduction_op `,` $element_type `,` operands attr-dict `:` functional-type(operands, results)";
+}
+
 #endif  // IREE_DIALECT_FLOW_OPS

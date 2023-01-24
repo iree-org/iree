@@ -284,12 +284,126 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
   }
 };
 
+struct ReduceScatterOpConversion
+    : public OpConversionPattern<mhlo::ReduceScatterOp> {
+  using OpConversionPattern<mhlo::ReduceScatterOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::ReduceScatterOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+
+    if (!op.getUseGlobalDeviceIds())
+      return rewriter.notifyMatchFailure(op, "must use global device IDs");
+
+    // Check there is only one group in the replica_groups
+    ShapedType replicaGroupType = op.getReplicaGroups().getType();
+    if (replicaGroupType.getRank() != 2 ||
+        replicaGroupType.getDimSize(0) != 1) {
+      return rewriter.notifyMatchFailure(op,
+                                         "must have a single replica group");
+    }
+
+    // Only single elementwise op is supported.
+    Block &block = op.getComputation().front();
+
+    if (block.empty() || llvm::hasSingleElement(block) ||
+        std::next(block.begin(), 2) != block.end())
+      return rewriter.notifyMatchFailure(op, "must have two ops in the block");
+
+    if (block.getNumArguments() != 2)
+      return rewriter.notifyMatchFailure(op, "must have two block args");
+
+    Operation &op1 = block.front();
+    Operation &op2 = *(++block.begin());
+
+    if (op1.getNumResults() != 1 ||
+        !op1.hasTrait<::mlir::OpTrait::Elementwise>())
+      return rewriter.notifyMatchFailure(op, "must have elementwise trait");
+
+    // Convert mhlo reduction op into flow reduction op.
+    std::optional<IREE::Flow::CollectiveReductionOp> redOp =
+        convertToFlowCollectiveReductionOp(op1);
+    if (!redOp)
+      return rewriter.notifyMatchFailure(op, "unsupported operation.");
+
+    if (!op2.mightHaveTrait<OpTrait::IsTerminator>())
+      return rewriter.notifyMatchFailure(op,
+                                         "the second op must be a terminator");
+
+    // Convert mhlo reduction op into flow reduction op
+    auto reductionOpAttr =
+        IREE::Flow::CollectiveReductionOpAttr::get(op.getContext(), *redOp);
+
+    // Currently only the default channel is used.
+
+    // Create a default channel.
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
+
+    auto resultType = op.getResult().getType().cast<RankedTensorType>();
+    SmallVector<int64_t> scatterResultShape(resultType.getShape());
+    auto elemType = resultType.getElementType();
+
+    // Get the element type
+    std::optional<IREE::Flow::CollectiveElementType> collectiveElemType =
+        convertToFlowCollectiveElementType(elemType);
+    if (!elemType)
+      return rewriter.notifyMatchFailure(op, "unsupported result type");
+    auto elementTypeAttr = IREE::Flow::CollectiveElementTypeAttr::get(
+        op.getContext(), *collectiveElemType);
+
+    // When scatter_dimension != 0, we need to transpose between 0 and
+    // scatter_dimension before and after the flow reduce_scatter op.
+    uint64_t scatterDim = op.getScatterDimension();
+    auto inputType = op.getOperand().getType().cast<RankedTensorType>();
+    SmallVector<int64_t> reduceInputShape(inputType.getShape());
+    Value reduceInput = op.getOperand();
+    DenseIntElementsAttr permutationAttr;
+
+    if (scatterDim != 0) {
+      SmallVector<int64_t> permutation =
+          llvm::to_vector(llvm::seq<int64_t>(0, scatterResultShape.size()));
+      std::swap(permutation[0], permutation[scatterDim]);
+      permutationAttr = rewriter.getI64VectorAttr(permutation);
+      std::swap(reduceInputShape[0], reduceInputShape[scatterDim]);
+      std::swap(scatterResultShape[0], scatterResultShape[scatterDim]);
+      // transpose the input
+      reduceInput =
+          rewriter
+              .create<mhlo::TransposeOp>(
+                  loc, RankedTensorType::get(reduceInputShape, elemType),
+                  reduceInput, permutationAttr)
+              .getResult();
+    }
+
+    // Create an empty tensor for the result
+    Value target = rewriter.create<tensor::EmptyOp>(
+        loc, scatterResultShape, resultType.getElementType());
+    Value scatterResult = rewriter
+                              .create<IREE::Flow::ReduceScatterOp>(
+                                  op.getLoc(), reductionOpAttr, elementTypeAttr,
+                                  target, reduceInput, channel)
+                              .getResult();
+
+    if (scatterDim != 0) {
+      scatterResult = rewriter
+                          .create<mhlo::TransposeOp>(
+                              loc, resultType, scatterResult, permutationAttr)
+                          .getResult();
+    }
+
+    rewriter.replaceOp(op, scatterResult);
+    return success();
+  }
+};
+
 void populateMHLOCollectiveOpsConversionPatterns(MLIRContext *context,
                                                  TypeConverter &typeConverter,
                                                  RewritePatternSet &patterns) {
-  patterns.insert<ReplicaIdOpConversion>(typeConverter, context);
   patterns.insert<AllGatherOpConversion>(typeConverter, context);
   patterns.insert<AllReduceOpConversion>(typeConverter, context);
+  patterns.insert<ReduceScatterOpConversion>(typeConverter, context);
+  patterns.insert<ReplicaIdOpConversion>(typeConverter, context);
 }
 
 }  // namespace MHLO
