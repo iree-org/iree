@@ -104,12 +104,12 @@ def DecomposeSoftmax :
                     "createDecomposeSoftmaxPass()";
 }
 
-def DecomposeAttention :
-    Pass<"iree-linalg-ext-decompose-attention", "func::FuncOp"> {
+def TileAndDecomposeAttention :
+    Pass<"iree-linalg-ext-tile-and-decompose-attention", "func::FuncOp"> {
   let summary =
-      "Decomposes attention op into a sequence of linalg ops";
+      "Tiles and decomposes attention op into a sequence of linalg ops";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createDecomposeAttentionPass()";
+                    "createTileAndDecomposeAttentionPass()";
 }
 
 //===---------------------------------------------------------------------====//

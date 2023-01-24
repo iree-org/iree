@@ -2873,13 +2873,13 @@ LogicalResult AttentionOp::verify() {
 }
 
 SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &builder) {
-  int64_t queryRank = getQueryRank();
-  SmallVector<Range> loopBounds(queryRank);
+  int64_t iterationDomainRank = getIterationDomainRank();
+  SmallVector<Range> loopBounds(iterationDomainRank);
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   Value source = query();
-  for (auto dim : llvm::seq<int64_t>(0, queryRank)) {
+  for (auto dim : llvm::seq<int64_t>(0, iterationDomainRank)) {
     loopBounds[dim].offset = zero;
     loopBounds[dim].size = getDimValue(builder, loc, source, dim);
     loopBounds[dim].stride = one;
@@ -2888,59 +2888,56 @@ SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &builder) {
 }
 
 SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
-  int64_t queryRank = getQueryRank();
-  SmallVector<utils::IteratorType> iteratorTypes(queryRank,
+  SmallVector<utils::IteratorType> iteratorTypes(getIterationDomainRank(),
                                                  utils::IteratorType::parallel);
-  iteratorTypes[queryRank - 1] = utils::IteratorType::reduction;
   return iteratorTypes;
-}
-
-static SmallVector<OpFoldResult> createDimValues(OpBuilder &builder,
-                                                 Location loc, Value memref) {
-  auto memrefType = memref.getType().cast<MemRefType>();
-  SmallVector<OpFoldResult> dims;
-  for (const auto &en : llvm::enumerate(memrefType.getShape())) {
-    if (en.value() == ShapedType::kDynamic) {
-      dims.push_back(
-          builder.createOrFold<memref::DimOp>(loc, memref, en.index()));
-    } else {
-      dims.push_back(builder.getIndexAttr(en.value()));
-    }
-  }
-  return dims;
 }
 
 SmallVector<Operation *>
 AttentionOp::getTiledImplementation(OpBuilder &builder,
                                     ArrayRef<OpFoldResult> offsets,
                                     ArrayRef<OpFoldResult> sizes) {
-  int64_t rank = getQueryRank();
-  auto oneAttr = builder.getI64IntegerAttr(1);
-  SmallVector<OpFoldResult> strides(rank, oneAttr);
-  SmallVector<Value> tiledOperands;
-  SmallVector<OpFoldResult> keyValueOffsets{offsets};
-  SmallVector<OpFoldResult> keyValueSizes{sizes};
-  SmallVector<OpFoldResult> keyDims;
-  if (hasTensorSemantics()) {
-    keyDims = tensor::createDimValues(builder, getLoc(), key());
-  } else {
-    keyDims = createDimValues(builder, getLoc(), key());
+  assert(offsets.size() == getIterationDomainRank());
+  assert(sizes.size() == getIterationDomainRank());
+
+  Location loc = getLoc();
+  auto one = builder.getIndexAttr(1);
+  auto zero = builder.getIndexAttr(0);
+
+  SmallVector<OpFoldResult> queryOutputOffsets(getQueryRank(), zero);
+  SmallVector<OpFoldResult> queryOutputStrides(getQueryRank(), one);
+  ArrayRef<int64_t> queryShape = getQueryType().getShape();
+  SmallVector<OpFoldResult> queryOutputSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(queryShape));
+  for (auto info : llvm::enumerate(llvm::zip(offsets, sizes))) {
+    queryOutputOffsets[info.index()] = std::get<0>(info.value());
+    queryOutputSizes[info.index()] = std::get<1>(info.value());
   }
-  keyValueOffsets[1] = builder.getIndexAttr(0);
-  keyValueSizes[1] = keyDims[1];
-  tiledOperands.emplace_back(
-      getSlice(builder, getLoc(), query(), offsets, sizes, strides));
-  tiledOperands.emplace_back(getSlice(builder, getLoc(), key(), keyValueOffsets,
-                                      keyValueSizes, strides));
-  tiledOperands.emplace_back(getSlice(builder, getLoc(), value(),
-                                      keyValueOffsets, keyValueSizes, strides));
-  tiledOperands.emplace_back(
-      getSlice(builder, getLoc(), output(), offsets, sizes, strides));
+
+  SmallVector<OpFoldResult> keyValueOffsets(getKeyRank(), zero);
+  SmallVector<OpFoldResult> keyValueStrides(getKeyRank(), one);
+  ArrayRef<int64_t> keyShape = getKeyType().getShape();
+  SmallVector<OpFoldResult> keyValueSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(keyShape));
+  keyValueSizes[0] = sizes[0];
+  keyValueOffsets[0] = offsets[0];
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(getSlice(builder, loc, query(), queryOutputOffsets,
+                                      queryOutputSizes, queryOutputStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, key(), keyValueOffsets,
+                                      keyValueSizes, keyValueStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, value(), keyValueOffsets,
+                                      keyValueSizes, keyValueStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, output(),
+                                      queryOutputOffsets, queryOutputSizes,
+                                      queryOutputStrides));
 
   SmallVector<Type, 4> resultTypes;
   if (hasTensorSemantics()) {
     resultTypes.push_back(tiledOperands[3].getType());
   }
+
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
@@ -2952,8 +2949,14 @@ LogicalResult AttentionOp::getResultTilePosition(
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
   if (resultNumber == 0) {
-    resultOffsets.assign(offsets.begin(), offsets.end());
-    resultSizes.assign(sizes.begin(), sizes.end());
+    ArrayRef<int64_t> resultShape = getOutputType().getShape();
+    resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
+    resultOffsets =
+        SmallVector<OpFoldResult>(getOutputRank(), builder.getIndexAttr(0));
+    for (auto info : llvm::enumerate(llvm::zip(offsets, sizes))) {
+      resultOffsets[info.index()] = std::get<0>(info.value());
+      resultSizes[info.index()] = std::get<1>(info.value());
+    }
     return success();
   }
   return failure();

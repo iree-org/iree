@@ -1611,7 +1611,6 @@ func.func @attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf
 // CHECK:        %[[C0:.+]] = arith.constant 0 : index
 // CHECK:        %[[C192:.+]] = arith.constant 192 : index
 // CHECK:        %[[C1024:.+]] = arith.constant 1024 : index
-// CHECK:        %[[C64:.+]] = arith.constant 64 : index
 // CHECK:        %[[C10:.+]] = arith.constant 10 : index
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<192x1024x64xf32>
 // CHECK:        %[[D1:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C192]] step %[[C10]]
@@ -1621,18 +1620,18 @@ func.func @attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf
 // CHECK-SAME:       iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<192x1024x64xf32>) {
 // CHECK-DAG:          %[[D4:.+]] = affine.min #[[MAP1]](%[[ARG5]])[%[[C30]], %[[C1024]]]
 // CHECK:            %[[EXTRACTED_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG3]], %[[ARG5]], 0] [%[[D2]],
-// CHECK-SAME:         %[[D4]], %[[C64]]] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x?x?xf32>
-// CHECK:            %[[EXTRACTED_SLICE_0:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG3]], 0, 0] [%[[D2]], 1024,
-// CHECK-SAME:         %[[C64]]] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x1024x?xf32>
-// CHECK:            %[[EXTRACTED_SLICE_1:.+]] = tensor.extract_slice %[[ARG2]][%[[ARG3]], 0, 0] [%[[D2]], 1024,
-// CHECK-SAME:         %[[C64]]] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x1024x?xf32>
+// CHECK-SAME:         %[[D4]], 64] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x?x64xf32>
+// CHECK:            %[[EXTRACTED_SLICE_0:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG3]], 0, 0] [%[[D2]], 1024, 64] [1,
+// CHECK-SAME:         1, 1] : tensor<192x1024x64xf32> to tensor<?x1024x64xf32>
+// CHECK:            %[[EXTRACTED_SLICE_1:.+]] = tensor.extract_slice %[[ARG2]][%[[ARG3]], 0, 0] [%[[D2]], 1024, 64] [1,
+// CHECK-SAME:         1, 1] : tensor<192x1024x64xf32> to tensor<?x1024x64xf32>
 // CHECK:            %[[EXTRACTED_SLICE_2:.+]] = tensor.extract_slice %[[D0]][%[[ARG3]], %[[ARG5]], 0] [%[[D2]],
-// CHECK-SAME:         %[[D4]], %[[C64]]] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x?x?xf32>
+// CHECK-SAME:         %[[D4]], 64] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x?x64xf32>
 // CHECK:            %[[D5:.+]] = iree_linalg_ext.attention ins(%[[EXTRACTED_SLICE]], %[[EXTRACTED_SLICE_0]],
-// CHECK-SAME:         %[[EXTRACTED_SLICE_1]] : tensor<?x?x?xf32>, tensor<?x1024x?xf32>, tensor<?x1024x?xf32>)
-// CHECK-SAME:         outs(%[[EXTRACTED_SLICE_2]] : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+// CHECK-SAME:         %[[EXTRACTED_SLICE_1]] : tensor<?x?x64xf32>, tensor<?x1024x64xf32>, tensor<?x1024x64xf32>)
+// CHECK-SAME:         outs(%[[EXTRACTED_SLICE_2]] : tensor<?x?x64xf32>) -> tensor<?x?x64xf32>
 // CHECK:            %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D5]] into %[[ARG6]][%[[ARG3]], %[[ARG5]], 0]
-// CHECK-SAME:         [%[[D2]], %[[D4]], %[[C64]]] [1, 1, 1] : tensor<?x?x?xf32> into tensor<192x1024x64xf32>
+// CHECK-SAME:         [%[[D2]], %[[D4]], 64] [1, 1, 1] : tensor<?x?x64xf32> into tensor<192x1024x64xf32>
 // CHECK:            scf.yield %[[INSERTED_SLICE]] : tensor<192x1024x64xf32>
 // CHECK:          }
 // CHECK:          scf.yield %[[D3]] : tensor<192x1024x64xf32>
@@ -1655,24 +1654,23 @@ func.func @attention_memref(%query: memref<192x1024x64xf32>, %key: memref<192x10
 // CHECK:        %[[C0:.+]] = arith.constant 0 : index
 // CHECK:        %[[C192:.+]] = arith.constant 192 : index
 // CHECK:        %[[C1024:.+]] = arith.constant 1024 : index
-// CHECK:        %[[C64:.+]] = arith.constant 64 : index
 // CHECK:        %[[C10:.+]] = arith.constant 10 : index
 // CHECK:        scf.for %[[ARG4:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C192]] step %[[C10]] {
 // CHECK-DAG:        %[[D0:.+]] = affine.min #[[MAP]](%[[ARG4]])[%[[C10]], %[[C192]]]
 // CHECK:          scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1024]] step %[[C30]] {
 // CHECK-DAG:          %[[D1:.+]] = affine.min #[[MAP1]](%[[ARG5]])[%[[C30]], %[[C1024]]]
-// CHECK:            %[[SUBVIEW:.+]] = memref.subview %[[ARG0]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], %[[C64]]]
-// CHECK-SAME:         [1, 1, 1] : memref<192x1024x64xf32> to memref<?x?x?xf32, strided<[65536, 64, 1], offset: ?>>
-// CHECK:            %[[SUBVIEW_0:.+]] = memref.subview %[[ARG1]][%[[ARG4]], 0, 0] [%[[D0]], 1024, %[[C64]]] [1, 1, 1] :
-// CHECK-SAME:         memref<192x1024x64xf32> to memref<?x1024x?xf32, strided<[65536, 64, 1], offset: ?>>
-// CHECK:            %[[SUBVIEW_1:.+]] = memref.subview %[[ARG2]][%[[ARG4]], 0, 0] [%[[D0]], 1024, %[[C64]]] [1, 1, 1] :
-// CHECK-SAME:         memref<192x1024x64xf32> to memref<?x1024x?xf32, strided<[65536, 64, 1], offset: ?>>
-// CHECK:            %[[SUBVIEW_2:.+]] = memref.subview %[[ARG3]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], %[[C64]]]
-// CHECK-SAME:         [1, 1, 1] : memref<192x1024x64xf32> to memref<?x?x?xf32, strided<[65536, 64, 1], offset: ?>>
-// CHECK:            iree_linalg_ext.attention ins(%[[SUBVIEW]], %[[SUBVIEW_0]], %[[SUBVIEW_1]] : memref<?x?x?xf32,
-// CHECK-SAME:         strided<[65536, 64, 1], offset: ?>>, memref<?x1024x?xf32, strided<[65536, 64, 1], offset: ?>>,
-// CHECK-SAME:         memref<?x1024x?xf32, strided<[65536, 64, 1], offset: ?>>) outs(%[[SUBVIEW_2]] : memref<?x?x?xf32,
-// CHECK-SAME:         strided<[65536, 64, 1], offset: ?>>)
+// CHECK:            %[[SUBVIEW:.+]] = memref.subview %[[ARG0]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], 64] [1, 1,
+// CHECK-SAME:         1] : memref<192x1024x64xf32> to memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>
+// CHECK:            %[[SUBVIEW_0:.+]] = memref.subview %[[ARG1]][%[[ARG4]], 0, 0] [%[[D0]], 1024, 64] [1, 1, 1] :
+// CHECK-SAME:         memref<192x1024x64xf32> to memref<?x1024x64xf32, strided<[65536, 64, 1], offset: ?>>
+// CHECK:            %[[SUBVIEW_1:.+]] = memref.subview %[[ARG2]][%[[ARG4]], 0, 0] [%[[D0]], 1024, 64] [1, 1, 1] :
+// CHECK-SAME:         memref<192x1024x64xf32> to memref<?x1024x64xf32, strided<[65536, 64, 1], offset: ?>>
+// CHECK:            %[[SUBVIEW_2:.+]] = memref.subview %[[ARG3]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], 64] [1, 1,
+// CHECK-SAME:         1] : memref<192x1024x64xf32> to memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>
+// CHECK:            iree_linalg_ext.attention ins(%[[SUBVIEW]], %[[SUBVIEW_0]], %[[SUBVIEW_1]] : memref<?x?x64xf32,
+// CHECK-SAME:         strided<[65536, 64, 1], offset: ?>>, memref<?x1024x64xf32, strided<[65536, 64, 1], offset: ?>>,
+// CHECK-SAME:         memref<?x1024x64xf32, strided<[65536, 64, 1], offset: ?>>) outs(%[[SUBVIEW_2]] :
+// CHECK-SAME:         memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>)
 // CHECK:          }
 // CHECK:        }
 // CHECK:        return

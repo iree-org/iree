@@ -181,7 +181,7 @@ static void addTileAndDistributePasses(
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createDecomposeAttentionPass());
+      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createDecomposeSoftmaxPass());
   if (clEnablePadConsumerFusion && useFuseTensorPadWithConsumerPass) {

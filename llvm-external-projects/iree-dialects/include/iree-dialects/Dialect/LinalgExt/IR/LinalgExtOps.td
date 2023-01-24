@@ -1265,6 +1265,12 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     int64_t getValueRank() {
       return getValueType().getRank();
     }
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
+    }
+    int64_t getIterationDomainRank() {
+      return 2;
+    };
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
