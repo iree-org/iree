@@ -568,10 +568,21 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   // automatically get listening capabilities.
 
   MLIRContext *ctx = target->getContext();
-  RewritePatternSet patterns(ctx);
   // MultiReduction lowering is necessary until we have explicit support for
   // distributing that op.
-  populateMultiReductionLoweringPatterns(target, patterns, /*benefit=*/3);
+  RewritePatternSet preProcessingPatterns(ctx);
+  populateMultiReductionLoweringPatterns(target, preProcessingPatterns,
+                                         /*benefit=*/1);
+  vector::ShapeCastOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
+  vector::BroadcastOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
+  vector::ExtractOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
+  if (failed(applyPatternsAndFoldGreedily(target,
+                                          std::move(preProcessingPatterns)))) {
+    target->emitOpError("multi-reduce patterns failed to apply");
+    return emitDefaultDefiniteFailure(target);
+  }
+
+  RewritePatternSet patterns(ctx);
   populateVectorTransferWriteDistribution(target, patterns, /*benefit=*/2);
   populatePropagateVectorDistribution(target, patterns, /*benefit=*/1);
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {

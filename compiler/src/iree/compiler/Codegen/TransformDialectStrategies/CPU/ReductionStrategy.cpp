@@ -61,8 +61,8 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const ReductionStrategy &strategy) {
   // Step 1. Tiling to the block/workgroup level. Keep everything fused.
-  auto [maybeLeadingHBlock, gridFillH, gridReductionH,
-        maybeTiledTrailingHBlock] =
+  auto [maybeLeadingHBlock, gridFillH, gridReductionH, maybeTiledTrailingHBlock,
+        foreachThread] =
       buildReductionStrategyBlockDistribution(b, variantH, strategy);
 
   // Step 2. Naive first strategy to tile the most minor dimension by

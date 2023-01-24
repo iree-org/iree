@@ -38,6 +38,8 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   tile_reduction_using_foreach_thread {{.*}} by num_threads = [0, 64], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
 //         CHECK:   transform.structured.fuse_into_containing_op
 //         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}} tile_sizes [1](mapping = [#gpu.thread<y>])
+//         CHECK:   cast %{{.*}} : !pdl.operation to !transform.op<"scf.foreach_thread">
+//         CHECK:   transform.iree.share_foreach_thread_operands %{{.*}} share_operands = [0] : (!transform.op<"scf.foreach_thread">) -> !transform.op<"scf.foreach_thread">
 //         CHECK:   transform.structured.match ops{["func.func"]} in %arg0
 //         CHECK:   transform.structured.vectorize
 //         CHECK:   transform.iree.bufferize {target_gpu}
@@ -46,10 +48,10 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   transform.structured.match ops{["func.func"]} in %{{.*}}
 //         CHECK:   transform.iree.foreach_thread_to_workgroup
 //         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [64, 1, 1]}
-//         CHECK:   transform.iree.apply_patterns %{{.*}} {fold_memref_aliases, rank_reducing_linalg, rank_reducing_vector}
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {fold_memref_aliases, rank_reducing_vector}
 //         CHECK:   transform.structured.match ops{["scf.if"]} in %{{.*}}
 //         CHECK:   sequence {{.*}} failures(suppress) {
-//         CHECK:     transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 32 : i64}
+//         CHECK:     transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 64 : i64}
 //         CHECK:   }
 //         CHECK:   transform.iree.vector.warp_distribute
 
@@ -134,7 +136,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
 //         CHECK:   transform.structured.tile_reduction_using_foreach_thread %{{.*}} by num_threads = [0, 256], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
 //         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [256, 1, 1]}
-//         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 64 : i64}
+//         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 256 : i64}
 
 // -----
 
@@ -232,4 +234,4 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   transform.structured.split %{{.*}} after 8192  {dimension = 1 : i64}
 //         CHECK:   transform.structured.tile %{{.*}}[0, 8192]
 //         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [1024, 1, 1]}
-//         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0{{.*}}{warp_size = 64 : i64}
+//         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0{{.*}}{warp_size = 1024 : i64}

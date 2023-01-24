@@ -27,6 +27,7 @@ using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::
     MapNestedForeachThreadToGpuThreadsOp;
+using iree_compiler::IREE::transform_dialect::ShareForeachThreadOperandsOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
 using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
 using transform::FuseIntoContainingOp;
@@ -112,9 +113,20 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
   }
 }
 
+static Value shareForeachArgument(ImplicitLocOpBuilder &b, Value foreachThread,
+                                  ArrayRef<int64_t> indices) {
+  auto foreachType =
+      transform::OperationType::get(b.getContext(), "scf.foreach_thread");
+  foreachThread = b.create<transform::CastOp>(foreachType, foreachThread);
+  return b.create<
+      iree_compiler::IREE::transform_dialect::ShareForeachThreadOperandsOp>(
+      foreachType, foreachThread, indices);
+}
+
 static void buildStagedReductionStrategyThreadLevel(
-    ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledLeadingH,
-    Value maybeTiledTrailingH, const StagedReductionStrategy &strategy) {
+    ImplicitLocOpBuilder &b, Value gridReductionH, Value gridFillH,
+    Value maybeTiledLeadingH, Value maybeTiledTrailingH,
+    const StagedReductionStrategy &strategy) {
   // Map the potential maybeTiledLeadingH.
   // TODO: Consider fusing leading elementwise into threads.
   if (strategy.captures.maybeLeadingRank > 0) {
@@ -152,7 +164,7 @@ static void buildStagedReductionStrategyThreadLevel(
   iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
       /*b=*/b,
       /*rootH=*/blockCombinerOpH,
-      /*opsToFuse=*/{},
+      /*opsToFuse=*/{gridFillH},
       /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({1})),
       /*mappingAttr=*/b.getArrayAttr(strategy.allThreadAttrs[1]));
 
@@ -182,15 +194,18 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
     const StagedReductionStrategy &strategy) {
   // Step 1. Match and tile to introduce the top-level scf.foreach_thread for
   // the block/workgroup level. Keep everything fused.
-  auto [maybeLeadingHBlock, gridFillH, gridReductionH,
-        maybeTiledTrailingHBlock] =
+  auto [maybeLeadingHBlock, gridFillH, gridReductionH, maybeTiledTrailingHBlock,
+        foreachThreadH] =
       buildReductionStrategyBlockDistribution(b, variantH, strategy);
 
   // Step 2. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
-  // TODO: consider fusing gridFillH.
-  buildStagedReductionStrategyThreadLevel(b, gridReductionH, maybeLeadingHBlock,
+  buildStagedReductionStrategyThreadLevel(b, gridReductionH, gridFillH,
+                                          maybeLeadingHBlock,
                                           maybeTiledTrailingHBlock, strategy);
+
+  // Make sure we don't create allocation by sharing foreach_thread output.
+  shareForeachArgument(b, foreachThreadH, ArrayRef<int64_t>({0}));
 
   // Step 3-4. Common trailing steps.
   auto [variantH2, funcH] = buildCommonTrailingStrategy(b, variantH, strategy);
@@ -201,7 +216,9 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
   assert(strategy.getNumThreadsXInBlock() % kCudaWarpSize == 0 &&
          "strategy requires full warps");
   int64_t numWarpsToUse = strategy.getNumThreadsXInBlock() / kCudaWarpSize;
-  int64_t bitWidth = strategy.captures.reductionOutputElementalTypeBitWidth;
-  numWarpsToUse = adjustNumberOfWarpsForBlockShuffle(numWarpsToUse, bitWidth);
   buildDistributeVectors(b, variantH2, funcH, numWarpsToUse * kCudaWarpSize);
+
+  // Step 6. Apply clean up of memory operations.
+  funcH = b.create<MatchOp>(variantH2, func::FuncOp::getOperationName());
+  iree_compiler::buildMemoryOptimizations(b, funcH);
 }

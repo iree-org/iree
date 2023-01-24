@@ -153,7 +153,6 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
   ApplyPatternsOpPatterns patterns;
   patterns.foldMemrefAliases = true;
   patterns.rankReducingVector = true;
-  patterns.rankReducingLinalg = true;
   funcH = b.create<ApplyPatternsOp>(funcH, patterns);
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
   // Locally suppress failures for this op only because it doesn't cover the
@@ -261,6 +260,7 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
     const AbstractReductionStrategy &strategy) {
   // Step N-1. Bufferize and drop HAL descriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+
   funcH = iree_compiler::buildVectorize(b, funcH);
   variantH = iree_compiler::buildBufferize(b, variantH, /*targetGpu=*/true);
 
