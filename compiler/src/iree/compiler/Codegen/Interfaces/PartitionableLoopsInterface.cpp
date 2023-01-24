@@ -45,7 +45,7 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
   if (maxNumPartitionedLoops.has_value() &&
       parallelLoops.size() > maxNumPartitionedLoops.value()) {
     parallelLoops =
-        llvm::to_vector(llvm::makeArrayRef(parallelLoops)
+        llvm::to_vector(llvm::ArrayRef(parallelLoops)
                             .take_back(maxNumPartitionedLoops.value()));
   }
   return parallelLoops;
@@ -236,6 +236,8 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
     IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
         AllParallelAsPartitionableLoops<
             IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
+    IREE::LinalgExt::SoftmaxOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::SoftmaxOp>>(*ctx);
   });
 }
 

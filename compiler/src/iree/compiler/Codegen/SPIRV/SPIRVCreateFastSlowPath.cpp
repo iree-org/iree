@@ -23,7 +23,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -97,7 +97,7 @@ struct CreateFastSlowPath final : public OpRewritePattern<scf::ForOp> {
       }
     }
     Value ifCond = eqZeroCmpVals.front();
-    for (Value cmp : llvm::makeArrayRef(eqZeroCmpVals).drop_front())
+    for (Value cmp : llvm::ArrayRef(eqZeroCmpVals).drop_front())
       ifCond = rewriter.create<arith::AndIOp>(loc, ifCond, cmp);
 
     SmallVector<Operation *> cloneOps;
@@ -109,7 +109,7 @@ struct CreateFastSlowPath final : public OpRewritePattern<scf::ForOp> {
     // computing padding sizes. For the "then" branch, we can elide the padding.
     // For the "else" branch, we retain the clone op.
     auto thenBuilder = [&](OpBuilder &builder, Location loc) {
-      BlockAndValueMapping bvm;
+      IRMapping bvm;
       for (Operation *op : cloneOps) {
         if (op == padOp.getOperation()) {
           // We can elide the tensor.pad op. Just use its source.
@@ -121,7 +121,7 @@ struct CreateFastSlowPath final : public OpRewritePattern<scf::ForOp> {
       builder.create<scf::YieldOp>(loc);
     };
     auto elseBuilder = [&](OpBuilder &builder, Location loc) {
-      BlockAndValueMapping bvm;
+      IRMapping bvm;
       for (Operation *op : cloneOps) builder.clone(*op, bvm);
       builder.create<scf::YieldOp>(loc);
     };

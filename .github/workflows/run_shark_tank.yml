@@ -2,7 +2,7 @@ name: SHARK
 
 on:
   schedule:
-    - cron: '0 10 * * *'
+    - cron: '0 13 * * *'
   workflow_dispatch:
 
 jobs:
@@ -75,10 +75,10 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/shark@sha256:1fa2d51110c47ac12826754b66d95e3d68336a8ecf141db8be1eec74f39c42e2 \
-          ./build_tools/benchmarks/shark/run_shark.sh "${SHARK_SHA}" "cpu" "cpu" "${SHARK_OUTPUT_DIR}"
+          ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cpu" --driver "cpu" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "true"
       - name: "Uploading artifacts"
         run: |
-          gcloud alpha storage cp "${SHARK_OUTPUT_DIR}/**" "${GCS_UPLOAD_DIR}/"
+          gcloud storage cp "${SHARK_OUTPUT_DIR}/**" "${GCS_UPLOAD_DIR}/"
 
   benchmark_cuda:
     needs: setup
@@ -104,10 +104,10 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --gpus all \
             gcr.io/iree-oss/shark@sha256:1fa2d51110c47ac12826754b66d95e3d68336a8ecf141db8be1eec74f39c42e2 \
-          ./build_tools/benchmarks/shark/run_shark.sh "${SHARK_SHA}" "cuda" "cuda" "${SHARK_OUTPUT_DIR}"
+          ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cuda" --driver "cuda" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "false"
       - name: "Uploading artifacts"
         run: |
-          gcloud alpha storage cp "${SHARK_OUTPUT_DIR}/**" "${GCS_UPLOAD_DIR}/"
+          gcloud storage cp "${SHARK_OUTPUT_DIR}/**" "${GCS_UPLOAD_DIR}/"
 
   generate_report:
     needs: [setup, benchmark_cpu, benchmark_cuda]
@@ -131,10 +131,10 @@ jobs:
       - name: "Download benchmark results"
         run: |
           mkdir "${BENCHMARK_RESULTS_DIR}"
-          gcloud alpha storage cp "${GCS_UPLOAD_DIR}/**" "${BENCHMARK_RESULTS_DIR}/"
+          gcloud storage cp "${GCS_UPLOAD_DIR}/**" "${BENCHMARK_RESULTS_DIR}/"
       - name: "Downloading baselines"
         run: |
-          gcloud alpha storage cp "${GCS_BASELINES_DIR}/**" "${BENCHMARK_RESULTS_DIR}/"
+          gcloud storage cp "${GCS_BASELINES_DIR}/**" "${BENCHMARK_RESULTS_DIR}/"
       - name: "Generating report"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -145,7 +145,7 @@ jobs:
             "${BENCHMARK_RESULTS_DIR}/summary.html"
       - name: "Uploading summary"
         run: |
-          gcloud alpha storage cp "${BENCHMARK_RESULTS_DIR}/summary.html" "${GCS_UPLOAD_DIR}/"
+          gcloud storage cp "${BENCHMARK_RESULTS_DIR}/summary.html" "${GCS_UPLOAD_DIR}/"
       - name: "Updating latest"
         run: |
-          gcloud alpha storage cp "${BENCHMARK_RESULTS_DIR}/summary.html" "${GCS_LATEST_DIR}/"
+          gcloud storage cp "${BENCHMARK_RESULTS_DIR}/summary.html" "${GCS_LATEST_DIR}/"

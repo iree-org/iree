@@ -19,10 +19,10 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -374,10 +374,10 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
 ///    retain(src_i, tmp_i); for all i
 ///    assign(tmp_i, dest_i); for all i
 LogicalResult retainOrMoveRefs(OpBuilder &builder, Location location,
-                               BlockAndValueMapping mapping, bool isMove) {
+                               IRMapping mapping, bool isMove) {
   auto ctx = builder.getContext();
 
-  BlockAndValueMapping tmpMapping;
+  IRMapping tmpMapping;
   for (auto &[srcRef, destRef] : mapping.getValueMap()) {
     assert(srcRef.getType() == emitc::PointerType::get(emitc::OpaqueType::get(
                                    ctx, "iree_vm_ref_t")));
@@ -2879,12 +2879,9 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
       OpBuilder::InsertionGuard guard(rewriter);
       destDispatch = rewriter.createBlock(dest);
 
-      BlockAndValueMapping refMapping;
-      for (auto pair :
+      IRMapping refMapping;
+      for (auto [operand, blockArg] :
            llvm::zip_equal(op.getOperands(), dest->getArguments())) {
-        Value operand = std::get<0>(pair);
-        BlockArgument blockArg = std::get<1>(pair);
-
         if (isNotRefOperand(operand)) {
           continue;
         }
@@ -3039,7 +3036,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
     unsigned int firstOutputArgumentIndex =
         funcOp.getNumArguments() - op.getOperands().size();
 
-    BlockAndValueMapping refMapping;
+    IRMapping refMapping;
     for (auto &pair : llvm::enumerate(op.getOperands())) {
       Value operand = pair.value();
       size_t index = pair.index();

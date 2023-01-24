@@ -23,56 +23,25 @@ iree_runtime_cc_library(
     deps = [":static_assert"],
 )
 
+ukernel_headers = [
+    "common.h",
+    "elementwise.h",
+    "mmt4d.h",
+    "pack.h",
+    "query_tile_sizes.h",
+    "unpack.h",
+]
+
 # :types is the type declarations used by both the entry points and the
 # internal implementation functions.
 iree_runtime_cc_library(
-    name = "common",
-    srcs = ["common.c"],
-    hdrs = [
-        "common.h",
-        "mmt4d_types.h",
-        "pack_types.h",
-        "query_tile_sizes_types.h",
-        "unpack_types.h",
-    ],
+    name = "headers",
+    hdrs = ukernel_headers,
     deps = [
         ":exported_bits",
         ":static_assert",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/builtins/ukernel/arch:config",
-    ],
-)
-
-# :generic contains non-architecture-specific implementations.
-iree_runtime_cc_library(
-    name = "generic",
-    srcs = [
-        "mmt4d_generic.c",
-        "pack_generic.c",
-    ],
-    hdrs = [
-        "mmt4d_generic.h",
-        "pack_generic.h",
-    ],
-    deps = [
-        ":common",
-    ],
-)
-
-# elementwise code is structured differently from other kernels. In fact it's
-# profoundly different: it carries its own custom shims. For now, we keep it
-# separate from the rest.
-iree_runtime_cc_library(
-    name = "elementwise",
-    srcs = [
-        "elementwise_generic.c",
-        "elementwise_impl.c.inc",
-    ],
-    hdrs = [
-        "elementwise.h",
-    ],
-    deps = [
-        ":common",
     ],
 )
 
@@ -84,18 +53,20 @@ iree_runtime_cc_library(
         "pack.c",
         "query_tile_sizes.c",
         "unpack.c",
-    ],
-    hdrs = [
-        "elementwise.h",
-        "mmt4d.h",
-        "pack.h",
-        "query_tile_sizes.h",
-        "unpack.h",
-    ],
+        "elementwise_generic.c",
+        "elementwise_impl.c.inc",
+        "mmt4d_generic.c",
+        "pack_generic.c",
+        "mmt4d_generic.h",
+        "pack_generic.h",
+    ] + ukernel_headers,
+    hdrs = ["api.h"],
     deps = [
-        ":common",
-        ":elementwise",
-        ":generic",
+        ":exported_bits",
+        ":headers",
+        ":static_assert",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/builtins/ukernel/arch:config",
         "//runtime/src/iree/builtins/ukernel/arch:ukernel_arch",
     ],
 )

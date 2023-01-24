@@ -222,11 +222,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-    "aarch64:+dotprod"
-    "aarch64:+i8mm"
+    "--iree-flow-enable-data-tiling"
 )
 
 iree_generated_trace_runner_test(
@@ -245,9 +241,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "--iree-flow-enable-data-tiling"
 )
 
 iree_generated_trace_runner_test(
@@ -315,6 +309,32 @@ iree_generated_trace_runner_test(
     "cuda"
   COMPILER_FLAGS
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f16_gpu_large_mma_sync_LLVMGPUMatmulTensorCore
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--shapes=gpu_large"
+    "--compilation_info=LLVMGPUMatmulTensorCore"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync=true"
   LABELS
     "noasan"
     "nomsan"

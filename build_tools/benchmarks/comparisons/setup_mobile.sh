@@ -209,7 +209,7 @@ rm -rf ${SOURCE_DIR}/iree-build-android
 
 cmake -GNinja -B ../iree-build-android/ \
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK?}/build/cmake/android.toolchain.cmake" \
-  -DIREE_HOST_BINARY_ROOT="${PWD}/../iree-build/install" \
+  -DIREE_HOST_BIN_DIR="${PWD}/../iree-build/install/bin" \
   -DANDROID_ABI="arm64-v8a" \
   -DANDROID_PLATFORM="latest" \
   -DIREE_BUILD_COMPILER=OFF \

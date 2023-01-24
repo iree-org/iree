@@ -11,6 +11,7 @@ include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformAttrs.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
+include "mlir/Dialect/Transform/IR/TransformTypes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/EnumAttr.td"
@@ -47,14 +48,12 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
       extract_slice ops with reassociative reshape ops.
-      - promote_foreach_thread_capture_to_shared: adds patterns that rewrite
-      uses of values captured by scf.foreach_thread with the matching
-      shared_outs bbarg. This checks that the values captured are
-      tensor.extract_slice with a matching tensor.parallel_insert_slice to
-      approximate the lack of cross-thread dependences. However this can still
-      be unsafe wrt parallelism so use carefully!
-      - rank_reducing: adds patterns that results in rank-reducing behavior on
-      subset-based operations.
+      - lower_transfer_op_permutations: Lower transfer ops to transfer ops
+      with minor identity permutations.
+      - rank_reducing_linalg: adds patterns that results in rank-reducing
+      behavior on subset-based linalg operations.
+      - rank_reducing_vector: adds patterns that results in rank-reducing 
+      behavior on subset-based vector operations.
       - expand_memref_strided_metadata: adds patterns that expand memref
       operations into extract_strided_metadata operations and a materialization
       of their effect on the metadata (sizes, offset, strides).
@@ -87,8 +86,9 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$erase_unnecessary_tensor_operands,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
-                       UnitAttr:$promote_foreach_thread_capture_to_shared,
-                       UnitAttr:$rank_reducing,
+                       UnitAttr:$lower_transfer_op_permutations,
+                       UnitAttr:$rank_reducing_linalg,
+                       UnitAttr:$rank_reducing_vector,
                        UnitAttr:$expand_memref_strided_metadata,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns);
@@ -274,6 +274,77 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
   }];
 }
 
+def ShareForeachThreadOperandsOp : Op<
+    Transform_Dialect, "iree.share_foreach_thread_operands", [
+      FunctionalStyleTransformOpTrait,
+      MemoryEffectsOpInterface,
+      TransformEachOpTrait,
+      TransformOpInterface]> {
+  let description = [{
+    Target a single scf.foreach_thread op and shares all uses of the specified 
+    `share_operands` operand indices.
+
+    Sharing can be thought of as the inverse of traditional privatization.
+    Privatization consists in determining that a part of memory is only accessed
+    by a single thread to and subsequently slicing out that part into a 
+    thread_private storage that has smaller footprint, better locality and better
+    alignment properties.
+    In the case of scf.foreach_thread on tensors, tensor values are immutable 
+    and the same tensor value may be passed as `shared_outs` and also captured
+    for internal uses.
+    Due to the immutability property, the whole tensor values are private by 
+    construction and result in alloc + copy of the whole tensor on every thread
+    to maintain the original SSA value after bufferizing. 
+
+    An analysis similar to privatization is needed to ensure that only a private
+    slice is needed and that the whole tensor can be shared.
+    This transformation amounts to injecting the result of such an analysis as 
+    static information in the program.
+    The transformation checks that the values captured are `tensor.extract_slice`
+    with a matching `tensor.parallel_insert_slice`, to approximate the lack of
+    a cross-thread dependence analysis. 
+    However this can still be unsafe wrt parallelism so use carefully!
+
+    Sharing consists in rewriting all uses of the operands passed as 
+    `shared_outs` that are also captured wihtin the `scf.foreach_thread` region
+    into the matching `shared_outs` bbarg.
+
+    Only those operands whose indices are specified in `share_operands` are
+    shared. An empty `share_operands` specification considers all operands to
+    be shared.
+
+    #### Return modes
+
+    If any of the `share_operands` indices overflow, a definite error is produced.
+    
+    If a `share_operands` fails a sharing precondition, it is ignored.
+    In the future, we should emit a notification.
+
+    This transform consumes the target handle and produces a result handle to
+    the modified `scf.foreach_thread` op.
+  }];
+
+  let arguments = (
+      ins Transform_ConcreteOpType<"scf.foreach_thread">:$foreach_thread_op,
+          DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$share_operands
+  );
+  let results = (outs Transform_ConcreteOpType<"scf.foreach_thread">:$result);
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let assemblyFormat = [{
+    $foreach_thread_op (`share_operands` `=` $share_operands^ )? attr-dict
+      `:` functional-type(operands, results)
+  }];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::scf::ForeachThreadOp foreachThreadOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def TileToForeachThreadAndWorkgroupCountRegionOp :
     Op<Transform_Dialect, "iree.tile_to_foreach_thread_and_workgroup_count_region",
       [AttrSizedOperandSegments,
@@ -364,6 +435,42 @@ def ConfigExtractPart :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
         ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def ApplyBufferOptimizationsOp :
+  Op<Transform_Dialect, "iree.apply_buffer_optimizations",
+    [TransformEachOpTrait,
+     TransformOpInterface,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let description = [{
+    This applies memory optimization on memref. In particular it does store to
+    load forwarding, dead store elimination and dead alloc elimination.
+
+    #### Return modes
+
+    This operation applies a set of memory optimization on the whole region of
+    the operand.
+
+    If the transformation is successful it returns the handle to the
+    same payload as its operand to allow for simpler composition.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$result);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
 }

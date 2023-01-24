@@ -83,5 +83,5 @@ jobs:
           ./build_tools/benchmarks/convperf/build_and_run_convperf.sh "${BUILD_DIR}" "${RESULTS_DIR}" "${IREE_SHA}"
       - name: "Uploading results"
         run: |
-          gcloud alpha storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/${GCS_UPLOAD_DIR_NAME}/"
-          gcloud alpha storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/latest/"
+          gcloud storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/${GCS_UPLOAD_DIR_NAME}/"
+          gcloud storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/latest/"

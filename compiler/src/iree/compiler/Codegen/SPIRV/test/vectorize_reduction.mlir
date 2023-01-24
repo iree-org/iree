@@ -155,7 +155,7 @@ func.func @reduce_innermost_dim_contraction(%a: tensor<4x12xf32>, %b: tensor<4xf
 //     CHECK-SAME: (%[[A:.+]]: tensor<4x12xf32>, %[[B:.+]]: tensor<4xf32>, %[[INIT:.+]]: tensor<4xf32>)
 
 // CHECK-COUNT-12: vector.transfer_read %[[A]]{{.+}} : tensor<4x12xf32>, vector<4xf32>
-//          CEHCK: vector.transfer_read %[[B]]{{.+}} : tensor<4xf32>, vector<4xf32>
+//          CHECK: vector.transfer_read %[[B]]{{.+}} : tensor<4xf32>, vector<4xf32>
 //          CHECK: vector.transfer_read %[[INIT]]{{.+}} : tensor<4xf32>, vector<4xf32>
 // CHECK-COUNT-12: arith.subf {{.+}} : vector<4xf32>
 // CHECK-COUNT-12: vector.fma {{.+}} : vector<4xf32>

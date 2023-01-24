@@ -18,11 +18,11 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 
@@ -298,10 +298,10 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
   auto &expandedGlobal = globalMap[op.getGlobal()];
   builder.create<IREE::Util::GlobalStoreOp>(op.getLoc(), expandedValue.tensor,
                                             expandedGlobal.tensorOp.getName());
-  for (auto it : llvm::zip_equal(expandedValue.dynamicDims,
-                                 expandedGlobal.dynamicDimOps)) {
-    builder.create<IREE::Util::GlobalStoreOp>(op.getLoc(), std::get<0>(it),
-                                              std::get<1>(it).getName());
+  for (auto [valueDynamicDims, globalDynamicDimOps] : llvm::zip_equal(
+           expandedValue.dynamicDims, expandedGlobal.dynamicDimOps)) {
+    builder.create<IREE::Util::GlobalStoreOp>(op.getLoc(), valueDynamicDims,
+                                              globalDynamicDimOps.getName());
   }
   op.erase();
 }
@@ -458,12 +458,12 @@ static void expandSelectOp(mlir::arith::SelectOp op, IndexSet &indexSet,
       op.getLoc(), op.getCondition(), op.getTrueValue(), op.getFalseValue());
 
   SmallVector<Value> selectedDims;
-  for (auto it :
+  for (auto [trueDynamicDims, falseDynamicDims] :
        llvm::zip_equal(trueValue.dynamicDims, falseValue.dynamicDims)) {
     selectedDims.push_back(
         builder
             .create<arith::SelectOp>(op.getLoc(), op.getCondition(),
-                                     std::get<0>(it), std::get<1>(it))
+                                     trueDynamicDims, falseDynamicDims)
             .getResult());
   }
   auto tieShapeOp = builder.create<IREE::Flow::TensorTieShapeOp>(

@@ -39,6 +39,43 @@ static iree_status_t iree_hal_cuda_driver_factory_enumerate(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_cuda_init_nccl_rank_and_count(
+    iree_hal_cuda_device_params_t* params) {
+  params->nccl_default_count = 0;
+  params->nccl_default_rank = 0;
+
+  char* nprocs_str = getenv("IREE_CUDA_NCCL_NPROCS");
+  if (!nprocs_str) {
+    return iree_ok_status();
+  }
+
+  int nprocs = atoi(nprocs_str);
+  if (nprocs <= 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "IREE_CUDA_NCCL_NPROCS has invalid value '%s'; expected integer >= 0",
+        nprocs_str);
+  }
+  params->nccl_default_count = nprocs;
+
+  char* procid_str = getenv("IREE_CUDA_NCCL_PROCID");
+  if (!procid_str) {
+    // Expected PROCID when NPROCS is set.
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "IREE_CUDA_NCCL_PROCID must be set when IREE_CUDA_NCCL_NPROCS is set.");
+  }
+  int procid = atoi(procid_str);
+  if (procid < 0 || procid >= nprocs) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "IREE_CUDA_NCCL_PROCID has invalid value '%s'; expected integer >= 0",
+        procid_str);
+  }
+  params->nccl_default_rank = procid;
+  return iree_status_from_code(IREE_STATUS_OK);
+}
+
 static iree_status_t iree_hal_cuda_driver_factory_try_create(
     void* self, iree_string_view_t driver_name, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
@@ -59,13 +96,22 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
   }
   default_params.allow_inline_execution = FLAG_cuda_allow_inline_execution;
 
-  iree_hal_cuda_driver_options_t driver_options;
-  iree_hal_cuda_driver_options_initialize(&driver_options);
-  driver_options.default_device_index = FLAG_cuda_default_index;
-
   iree_status_t status =
-      iree_hal_cuda_driver_create(driver_name, &default_params, &driver_options,
-                                  host_allocator, out_driver);
+      iree_hal_cuda_init_nccl_rank_and_count(&default_params);
+
+  if (iree_status_is_ok(status)) {
+    // Note that nccl_default_id can't be initalized until the driver imports
+    // the NCCL symbols from the dynamic library.
+
+    iree_hal_cuda_driver_options_t driver_options;
+    iree_hal_cuda_driver_options_initialize(&driver_options);
+    driver_options.default_device_index = FLAG_cuda_default_index;
+
+    status = iree_hal_cuda_driver_create(driver_name, &default_params,
+                                         &driver_options, host_allocator,
+                                         out_driver);
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

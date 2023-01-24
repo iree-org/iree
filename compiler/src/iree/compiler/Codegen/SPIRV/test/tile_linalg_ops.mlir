@@ -52,3 +52,58 @@ func.func @innermost_reduction() {
 //      CHECK:       linalg.generic
 // CHECK-SAME:         ins(%{{.+}}, %{{.+}} : tensor<4x4xf32>, tensor<4xf32>)
 // CHECK-SAME:         outs(%{{.+}}g4 : tensor<4xf32>)
+
+// -----
+
+func.func @has_scf_if() {
+  %c49152 = arith.constant 49152 : index
+  %c0 = arith.constant 0 : index
+  %c4096_i32 = arith.constant 4096 : i32
+  %c1023_i32 = arith.constant 1023 : i32
+  %c2_i32 = arith.constant 2 : i32
+  %c0_i32 = arith.constant 0 : i32
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<49152xi32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:tensor<49152xi32>>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %2 = affine.apply affine_map<()[s0] -> (s0 * 256)>()[%workgroup_id_x]
+  %3 = affine.apply affine_map<()[s0] -> (s0 * 256)>()[%workgroup_count_x]
+  scf.for %arg0 = %2 to %c49152 step %3 {
+    %4 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [256], strides = [1] : !flow.dispatch.tensor<readonly:tensor<49152xi32>> -> tensor<256xi32>
+    %5 = flow.dispatch.tensor.load %1, offsets = [%arg0], sizes = [256], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<49152xi32>> -> tensor<256xi32>
+    %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4 : tensor<256xi32>) outs(%5 : tensor<256xi32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[256], [4]]>} {
+    ^bb0(%in: i32, %out: i32):
+      %7 = arith.cmpi sle, %in, %c0_i32 : i32
+      %8 = scf.if %7 -> (i32) {
+        scf.yield %c0_i32 : i32
+      } else {
+        %9 = arith.cmpi sge, %in, %c4096_i32 : i32
+        %10 = scf.if %9 -> (i32) {
+          scf.yield %c1023_i32 : i32
+        } else {
+          %11 = arith.shrsi %in, %c2_i32 : i32
+          scf.yield %11 : i32
+        }
+        scf.yield %10 : i32
+      }
+      linalg.yield %8 : i32
+    } -> tensor<256xi32>
+    flow.dispatch.tensor.store %6, %1, offsets = [%arg0], sizes = [256], strides = [1] : tensor<256xi32> -> !flow.dispatch.tensor<readwrite:tensor<49152xi32>>
+  }
+  return
+}
+
+// CHECK-LABEL: func @has_scf_if()
+
+//  CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:  %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-DAG:  %[[C256:.+]] = arith.constant 256 : index
+
+//      CHECK: scf.for
+//      CHECK:     scf.for %{{.+}} = %[[C0]] to %[[C256]] step %[[C4]]
+//      CHECK:       linalg.generic
+// CHECK-SAME:         ins(%{{.+}}slice : tensor<4xi32>)
+// CHECK-SAME:         outs(%{{.+}} : tensor<4xi32>)
+//      CHECK: scf.if
+//      CHECK: scf.if
+//      CHECK: linalg.yield %{{.*}} : i32

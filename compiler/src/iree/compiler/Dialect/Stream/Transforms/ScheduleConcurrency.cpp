@@ -17,9 +17,9 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -40,8 +40,7 @@ namespace {
 // Must be constructed in a topological order of all partitions.
 struct WavePartitionBuilder {
   explicit WavePartitionBuilder(Block *parentBlock, size_t ordinal,
-                                Partition *partition,
-                                BlockAndValueMapping &parentMapping,
+                                Partition *partition, IRMapping &parentMapping,
                                 MLIRContext *context)
       : ordinal(ordinal), partition(partition), builder(context) {
     // Fuse the location of all ops we'll be putting in the partition.
@@ -110,16 +109,16 @@ struct WavePartitionBuilder {
     auto &entryBlock = concurrentOp.getBody().emplaceBlock();
     SmallVector<Location> operandLocs(operandTypes.size(),
                                       concurrentOp.getLoc());
-    for (auto args : llvm::zip_equal(
+    for (auto [operand, arg] : llvm::zip_equal(
              operands, entryBlock.addArguments(operandTypes, operandLocs))) {
-      mapping.map(std::get<0>(args), std::get<1>(args));
+      mapping.map(operand, arg);
     }
     builder = OpBuilder::atBlockBegin(&entryBlock);
 
     // Remap results for escaping outputs.
-    for (auto results :
+    for (auto [operand, result] :
          llvm::zip_equal(partition->outs, concurrentOp.getResults())) {
-      parentMapping.map(std::get<0>(results), std::get<1>(results));
+      parentMapping.map(operand, result);
     }
   }
 
@@ -165,7 +164,7 @@ struct WavePartitionBuilder {
   Partition *partition = nullptr;
   IREE::Stream::AsyncConcurrentOp concurrentOp;
   OpBuilder builder;
-  BlockAndValueMapping mapping;
+  IRMapping mapping;
 };
 
 class ScheduleConcurrencyPass
@@ -206,7 +205,7 @@ class ScheduleConcurrencyPass
     // Create partition builders for each partition.
     // We'll clone ops into each and insert them into the block at the
     // appropriate position (first use... probably).
-    BlockAndValueMapping mapping;
+    IRMapping mapping;
     SmallVector<WavePartitionBuilder> partitionBuilders;
     partitionBuilders.reserve(waveSet.size());
     for (auto partition : llvm::enumerate(waveSet.partitions)) {
@@ -236,11 +235,9 @@ class ScheduleConcurrencyPass
     // Apply remapping for values captured/escaping partitions.
     // We must do this per block as we'll be updating dominated block values.
     for (auto &partitionBuilder : partitionBuilders) {
-      for (auto resultPair :
+      for (auto [oldResult, newResult] :
            llvm::zip_equal(partitionBuilder.partition->outs,
                            partitionBuilder.concurrentOp.getResults())) {
-        auto oldResult = std::get<0>(resultPair);
-        auto newResult = std::get<1>(resultPair);
         oldResult.replaceAllUsesWith(newResult);
         deadOps.insert(oldResult.getDefiningOp());
       }

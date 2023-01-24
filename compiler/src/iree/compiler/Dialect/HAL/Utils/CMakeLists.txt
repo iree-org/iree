@@ -15,9 +15,6 @@ iree_cc_library(
     Utils
   HDRS
     "DeviceSwitchBuilder.h"
-    "InferCustomKernelsTargetInfoFromParent.h"
-  SRCS
-    "InferCustomKernelsTargetInfoFromParent.cpp"
   DEPS
     LLVMSupport
     MLIRFuncDialect

@@ -17,6 +17,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
+#include "iree/compiler/Codegen/Common/EncodingInfo.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
@@ -135,6 +136,13 @@ getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
 // workgroups.
 //===---------------------------------------------------------------------===//
 
+namespace {
+
+class SimpleRewriter : public PatternRewriter {
+ public:
+  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
+};
+
 /// The `flow.dispatch.workgroup_count_from_dag_root` op is lowered to
 /// a sequence of `affine.apply affine_map<()[s0, s1] -> ceildDiv(s0,
 /// s1)>(workload, tileSize)`. for each of the dimensions. When tile size is
@@ -247,12 +255,20 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
   LowerDispatchWorkgroupCountFromSetEncodingOp(
       MLIRContext *context,
       IREE::LinalgExt::MaterializeEncodingInfo encodingInfo,
-      IREE::LinalgExt::MaterializeEncodingValueFn materializeEncodingValueFn,
       RankedTensorType inputType, PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
         materializeEncodingInfo(std::move(encodingInfo)),
-        materializeEncodingValueFn(materializeEncodingValueFn),
-        inputType(inputType) {}
+        inputType(inputType) {
+    for (int64_t &s : materializeEncodingInfo.innerTileSizes) {
+      if (s == ShapedType::kDynamic) {
+        // Dynamic tile sizes. The actual values can only be queried in device
+        // code, not here, so we use an approximation here. They are currently
+        // powers of two <= 16, so this value works for now. This is also
+        // consistent with the default padding in SetEncoding.
+        s = 16;
+      }
+    }
+  }
 
   LogicalResult matchAndRewrite(
       IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp workgroupCountOp,
@@ -261,9 +277,8 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
     // The workload represents the unpacked shape. Get the workload of the
     // packed shape.
     Location loc = workgroupCountOp.getLoc();
-    auto innerTileSizes =
-        getInnerTileSizesOfr(rewriter, loc, inputType, materializeEncodingInfo,
-                             materializeEncodingValueFn);
+    auto innerTileSizes = getInnerTileSizesOfr(rewriter, loc, inputType,
+                                               materializeEncodingInfo, {});
     if (failed(innerTileSizes)) return failure();
     SmallVector<OpFoldResult> resultShape =
         IREE::LinalgExt::PackOp::getResultShape(
@@ -281,7 +296,6 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
 
  private:
   IREE::LinalgExt::MaterializeEncodingInfo materializeEncodingInfo;
-  IREE::LinalgExt::MaterializeEncodingValueFn materializeEncodingValueFn;
   RankedTensorType inputType;
 };
 
@@ -289,7 +303,6 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
 // Patterns and methods for tile and distribute of Linalg ops to workgroups.
 //===---------------------------------------------------------------------===//
 
-namespace {
 struct TileAndDistributeToWorkgroupsPass
     : public TileAndDistributeToWorkgroupsBase<
           TileAndDistributeToWorkgroupsPass> {
@@ -348,9 +361,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         if (failed(encodingInfo)) {
           return signalPassFailure();
         }
-        auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(packRootOp);
-        auto materializeEncodingValueFn =
-            getMaterializeEncodingValueFn(targetAttr);
         auto tensorType = packRootOp.getInputType().cast<RankedTensorType>();
         // The LowerDispatchWorkgroupCountFromSetEncodingOp pattern is going to
         // call materializeEncodingValueFn, passing it a tensor type, expecting
@@ -369,8 +379,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         auto tensorTypeWithEncoding = RankedTensorType::Builder(
             tensorType.getShape(), tensorType.getElementType(), encodingAttr);
         patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
-            context, encodingInfo.value(), materializeEncodingValueFn,
-            tensorTypeWithEncoding);
+            context, encodingInfo.value(), tensorTypeWithEncoding);
       }
       if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
         exportOp.emitOpError("failed to lower number of workgroups");
@@ -380,11 +389,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
     // If there are no compute ops, nothing more to do.
     if (computeOps.empty()) continue;
-
-    // Add a marker to the last operation in the list.
-    auto marker = StringAttr::get(context, "__workgroup_tiling__");
-    computeOps.back()->setAttr(
-        IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker, marker);
 
     // Configure the linalg options.
     // Tile size selection function.
@@ -410,23 +414,23 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
             .setLoopType(linalg::LinalgTilingLoopType::Loops)
             .setTileSizeComputationFunction(tileSizeFn);
 
+    SimpleRewriter rewriter(context);
+    if (failed(tileAndFuseDispatchUsingSCFForOp(
+            cast<TilingInterface>(computeOps.back()), linalgTilingOptions,
+            rewriter))) {
+      funcOp.emitOpError("Tile+Distribute failed");
+      return signalPassFailure();
+    }
+
     {
       RewritePatternSet patterns(context);
-      populateTileAndDistributeToWorkgroupsPatterns(
-          patterns, linalgTilingOptions,
-          IREE::LinalgExt::LinalgTransformationFilter(marker));
+      populateTileAndDistributeToWorkgroupsCleanupPatterns(patterns,
+                                                           linalgTilingOptions);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        funcOp.emitOpError("Tile+Distribute failed");
+        funcOp.emitOpError("Tile+Distribute clean up patterns failed");
         return signalPassFailure();
       }
     }
-
-    // If tiling didn't happen because there are no tile sizes we are
-    // potentially left with a marker that will confuse the following passes so
-    // we remove the intermediate markers.
-    funcOp->walk([&](Operation *op) {
-      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
-    });
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After Tile + Distribute ---\n";

@@ -14,12 +14,8 @@ package(
 
 iree_compiler_cc_library(
     name = "Utils",
-    srcs = [
-        "InferCustomKernelsTargetInfoFromParent.cpp",
-    ],
     hdrs = [
         "DeviceSwitchBuilder.h",
-        "InferCustomKernelsTargetInfoFromParent.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/IR",

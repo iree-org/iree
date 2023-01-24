@@ -20,9 +20,9 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -56,14 +56,19 @@ static void computeRegionValueAliases(Operation *regionOp,
     aliasedSet.insert(streamValue);
   };
 
+  // Filter out to only resource results - some regions may return additional
+  // things like stream.async.execute returning a timepoint.
+  auto resourceResults = llvm::to_vector_of<OpResult>(
+      llvm::make_filter_range(regionOp->getResults(), [](OpResult result) {
+        return result.getType().isa<IREE::Stream::ResourceType>();
+      }));
+
   // Start with outputs so that we handle tied values that may lead all the way
   // back up the chain to the stream inputs.
   auto tiedStreamOp = cast<IREE::Util::TiedOpInterface>(regionOp);
   auto yieldOp = cast<IREE::Stream::YieldOp>(block->getTerminator());
-  for (auto it :
-       llvm::zip(regionOp->getResults(), yieldOp.getResourceOperands())) {
-    auto outerResult = std::get<0>(it);
-    auto innerResult = std::get<1>(it);
+  for (auto [outerResult, innerResult] :
+       llvm::zip_equal(resourceResults, yieldOp.getResourceOperands())) {
     auto tiedOperandIndex =
         tiedStreamOp.getTiedResultOperandIndex(outerResult.getResultNumber());
     if (tiedOperandIndex.has_value()) {
@@ -1205,10 +1210,8 @@ static LogicalResult allocateExecutionRegion(
     scope.mapResourceRange(arg, resourceRange, asmState.get());
   }
   SmallVector<ResultReservation> resultReservations;
-  for (auto it :
-       llvm::zip(executeOp.getResults(), executeOp.getResultSizes())) {
-    auto result = std::get<0>(it);
-    auto resultSize = std::get<1>(it);
+  for (auto [result, resultSize] :
+       llvm::zip_equal(executeOp.getResults(), executeOp.getResultSizes())) {
     auto resultType = result.getType().cast<IREE::Stream::ResourceType>();
     if (handledResults.contains(result)) {
       resultReplacements.push_back(std::make_pair(result, Value{}));
@@ -1294,11 +1297,8 @@ static LogicalResult allocateExecutionRegion(
       llvm::dbgs() << ":\n";
     });
 
-    for (auto it :
-         llvm::zip(reservationSet.reservations, allocOp.getResults())) {
-      auto &reservation = std::get<0>(it);
-      auto allocResult = std::get<1>(it);
-
+    for (auto [reservation, allocResult] :
+         llvm::zip_equal(reservationSet.reservations, allocOp.getResults())) {
       newOperands.push_back(allocResult);
       newOperandSizes.push_back(reservation.resultSize);
       resultReplacements.push_back(
@@ -1395,10 +1395,9 @@ static LogicalResult allocateExecutionRegion(
   asmState = getRootAsmState(newExecuteOp->getParentOp());
   newExecuteOp.getBody().walk<WalkOrder::PreOrder>(
       [&](IREE::Stream::AsyncConcurrentOp concurrentOp) {
-        for (auto it : llvm::zip(concurrentOp.getResourceOperands(),
-                                 concurrentOp.getBody().getArguments())) {
-          auto outerValue = std::get<0>(it);
-          auto innerValue = std::get<1>(it);
+        for (auto [outerValue, innerValue] :
+             llvm::zip_equal(concurrentOp.getResourceOperands(),
+                             concurrentOp.getBody().getArguments())) {
           LLVM_DEBUG({
             llvm::dbgs() << "  = shady alias of wave operand ";
             outerValue.printAsOperand(llvm::dbgs(), *asmState);
@@ -1412,10 +1411,8 @@ static LogicalResult allocateExecutionRegion(
         }
         auto yieldOp = cast<IREE::Stream::YieldOp>(
             concurrentOp.getBody().front().getTerminator());
-        for (auto it : llvm::zip(yieldOp.getResourceOperands(),
-                                 concurrentOp.getResults())) {
-          auto innerValue = std::get<0>(it);
-          auto outerValue = std::get<1>(it);
+        for (auto [innerValue, outerValue] : llvm::zip_equal(
+                 yieldOp.getResourceOperands(), concurrentOp.getResults())) {
           LLVM_DEBUG({
             llvm::dbgs() << "  = shady alias of wave result ";
             innerValue.printAsOperand(llvm::dbgs(), *asmState);

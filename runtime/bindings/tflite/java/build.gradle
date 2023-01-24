@@ -42,7 +42,7 @@ android {
                         "-DIREE_BUILD_TESTS=OFF",
                         "-DIREE_BUILD_SAMPLES=OFF",
                         "-DIREE_BUILD_PYTHON_BINDINGS=OFF",
-                        "-DIREE_HOST_BINARY_ROOT=${hostInstallDir}"
+                        "-DIREE_HOST_BIN_DIR=${hostInstallDir}/bin"
 
                 targets "iree-tflite-bindings"
             }

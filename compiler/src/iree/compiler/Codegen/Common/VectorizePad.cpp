@@ -196,7 +196,7 @@ struct VectorizePadWithConditions final
           [&](OpBuilder builder, Location Loc) {
             Value read = builder.create<vector::TransferReadOp>(
                 loc, sliceVectorType, padOp.getSource(), readIndices,
-                paddingValue, llvm::makeArrayRef(inBounds));
+                paddingValue, llvm::ArrayRef(inBounds));
             builder.create<scf::YieldOp>(loc, read);
           },
           [&](OpBuilder builder, Location Loc) {
@@ -206,7 +206,7 @@ struct VectorizePadWithConditions final
       // Insert this slice back to the full vector.
       fullVector = rewriter.create<vector::InsertStridedSliceOp>(
           loc, ifOp.getResult(0), fullVector,
-          llvm::makeArrayRef(staticIndices).take_back(fullVectorType.getRank()),
+          llvm::ArrayRef(staticIndices).take_back(fullVectorType.getRank()),
           staticStrides);
     }
 

@@ -209,7 +209,6 @@ def iree_generated_trace_runner_test(
             fail("Entry %s in target_cpu_features_variants: unimplemented" % target_cpu_features)
 
     tests = []
-    processsed_compiler_flags = [flag.replace("#pass_options_variant#", "") for flag in compiler_flags]
     for backend, driver in target_backends_and_drivers:
         # CUDA backend/driver not supported by Bazel build.
         if backend == "cuda" or driver == "cuda":
@@ -222,7 +221,7 @@ def iree_generated_trace_runner_test(
             driver = driver,
             target_backend = backend,
             generator_args = generator_args,
-            compiler_flags = processsed_compiler_flags,
+            compiler_flags = compiler_flags,
             runner_args = runner_args,
             tags = tags,
             timeout = timeout,

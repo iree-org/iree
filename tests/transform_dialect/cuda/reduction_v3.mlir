@@ -41,7 +41,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   //     CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x1024xf32, 3>
+  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x1024xf32, #gpu.address_space<workgroup>>
   
   //         CHECK: %[[TIDX:.]] = gpu.thread_id  x
   // Local per-thread scf.for-based reduction.
@@ -49,11 +49,10 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //         CHECK:   vector.transfer_read %{{.*}} : memref<?x?xf32>, vector<f32>
   //         CHECK:   arith.addf {{.*}} : f32
   //         CHECK: }
-  //         CHECK: vector.transfer_write %[[v]], %[[SHMEM_ALLOC]][%[[C0]], %[[TIDX]]] : vector<f32>, memref<1x1024xf32, 3>
+  //         CHECK: vector.transfer_write %[[v]], %[[SHMEM_ALLOC]][%[[C0]], %[[TIDX]]] : vector<f32>, memref<1x1024xf32, #gpu.address_space<workgroup>>
 
-  //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
   // Distributed reduction: everyone loads then 5 xor + addf expected
-  //         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %{{.*}}]
+  //         CHECK: vector.transfer_read %{{.*}}[%[[C0]], %{{.*}}]
   // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
   //         CHECK: %[[RES:.*]] = arith.addf %{{.*}}

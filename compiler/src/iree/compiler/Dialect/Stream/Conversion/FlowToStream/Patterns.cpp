@@ -14,7 +14,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/IRMapping.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -229,9 +229,8 @@ struct ConvertTensorTraceOp
       IREE::Flow::TensorTraceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> exportedTensors;
-    for (auto it : llvm::zip_equal(op.getOperands(), adaptor.getOperands())) {
-      auto tensorOperand = std::get<0>(it);
-      auto resourceOperand = std::get<1>(it);
+    for (auto [tensorOperand, resourceOperand] :
+         llvm::zip_equal(op.getOperands(), adaptor.getOperands())) {
       auto source =
           consumeTensorOperand(op.getLoc(), resourceOperand, rewriter);
       auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
@@ -272,10 +271,8 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     SmallVector<Value> dispatchOperandEnds;
     SmallVector<Value> dispatchOperandLengths;
     SmallVector<Value> operandSizes;
-    for (auto oldNewOperand :
+    for (auto [oldOperand, newOperand] :
          llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
-      auto oldOperand = std::get<0>(oldNewOperand);
-      auto newOperand = std::get<1>(oldNewOperand);
       if (oldOperand.getType().isa<ShapedType>()) {
         auto newOperandCast =
             consumeTensorOperand(op.getLoc(), newOperand, rewriter);
@@ -419,7 +416,7 @@ struct ConvertExecutableOp
           exportOp.getFunctionRefAttr());
       newOp->setDialectAttrs(exportOp->getDialectAttrs());
       if (!exportOp.getWorkgroupCount().empty()) {
-        mlir::BlockAndValueMapping mapper;
+        mlir::IRMapping mapper;
         exportOp.getWorkgroupCount().cloneInto(&newOp.getWorkgroupCount(),
                                                mapper);
         convertReturnOps(newOp.getWorkgroupCount());

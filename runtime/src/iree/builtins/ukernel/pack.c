@@ -9,27 +9,22 @@
 #include "iree/builtins/ukernel/arch/pack_arch.h"
 #include "iree/builtins/ukernel/pack_generic.h"
 
-static iree_uk_status_t iree_uk_pack_validate(
-    const iree_uk_pack_params_t* params) {
-#ifdef IREE_UK_ENABLE_VALIDATION
+static void iree_uk_pack_validate(const iree_uk_pack_params_t* params) {
+#ifdef IREE_UK_ENABLE_ASSERTS
   const iree_uk_uint32_t allflags =
       IREE_UK_FLAG_PACK_TRANSPOSE_INNER | IREE_UK_FLAG_PACK_TRANSPOSE_OUTER;
-  if (params->flags & ~allflags) {
-    return iree_uk_status_bad_flags;
-  }
-  switch (params->type) {
-    case iree_uk_pack_type_f32f32:
-    case iree_uk_pack_type_i8i8:
-    case iree_uk_pack_type_i32i32:
-      break;
-    default:
-      return iree_uk_status_bad_type;
-  }
-  if (params->in_stride0 < 0 || params->out_stride0 < 0 ||
-      params->in_size0 < 0 || params->in_size1 < 0 || params->out_size0 < 0 ||
-      params->out_size1 < 0 || params->out_size2 < 0 || params->out_size3 < 0) {
-    return iree_uk_status_unsupported_huge_or_negative_dimension;
-  }
+  IREE_UK_ASSERT(!(params->flags & ~allflags));
+  IREE_UK_ASSERT(params->type == iree_uk_pack_type_f32f32 ||
+                 params->type == iree_uk_pack_type_i8i8 ||
+                 params->type == iree_uk_pack_type_i32i32);
+  IREE_UK_ASSERT(params->in_stride0 >= 0);
+  IREE_UK_ASSERT(params->out_stride0 >= 0);
+  IREE_UK_ASSERT(params->in_size0 >= 0);
+  IREE_UK_ASSERT(params->in_size1 >= 0);
+  IREE_UK_ASSERT(params->out_size0 >= 0);
+  IREE_UK_ASSERT(params->out_size1 >= 0);
+  IREE_UK_ASSERT(params->out_size2 >= 0);
+  IREE_UK_ASSERT(params->out_size3 >= 0);
   // Check that the input and output shapes match, give or take padding that
   // must not exceed the inner tile size.s
   iree_uk_ssize_t outer_size0 = params->out_size0;
@@ -42,14 +37,12 @@ static iree_uk_status_t iree_uk_pack_validate(
   if (params->flags & IREE_UK_FLAG_PACK_TRANSPOSE_INNER) {
     iree_uk_ssize_swap(&tile_size0, &tile_size1);
   }
-  if (outer_size0 * tile_size0 < params->in_size0 ||
-      outer_size1 * tile_size1 < params->in_size1 ||
-      (outer_size0 - 1) * tile_size0 >= params->in_size0 ||
-      (outer_size1 - 1) * tile_size1 >= params->in_size1) {
-    return iree_uk_status_shapes_mismatch;
-  }
-#endif  // IREE_UK_ENABLE_VALIDATION
-  return iree_uk_status_ok;
+  IREE_UK_ASSERT(outer_size0 * tile_size0 >= params->in_size0);
+  IREE_UK_ASSERT(outer_size1 * tile_size1 >= params->in_size1);
+  // TODO(#11632): reenable these conditions.
+  // IREE_UK_ASSERT((outer_size0 - 1) * tile_size0 < params->in_size0);
+  // IREE_UK_ASSERT((outer_size1 - 1) * tile_size1 < params->in_size1);
+#endif  // IREE_UK_ENABLE_ASSERTS
 }
 
 static bool iree_uk_pack_early(const iree_uk_pack_params_t* params) {
@@ -94,11 +87,18 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   bool l1_has_padding = outer_size1 * tile_size1 != params->in_size1;
   iree_uk_ssize_t l0_full_tile_end = outer_size0 - (l0_has_padding ? 1 : 0);
   iree_uk_ssize_t l1_full_tile_end = outer_size1 - (l1_has_padding ? 1 : 0);
+
+  // TODO(#11632): this fix-up is needed only because at the moment,
+  // there may actually be padding in more than just the last tile along each
+  // dimension, because dispatch region formation rounds small sizes up.
+  while (l0_full_tile_end * tile_size0 > params->in_size0) --l0_full_tile_end;
+  while (l1_full_tile_end * tile_size1 > params->in_size1) --l1_full_tile_end;
+
   for (iree_uk_ssize_t outer_i0 = 0; outer_i0 < outer_size0; ++outer_i0) {
     // If we're on the final iteration of outer loop 0 and there is padding,
     // set l1_full_tile_end to 0, so henceforth it is sufficient to check
     // against l1_full_tile_end to tell if we are padding.
-    if (outer_i0 == l0_full_tile_end) {
+    if (outer_i0 >= l0_full_tile_end) {
       l1_full_tile_end = 0;
     }
     // Handle full tiles, using the (fast) tile_func.
@@ -132,14 +132,13 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   }
 }
 
-iree_uk_status_t iree_uk_pack(const iree_uk_pack_params_t* params) {
-  IREE_UK_RETURN_IF_ERROR(iree_uk_pack_validate(params));
+IREE_UK_EXPORT void iree_uk_pack(const iree_uk_pack_params_t* params) {
+  iree_uk_pack_validate(params);
 
-  if (iree_uk_pack_early(params)) return iree_uk_status_ok;
+  if (iree_uk_pack_early(params)) return;
 
   // Select a target-specific tile_func (inner loop on K, computing one M0xN0
   // tile) and use that with generic outer loops.
   iree_uk_pack_tile_func_t row_func = iree_uk_pack_select_tile_func(params);
   iree_uk_pack_using_tile_func(params, row_func);
-  return iree_uk_status_ok;
 }

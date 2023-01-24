@@ -28,7 +28,12 @@ iree_cc_library(
     "Passes.h.inc"
   DEPS
     ::PassesIncGen
+    IREELinalgExtDialect
+    MLIRArithDialect
+    MLIRFuncDialect
+    MLIRLinalgDialect
     MLIRPass
+    MLIRTensorDialect
     MLIRTransforms
   PUBLIC
 )
@@ -40,13 +45,19 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "Passes.cpp"
+    "TosaToLinalgExt.cpp"
     "VerifyCompilerTOSAInputLegality.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    IREELinalgExtDialect
+    MLIRArithDialect
+    MLIRFuncDialect
     MLIRIR
+    MLIRLinalgDialect
     MLIRPass
     MLIRSCFToControlFlow
+    MLIRTensorDialect
     MLIRTosaDialect
     MLIRTosaToArith
     MLIRTosaToLinalg

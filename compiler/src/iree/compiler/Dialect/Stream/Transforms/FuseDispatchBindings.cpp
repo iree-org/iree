@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Utils/ADTExtras.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
@@ -86,20 +87,17 @@ static SmallVector<Binding> findCorrelatedBindings(
   for (auto dispatchOp : dispatchOps) {
     llvm::EquivalenceClasses<unsigned> ec;
     DenseMap<Value, unsigned> leaders;
-    for (auto it : llvm::enumerate(llvm::zip_equal(
-             dispatchOp.getResources(), dispatchOp.getResourceAccesses()))) {
-      auto resource = std::get<0>(it.value());
-
+    for (auto [idx, resource, resourceAccessAttr] : enumerate_zip_equal(
+             dispatchOp.getResources(), dispatchOp.getResourceAccesses())) {
       // If the resource is mutable and we were told not to alias mutable
       // bindings we always put the resource into its own class.
       auto resourceAccess =
-          std::get<1>(it.value())
-              .cast<IREE::Stream::ResourceAccessBitfieldAttr>();
+          resourceAccessAttr.cast<IREE::Stream::ResourceAccessBitfieldAttr>();
       if (!aliasMutableBindings &&
           bitEnumContainsAll(resourceAccess.getValue(),
                              IREE::Stream::ResourceAccessBitfield::Write)) {
-        ec.insert(it.index());
-        leaders.insert(std::make_pair(resource, it.index()));
+        ec.insert(idx);
+        leaders.insert(std::make_pair(resource, idx));
         continue;
       }
 
@@ -107,11 +105,11 @@ static SmallVector<Binding> findCorrelatedBindings(
       auto ecIt = leaders.find(resource);
       if (ecIt == leaders.end()) {
         // New unique value.
-        ec.insert(it.index());
-        leaders.insert(std::make_pair(resource, it.index()));
+        ec.insert(idx);
+        leaders.insert(std::make_pair(resource, idx));
       } else {
         // Found existing; union with leader.
-        ec.unionSets(ecIt->second, it.index());
+        ec.unionSets(ecIt->second, idx);
       }
     }
     ecs.push_back(std::move(ec));

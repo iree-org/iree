@@ -168,6 +168,18 @@ IREE_EMBED_EXPORTED void ireeCompilerInvocationEnableConsoleDiagnostics(
 IREE_EMBED_EXPORTED void ireeCompilerInvocationDestroy(
     iree_compiler_invocation_t *inv);
 
+// Sets a crash handler on the invocation. In the event of a crash, the callback
+// will be invoked to create an output which will receive the crash dump.
+// The callback should either set |*outOutput| to a new |iree_compiler_output_t|
+// or return an error. Ownership of the output is passed to the caller.
+// The implementation implicitly calls |ireeCompilerOutputKeep| on the
+// output.
+IREE_EMBED_EXPORTED void ireeCompilerInvocationSetCrashHandler(
+    iree_compiler_invocation_t *inv, bool genLocalReproducer,
+    iree_compiler_error_t *(*onCrashCallback)(
+        iree_compiler_output_t **outOutput, void *userData),
+    void *userData);
+
 // Parses a source into this instance in preparation for performing a
 // compilation action.
 // Returns false and emits diagnostics on failure.
@@ -240,12 +252,15 @@ IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerSourceOpenFile(
     iree_compiler_session_t *session, const char *filePath,
     iree_compiler_source_t **out_source);
 
-// Wraps an existing buffer in memory. The |buffer| must be null terminated, and
-// the null must be accounted for in the |length|.
+// Wraps an existing buffer in memory.
+// If |isNullTerminated| is true, then the null must be accounted for in the
+// length. This is required for text buffers and it is permitted for binary
+// buffers.
 // Must be destroyed with ireeCompilerSourceDestroy().
 IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
     iree_compiler_session_t *session, const char *bufferName,
-    const char *buffer, size_t length, iree_compiler_source_t **out_source);
+    const char *buffer, size_t length, bool isNullTerminated,
+    iree_compiler_source_t **out_source);
 
 // Splits the current source buffer, invoking a callback for each "split"
 // within it. This is per the usual MLIR split rules (see

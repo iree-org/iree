@@ -204,7 +204,6 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-flow-enable-aggressive-fusion"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

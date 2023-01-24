@@ -18,6 +18,7 @@ EXPORTS
   ireeCompilerInvocationParseSource
   ireeCompilerInvocationPipeline
   ireeCompilerInvocationSetCompileToPhase
+  ireeCompilerInvocationSetCrashHandler
   ireeCompilerInvocationSetVerifyIR
   ireeCompilerOptionsCreate
   ireeCompilerOptionsDestroy

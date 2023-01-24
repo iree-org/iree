@@ -210,6 +210,14 @@ static iree_hal_allocator_t* iree_hal_cuda_device_allocator(
   return device->device_allocator;
 }
 
+static void iree_hal_cuda_replace_device_allocator(
+    iree_hal_device_t* base_device, iree_hal_allocator_t* new_allocator) {
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  iree_hal_allocator_retain(new_allocator);
+  iree_hal_allocator_release(device->device_allocator);
+  device->device_allocator = new_allocator;
+}
+
 static iree_status_t iree_hal_cuda_device_trim(iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   iree_arena_block_pool_trim(&device->block_pool);
@@ -249,16 +257,6 @@ static iree_status_t iree_hal_cuda_device_create_channel(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-
-  // TODO(#9580): check if nccl symbols are available - if not then we fail
-  // here and have the error propagated up to users. If we wanted to delay load
-  // NCCL we'd want to take a lock here, load it, and merge the symbols into the
-  // dynamic symbol table.
-  if (true) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "NCCL unavailable and collective operations cannot be performed");
-  }
 
   // Try to use the ID specified in the parameters and fall back to the default.
   iree_hal_cuda_nccl_id_t id;
@@ -492,6 +490,7 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .id = iree_hal_cuda_device_id,
     .host_allocator = iree_hal_cuda_device_host_allocator,
     .device_allocator = iree_hal_cuda_device_allocator,
+    .replace_device_allocator = iree_hal_cuda_replace_device_allocator,
     .trim = iree_hal_cuda_device_trim,
     .query_i64 = iree_hal_cuda_device_query_i64,
     .create_channel = iree_hal_cuda_device_create_channel,

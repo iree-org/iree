@@ -39,10 +39,11 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
 
 /// Returns true if the given MemRef is in workgroup memory.
 bool isInWorkgroupMemory(MemRefType memrefType) {
-  Optional<unsigned> workgroupMemorySpace =
-      spirv::mapVulkanStorageClassToMemorySpace(spirv::StorageClass::Workgroup);
-  if (auto attr = memrefType.getMemorySpace().dyn_cast_or_null<IntegerAttr>())
-    if (attr.getInt() == *workgroupMemorySpace) return true;
+  auto attribute =
+      memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
+  if (attribute &&
+      attribute.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace())
+    return true;
   return false;
 }
 

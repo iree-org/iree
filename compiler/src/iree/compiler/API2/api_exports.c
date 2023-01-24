@@ -26,6 +26,7 @@ extern void ireeCompilerInvocationOutputVMCSource();
 extern void ireeCompilerInvocationParseSource();
 extern void ireeCompilerInvocationPipeline();
 extern void ireeCompilerInvocationSetCompileToPhase();
+extern void ireeCompilerInvocationSetCrashHandler();
 extern void ireeCompilerInvocationSetVerifyIR();
 extern void ireeCompilerOptionsCreate();
 extern void ireeCompilerOptionsDestroy();
@@ -600,6 +601,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerInvocationParseSource;
   x += (uintptr_t)&ireeCompilerInvocationPipeline;
   x += (uintptr_t)&ireeCompilerInvocationSetCompileToPhase;
+  x += (uintptr_t)&ireeCompilerInvocationSetCrashHandler;
   x += (uintptr_t)&ireeCompilerInvocationSetVerifyIR;
   x += (uintptr_t)&ireeCompilerOptionsCreate;
   x += (uintptr_t)&ireeCompilerOptionsDestroy;

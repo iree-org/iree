@@ -76,6 +76,8 @@ if [[ "$OSTYPE" =~ ^msys ]]; then
     # TODO(#11077): Fix assert on task->pending_dependency_count atomic
     "iree/tests/e2e/matmul/e2e_matmul_direct_i8_small_ukernel_vmvx_local-task"
     "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_ukernel_vmvx_local-task"
+    "iree/tests/e2e/matmul/e2e_matmul_mmt4d_i8_small_ukernel_vmvx_local-task"
+    "iree/tests/e2e/matmul/e2e_matmul_mmt4d_f32_small_ukernel_vmvx_local-task"
     # TODO: fix segfault
     "iree/tests/e2e/models/check_llvm-cpu_local-task_mobilenetv3_fake_weights.mlir"
     # TODO(#11068): Fix compilation segfault

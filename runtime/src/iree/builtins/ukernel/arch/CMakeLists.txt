@@ -58,7 +58,7 @@ iree_cc_library(
     "pack_arch.c"
     "query_tile_sizes_arch.c"
   DEPS
-    iree::builtins::ukernel::common
+    iree::builtins::ukernel::headers
     ${IREE_UK_ARCH_DEPS}
   PUBLIC
 )

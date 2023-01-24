@@ -12,7 +12,6 @@
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -199,14 +198,6 @@ createFuseTensorPadWithConsumerPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConcretizePadResultShapePass();
 
-IREE::LinalgExt::MaterializeEncodingValueFn getMaterializeEncodingValueFn(
-    IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Materialize the encoding of operations. The layout to use for the encoded
-/// operations are backend specific.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createIREEMaterializeEncodingPass();
-
 /// Erases #hal.descriptor_type as MemRef memory space.
 LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp);
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -274,12 +265,17 @@ createLLVMCPUCheckIRBeforeLLVMConversionPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass();
 
+/// Materialize the encoding of operations. The layout to use for the encoded
+/// operations are LLVMCPU specific.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUMaterializeEncodingPass();
+
 /// Synchronizes LLVM linkage with MLIR symbol visibility.
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUAArch64VectorLoweringPass();
+createLLVMCPUMmt4dVectorLoweringPass();
 
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
@@ -295,7 +291,7 @@ createVectorContractCustomKernelsPass();
 /// Populates `patterns` to convert certain vector.contract ops to special
 /// "kernels" written either in SIMD intrinsics or inline assembly.
 void populateVectorContractCustomKernelsPatterns(
-    const CustomKernelsTargetInfo &targetInfo, RewritePatternSet &patterns);
+    IREE::HAL::ExecutableTargetAttr target, RewritePatternSet &patterns);
 
 void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
                                        RewritePatternSet &patterns);
@@ -355,7 +351,7 @@ void addTransformDialectPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
-void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager);
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.
@@ -612,6 +608,11 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
 //------------------------------------------------------------------------------
 // VMVX passes
 //------------------------------------------------------------------------------
+
+/// Materialize the encoding of operations. The layout to use for the encoded
+/// operations are VMVX specific.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createVMVXMaterializeEncodingPass();
 
 // Lowers high level library calls from named ops and generics. This operates
 // at the bufferized linalg level.

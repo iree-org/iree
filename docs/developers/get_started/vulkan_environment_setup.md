@@ -199,7 +199,7 @@ export DISPLAY=:0
 ```
 
 [VulkanArchOverview]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#overview
-[VulkanArchPicture]: https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/master/loader/images/high_level_loader.png
+[VulkanArchPicture]: https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/master/docs/images/high_level_loader.png
 [VulkanICD]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#installable-client-drivers
 [VulkanLayer]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#layers
 [VulkanLoader]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#the-loader

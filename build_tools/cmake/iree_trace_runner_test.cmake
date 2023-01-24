@@ -35,7 +35,7 @@ function(iree_trace_runner_test)
   endif()
 
   # See comment in iree_check_test about this condition.
-  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BINARY_ROOT)
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BIN_DIR)
     return()
   endif()
 
@@ -130,7 +130,7 @@ function(iree_single_backend_generated_trace_runner_test)
   endif()
 
   # Copied from iree_check_test. Refer to the comment there.
-  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BINARY_ROOT)
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BIN_DIR)
     return()
   endif()
 
@@ -164,7 +164,7 @@ function(iree_single_backend_generated_trace_runner_test)
   if(NOT DEFINED IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
     message(SEND_ERROR "Unknown backend '${_RULE_TARGET_BACKEND}'. Check IREE_TARGET_BACKEND_* options.")
   endif()
-  if(DEFINED IREE_HOST_BINARY_ROOT)
+  if(IREE_HOST_BIN_DIR)
     # If we're not building the host tools from source under this configuration,
     # such as when cross compiling, then we can't easily check for which
     # compiler target backends are enabled. Just assume all are enabled and only
@@ -316,8 +316,7 @@ function(iree_generated_trace_runner_test)
       set(_TARGET_CPU_FEATURES_VARIANTS "default")
     endif()
     foreach(_TARGET_CPU_FEATURES_LIST_ELEM IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
-      process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX _TARGET_PASS_OPTIONS)
-      string(REPLACE "#pass_options_variant#" "${_TARGET_PASS_OPTIONS}" _PROCESSED_COMPILER_FLAGS "${_RULE_COMPILER_FLAGS}")
+      process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX)
       if(NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
         continue()
@@ -336,7 +335,7 @@ function(iree_generated_trace_runner_test)
         DRIVER
           ${_DRIVER}
         COMPILER_FLAGS
-          ${_PROCESSED_COMPILER_FLAGS}
+          ${_RULE_COMPILER_FLAGS}
         RUNNER_ARGS
           ${_RULE_RUNNER_ARGS}
         LABELS

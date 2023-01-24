@@ -92,11 +92,9 @@ static LogicalResult printOperation(CppEmitter &emitter,
   raw_ostream &os = emitter.ostream();
   Block &successor = *branchOp.getSuccessor();
 
-  for (auto pair :
+  for (auto [operand, arg] :
        llvm::zip_equal(branchOp.getOperands(), successor.getArguments())) {
-    Value &operand = std::get<0>(pair);
-    BlockArgument &argument = std::get<1>(pair);
-    os << emitter.getOrCreateName(argument) << " = "
+    os << emitter.getOrCreateName(arg) << " = "
        << emitter.getOrCreateName(operand) << ";\n";
   }
 
@@ -117,11 +115,9 @@ static LogicalResult printOperation(CppEmitter &emitter,
      << ") {\n";
 
   // If condition is true.
-  for (auto pair : llvm::zip_equal(condBranchOp.getTrueOperands(),
+  for (auto [operand, arg] : llvm::zip_equal(condBranchOp.getTrueOperands(),
                              trueSuccessor.getArguments())) {
-    Value &operand = std::get<0>(pair);
-    BlockArgument &argument = std::get<1>(pair);
-    os << emitter.getOrCreateName(argument) << " = "
+    os << emitter.getOrCreateName(arg) << " = "
        << emitter.getOrCreateName(operand) << ";\n";
   }
 
@@ -132,11 +128,9 @@ static LogicalResult printOperation(CppEmitter &emitter,
   os << emitter.getOrCreateName(trueSuccessor) << ";\n";
   os << "} else {\n";
   // If condition is false.
-  for (auto pair : llvm::zip_equal(condBranchOp.getFalseOperands(),
+  for (auto [operand, arg] : llvm::zip_equal(condBranchOp.getFalseOperands(),
                              falseSuccessor.getArguments())) {
-    Value &operand = std::get<0>(pair);
-    BlockArgument &argument = std::get<1>(pair);
-    os << emitter.getOrCreateName(argument) << " = "
+    os << emitter.getOrCreateName(arg) << " = "
        << emitter.getOrCreateName(operand) << ";\n";
   }
 
@@ -265,11 +259,11 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::ForOp forOp) {
     }
   }
 
-  for (auto pair : llvm::zip_equal(iterArgs, operands)) {
-    if (failed(emitter.emitType(forOp.getLoc(), std::get<0>(pair).getType())))
+  for (auto [iterArg, operand] : llvm::zip_equal(iterArgs, operands)) {
+    if (failed(emitter.emitType(forOp.getLoc(), iterArg.getType())))
       return failure();
-    os << " " << emitter.getOrCreateName(std::get<0>(pair)) << " = ";
-    os << emitter.getOrCreateName(std::get<1>(pair)) << ";";
+    os << " " << emitter.getOrCreateName(iterArg) << " = ";
+    os << emitter.getOrCreateName(operand) << ";";
     os << "\n";
   }
 
@@ -306,9 +300,7 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::ForOp forOp) {
 
   Operation *yieldOp = forRegion.getBlocks().front().getTerminator();
   // Copy yield operands into iterArgs at the end of a loop iteration.
-  for (auto pair : llvm::zip_equal(iterArgs, yieldOp->getOperands())) {
-    BlockArgument iterArg = std::get<0>(pair);
-    Value operand = std::get<1>(pair);
+  for (auto [iterArg, operand] : llvm::zip_equal(iterArgs, yieldOp->getOperands())) {
     os << emitter.getOrCreateName(iterArg) << " = "
        << emitter.getOrCreateName(operand) << ";\n";
   }
@@ -316,9 +308,7 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::ForOp forOp) {
   os.unindent() << "}";
 
   // Copy iterArgs into results after the for loop.
-  for (auto pair : llvm::zip_equal(results, iterArgs)) {
-    OpResult result = std::get<0>(pair);
-    BlockArgument iterArg = std::get<1>(pair);
+  for (auto [result, iterArg] : llvm::zip_equal(results, iterArgs)) {
     os << "\n"
        << emitter.getOrCreateName(result) << " = "
        << emitter.getOrCreateName(iterArg) << ";";

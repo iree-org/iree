@@ -6,7 +6,7 @@ Cross-compilation for iOS consists of the two steps below.
   IREE modules.
 * Build the IREE runtime on the macOS host for iOS devices and the
   simulator.  We can then run the IREE module on the simulator.
-  
+
 ## Prerequisites
 
 ### Install Xcode and iOS SDK
@@ -32,7 +32,7 @@ Build and install on your macOS host:
 cmake -S . -B ../iree-build/ -GNinja \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DCMAKE_INSTALL_PREFIX=../iree-build/install
-  
+
 cmake --build ../iree-build/ --target install
 ```
 
@@ -48,7 +48,7 @@ cmake -S . -B ../build-ios-sim -GNinja \
   -DCMAKE_SYSTEM_PROCESSOR=arm64 \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
   -DCMAKE_IOS_INSTALL_COMBINED=YES \
-  -DIREE_HOST_BINARY_ROOT=$PWD/../iree-build/install \
+  -DIREE_HOST_BIN_DIR="$PWD/../iree-build/install/bin" \
   -DCMAKE_INSTALL_PREFIX=../build-ios-sim/install \
   -DIREE_BUILD_COMPILER=OFF
 

@@ -205,7 +205,7 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
 // flow.dispatch.tie_shape
 //===----------------------------------------------------------------------===//
 
-OpFoldResult DispatchTieShapeOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult DispatchTieShapeOp::fold(FoldAdaptor operands) {
   if (getDynamicDims().empty()) {
     return getOperand();
   }
@@ -373,7 +373,7 @@ void DispatchTensorLoadOp::getCanonicalizationPatterns(
 // `flow.dispatch.input.load` having a `tensor` type as input. This fails
 // verification. Fold such uses of the offsets, size and strides are emtpy.
 // i.e, flow.dispatch.input.load %v -> %v
-OpFoldResult DispatchTensorLoadOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult DispatchTensorLoadOp::fold(FoldAdaptor operands) {
   if (getSource().getType() && getSource().getType().isa<RankedTensorType>() &&
       getMixedOffsets().empty() && getMixedSizes().empty() &&
       getMixedStrides().empty()) {
@@ -499,7 +499,7 @@ static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
   return true;
 }
 
-OpFoldResult TensorConstantOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TensorConstantOp::fold(FoldAdaptor operands) {
   auto dynamicType = getType();
   if (dynamicType.getNumDynamicDims() == 0) {
     return getValue();
@@ -541,7 +541,7 @@ void TensorConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<ExpandDynamicShapeConstant>(context);
 }
 
-OpFoldResult TensorTieShapeOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TensorTieShapeOp::fold(FoldAdaptor operands) {
   if (getDynamicDims().empty()) {
     return getOperand();
   }
@@ -554,7 +554,7 @@ void TensorTieShapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
       context);
 }
 
-OpFoldResult TensorReshapeOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TensorReshapeOp::fold(FoldAdaptor operands) {
   auto sourceType = getSource().getType().cast<ShapedType>();
   auto resultType = getResult().getType().cast<ShapedType>();
   if (compareShapesEqual(sourceType, getSourceDims(), resultType,
@@ -688,13 +688,12 @@ void TensorLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<FoldSplatLoadIntoPrimitive>(context);
 }
 
-OpFoldResult TensorLoadOp::fold(ArrayRef<Attribute> operands) {
-  if (auto source = operands[0].dyn_cast_or_null<ElementsAttr>()) {
+OpFoldResult TensorLoadOp::fold(FoldAdaptor operands) {
+  if (auto source = operands.getSource().dyn_cast_or_null<ElementsAttr>()) {
     // Load directly from the constant source tensor.
-    auto indices = operands.drop_front();
-    if (llvm::count(indices, nullptr) == 0) {
+    if (llvm::count(operands.getIndices(), nullptr) == 0) {
       return source.getValues<Attribute>()[llvm::to_vector<4>(
-          llvm::map_range(indices, [](Attribute value) {
+          llvm::map_range(operands.getIndices(), [](Attribute value) {
             return value.cast<IntegerAttr>().getValue().getZExtValue();
           }))];
     }
@@ -702,21 +701,21 @@ OpFoldResult TensorLoadOp::fold(ArrayRef<Attribute> operands) {
   return {};
 }
 
-OpFoldResult TensorStoreOp::fold(ArrayRef<Attribute> operands) {
-  if (!operands[0]) return {};
-  auto &value = operands[0];
-  if (auto target = operands[1].dyn_cast_or_null<ElementsAttr>()) {
+OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
+  auto value = operands.getValue();
+  if (!value) return {};
+  if (auto target = operands.getTarget().dyn_cast_or_null<ElementsAttr>()) {
     // Store into the constant target tensor.
     if (target.getType().getRank() == 0) {
       return DenseElementsAttr::get(target.getType(), {value});
     }
-    auto indices = operands.drop_front(2);
-    if (llvm::count(indices, nullptr) == 0) {
+    if (llvm::count(operands.getIndices(), nullptr) == 0) {
       uint64_t offset = getFlattenedIndex(
           target.getType(),
-          llvm::to_vector<4>(llvm::map_range(indices, [](Attribute value) {
-            return value.cast<IntegerAttr>().getValue().getZExtValue();
-          })));
+          llvm::to_vector<4>(
+              llvm::map_range(operands.getIndices(), [](Attribute value) {
+                return value.cast<IntegerAttr>().getValue().getZExtValue();
+              })));
       SmallVector<Attribute, 16> newContents(target.getValues<Attribute>());
       newContents[offset] = value;
       return DenseElementsAttr::get(target.getType(), newContents);
@@ -738,10 +737,10 @@ void TensorSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<FoldSplatReshapeIntoSplat>(context);
 }
 
-OpFoldResult TensorCloneOp::fold(ArrayRef<Attribute> operands) {
-  if (operands[0]) {
+OpFoldResult TensorCloneOp::fold(FoldAdaptor operands) {
+  if (auto operand = operands.getOperand()) {
     // Constants always fold.
-    return operands[0];
+    return operand;
   }
 
   // TODO(benvanik): elide clones when safe to do so. Right now clone is
@@ -791,18 +790,17 @@ static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
   return DenseElementsAttr::get(outputType, newContents);
 }
 
-OpFoldResult TensorSliceOp::fold(ArrayRef<Attribute> operands) {
-  if (llvm::count(operands, nullptr) == 0) {
+OpFoldResult TensorSliceOp::fold(FoldAdaptor operands) {
+  if (llvm::count(operands.getOperands(), nullptr) == 0) {
     // Fully constant arguments so we can perform the slice here.
-    auto tensor = operands[0].cast<ElementsAttr>();
+    auto tensor = operands.getSource().cast<ElementsAttr>();
     int64_t rank = getSource().getType().cast<ShapedType>().getRank();
-    // start = operands[1:1+rank), and length = operands[1+rank:].
-    auto start = llvm::to_vector<4>(llvm::map_range(
-        operands.drop_front(1).drop_back(rank), [](Attribute value) {
+    auto start = llvm::to_vector<4>(
+        llvm::map_range(operands.getStartIndices(), [](Attribute value) {
           return value.cast<IntegerAttr>().getValue().getZExtValue();
         }));
     auto length = llvm::to_vector<4>(
-        llvm::map_range(operands.drop_front(1 + rank), [](Attribute value) {
+        llvm::map_range(operands.getLengths(), [](Attribute value) {
           return value.cast<IntegerAttr>().getValue().getZExtValue();
         }));
     for (int64_t dim = 0; dim < rank; ++dim) {
@@ -869,16 +867,14 @@ static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
   return DenseElementsAttr::get(targetType, targetValues);
 }
 
-OpFoldResult TensorUpdateOp::fold(ArrayRef<Attribute> operands) {
-  auto targetIndex = getODSOperandIndexAndLength(0).first;
-  auto startIndices = getODSOperandIndexAndLength(2);
-  auto updateIndex = getODSOperandIndexAndLength(3).first;
-  auto indices = operands.slice(startIndices.first, startIndices.second);
-  bool allIndicesConstant = llvm::count(indices, nullptr) == 0;
-  if (operands[updateIndex] && operands[targetIndex] && allIndicesConstant) {
+OpFoldResult TensorUpdateOp::fold(FoldAdaptor operands) {
+  bool allIndicesConstant =
+      llvm::count(operands.getStartIndices(), nullptr) == 0;
+  if (operands.getUpdate() && operands.getTarget() && allIndicesConstant) {
     // Fully constant arguments so we can perform the update here.
-    return tensorUpdate(operands[updateIndex].cast<ElementsAttr>(),
-                        operands[targetIndex].cast<ElementsAttr>(), indices);
+    return tensorUpdate(operands.getUpdate().cast<ElementsAttr>(),
+                        operands.getTarget().cast<ElementsAttr>(),
+                        operands.getStartIndices());
   } else {
     // Replace the entire tensor when the sizes match.
     auto updateType = getUpdate().getType().cast<ShapedType>();

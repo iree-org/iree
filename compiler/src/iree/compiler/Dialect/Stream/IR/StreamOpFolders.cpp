@@ -391,7 +391,7 @@ void ResourceDeallocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.resource.size
 //===----------------------------------------------------------------------===//
 
-OpFoldResult ResourceSizeOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ResourceSizeOp::fold(FoldAdaptor operands) {
   auto sizeAwareType =
       getOperand().getType().cast<IREE::Util::SizeAwareTypeInterface>();
   Operation *op = this->getOperation();
@@ -545,7 +545,7 @@ void ResourceStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.resource.pack
 //===----------------------------------------------------------------------===//
 
-LogicalResult ResourcePackOp::fold(ArrayRef<Attribute> operands,
+LogicalResult ResourcePackOp::fold(FoldAdaptor operands,
                                    SmallVectorImpl<OpFoldResult> &results) {
   Builder builder(getContext());
 
@@ -638,8 +638,9 @@ struct CanonicalizeResourcePackIntervals
 
     // See if the sorted order is different than how they are stored in the op.
     bool orderChanged = false;
-    for (auto it : llvm::zip_equal(slices, op.getPackedOffsets())) {
-      if (std::get<0>(it).packedOffset != std::get<1>(it)) {
+    for (auto [slice, packedOffset] :
+         llvm::zip_equal(slices, op.getPackedOffsets())) {
+      if (slice.packedOffset != packedOffset) {
         orderChanged = true;
         break;
       }
@@ -686,7 +687,7 @@ void ResourcePackOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.resource.pack
 //===----------------------------------------------------------------------===//
 
-OpFoldResult ResourceSubviewOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ResourceSubviewOp::fold(FoldAdaptor operands) {
   if (getSourceSize() == getResultSize()) {
     // Entire range is covered; return it all.
     return getSource();
@@ -763,7 +764,7 @@ void ResourceSubviewOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.tensor.import
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TensorImportOp::fold(FoldAdaptor operands) {
   // If operand comes from an export with the same affinity and size then fold.
   // Different affinities may indicate exporting from one device or queue and
   // importing to a different device or queue.
@@ -785,7 +786,7 @@ void TensorImportOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.tensor.export
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
   // If operand comes from import with the same properties then fold.
   // These checks are conservative, since encoding changes may be meaningful.
   auto importOp = getSource().getDefiningOp<TensorImportOp>();
@@ -1047,7 +1048,7 @@ void TensorSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.tensor.clone
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TensorCloneOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TensorCloneOp::fold(FoldAdaptor operands) {
   auto users = getResult().getUsers();
   if (!users.empty() && std::next(users.begin()) == users.end()) {
     // If the second user is the end it means there's one user.
@@ -1087,7 +1088,7 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.tensor.slice
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TensorSliceOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TensorSliceOp::fold(FoldAdaptor operands) {
   // TODO(benvanik): fold if source_size == result_size and affinity/lifetime.
   return {};
 }
@@ -1140,7 +1141,7 @@ void TensorFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.tensor.update
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TensorUpdateOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TensorUpdateOp::fold(FoldAdaptor operands) {
   // TODO(benvanik): fold if target_size == update_size and affinity/lifetime.
   return {};
 }
@@ -1300,7 +1301,7 @@ void AsyncSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.async.clone
 //===----------------------------------------------------------------------===//
 
-OpFoldResult AsyncCloneOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult AsyncCloneOp::fold(FoldAdaptor operands) {
   // TODO(benvanik): trivial elides when there are no tied users/one user.
   return {};
 }
@@ -1350,7 +1351,7 @@ void AsyncCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.async.slice
 //===----------------------------------------------------------------------===//
 
-OpFoldResult AsyncSliceOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult AsyncSliceOp::fold(FoldAdaptor operands) {
   if (getSourceSize() == getResultSize()) {
     // Slicing entire source - just reroute to source.
     // Note that this breaks copy-on-write semantics but will be fixed up during
@@ -1433,7 +1434,7 @@ void AsyncFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.async.update
 //===----------------------------------------------------------------------===//
 
-OpFoldResult AsyncUpdateOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult AsyncUpdateOp::fold(FoldAdaptor operands) {
   if (getUpdateSize() == getTargetSize()) {
     // If updating the entire target then just replace with the update.
     // Note that this breaks copy-on-write semantics but will be fixed up during
@@ -1572,7 +1573,7 @@ void AsyncCollectiveOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.async.transfer
 //===----------------------------------------------------------------------===//
 
-OpFoldResult AsyncTransferOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult AsyncTransferOp::fold(FoldAdaptor operands) {
   if (auto sourceTransferOp = getSource().getDefiningOp<AsyncTransferOp>()) {
     if (sourceTransferOp.getSource().getType() == getResult().getType() &&
         sourceTransferOp.getSourceAffinity() == getResultAffinity()) {
@@ -2236,7 +2237,7 @@ void CmdConcurrentOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.timepoint.immediate
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TimepointImmediateOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TimepointImmediateOp::fold(FoldAdaptor operands) {
   return IREE::Stream::TimepointAttr::get(getContext(), getResult().getType());
 }
 
@@ -2244,7 +2245,7 @@ OpFoldResult TimepointImmediateOp::fold(ArrayRef<Attribute> operands) {
 // stream.timepoint.export
 //===----------------------------------------------------------------------===//
 
-LogicalResult TimepointExportOp::fold(ArrayRef<Attribute> operands,
+LogicalResult TimepointExportOp::fold(FoldAdaptor operands,
                                       SmallVectorImpl<OpFoldResult> &results) {
   // If the source timepoint comes from an import op we can fold - but only if
   // the types match.
@@ -2262,8 +2263,9 @@ LogicalResult TimepointExportOp::fold(ArrayRef<Attribute> operands,
 // stream.timepoint.join
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TimepointJoinOp::fold(ArrayRef<Attribute> operands) {
-  if (llvm::all_of(operands, [](auto operand) { return operand != nullptr; })) {
+OpFoldResult TimepointJoinOp::fold(FoldAdaptor operands) {
+  if (llvm::all_of(operands.getAwaitTimepoints(),
+                   [](auto operand) { return operand != nullptr; })) {
     // Immediate wait; fold into immediate.
     return IREE::Stream::TimepointAttr::get(getContext(),
                                             getResult().getType());
@@ -2433,9 +2435,9 @@ void TimepointBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.timepoint.await
 //===----------------------------------------------------------------------===//
 
-LogicalResult TimepointAwaitOp::fold(ArrayRef<Attribute> foldOperands,
+LogicalResult TimepointAwaitOp::fold(FoldAdaptor operands,
                                      SmallVectorImpl<OpFoldResult> &results) {
-  if (foldOperands[0]) {
+  if (operands.getAwaitTimepoint()) {
     // Immediate wait; fold to all captured operands.
     results.append(getResourceOperands().begin(), getResourceOperands().end());
     return success();
@@ -2584,6 +2586,7 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
       // there. We rely on other canonicalizers to sink things such that
       // (hopefully) we get them directly accessible here.
       if (use.getOwner() == op) continue;
+      if (op->getBlock() != use.getOwner()->getBlock()) continue;
       if (dominanceInfo.dominates(use.getOwner(), op)) continue;
       auto awaitOp = dyn_cast<TimepointAwaitOp>(use.getOwner());
       if (!awaitOp ||
@@ -2650,12 +2653,9 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
     SmallVector<std::pair<Value, unsigned>> replacements;
     SmallVector<Value> newOperands;
     SmallVector<Value> newOperandSizes;
-    for (auto it :
+    for (auto [operand, operandSize, result] :
          llvm::zip_equal(op.getResourceOperands(), op.getResourceOperandSizes(),
                          op.getResults())) {
-      auto operand = std::get<0>(it);
-      auto operandSize = std::get<1>(it);
-      auto result = std::get<2>(it);
       auto insertion =
           baseMap.insert(std::make_pair(operand, newOperands.size()));
       if (insertion.second) {

@@ -53,8 +53,8 @@ static LogicalResult padAlloc(memref::AllocOp allocOp) {
   }
   if (dynamicDimIdx == 0) return success();
   Type elType = allocOp.getType().getElementType();
-  MemRefType allocType = MemRefType::get(
-      shape, elType, {}, allocOp.getType().getMemorySpaceAsInt());
+  MemRefType allocType = MemRefType::get(shape, elType, AffineMap(),
+                                         allocOp.getType().getMemorySpace());
   Location loc = allocOp.getLoc();
   Value paddedAlloc = builder.create<memref::AllocOp>(loc, allocType);
   SmallVector<OpFoldResult> offsets(shape.size(), builder.getIndexAttr(0));

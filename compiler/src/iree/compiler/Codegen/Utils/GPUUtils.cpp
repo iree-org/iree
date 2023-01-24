@@ -135,8 +135,10 @@ Optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
   }
 
   builder.setInsertionPoint(&funcOp.front(), funcOp.front().begin());
-  auto type = MemRefType::get(shape, subview.getType().getElementType(), {},
-                              gpu::GPUDialect::getWorkgroupAddressSpace());
+  auto type = MemRefType::get(
+      shape, subview.getType().getElementType(), MemRefLayoutAttrInterface{},
+      gpu::AddressSpaceAttr::get(builder.getContext(),
+                                 gpu::GPUDialect::getWorkgroupAddressSpace()));
   Value buffer = builder.create<memref::AllocOp>(funcOp.getLoc(), type);
   return buffer;
 }
@@ -477,9 +479,11 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
     assert(numWarp <= warpSize &&
            "Only support 1 level, need to implement recursive/loop for this "
            "case.");
+    auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
+        builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
     MemRefType memrefType =
-        MemRefType::get(numWarp, laneVal.getType(), {},
-                        gpu::GPUDialect::getWorkgroupAddressSpace());
+        MemRefType::get(numWarp, laneVal.getType(), MemRefLayoutAttrInterface{},
+                        addressSpaceAttr);
     Value alloc = builder.create<memref::AllocOp>(loc, memrefType);
     Value threadX = builder.create<gpu::ThreadIdOp>(loc, builder.getIndexType(),
                                                     gpu::Dimension::x);

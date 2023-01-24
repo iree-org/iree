@@ -152,7 +152,8 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
                                                        int64_t warpSize) {
   ApplyPatternsOpPatterns patterns;
   patterns.foldMemrefAliases = true;
-  patterns.rankReducing = true;
+  patterns.rankReducingVector = true;
+  patterns.rankReducingLinalg = true;
   funcH = b.create<ApplyPatternsOp>(funcH, patterns);
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
   // Locally suppress failures for this op only because it doesn't cover the
@@ -324,11 +325,11 @@ static ReductionConfig getReductionConfig(
   // Since this mode does not coalesce reads, perf will suffer
   // catastrophically on larger runtime reduction.
   // TODO: explicit hint from above that we really want to do that.
-  int64_t reductionDimensionSize = captures.reductionOpSizes.back();
-  bool isDynamicReduction = ShapedType::isDynamic(reductionDimensionSize);
+  int64_t redSize = captures.reductionOpSizes.back();
+  bool isDynamicReduction = ShapedType::isDynamic(redSize);
   // Otherwise, still only support the small cases for now and fall back to
   // other strategies otherwise.
-  bool isSmallReduction = (reductionDimensionSize < 2 * kCudaWarpSize);
+  bool isSmallReduction = (redSize < 2 * kCudaWarpSize);
   if (!isDynamicReduction && isSmallReduction) {
     int64_t maxNumThreads = 4 * kCudaWarpSize;
     return ReductionConfig{maxNumThreads, 0, ReductionStrategy::Small};
@@ -342,9 +343,9 @@ static ReductionConfig getReductionConfig(
   int64_t maxNumThreads = 8 * kCudaWarpSize;
   // No adjustments in the dynamic case, we need extra information to make a
   // good decision.
-  int64_t redSize = captures.reductionOpSizes.back();
   if (ShapedType::isDynamic(redSize))
-    return ReductionConfig{maxNumThreads, vectorSize};
+    return ReductionConfig{maxNumThreads, vectorSize,
+                           ReductionStrategy::Staged};
   // Scale down to smaller sizes (4, 8, 16)-warps.
   if (scaleUpByBitWidth(redSize, bitWidth) <= 4 * kCudaWarpSize) {
     vectorSize = scaleUpByBitWidth(1, bitWidth);

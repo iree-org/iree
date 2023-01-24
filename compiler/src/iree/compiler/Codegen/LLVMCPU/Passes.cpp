@@ -128,6 +128,8 @@ static void addTileAndDistributePasses(
     OpPassManager &pm, bool useFuseTensorPadWithConsumerPass = true) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createDecomposeSoftmaxPass());
   if (clEnablePadConsumerFusion && useFuseTensorPadWithConsumerPass) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createFuseTensorPadWithConsumerPass());
@@ -269,19 +271,30 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
   int64_t khSize, kwSize, ohSize, owSize;
   auto isSizeExtracted =
       TypeSwitch<Operation *, LogicalResult>(op)
-          .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-              [&](auto) {
-                // Shape: N, OH, OW, OC, KH, KW, (IC)
-                khSize = shape[4];
-                kwSize = shape[5];
-                ohSize = shape[1];
-                owSize = shape[2];
-                return success();
-              })
+          .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
+                linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+                linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+                linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
+                linalg::PoolingNchwMaxOp>([&](auto) {
+            // Shape: N, OH, OW, OC, KH, KW, (IC)
+            khSize = shape[4];
+            kwSize = shape[5];
+            ohSize = shape[1];
+            owSize = shape[2];
+            return success();
+          })
           .Case<linalg::Conv2DNchwFchwOp>([&](auto) {
             // Shape: N, OC, OH, OW, (IC), KH, KW
             khSize = shape[5];
             kwSize = shape[6];
+            ohSize = shape[2];
+            owSize = shape[3];
+            return success();
+          })
+          .Case<linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp>([&](auto) {
+            // Shape: N, OC, OH, OW, KH, KW
+            khSize = shape[4];
+            kwSize = shape[5];
             ohSize = shape[2];
             owSize = shape[3];
             return success();
@@ -462,6 +475,13 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+
+  // This is a temporary solution for handling aggressive fusion heuristics.
+  // This rematerializes parallel ops into the consumers to avoid stack
+  // allocation.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
+
   {
     LinalgFusePassOptions options;
     // Run SplitReductionPass before the final reduction Fuse pass, because
@@ -583,7 +603,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -624,7 +644,7 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   addBufferizePasses(nestedModulePM);
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUAArch64VectorLoweringPass());
+      createLLVMCPUMmt4dVectorLoweringPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass(/*flatten=*/true));
 }
@@ -720,7 +740,7 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createTypePropagationPass());
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createIREEMaterializeEncodingPass());
+      createLLVMCPUMaterializeEncodingPass());
   passManager.addNestedPass<ModuleOp>(createBufferizeCopyOnlyDispatchesPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.

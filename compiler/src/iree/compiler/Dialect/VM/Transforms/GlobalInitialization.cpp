@@ -9,7 +9,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Pass/Pass.h"

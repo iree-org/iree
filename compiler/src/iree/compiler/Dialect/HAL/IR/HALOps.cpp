@@ -14,10 +14,10 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/FunctionImplementation.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -140,13 +140,12 @@ LogicalResult ReturnOp::verify() {
                               << op.getNumOperands() << ", expected "
                               << expectedTypes.size() << ")";
     }
-    for (auto pair :
+    for (auto &&[index, values] :
          llvm::enumerate(llvm::zip_equal(op.getOperands(), expectedTypes))) {
-      auto operand = std::get<0>(pair.value());
-      auto expectedType = std::get<1>(pair.value());
+      auto [operand, expectedType] = values;
       if (operand.getType() != expectedType) {
         return op.emitOpError()
-               << "parent expected result " << pair.index() << " to be "
+               << "parent expected result " << index << " to be "
                << expectedType << " but returning " << operand.getType();
       }
     }
@@ -816,7 +815,7 @@ static std::array<Value, 3> calculateWorkgroupCountFromRegion(
     Location loc, Block *body, Value device, ValueRange workload,
     OpBuilder &builder) {
   // TODO(benvanik): replace with region inlining util.
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   bvm.map(body->getArgument(0), device);
   // For now use the number of args to minimum of number of args used by
   // the body, and number of workload entries. When there is a more explicit
@@ -1061,6 +1060,19 @@ void ExecutableLookupOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
+void InterfaceBindingSubspanOp::build(
+    OpBuilder &builder, OperationState &result, Type resultType, APInt set,
+    APInt binding, IREE::HAL::DescriptorType descriptor_type, Value byte_offset,
+    ValueRange dynamic_dims, IntegerAttr alignment,
+    Optional<DescriptorFlags> flags) {
+  IREE::HAL::DescriptorFlagsAttr descriptorAttr;
+  if (flags.has_value()) {
+    descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),
+                                                         flags.value());
+  }
+  build(builder, result, resultType, set, binding, descriptor_type, byte_offset,
+        dynamic_dims, alignment, descriptorAttr);
+}
 
 LogicalResult InterfaceBindingSubspanOp::verify() {
   InterfaceBindingSubspanOp op = *this;

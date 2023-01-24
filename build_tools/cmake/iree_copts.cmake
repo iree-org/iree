@@ -427,13 +427,27 @@ endif()
 # Compiler: MSVC
 #-------------------------------------------------------------------------------
 
-# TODO(benvanik): MSVC options.
+if(MSVC)
+  if("${CMAKE_C_COMPILER_LAUNCHER}" MATCHES "ccache" OR
+     "${CMAKE_CXX_COMPILER_LAUNCHER}" MATCHES "ccache")
+    # Disable separate PDB file generation (for debug info) when using ccache.
+    # ccache silently falls back to the real compiler when an unsupported flag
+    # like /Zi is encountered.
+    message(STATUS "Replacing /Zi with /Z7 since ccache is in use and does not support /Zi")
+    # https://learn.microsoft.com/en-us/cpp/build/reference/z7-zi-zi-debug-information-format
+    string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+    string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+    string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+    string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+  endif()
+endif()
 
 #-------------------------------------------------------------------------------
 # Third party: llvm-project
 #-------------------------------------------------------------------------------
+
 if(IREE_BUILD_COMPILER)
-  # iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
-  # tools in LLVM.
-  iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
+  # iree-tblgen is not defined using the add_tablegen mechanism as other
+  # TableGen tools in LLVM.
+  set(IREE_TABLEGEN_EXE "$<TARGET_FILE:iree-tblgen>")
 endif()

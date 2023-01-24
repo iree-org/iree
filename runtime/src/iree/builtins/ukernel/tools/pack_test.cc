@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/pack.h"
-
 #include <algorithm>
 #include <cstring>
 #include <vector>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
+#include "iree/builtins/ukernel/api.h"
 #include "iree/builtins/ukernel/tools/ukernel_test_utils.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -85,12 +84,7 @@ static void test_one_pack_using_given_input(
                                    out_type, engine);
 
   iree_pack_reference(reference_params);
-  iree_uk_status_t status = iree_uk_pack(&actual_params);
-  if (status != iree_uk_status_ok) {
-    fprintf(stderr, "FATAL: iree_uk_pack failed: %s\n",
-            iree_uk_status_message(status));
-    iree_abort();
-  }
+  iree_uk_pack(&actual_params);
 
   // For now we use exact comparisons, even for float, even though the reference
   // code accumulates in a different order compared to the actual code. This

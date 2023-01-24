@@ -64,14 +64,15 @@ typedef struct iree_string_pair_t {
 
 // Returns an empty string pair ("", "").
 static inline iree_string_pair_t iree_string_pair_empty(void) {
-  iree_string_pair_t v = {iree_string_view_empty(), iree_string_view_empty()};
+  iree_string_pair_t v = {{iree_string_view_empty()},
+                          {iree_string_view_empty()}};
   return v;
 }
 
 // Returns a string pair with the given values.
 static inline iree_string_pair_t iree_make_string_pair(
     iree_string_view_t first, iree_string_view_t second) {
-  iree_string_pair_t v = {first, second};
+  iree_string_pair_t v = {{first}, {second}};
   return v;
 }
 

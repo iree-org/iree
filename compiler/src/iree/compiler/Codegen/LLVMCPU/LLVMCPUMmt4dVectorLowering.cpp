@@ -9,13 +9,12 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/Utils/InferCustomKernelsTargetInfoFromParent.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-llvmcpu-aarch64-vector-lowering"
+#define DEBUG_TYPE "iree-llvmcpu-mmt4d-vector-lowering"
 
 // A flag to switch between inline asm and intrinsics while we develop these two
 // parallel paths.
@@ -30,9 +29,8 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LLVMCPUAArch64VectorLoweringPass
-    : public LLVMCPUAArch64VectorLoweringBase<
-          LLVMCPUAArch64VectorLoweringPass> {
+struct LLVMCPUMmt4dVectorLoweringPass
+    : public LLVMCPUMmt4dVectorLoweringBase<LLVMCPUMmt4dVectorLoweringPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -40,7 +38,7 @@ struct LLVMCPUAArch64VectorLoweringPass
 };
 }  // namespace
 
-void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
+void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
@@ -94,16 +92,11 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
   {
     // Special-case vector.contract codegen paths. This needs to happen
     // just before the generic vector ops lowerings.
-    CustomKernelsTargetInfo info;
-    if (succeeded(InferCustomKernelsTargetInfoFromParent(funcOp, info))) {
-      if (clMmt4dUseIntrinsics) {
-        info.add(CustomKernelTargetFeature::Intrinsics);
-      }
-      RewritePatternSet patterns(context);
-      populateVectorContractCustomKernelsPatterns(info, patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
+    RewritePatternSet patterns(context);
+    auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+    populateVectorContractCustomKernelsPatterns(target, patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
     }
   }
 
@@ -161,8 +154,8 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUAArch64VectorLoweringPass() {
-  return std::make_unique<LLVMCPUAArch64VectorLoweringPass>();
+createLLVMCPUMmt4dVectorLoweringPass() {
+  return std::make_unique<LLVMCPUMmt4dVectorLoweringPass>();
 }
 
 }  // namespace iree_compiler

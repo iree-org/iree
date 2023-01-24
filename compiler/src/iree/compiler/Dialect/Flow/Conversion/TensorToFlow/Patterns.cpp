@@ -185,10 +185,10 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
       return failure();
     }
     SmallVector<Value> outputDynamicShapes;
-    for (auto shape : llvm::zip_equal(reshapeOp.getResultType().getShape(),
-                                      outputShape[0])) {
-      if (std::get<0>(shape) != ShapedType::kDynamic) continue;
-      outputDynamicShapes.push_back(std::get<1>(shape));
+    for (auto [resultShape, outputShape] : llvm::zip_equal(
+             reshapeOp.getResultType().getShape(), outputShape[0])) {
+      if (resultShape != ShapedType::kDynamic) continue;
+      outputDynamicShapes.push_back(outputShape);
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
         reshapeOp, reshapeOp.getResultType(), reshapeOp.getSrc(),

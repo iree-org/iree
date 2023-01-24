@@ -51,7 +51,6 @@ iree_cc_library(
     MLIRMemRefTransformOps
     MLIRPDLDialect
     MLIRPDLInterpDialect
-    MLIRParser
     MLIRPass
     MLIRRewrite
     MLIRSCFDialect
@@ -72,6 +71,7 @@ iree_cc_library(
     iree::compiler::Codegen::TransformDialectStrategies::Common::TransformDialectStrategies
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
+    iree::compiler::Utils
   PUBLIC
 )
 
@@ -80,6 +80,7 @@ iree_cc_library(
     CommonPasses
   HDRS
     "BufferizationAnalysis.h"
+    "EncodingInfo.h"
     "Transforms.h"
   SRCS
     "BufferizationAnalysis.cpp"
@@ -93,7 +94,7 @@ iree_cc_library(
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "IREEComprehensiveBufferizePass.cpp"
-    "MaterializeEncodingPass.cpp"
+    "MaterializeEncodingIntoPackUnPack.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PolynomialApproximationPass.cpp"
     "RematerializeParallelOps.cpp"

@@ -89,7 +89,7 @@ func.func @reorder_broadcast_in_dim_scalar_binary(%arg0: tensor<f32>, %arg1: ten
 
 // CHECK: @reorder_broadcast_in_dim_scalar_binary_diff_type(%[[ARG0:.*]]: tensor<f32>, %[[ARG1:.*]]: tensor<f32>) -> tensor<1x8x8x64xcomplex<f32>>
 func.func @reorder_broadcast_in_dim_scalar_binary_diff_type(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<1x8x8x64xcomplex<f32>> {
-  // CEHCK: %0 = "mhlo.complex"(%[[ARG0]], %[[ARG1]]) : (tensor<f32>, tensor<f32>) -> tensor<complex<f32>>
+  // CHECK: %0 = mhlo.complex %[[ARG0]], %[[ARG1]] : tensor<complex<f32>>
   // CHECK: "mhlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<complex<f32>>) -> tensor<1x8x8x64xcomplex<f32>>
   %0 = "mhlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
   %1 = "mhlo.broadcast_in_dim"(%arg1) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>

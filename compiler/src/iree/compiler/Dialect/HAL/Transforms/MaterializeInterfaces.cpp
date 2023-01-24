@@ -189,7 +189,8 @@ static void convertBindingUsage(
     auto newOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
         oldOp.getLoc(), oldOp.getType(), APInt(64, setLayoutAttr.getOrdinal()),
         APInt(64, bindingAttr.getOrdinal()), bindingAttr.getType(),
-        oldOp.getByteOffset(), oldOp.getDynamicDims(), alignmentAttr);
+        oldOp.getByteOffset(), oldOp.getDynamicDims(), alignmentAttr,
+        bindingAttr.getFlags());
     oldOp.replaceAllUsesWith(newOp.getResult());
     oldOp.erase();
   }
@@ -295,7 +296,7 @@ static LogicalResult declareEntryPointOps(
 
       // Clone the workgroup count calculation function.
       if (!exportOp.getWorkgroupCount().empty()) {
-        mlir::BlockAndValueMapping mapper;
+        mlir::IRMapping mapper;
         exportOp.getWorkgroupCount().cloneInto(&newExportOp.getWorkgroupCount(),
                                                mapper);
         // Insert the !hal.device argument.

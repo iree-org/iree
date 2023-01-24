@@ -189,6 +189,15 @@ void ireeCompilerInvocationDestroy(iree_compiler_invocation_t *run) {
   __ireeCompilerInvocationDestroy(run);
 }
 
+void ireeCompilerInvocationSetCrashHandler(
+    iree_compiler_invocation_t *inv, bool genLocalReproducer,
+    iree_compiler_error_t *(*onCrashCallback)(
+        iree_compiler_output_t **outOutput, void *userData),
+    void *userData) {
+  __ireeCompilerInvocationSetCrashHandler(inv, genLocalReproducer,
+                                          onCrashCallback, userData);
+}
+
 bool ireeCompilerInvocationParseSource(iree_compiler_invocation_t *run,
                                        iree_compiler_source_t *source) {
   return __ireeCompilerInvocationParseSource(run, source);
@@ -241,9 +250,10 @@ iree_compiler_error_t *ireeCompilerSourceOpenFile(
 
 iree_compiler_error_t *ireeCompilerSourceWrapBuffer(
     iree_compiler_session_t *session, const char *bufferName,
-    const char *buffer, size_t length, iree_compiler_source_t **out_source) {
+    const char *buffer, size_t length, bool isNullTerminated,
+    iree_compiler_source_t **out_source) {
   return __ireeCompilerSourceWrapBuffer(session, bufferName, buffer, length,
-                                        out_source);
+                                        isNullTerminated, out_source);
 }
 
 iree_compiler_error_t *ireeCompilerSourceSplit(

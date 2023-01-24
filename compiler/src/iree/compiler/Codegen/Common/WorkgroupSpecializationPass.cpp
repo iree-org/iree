@@ -231,7 +231,7 @@ static void specializeDistributionLoops(
   // Clone the else block into the then block. minOps are replaced during the
   // cloning.
   auto b = ifOp.getThenBodyBuilder();
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   for (unsigned i = 0, e = minSizeOps.size(); i != e; ++i) {
     bvm.map(minSizeOps[i], constantOps[i]);
   }

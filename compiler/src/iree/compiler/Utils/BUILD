@@ -6,7 +6,7 @@
 
 # Utilities for working with IREE MLIR types.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -18,7 +18,6 @@ iree_compiler_cc_library(
     name = "Utils",
     srcs = [
         "ConversionUtils.cpp",
-        "CustomKernelsTargetInfo.cpp",
         "FlatbufferUtils.cpp",
         "ModuleUtils.cpp",
         "OptionUtils.cpp",
@@ -27,8 +26,8 @@ iree_compiler_cc_library(
         "TracingUtils.cpp",
     ],
     hdrs = [
+        "ADTExtras.h",
         "ConversionUtils.h",
-        "CustomKernelsTargetInfo.h",
         "FlatbufferUtils.h",
         "IndexSet.h",
         "ModuleUtils.h",
@@ -53,5 +52,15 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "UtilsTest",
+    srcs = ["ADTExtrasTest.cpp"],
+    deps = [
+        ":Utils",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )

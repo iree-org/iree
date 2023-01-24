@@ -140,7 +140,7 @@ py_binary(
     name = "e2e_matmul_mmt4d_%s_small_ukernel" % lhs_rhs_type,
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
-        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
+        "--iree-flow-enable-data-tiling",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -150,10 +150,6 @@ py_binary(
     target_backends_and_drivers = [
         ("vmvx", "local-task"),
     ],
-    target_cpu_features_variants = ["default"] + ([
-        "aarch64:+dotprod",
-        "aarch64:+i8mm",
-    ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
@@ -184,7 +180,8 @@ py_binary(
     "LLVMGPUMatmulSimt",
 ]]
 
-# Testing Ampere+ tensorcore path.
+# Testing Ampere + TensorCore path.
+# WMMA TensorCore(F32): wmma.161616.f32.tf32
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_gpu_large_%s" % compilation_info,
     compiler_flags = [
@@ -212,10 +209,40 @@ py_binary(
     "LLVMGPUMatmulTensorCore",
 ]]
 
+# WMMA TensorCore(F16): wmma.161616.f16.f16
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f16_gpu_large_%s" % compilation_info,
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f16",
+        "--shapes=gpu_large",
+        "--compilation_info=%s" % compilation_info,
+    ],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backends_and_drivers = [
+        ("cuda", "cuda"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+) for compilation_info in [
+    "LLVMGPUMatmulTensorCore",
+]]
+
+# MMA.SYNC TensorCore(F16): mma.sync.161616.f16.f16
+[iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f16_gpu_large_mma_sync_%s" % compilation_info,
+    compiler_flags = [
+        "--iree-hal-cuda-llvm-target-arch=sm_80",
+        "--iree-codegen-llvmgpu-use-mma-sync=true",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [

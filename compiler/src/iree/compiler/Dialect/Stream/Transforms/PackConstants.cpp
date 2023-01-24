@@ -18,9 +18,9 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -278,10 +278,8 @@ static UploadResult buildStagingUpload(
   SmallVector<Copy> copies;
   SmallVector<Value> capturedResources;
   SmallVector<Value> capturedResourceSizes;
-  for (auto it : llvm::zip_equal(storageResources, storageBuffers)) {
-    auto &storageResource = std::get<0>(it);
-    auto storageBuffer = std::get<1>(it);
-
+  for (auto [storageResource, storageBuffer] :
+       llvm::zip_equal(storageResources, storageBuffers)) {
     // Today we assume 1:1 lengths of storage data and uploaded data, but this
     // need not be the case if we want to pad the buffer for runtime.
     auto totalLength = indexSet.get(storageResource.totalSize);
@@ -327,7 +325,7 @@ static UploadResult buildStagingUpload(
   uploadResult.timepoint = executeOp.getResultTimepoint();
 
   // Map captured resources into the execution region.
-  BlockAndValueMapping mapping;
+  IRMapping mapping;
   auto *entryBlock = new Block();
   executeOp.getBody().push_back(entryBlock);
   for (auto outerValue : capturedResources) {
@@ -366,9 +364,8 @@ static UploadResult buildTryMapConstantResources(
   SmallVector<Type> resultTypes;
   Value ok;
   auto zero = indexSet.get(0);
-  for (auto it : llvm::zip_equal(storageResources, storageBuffers)) {
-    auto &storageResource = std::get<0>(it);
-    auto storageBuffer = std::get<1>(it);
+  for (auto [storageResource, storageBuffer] :
+       llvm::zip_equal(storageResources, storageBuffers)) {
     auto tryMapOp = builder.create<IREE::Stream::ResourceTryMapOp>(
         storageResource.loc, builder.getI1Type(), resourceType, storageBuffer,
         zero, indexSet.get(storageResource.totalSize), affinityAttr);
@@ -415,9 +412,8 @@ static UploadResult buildTryMapConstantResources(
   // Use the result of either the direct mapping or the staging upload.
   UploadResult uploadResult;
   uploadResult.timepoint = ifTimepoint;
-  for (auto it : llvm::zip_equal(storageResources, ifResources)) {
-    auto &storageResource = std::get<0>(it);
-    auto ifResource = std::get<1>(it);
+  for (auto [storageResource, ifResource] :
+       llvm::zip_equal(storageResources, ifResources)) {
     uploadResult.allocations.push_back({
         ifResource,
         indexSet.get(storageResource.totalSize),
@@ -480,9 +476,8 @@ static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
   }
 
   // Build subviews for all packed spans back into storage buffers.
-  for (auto it : llvm::zip_equal(storageResources, uploadResult.allocations)) {
-    auto &storageResource = std::get<0>(it);
-    auto &allocatedStorage = std::get<1>(it);
+  for (auto [storageResource, allocatedStorage] :
+       llvm::zip_equal(storageResources, uploadResult.allocations)) {
     for (auto &span : storageResource.spans) {
       auto loc = span.slice.result.getLoc();
       auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
