@@ -16,6 +16,7 @@ iree_compiler_cc_library(
     name = "LLVMCPU",
     srcs = [
         "ConvertToLLVM.cpp",
+        "DispatchABI.cpp",
         "KernelDispatch.cpp",
         "LLVMCPUAssignConstantOrdinals.cpp",
         "LLVMCPUAssignImportOrdinals.cpp",
@@ -33,6 +34,7 @@ iree_compiler_cc_library(
         "VerifyLinalgTransformLegality.cpp",
     ],
     hdrs = [
+        "DispatchABI.h",
         "KernelDispatch.h",
         "TargetMLTransformInfo.h",
     ],
@@ -57,6 +59,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialectPasses",
+        "@llvm-project//llvm:BinaryFormat",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineToStandard",
