@@ -762,6 +762,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // math dialect elementry functions -> polynomial form.
   passManager.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
+  passManager.addNestedPass<func::FuncOp>(
+      createHoistStaticallyBoundAllocationsPass());
+
   // Checking stack allocation before converting to CF dialect is easier.
   // Do not check allocation if hoist-padding is enabled. It intends to allocate
   // big stack buffers for better accessing.
