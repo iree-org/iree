@@ -51,6 +51,7 @@ struct RematerializeParallelOpsPass
     func::FuncOp funcOp = getOperation();
     RewritePatternSet fusionPatterns(funcOp.getContext());
     fusionPatterns.insert<MergeElementwiseOps>(funcOp.getContext());
+    linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns)))) {
       return signalPassFailure();
