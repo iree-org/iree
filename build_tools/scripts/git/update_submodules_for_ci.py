@@ -83,7 +83,7 @@ def run():
     if name != 'third_party/llvm-project':
       continue
 
-    llvm_hash = submodule.split()[0].strip('-')
+    llvm_hash = submodule.split()[0].strip('-+')
 
     run_command(['git', 'fetch', '--depth=1', 'origin', llvm_hash],
                 cwd=llvm_dir)
