@@ -75,12 +75,14 @@ func.func @matmul() {
 func.func @matmul_fill() {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
+  %c1024 = arith.constant 1024 : index
   %m = hal.interface.constant.load[0] : index
   %n = hal.interface.constant.load[1] : index
   %k = hal.interface.constant.load[2] : index
+  %base_offset = hal.interface.constant.load[3] alignment(8) : index
   %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%m, %k}
-  %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%k, %n}
-  %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%m, %n}
+  %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%base_offset) alignment(64) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%k, %n}
+  %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c1024) alignment(64) : !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%m, %n}
   %wg_id_y = hal.interface.workgroup.id[1] : index
   %wg_count_y = hal.interface.workgroup.count[1] : index
   %wg_size_y = hal.interface.workgroup.size[1] : index
@@ -113,10 +115,13 @@ func.func @matmul_fill() {
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
 //  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
+//  CHECK-DAG:   %[[BASE_OFFSET:.+]] = hal.interface.constant.load[3]
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32)
 //  CHECK-DAG:   memref.assume_alignment %[[LHS]], 32
-//  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%[[BASE_OFFSET]]) alignment(64)
+//  CHECK-DAG:   memref.assume_alignment %[[RHS]], 8
+//  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c1024) alignment(64)
+//  CHECK-DAG:   memref.assume_alignment %[[RESULT]], 64
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_COUNT_Y:.+]] = hal.interface.workgroup.count[1]
 //  CHECK-DAG:   %[[WG_SIZE_Y:.+]] = hal.interface.workgroup.size[1]

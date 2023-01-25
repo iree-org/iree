@@ -2194,7 +2194,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     OptionalAttr<IndexAttr>:$alignment,
     OptionalAttr<HAL_DescriptorFlagsAttr>:$descriptor_flags
   );
-  
+
 let builders = [
     OpBuilder<(ins
       "Type":$resultType,
@@ -2228,6 +2228,9 @@ let builders = [
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
     ValueRange getResultDynamicDims(unsigned idx) { return getDynamicDims(); }
+
+    // Returns the alignment of the base buffer pointer (before offset).
+    llvm::MaybeAlign getBaseAlignment();
 
     // Attempts to calculate an alignment of the final subspan offset in the
     // parent storage buffer. This is a combination of both the binding
