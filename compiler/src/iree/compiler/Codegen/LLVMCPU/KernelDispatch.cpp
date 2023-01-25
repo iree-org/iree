@@ -1229,10 +1229,10 @@ static LogicalResult setDefaultGenericOpRootConfig(
   TileSizesListType tileSizes;
   SmallVector<int64_t> updatedFlowTileSizes;
   bool foundNonZero = false;
-  for (auto val: flowTileSizes) {
+  for (auto val : flowTileSizes) {
     if (val == 0) {
-      updatedFlowTileSizes.push_back(
-          foundNonZero || tileSizes.size() <= 3? 0 : 1);
+      updatedFlowTileSizes.push_back(foundNonZero || tileSizes.size() <= 3 ? 0
+                                                                           : 1);
       continue;
     }
     updatedFlowTileSizes.push_back(val);
