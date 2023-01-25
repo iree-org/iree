@@ -1337,6 +1337,7 @@ jobs:
       - small_runtime
       - gcc
       - tracing
+      - debug
 
       # Crosscompilation
       - cross_compile_and_test
