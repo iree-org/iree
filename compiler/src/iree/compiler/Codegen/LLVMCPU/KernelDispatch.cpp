@@ -1233,11 +1233,12 @@ static LogicalResult setDefaultGenericOpRootConfig(
   // the required tiling. If the dimensions is less than 3, again parallel and
   // reduction tiling would handle it.
   SmallVector<int64_t> updatedFlowTileSizes;
+  updatedFlowTileSizes.reserve(flowTileSizes.size());
   bool foundNonZero = false;
   for (auto val : flowTileSizes) {
     if (val == 0) {
-      updatedFlowTileSizes.push_back(foundNonZero || tileSizes.size() <= 3 ? 0
-                                                                           : 1);
+      updatedFlowTileSizes.push_back((foundNonZero || 
+                                      flowTileSizes.size() <= 3) ? 0 : 1);
       continue;
     }
     updatedFlowTileSizes.push_back(val);
