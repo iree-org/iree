@@ -164,7 +164,7 @@ static void buildStagedReductionStrategyThreadLevel(
   Value root = blockCombinerOpH;
   SmallVector<Value> opsToFuse = {gridFillH};
   // If we have a unit dim after the reduction that doesn't broadcast fuse it
-  // wuth the reduction.
+  // with the reduction.
   if (strategy.captures.maybeTrailingRank ==
       strategy.captures.reductionRank - 1) {
     root = maybeTiledTrailingH;
