@@ -509,24 +509,7 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
         getMaxTileSize(lbs[i], ubs[i], distributedTileSizes[i], minTileSizes[i],
                        allowIncompleteTile);
   }
-  // All higher dimensions should be tiled at the workgroup level
-  // (distributedTileSizes), except after encountering an already specified workgroup
-  // tile - because at that point, parallel and reduction tiling would handle
-  // the required tiling. If the dimensions is less than 3, again parallel and
-  // reduction tiling would handle it.
-  SmallVector<int64_t> updatedDistributedTileSizes;
-  updatedDistributedTileSizes.reserve(distributedTileSizes.size());
-  bool foundNonZero = false;
-  for (auto val : distributedTileSizes) {
-    if (val == 0) {
-      updatedDistributedTileSizes.push_back(
-          (foundNonZero || distributedTileSizes.size() <= 3) ? 0 : 1);
-      continue;
-    }
-    updatedDistributedTileSizes.push_back(val);
-    foundNonZero = true;
-  }
-  return updatedDistributedTileSizes;
+  return distributedTileSizes;
 }
 
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
@@ -1244,7 +1227,24 @@ static LogicalResult setDefaultGenericOpRootConfig(
                                  parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
-  tileSizes.push_back(flowTileSizes);
+  // All higher dimensions should be tiled at the workgroup level
+  // (flowTileSizes), except after encountering an already specified workgroup
+  // tile - because at that point, parallel and reduction tiling would handle
+  // the required tiling. If the dimensions is less than 3, again parallel and
+  // reduction tiling would handle it.
+  SmallVector<int64_t> updatedFlowTileSizes;
+  updatedFlowTileSizes.reserve(flowTileSizes.size());
+  bool foundNonZero = false;
+  for (auto val : flowTileSizes) {
+    if (val == 0) {
+      updatedFlowTileSizes.push_back((foundNonZero || 
+                                      flowTileSizes.size() <= 3) ? 0 : 1);
+      continue;
+    }
+    updatedFlowTileSizes.push_back(val);
+    foundNonZero = true;
+  }
+  tileSizes.push_back(updatedFlowTileSizes);
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
 
