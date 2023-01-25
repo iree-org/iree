@@ -235,19 +235,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    main
-  HDRS
-    "main.h"
-  SRCS
-    "main_posix.c"
-    "main_win32.c"
-  DEPS
-    iree::base::core_headers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     path
   HDRS
     "path.h"
