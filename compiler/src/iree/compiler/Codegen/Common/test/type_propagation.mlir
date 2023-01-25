@@ -303,9 +303,9 @@ func.func @constant_splat_op() {
 func.func @tensor_extract() {
   %c0 = arith.constant 0 : index
   %c13 = arith.constant 13 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64)
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<14xi8>>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64)
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<writeonly:tensor<14xi8>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [14], strides = [1]
       : !flow.dispatch.tensor<readonly:tensor<14xi8>> -> tensor<14xi8>

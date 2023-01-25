@@ -111,11 +111,11 @@ builtin.module {
     %c4 = arith.constant 4 : index
     %c32 = arith.constant 32 : index
     %c64 = arith.constant 64 : index
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : memref<4x32x1024xf32>
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%c0) : memref<4x32x1024xf32>
     memref.assume_alignment %0, 32 : memref<4x32x1024xf32>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : memref<4x1024x64xf32>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) offset(%c0) : memref<4x1024x64xf32>
     memref.assume_alignment %1, 32 : memref<4x1024x64xf32>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : memref<4x32x64xf32>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) offset(%c0) : memref<4x32x64xf32>
     memref.assume_alignment %2, 32 : memref<4x32x64xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -330,11 +330,11 @@ hal.executable private @conv_dispatch  {
         %c41664 = arith.constant 41664 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<1x64x56x56xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<1x64x56x56xf32>
         memref.assume_alignment %0, 64 : memref<1x64x56x56xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c41664) alignment(64) : memref<64x64x1x1xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c41664) : memref<64x64x1x1xf32>
         memref.assume_alignment %1, 64 : memref<64x64x1x1xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c802816) alignment(64) : memref<1x64x56x56xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c802816) : memref<1x64x56x56xf32>
         memref.assume_alignment %2, 64 : memref<1x64x56x56xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -400,9 +400,9 @@ hal.executable private @contract_4d  {
         %cst_0 = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.constant.load[0] : i32
         %6 = arith.index_cast %0 : i32 to index
-        %12 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%6) alignment(64) : memref<?x?x12x64xf32>{%6, %6}
-        %13 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%6) alignment(64) : memref<?x?x12x64xf32>{%6, %6}
-        %15 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<?x12x?x?xf32>{%6, %6, %6}
+        %12 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%6) : memref<?x?x12x64xf32>{%6, %6}
+        %13 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%6) : memref<?x?x12x64xf32>{%6, %6}
+        %15 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<?x12x?x?xf32>{%6, %6, %6}
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index

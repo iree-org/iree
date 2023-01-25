@@ -3,9 +3,9 @@
 func.func @matmul_123x456xf32_times_456x789xf32_into_123x789xf32_dispatch_0() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<123x4x114xf32>>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<4x114x789xf32>>
-  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<4x123x789xf32>>
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<123x4x114xf32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4x114x789xf32>>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x123x789xf32>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [123, 4, 114], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<123x4x114xf32>> -> tensor<123x4x114xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4, 114, 789], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x114x789xf32>> -> tensor<4x114x789xf32>
   %5 = tensor.empty() : tensor<4x123x789xf32>

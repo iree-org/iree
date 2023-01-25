@@ -75,7 +75,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    %[[WID:.+]] = arith.divui %{{.*}}, %{{.*}} : index
 //         CHECK:    %[[LANE_ID:.*]] = arith.remui %[[TID]], %[[C32I]] : index
 //         CHECK:    %[[LANE0:.*]] = arith.cmpi eq, %[[LANE_ID]], %[[C0]] : index
-//         CHECK:    scf.if %[[LANE0]] { 
+//         CHECK:    scf.if %[[LANE0]] {
 //         CHECK:      memref.store %[[R6]], %[[ALLOC]][%[[WID]]] : memref<16xf32, #gpu.address_space<workgroup>>
 //         CHECK:    }
 //         CHECK:    gpu.barrier
@@ -209,8 +209,8 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
       %cst = arith.constant -3.40282347E+38 : f32
       %cst_0 = arith.constant 0.000000e+00 : f32
       %cst_1 = arith.constant 1.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
       %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>> -> tensor<12x128x40960xf32>
       %3 = tensor.empty() : tensor<12x128xf32>
       %4 = tensor.empty() : tensor<12x128x40960xf32>

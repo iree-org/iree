@@ -2217,8 +2217,8 @@ let builders = [
     `set` `(` $set `)`
     `binding` `(` $binding `)`
     `type` `(` custom<DescriptorType>($descriptor_type) `)`
-    (`offset` `(` $byte_offset^ `)`)?
     (`alignment` `(` $alignment^ `)`)?
+    (`offset` `(` $byte_offset^ `)`)?
     (`flags` `(` $descriptor_flags^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];

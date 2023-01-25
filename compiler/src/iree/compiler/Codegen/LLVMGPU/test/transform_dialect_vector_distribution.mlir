@@ -16,7 +16,7 @@ hal.executable private @reduce_dispatch_0 {
       func.func @reduce_dispatch_0() {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<128xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
         memref.assume_alignment %0, 64 : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c1 : index

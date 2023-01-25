@@ -18,8 +18,8 @@ hal.executable private @split_reduction_pass1_dispatch_0 {
         %c0 = arith.constant 0 : index
         %cst = arith.constant dense<0> : tensor<1024x512xi32>
         %c1_i32 = arith.constant 1 : i32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1024x512x256xi32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1024x512xi32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1024x512x256xi32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x512xi32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1024, 512, 256], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x512x256xi32>> -> tensor<1024x512x256xi32>
         %3 = tensor.empty() : tensor<1024x512xi32>
         %4 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<1024x512x256xi32>) outs(%cst : tensor<1024x512xi32>) {
@@ -71,8 +71,8 @@ hal.executable private @split_reduction_pass1_dispatch_0 {
         %c0 = arith.constant 0 : index
         %cst = arith.constant dense<0.0> : tensor<1024x512xf32>
         %c1_f32 = arith.constant 1.0 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1024x512x256xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1024x512x256xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1024, 512, 256], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x512x256xf32>> -> tensor<1024x512x256xf32>
         %3 = tensor.empty() : tensor<1024x512xf32>
         %4 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<1024x512x256xf32>) outs(%cst : tensor<1024x512xf32>) {
@@ -127,8 +127,8 @@ hal.executable private @split_reduction_pass2_dispatch_0 {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.constant.load[0] : i32
         %1 = arith.index_castui %0 : i32 to index
-        %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1024x?x256xi32>>{%1}
-        %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1024x?xi32>>{%1}
+        %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1024x?x256xi32>>{%1}
+        %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x?xi32>>{%1}
         %4 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [1024, %1, 256], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x?x256xi32>>{%1} -> tensor<1024x?x256xi32>
         %5 = tensor.empty(%1) : tensor<1024x?xi32>
         %6 = linalg.fill ins(%c0_i32 : i32) outs(%5 : tensor<1024x?xi32>) -> tensor<1024x?xi32>
@@ -173,8 +173,8 @@ hal.executable private @split_reduction_pass3_dispatch_0 {
       func.func @split_reduction_innermost_reduction_next_imperfect_tiling_supported() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant dense<0> : tensor<1024x513xi32>
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1024x513x256xi32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1024x513xi32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1024x513x256xi32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x513xi32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1024, 513, 256], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x513x256xi32>> -> tensor<1024x513x256xi32>
         %3 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<1024x513x256xi32>) outs(%cst : tensor<1024x513xi32>) {
         ^bb0(%arg0: i32, %arg1: i32):
@@ -219,8 +219,8 @@ hal.executable private @split_reduction_fail1_dispatch_0 {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.constant.load[0] : i32
         %1 = arith.index_castui %0 : i32 to index
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1024x512xi32>>
-        %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1024x512x?xi32>>{%1}
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x512xi32>>
+        %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1024x512x?xi32>>{%1}
         %4 = flow.dispatch.tensor.load %3, offsets = [0, 0, 0], sizes = [1024, 512, %1], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x512x?xi32>>{%1} -> tensor<1024x512x?xi32>
         %5 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%4 : tensor<1024x512x?xi32>) outs(%cst : tensor<1024x512xi32>) {
         ^bb0(%arg0: i32, %arg1: i32):
@@ -255,8 +255,8 @@ hal.executable private @split_reduction_fail2_dispatch_0 {
       func.func @split_reduction_innermost_imperfect_reduction_unsupported() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant dense<0> : tensor<1024x512xi32>
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1024x512x257xi32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1024x512xi32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1024x512x257xi32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x512xi32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1024, 512, 257], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x512x257xi32>> -> tensor<1024x512x257xi32>
         %3 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<1024x512x257xi32>) outs(%cst : tensor<1024x512xi32>) {
         ^bb0(%arg0: i32, %arg1: i32):
@@ -291,8 +291,8 @@ hal.executable private @split_reduction_fail3_dispatch_0 {
       func.func @split_reduction_not_innermost_reduction_unsupported() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant dense<0> : tensor<1024x256xi32>
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1024x512x256xi32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1024x256xi32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1024x512x256xi32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x256xi32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1024, 512, 256], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x512x256xi32>> -> tensor<1024x512x256xi32>
         %3 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<1024x512x256xi32>) outs(%cst : tensor<1024x256xi32>) {
         ^bb0(%arg0: i32, %arg1: i32):
@@ -327,8 +327,8 @@ hal.executable private @split_reduction_fail4_dispatch_0 {
       func.func @split_reduction_double_reduction_unsupported() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant dense<0> : tensor<1024xi32>
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1024x512x256xi32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1024xi32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1024x512x256xi32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024xi32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1024, 512, 256], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x512x256xi32>> -> tensor<1024x512x256xi32>
         %3 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "reduction", "reduction"]} ins(%2 : tensor<1024x512x256xi32>) outs(%cst : tensor<1024xi32>) {
         ^bb0(%arg0: i32, %arg1: i32):

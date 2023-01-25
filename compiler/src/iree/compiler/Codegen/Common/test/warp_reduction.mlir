@@ -20,8 +20,8 @@ hal.executable private @simple_reduce  {
       %cst_1 = arith.constant dense<3.840000e+02> : vector<1xf32>
       %c32 = arith.constant 32 : index
       %c384 = arith.constant 384 : index
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<128x384xf32>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<128xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<128x384xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %2 = gpu.thread_id  x
       %3 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>()[%2, %workgroup_id_x]

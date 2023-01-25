@@ -69,7 +69,7 @@ func.func @constantLoadF32() {
 
 // CHECK-LABEL: @constantLoadWithIndexAndAlignment
 func.func @constantLoadWithIndexAndAlignment() {
-  // CHECK: %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(3) binding(0) type(uniform_buffer) offset(%c5) alignment(16) : !flow.dispatch.tensor<readonly:tensor<2xvector<4xi32>>
+  // CHECK: %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(3) binding(0) type(uniform_buffer) alignment(16) offset(%c5) : !flow.dispatch.tensor<readonly:tensor<2xvector<4xi32>>
   // CHECK: %[[LOAD:.+]] = flow.dispatch.tensor.load %[[SUBSPAN]], offsets = [0], sizes = [2], strides = [1] : !flow.dispatch.tensor<readonly:tensor<2xvector<4xi32>>> -> tensor<2xvector<4xi32>>
   // CHECK: %[[TENSOR_EXTRACT:.+]] = tensor.extract %[[LOAD]][%c1{{.*}}] : tensor<2xvector<4xi32>>
   // CHECK: %[[VECTOR_EXTRACT:.+]] = vector.extractelement %[[TENSOR_EXTRACT]][%c1{{.*}}] : vector<4xi32>

@@ -173,9 +173,9 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
           %tid = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
 
           // Bindings are accessed by reference.
-          %binding0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<?xf32>{%dim}
-          %binding1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<?xf32>{%dim}
-          %binding2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<?xf32>{%dim}
+          %binding0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
 
           // Call the externally defined C function with an (almost) plain C
           // calling convention (see above for details about the mess memrefs
@@ -207,8 +207,8 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
           %tid = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
 
           // Same as above but note that we're treating %binding1 as read/write.
-          %binding0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<?xf32>{%dim}
-          %binding1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<?xf32>{%dim}
+          %binding0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
 
           func.call @simple_mul_inplace_workgroup(%binding0, %binding1, %dim, %tid) : (memref<?xf32>, memref<?xf32>, index, index) -> ()
 
