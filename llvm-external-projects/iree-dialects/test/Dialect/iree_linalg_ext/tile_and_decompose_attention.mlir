@@ -20,7 +20,7 @@ func.func @attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf
 // CHECK:        %[[D1:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C192]] step %[[C1]]
 // CHECK-SAME:     iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<192x1024x64xf32>) {
 // CHECK:          %[[CST:.+]] = arith.constant 0.000000e+00 : f32
-// CHECK:          %[[CST_0:.+]] = arith.constant -1.000000e+02 : f32
+// CHECK:          %[[CST_0:.+]] = arith.constant -1.000000e+30 : f32
 // CHECK:          %[[D2:.+]] = tensor.empty(%[[C1024]]) : tensor<?xf32>
 // CHECK:          %[[D3:.+]] = linalg.fill ins(%[[CST_0]] : f32) outs(%[[D2]] : tensor<?xf32>) -> tensor<?xf32>
 // CHECK:          %[[D4:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[D2]] : tensor<?xf32>) -> tensor<?xf32>
@@ -42,84 +42,59 @@ func.func @attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf
 // CHECK:            %[[D8:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[D7]] : tensor<?x?xf32>) -> tensor<?x?xf32>
 // CHECK:            %[[D9:.+]] = linalg.matmul ins(%[[EXTRACTED_SLICE_2]], %[[TRANSPOSED]] : tensor<?x64xf32>,
 // CHECK-SAME:         tensor<64x?xf32>) outs(%[[D8]] : tensor<?x?xf32>) -> tensor<?x?xf32>
-// CHECK:            %[[D10:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]]], iterator_types = ["reduction",
-// CHECK-SAME:         "parallel"]} ins(%[[D9]] : tensor<?x?xf32>) outs(%[[D3]] : tensor<?xf32>) {
+// CHECK:            %[[D10:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]]], iterator_types = ["parallel",
+// CHECK-SAME:         "reduction"]} ins(%[[D9]] : tensor<?x?xf32>) outs(%[[ARG7]] : tensor<?xf32>) {
 // CHECK:            ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:              %[[D21:.+]] = arith.maxf %[[IN]], %[[OUT]] : f32
-// CHECK:              linalg.yield %[[D21]] : f32
+// CHECK:              %[[D18:.+]] = arith.maxf %[[IN]], %[[OUT]] : f32
+// CHECK:              linalg.yield %[[D18]] : f32
 // CHECK:            } -> tensor<?xf32>
 // CHECK:            %[[D11:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP]]], iterator_types =
 // CHECK-SAME:         ["parallel", "parallel"]} ins(%[[D9]], %[[D10]] : tensor<?x?xf32>, tensor<?xf32>) outs(%[[D7]] :
 // CHECK-SAME:         tensor<?x?xf32>) {
 // CHECK:            ^bb0(%[[IN:.+]]: f32, %[[IN_6:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:              %[[D21]] = arith.subf %[[IN]], %[[IN_6]] : f32
-// CHECK:              %[[D22:.+]] = math.exp %[[D21]] : f32
-// CHECK:              linalg.yield %[[D22]] : f32
+// CHECK:              %[[D18]] = arith.subf %[[IN]], %[[IN_6]] : f32
+// CHECK:              %[[D19:.+]] = math.exp %[[D18]] : f32
+// CHECK:              linalg.yield %[[D19]] : f32
 // CHECK:            } -> tensor<?x?xf32>
-// CHECK:            %[[D12:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]]], iterator_types = ["reduction",
-// CHECK-SAME:         "parallel"]} ins(%[[D11]] : tensor<?x?xf32>) outs(%[[D4]] : tensor<?xf32>) {
+// CHECK:            %[[D12:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]]], iterator_types = ["parallel",
+// CHECK-SAME:         "reduction"]} ins(%[[D11]] : tensor<?x?xf32>) outs(%[[D4]] : tensor<?xf32>) {
 // CHECK:            ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:              %[[D21]] = arith.addf %[[IN]], %[[OUT]] : f32
-// CHECK:              linalg.yield %[[D21]] : f32
+// CHECK:              %[[D18]] = arith.addf %[[IN]], %[[OUT]] : f32
+// CHECK:              linalg.yield %[[D18]] : f32
 // CHECK:            } -> tensor<?xf32>
-// CHECK:            %[[D13:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]], #[[MAP2]]], iterator_types =
-// CHECK-SAME:         ["parallel"]} ins(%[[ARG7]], %[[D10]] : tensor<?xf32>, tensor<?xf32>) outs(%[[D2]] :
-// CHECK-SAME:         tensor<?xf32>) {
-// CHECK:            ^bb0(%[[IN:.+]]: f32, %[[IN_6:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:              %[[D21]] = arith.maxf %[[IN]], %[[IN_6]] : f32
-// CHECK:              linalg.yield %[[D21]] : f32
-// CHECK:            } -> tensor<?xf32>
-// CHECK:            %[[D14:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]], #[[MAP2]]], iterator_types =
-// CHECK-SAME:         ["parallel"]} ins(%[[ARG7]], %[[D13]] : tensor<?xf32>, tensor<?xf32>) outs(%[[D2]] :
-// CHECK-SAME:         tensor<?xf32>) {
-// CHECK:            ^bb0(%[[IN:.+]]: f32, %[[IN_6:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:              %[[D21]] = arith.subf %[[IN]], %[[IN_6]] : f32
-// CHECK:              %[[D22]] = math.exp %[[D21]] : f32
-// CHECK:              linalg.yield %[[D22]] : f32
-// CHECK:            } -> tensor<?xf32>
-// CHECK:            %[[D15:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]], #[[MAP2]]], iterator_types =
-// CHECK-SAME:         ["parallel"]} ins(%[[D10]], %[[D13]] : tensor<?xf32>, tensor<?xf32>) outs(%[[D2]] :
-// CHECK-SAME:         tensor<?xf32>) {
-// CHECK:            ^bb0(%[[IN:.+]]: f32, %[[IN_6:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:              %[[D21]] = arith.subf %[[IN]], %[[IN_6]] : f32
-// CHECK:              %[[D22]] = math.exp %[[D21]] : f32
-// CHECK:              linalg.yield %[[D22]] : f32
-// CHECK:            } -> tensor<?xf32>
-// CHECK:            %[[D16:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]], #[[MAP2]], #[[MAP2]],
-// CHECK-SAME:         #[[MAP2]]], iterator_types = ["parallel"]} ins(%[[ARG8]], %[[D12]], %[[D14]], %[[D15]] :
+// CHECK:            %[[D13:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]], #[[MAP2]], #[[MAP2]],
+// CHECK-SAME:         #[[MAP2]]], iterator_types = ["parallel"]} ins(%[[ARG7]], %[[D10]], %[[ARG8]], %[[D12]] :
 // CHECK-SAME:         tensor<?xf32>, tensor<?xf32>, tensor<?xf32>, tensor<?xf32>) outs(%[[D2]] : tensor<?xf32>) {
 // CHECK:            ^bb0(%[[IN:.+]]: f32, %[[IN_6:.+]]: f32, %[[IN_7:.+]]: f32, %[[IN_8:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:              %[[D21]] = arith.mulf %[[IN_7]], %[[IN]] : f32
-// CHECK:              %[[D22]] = arith.mulf %[[IN_8]], %[[IN_6]] : f32
-// CHECK:              %[[D23:.+]] = arith.addf %[[D21]], %[[D22]] : f32
-// CHECK:              linalg.yield %[[D23]] : f32
+// CHECK:              %[[D18]] = arith.subf %[[IN]], %[[IN_6]] : f32
+// CHECK:              %[[D19]] = math.exp %[[D18]] : f32
+// CHECK:              %[[D20:.+]] = arith.mulf %[[D19]], %[[IN_7]] : f32
+// CHECK:              %[[D21:.+]] = arith.addf %[[D20]], %[[IN_8]] : f32
+// CHECK:              linalg.yield %[[D21]] : f32
 // CHECK:            } -> tensor<?xf32>
-// CHECK:            %[[D17:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP1]], #[[MAP]]],
-// CHECK-SAME:         iterator_types = ["parallel", "parallel"]} ins(%[[D11]], %[[D15]], %[[D16]] : tensor<?x?xf32>,
-// CHECK-SAME:         tensor<?xf32>, tensor<?xf32>) outs(%[[D7]] : tensor<?x?xf32>) {
-// CHECK:            ^bb0(%[[IN:.+]]: f32, %[[IN_6:.+]]: f32, %[[IN_7:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:              %[[D21]] = arith.mulf %[[IN]], %[[IN_6]] : f32
-// CHECK:              %[[D22]] = arith.divf %[[D21]], %[[IN_7]] : f32
-// CHECK:              linalg.yield %[[D22]] : f32
+// CHECK:            %[[D14:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP]]], iterator_types =
+// CHECK-SAME:         ["parallel", "parallel"]} ins(%[[D11]], %[[D13]] : tensor<?x?xf32>, tensor<?xf32>) outs(%[[D7]] :
+// CHECK-SAME:         tensor<?x?xf32>) {
+// CHECK:            ^bb0(%[[IN:.+]]: f32, %[[IN_6:.+]]: f32, %[[OUT:.+]]: f32):
+// CHECK:              %[[D18]] = arith.divf %[[IN]], %[[IN_6]] : f32
+// CHECK:              linalg.yield %[[D18]] : f32
 // CHECK:            } -> tensor<?x?xf32>
-// CHECK:            %[[D18:.+]] = tensor.empty(%[[C1024]]) : tensor<?x64xf32>
-// CHECK:            %[[D19:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP1]], #[[MAP1]],
-// CHECK-SAME:         #[[MAP]]], iterator_types = ["parallel", "parallel"]} ins(%[[EXTRACTED_SLICE_3]], %[[ARG8]],
-// CHECK-SAME:         %[[D16]], %[[D14]] : tensor<?x64xf32>, tensor<?xf32>, tensor<?xf32>, tensor<?xf32>) outs(%[[D18]]
-// CHECK-SAME:         : tensor<?x64xf32>) {
-// CHECK:            ^bb0(%[[IN:.+]]: f32, %[[IN_6:.+]]: f32, %[[IN_7:.+]]: f32, %[[IN_8:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:              %[[D21]] = arith.mulf %[[IN_6]], %[[IN_8]] : f32
-// CHECK:              %[[D22]] = arith.mulf %[[IN]], %[[D21]] : f32
-// CHECK:              %[[D23]] = arith.divf %[[D22]], %[[IN_7]] : f32
-// CHECK:              linalg.yield %[[D23]] : f32
+// CHECK:            %[[D15:.+]] = tensor.empty(%[[C1024]]) : tensor<?x64xf32>
+// CHECK:            %[[D16:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP1]], #[[MAP]]],
+// CHECK-SAME:         iterator_types = ["parallel", "parallel"]} ins(%[[EXTRACTED_SLICE_3]], %[[ARG8]], %[[D13]] :
+// CHECK-SAME:         tensor<?x64xf32>, tensor<?xf32>, tensor<?xf32>) outs(%[[D15]] : tensor<?x64xf32>) {
+// CHECK:            ^bb0(%[[IN:.+]]: f32, %[[IN_6:.+]]: f32, %[[IN_7:.+]]: f32, %[[OUT:.+]]: f32):
+// CHECK:              %[[D18]] = arith.divf %[[IN_6]], %[[IN_7]] : f32
+// CHECK:              %[[D19]] = arith.mulf %[[IN]], %[[D18]] : f32
+// CHECK:              linalg.yield %[[D19]] : f32
 // CHECK:            } -> tensor<?x64xf32>
-// CHECK:            %[[D20:.+]] = linalg.matmul ins(%[[D17]], %[[EXTRACTED_SLICE_1]] : tensor<?x?xf32>,
-// CHECK-SAME:         tensor<?x64xf32>) outs(%[[D19]] : tensor<?x64xf32>) -> tensor<?x64xf32>
-// CHECK:            %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D20]] into %[[ARG6]][%[[ARG3]], 0, 0] [1,
+// CHECK:            %[[D17:.+]] = linalg.matmul ins(%[[D14]], %[[EXTRACTED_SLICE_1]] : tensor<?x?xf32>,
+// CHECK-SAME:         tensor<?x64xf32>) outs(%[[D16]] : tensor<?x64xf32>) -> tensor<?x64xf32>
+// CHECK:            %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D17]] into %[[ARG6]][%[[ARG3]], 0, 0] [1,
 // CHECK-SAME:         %[[C1024]], 64] [1, 1, 1] : tensor<?x64xf32> into tensor<192x1024x64xf32>
-// CHECK:            %[[INSERTED_SLICE_4:.+]] = tensor.insert_slice %[[D13]] into %[[ARG7]][0] [%[[C1024]]] [1] :
+// CHECK:            %[[INSERTED_SLICE_4:.+]] = tensor.insert_slice %[[D10]] into %[[ARG7]][0] [%[[C1024]]] [1] :
 // CHECK-SAME:         tensor<?xf32> into tensor<?xf32>
-// CHECK:            %[[INSERTED_SLICE_5:.+]] = tensor.insert_slice %[[D16]] into %[[ARG8]][0] [%[[C1024]]] [1] :
+// CHECK:            %[[INSERTED_SLICE_5:.+]] = tensor.insert_slice %[[D13]] into %[[ARG8]][0] [%[[C1024]]] [1] :
 // CHECK-SAME:         tensor<?xf32> into tensor<?xf32>
 // CHECK:            scf.yield %[[INSERTED_SLICE]], %[[INSERTED_SLICE_4]], %[[INSERTED_SLICE_5]] :
 // CHECK-SAME:         tensor<192x1024x64xf32>, tensor<?xf32>, tensor<?xf32>

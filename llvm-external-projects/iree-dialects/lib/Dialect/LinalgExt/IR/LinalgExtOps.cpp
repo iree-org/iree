@@ -2860,15 +2860,12 @@ LogicalResult AttentionOp::verify() {
   ArrayRef<int64_t> keyShape = keyType.getShape();
   ArrayRef<int64_t> valueShape = valueType.getShape();
   ArrayRef<int64_t> outputShape = outputType.getShape();
-  if (!areShapesCompatible(queryShape, keyShape)) {
+  if (!areShapesCompatible(queryShape, keyShape))
     return op->emitOpError("incompatible key shape");
-  }
-  if (!areShapesCompatible(queryShape, valueShape)) {
+  if (!areShapesCompatible(queryShape, valueShape))
     return op->emitOpError("incompatible value shape");
-  }
-  if (!areShapesCompatible(queryShape, outputShape)) {
+  if (!areShapesCompatible(queryShape, outputShape))
     return op->emitOpError("incompatible output shape");
-  }
   return success();
 }
 
@@ -2878,7 +2875,7 @@ SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  Value source = query();
+  Value source = getQuery();
   for (auto dim : llvm::seq<int64_t>(0, iterationDomainRank)) {
     loopBounds[dim].offset = zero;
     loopBounds[dim].size = getDimValue(builder, loc, source, dim);
@@ -2923,20 +2920,20 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   keyValueOffsets[0] = offsets[0];
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(getSlice(builder, loc, query(), queryOutputOffsets,
-                                      queryOutputSizes, queryOutputStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, key(), keyValueOffsets,
+  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(),
+                                      queryOutputOffsets, queryOutputSizes,
+                                      queryOutputStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, getKey(), keyValueOffsets,
                                       keyValueSizes, keyValueStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, value(), keyValueOffsets,
+  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), keyValueOffsets,
                                       keyValueSizes, keyValueStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, output(),
+  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(),
                                       queryOutputOffsets, queryOutputSizes,
                                       queryOutputStrides));
 
-  SmallVector<Type, 4> resultTypes;
-  if (hasTensorSemantics()) {
+  SmallVector<Type> resultTypes;
+  if (hasTensorSemantics())
     resultTypes.push_back(tiledOperands[3].getType());
-  }
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);

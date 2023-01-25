@@ -1184,6 +1184,7 @@ def IREELinalgExt_SoftmaxOp : IREELinalgExt_Op<"softmax",
 // Attention
 //===----------------------------------------------------------------------===//
 
+// This class checks that the operand has a shaped type and has rank 3
 class CheckShapedOperandOfRank3<int i> : And<[
          CPred<"$_op.getNumOperands() > " # i>,
          SubstLeaves<"$_self", "$_op.getOperand(" # i # ").getType()",
@@ -1232,29 +1233,29 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value query() {
+    Value getQuery() {
       return getInputOperand(0)->get();
     }
-    Value key() {
+    Value getKey() {
       return getInputOperand(1)->get();
     }
-    Value value() {
+    Value getValue() {
       return getInputOperand(2)->get();
     }
-    Value output() {
+    Value getOutput() {
       return getOutputOperand(0)->get();
     }
     ShapedType getQueryType() {
-      return query().getType().cast<ShapedType>();
+      return getQuery().getType().cast<ShapedType>();
     }
     ShapedType getKeyType() {
-      return key().getType().cast<ShapedType>();
+      return getKey().getType().cast<ShapedType>();
     }
     ShapedType getValueType() {
-      return value().getType().cast<ShapedType>();
+      return getValue().getType().cast<ShapedType>();
     }
     ShapedType getOutputType() {
-      return output().getType().cast<ShapedType>();
+      return getOutput().getType().cast<ShapedType>();
     }
     int64_t getQueryRank() {
       return getQueryType().getRank();

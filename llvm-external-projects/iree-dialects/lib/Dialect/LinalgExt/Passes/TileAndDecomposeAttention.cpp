@@ -31,8 +31,8 @@ namespace {
 template <typename T>
 static Value computeRowwiseReduction(Value a, Value output, Location loc,
                                      OpBuilder &builder) {
-  SmallVector<utils::IteratorType> iteratorTypes{utils::IteratorType::reduction,
-                                                 utils::IteratorType::parallel};
+  SmallVector<utils::IteratorType> iteratorTypes{
+      utils::IteratorType::parallel, utils::IteratorType::reduction};
   AffineMap id = AffineMap::getMultiDimIdentityMap(2, builder.getContext());
   AffineExpr d0, d1;
   bindDims(builder.getContext(), d0, d1);
@@ -48,51 +48,20 @@ static Value computeRowwiseReduction(Value a, Value output, Location loc,
   return genericOp.getResult(0);
 }
 
-static Value computeNewMax(Value oldMax, Value currentMax, Value output,
-                           Location loc, OpBuilder &builder) {
-  SmallVector<utils::IteratorType> iteratorTypes{utils::IteratorType::parallel};
-  auto identityMap = AffineMap::getMultiDimIdentityMap(1, builder.getContext());
-  SmallVector<AffineMap> indexingMaps(3, identityMap);
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, currentMax.getType(), ValueRange{oldMax, currentMax}, output,
-      indexingMaps, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value result = b.create<arith::MaxFOp>(loc, args[0], args[1]);
-        b.create<linalg::YieldOp>(loc, result);
-      });
-  return genericOp.getResult(0);
-}
-
-// Computes alpha * oldSum + beta * currentSum
-static Value computeNewSum(Value oldSum, Value currentSum, Value alpha,
-                           Value beta, Value output, Location loc,
+static Value computeNewSum(Value oldMax, Value newMax, Value oldSum,
+                           Value currentSum, Value output, Location loc,
                            OpBuilder &builder) {
   SmallVector<utils::IteratorType> iteratorTypes{utils::IteratorType::parallel};
   auto identityMap = AffineMap::getMultiDimIdentityMap(1, builder.getContext());
   SmallVector<AffineMap> indexingMaps(5, identityMap);
   auto genericOp = builder.create<linalg::GenericOp>(
-      loc, currentSum.getType(), ValueRange{oldSum, currentSum, alpha, beta},
+      loc, currentSum.getType(), ValueRange{oldMax, newMax, oldSum, currentSum},
       output, indexingMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value first = b.create<arith::MulFOp>(loc, args[2], args[0]);
-        Value second = b.create<arith::MulFOp>(loc, args[3], args[1]);
-        Value result = b.create<arith::AddFOp>(loc, first, second);
-        b.create<linalg::YieldOp>(loc, result);
-      });
-  return genericOp.getResult(0);
-}
-
-// Computes c = exp(a - b) where a, b, c are 1D
-static Value subtractAndExponentiate1D(Value a, Value b, Value output,
-                                       Location loc, OpBuilder &builder) {
-  SmallVector<utils::IteratorType> iteratorTypes{utils::IteratorType::parallel};
-  auto identityMap = AffineMap::getMultiDimIdentityMap(1, builder.getContext());
-  SmallVector<AffineMap> indexingMaps(3, identityMap);
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, a.getType(), ValueRange{a, b}, output, indexingMaps, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
         Value diff = b.create<arith::SubFOp>(loc, args[0], args[1]);
-        Value result = b.create<math::ExpOp>(loc, diff);
+        Value weight = b.create<math::ExpOp>(loc, diff);
+        Value first = b.create<arith::MulFOp>(loc, weight, args[2]);
+        Value result = b.create<arith::AddFOp>(loc, first, args[3]);
         b.create<linalg::YieldOp>(loc, result);
       });
   return genericOp.getResult(0);
@@ -120,8 +89,28 @@ static Value computeSoftmax(Value qkTranspose, Value currentMax, Value output,
   return genericOp.getResult(0);
 }
 
-static Value scaleSoftmax(Value softmax, Value currentWeight, Value newSum,
-                          Value output, Location loc, OpBuilder &builder) {
+static Value scaleSoftmax(Value softmax, Value newSum, Value output,
+                          Location loc, OpBuilder &builder) {
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(2, builder.getContext());
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  // (d0, d1) -> (d0)
+  auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{identityMap, rowMap, identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(2,
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, softmax.getType(), ValueRange{softmax, newSum}, output, indexingMaps,
+      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value result = b.create<arith::DivFOp>(loc, args[0], args[1]);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  return genericOp.getResult(0);
+}
+
+static Value scaleAccumulator(Value accumulator, Value oldSum, Value newSum,
+                              Value output, Location loc, OpBuilder &builder) {
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(2, builder.getContext());
   AffineExpr d0, d1;
@@ -132,36 +121,11 @@ static Value scaleSoftmax(Value softmax, Value currentWeight, Value newSum,
   SmallVector<utils::IteratorType> iteratorTypes(2,
                                                  utils::IteratorType::parallel);
   auto genericOp = builder.create<linalg::GenericOp>(
-      loc, softmax.getType(), ValueRange{softmax, currentWeight, newSum},
+      loc, accumulator.getType(), ValueRange{accumulator, oldSum, newSum},
       output, indexingMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value scaledResult = b.create<arith::MulFOp>(loc, args[0], args[1]);
-        Value finalResult = b.create<arith::DivFOp>(loc, scaledResult, args[2]);
-        b.create<linalg::YieldOp>(loc, finalResult);
-      });
-  return genericOp.getResult(0);
-}
-
-static Value scaleAccumulator(Value accumulator, Value oldSum, Value newSum,
-                              Value oldWeight, Value output, Location loc,
-                              OpBuilder &builder) {
-  AffineMap identityMap =
-      AffineMap::getMultiDimIdentityMap(2, builder.getContext());
-  AffineExpr d0, d1;
-  bindDims(builder.getContext(), d0, d1);
-  // (d0, d1) -> (d0)
-  auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
-  SmallVector<AffineMap> indexingMaps{identityMap, rowMap, rowMap, rowMap,
-                                      identityMap};
-  SmallVector<utils::IteratorType> iteratorTypes(2,
-                                                 utils::IteratorType::parallel);
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, accumulator.getType(),
-      ValueRange{accumulator, oldSum, newSum, oldWeight}, output, indexingMaps,
-      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value prod = b.create<arith::MulFOp>(loc, args[1], args[3]);
-        Value scaled = b.create<arith::MulFOp>(loc, args[0], prod);
-        Value result = b.create<arith::DivFOp>(loc, scaled, args[2]);
+        Value prod = b.create<arith::DivFOp>(loc, args[1], args[2]);
+        Value result = b.create<arith::MulFOp>(loc, args[0], prod);
         b.create<linalg::YieldOp>(loc, result);
       });
   return genericOp.getResult(0);
@@ -249,9 +213,8 @@ static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
       builder, loc, lbs, ubs, steps, args,
       [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
           ValueRange iterArgs) -> scf::ValueVector { return iterArgs; });
-  for (scf::ForOp loop : loopNest.loops) {
+  for (scf::ForOp loop : loopNest.loops)
     ivs.push_back(loop.getInductionVar());
-  }
   return loopNest;
 }
 
@@ -289,7 +252,7 @@ LogicalResult reifyAttentionTransform(func::FuncOp funcOp) {
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(attnOp);
 
-    Value query = attnOp.query();
+    Value query = attnOp.getQuery();
     ShapedType queryType = attnOp.getQueryType();
     Type elementType = queryType.getElementType();
     ArrayRef<int64_t> queryShape = queryType.getShape();
@@ -300,8 +263,8 @@ LogicalResult reifyAttentionTransform(func::FuncOp funcOp) {
     Value batchTileLength =
         getValueOrCreateConstantIndexOp(rewriter, loc, queryDimValues[0]);
 
-    Value key = attnOp.key();
-    Value value = attnOp.value();
+    Value key = attnOp.getKey();
+    Value value = attnOp.getValue();
     SmallVector<OpFoldResult> keyDimValues =
         tensor::createDimValues(rewriter, loc, key);
     Value sequenceLength =
@@ -311,7 +274,7 @@ LogicalResult reifyAttentionTransform(func::FuncOp funcOp) {
     Value zeroValue = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     Value oneValue = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     SmallVector<Value> ivs;
-    Value output = attnOp.output();
+    Value output = attnOp.getOutput();
     scf::LoopNest firstLoopNest =
         createLoopNest(ivs, zeroValue, oneValue, batchTileLength,
                        ValueRange({output}), loc, rewriter);
@@ -325,7 +288,7 @@ LogicalResult reifyAttentionTransform(func::FuncOp funcOp) {
     Value zeroF32 = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
     Value largeNegativeF32 = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getFloatAttr(elementType, -100.0));
+        loc, rewriter.getFloatAttr(elementType, -1e30));
     Value max = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
     Value negativeMax =
         rewriter.create<linalg::FillOp>(loc, ValueRange{largeNegativeF32}, max)
@@ -370,38 +333,32 @@ LogicalResult reifyAttentionTransform(func::FuncOp funcOp) {
         loc, SmallVector<OpFoldResult>{sequenceTileLength}, elementType);
 
     // Compute current statistics
-    Value currentMax = computeRowwiseReduction<arith::MaxFOp>(
-        qkTranspose, negativeMax, loc, rewriter);
+    Value newMax = computeRowwiseReduction<arith::MaxFOp>(
+        qkTranspose, iterArgMax, loc, rewriter);
     Value softmax =
-        computeSoftmax(qkTranspose, currentMax, emptySquare, loc, rewriter);
+        computeSoftmax(qkTranspose, newMax, emptySquare, loc, rewriter);
     Value currentSum =
         computeRowwiseReduction<arith::AddFOp>(softmax, zeroSum, loc, rewriter);
 
-    // Update global statistics
-    Value newMax = computeNewMax(iterArgMax, currentMax, empty, loc, rewriter);
-    Value oldWeight =
-        subtractAndExponentiate1D(iterArgMax, newMax, empty, loc, rewriter);
-    Value currentWeight =
-        subtractAndExponentiate1D(currentMax, newMax, empty, loc, rewriter);
-    Value newSum = computeNewSum(iterArgSum, currentSum, oldWeight,
-                                 currentWeight, empty, loc, rewriter);
+    Value newSum = computeNewSum(iterArgMax, newMax, iterArgSum, currentSum,
+                                 empty, loc, rewriter);
 
     // Scale softmax
-    softmax = scaleSoftmax(softmax, currentWeight, newSum, emptySquare, loc,
-                           rewriter);
+    Value scaledSoftmax =
+        scaleSoftmax(softmax, newSum, emptySquare, loc, rewriter);
 
-    // Update accumulator
+    //// Update accumulator
     empty = rewriter.create<tensor::EmptyOp>(
         loc, SmallVector<OpFoldResult>{sequenceLength, headDimension},
         elementType);
-    Value scaledAcc = scaleAccumulator(outputSlice, iterArgSum, newSum,
-                                       oldWeight, empty, loc, rewriter);
+    Value scaledAcc =
+        scaleAccumulator(outputSlice, iterArgSum, newSum, empty, loc, rewriter);
 
     // Compute matmul(softmax, v)
     Value result = rewriter
                        .create<linalg::MatmulOp>(
                            loc, outputSlice.getType(),
-                           ValueRange{softmax, valueSlice}, scaledAcc)
+                           ValueRange{scaledSoftmax, valueSlice}, scaledAcc)
                        .getResult(0);
 
     // Insert slices
