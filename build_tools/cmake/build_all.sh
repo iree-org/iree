@@ -17,6 +17,7 @@ set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_BUILD_DIR:-build}}"
 INSTALL_DIR="${IREE_INSTALL_DIR:-${BUILD_DIR}/install}"
+CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 # Enable WebGPU compiler builds and tests by default. All deps get fetched as
 # needed, but some of the deps are too large to enable by default for all
@@ -30,7 +31,7 @@ declare -a CMAKE_ARGS=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
 
-  "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+  "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
   "-DCMAKE_INSTALL_PREFIX=$(realpath ${INSTALL_DIR})"
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
 

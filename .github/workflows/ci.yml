@@ -758,6 +758,35 @@ jobs:
             ./build_tools/cmake/build_tracing.sh \
             "${BUILD_DIR}"
 
+  debug:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: build-debug
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        with:
+          submodules: true
+      - name: "Building IREE in Debug configuration"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CMAKE_BUILD_TYPE=Debug" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e" \
+            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            ./build_tools/cmake/build_all.sh \
+            "${BUILD_DIR}"
+
   ############################### Configurations ###############################
   # Jobs that build and run IREE e2e tests/benchmarks                          #
   ##############################################################################
@@ -1308,6 +1337,7 @@ jobs:
       - small_runtime
       - gcc
       - tracing
+      - debug
 
       # Crosscompilation
       - cross_compile_and_test
