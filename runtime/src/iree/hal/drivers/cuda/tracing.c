@@ -275,4 +275,21 @@ void iree_hal_cuda_tracing_zone_end_impl(
   iree_tracing_gpu_zone_end(context->id, query_id);
 }
 
+#else
+
+iree_status_t iree_hal_cuda_tracing_context_allocate(
+    iree_hal_cuda_context_wrapper_t* cuda_context,
+    iree_string_view_t queue_name, CUstream stream,
+    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
+    iree_hal_cuda_tracing_context_t** out_context) {
+  *out_context = NULL;
+  return iree_ok_status();
+}
+
+void iree_hal_cuda_tracing_context_free(
+    iree_hal_cuda_tracing_context_t* context) {}
+
+void iree_hal_cuda_tracing_context_collect(
+    iree_hal_cuda_tracing_context_t* context) {}
+
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION

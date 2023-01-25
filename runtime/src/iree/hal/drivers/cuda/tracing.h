@@ -43,8 +43,6 @@ extern "C" {
 // multiple threads (same as with CUstream itself).
 typedef struct iree_hal_cuda_tracing_context_t iree_hal_cuda_tracing_context_t;
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-
 // Allocates a tracing context for the given CUDA stream.
 // Each context must only be used with the stream it was created for.
 iree_status_t iree_hal_cuda_tracing_context_allocate(
@@ -63,6 +61,8 @@ void iree_hal_cuda_tracing_context_free(
 // tracing may start failing if the internal ringbuffer is exceeded.
 void iree_hal_cuda_tracing_context_collect(
     iree_hal_cuda_tracing_context_t* context);
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 // Begins a normal zone derived on the calling |src_loc|.
 // Must be perfectly nested and paired with a corresponding zone end.
@@ -104,21 +104,6 @@ void iree_hal_cuda_tracing_zone_end_impl(
   iree_hal_cuda_tracing_zone_end_impl(context, stream)
 
 #else
-
-inline iree_status_t iree_hal_cuda_tracing_context_allocate(
-    iree_hal_cuda_context_wrapper_t* cuda_context,
-    iree_string_view_t queue_name, CUstream stream,
-    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
-    iree_hal_cuda_tracing_context_t** out_context) {
-  *out_context = NULL;
-  return iree_ok_status();
-}
-
-inline void iree_hal_cuda_tracing_context_free(
-    iree_hal_cuda_tracing_context_t* context) {}
-
-inline void iree_hal_cuda_tracing_context_collect(
-    iree_hal_cuda_tracing_context_t* context) {}
 
 #define IREE_CUDA_TRACE_ZONE_BEGIN(context, stream)
 #define IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(                           \
