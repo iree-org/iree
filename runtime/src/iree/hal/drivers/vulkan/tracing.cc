@@ -593,4 +593,24 @@ void iree_hal_vulkan_tracing_zone_end_impl(
   iree_tracing_gpu_zone_end(context->id, (uint16_t)query_id);
 }
 
+#else
+
+iree_status_t iree_hal_vulkan_tracing_context_allocate(
+    VkPhysicalDevice physical_device,
+    iree::hal::vulkan::VkDeviceHandle* logical_device, VkQueue queue,
+    iree_string_view_t queue_name, VkQueue maintenance_dispatch_queue,
+    iree::hal::vulkan::VkCommandPoolHandle* maintenance_command_pool,
+    iree_allocator_t host_allocator,
+    iree_hal_vulkan_tracing_context_t** out_context) {
+  *out_context = NULL;
+  return iree_ok_status();
+}
+
+void iree_hal_vulkan_tracing_context_free(
+    iree_hal_vulkan_tracing_context_t* context) {}
+
+void iree_hal_vulkan_tracing_context_collect(
+    iree_hal_vulkan_tracing_context_t* context,
+    VkCommandBuffer command_buffer) {}
+
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
