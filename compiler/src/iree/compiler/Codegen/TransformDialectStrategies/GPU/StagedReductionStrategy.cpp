@@ -161,15 +161,25 @@ static void buildStagedReductionStrategyThreadLevel(
   // y only will trigger the insertion of an `scf.if (threadIdx.x == 0)`
   // predicate after `scf.foreach_thread` is lowered.
   // This predicate allows further vector distribution to kick in.
+  Value root = blockCombinerOpH;
+  SmallVector<Value> opsToFuse = {gridFillH};
+  // If we have a unit dim after the reduction that doesn't broadcast fuse it
+  // wuth the reduction.
+  if (strategy.captures.maybeTrailingRank ==
+      strategy.captures.reductionRank - 1) {
+    root = maybeTiledTrailingH;
+    opsToFuse.push_back(blockCombinerOpH);
+  }
   iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
       /*b=*/b,
-      /*rootH=*/blockCombinerOpH,
-      /*opsToFuse=*/{gridFillH},
+      /*rootH=*/root,
+      /*opsToFuse=*/opsToFuse,
       /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({1})),
       /*mappingAttr=*/b.getArrayAttr(strategy.allThreadAttrs[1]));
 
-  // Map the potential maybeTiledTrailingH.
-  if (strategy.captures.maybeTrailingRank > 0) {
+  // Map the potential maybeTiledTrailingH if it hasn't been fused with the
+  // reduction.
+  if (root != maybeTiledTrailingH && strategy.captures.maybeTrailingRank > 0) {
     int64_t vectorSize =
         iree_compiler::gpu::kCudaMaxVectorLoadBitWidth /
         strategy.captures.maybeTrailingOutputElementalTypeBitWidth;
