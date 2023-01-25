@@ -1227,7 +1227,18 @@ static LogicalResult setDefaultGenericOpRootConfig(
                                  parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
-  tileSizes.push_back(flowTileSizes);
+  SmallVector<int64_t> updatedFlowTileSizes;
+  bool foundNonZero = false;
+  for (auto val: flowTileSizes) {
+    if (val == 0) {
+      updatedFlowTileSizes.push_back(
+          foundNonZero || tileSizes.size() <= 3? 0 : 1);
+      continue;
+    }
+    updatedFlowTileSizes.push_back(val);
+    foundNonZero = true;
+  }
+  tileSizes.push_back(updatedFlowTileSizes);
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
 
