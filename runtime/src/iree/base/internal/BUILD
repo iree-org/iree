@@ -224,18 +224,6 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
-    name = "main",
-    srcs = [
-        "main_posix.c",
-        "main_win32.c",
-    ],
-    hdrs = ["main.h"],
-    deps = [
-        "//runtime/src/iree/base:core_headers",
-    ],
-)
-
-iree_runtime_cc_library(
     name = "path",
     srcs = ["path.c"],
     hdrs = ["path.h"],
