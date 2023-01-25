@@ -48,6 +48,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
       extract_slice ops with reassociative reshape ops.
+      - fold_tensor_empty_extract: Fold tensor.empty used by extract_slice.
       - lower_transfer_op_permutations: Lower transfer ops to transfer ops
       with minor identity permutations.
       - rank_reducing_linalg: adds patterns that results in rank-reducing
@@ -86,6 +87,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$erase_unnecessary_tensor_operands,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
+                       UnitAttr:$fold_tensor_empty_extract,
                        UnitAttr:$lower_transfer_op_permutations,
                        UnitAttr:$rank_reducing_linalg,
                        UnitAttr:$rank_reducing_vector,

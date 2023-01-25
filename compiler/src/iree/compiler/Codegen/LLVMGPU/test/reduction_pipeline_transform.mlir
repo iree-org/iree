@@ -365,10 +365,10 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //   CHECK-LABEL: func.func @group_reduction_i8_12345
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-NOT:   memref.alloc()
 
+//         CHECK: %[[ALLOC0:.+]] = memref.alloc() {alignment = 64 : i64} : memref<1xi8, #gpu.address_space<workgroup>>
 // Local per-thread scf.for-based reduction.
-//         CHECK:   %[[TIDX:.]] = gpu.thread_id  x
+//         CHECK: %[[TIDX:.]] = gpu.thread_id  x
 //         CHECK: scf.for {{.*}} -> (vector<1xi8>)
 //         CHECK:   vector.transfer_read {{.*}} vector<1xi8>
 //         CHECK:   arith.addi{{.*}} : vector<1xi8>
@@ -392,7 +392,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK: %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : i8 to vector<1xi8>
 //         CHECK: %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
 //         CHECK: scf.if %[[CONDXIS0]]
-//         CHECK:   vector.transfer_write %[[RES_VEC]]
+//         CHECK:   vector.transfer_write %[[RES_VEC]], %[[ALLOC0]][%[[C0]]] {in_bounds = [true]} : vector<1xi8>, memref<1xi8, #gpu.address_space<workgroup>>
 
 //         CHECK:   gpu.barrier
 //         CHECK:   arith.divui {{.*}} vector<8xi8>
