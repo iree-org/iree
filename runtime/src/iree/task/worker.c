@@ -18,13 +18,15 @@
 #include "iree/task/task_impl.h"
 #include "iree/task/tuning.h"
 
+#define IREE_TASK_WORKER_MIN_STACK_SIZE (32 * 1024)
+
 static int iree_task_worker_main(iree_task_worker_t* worker);
 
 iree_status_t iree_task_worker_initialize(
     iree_task_executor_t* executor, iree_host_size_t worker_index,
     const iree_task_topology_group_t* topology_group,
-    iree_byte_span_t local_memory, iree_prng_splitmix64_state_t* seed_prng,
-    iree_task_worker_t* out_worker) {
+    iree_host_size_t stack_size, iree_byte_span_t local_memory,
+    iree_prng_splitmix64_state_t* seed_prng, iree_task_worker_t* out_worker) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   out_worker->executor = executor;
@@ -56,6 +58,8 @@ iree_status_t iree_task_worker_initialize(
   thread_params.create_suspended = false;
   thread_params.priority_class = IREE_THREAD_PRIORITY_CLASS_NORMAL;
   thread_params.initial_affinity = out_worker->ideal_thread_affinity;
+  thread_params.stack_size =
+      iree_max(IREE_TASK_WORKER_MIN_STACK_SIZE, stack_size);
 
   // NOTE: if the thread creation fails we'll bail here and let the caller
   // cleanup by calling deinitialize (which is safe because we zero init
