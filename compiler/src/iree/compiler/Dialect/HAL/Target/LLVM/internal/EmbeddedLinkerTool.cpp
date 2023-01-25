@@ -79,10 +79,32 @@ class EmbeddedLinkerTool : public LinkerTool {
   LogicalResult configureModule(
       llvm::Module *llvmModule,
       ArrayRef<llvm::Function *> exportedFuncs) override {
-    for (auto &func : *llvmModule) {
+    for (auto &llvmFunc : *llvmModule) {
       // -fno-plt - prevent PLT on calls to imports.
-      func.addFnAttr("nonlazybind");
+      llvmFunc.addFnAttr("nonlazybind");
+
+      // No unwind tables are required as we don't support exceptions.
+      llvmFunc.setUWTableKind(llvm::UWTableKind::None);
     }
+
+    // Since all exports are fetched via the executable library query function
+    // we don't need to make them publicly exported on the module. This has
+    // the downside of making some tooling (disassemblers/decompilers/binary
+    // size analysis tools/etc) a bit harder to work with, though, so when
+    // compiling in debug mode we export all the functions.
+    if (targetOptions.debugSymbols) {
+      for (auto llvmFunc : exportedFuncs) {
+        llvmFunc->setVisibility(
+            llvm::GlobalValue::VisibilityTypes::DefaultVisibility);
+        llvmFunc->setLinkage(llvm::GlobalValue::LinkageTypes::ExternalLinkage);
+
+        // In debug modes we need unwind tables in order to get proper stacks on
+        // all platforms. We don't support exceptions so unless debugging is
+        // requested we omit them to reduce code size.
+        llvmFunc->setUWTableKind(llvm::UWTableKind::Default);
+      }
+    }
+
     return success();
   }
 
