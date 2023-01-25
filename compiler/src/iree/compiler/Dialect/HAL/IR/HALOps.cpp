@@ -1088,30 +1088,10 @@ LogicalResult InterfaceBindingSubspanOp::verify() {
   return success();
 }
 
-// TODO(benvanik): share with align op folder and analysis.
-// May need an interface for querying the alignment from ops that can carry it.
-
-// Tries to find the alignment of the given |value| based on either the IR
-// structure or annotations.
-static llvm::Optional<APInt> lookupValueOrAlignment(Value value) {
-  APInt constantValue;
-  if (matchPattern(value, m_ConstantInt(&constantValue))) {
-    // Value is constant and we can just treat that as if it were an alignment.
-    return constantValue;
+llvm::MaybeAlign InterfaceBindingSubspanOp::getBaseAlignment() {
+  if (auto baseAlignmentInt = getAlignment()) {
+    return llvm::MaybeAlign(baseAlignmentInt.value().getZExtValue());
   }
-
-  auto op = value.getDefiningOp();
-  if (auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceConstantLoadOp>(op)) {
-    // Push constants have an optional value alignment.
-    auto alignment = loadOp.getAlignment();
-    if (alignment.has_value()) return alignment;
-  } else if (auto alignmentAttr =
-                 op->getAttrOfType<IntegerAttr>("stream.alignment")) {
-    // The op has an alignment tagged on it we can use directly.
-    return alignmentAttr.getValue();
-  }
-
-  // TODO(benvanik): more searching.
   return std::nullopt;
 }
 
@@ -1127,25 +1107,23 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
   }
 
   // If the binding has no assigned alignment we fall back to natural alignment.
-  auto bindingAlignmentInt = getAlignment();
-  if (!bindingAlignmentInt) return naturalAlignment;
-  auto bindingAlignment =
-      llvm::Align(bindingAlignmentInt.value().getZExtValue());
+  auto baseAlignment = getBaseAlignment();
+  if (!baseAlignment) return naturalAlignment;
 
   // If there's no offset specified then we can use the binding alignment
   // directly.
-  if (!getByteOffset()) return bindingAlignment;
+  if (!getByteOffset()) return baseAlignment.value();
 
   // Try to get the alignment of the byte offset. If it's a constant then we can
   // find a common alignment between it and the base and otherwise we need to
   // try to infer the alignment from the IR - otherwise we fall back.
-  auto offsetOrAlignment = lookupValueOrAlignment(getByteOffset());
+  auto offsetOrAlignment = lookupOffsetOrAlignment(getByteOffset());
   if (!offsetOrAlignment.has_value()) return naturalAlignment;
 
   // Compute the common alignment between that of the binding base and that of
   // the byte offset.
-  return llvm::commonAlignment(bindingAlignment,
-                               offsetOrAlignment->getZExtValue());
+  return llvm::commonAlignment(baseAlignment.value(),
+                               offsetOrAlignment.value());
 }
 
 //===----------------------------------------------------------------------===//

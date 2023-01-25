@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/Matchers.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
@@ -156,6 +157,42 @@ uint32_t CollectiveAttr::getEncodedValue() const {
       getReduction().value_or(CollectiveReductionOp::None));
   value.elementType = static_cast<uint8_t>(getElementType());
   return value.packed;
+}
+
+//===----------------------------------------------------------------------===//
+// Alignment
+//===----------------------------------------------------------------------===//
+
+llvm::MaybeAlign commonAlignment(llvm::MaybeAlign lhs, llvm::MaybeAlign rhs) {
+  if (!lhs.has_value() || !rhs.has_value()) return std::nullopt;
+  return llvm::MaybeAlign(
+      llvm::MinAlign(lhs.value().value(), rhs.value().value()));
+}
+
+// TODO(benvanik): share with align op folder and analysis.
+// May need an interface for querying the alignment from ops that can carry it.
+std::optional<uint64_t> lookupOffsetOrAlignment(Value value) {
+  APInt constantValue;
+  if (matchPattern(value, m_ConstantInt(&constantValue))) {
+    // Value is constant and we can just treat that as if it were an alignment.
+    return constantValue.getZExtValue();
+  }
+
+  auto op = value.getDefiningOp();
+  if (auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceConstantLoadOp>(op)) {
+    // Push constants have an optional value alignment.
+    auto alignment = loadOp.getAlignment();
+    if (alignment.has_value()) {
+      return alignment.value().getZExtValue();
+    }
+  } else if (auto alignmentAttr =
+                 op->getAttrOfType<IntegerAttr>("stream.alignment")) {
+    // The op has an alignment tagged on it we can use directly.
+    return alignmentAttr.getValue().getZExtValue();
+  }
+
+  // TODO(benvanik): more searching using util.align and other ops.
+  return std::nullopt;
 }
 
 //===----------------------------------------------------------------------===//

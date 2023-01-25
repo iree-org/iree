@@ -36,7 +36,7 @@ hal.executable.source public @executable {
       // byte offset from the base of the descriptor. Alignment information when
       // available can help code generation emit better loads/stores.
       %s0b0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
-      %s0b1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %s0b1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) offset(%offset) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
       %s0b2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<4xf32>>
 
       // Workgroup information can be queried from the interface.

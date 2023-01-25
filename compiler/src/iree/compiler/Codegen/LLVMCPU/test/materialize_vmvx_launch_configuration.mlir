@@ -143,11 +143,11 @@ hal.executable @fusion_quant_matmul_generic {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.constant.load[0] : i32
         %1 = arith.index_castui %0 : i32 to index
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<3360x32xi8>>
-        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32xi32>>
-        %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c107520) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32xi32>>
-        %5 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<?x3360xi8>>{%1}
-        %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<?x32xi8>>{%1}
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<3360x32xi8>>
+        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<32xi32>>
+        %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c107520) : !flow.dispatch.tensor<readonly:tensor<32xi32>>
+        %5 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<?x3360xi8>>{%1}
+        %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x32xi8>>{%1}
         %7 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%1, 3360], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x3360xi8>>{%1} -> tensor<?x3360xi8>
         %8 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [3360, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<3360x32xi8>> -> tensor<3360x32xi8>
         %9 = flow.dispatch.tensor.load %3, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readonly:tensor<32xi32>> -> tensor<32xi32>
@@ -208,8 +208,8 @@ hal.executable private @unpack_outer_dynamic  {
         %5 = arith.index_castui %1 : i32 to index
         %6 = arith.index_castui %2 : i32 to index
         %7 = arith.index_castui %3 : i32 to index
-        %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5}
-        %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c131072) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
+        %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5}
+        %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, 32, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5} -> tensor<?x?x32x16xi32>
         %11 = tensor.empty(%6, %7) : tensor<?x?xi32>
         %12 = iree_linalg_ext.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11 : (tensor<?x?x32x16xi32> tensor<?x?xi32>) -> tensor<?x?xi32>

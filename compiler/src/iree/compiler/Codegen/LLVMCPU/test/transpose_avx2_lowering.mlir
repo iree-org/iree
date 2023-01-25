@@ -27,8 +27,8 @@ hal.executable private @transpose_10_8x8_pattern {
       func.func @transpose_10_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<512x1024xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<512x1024xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x1024xf32>> -> tensor<512x1024xf32>
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>> -> tensor<1024x512xf32>
         %6 = linalg.generic {
@@ -85,8 +85,8 @@ hal.executable private @transpose_021_8x8_pattern {
       func.func @transpose_021_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<64x128x96xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x128x96xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 96, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>> -> tensor<64x96x128xf32>
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [64, 128, 96], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<64x128x96xf32>> -> tensor<64x128x96xf32>
         %6 = linalg.generic {
@@ -143,8 +143,8 @@ hal.executable private @transpose_201_8x8_pattern {
       func.func @transpose_201_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<128x64x96xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x64x96xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 96, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>> -> tensor<64x96x128xf32>
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [128, 64, 96], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<128x64x96xf32>> -> tensor<128x64x96xf32>
         %6 = linalg.generic {
@@ -201,8 +201,8 @@ hal.executable private @transpose_210_8x8_pattern {
       func.func @transpose_210_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<128x96x64xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x96x64xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 96, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>> -> tensor<64x96x128xf32>
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [128, 96, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<128x96x64xf32>> -> tensor<128x96x64xf32>
         %6 = linalg.generic {
@@ -259,8 +259,8 @@ hal.executable private @transpose_120_8x8_pattern {
       func.func @transpose_120_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<96x128x64xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<96x128x64xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 96, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>> -> tensor<64x96x128xf32>
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [96, 128, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<96x128x64xf32>> -> tensor<96x128x64xf32>
         %6 = linalg.generic {
@@ -317,8 +317,8 @@ hal.executable private @transpose_102 {
       func.func @transpose_102() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<96x64x128xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<96x64x128xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 96, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x96x128xf32>> -> tensor<64x96x128xf32>
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [96, 64, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<96x64x128xf32>> -> tensor<96x64x128xf32>
         %6 = linalg.generic {
@@ -367,8 +367,8 @@ hal.executable private @test_no_avx2_feature {
       func.func @test_no_avx2_feature() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<512x1024xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<512x1024xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x1024xf32>> -> tensor<512x1024xf32>
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>> -> tensor<1024x512xf32>
         %6 = linalg.generic {

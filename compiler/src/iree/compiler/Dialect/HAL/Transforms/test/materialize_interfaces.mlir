@@ -101,8 +101,8 @@ hal.executable.source public @ex {
     func.func @entry() {
       %const0 = hal.interface.constant.load[0] : index
       %const1 = hal.interface.constant.load[1] : index
-      %s0b0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%const0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
-      %s1b0 = hal.interface.binding.subspan set(1) binding(0) type(storage_buffer) offset(%const1) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %s0b0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%const0) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %s1b0 = hal.interface.binding.subspan set(1) binding(0) type(storage_buffer) alignment(32) offset(%const1) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
       %s1b1 = hal.interface.binding.subspan set(1) binding(1) type(storage_buffer) alignment(16) : !flow.dispatch.tensor<writeonly:tensor<4xf32>>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index

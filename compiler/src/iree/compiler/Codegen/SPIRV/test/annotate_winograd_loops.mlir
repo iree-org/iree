@@ -10,8 +10,8 @@ func.func @_wino_input_dispatch_0() {
   %c1 = arith.constant 1 : index
   %c32 = arith.constant 32 : index
   %0 = tensor.empty() : tensor<8x8xf32>
-  %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>>
-  %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
+  %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>>
+  %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -62,10 +62,10 @@ func.func @_wino_input_dispatch_0() {
 // CHECK:        %[[C1:.+]] = arith.constant 1 : index
 // CHECK:        %[[C32:.+]] = arith.constant 32 : index
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<8x8xf32>
-// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[C0]])
-// CHECK-SAME:     alignment(64) : !flow.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>>
-// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%[[C0]])
-// CHECK-SAME:     alignment(64) : !flow.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
+// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]])
+// CHECK-SAME:     : !flow.dispatch.tensor<readonly:tensor<2x10x10x1280xf32>>
+// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[C0]])
+// CHECK-SAME:     : !flow.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>
 // CHECK:        %[[WORKGROUP_ID_X:.+]] = hal.interface.workgroup.id[0] : index
 // CHECK:        %[[WORKGROUP_COUNT_X:.+]] = hal.interface.workgroup.count[0] : index
 // CHECK:        %[[WORKGROUP_ID_Y:.+]] = hal.interface.workgroup.id[1] : index

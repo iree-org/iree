@@ -58,6 +58,18 @@ inline bool allEnumBitsSet(T value, T required) {
 }
 
 //===----------------------------------------------------------------------===//
+// Alignment
+//===----------------------------------------------------------------------===//
+
+// Returns the common (minimum) alignment between |lhs| and |rhs| or nullopt if
+// either is unaligned.
+llvm::MaybeAlign commonAlignment(llvm::MaybeAlign lhs, llvm::MaybeAlign rhs);
+
+// Returns either the constant offset |value| or the alignment of the offset
+// inferred from the IR. Returns nullopt if no alignment is available.
+std::optional<uint64_t> lookupOffsetOrAlignment(Value value);
+
+//===----------------------------------------------------------------------===//
 // Object types
 //===----------------------------------------------------------------------===//
 

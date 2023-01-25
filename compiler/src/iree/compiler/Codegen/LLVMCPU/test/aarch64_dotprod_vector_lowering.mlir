@@ -24,11 +24,11 @@ func.func @mmt4d_kernel_dispatch() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c64 = arith.constant 64 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<1x2x8x4xi8>
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<1x2x8x4xi8>
   memref.assume_alignment %0, 64 : memref<1x2x8x4xi8>
-  %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c64) alignment(64) : memref<1x2x8x4xi8>
+  %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c64) : memref<1x2x8x4xi8>
   memref.assume_alignment %1, 64 : memref<1x2x8x4xi8>
-  %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c128) alignment(64) : memref<1x1x8x8xi32>
+  %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c128) : memref<1x1x8x8xi32>
   memref.assume_alignment %2, 64 : memref<1x1x8x8xi32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
