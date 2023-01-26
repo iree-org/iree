@@ -578,16 +578,16 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   vector::ExtractOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
   if (failed(applyPatternsAndFoldGreedily(target,
                                           std::move(preProcessingPatterns)))) {
-    target->emitOpError("multi-reduce patterns failed to apply");
-    return emitDefaultDefiniteFailure(target);
+    return mlir::emitDefiniteFailure(target,
+                                     "multi-reduce patterns failed to apply");
   }
 
   RewritePatternSet patterns(ctx);
   populateVectorTransferWriteDistribution(target, patterns, /*benefit=*/2);
   populatePropagateVectorDistribution(target, patterns, /*benefit=*/1);
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {
-    target->emitOpError("warp distribution patterns failed to apply");
-    return emitDefaultDefiniteFailure(target);
+    return mlir::emitDefiniteFailure(
+        target, "warp distribution patterns failed to apply");
   }
 
   RewritePatternSet endPatterns(ctx);
@@ -596,9 +596,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   options.warpSyncronizationFn = warpSyncronizationFn;
   populateWarpExecuteOnLane0ToScf(target, endPatterns, options, /*benefit=*/0);
   if (failed(applyPatternsAndFoldGreedily(target, std::move(endPatterns)))) {
-    target->emitOpError(
-        "warp execute on lane 0 to scf patterns failed to apply");
-    return emitDefaultDefiniteFailure(target);
+    return mlir::emitDefiniteFailure(
+        target, "warp execute on lane 0 to scf patterns failed to apply");
   }
 
   return DiagnosedSilenceableFailure::success();
