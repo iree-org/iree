@@ -93,7 +93,7 @@ jobs:
   build_test_all_windows:
     needs: setup
     if: needs.setup.outputs.should-run == 'true'
-    runs-on: managed-windows-cpu
+    runs-on: windows-2022
     defaults:
       run:
         shell: bash
@@ -103,55 +103,55 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-      # Attempt to restore from the build cache unconditionally.
-      # Note: this will first try to grab a cache entry for this exact commit
-      #       then they will fall back to the latest for any commit.
-      # We're pretty limited on repository cache space (10GB) relative to cache
-      # entry size (~2.5GB), so this usage is pretty optimistic.
-      - name: "Fetching cache (CMake/ccache)"
-        uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache_all_windows_${{ github.sha }}
-          restore-keys: ccache_all_windows
+      # # Attempt to restore from the build cache unconditionally.
+      # # Note: this will first try to grab a cache entry for this exact commit
+      # #       then they will fall back to the latest for any commit.
+      # # We're pretty limited on repository cache space (10GB) relative to cache
+      # # entry size (~2.5GB), so this usage is pretty optimistic.
+      # - name: "Fetching cache (CMake/ccache)"
+      #   uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
+      #   with:
+      #     path: ${{ github.workspace }}/.ccache
+      #     key: ccache_all_windows_${{ github.sha }}
+      #     restore-keys: ccache_all_windows
       # Fetch dependencies.
       # TODO(scotttodd): Move some of these into a Docker image / add to PATH.
       - name: "Updating git submodules for CI"
         run: ./build_tools/scripts/git/update_submodules_for_ci.py
-      - name: "Setting up Python"
-        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
-        with:
-          python-version: "3.10"  # Needs pybind >= 2.10.1 for Python >= 3.11
-      - name: "Installing Python packages"
-        run: |
-          python3 -m venv .venv
-          .venv/Scripts/activate.bat
-          python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
-      - name: "Installing requirements"
-        run: choco install ccache --yes
-      - name: "Configuring MSVC"
-        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
-      # Finally: build and run tests.
-      - name: "Building IREE"
-        env:
-          IREE_READ_REMOTE_CCACHE: 0
-          IREE_WRITE_REMOTE_CCACHE: 0
-          IREE_READ_LOCAL_CCACHE: 1
-          IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
-          CCACHE_DIR: ${{ github.workspace }}/.ccache
-          # A full build is around 2.5GB, but uploads/downloads are slow and
-          # we have a limit of 10GB per repository
-          CCACHE_MAXSIZE: 3G
-        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
-      - name: "Testing IREE"
-        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-      # Write cache (if configured to) after all other steps are finished.
-      - name: "Saving cache (CMake/ccache)"
-        if: needs.setup.outputs.write-caches == '1'
-        uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache_all_windows_${{ github.sha }}
+      # - name: "Setting up Python"
+      #   uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
+      #   with:
+      #     python-version: "3.10"  # Needs pybind >= 2.10.1 for Python >= 3.11
+      # - name: "Installing Python packages"
+      #   run: |
+      #     python3 -m venv .venv
+      #     .venv/Scripts/activate.bat
+      #     python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      # - name: "Installing requirements"
+      #   run: choco install ccache --yes
+      # - name: "Configuring MSVC"
+      #   uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
+      # # Finally: build and run tests.
+      # - name: "Building IREE"
+      #   env:
+      #     IREE_READ_REMOTE_CCACHE: 0
+      #     IREE_WRITE_REMOTE_CCACHE: 0
+      #     IREE_READ_LOCAL_CCACHE: 1
+      #     IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
+      #     CCACHE_DIR: ${{ github.workspace }}/.ccache
+      #     # A full build is around 2.5GB, but uploads/downloads are slow and
+      #     # we have a limit of 10GB per repository
+      #     CCACHE_MAXSIZE: 3G
+      #   run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+      # - name: "Testing IREE"
+      #   run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+      # # Write cache (if configured to) after all other steps are finished.
+      # - name: "Saving cache (CMake/ccache)"
+      #   if: needs.setup.outputs.write-caches == '1'
+      #   uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
+      #   with:
+      #     path: ${{ github.workspace }}/.ccache
+      #     key: ccache_all_windows_${{ github.sha }}
 
   ##############################################################################
 
