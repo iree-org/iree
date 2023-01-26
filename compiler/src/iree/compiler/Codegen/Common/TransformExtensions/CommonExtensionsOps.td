@@ -17,6 +17,8 @@ include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
+def Transform_FuncOp : Transform_ConcreteOpType<"func.func">;
+
 def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
@@ -484,18 +486,22 @@ def PackGreedilyOp : Op<Transform_Dialect,
   let description = [{
     Target the whole func op and rewrite known LinalgOp to packed form greedily.
 
-    Return modes:
-    =============
+    #### Return modes
+    
     This operation ignores non-Func ops and drops them in the return.
 
-    It returns the same Func ops where all supported containing LinalgOps are
+    It returns the same Func ops where all supported contained LinalgOps are
     packed.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
+  let arguments = (ins Transform_FuncOp:$target);
+  let results = (outs Transform_FuncOp:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = [{
+    $target
+    attr-dict
+    `:` functional-type($target, results)
+  }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let builders = [

@@ -32,9 +32,9 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
-// #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
@@ -473,13 +473,6 @@ auto par = utils::IteratorType::parallel;
 auto red = utils::IteratorType::reduction;
 }  // namespace
 
-static int64_t numResultsFunctionOf(AffineMap map, AffineDimExpr d) {
-  int64_t count = 0;
-  for (AffineExpr e : map.getResults())
-    if (e.isFunctionOfDim(d.getPosition())) ++count;
-  return count;
-}
-
 /// Return the set of AffineDimExpr
 static DenseSet<int64_t> findPermutationsIndexingOperand(
     linalg::LinalgOp linalgOp, OpOperand *opOperand, utils::IteratorType iter) {
@@ -489,7 +482,9 @@ static DenseSet<int64_t> findPermutationsIndexingOperand(
   for (AffineExpr e : indexingMap.getResults()) {
     if (auto d = e.dyn_cast<AffineDimExpr>()) {
       if (linalgOp.getIteratorTypesArray()[d.getPosition()] == iter &&
-          numResultsFunctionOf(indexingMap, d) == 1)
+          llvm::count_if(indexingMap.getResults(), [d](AffineExpr e) {
+            return e.isFunctionOfDim(d.getPosition());
+          }) == 1)
         res.insert(d.getPosition());
     }
   }
@@ -589,6 +584,7 @@ static LogicalResult packContractionGreedily(
     ArrayRef<OpFoldResult> mnkPackingSizes, ArrayRef<int64_t> mnkOrder) {
   assert(mnkPackingSizes.size() == 3 && "unexpected num of packing sizes");
   assert(mnkOrder.size() == 3 && "unexpected mnkOrder size");
+  assert(isPermutationVector(mnkOrder) && "expected a permutation");
 
   int64_t numLoops = linalgOp.getNumLoops();
   if (numLoops <= 2)
