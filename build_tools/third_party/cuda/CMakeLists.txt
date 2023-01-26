@@ -19,6 +19,8 @@ function(fetch_cuda_toolkit)
     return()
   endif()
   # CUDA is only supported on Linux/Windows where x64 is the only arch for now.
+  # Note: CMAKE_HOST_SYSTEM_PROCESSOR may be AMD64 on Windows, but we still
+  # want to use `x86_64` here.
   set(_ARCH "x86_64")
 
   set(_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/${_VERSION}")
