@@ -165,6 +165,8 @@ transform.sequence failures(propagate) {
 // CHECK-DAG: #[[$M2:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d6, d4, d2, d3, d7, d9)>
 //                                                                                   n   f   h   w  nn  ff
 // CHECK-DAG: #[[$M3:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d5, d6, d0, d1, d8, d9)>
+
+// CHECK-LABEL: @conv_2d_nchw_fchw
 func.func @conv_2d_nchw_fchw(%arg0: tensor<?x47x16x16xf32>, %arg2: tensor<?x16x14x14xf32>) -> tensor<?x16x14x14xf32> {
   %c0 = arith.constant dense<0.1> : tensor<16x47x3x3xf32>
   //      CHECK: linalg.generic
@@ -177,6 +179,32 @@ func.func @conv_2d_nchw_fchw(%arg0: tensor<?x47x16x16xf32>, %arg2: tensor<?x16x1
      ins(%arg0, %c0: tensor<?x47x16x16xf32>, tensor<16x47x3x3xf32>)
     outs(%arg2: tensor<?x16x14x14xf32>) -> tensor<?x16x14x14xf32>
   return %0 : tensor<?x16x14x14xf32>
+}
+
+transform.sequence failures(propagate) {
+^bb1(%module_op: !pdl.operation):
+  %func = transform.structured.match ops{["func.func"]} in %module_op
+  %func_2 = transform.iree.pack_greedily %func
+}
+
+
+// -----
+
+// These should fail to pack for now as they don't contain a contraction.
+// CHECK-LABEL: @reduce_and_map
+func.func @reduce_and_map(%arg0: tensor<10x100xf32>,
+    %arg1: tensor<10x100xf32>, %output: tensor<10xf32>) -> tensor<10xf32> {
+  %map_init = tensor.empty() : tensor<10x100xf32>
+  // CHECK: linalg.map
+  %mapped = linalg.map { arith.addf }
+              ins(%arg0, %arg1 : tensor<10x100xf32>, tensor<10x100xf32>)
+              outs(%map_init : tensor<10x100xf32>)
+  // CHECK: linalg.reduce
+  %res = linalg.reduce { arith.addf }
+           ins(%mapped: tensor<10x100xf32>)
+           outs(%output: tensor<10xf32>)
+           dimensions = [1]
+  return %res : tensor<10xf32>
 }
 
 transform.sequence failures(propagate) {
