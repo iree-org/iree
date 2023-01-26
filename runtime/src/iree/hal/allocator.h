@@ -409,7 +409,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_query_memory_heaps(
 // be transferred externally into a buffer compatible with the device the
 // allocator services.
 IREE_API_EXPORT iree_hal_buffer_compatibility_t
-iree_hal_allocator_query_compatibility(
+iree_hal_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size);
 
@@ -427,8 +427,8 @@ iree_hal_allocator_query_compatibility(
 //
 // |out_buffer| must be released by the caller.
 // Fails if the memory type requested for the given usage cannot be serviced.
-// Callers can use iree_hal_allocator_query_compatibility to decide their memory
-// use strategy.
+// Callers can use iree_hal_allocator_query_buffer_compatibility to decide their
+// memory use strategy.
 IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
@@ -446,7 +446,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
 // iree_hal_buffer_t. The returned external buffer may only be usable with the
 // same driver/device.
 //
-// iree_hal_allocator_query_compatibility can be used to query whether a
+// iree_hal_allocator_query_buffer_compatibility can be used to query whether a
 // buffer can be imported when using the given memory type and usage. A
 // compatibility result containing IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE
 // means the import _may_ succeed however if the pointer/page range is not in a
@@ -524,7 +524,7 @@ typedef struct iree_hal_allocator_vtable_t {
       iree_hal_allocator_memory_heap_t* IREE_RESTRICT heaps,
       iree_host_size_t* IREE_RESTRICT out_count);
 
-  iree_hal_buffer_compatibility_t(IREE_API_PTR* query_compatibility)(
+  iree_hal_buffer_compatibility_t(IREE_API_PTR* query_buffer_compatibility)(
       iree_hal_allocator_t* IREE_RESTRICT allocator,
       const iree_hal_buffer_params_t* IREE_RESTRICT params,
       iree_device_size_t allocation_size);

@@ -56,7 +56,7 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
     iree_hal_buffer_compatibility_t required_compatibility,
     iree_hal_buffer_usage_t intended_usage) {
   iree_hal_buffer_compatibility_t allowed_compatibility =
-      iree_hal_allocator_query_compatibility(
+      iree_hal_allocator_query_buffer_compatibility(
           iree_hal_device_allocator(validation_state->device),
           (iree_hal_buffer_params_t){
               .type = iree_hal_buffer_memory_type(buffer),

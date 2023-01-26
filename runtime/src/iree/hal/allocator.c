@@ -116,13 +116,13 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_query_memory_heaps(
 }
 
 IREE_API_EXPORT iree_hal_buffer_compatibility_t
-iree_hal_allocator_query_compatibility(
+iree_hal_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size) {
   IREE_ASSERT_ARGUMENT(allocator);
   iree_hal_buffer_params_canonicalize(&params);
-  return _VTABLE_DISPATCH(allocator, query_compatibility)(allocator, &params,
-                                                          allocation_size);
+  return _VTABLE_DISPATCH(allocator, query_buffer_compatibility)(
+      allocator, &params, allocation_size);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(

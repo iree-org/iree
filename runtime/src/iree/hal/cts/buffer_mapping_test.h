@@ -64,8 +64,8 @@ TEST_P(buffer_mapping_test, AllocatorSupportsBufferMapping) {
   params.type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   params.usage = IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_compatibility_t compatibility =
-      iree_hal_allocator_query_compatibility(device_allocator_, params,
-                                             kDefaultAllocationSize);
+      iree_hal_allocator_query_buffer_compatibility(device_allocator_, params,
+                                                    kDefaultAllocationSize);
   EXPECT_TRUE(iree_all_bits_set(compatibility,
                                 IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE));
 

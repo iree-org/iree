@@ -576,7 +576,7 @@ static iree_status_t iree_hal_vulkan_vma_allocator_query_memory_heaps(
 }
 
 static iree_hal_buffer_compatibility_t
-iree_hal_vulkan_vma_allocator_query_compatibility(
+iree_hal_vulkan_vma_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_device_size_t allocation_size) {
@@ -765,8 +765,8 @@ const iree_hal_allocator_vtable_t iree_hal_vulkan_vma_allocator_vtable = {
     /*.trim=*/iree_hal_vulkan_vma_allocator_trim,
     /*.query_statistics=*/iree_hal_vulkan_vma_allocator_query_statistics,
     /*.query_memory_heaps=*/iree_hal_vulkan_vma_allocator_query_memory_heaps,
-    /*.query_compatibility=*/
-    iree_hal_vulkan_vma_allocator_query_compatibility,
+    /*.query_buffer_compatibility=*/
+    iree_hal_vulkan_vma_allocator_query_buffer_compatibility,
     /*.allocate_buffer=*/iree_hal_vulkan_vma_allocator_allocate_buffer,
     /*.deallocate_buffer=*/iree_hal_vulkan_vma_allocator_deallocate_buffer,
     /*.import_buffer=*/iree_hal_vulkan_vma_allocator_import_buffer,

@@ -622,13 +622,13 @@ void SetupHalBindings(pybind11::module m) {
       .def_property_readonly("formatted_statistics",
                              &HalAllocator::FormattedStatistics)
       .def(
-          "query_compatibility",
+          "query_buffer_compatibility",
           [](HalAllocator& self, int memory_type, int allowed_usage,
              int intended_usage, iree_device_size_t allocation_size) -> int {
             iree_hal_buffer_params_t params = {0};
             params.type = memory_type;
             params.usage = allowed_usage & intended_usage;
-            return iree_hal_allocator_query_compatibility(
+            return iree_hal_allocator_query_buffer_compatibility(
                 self.raw_ptr(), params, allocation_size);
           },
           py::arg("memory_type"), py::arg("allowed_usage"),

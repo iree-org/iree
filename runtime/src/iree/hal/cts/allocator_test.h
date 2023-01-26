@@ -38,7 +38,7 @@ TEST_P(allocator_test, BaselineBufferCompatibility) {
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   host_local_params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_compatibility_t transfer_compatibility_host =
-      iree_hal_allocator_query_compatibility(
+      iree_hal_allocator_query_buffer_compatibility(
           device_allocator_, host_local_params, kAllocationSize);
 
   iree_hal_buffer_params_t device_local_params = {0};
@@ -46,7 +46,7 @@ TEST_P(allocator_test, BaselineBufferCompatibility) {
       IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   device_local_params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_compatibility_t transfer_compatibility_device =
-      iree_hal_allocator_query_compatibility(
+      iree_hal_allocator_query_buffer_compatibility(
           device_allocator_, device_local_params, kAllocationSize);
 
   iree_hal_buffer_compatibility_t required_transfer_compatibility =
@@ -63,8 +63,8 @@ TEST_P(allocator_test, BaselineBufferCompatibility) {
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   dispatch_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
   iree_hal_buffer_compatibility_t dispatch_compatibility =
-      iree_hal_allocator_query_compatibility(device_allocator_, dispatch_params,
-                                             kAllocationSize);
+      iree_hal_allocator_query_buffer_compatibility(
+          device_allocator_, dispatch_params, kAllocationSize);
   EXPECT_TRUE(
       iree_all_bits_set(dispatch_compatibility,
                         IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE |
