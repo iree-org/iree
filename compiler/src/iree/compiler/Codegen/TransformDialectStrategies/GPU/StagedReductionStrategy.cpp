@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
@@ -115,8 +116,8 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
 
 static Value shareForeachArgument(ImplicitLocOpBuilder &b, Value foreachThread,
                                   ArrayRef<int64_t> indices) {
-  auto foreachType =
-      transform::OperationType::get(b.getContext(), "scf.foreach_thread");
+  auto foreachType = transform::OperationType::get(
+      b.getContext(), scf::ForeachThreadOp::getOperationName());
   foreachThread = b.create<transform::CastOp>(foreachType, foreachThread);
   return b.create<
       iree_compiler::IREE::transform_dialect::ShareForeachThreadOperandsOp>(
