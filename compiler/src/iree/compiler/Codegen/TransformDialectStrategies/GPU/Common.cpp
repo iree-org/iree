@@ -261,6 +261,11 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
   // Step N-1. Bufferize and drop HAL descriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
 
+  // Fold tensor.empty to avoid large allocations.
+  ApplyPatternsOpPatterns patterns;
+  patterns.foldTensorEmptyExtract = true;
+  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+
   funcH = iree_compiler::buildVectorize(b, funcH);
   variantH = iree_compiler::buildBufferize(b, variantH, /*targetGpu=*/true);
 
