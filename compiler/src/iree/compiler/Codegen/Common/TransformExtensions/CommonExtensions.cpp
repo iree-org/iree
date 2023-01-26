@@ -108,14 +108,17 @@ struct GenerateToConstant : public OpRewritePattern<tensor::GenerateOp> {
   }
 };
 
-/// Fold tensor.empty used by extract_slice.
+/// Fold tensor.empty used by extract_slice if this the only use of
+/// extract_slice and the result is static.
 struct FoldTensorEmptyExtract
     : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
                                 PatternRewriter &rewriter) const final {
     auto tensorEmpty = extractOp.getSource().getDefiningOp<tensor::EmptyOp>();
-    if (!tensorEmpty || !extractOp.getType().hasStaticShape()) return failure();
+    if (!tensorEmpty || !extractOp.getType().hasStaticShape() ||
+        !tensorEmpty->hasOneUse())
+      return failure();
     rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
         extractOp, extractOp.getType().getShape(),
         extractOp.getType().getElementType());
