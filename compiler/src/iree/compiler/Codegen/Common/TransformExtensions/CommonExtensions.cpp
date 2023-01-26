@@ -468,83 +468,6 @@ LogicalResult rewriteForeachThreadToWorkgroup(
 // PackGreedilyOp.
 //===---------------------------------------------------------------------===//
 
-using PackPermType = SmallVector<SmallVector<int64_t>>;
-
-/// Build transform IR .
-/// Needs to know number of opH input operands.
-static LogicalResult applyPackAndTranspose(RewriterBase &rewriter,
-                                           linalg::LinalgOp linalgOp,
-                                           ArrayRef<OpFoldResult> packingSizes,
-                                           PackPermType &outerPermutations,
-                                           PackPermType &innerPermutations) {
-  FailureOr<linalg::LinalgOp> packedLinalgOp =
-      linalg::pack(rewriter, linalgOp, packingSizes);
-  if (failed(packedLinalgOp))
-    return rewriter.notifyMatchFailure(linalgOp, "could not pack");
-
-  int64_t idx = -1;
-  for (auto [outerPerm, innerPerm] :
-       llvm::zip_equal(outerPermutations, innerPermutations)) {
-    ++idx;
-    if (outerPerm.empty() && innerPerm.empty()) continue;
-
-    tensor::PackOp packOp;
-    tensor::UnPackOp maybeUnPackOp;
-    if (idx < packedLinalgOp->getNumDpsInputs()) {
-      auto packOpOperand = packedLinalgOp->getDpsInputOperand(idx);
-      packOp = packOpOperand->get().getDefiningOp<tensor::PackOp>();
-    } else {
-      auto packOpOperand = packedLinalgOp->getDpsInitOperand(
-          idx - packedLinalgOp->getNumDpsInputs());
-      packOp = packOpOperand->get().getDefiningOp<tensor::PackOp>();
-    }
-    Value packResult = packOp.getResult();
-    if (!packOp || !packResult.hasOneUse()) {
-      return rewriter.notifyMatchFailure(
-          *packedLinalgOp, "could not find pack op with single use");
-    }
-    if (idx >= packedLinalgOp->getNumDpsInputs()) {
-      OpResult toPack = packedLinalgOp->getTiedOpResult(
-          packResult.getUses().begin().getOperand());
-      if (!toPack.hasOneUse()) {
-        return rewriter.notifyMatchFailure(
-            *packedLinalgOp, "could not find unpack op with single use");
-      }
-      maybeUnPackOp = dyn_cast<tensor::UnPackOp>(*toPack.getUsers().begin());
-      if (!maybeUnPackOp) {
-        return rewriter.notifyMatchFailure(
-            *packedLinalgOp, "could not find unpack op with single use");
-      }
-    }
-
-    // clang-format off
-    LLVM_DEBUG(
-      DBGSNL(); DBGSNL(); DBGSNL();
-      DBGS() << "In module: " << (*packedLinalgOp)->getParentOfType<ModuleOp>();
-      DBGSNL();
-      DBGS() << "Call packTranspose with:\n";
-      DBGS() << "\tpackOp: " << packOp << "\n";
-      DBGS() << "\tlinalgOp: " << *packedLinalgOp << "\n";
-      if (maybeUnPackOp) {
-        DBGS() << "\tmaybeUnPackOp: " << maybeUnPackOp << "\n";
-      }
-      llvm::interleaveComma(outerPerm, DBGS() << "outerPerm: "); DBGSNL();
-      llvm::interleaveComma(innerPerm, DBGS() << "innerPerm: "); DBGSNL();
-    );
-    // clang-format on
-
-    FailureOr<linalg::PackTransposeResult> packTransposeResult =
-        linalg::packTranspose(rewriter, packOp, *packedLinalgOp, maybeUnPackOp,
-                              outerPerm, innerPerm);
-    if (failed(packTransposeResult))
-      llvm_unreachable("unexpected failure to packTranspose");
-
-    // Update the packedLinalgOp for the next iteration.
-    packedLinalgOp = packTransposeResult->transposedLinalgOp;
-  }
-  return success();
-}
-
 namespace {
 auto par = utils::IteratorType::parallel;
 auto red = utils::IteratorType::reduction;
@@ -723,20 +646,14 @@ static LogicalResult packContractionGreedily(
   // leading_lhs, leading_rhs and leading_res) could follow by computing the
   // desired outerPerm for each operand. This is left for future work.
 
-  // `innerPermutations` is always empty in this case, this is purely controlled
-  // by the normalization step.
-  // `outerPermutations` is empty for now but could be set up in the future.
-  // TODO: If we wanted to give the genericOp a name after packing, after
-  // calling `applyPackAndTranspose` would be a good time.
-  PackPermType emptyPerm;
   // Add leading zeros to match numLoops.
   SmallVector<OpFoldResult> adjustedPackingSizes(numLoops - packingSizes.size(),
                                                  rewriter.getIndexAttr(0));
   llvm::append_range(adjustedPackingSizes, packingSizes);
-  return applyPackAndTranspose(rewriter, genericOp,
-                               /*packingSizes=*/adjustedPackingSizes,
-                               /*outerPermutations=*/emptyPerm,
-                               /*innerPermutations=*/emptyPerm);
+
+  // TODO: If we wanted to give the genericOp a name after packing, after
+  // calling `pack` would be a good time.
+  return linalg::pack(rewriter, genericOp, adjustedPackingSizes);
 }
 
 ///
