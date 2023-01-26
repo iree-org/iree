@@ -93,17 +93,23 @@ else()
   # Attempt to deduce a CUDAToolkit_ROOT (possibly downloading) if not
   # explicitly set.
   if(NOT CUDAToolkit_ROOT)
-    # Download the CUDA toolkit if needed.
-    fetch_cuda_toolkit()
-    if(CUDAToolkit_ROOT)
-      # Download succeeded.
-      message(STATUS "Using downloaded CUDA toolkit: ${CUDAToolkit_ROOT}")
-      set(CUDAToolkit_ROOT "${CUDAToolkit_ROOT}" PARENT_SCOPE)
-      # For some reason having the BIN_DIR set wrong can cause mayhem. Just make
-      # sure it is right.
-      set(CUDAToolkit_BIN_DIR "${CUDAToolkit_ROOT}/bin" PARENT_SCOPE)
+    if(CUDAToolkit_FOUND)
+      # Found on the system somewhere, no need to install our own copy.
+      cmake_path(GET CUDAToolkit_BIN_DIR PARENT_PATH CUDAToolkit_ROOT)
+      message(STATUS "Using found CUDA toolkit: ${CUDAToolkit_ROOT}")
     else()
-      message(SEND_ERROR "Failed to download a CUDA toolkit. Check the logs and/or set CUDAToolkit_ROOT to an existing installation.")
+      # Download a copy of the CUDA toolkit into the build directory if needed.
+      fetch_cuda_toolkit()
+      if(CUDAToolkit_ROOT)
+        # Download succeeded.
+        message(STATUS "Using downloaded CUDA toolkit: ${CUDAToolkit_ROOT}")
+        set(CUDAToolkit_ROOT "${CUDAToolkit_ROOT}" PARENT_SCOPE)
+        # For some reason having the BIN_DIR set wrong can cause mayhem. Just make
+        # sure it is right.
+        set(CUDAToolkit_BIN_DIR "${CUDAToolkit_ROOT}/bin" PARENT_SCOPE)
+      else()
+        message(SEND_ERROR "Failed to download a CUDA toolkit. Check the logs and/or set CUDAToolkit_ROOT to an existing installation.")
+      endif()
     endif()
   endif()
   find_package(CUDAToolkit REQUIRED)
