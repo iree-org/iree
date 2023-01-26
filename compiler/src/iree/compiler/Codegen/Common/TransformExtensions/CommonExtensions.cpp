@@ -763,9 +763,9 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
   dispatchIndexOpFoldResults(mixedTileSizes, dynamicTileSizes, staticTileSizes);
-  // Call the default builder which sets up the proper operands segment
-  // sizes attributes for multiple variadic operands. In the absence of
-  // this, horrible bugs ensue.
+  // Call the default builder which sets up the proper operands segment sizes
+  // attributes for multiple variadic operands. In the absence of this, horrible
+  // bugs ensue.
   MLIRContext *ctx = builder.getContext();
   auto operationType = pdl::OperationType::get(ctx);
 
@@ -800,9 +800,9 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   SmallVector<Value> dynamicNumThreads;
   dispatchIndexOpFoldResults(mixedNumThreads, dynamicNumThreads,
                              staticNumThreads);
-  // Call the default builder which sets up the proper operands segment
-  // sizes attributes for multiple variadic operands. In the absence of
-  // this, horrible bugs ensue.
+  // Call the default builder which sets up the proper operands segment sizes
+  // attributes for multiple variadic operands. In the absence of this, horrible
+  // bugs ensue.
   MLIRContext *ctx = builder.getContext();
   auto operationType = pdl::OperationType::get(ctx);
   build(builder, result,
@@ -816,12 +816,11 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
 }
 
 /// Lower the ops within the workgroup count region of `exportOp` that
-/// represents the workgroup count calculation, to the actual
-/// computation that returns the number of workgroups. For now
-/// this lowers the `flow.dispatch.workgroup_count_from_dag_root` op
-/// to `ceilDiv(workload, tileSizes)`.
-/// Note: transform::TransformState &state is passed to allow  unpacking
-/// pdl::OperationType handles on the fly.
+/// represents the workgroup count calculation, to the actual computation that
+/// returns the number of workgroups. For now this lowers the
+/// `flow.dispatch.workgroup_count_from_dag_root` op to `ceilDiv(workload,
+/// tileSizes)`. Note: transform::TransformState &state is passed to allow
+/// unpacking pdl::OperationType handles on the fly.
 static LogicalResult lowerWorkgroupCountComputingRegion(
     transform::TransformState &state, RewriterBase &rewriter, Location loc,
     HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> tileSizes,
@@ -951,8 +950,8 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
                                      "couldn't find export op for func");
   }
 
-  /// Lower the workgroup count region in keeping with the way dispatch
-  /// regions are created by default in IREEs compilation flow.
+  /// Lower the workgroup count region in keeping with the way dispatch regions
+  /// are created by default in IREEs compilation flow.
   IRRewriter rewriter(getContext());
   if (failed(lowerWorkgroupCountComputingRegion(
           state, rewriter, getLoc(), exportOp.value(), getMixedTileSizes(),
@@ -985,17 +984,17 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
   return DiagnosedSilenceableFailure::success();
 }
 
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // IREEBufferizeOp
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 // Important note: this transform is load-bearing and is the glue between
 // different dialects that want to operate on tensors.
 // Originaly, it used to just call `addIREEComprehensiveBufferizePasses` but
-// this introduces a lot of complexity in the registration process due to
-// the use of nested pass pipelines, to a point that it is a major endeavor
-// to connect a new dialect. Instead, avoid calling the passes and only take
-// what we need from them.
+// this introduces a lot of complexity in the registration process due to the
+// use of nested pass pipelines, to a point that it is a major endeavor to
+// connect a new dialect.
+// Instead, avoid calling the passes and only take what we need from them.
 //
 // TODO: Maybe we need both a transform.iree.cpu.bufferize and a
 // transform.iree.gpu.bufferize rather than a single common bufferize op?
@@ -1029,12 +1028,12 @@ void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
   result.addTypes(pdl::OperationType::get(ctx));
 }
 
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 // TODO: register the bufferization behavior in a target-specific way.
-// TODO: Maybe bufferize should have a separate cpu and a gpu version. This
-// is unclear though: what happens on heterogeneous HW ?
-//===---------------------------------------------------------------------===//
+// TODO: Maybe bufferize should have a separate cpu and a gpu version. This is
+// unclear though: what happens on heterogeneous HW ?
+//===----------------------------------------------------------------------===//
 
 // Allocation callbacks to use with upstream comprehensive bufferization
 static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
@@ -1056,9 +1055,9 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
   // TODO: ideally we should use linalg.copy which was recently reintroduced
-  // as an OpDSL named op. However, IREE-specific patterns to cleanup
-  // spurious post-bufferization copies do not trigger properly. So we keep
-  // using `createLinalgCopyOp` which builds a GenericOp.
+  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
+  // post-bufferization copies do not trigger properly. So we keep using
+  // `createLinalgCopyOp` which builds a GenericOp.
   // builder.create<linalg::CopyOp>(loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   return success();
@@ -1089,9 +1088,9 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
   // TODO: ideally we should use linalg.copy which was recently reintroduced
-  // as an OpDSL named op. However, IREE-specific patterns to cleanup
-  // spurious post-bufferization copies do not trigger properly. So we keep
-  // using `createLinalgCopyOp` which builds a GenericOp.
+  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
+  // post-bufferization copies do not trigger properly. So we keep using
+  // `createLinalgCopyOp` which builds a GenericOp.
   // builder.create<linalg::CopyOp>(loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   return success();
@@ -1102,10 +1101,9 @@ static OneShotBufferizationOptions getBufferizationOptions() {
   // options.testAnalysisOnly = testAnalysisOnly;
   // options.printConflicts = printConflicts;
 
-  // bufferization.to_memref is used to bufferize constants in IREE. IREE
-  // has it's own logic to handle constants. We'd like to leave the
-  // arith.constant as is and insert bufferization.to_memref to convert the
-  // tensor to memref.
+  // bufferization.to_memref is used to bufferize constants in IREE. IREE has
+  // it's own logic to handle constants. We'd like to leave the arith.constant
+  // as is and insert bufferization.to_memref to convert the tensor to memref.
   options.opFilter.denyOperation<arith::ConstantOp>();
   options.opFilter.denyOperation<bufferization::ToMemrefOp>();
 
@@ -1115,8 +1113,8 @@ static OneShotBufferizationOptions getBufferizationOptions() {
                                       const BufferizationOptions &options) {
     auto tensorType = value.getType().cast<TensorType>();
 
-    // Special rule for ConstantOps: These always lower to some memref with
-    // a static identity layout.
+    // Special rule for ConstantOps: These always lower to some memref with a
+    // static identity layout.
     if (value.getDefiningOp<arith::ConstantOp>())
       return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
                                                                   memorySpace);
@@ -1155,11 +1153,11 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
         "HAL::ExecutableVariantOp target op.");
   }
 
-  //===-------------------------------------------------------------------===//
-  // DO NOT JUST CALL `addIREEComprehensiveBufferizePasses` as this results
-  // in a lot of registration issues due to nested pass pipeline mess.
-  // Instead, take what we need from it.
-  //===-------------------------------------------------------------------===//
+  //===--------------------------------------------------------------------===//
+  // DO NOT JUST CALL `addIREEComprehensiveBufferizePasses` as this results in a
+  // lot of registration issues due to nested pass pipeline mess. Instead, take
+  // what we need from it.
+  //===--------------------------------------------------------------------===//
   // Bufferize the dispatch.
   using mlir::bufferization::BufferizationOptions;
   BufferizationOptions::AllocationFn allocationFn =
