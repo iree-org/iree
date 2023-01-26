@@ -14,6 +14,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "contraction-packing-and-dispatch.mlir"
+    "contraction-packing.mlir"
     "eltwise_reduction_eltwise.mlir"
     "matmul.mlir"
   TOOLS

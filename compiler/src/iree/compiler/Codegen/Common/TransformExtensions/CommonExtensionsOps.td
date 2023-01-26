@@ -44,6 +44,9 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       registered dialects and ops.
       - erase_unnecessary_tensor_operands: add patterns that erase unnecessary
       tensor operands.
+      - expand_memref_strided_metadata: adds patterns that expand memref
+      operations into extract_strided_metadata operations and a materialization
+      of their effect on the metadata (sizes, offset, strides).
       - fold_memref_aliases: adds patterns for folding ops such as
       memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
@@ -56,9 +59,9 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       behavior on subset-based linalg operations.
       - rank_reducing_vector: adds patterns that results in rank-reducing 
       behavior on subset-based vector operations.
-      - expand_memref_strided_metadata: adds patterns that expand memref
-      operations into extract_strided_metadata operations and a materialization
-      of their effect on the metadata (sizes, offset, strides).
+      - rewrite_pack_ops: rewrite tensor.pack/unpack to linalg_ext.pack/unpack.
+      This is a temporary pattern that is needed to connect to IREE until it 
+      adopts the upstream version.
       - swapping_patterns: adds patterns that swap operations for a better outcome.
       This is a catch all that can be refined further if/when needed.
       - swap_padding_elide_conditional: refines the tensor.pad +
@@ -86,13 +89,14 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$bubble_collapse_expand,
                        UnitAttr:$canonicalization,
                        UnitAttr:$erase_unnecessary_tensor_operands,
+                       UnitAttr:$expand_memref_strided_metadata,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
                        UnitAttr:$fold_tensor_empty_extract,
                        UnitAttr:$lower_transfer_op_permutations,
                        UnitAttr:$rank_reducing_linalg,
                        UnitAttr:$rank_reducing_vector,
-                       UnitAttr:$expand_memref_strided_metadata,
+                       UnitAttr:$rewrite_pack_ops,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns);
   let results = (outs PDL_Operation:$result);
