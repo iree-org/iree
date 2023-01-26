@@ -1016,17 +1016,26 @@
 
 
 <h1 id="jax-integration">JAX Integration<a class="headerlink" href="#jax-integration" title="Permanent link">&para;</a></h1>
-<div class="admonition todo">
-<p class="admonition-title">Todo</p>
-<p><a href="https://github.com/iree-org/iree/issues/5454">Issue#5454</a>: write this documentation</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>IREE's JAX support is under active development. This page is still under
+construction.</p>
 </div>
-<!-- TODO(??): overview (mention XLA? numpy?) -->
-
-<!-- TODO(??): pip install vs build from source -->
-
-<!-- TODO(??): python model code vs intermediate/serialization format(s), if any -->
-
-<!-- TODO(??): Colab notebooks, code samples -->
+<p>IREE offers two ways to interface with <a href="https://github.com/google/jax">JAX</a>
+programs:</p>
+<ul>
+<li>An API for extracting and compiling full models ahead of time (AOT) for
+  execution apart from JAX. This API is being developed in the
+  <a href="https://github.com/iree-org/iree-jax">iree-org/iree-jax repository</a>.</li>
+<li>A PJRT plugin that adapts IREE as a native JAX backend for online / just in
+  time (JIT) use. This plugin is being developed in the
+  <a href="https://github.com/iree-org/iree-samples/tree/main/pjrt-plugin">pjrt-plugin/</a>
+  folder within the iree-samples repository for now, though it will likely move
+  elsewhere as it matures.</li>
+</ul>
+<!-- TODO: Expand on interface differences -->
+<!-- TODO: Add quickstart instructions -->
+<!-- TODO: Link to samples -->
 
 
 
