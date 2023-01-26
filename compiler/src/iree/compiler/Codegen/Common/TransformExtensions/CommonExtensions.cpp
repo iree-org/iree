@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -31,9 +32,10 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
+// #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -543,70 +545,150 @@ static LogicalResult applyPackAndTranspose(RewriterBase &rewriter,
   return success();
 }
 
-static LogicalResult bindDimsAs(linalg::LinalgOp linalgOp,
-                                ArrayRef<AffineExpr *> dims,
-                                ArrayRef<utils::IteratorType> iters) {
-  if (dims.size() != iters.size()) return failure();
-  if (dims.size() != linalgOp.getNumLoops()) return failure();
+namespace {
+auto par = utils::IteratorType::parallel;
+auto red = utils::IteratorType::reduction;
+}  // namespace
 
-  MLIRContext *ctx = linalgOp->getContext();
-  auto par = utils::IteratorType::parallel;
-  auto red = utils::IteratorType::reduction;
-  for (auto iterType : {par, red}) {
-    SmallVector<int64_t> indices1, indices2;
-    indices1.reserve(dims.size());
-    indices2.reserve(dims.size());
-    // Collect the indices of `iters` of type `iterType`.
-    for (auto en : llvm::enumerate(iters))
-      if (en.value() == iterType) indices1.push_back(en.index());
-    // Collect the indices of `linalgOp.iterator_types` of type `iterType`.
-    for (auto en : llvm::enumerate(linalgOp.getIteratorTypesArray()))
-      if (en.value() == iterType) indices2.push_back(en.index());
-    // Ensure well-formedness.
-    if (indices1.size() != indices2.size()) return failure();
-    // Bind dims[indices1] to loop[indices2].
-    for (auto it : llvm::zip(indices1, indices2))
-      *dims[std::get<0>(it)] = getAffineDimExpr(std::get<1>(it), ctx);
+static int64_t numResultsFunctionOf(AffineMap map, AffineDimExpr d) {
+  int64_t count = 0;
+  for (AffineExpr e : map.getResults())
+    if (e.isFunctionOfDim(d.getPosition())) ++count;
+  return count;
+}
+
+/// Return the set of AffineDimExpr
+static DenseSet<int64_t> findPermutationsIndexingOperand(
+    linalg::LinalgOp linalgOp, OpOperand *opOperand, utils::IteratorType iter) {
+  DenseSet<int64_t> res;
+  assert(linalgOp == opOperand->getOwner() && "expected linalgOp owner");
+  AffineMap indexingMap = linalgOp.getMatchingIndexingMap(opOperand);
+  for (AffineExpr e : indexingMap.getResults()) {
+    if (auto d = e.dyn_cast<AffineDimExpr>()) {
+      if (linalgOp.getIteratorTypesArray()[d.getPosition()] == iter &&
+          numResultsFunctionOf(indexingMap, d) == 1)
+        res.insert(d.getPosition());
+    }
   }
-  return success();
+  return res;
+}
+
+struct ContractionDimsForPacking {
+  int64_t mPos, nPos, kPos;
+};
+/// Greedily look for 2 parallel (m and n) and 1 reduction (k) dimension that
+/// form a contraction. Such dimensions are such that:
+///   1. The m dimension is involved in an outer-product along LHS
+///      (i.e. it is a permutation on RES and LHS and does not appear in RHS).
+///   2. The n dimension is involved in an outer-product along RHS
+///      (i.e. it is a permutation on RES and RHS and does not appear in LHS).
+///   3. The k dimension appears as a permutation on LHS and RHS.
+///   4. m, n and k appear only once in any given indexing.
+///
+/// This allows detecting that some contraction is embedded within `linalgOp`.
+///
+/// When multiple possibilities for selecting m, n and k appear, we just pick
+/// an arbitrary one (i.e. the first in a DenseSet).
+// TODO: Better heuristic (e.g pick dims based on packing-based metric).
+static FailureOr<ContractionDimsForPacking> getContractionDims(
+    linalg::LinalgOp linalgOp) {
+  assert(linalgOp.getNumDpsInits() == 1 && "wrong number of dps inits");
+  assert(linalgOp.getNumDpsInputs() == 2 && "wrong number of dps inputs");
+
+  DenseSet<int64_t> a = findPermutationsIndexingOperand(
+      linalgOp, linalgOp.getDpsInputOperand(0), par);
+  DenseSet<int64_t> b = findPermutationsIndexingOperand(
+      linalgOp, linalgOp.getDpsInputOperand(1), par);
+  DenseSet<int64_t> c = findPermutationsIndexingOperand(
+      linalgOp, linalgOp.getDpsInitOperand(0), par);
+
+  // A & C - B are the iterators involved in an outer-product along A (the LHS).
+  DenseSet<int64_t> ac = a;
+  llvm::set_intersect(ac, c);
+  llvm::set_subtract(ac, b);
+  // B & C - A are the iterators involved in an outer-product along B (the RHS).
+  DenseSet<int64_t> bc = b;
+  llvm::set_intersect(bc, c);
+  llvm::set_subtract(bc, a);
+
+  // Note: if we ever need them, A & B & C would be "batch" dimensions.
+
+  // A & B red are the reduction dimensions.
+  DenseSet<int64_t> ra = findPermutationsIndexingOperand(
+      linalgOp, linalgOp.getDpsInputOperand(0), red);
+  DenseSet<int64_t> rb = findPermutationsIndexingOperand(
+      linalgOp, linalgOp.getDpsInputOperand(1), red);
+  llvm::set_intersect(ra, rb);
+
+  if (ac.empty() || bc.empty() || ra.empty()) return failure();
+
+  // Pick the first one in each set.
+  // TODO: Better heuristic (e.g pick dims based on packing-based metric).
+  return ContractionDimsForPacking{*ac.begin(), *bc.begin(), *ra.begin()};
+}
+
+/// Return a permutation vector of size permSize that would result in moving
+/// positions into desiredPositions.
+///
+/// For example, permSize == 5, positions = {2, 4}, desiredPositions = {1, 0}
+/// would result in a {4, 2, 0, 1, 3} permutation vector.
+static SmallVector<int64_t> computePermutationVector(
+    int64_t permSize, ArrayRef<int64_t> positions,
+    ArrayRef<int64_t> desiredPositions) {
+  SmallVector<int64_t> res(permSize, -1);
+  DenseSet<int64_t> seen;
+  for (auto [pos, desiredPos] : llvm::zip(positions, desiredPositions)) {
+    res[desiredPos] = pos;
+    seen.insert(pos);
+  }
+  int64_t nextPos = 0;
+  for (int64_t &entry : res) {
+    if (entry != -1) continue;
+    while (seen.contains(nextPos)) ++nextPos;
+    entry = nextPos;
+    ++nextPos;
+  }
+  return res;
 }
 
 /// Pack a 2-D contraction into.
 static LogicalResult packContractionGreedily(
     RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-    ArrayRef<OpFoldResult> packingSizes) {
-  assert(linalg::isaContractionOpInterface(linalgOp) && "not a contraction");
+    ArrayRef<OpFoldResult> mnkPackingSizes, ArrayRef<int64_t> mnkOrder) {
+  assert(mnkPackingSizes.size() == 3 && "unexpected num of packing sizes");
+  assert(mnkOrder.size() == 3 && "unexpected mnkOrder size");
 
-  MLIRContext *ctx = rewriter.getContext();
-  auto par = utils::IteratorType::parallel;
-  auto red = utils::IteratorType::reduction;
   int64_t numLoops = linalgOp.getNumLoops();
   if (numLoops <= 2)
     return rewriter.notifyMatchFailure(
         linalgOp, "unexpected numLoops <= 2 in a contraction");
 
-  // 1. Bind dims according to the linalgOp parallel/reduction structure.
-  AffineExpr m, n, k;
-  if (failed(bindDimsAs(linalgOp, {&m, &n, &k}, {par, par, red}))) {
-    return rewriter.notifyMatchFailure(
-        linalgOp, "couldn't bind [par, par, red] iterators");
+  // Locally adjust the desired iterator position of mnk and packing sizes.
+  int64_t numPackedDims = mnkPackingSizes.size();
+  SmallVector<int64_t> mmnnkkPos(numPackedDims);
+  for (int64_t i = 0, e = numPackedDims; i < e; ++i)
+    mmnnkkPos[i] = numLoops - numPackedDims + mnkOrder[i];
+  SmallVector<OpFoldResult> packingSizes(mnkPackingSizes.size());
+  for (int64_t i = 0, e = numPackedDims; i < e; ++i)
+    packingSizes[mnkOrder[i]] = mnkPackingSizes[i];
+
+  // 1. Infer dims that are important for contraction.
+  FailureOr<ContractionDimsForPacking> res = getContractionDims(linalgOp);
+  if (failed(res)) {
+    return rewriter.notifyMatchFailure(linalgOp,
+                                       "couldn't infer contraction iterators");
   }
 
-  // 2. Normalize linalgOp to an mnk-matmul-like with [par, par, red] most-minor
-  // iterators.
-  int64_t mPos = m.cast<AffineDimExpr>().getPosition();
-  int64_t nPos = n.cast<AffineDimExpr>().getPosition();
-  int64_t kPos = k.cast<AffineDimExpr>().getPosition();
-  int64_t mDesiredPos = numLoops - 3;
-  int64_t nDesiredPos = numLoops - 2;
-  int64_t kDesiredPos = numLoops - 1;
+  // 2. Normalize linalgOp to an kmn-matmul-like with [red, par, par] most
+  // minor iterators. If we wanted a different normalization order, this is
+  // where it would have to start.
+  int64_t mPos = res->mPos, nPos = res->nPos, kPos = res->kPos;
+  LLVM_DEBUG(DBGSNL(); DBGSNL(); DBGSNL();
+             DBGS() << "Start packing generic op greedily with (m@" << mPos
+                    << ", n@" << nPos << ", k@" << kPos << "): " << linalgOp
+                    << "\n";);
 
-  // clang-format off
-  LLVM_DEBUG(
-    DBGSNL(); DBGSNL(); DBGSNL();
-    DBGS() << "Start packing generic op greedily with (m@" << m << ", n@" << n << ", k@"
-           << k << "): " << linalgOp << "\n";);
-  // clang-format on
+  // 2.a. Rewrite as a generic.
   auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation());
   if (!genericOp) {
     FailureOr<linalg::GenericOp> generalizeResult =
@@ -615,100 +697,59 @@ static LogicalResult packContractionGreedily(
     genericOp = *generalizeResult;
   }
 
-  SmallVector<int64_t> pos{mPos, nPos, kPos};
-  std::sort(pos.begin(), pos.end());
-  auto permutation = llvm::to_vector(llvm::seq<unsigned>(0, numLoops));
-  for (int64_t p : llvm::reverse(pos))
-    permutation.erase(permutation.begin() + p);
-  permutation.append({(unsigned)mPos, (unsigned)nPos, (unsigned)kPos});
+  // 2.b. Interchange to move the dimensions (k, m, n) as most-minor iterators.
+  // Note that this only normalized the iteration order and does not change the
+  // indexings of any operand.
+  SmallVector<int64_t> permutation =
+      computePermutationVector(numLoops, {mPos, nPos, kPos}, mmnnkkPos);
   LLVM_DEBUG(llvm::interleaveComma(permutation, DBGS() << "perm: "); DBGSNL(););
+  // Sign .. unsigned pollution.
+  SmallVector<unsigned> unsignedPerm(permutation.begin(), permutation.end());
   FailureOr<linalg::GenericOp> interchangeResult =
-      interchangeGenericOp(rewriter, genericOp, permutation);
+      interchangeGenericOp(rewriter, genericOp, unsignedPerm);
   assert(succeeded(interchangeResult) && "unexpected failure interchanging op");
   genericOp = *interchangeResult;
+  LLVM_DEBUG(DBGS() << "Generalized Op to pack: " << genericOp << "\n";);
 
-  // Reassign the m, n, k dimensions which are now unsurprisingly last.
-  m = getAffineDimExpr(mDesiredPos, ctx);
-  n = getAffineDimExpr(nDesiredPos, ctx);
-  k = getAffineDimExpr(kDesiredPos, ctx);
+  // At this point, the op iterators are normalized to {leading, k, m, n}.
+  // The layouts induced by packing will always be:
+  //   - LHS{leading_lhs, kk, mm}
+  //   - RHS{leading_rhs, kk, nn}
+  //   - RES{leading_res, mm, nn}
+  // If we wanted to change the packed order, we would reorder (k, m, n) to
+  // something else above.
+  //
+  // Additional permutations of the outer dims of the operands (i.e.
+  // leading_lhs, leading_rhs and leading_res) could follow by computing the
+  // desired outerPerm for each operand. This is left for future work.
 
-  LLVM_DEBUG(DBGS() << "Generalized Op: " << genericOp << "\n";);
-  LLVM_DEBUG(DBGS() << "Start packing op greedily with (m@" << m << ", n@" << n
-                    << ", k@" << k << "): " << genericOp << "\n";);
-
-  // 3. Stupidly brute-force packing mxnxk to 8x16x32 for now.
-  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
-  SmallVector<AffineMap, 4> maps = genericOp.getIndexingMapsArray();
-  SmallVector<SmallVector<int64_t>> outerPerm, innerPerm;
-  // clang-format off
-  if (maps == infer({{m, k}, {k, n}, {m, n}})) {
-    //  {m, k, mm, kk}, {k, n, nn, kk}, {m, n, mm, nn}
-    // ->
-    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
-    outerPerm = PackPermType{{    }, {1, 0}, {    }};
-    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
-  } else if (maps == infer({{m, k}, {n, k}, {m, n}})) {
-    //  {m, k, mm, kk}, {n, k, nn, kk}, {m, n, mm, nn}
-    // ->
-    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
-    outerPerm = PackPermType{{    }, {    }, {    }};
-    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
-  } else if (maps == infer({{k, m}, {k, n}, {m, n}})) {
-    //  {k, m, mm, kk}, {k, n, nn, kk}, {m, n, mm, nn}
-    // ->
-    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
-    outerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
-    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
-  } else if (maps == infer({{k, m}, {n, k}, {m, n}})) {
-    //  {k, m, mm, kk}, {n, k, nn, kk}, {m, n, mm, nn}
-    // ->
-    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
-    outerPerm = PackPermType{{1, 0}, {    }, {    }};
-    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
-  } else if (maps == infer({{m, k}, {k, n}, {n, m}})) {
-    //  {m, k, mm, kk}, {k, n, nn, kk}, {n, m, mm, nn}
-    // ->
-    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
-    outerPerm = PackPermType{{    }, {1, 0}, {1, 0}};
-    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
-  } else if (maps == infer({{m, k}, {n, k}, {n, m}})) {
-    //  {m, k, mm, kk}, {n, k, nn, kk}, {n, m, mm, nn}
-    // ->
-    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
-    outerPerm = PackPermType{{    }, {    }, {1, 0}};
-    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
-  } else if (maps == infer({{k, m}, {k, n}, {n, m}})) {
-    //  {k, m, mm, kk}, {k, n, nn, kk}, {n, m, mm, nn}
-    // ->
-    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
-    outerPerm = PackPermType{{1, 0}, {1, 0}, {1, 0}};
-    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
-  } else if (maps == infer({{k, m}, {n, k}, {n, m}})) {
-    //  {k, m, mm, kk}, {n, k, nn, kk}, {n, m, mm, nn}
-    // ->
-    //  {m, k, kk, mm}, {n, k, kk, nn}, {m, n, mm, nn}
-    outerPerm = PackPermType{{1, 0}, {    }, {1, 0}};
-    innerPerm = PackPermType{{1, 0}, {1, 0}, {    }};
-  }  else {
-    llvm_unreachable("unexpected contraction case");
-  }
-  // clang-format on
-
-  // TODO: If we want to give the genericOp a name after packing, here would be
-  // a good place.
+  // `innerPermutations` is always empty in this case, this is purely controlled
+  // by the normalization step.
+  // `outerPermutations` is empty for now but could be set up in the future.
+  // TODO: If we wanted to give the genericOp a name after packing, after
+  // calling `applyPackAndTranspose` would be a good time.
+  PackPermType emptyPerm;
+  // Add leading zeros to match numLoops.
+  SmallVector<OpFoldResult> adjustedPackingSizes(numLoops - packingSizes.size(),
+                                                 rewriter.getIndexAttr(0));
+  llvm::append_range(adjustedPackingSizes, packingSizes);
   return applyPackAndTranspose(rewriter, genericOp,
-                               /*packingSizes=*/packingSizes,
-                               /*outerPermutations=*/outerPerm,
-                               /*innerPermutations=*/innerPerm);
+                               /*packingSizes=*/adjustedPackingSizes,
+                               /*outerPermutations=*/emptyPerm,
+                               /*innerPermutations=*/emptyPerm);
 }
 
+///
 static LogicalResult packKnownOperationsGreedily(RewriterBase &rewriter,
                                                  linalg::LinalgOp linalgOp) {
   if (linalg::isaContractionOpInterface(linalgOp)) {
     return packContractionGreedily(
-        rewriter, linalgOp,
-        getAsOpFoldResult(rewriter.getI64ArrayAttr({8, 16, 32})));
+        /*rewriter=*/rewriter,
+        /*linalgOp=*/linalgOp,
+        /*mnkPackingSizes=*/
+        getAsOpFoldResult(
+            rewriter.getI64ArrayAttr({/*m=*/8, /*n=*/16, /*k=*/32})),
+        /*mnkOrder=*/{1, 2, 0});
   }
   return failure();
 }
@@ -721,6 +762,7 @@ DiagnosedSilenceableFailure transform_dialect::PackGreedilyOp::applyToOne(
     // linalgOp will be replaced and the insertion point may be invalidated if
     // we set it before -> set it after.
     rewriter.setInsertionPointAfter(linalgOp);
+    // failing to pack greedily is perfectly fine.
     (void)packKnownOperationsGreedily(rewriter, linalgOp);
   });
   results.push_back(target);
