@@ -163,8 +163,19 @@ static void buildStagedReductionStrategyThreadLevel(
   // This predicate allows further vector distribution to kick in.
   Value root = blockCombinerOpH;
   SmallVector<Value> opsToFuse = {gridFillH};
-  // If we have a unit dim after the reduction that doesn't broadcast fuse it
-  // with the reduction.
+
+  // By the properties matching, we know the optional trailing op takes the
+  // result of the reduction as an input argument.
+  // It necessarily follows that maybeTrailingRank >= reductionRank - 1.
+  // When maybeTrailingRank == reductionRank - 1, by the properties of the
+  // transformations we have applied until now, we know that the elementwise is
+  // a simple scalar operation and it can be fused in the producing reduction
+  // without creating recomputations.
+  // TODO: Some `transform.assert` op that the shape of the op is indeed 1s only
+  // as a safety measure.
+  // TODO: More composable transform strategy parts require more matching after
+  // part of the strategy has been applied. See the discussion in #11951 for
+  // more context.
   if (strategy.captures.maybeTrailingRank ==
       strategy.captures.reductionRank - 1) {
     root = maybeTiledTrailingH;
