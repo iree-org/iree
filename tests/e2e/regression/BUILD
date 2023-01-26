@@ -158,6 +158,27 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
+    name = "aggressive_fusion_test_vulkan",
+    srcs = [
+        "softmax.mlir",
+        "softmax_large.mlir",
+    ],
+    compiler_flags = [
+        "--iree-flow-enable-aggressive-fusion",
+    ],
+    driver = "vulkan",
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
     name = "disable_demote_f64_to_f32",
     srcs = [
         "disable_demote_f64_to_f32.mlir",
