@@ -172,12 +172,10 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   %[[PARTIAL:.*]] = arith.addf %{{.*}}
 //         CHECK:   %[[BROADCAST:.*]], %{{.*}} = gpu.shuffle  idx %[[PARTIAL]]
 //         CHECK:   %[[RES_VEC:.*]] = vector.broadcast %[[BROADCAST]] : f32 to vector<1xf32>
+//         CHECK:   %[[SQRT_VEC:.*]] = math.sqrt %[[RES_VEC]] : vector<1xf32>
 //         CHECK:   %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
 //         CHECK:   scf.if %[[CONDXIS0]]
-//         CHECK:     vector.transfer_write %[[RES_VEC]]
-
-//         CHECK:   gpu.barrier
-//         CHECK:   math.sqrt
+//         CHECK:     vector.transfer_write %[[SQRT_VEC]], {{.*}} : vector<1xf32>, memref<8xf32>
 //         CHECK:   gpu.barrier
 
 // -----

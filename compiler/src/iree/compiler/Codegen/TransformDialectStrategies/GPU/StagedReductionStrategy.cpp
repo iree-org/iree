@@ -161,15 +161,36 @@ static void buildStagedReductionStrategyThreadLevel(
   // y only will trigger the insertion of an `scf.if (threadIdx.x == 0)`
   // predicate after `scf.foreach_thread` is lowered.
   // This predicate allows further vector distribution to kick in.
+  Value root = blockCombinerOpH;
+  SmallVector<Value> opsToFuse = {gridFillH};
+
+  // By the properties matching, we know the optional trailing op takes the
+  // result of the reduction as an input argument.
+  // It necessarily follows that maybeTrailingRank >= reductionRank - 1.
+  // When maybeTrailingRank == reductionRank - 1, by the properties of the
+  // transformations we have applied until now, we know that the elementwise is
+  // a simple scalar operation and it can be fused in the producing reduction
+  // without creating recomputations.
+  // TODO: Some `transform.assert` op that the shape of the op is indeed 1s only
+  // as a safety measure.
+  // TODO: More composable transform strategy parts require more matching after
+  // part of the strategy has been applied. See the discussion in #11951 for
+  // more context.
+  if (strategy.captures.maybeTrailingRank ==
+      strategy.captures.reductionRank - 1) {
+    root = maybeTiledTrailingH;
+    opsToFuse.push_back(blockCombinerOpH);
+  }
   iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
       /*b=*/b,
-      /*rootH=*/blockCombinerOpH,
-      /*opsToFuse=*/{gridFillH},
+      /*rootH=*/root,
+      /*opsToFuse=*/opsToFuse,
       /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({1})),
       /*mappingAttr=*/b.getArrayAttr(strategy.allThreadAttrs[1]));
 
-  // Map the potential maybeTiledTrailingH.
-  if (strategy.captures.maybeTrailingRank > 0) {
+  // Map the potential maybeTiledTrailingH if it hasn't been fused with the
+  // reduction.
+  if (root != maybeTiledTrailingH && strategy.captures.maybeTrailingRank > 0) {
     int64_t vectorSize =
         iree_compiler::gpu::kCudaMaxVectorLoadBitWidth /
         strategy.captures.maybeTrailingOutputElementalTypeBitWidth;
