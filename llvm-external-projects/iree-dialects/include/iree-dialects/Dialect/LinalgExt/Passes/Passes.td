@@ -104,6 +104,14 @@ def DecomposeSoftmax :
                     "createDecomposeSoftmaxPass()";
 }
 
+def TileAndDecomposeAttention :
+    Pass<"iree-linalg-ext-tile-and-decompose-attention", "func::FuncOp"> {
+  let summary =
+      "Tiles and decomposes attention op into a sequence of linalg ops";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createTileAndDecomposeAttentionPass()";
+}
+
 //===---------------------------------------------------------------------====//
 // Codegen Strategy passes moved into IREE
 // TODO: Deprecate all this.

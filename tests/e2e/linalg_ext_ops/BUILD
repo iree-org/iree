@@ -17,6 +17,7 @@ iree_check_single_backend_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "attention.mlir",
             "reverse.mlir",
             "scan.mlir",
             "scatter.mlir",
@@ -85,6 +86,7 @@ iree_check_single_backend_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "attention.mlir",
             "pack.mlir",
             "reverse.mlir",
             "scan.mlir",
@@ -137,6 +139,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "attention.mlir",
             "softmax.mlir",
             "winograd_input.mlir",
             "winograd_output.mlir",
@@ -168,6 +171,7 @@ iree_check_single_backend_test_suite(
             "top-k.mlir",
             "scan.mlir",
             "softmax.mlir",
+            "attention.mlir",
         ],
     ),
     driver = "vulkan",

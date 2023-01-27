@@ -176,6 +176,10 @@ std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
 // linalg generic ops.
 std::unique_ptr<Pass> createDecomposeSoftmaxPass();
 
+// Creates a pass to convert the attention op into a sequence of
+// linalg ops.
+std::unique_ptr<Pass> createTileAndDecomposeAttentionPass();
+
 // Marker used as attribute the depth of the split reduction transformations.
 const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 
