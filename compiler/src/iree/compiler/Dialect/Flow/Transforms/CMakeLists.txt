@@ -35,7 +35,6 @@ iree_cc_library(
     "CollapseDimensions.cpp"
     "CollapseReductionDims.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
-    "ConvertConv2DToImg2Col.cpp"
     "ConvertRegionToWorkgroups.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
@@ -54,7 +53,6 @@ iree_cc_library(
     "InterchangeTransposeGenericOps.cpp"
     "OptimizeNumerics.cpp"
     "OutlineDispatchRegions.cpp"
-    "PadLinalgOps.cpp"
     "PassDetail.h"
     "Passes.cpp"
     "RegionOpUtils.cpp"
@@ -109,6 +107,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Preprocessing::Passes
     iree::compiler::Utils
   PUBLIC
 )
