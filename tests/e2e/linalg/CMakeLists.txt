@@ -19,8 +19,6 @@ iree_check_single_backend_test_suite(
     "llvm-cpu"
   DRIVER
     "local-task"
-  COMPILER_FLAGS
-    "--iree-input-type=none"
 )
 
 iree_check_single_backend_test_suite(
@@ -45,8 +43,6 @@ iree_check_single_backend_test_suite(
     "vmvx"
   DRIVER
     "local-task"
-  COMPILER_FLAGS
-    "--iree-input-type=none"
 )
 
 iree_check_single_backend_test_suite(
@@ -58,8 +54,6 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
-  COMPILER_FLAGS
-    "--iree-input-type=none"
 )
 
 iree_check_single_backend_test_suite(
@@ -68,9 +62,9 @@ iree_check_single_backend_test_suite(
   SRCS
     "conv2d.mlir"
   TARGET_BACKEND
-    "llvm-cpu"
+    "vulkan-spirv"
   DRIVER
-    "local-task"
+    "vulkan"
   COMPILER_FLAGS
     "--iree-flow-enable-conv-winograd-transform"
 )
