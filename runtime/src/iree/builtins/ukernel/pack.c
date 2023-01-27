@@ -11,6 +11,48 @@
 
 enum { iree_uk_pack_tmp_buf_size = 4096 };
 
+// Holds some information and a temporary buffer for performing padding.
+typedef struct iree_uk_pack_padding_helper {
+  // Temporary buffer to pad the source data into, to pass to the tile_func.
+  // Cache line alignment helps in pack_benchmark on ARM Cortex-A510/A710.
+  IREE_UK_ATTRIBUTE_ALIGNED(64) char tmp_buf[iree_uk_pack_tmp_buf_size];
+  // How many tiles fit in `tmp_buf`.
+  int max_tiles_in_tmp_buf;
+  // Is the padding value as single-byte pattern (so we can use memset).
+  bool is_padding_single_byte;
+} iree_uk_pack_padding_helper;
+
+// Return x/y for x>=0 and y>0, with a fast path for when y is a power of two.
+static iree_uk_ssize_t iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
+    iree_uk_ssize_t x, iree_uk_int32_t y) {
+  IREE_UK_ASSERT(x >= 0);
+  IREE_UK_ASSERT(y > 0);
+  return IREE_UK_LIKELY(iree_uk_is_po2_u32(y)) ? (x >> iree_uk_po2_log2_u32(y))
+                                               : (x / y);
+}
+
+// Returns true if the `num_bytes` bytes at `buf` are all equal.
+static bool iree_uk_is_single_byte_pattern(const char* buf,
+                                           iree_uk_ssize_t num_bytes) {
+  for (iree_uk_ssize_t i = 1; i < num_bytes; ++i) {
+    if (buf[i] != buf[0]) return false;
+  }
+  return true;
+}
+
+// Initializes a `iree_uk_pack_padding_helper`. Asserts if the temporary buffer
+// is smaller than one tile.
+static void iree_uk_pack_padding_helper_init(
+    iree_uk_ssize_t tile_size0, iree_uk_ssize_t tile_size1,
+    iree_uk_ssize_t elem_size, const void* padding_value,
+    iree_uk_pack_padding_helper* helper) {
+  helper->max_tiles_in_tmp_buf = iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
+      iree_uk_pack_tmp_buf_size, tile_size0 * tile_size1 * elem_size);
+  IREE_UK_ASSERT(helper->max_tiles_in_tmp_buf > 0);
+  helper->is_padding_single_byte =
+      iree_uk_is_single_byte_pattern(padding_value, elem_size);
+}
+
 static void iree_uk_pack_validate(const iree_uk_pack_params_t* params) {
 #ifdef IREE_UK_ENABLE_ASSERTS
   const iree_uk_uint32_t allflags =
@@ -44,6 +86,17 @@ static void iree_uk_pack_validate(const iree_uk_pack_params_t* params) {
   // TODO(#11632): reenable these conditions.
   // IREE_UK_ASSERT((outer_size0 - 1) * tile_size0 < params->in_size0);
   // IREE_UK_ASSERT((outer_size1 - 1) * tile_size1 < params->in_size1);
+
+  // Initialize a padding helper, just to get the assertion that the tile size
+  // does not exceed the internal temporary buffer size, without having to
+  // duplicate this arithmetic. Generally, we want to hit all failure modes
+  // in the validation function so that the subsequent ukernel code can be
+  // treated as infallible.
+  iree_uk_pack_padding_helper padding_helper;
+  iree_uk_type_t elem_type = iree_uk_pack_in_type(params->type);
+  iree_uk_ssize_t elem_size = iree_uk_type_size(elem_type);
+  iree_uk_pack_padding_helper_init(tile_size0, tile_size1, elem_size,
+                                   params->padding_value, &padding_helper);
 #endif  // IREE_UK_ENABLE_ASSERTS
 }
 
@@ -63,15 +116,6 @@ static iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func(
     return arch_tile_func;
   }
   return iree_uk_pack_select_tile_func_generic(params);
-}
-
-// Returns true if the `num_bytes` bytes at `buf` are all equal.
-static bool iree_uk_is_single_byte_pattern(const char* buf,
-                                           iree_uk_ssize_t num_bytes) {
-  for (iree_uk_ssize_t i = 1; i < num_bytes; ++i) {
-    if (buf[i] != buf[0]) return false;
-  }
-  return true;
 }
 
 // Fills `buf` with `num_elems` times the `pattern` of size `elem_size`.
@@ -106,38 +150,6 @@ static void iree_uk_copy_and_pad(iree_uk_ssize_t src_size0,
     dst_buf += dst_stride0 * elem_size;
     src_buf += src_stride0 * elem_size;
   }
-}
-
-// Return x/y for x>=0 and y>0, with a fast path for when y is a power of two.
-static iree_uk_ssize_t iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
-    iree_uk_ssize_t x, iree_uk_int32_t y) {
-  IREE_UK_ASSERT(x >= 0);
-  IREE_UK_ASSERT(y > 0);
-  return IREE_UK_LIKELY(iree_uk_is_po2_u32(y)) ? (x >> iree_uk_po2_log2_u32(y))
-                                               : (x / y);
-}
-
-// Holds some information and a temporary buffer for performing padding.
-typedef struct iree_uk_pack_padding_helper {
-  // Temporary buffer to pad the source data into, to pass to the tile_func.
-  // Cache line alignment helps in pack_benchmark on ARM Cortex-A510/A710.
-  IREE_UK_ATTRIBUTE_ALIGNED(64) char tmp_buf[iree_uk_pack_tmp_buf_size];
-  // How many tiles fit in `tmp_buf`.
-  int max_tiles_in_tmp_buf;
-  // Is the padding value as single-byte pattern (so we can use memset).
-  bool is_padding_single_byte;
-} iree_uk_pack_padding_helper;
-
-// Initializes a `iree_uk_pack_padding_helper`.
-static void iree_uk_pack_padding_helper_init(
-    iree_uk_ssize_t tile_size0, iree_uk_ssize_t tile_size1,
-    iree_uk_ssize_t elem_size, const void* padding_value,
-    iree_uk_pack_padding_helper* helper) {
-  helper->max_tiles_in_tmp_buf = iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
-      iree_uk_pack_tmp_buf_size, tile_size0 * tile_size1 * elem_size);
-  IREE_UK_ASSERT(max_tiles_in_tmp_buf > 0);
-  helper->is_padding_single_byte =
-      iree_uk_is_single_byte_pattern(padding_value, elem_size);
 }
 
 // Pads and packs an entire row. In cases that are known not to require padding,
