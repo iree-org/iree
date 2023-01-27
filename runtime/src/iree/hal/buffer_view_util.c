@@ -298,10 +298,14 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
   mappable_params.type |= IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   mappable_params.usage |= IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_compatibility_t compatibility =
-      iree_hal_allocator_query_buffer_compatibility(allocator, mappable_params,
-                                                    allocation_size);
-  bool is_mappable = iree_all_bits_set(
-      compatibility, IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE);
+      iree_hal_allocator_query_buffer_compatibility(
+          allocator, mappable_params, allocation_size, &mappable_params,
+          &allocation_size);
+  bool is_mappable =
+      iree_all_bits_set(compatibility,
+                        IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE) &&
+      !iree_any_bit_set(compatibility,
+                        IREE_HAL_BUFFER_COMPATIBILITY_LOW_PERFORMANCE);
 
   iree_status_t status = iree_ok_status();
   if (is_mappable) {

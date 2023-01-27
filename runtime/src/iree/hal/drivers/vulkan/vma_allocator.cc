@@ -179,8 +179,9 @@ static void iree_hal_vulkan_populate_transfer_memory_types(
                                      ? host_local_download_idx
                                      : device_local_download_idx;
 
-  // Always use device-local for staging if we have it. This is BAR/page-locked
-  // memory on discrete devices but may just be the same has
+  // Always use device-local for staging if we have it. This is usually PCI-E
+  // BAR/page-locked memory on discrete devices while it may just be host
+  // allocations with special caching flags on integrated ones.
   out_types->staging_upload_idx = device_local_upload_idx != -1
                                       ? device_local_upload_idx
                                       : host_local_upload_idx;
@@ -570,6 +571,7 @@ static iree_status_t iree_hal_vulkan_vma_allocator_query_memory_heaps(
   IREE_TRACE_ZONE_APPEND_VALUE(z0, count);
   IREE_TRACE_ZONE_END(z0);
   if (capacity < count) {
+    // NOTE: lightweight as this is hit in normal pre-sizing usage.
     return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
   return iree_ok_status();
@@ -578,8 +580,8 @@ static iree_status_t iree_hal_vulkan_vma_allocator_query_memory_heaps(
 static iree_hal_buffer_compatibility_t
 iree_hal_vulkan_vma_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
-    const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size) {
+    iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_device_size_t* IREE_RESTRICT allocation_size) {
   // TODO(benvanik): check to ensure the allocator can serve the memory type.
 
   // All buffers can be allocated on the heap.
@@ -598,6 +600,18 @@ iree_hal_vulkan_vma_allocator_query_buffer_compatibility(
     }
   }
 
+  // We are now optimal.
+  params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
+
+  // Guard against the corner case where the requested buffer size is 0. The
+  // application is unlikely to do anything when requesting a 0-byte buffer; but
+  // it can happen in real world use cases. So we should at least not crash.
+  if (*allocation_size == 0) *allocation_size = 4;
+
+  // Align allocation sizes to 4 bytes so shaders operating on 32 bit types can
+  // act safely even on buffer ranges that are not naturally aligned.
+  *allocation_size = iree_host_align(*allocation_size, 4);
+
   return compatibility;
 }
 
@@ -607,14 +621,6 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
     iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
     VmaAllocationCreateFlags flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  // Guard against the corner case where the requested buffer size is 0. The
-  // application is unlikely to do anything when requesting a 0-byte buffer; but
-  // it can happen in real world use cases. So we should at least not crash.
-  if (allocation_size == 0) allocation_size = 4;
-  // Align allocation sizes to 4 bytes so shaders operating on 32 bit types can
-  // act safely even on buffer ranges that are not naturally aligned.
-  allocation_size = iree_host_align(allocation_size, 4);
-
   VkBufferCreateInfo buffer_create_info;
   buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   buffer_create_info.pNext = NULL;
@@ -725,8 +731,20 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_buffer(
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_vulkan_vma_allocator_t* allocator =
       iree_hal_vulkan_vma_allocator_cast(base_allocator);
+
+  // Coerce options into those required by the current device.
+  iree_hal_buffer_params_t compat_params = *params;
+  if (!iree_all_bits_set(
+          iree_hal_vulkan_vma_allocator_query_buffer_compatibility(
+              base_allocator, &compat_params, &allocation_size),
+          IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "allocator cannot allocate a buffer with the given parameters");
+  }
+
   return iree_hal_vulkan_vma_allocator_allocate_internal(
-      allocator, params, allocation_size, initial_data,
+      allocator, &compat_params, allocation_size, initial_data,
       /*flags=*/0, out_buffer);
 }
 

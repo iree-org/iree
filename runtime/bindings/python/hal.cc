@@ -629,7 +629,8 @@ void SetupHalBindings(pybind11::module m) {
             params.type = memory_type;
             params.usage = allowed_usage & intended_usage;
             return iree_hal_allocator_query_buffer_compatibility(
-                self.raw_ptr(), params, allocation_size);
+                self.raw_ptr(), params, allocation_size,
+                /*out_params=*/nullptr, /*out_allocation_size=*/0);
           },
           py::arg("memory_type"), py::arg("allowed_usage"),
           py::arg("intended_usage"), py::arg("allocation_size"))

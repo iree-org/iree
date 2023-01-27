@@ -279,6 +279,13 @@ enum iree_hal_buffer_usage_bits_t {
       IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_READ |
       IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_WRITE,
 
+  // Buffer contents are available for use by all dispatch-related operations.
+  IREE_HAL_BUFFER_USAGE_DISPATCH =
+      IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
+      IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
+      IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+      IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE,
+
   // ==== IREE_HAL_BUFFER_USAGE_SHARING_* ======================================
 
   // Buffer can be exported via iree_hal_allocator_export_buffer.

@@ -80,6 +80,7 @@ IREE_API_EXPORT iree_string_view_t iree_hal_memory_access_format(
 static const iree_bitfield_string_mapping_t iree_hal_buffer_usage_mappings[] = {
   // Combined:
   {IREE_HAL_BUFFER_USAGE_TRANSFER, IREE_SVL("TRANSFER")},
+  {IREE_HAL_BUFFER_USAGE_DISPATCH, IREE_SVL("DISPATCH")},
   {IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE, IREE_SVL("DISPATCH_STORAGE")},
   {IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE, IREE_SVL("DISPATCH_IMAGE")},
   {IREE_HAL_BUFFER_USAGE_MAPPING, IREE_SVL("MAPPING")},

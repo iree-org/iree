@@ -70,7 +70,8 @@ typedef struct iree_hal_allocator_memory_heap_t {
   iree_hal_buffer_usage_t allowed_usage;
 
   // Maximum size, in bytes, of any individual allocation of this type.
-  // Due to fragmentation it's possible for allocations under this size to fail.
+  // Allocations over this size will fail. Note that due to fragmentation it's
+  // also possible for allocations under this size to fail.
   iree_device_size_t max_allocation_size;
 
   // Minimum alignment, in bytes, of allocations of this type.
@@ -194,6 +195,12 @@ enum iree_hal_buffer_compatibility_bits_t {
 
   // Indicates that the buffer can be used as an input/output to a dispatch.
   IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH = 1u << 11,
+
+  // Indicates that buffers allocated this way may have much lower performance
+  // than others. An example would be a buffer that must be allocated in host
+  // memory and accessed by the device over the PCI bus as compared to device
+  // local memory that will be significantly faster.
+  IREE_HAL_BUFFER_COMPATIBILITY_LOW_PERFORMANCE = 1u << 20,
 };
 typedef uint32_t iree_hal_buffer_compatibility_t;
 
@@ -399,7 +406,9 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_query_memory_heaps(
     iree_host_size_t* IREE_RESTRICT out_count);
 
 // Returns a bitmask indicating what operations with buffers of the given type
-// are available on the allocator.
+// are available on the allocator. If any parameters or the allocation size must
+// be changed by the allocator to match device requirements they will be
+// returned in the optional |out_params| and |out_allocation_size| arguments.
 //
 // For buffers allocated from the given allocator it's expected that the result
 // will always be non-NONE. For buffers that originate from another allocator
@@ -411,7 +420,9 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_query_memory_heaps(
 IREE_API_EXPORT iree_hal_buffer_compatibility_t
 iree_hal_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
-    iree_hal_buffer_params_t params, iree_device_size_t allocation_size);
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
+    iree_hal_buffer_params_t* out_params,
+    iree_device_size_t* out_allocation_size);
 
 // Allocates a buffer from the allocator.
 // If |initial_data| is provided then the bytes will be copied into the device
@@ -526,8 +537,8 @@ typedef struct iree_hal_allocator_vtable_t {
 
   iree_hal_buffer_compatibility_t(IREE_API_PTR* query_buffer_compatibility)(
       iree_hal_allocator_t* IREE_RESTRICT allocator,
-      const iree_hal_buffer_params_t* IREE_RESTRICT params,
-      iree_device_size_t allocation_size);
+      iree_hal_buffer_params_t* IREE_RESTRICT params,
+      iree_device_size_t* IREE_RESTRICT allocation_size);
 
   iree_status_t(IREE_API_PTR* allocate_buffer)(
       iree_hal_allocator_t* IREE_RESTRICT allocator,

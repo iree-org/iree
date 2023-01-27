@@ -134,6 +134,7 @@ static iree_status_t iree_hal_cuda_allocator_query_memory_heaps(
   }
   if (out_count) *out_count = count;
   if (capacity < count) {
+    // NOTE: lightweight as this is hit in normal pre-sizing usage.
     return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
 
@@ -148,10 +149,8 @@ static iree_status_t iree_hal_cuda_allocator_query_memory_heaps(
   // Device-local memory (dispatch resources):
   heaps[i++] = (iree_hal_allocator_memory_heap_t){
       .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-      .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE,
+      .allowed_usage =
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH,
       .max_allocation_size = max_allocation_size,
       .min_alignment = min_alignment,
   };
@@ -163,9 +162,7 @@ static iree_status_t iree_hal_cuda_allocator_query_memory_heaps(
                 IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
                 IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
         .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                         IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
-                         IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
-                         IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                         IREE_HAL_BUFFER_USAGE_DISPATCH |
                          IREE_HAL_BUFFER_USAGE_MAPPING,
         .max_allocation_size = max_allocation_size,
         .min_alignment = min_alignment,
@@ -178,9 +175,7 @@ static iree_status_t iree_hal_cuda_allocator_query_memory_heaps(
               IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
               IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
       .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                       IREE_HAL_BUFFER_USAGE_DISPATCH |
                        IREE_HAL_BUFFER_USAGE_MAPPING,
       .max_allocation_size = max_allocation_size,
       .min_alignment = min_alignment,
@@ -193,9 +188,7 @@ static iree_status_t iree_hal_cuda_allocator_query_memory_heaps(
               IREE_HAL_MEMORY_TYPE_HOST_COHERENT |
               IREE_HAL_MEMORY_TYPE_HOST_CACHED,
       .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
-                       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                       IREE_HAL_BUFFER_USAGE_DISPATCH |
                        IREE_HAL_BUFFER_USAGE_MAPPING,
       .max_allocation_size = max_allocation_size,
       .min_alignment = min_alignment,
@@ -208,19 +201,10 @@ static iree_status_t iree_hal_cuda_allocator_query_memory_heaps(
 static iree_hal_buffer_compatibility_t
 iree_hal_cuda_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
-    const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size) {
+    iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_device_size_t* IREE_RESTRICT allocation_size) {
   iree_hal_cuda_allocator_t* allocator =
       iree_hal_cuda_allocator_cast(base_allocator);
-
-  // If concurrent managed access is not supported then we disallow mapping of
-  // device local memory.
-  if (!allocator->supports_concurrent_managed_access &&
-      iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_MAPPING) &&
-      iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-    return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
-  }
 
   // All buffers can be allocated on the heap.
   iree_hal_buffer_compatibility_t compatibility =
@@ -237,6 +221,29 @@ iree_hal_cuda_allocator_query_buffer_compatibility(
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
     }
   }
+
+  // If concurrent managed access is not supported then make device-local +
+  // host-visible allocations fall back to host-local + device-visible
+  // page-locked memory. This will be significantly slower for the device to
+  // access but the compiler only uses this type for readback staging buffers
+  // and it's better to function than function fast.
+  if (!allocator->supports_concurrent_managed_access &&
+      iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_LOW_PERFORMANCE;
+    params->type &= ~(IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE);
+    params->type |=
+        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  }
+
+  // We are now optimal.
+  params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
+
+  // Guard against the corner case where the requested buffer size is 0. The
+  // application is unlikely to do anything when requesting a 0-byte buffer; but
+  // it can happen in real world use cases. So we should at least not crash.
+  if (*allocation_size == 0) *allocation_size = 4;
 
   return compatibility;
 }
@@ -272,24 +279,15 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_cuda_allocator_t* allocator =
       iree_hal_cuda_allocator_cast(base_allocator);
-  // Guard against the corner case where the requested buffer size is 0. The
-  // application is unlikely to do anything when requesting a 0-byte buffer; but
-  // it can happen in real world use cases. So we should at least not crash.
-  if (allocation_size == 0) allocation_size = 4;
 
-  // If concurrent managed access is not supported then make device-local +
-  // host-visible allocations fall back to host-local + device-visible
-  // page-locked memory. This will be significantly slower for the device to
-  // access but the compiler only uses this type for readback staging buffers
-  // and it's better to function than function fast.
-  iree_hal_memory_type_t memory_type = params->type;
-  if (!allocator->supports_concurrent_managed_access &&
-      iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                                         IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-    memory_type &= ~(IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                     IREE_HAL_MEMORY_TYPE_HOST_VISIBLE);
-    memory_type |=
-        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  // Coerce options into those required by the current device.
+  iree_hal_buffer_params_t compat_params = *params;
+  if (!iree_all_bits_set(iree_hal_cuda_allocator_query_buffer_compatibility(
+                             base_allocator, &compat_params, &allocation_size),
+                         IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "allocator cannot allocate a buffer with the given parameters");
   }
 
   iree_status_t status = iree_ok_status();
@@ -298,9 +296,11 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   CUdeviceptr device_ptr = 0;
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_cuda_buffer_allocate");
   IREE_TRACE_ZONE_APPEND_VALUE(z0, allocation_size);
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+  if (iree_all_bits_set(compat_params.type,
+                        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local case.
-    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    if (iree_all_bits_set(compat_params.type,
+                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
       buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_DEVICE;
       status =
           CU_RESULT_TO_STATUS(allocator->context->syms,
@@ -324,7 +324,8 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   } else {
     buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_HOST;
     unsigned int flags = CU_MEMHOSTALLOC_DEVICEMAP;
-    if (!iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
+    if (!iree_all_bits_set(compat_params.type,
+                           IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
       flags |= CU_MEMHOSTALLOC_WRITECOMBINED;
     }
     status =
@@ -341,8 +342,8 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_buffer_wrap(
-        base_allocator, memory_type, params->access, params->usage,
-        allocation_size,
+        base_allocator, compat_params.type, compat_params.access,
+        compat_params.usage, allocation_size,
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, buffer_type, device_ptr, host_ptr,
         iree_hal_buffer_release_callback_null(), &buffer);
@@ -365,7 +366,7 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
                            (void*)iree_hal_cuda_buffer_device_pointer(buffer),
                            allocation_size);
     IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
-        &allocator->statistics, memory_type, allocation_size));
+        &allocator->statistics, compat_params.type, allocation_size));
     *out_buffer = buffer;
   } else {
     if (!buffer) {
@@ -433,6 +434,17 @@ static iree_status_t iree_hal_cuda_allocator_import_buffer(
   iree_hal_cuda_allocator_t* allocator =
       iree_hal_cuda_allocator_cast(base_allocator);
 
+  // Coerce options into those required by the current device.
+  iree_hal_buffer_params_t compat_params = *params;
+  iree_device_size_t allocation_size = external_buffer->size;
+  if (!iree_all_bits_set(iree_hal_cuda_allocator_query_buffer_compatibility(
+                             base_allocator, &compat_params, &allocation_size),
+                         IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "allocator cannot import a buffer with the given parameters");
+  }
+
   iree_status_t status = iree_ok_status();
   iree_hal_cuda_buffer_type_t buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_DEVICE;
   void* host_ptr = NULL;
@@ -440,7 +452,8 @@ static iree_status_t iree_hal_cuda_allocator_import_buffer(
 
   switch (external_buffer->type) {
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION: {
-      if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+      if (iree_all_bits_set(compat_params.type,
+                            IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
         return iree_make_status(
             IREE_STATUS_INVALID_ARGUMENT,
             "unable to register host allocations as device-local memory");
@@ -448,10 +461,10 @@ static iree_status_t iree_hal_cuda_allocator_import_buffer(
       buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_HOST_REGISTERED;
       host_ptr = external_buffer->handle.host_allocation.ptr;
       uint32_t register_flags = 0;
-      if (params->access == IREE_HAL_MEMORY_ACCESS_READ) {
+      if (compat_params.access == IREE_HAL_MEMORY_ACCESS_READ) {
         register_flags = CU_MEMHOSTREGISTER_READ_ONLY;
       }
-      if (iree_any_bit_set(params->usage,
+      if (iree_any_bit_set(compat_params.usage,
                            IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
                                IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
                                IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
@@ -482,8 +495,8 @@ static iree_status_t iree_hal_cuda_allocator_import_buffer(
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_buffer_wrap(
-        base_allocator, params->type, params->access, params->usage,
-        external_buffer->size,
+        base_allocator, compat_params.type, compat_params.access,
+        compat_params.usage, external_buffer->size,
         /*byte_offset=*/0,
         /*byte_length=*/external_buffer->size, buffer_type, device_ptr,
         host_ptr, release_callback, &buffer);
