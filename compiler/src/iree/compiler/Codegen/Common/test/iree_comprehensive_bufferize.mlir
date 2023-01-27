@@ -79,7 +79,8 @@ func.func @matmul_fill() {
   %m = hal.interface.constant.load[0] : index
   %n = hal.interface.constant.load[1] : index
   %k = hal.interface.constant.load[2] : index
-  %base_offset = hal.interface.constant.load[3] alignment(8) : index
+  %base_offset_i32 = hal.interface.constant.load[3] alignment(8) : i32
+  %base_offset = arith.index_castui %base_offset_i32 : i32 to index
   %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%m, %k}
   %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%base_offset) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%k, %n}
   %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c1024) : !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%m, %n}
@@ -115,7 +116,8 @@ func.func @matmul_fill() {
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
 //  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
-//  CHECK-DAG:   %[[BASE_OFFSET:.+]] = hal.interface.constant.load[3]
+//  CHECK-DAG:   %[[BASE_OFFSET_I32:.+]] = hal.interface.constant.load[3]
+//  CHECK-DAG:   %[[BASE_OFFSET:.+]] = arith.index_castui %[[BASE_OFFSET_I32]]
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32)
 //  CHECK-DAG:   memref.assume_alignment %[[LHS]], 32
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[BASE_OFFSET]])

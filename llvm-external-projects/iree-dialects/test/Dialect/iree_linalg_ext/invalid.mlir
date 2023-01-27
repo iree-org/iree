@@ -731,3 +731,12 @@ func.func @illegal_softmax_output_shape(%arg0: tensor<2x16x32xf32>) -> tensor<2x
 }
 
 // -----
+
+func.func @illegal_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<6x12x20x8xf32>, %value: tensor<6x12x20x8xf32>) {
+  %0 = tensor.empty() : tensor<6x12x20x8xf32>
+  // expected-error @+1 {{failed to verify that query has shaped type of rank 3}}
+  %1 = iree_linalg_ext.attention ins(%query, %key, %value : tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>) outs(%0 : tensor<6x12x20x8xf32>) -> tensor<6x12x20x8xf32>
+  return %1 : tensor<6x12x20x8xf32>
+}
+
+// -----

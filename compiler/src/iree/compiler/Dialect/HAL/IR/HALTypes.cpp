@@ -179,16 +179,22 @@ std::optional<uint64_t> lookupOffsetOrAlignment(Value value) {
   }
 
   auto op = value.getDefiningOp();
-  if (auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceConstantLoadOp>(op)) {
+  if (!op) return std::nullopt;
+  if (auto alignmentAttr = op->getAttrOfType<IntegerAttr>("stream.alignment")) {
+    // The op has an alignment tagged on it we can use directly.
+    return alignmentAttr.getValue().getZExtValue();
+  }
+
+  // TODO(benvanik): walk other pass-through. These are the most common in our
+  // programs today.
+  if (auto loadOp = dyn_cast<IREE::HAL::InterfaceConstantLoadOp>(op)) {
     // Push constants have an optional value alignment.
     auto alignment = loadOp.getAlignment();
     if (alignment.has_value()) {
       return alignment.value().getZExtValue();
     }
-  } else if (auto alignmentAttr =
-                 op->getAttrOfType<IntegerAttr>("stream.alignment")) {
-    // The op has an alignment tagged on it we can use directly.
-    return alignmentAttr.getValue().getZExtValue();
+  } else if (auto castOp = dyn_cast<arith::IndexCastUIOp>(op)) {
+    return lookupOffsetOrAlignment(castOp.getOperand());
   }
 
   // TODO(benvanik): more searching using util.align and other ops.

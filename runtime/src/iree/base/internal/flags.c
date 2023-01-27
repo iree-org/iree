@@ -598,4 +598,17 @@ IREE_FLAG_CALLBACK(iree_flags_parse_flagfile, iree_flags_print_flagfile, NULL,
 
 #endif  // IREE_FLAGS_ENABLE_FLAG_FILE
 
+#else
+
+void iree_flags_set_usage(const char* program_name, const char* usage) {}
+
+int iree_flags_parse(iree_flags_parse_mode_t mode, int* argc, char*** argv) {
+  return 0;
+}
+
+void iree_flags_parse_checked(iree_flags_parse_mode_t mode, int* argc,
+                              char*** argv) {}
+
+void iree_flags_dump(iree_flag_dump_mode_t mode, FILE* file) {}
+
 #endif  // IREE_FLAGS_ENABLE_CLI
