@@ -14,42 +14,42 @@ package(
 )
 
 iree_gentbl_cc_library(
-  name = "PassesIncGen",
-  tbl_outs = [
-      (
-          ["--gen-pass-decls"],
-          "Passes.h.inc",
-      ),
-  ],
-  tblgen = "@llvm-project//mlir:mlir-tblgen",
-  td_file = "Passes.td",
-  deps = [
-    "@llvm-project//mlir:PassBaseTdFiles",
-  ],
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
 )
 
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
-      "ConvertConv2DToImg2Col.cpp",
-      "PadLinalgOps.cpp",
-      "PassDetail.h",
-      "Passes.cpp",
+        "ConvertConv2DToImg2Col.cpp",
+        "PadLinalgOps.cpp",
+        "PassDetail.h",
+        "Passes.cpp",
     ],
     hdrs = [
-      "Passes.h",
-      "Passes.h.inc",
+        "Passes.h",
+        "Passes.h.inc",
     ],
     deps = [
-      ":PassesIncGen",
-      "@llvm-project//llvm:Support",
-      "@llvm-project//mlir:ArithDialect",
-      "@llvm-project//mlir:DialectUtils",
-      "@llvm-project//mlir:IR",
-      "@llvm-project//mlir:LinalgDialect",
-      "@llvm-project//mlir:Pass",
-      "@llvm-project//mlir:TensorDialect",
-      "@llvm-project//mlir:TensorUtils",
-      "@llvm-project//mlir:Transforms",
+        ":PassesIncGen",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorUtils",
+        "@llvm-project//mlir:Transforms",
     ]
 )

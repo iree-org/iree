@@ -13,17 +13,17 @@ package(
 )
 
 iree_compiler_cc_library(
-  name = "Passes",
-  srcs = [
-    "Passes.cpp",
-  ],
-  hdrs = [
-    "Passes.h",
-  ],
-  deps = [
-    "//compiler/src/iree/compiler/Preprocessing/Common:Transforms",
-    "@llvm-project//llvm:Support",
-    "@llvm-project//mlir:ArithDialect",
-    "@llvm-project//mlir:Pass",
-  ],
+    name = "Passes",
+    srcs = [
+        "Passes.cpp",
+    ],
+    hdrs = [
+        "Passes.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Preprocessing/Common:Transforms",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:Pass",
+    ],
 )
