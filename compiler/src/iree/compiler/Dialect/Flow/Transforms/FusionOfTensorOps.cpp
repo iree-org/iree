@@ -129,8 +129,6 @@ struct FuseElementwiseOpsWithMultipleUses
       return rewriter.notifyMatchFailure(consumerOp,
                                          "failed to fuse with producer");
     }
-    assert(fusedOperation.value()->getNumResults() ==
-           producerOp->getNumResults() + consumerOp->getNumResults());
     auto fusedResults = fusedOperation.value()->getResults();
     rewriter.replaceOp(producerOp,
                        fusedResults.take_front(producerOp->getNumResults()));
