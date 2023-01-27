@@ -62,12 +62,6 @@ static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<int> clLinalgOpsPaddingSize(
-    "iree-flow-linalg-ops-padding-size",
-    llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
-                   "flow-padding-size"),
-    llvm::cl::init(4));
-
 static llvm::cl::opt<bool> clEnableAggressiveFusion(
     "iree-flow-enable-aggressive-fusion",
     llvm::cl::desc(
