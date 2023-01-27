@@ -520,7 +520,7 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   for (auto val : distributedTileSizes) {
     if (val == 0) {
       updatedDistributedTileSizes.push_back(
-          (foundNonZero || distributedTileSizes.size() <= 3) ? 0 : 1);
+          (foundNonZero || distributedTileSizes.size() <= 4) ? 0 : 1);
       continue;
     }
     updatedDistributedTileSizes.push_back(val);
