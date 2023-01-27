@@ -69,8 +69,9 @@ static std::tuple<Value, Value> computeNewSum(Value oldMax, Value newMax,
   return std::make_tuple(genericOp.getResult(0), genericOp.getResult(1));
 }
 
-static Value computeSoftmax(Value qkTranspose, Value currentMax, Value output,
-                            Location loc, OpBuilder &builder) {
+static Value computePartialSoftmax(Value qkTranspose, Value currentMax,
+                                   Value output, Location loc,
+                                   OpBuilder &builder) {
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(2, builder.getContext());
   AffineExpr d0, d1;
@@ -91,31 +92,49 @@ static Value computeSoftmax(Value qkTranspose, Value currentMax, Value output,
   return genericOp.getResult(0);
 }
 
-static std::tuple<Value, Value>
-scaleSoftmaxAndAccumulator(Value oldSum, Value newSum, Value softmax, Value acc,
-                           Value softmaxOutput, Location loc,
-                           OpBuilder &builder) {
+static Value scalePartialSoftmax(Value softmax, Value scaledOldSum,
+                                 Value output, Location loc,
+                                 OpBuilder &builder) {
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(2, builder.getContext());
   AffineExpr d0, d1;
   bindDims(builder.getContext(), d0, d1);
   // (d0, d1) -> (d0)
   auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
-  SmallVector<AffineMap> indexingMaps{rowMap, rowMap, identityMap, identityMap,
-                                      identityMap};
+  SmallVector<AffineMap> indexingMaps{identityMap, rowMap, identityMap};
   SmallVector<utils::IteratorType> iteratorTypes(2,
                                                  utils::IteratorType::parallel);
-  SmallVector<Type> resultTypes{softmaxOutput.getType(), acc.getType()};
   auto genericOp = builder.create<linalg::GenericOp>(
-      loc, resultTypes, ValueRange{oldSum, newSum, softmax},
-      ValueRange{softmaxOutput, acc}, indexingMaps, iteratorTypes,
+      loc, softmax.getType(), ValueRange{softmax, scaledOldSum}, output,
+      indexingMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value softmax = b.create<arith::DivFOp>(loc, args[2], args[1]);
-        Value prod = b.create<arith::DivFOp>(loc, args[0], args[1]);
-        Value result = b.create<arith::MulFOp>(loc, args[4], prod);
-        b.create<linalg::YieldOp>(loc, ValueRange{softmax, result});
+        Value result = b.create<arith::DivFOp>(loc, args[0], args[1]);
+        b.create<linalg::YieldOp>(loc, result);
       });
-  return std::make_tuple(genericOp.getResult(0), genericOp.getResult(1));
+  return genericOp.getResult(0);
+}
+
+static Value scaleAccumulator(Value accumulator, Value scaledOldSum,
+                              Value newSum, Value output, Location loc,
+                              OpBuilder &builder) {
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(2, builder.getContext());
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  // (d0, d1) -> (d0)
+  auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{identityMap, rowMap, rowMap, identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(2,
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, accumulator.getType(), ValueRange{accumulator, scaledOldSum, newSum},
+      output, indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value prod = b.create<arith::DivFOp>(loc, args[1], args[2]);
+        Value result = b.create<arith::MulFOp>(loc, prod, args[0]);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  return genericOp.getResult(0);
 }
 
 static Value computeQKTranspose(Value query, Value key, Value transposedOutput,
@@ -322,22 +341,30 @@ LogicalResult reifyAttentionTransform(func::FuncOp funcOp) {
     // Compute current statistics
     Value newMax = computeRowwiseReduction<arith::MaxFOp>(
         qkTranspose, iterArgMax, loc, rewriter);
-    Value softmax =
-        computeSoftmax(qkTranspose, newMax, emptySquare, loc, rewriter);
-    Value currentSum =
-        computeRowwiseReduction<arith::AddFOp>(softmax, zeroSum, loc, rewriter);
+    Value partialSoftmax =
+        computePartialSoftmax(qkTranspose, newMax, emptySquare, loc, rewriter);
+    Value currentSum = computeRowwiseReduction<arith::AddFOp>(
+        partialSoftmax, zeroSum, loc, rewriter);
 
     auto [newSum, scaledOldSum] = computeNewSum(
         iterArgMax, newMax, iterArgSum, currentSum, empty, loc, rewriter);
 
-    auto [scaledSoftmax, scaledAcc] = scaleSoftmaxAndAccumulator(
-        scaledOldSum, newSum, softmax, outputSlice, emptySquare, loc, rewriter);
+    // Scale partial softmax
+    Value softmax =
+        scalePartialSoftmax(partialSoftmax, newSum, emptySquare, loc, rewriter);
+
+    // Update accumulator
+    empty = rewriter.create<tensor::EmptyOp>(
+        loc, SmallVector<OpFoldResult>{sequenceLength, headDimension},
+        elementType);
+    Value scaledAcc = scaleAccumulator(outputSlice, scaledOldSum, newSum, empty,
+                                       loc, rewriter);
 
     // Compute matmul(softmax, v)
     Value result = rewriter
                        .create<linalg::MatmulOp>(
                            loc, outputSlice.getType(),
-                           ValueRange{scaledSoftmax, valueSlice}, scaledAcc)
+                           ValueRange{softmax, valueSlice}, scaledAcc)
                        .getResult(0);
 
     // Insert slices
