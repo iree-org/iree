@@ -124,16 +124,6 @@ def build_main_dist():
   # Clean up install and build trees.
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
   remove_cmake_cache()
-  extra_cmake_flags = []
-
-  # Enable CUDA if on platforms where we expect to have the deps and produce
-  # such binaries.
-  if platform.system() == "Linux":
-    print("*** Enabling CUDA compiler target and runtime ***")
-    extra_cmake_flags.extend([
-        "-DIREE_TARGET_BACKEND_CUDA=ON",
-        "-DIREE_HAL_DRIVER_CUDA=ON",
-    ])
 
   # CMake configure.
   print("*** Configuring ***")
@@ -151,7 +141,7 @@ def build_main_dist():
           f"-DIREE_BUILD_COMPILER=ON",
           f"-DIREE_BUILD_PYTHON_BINDINGS=OFF",
           f"-DIREE_BUILD_SAMPLES=OFF",
-      ] + extra_cmake_flags,
+      ],
       check=True)
 
   print("*** Building ***")
