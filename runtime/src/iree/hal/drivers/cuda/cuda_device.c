@@ -135,7 +135,8 @@ static iree_status_t iree_hal_cuda_device_create_internal(
     status = iree_hal_cuda_stream_command_buffer_create(
         (iree_hal_device_t*)device, &device->context_wrapper,
         device->tracing_context,
-        IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
+        IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
+            IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED,
         IREE_HAL_COMMAND_CATEGORY_ANY, /*binding_capacity=*/0, device->stream,
         &device->block_pool, &device->stream_command_buffer);
   }
