@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
@@ -25,59 +26,10 @@ struct HoistStaticallyBoundAllocationsPass
 
 }  // namespace
 
-static std::optional<Value> hoistStaticallyBoundAllocations(
-    OpBuilder &builder, func::FuncOp funcOp, memref::AllocaOp allocaOp) {
-  if (allocaOp->getBlock() == &funcOp.getBody().front()) return std::nullopt;
-
-  auto allocaType = allocaOp.getType();
-  ValueRange dynamicOperands = allocaOp.getDynamicSizes();
-  if (dynamicOperands.empty()) {
-    OpBuilder::InsertionGuard g(builder);
-    builder.setInsertionPointToStart(&funcOp.getBody().front());
-    Value allocation = builder.create<memref::AllocaOp>(
-        allocaOp.getLoc(), allocaType, allocaOp.getAlignmentAttr());
-    return allocation;
-  }
-
-  int index = 0;
-
-  SmallVector<int64_t> staticShape;
-  SmallVector<OpFoldResult> subviewSizes;
-  staticShape.reserve(allocaType.getRank());
-  subviewSizes.reserve(allocaType.getRank());
-
-  for (auto dimSize : allocaType.getShape()) {
-    if (!ShapedType::isDynamic(dimSize)) {
-      staticShape.push_back(dimSize);
-      subviewSizes.push_back(builder.getIndexAttr(dimSize));
-      continue;
-    }
-    Value dynamicSize = dynamicOperands[index++];
-    auto ub = linalg::getConstantUpperBoundForIndex(dynamicSize);
-    if (failed(ub)) {
-      return std::nullopt;
-    }
-    staticShape.push_back(ub.value());
-    subviewSizes.push_back(dynamicSize);
-  }
-  SmallVector<OpFoldResult> offsets(allocaType.getRank(),
-                                    builder.getIndexAttr(0));
-  SmallVector<OpFoldResult> strides(allocaType.getRank(),
-                                    builder.getIndexAttr(1));
-
-  OpBuilder::InsertionGuard g(builder);
-  builder.setInsertionPointToStart(&funcOp.getBody().front());
-  auto allocationType =
-      MemRefType::get(staticShape, allocaType.getElementType());
-  Value allocation = builder.create<memref::AllocaOp>(
-      allocaOp.getLoc(), allocationType, allocaOp.getAlignmentAttr());
-
-  builder.setInsertionPoint(allocaOp);
-  Value subviewOp = builder.create<memref::SubViewOp>(
-      allocaOp.getLoc(), allocation, offsets, subviewSizes, strides);
-  return subviewOp;
-}
-
+/// Some uses of a `memref.alloca` can be replaced with a `memref.subview`
+/// easily. Other uses (like a use in a
+/// `scf.yield` or `func.return`) are non-trivial because of compatibility
+/// between types of different SSA values.
 static bool isUseReplacableWithSubview(OpOperand &use) {
   Operation *user = use.getOwner();
   if (isa<linalg::LinalgOp, memref::StoreOp, memref::SubViewOp>(user))
@@ -85,24 +37,11 @@ static bool isUseReplacableWithSubview(OpOperand &use) {
   return false;
 }
 
-static LogicalResult replaceUseWith(OpOperand &use, Value replacement) {
-  Operation *user = use.getOwner();
-  auto doReplace = [&](OpOperand &replacedUse) { return &use == &replacedUse; };
-  if (use.get().getType().cast<MemRefType>().hasStaticShape()) {
-    use.get().replaceUsesWithIf(replacement, doReplace);
-    return success();
-  }
-  if (isa<linalg::LinalgOp, memref::StoreOp, memref::SubViewOp>(user)) {
-    use.get().replaceUsesWithIf(replacement, doReplace);
-    return success();
-  }
-  return user->emitOpError("failed to replace operand ")
-         << use.getOperandNumber() << " with " << replacement;
-}
-
 void HoistStaticallyBoundAllocationsPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
   SmallVector<memref::AllocaOp> allocaOps;
+
+  // Collect all allocas that are hoistable.
   funcOp.walk([&](memref::AllocaOp allocaOp) {
     if (allocaOp->getBlock() == &funcOp.getBody().front()) return;
     if (allocaOp.getDynamicSizes().empty()) {
@@ -117,6 +56,7 @@ void HoistStaticallyBoundAllocationsPass::runOnOperation() {
     }
   });
 
+  // Hoist the allocas and replace all uses.
   OpBuilder builder(&getContext());
   for (auto allocaOp : allocaOps) {
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
@@ -127,7 +67,7 @@ void HoistStaticallyBoundAllocationsPass::runOnOperation() {
       llvm::dbgs() << " num Uses : " << numUses;
     });
     std::optional<Value> replacement =
-        hoistStaticallyBoundAllocations(builder, funcOp, allocaOp);
+        hoistStaticallyBoundAllocations(funcOp, builder, allocaOp);
     if (!replacement) continue;
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs() << "Replacement : ";
