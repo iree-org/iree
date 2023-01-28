@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Utils/ADTExtras.h"
 #include "iree/testing/gtest.h"
+#include "llvm/ADT/SmallVector.h"
 
 using ::testing::ElementsAre;
 
