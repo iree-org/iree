@@ -146,6 +146,12 @@ static IREE::Flow::DispatchTensorStoreOp walkUseToGetDispatchTensorStoreOp(
     if (!value) return nullptr;
     traversedUses.push_back(&use);
   }
+  // If the value has a use which is a store, then use that directly.
+  for (Operation *user : value.getUsers()) {
+    if (auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(user)) {
+      return storeOp;
+    }
+  }
   return nullptr;
 }
 
