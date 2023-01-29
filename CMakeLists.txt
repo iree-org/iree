@@ -326,6 +326,11 @@ set(IREE_EXTERNAL_ROCM_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experi
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_TARGET "iree::experimental::rocm::registration")
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register")
 
+set(IREE_EXTERNAL_METAL_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/metal")
+set(IREE_EXTERNAL_METAL_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/metal")
+set(IREE_EXTERNAL_METAL_HAL_DRIVER_TARGET "iree::experimental::metal::registration")
+set(IREE_EXTERNAL_METAL_HAL_DRIVER_REGISTER "iree_hal_metal_driver_module_register")
+
 #-------------------------------------------------------------------------------
 # Experimental WebGPU HAL driver
 #-------------------------------------------------------------------------------
