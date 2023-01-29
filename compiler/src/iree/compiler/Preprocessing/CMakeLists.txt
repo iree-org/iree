@@ -21,6 +21,7 @@ iree_cc_library(
     LLVMSupport
     MLIRArithDialect
     MLIRPass
+    iree::compiler::Pipelines::Options
     iree::compiler::Preprocessing::Common::Transforms
   PUBLIC
 )

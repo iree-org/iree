@@ -21,6 +21,7 @@ iree_compiler_cc_library(
         "Passes.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Pipelines:Options",
         "//compiler/src/iree/compiler/Preprocessing/Common:Transforms",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
