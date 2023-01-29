@@ -66,7 +66,7 @@ static llvm::cl::opt<bool> clEnableAggressiveFusion(
     llvm::cl::desc(
         "Enable the aggressive fusion heuristic to fuse multiuse ops and ops "
         "with reduction loops"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
