@@ -82,7 +82,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/DFX",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
-        "//compiler/src/iree/compiler/Preprocessing:Passes",
         "//compiler/src/iree/compiler/Utils",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",

@@ -107,7 +107,6 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
-    iree::compiler::Preprocessing::Passes
     iree::compiler::Utils
   PUBLIC
 )
