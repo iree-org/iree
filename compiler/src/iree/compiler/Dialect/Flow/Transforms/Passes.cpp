@@ -182,9 +182,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass);
 
-  // Optional pre-processing passes.
-  IREE::buildPreprocessingPassPipeline(passManager);
-
   // Start of Flow pipeline, verify input legality.
   passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
 

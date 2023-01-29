@@ -36,7 +36,7 @@ iree_check_single_backend_test_suite(
     name = "check_winograd_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
     compiler_flags = [
-        "--iree-preprocessing-pass-pipeline=\"builtin.module(func.func(iree-linalg-ext-convert-conv2d-to-winograd))\"",
+        "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-linalg-ext-convert-conv2d-to-winograd))",
     ],
     driver = "local-task",
     target_backend = "llvm-cpu",
@@ -74,7 +74,7 @@ iree_check_single_backend_test_suite(
     name = "check_winograd_vulkan-spirv_vulkan",
     srcs = VULKAN_SRCS,
     compiler_flags = [
-        "--iree-preprocessing-pass-pipeline=\"builtin.module(func.func(iree-linalg-ext-convert-conv2d-to-winograd))\"",
+        "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-linalg-ext-convert-conv2d-to-winograd))",
     ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",

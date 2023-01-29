@@ -59,6 +59,7 @@ struct GlobalInit {
   // they should be default initialized at the session level.
   BindingOptions *clBindingOptions = nullptr;
   InputDialectOptions *clInputOptions = nullptr;
+  PreprocessingOptions *clPreprocessingOptions = nullptr;
   HighLevelOptimizationOptions *clHighLevelOptimizationOptions = nullptr;
   SchedulingOptions *clSchedulingOptions = nullptr;
   IREE::HAL::TargetOptions *clHalTargetOptions = nullptr;
@@ -93,6 +94,7 @@ GlobalInit::GlobalInit(bool initializeCommandLine)
     // Bind session options to the command line environment.
     clBindingOptions = &BindingOptions::FromFlags::get();
     clInputOptions = &InputDialectOptions::FromFlags::get();
+    clPreprocessingOptions = &PreprocessingOptions::FromFlags::get();
     clHighLevelOptimizationOptions =
         &HighLevelOptimizationOptions::FromFlags::get();
     clSchedulingOptions = &SchedulingOptions::FromFlags::get();
@@ -136,6 +138,7 @@ struct Session {
   MLIRContext context;
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
+  PreprocessingOptions preprocessingOptions;
   HighLevelOptimizationOptions highLevelOptimizationOptions;
   SchedulingOptions schedulingOptions;
   IREE::HAL::TargetOptions halTargetOptions;
@@ -422,9 +425,9 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
 
       buildIREEVMTransformPassPipeline(
           session.bindingOptions, session.inputOptions,
-          session.highLevelOptimizationOptions, session.schedulingOptions,
-          session.halTargetOptions, session.vmTargetOptions, getHooks(),
-          passManager, *compileToPhase);
+          session.preprocessingOptions, session.highLevelOptimizationOptions,
+          session.schedulingOptions, session.halTargetOptions,
+          session.vmTargetOptions, getHooks(), passManager, *compileToPhase);
       break;
     }
     case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {

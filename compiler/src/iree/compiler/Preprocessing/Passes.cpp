@@ -8,21 +8,18 @@
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "mlir/Pass/PassRegistry.h"
 
-static llvm::cl::opt<std::string> clPreprocessingPassPipeline(
-    "iree-preprocessing-pass-pipeline",
-    llvm::cl::desc(
-        "Passes to run before IREE's Flow pipeline for program pre-processing"),
-    llvm::cl::init(""));
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 
-void buildPreprocessingPassPipeline(OpPassManager &mainPassManager) {
-  if (clPreprocessingPassPipeline.empty()) {
+void buildPreprocessingPassPipeline(
+    OpPassManager &passManager,
+    const PreprocessingOptions &preprocessingOptions) {
+  if (preprocessingOptions.preprocessingPassPipeline.empty()) {
     return;
   }
-  (void)parsePassPipeline(clPreprocessingPassPipeline, mainPassManager);
+  (void)parsePassPipeline(preprocessingOptions.preprocessingPassPipeline,
+                          passManager);
 }
 
 void registerPreprocessingPasses() { registerCommonPreprocessingPasses(); }
