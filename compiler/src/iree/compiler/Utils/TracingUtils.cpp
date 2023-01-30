@@ -35,3 +35,63 @@ void PassTracing::runAfterPassFailed(Pass *pass, Operation *op) {
 
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+
+// Replace most forms of the allocation and deallocation functions.
+
+void *operator new(std::size_t count) {
+  auto ptr = malloc(count);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+void *operator new[](std::size_t count) {
+  auto ptr = malloc(count);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+void *operator new(std::size_t count, std::align_val_t al) {
+  auto ptr = malloc(count);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+void *operator new[](std::size_t count, std::align_val_t al) {
+  auto ptr = malloc(count);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+
+void operator delete(void *ptr) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+void operator delete[](void *ptr) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+void operator delete(void *ptr, size_t sz) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+void operator delete[](void *ptr, size_t sz) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+void operator delete(void *ptr, std::align_val_t al) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+void operator delete[](void *ptr, std::align_val_t al) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+void operator delete(void *ptr, size_t sz, std::align_val_t al) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+void operator delete[](void *ptr, size_t sz, std::align_val_t al) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+
+#endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
