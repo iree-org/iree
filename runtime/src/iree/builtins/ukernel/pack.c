@@ -180,15 +180,12 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   iree_uk_ssize_t tile_size1 = params->out_size3;
   iree_uk_ssize_t out_stride_l0 = params->out_stride0;
   iree_uk_ssize_t out_stride1 = params->out_size3 * params->out_size2;
-  iree_uk_ssize_t out_stride_l2 = params->out_size3;
-  iree_uk_ssize_t out_stride_l3 = 1;
   if (params->flags & IREE_UK_FLAG_PACK_TRANSPOSE_OUTER) {
     iree_uk_ssize_swap(&outer_size0, &outer_size1);
     iree_uk_ssize_swap(&out_stride_l0, &out_stride1);
   }
   if (params->flags & IREE_UK_FLAG_PACK_TRANSPOSE_INNER) {
     iree_uk_ssize_swap(&tile_size0, &tile_size1);
-    iree_uk_ssize_swap(&out_stride_l2, &out_stride_l3);
   }
   const char* in_buf = params->in_buffer;
   char* out_buf = params->out_buffer;
@@ -235,8 +232,7 @@ IREE_UK_EXPORT void iree_uk_pack(const iree_uk_pack_params_t* params) {
 
   if (iree_uk_pack_early(params)) return;
 
-  // Select a target-specific tile_func (inner loop on K, computing one M0xN0
-  // tile) and use that with generic outer loops.
-  iree_uk_pack_tile_func_t row_func = iree_uk_pack_select_tile_func(params);
-  iree_uk_pack_using_tile_func(params, row_func);
+  // Select a target-specific tile_func and use that with generic outer loops.
+  iree_uk_pack_tile_func_t tile_func = iree_uk_pack_select_tile_func(params);
+  iree_uk_pack_using_tile_func(params, tile_func);
 }
