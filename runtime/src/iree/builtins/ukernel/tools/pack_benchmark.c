@@ -109,7 +109,7 @@ static iree_status_t iree_pack_benchmark(
   }
   params.in_size0 = iree_max(0, out_size0 * out_size2 - FLAG_padding_size);
   params.in_size1 = iree_max(0, out_size1 * out_size3 - FLAG_padding_size);
-  params.in_stride0 = params.in_size1;
+  params.in_stride0 = out_size0 * out_size2;
   params.out_stride0 = params.out_size1 * params.out_size2 * params.out_size3;
   iree_uk_ssize_t in_buffer_size = iree_uk_test_2d_buffer_length(
       in_type, params.in_size0, params.in_stride0);
@@ -126,8 +126,8 @@ static iree_status_t iree_pack_benchmark(
   iree_uk_test_write_random_buffer(in_buffer, in_buffer_size, in_type, engine);
   iree_uk_test_write_random_buffer(out_buffer, out_buffer_size, out_type,
                                    engine);
-  iree_uk_test_write_random_buffer(padding_value_buffer, out_type_size,
-                                   out_type, engine);
+  // Test single-byte padding pattern, most common use case as 0.0f is 0 bytes.
+  memset(padding_value_buffer, 0, out_type_size);
   iree_uk_test_random_engine_destroy(engine);
   params.in_buffer = in_buffer;
   params.out_buffer = out_buffer;

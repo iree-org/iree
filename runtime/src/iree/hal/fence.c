@@ -200,6 +200,19 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_insert(
   return iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_fence_extend(
+    iree_hal_fence_t* into_fence, iree_hal_fence_t* from_fence) {
+  IREE_ASSERT_ARGUMENT(into_fence);
+  IREE_ASSERT_ARGUMENT(from_fence);
+
+  iree_hal_semaphore_list_t list = iree_hal_fence_semaphore_list(from_fence);
+  for (iree_host_size_t i = 0; i < list.count; ++i) {
+    IREE_RETURN_IF_ERROR(iree_hal_fence_insert(into_fence, list.semaphores[i],
+                                               list.payload_values[i]));
+  }
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_fence_query(iree_hal_fence_t* fence) {
   if (!fence) return iree_ok_status();
 

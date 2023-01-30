@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -90,50 +91,6 @@ struct LinalgCPUVectorLoweringPassOptions : LinalgVectorLoweringPassOptions {
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
 
-static std::optional<Value> hoistStaticallyBoundAllocations(
-    OpBuilder &builder, func::FuncOp funcOp, Location loc,
-    MemRefType memRefType, ValueRange dynamicSizes, unsigned alignment) {
-  int index = 0;
-
-  SmallVector<int64_t> staticShape;
-  SmallVector<OpFoldResult> subviewSizes;
-  staticShape.reserve(memRefType.getRank());
-  subviewSizes.reserve(memRefType.getRank());
-
-  for (auto dimSize : memRefType.getShape()) {
-    if (!ShapedType::isDynamic(dimSize)) {
-      staticShape.push_back(dimSize);
-      subviewSizes.push_back(builder.getIndexAttr(dimSize));
-      continue;
-    }
-    Value dynamicSize = dynamicSizes[index++];
-    auto ub = linalg::getConstantUpperBoundForIndex(dynamicSize);
-    if (failed(ub)) {
-      return std::nullopt;
-    }
-    staticShape.push_back(ub.value());
-    subviewSizes.push_back(dynamicSize);
-  }
-  SmallVector<OpFoldResult> offsets(memRefType.getRank(),
-                                    builder.getIndexAttr(0));
-  SmallVector<OpFoldResult> strides(memRefType.getRank(),
-                                    builder.getIndexAttr(1));
-
-  Value allocation;
-  {
-    OpBuilder::InsertionGuard g(builder);
-    builder.setInsertionPointToStart(&funcOp.getBody().front());
-    auto allocationType =
-        MemRefType::get(staticShape, memRefType.getElementType());
-    allocation = builder.create<memref::AllocaOp>(
-        loc, allocationType, builder.getI64IntegerAttr(alignment));
-  }
-
-  Value subviewOp = builder.create<memref::SubViewOp>(loc, allocation, offsets,
-                                                      subviewSizes, strides);
-  return subviewOp;
-}
-
 // Allocation callbacks to use with upstream comprehensive bufferization
 static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
@@ -142,7 +99,7 @@ static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
   auto funcOp = builder.getInsertionPoint()->getParentOfType<func::FuncOp>();
   if (funcOp) {
     std::optional<Value> hoistedAllocation = hoistStaticallyBoundAllocations(
-        builder, funcOp, loc, memRefType, dynamicSizes, alignment);
+        funcOp, builder, loc, memRefType, dynamicSizes, alignment);
     if (hoistedAllocation) {
       return hoistedAllocation.value();
     }
@@ -761,6 +718,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   // math dialect elementry functions -> polynomial form.
   passManager.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
+
+  passManager.addNestedPass<func::FuncOp>(
+      createHoistStaticallyBoundAllocationsPass());
 
   // Checking stack allocation before converting to CF dialect is easier.
   // Do not check allocation if hoist-padding is enabled. It intends to allocate
