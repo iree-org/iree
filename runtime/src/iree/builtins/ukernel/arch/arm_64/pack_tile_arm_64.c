@@ -8,14 +8,14 @@
 
 #include <arm_neon.h>
 
-void* iree_uk_pack_tile_8x1_x32_arm_64_direct(
+void iree_uk_pack_tile_8x1_x32_arm_64_direct(
     void* restrict out_tile_ptr, const void* restrict in_tile_ptr,
     iree_uk_ssize_t outer_size1, iree_uk_ssize_t out_stride1,
     iree_uk_ssize_t in_stride0, iree_uk_ssize_t elem_size_unused,
     iree_uk_ssize_t tile_size0_unused, iree_uk_ssize_t tile_size1_unused) {
-  return iree_uk_pack_tile_8x4_x8_arm_64_direct(out_tile_ptr, in_tile_ptr,
-                                                outer_size1, out_stride1 * 4,
-                                                in_stride0 * 4, 1, 8, 4);
+  iree_uk_pack_tile_8x4_x8_arm_64_direct(out_tile_ptr, in_tile_ptr, outer_size1,
+                                         out_stride1 * 4, in_stride0 * 4, 1, 8,
+                                         4);
 }
 
 static inline int8x8_t iree_uk_neon_load_8xi8_strided(const iree_uk_int8_t* src,
@@ -181,7 +181,7 @@ static inline void iree_uk_neon_copy_8x8xi8_rowmajor_to_colmajor_tiled_1x4(
   vst1q_s8(out_ptr + 16 + 1 * out_stride, vreinterpretq_s8_s32(c1.val[1]));
 }
 
-void* iree_uk_pack_tile_8x1_x8_arm_64_direct(
+void iree_uk_pack_tile_8x1_x8_arm_64_direct(
     void* restrict out_tile_ptr, const void* restrict in_tile_ptr,
     iree_uk_ssize_t outer_size1, iree_uk_ssize_t out_stride1,
     iree_uk_ssize_t in_stride0, iree_uk_ssize_t elem_size_unused,
@@ -203,10 +203,9 @@ void* iree_uk_pack_tile_8x1_x8_arm_64_direct(
     out_ptr += out_stride1;
     in_ptr += 1;
   }
-  return out_ptr;
 }
 
-void* iree_uk_pack_tile_8x4_x8_arm_64_direct(
+void iree_uk_pack_tile_8x4_x8_arm_64_direct(
     void* restrict out_tile_ptr, const void* restrict in_tile_ptr,
     iree_uk_ssize_t outer_size1, iree_uk_ssize_t out_stride1,
     iree_uk_ssize_t in_stride0, iree_uk_ssize_t elem_size_unused,
@@ -226,9 +225,8 @@ void* iree_uk_pack_tile_8x4_x8_arm_64_direct(
     out_ptr += out_stride1;
     in_ptr += 4;
   }
-  return out_ptr;
 }
-void* iree_uk_pack_tile_8x8_x8_arm_64_direct(
+void iree_uk_pack_tile_8x8_x8_arm_64_direct(
     void* restrict out_tile_ptr, const void* restrict in_tile_ptr,
     iree_uk_ssize_t outer_size1, iree_uk_ssize_t out_stride1,
     iree_uk_ssize_t in_stride0, iree_uk_ssize_t elem_size_unused,
@@ -241,10 +239,9 @@ void* iree_uk_pack_tile_8x8_x8_arm_64_direct(
     out_ptr += out_stride1;
     in_ptr += 8;
   }
-  return out_ptr;
 }
 
-void* iree_uk_pack_tile_8x1_x32_arm_64_transpose(
+void iree_uk_pack_tile_8x1_x32_arm_64_transpose(
     void* restrict out_tile_ptr, const void* restrict in_tile_ptr,
     iree_uk_ssize_t outer_size1, iree_uk_ssize_t out_stride1,
     iree_uk_ssize_t in_stride0, iree_uk_ssize_t elem_size_unused,
@@ -256,10 +253,9 @@ void* iree_uk_pack_tile_8x1_x32_arm_64_transpose(
     out_tile_i32_ptr += out_stride1;
     in_tile_ptr_i32 += 8;
   }
-  return out_tile_i32_ptr;
 }
 
-void* iree_uk_pack_tile_8x1_x8_arm_64_transpose(
+void iree_uk_pack_tile_8x1_x8_arm_64_transpose(
     void* restrict out_tile_ptr, const void* restrict in_tile_ptr,
     iree_uk_ssize_t outer_size1, iree_uk_ssize_t out_stride1,
     iree_uk_ssize_t in_stride0, iree_uk_ssize_t elem_size_unused,
@@ -280,10 +276,9 @@ void* iree_uk_pack_tile_8x1_x8_arm_64_transpose(
     out_ptr += out_stride1;
     in_ptr += 8;
   }
-  return out_ptr;
 }
 
-void* iree_uk_pack_tile_8x4_x8_arm_64_transpose(
+void iree_uk_pack_tile_8x4_x8_arm_64_transpose(
     void* restrict out_tile_ptr, const void* restrict in_tile_ptr,
     iree_uk_ssize_t outer_size1, iree_uk_ssize_t out_stride1,
     iree_uk_ssize_t in_stride0, iree_uk_ssize_t elem_size_unused,
@@ -304,10 +299,9 @@ void* iree_uk_pack_tile_8x4_x8_arm_64_transpose(
     out_ptr += out_stride1;
     in_ptr += 8;
   }
-  return out_ptr;
 }
 
-void* iree_uk_pack_tile_8x8_x8_arm_64_transpose(
+void iree_uk_pack_tile_8x8_x8_arm_64_transpose(
     void* restrict out_tile_ptr, const void* restrict in_tile_ptr,
     iree_uk_ssize_t outer_size1, iree_uk_ssize_t out_stride1,
     iree_uk_ssize_t in_stride0, iree_uk_ssize_t elem_size_unused,
@@ -320,5 +314,4 @@ void* iree_uk_pack_tile_8x8_x8_arm_64_transpose(
     out_ptr += out_stride1;
     in_ptr += 8;
   }
-  return out_ptr;
 }

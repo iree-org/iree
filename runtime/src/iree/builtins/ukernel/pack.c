@@ -205,36 +205,35 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   }
   const char* in_buf = params->in_buffer;
   char* out_buf = params->out_buffer;
-  // Compute number of tiles along both dimensions that fit entirely within the
-  // source buffer's boundaries.
-  int dim0_full_tiles_end = iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
-      params->in_size0, tile_size0);
-  int dim1_full_tiles_end = iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
-      params->in_size1, tile_size1);
   // Prepare for padding.
   iree_uk_pack_padding_helper padding_helper;
-  if (dim0_full_tiles_end < outer_size0 || dim1_full_tiles_end < outer_size1) {
+  if (params->in_size0 < outer_size0 * tile_size0 ||
+      params->in_size1 < outer_size1 * tile_size1) {
     iree_uk_pack_padding_helper_init(tile_size0, tile_size1, elem_size,
                                      params->padding_value, &padding_helper);
   }
-  iree_uk_ssize_t outer_i0 = 0;
-  for (; outer_i0 < dim0_full_tiles_end; ++outer_i0) {
+  // Compute number of tiles along both dimensions that fit entirely within the
+  // source buffer's boundaries.
+  int dim1_full_tiles = iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
+      params->in_size1, tile_size1);
+  iree_uk_ssize_t i0 = 0;
+  for (; i0 <= params->in_size0 - tile_size0; i0 += tile_size0) {
     // Pack whole tiles that do not require padding (entirely within the source
     // buffer's boundaries).
-    tile_func(out_buf, in_buf, dim1_full_tiles_end, out_stride1,
-              params->in_stride0, elem_size, tile_size0, tile_size1);
+    tile_func(out_buf, in_buf, dim1_full_tiles, out_stride1, params->in_stride0,
+              elem_size, tile_size0, tile_size1);
     // Right-padding.
     iree_uk_pad_and_pack_row_using_tile_func(
-        tile_func, dim1_full_tiles_end, outer_size1, tile_size0, tile_size0,
+        tile_func, dim1_full_tiles, outer_size1, tile_size0, tile_size0,
         tile_size1, elem_size, params->in_size1, params->in_stride0,
         out_stride1, params->padding_value, &padding_helper, in_buf, out_buf);
     out_buf += out_stride_l0 * elem_size;
     in_buf += tile_size0 * params->in_stride0 * elem_size;
   }
   // Bottom-padding.
-  for (; outer_i0 < outer_size0; ++outer_i0) {
-    iree_uk_ssize_t dim0_src_read_size = iree_uk_ssize_clamp(
-        params->in_size0 - outer_i0 * tile_size0, 0, tile_size0);
+  for (; i0 < outer_size0 * tile_size0; i0 += tile_size0) {
+    iree_uk_ssize_t dim0_src_read_size =
+        iree_uk_ssize_clamp(params->in_size0 - i0, 0, tile_size0);
     iree_uk_pad_and_pack_row_using_tile_func(
         tile_func, 0, outer_size1, dim0_src_read_size, tile_size0, tile_size1,
         elem_size, params->in_size1, params->in_stride0, out_stride1,

@@ -6,7 +6,7 @@
 
 #include "iree/builtins/ukernel/pack_generic.h"
 
-static void* iree_uk_pack_tile_generic_direct(
+static void iree_uk_pack_tile_generic_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
     const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
     iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
@@ -25,10 +25,9 @@ static void* iree_uk_pack_tile_generic_direct(
     out_ptr_l1 += out_stride1 * elem_size;
     in_ptr_l1 += tile_size1 * elem_size;
   }
-  return out_ptr_l1;
 }
 
-static void* iree_uk_pack_tile_generic_transpose(
+static void iree_uk_pack_tile_generic_transpose(
     void* IREE_UK_RESTRICT out_tile_ptr,
     const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
     iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
@@ -53,7 +52,6 @@ static void* iree_uk_pack_tile_generic_transpose(
     out_ptr_l1 += out_stride1 * elem_size;
     in_ptr_l1 += tile_size1 * elem_size;
   }
-  return out_ptr_l1;
 }
 
 iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func_generic(
