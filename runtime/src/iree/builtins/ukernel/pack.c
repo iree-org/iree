@@ -12,7 +12,7 @@
 enum { iree_uk_pack_tmp_buf_size = 4096 };
 
 // Holds some information and a temporary buffer for performing padding.
-typedef struct iree_uk_pack_padding_helper {
+typedef struct iree_uk_pack_tmpbuf_helper_t {
   // Temporary buffer to pad the source data into, to pass to the tile_func.
   // Cache line alignment helps in pack_benchmark on ARM Cortex-A510/A710.
   IREE_UK_ATTRIBUTE_ALIGNED(64) char tmp_buf[iree_uk_pack_tmp_buf_size];
@@ -20,7 +20,7 @@ typedef struct iree_uk_pack_padding_helper {
   int max_tiles_in_tmp_buf;
   // Is the padding value as single-byte pattern (so we can use memset).
   bool is_padding_single_byte;
-} iree_uk_pack_padding_helper;
+} iree_uk_pack_tmpbuf_helper_t;
 
 // Return x/y for x>=0 and y>0, with a fast path for when y is a power of two.
 static iree_uk_ssize_t iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
@@ -40,12 +40,12 @@ static bool iree_uk_is_single_byte_pattern(const char* buf,
   return true;
 }
 
-// Initializes a `iree_uk_pack_padding_helper`. Asserts if the temporary buffer
+// Initializes a `iree_uk_pack_tmpbuf_helper_t`. Asserts if the temporary buffer
 // is smaller than one tile.
-static void iree_uk_pack_padding_helper_init(
+static void iree_uk_pack_tmpbuf_helper_t_init(
     iree_uk_ssize_t tile_size0, iree_uk_ssize_t tile_size1,
     iree_uk_ssize_t elem_size, const void* padding_value,
-    iree_uk_pack_padding_helper* helper) {
+    iree_uk_pack_tmpbuf_helper_t* helper) {
   helper->max_tiles_in_tmp_buf = iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
       iree_uk_pack_tmp_buf_size, tile_size0 * tile_size1 * elem_size);
   IREE_UK_ASSERT(helper->max_tiles_in_tmp_buf > 0);
@@ -92,11 +92,11 @@ static void iree_uk_pack_validate(const iree_uk_pack_params_t* params) {
   // duplicate this arithmetic. Generally, we want to hit all failure modes
   // in the validation function so that the subsequent ukernel code can be
   // treated as infallible.
-  iree_uk_pack_padding_helper padding_helper;
+  iree_uk_pack_tmpbuf_helper_t padding_helper;
   iree_uk_type_t elem_type = iree_uk_pack_in_type(params->type);
   iree_uk_ssize_t elem_size = iree_uk_type_size(elem_type);
-  iree_uk_pack_padding_helper_init(tile_size0, tile_size1, elem_size,
-                                   params->padding_value, &padding_helper);
+  iree_uk_pack_tmpbuf_helper_t_init(tile_size0, tile_size1, elem_size,
+                                    params->padding_value, &padding_helper);
 #endif  // IREE_UK_ENABLE_ASSERTS
 }
 
@@ -160,7 +160,7 @@ static void iree_uk_pad_and_pack_row_using_tile_func(
     iree_uk_ssize_t tile_size0, iree_uk_ssize_t tile_size1,
     iree_uk_ssize_t elem_size, iree_uk_ssize_t in_size1,
     iree_uk_ssize_t in_stride0, iree_uk_ssize_t out_stride1,
-    const void* padding_value, iree_uk_pack_padding_helper* helper,
+    const void* padding_value, iree_uk_pack_tmpbuf_helper_t* helper,
     const char* in_buf, char* out_buf) {
   iree_uk_ssize_t dim1_tile = dim1_tile_start;
   while (dim1_tile < dim1_tile_end) {
@@ -206,11 +206,11 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   const char* in_buf = params->in_buffer;
   char* out_buf = params->out_buffer;
   // Prepare for padding.
-  iree_uk_pack_padding_helper padding_helper;
+  iree_uk_pack_tmpbuf_helper_t padding_helper;
   if (params->in_size0 < outer_size0 * tile_size0 ||
       params->in_size1 < outer_size1 * tile_size1) {
-    iree_uk_pack_padding_helper_init(tile_size0, tile_size1, elem_size,
-                                     params->padding_value, &padding_helper);
+    iree_uk_pack_tmpbuf_helper_t_init(tile_size0, tile_size1, elem_size,
+                                      params->padding_value, &padding_helper);
   }
   // Compute number of tiles along both dimensions that fit entirely within the
   // source buffer's boundaries.
