@@ -84,12 +84,6 @@ SliceAndDynamicDims cloneOffsetsSizesAndStrides(
       loadOp.getMixedSizes(), loadOp.getMixedStrides(), loadOp.getSourceDims());
 }
 
-/// Hoists `allocaOp` to the entry block of the function if the size is
-/// statically bounded. For a static allocation, it returns an allocation
-/// of the same size but in the entry basic block. For dynamic (still bounded)
-/// allocations creates an allocation, and inserts a subview to match the
-/// dynamic shape of the allocation. The method returns a value, but
-/// does not replace the uses of the `allocaOp`.
 std::optional<Value> hoistStaticallyBoundAllocations(
     func::FuncOp funcOp, OpBuilder &builder, Location loc,
     MemRefType allocaType, ValueRange dynamicSizes,
@@ -150,6 +144,7 @@ std::optional<Value> hoistStaticallyBoundAllocations(
 }
 std::optional<Value> hoistStaticallyBoundAllocations(
     func::FuncOp funcOp, OpBuilder &builder, memref::AllocaOp allocaOp) {
+  OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPoint(allocaOp);
   return hoistStaticallyBoundAllocations(
       funcOp, builder, allocaOp.getLoc(), allocaOp.getType(),

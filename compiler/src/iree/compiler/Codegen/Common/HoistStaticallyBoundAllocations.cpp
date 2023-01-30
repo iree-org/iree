@@ -1,4 +1,4 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -27,14 +27,11 @@ struct HoistStaticallyBoundAllocationsPass
 }  // namespace
 
 /// Some uses of a `memref.alloca` can be replaced with a `memref.subview`
-/// easily. Other uses (like a use in a
-/// `scf.yield` or `func.return`) are non-trivial because of compatibility
-/// between types of different SSA values.
+/// easily. Other uses (like a use in a `scf.yield` or `func.return`) are
+/// non-trivial because of compatibility between types of different SSA values.
 static bool isUseReplacableWithSubview(OpOperand &use) {
   Operation *user = use.getOwner();
-  if (isa<linalg::LinalgOp, memref::StoreOp, memref::SubViewOp>(user))
-    return true;
-  return false;
+  return isa<linalg::LinalgOp, memref::StoreOp, memref::SubViewOp>(user);
 }
 
 void HoistStaticallyBoundAllocationsPass::runOnOperation() {
@@ -59,7 +56,7 @@ void HoistStaticallyBoundAllocationsPass::runOnOperation() {
   // Hoist the allocas and replace all uses.
   OpBuilder builder(&getContext());
   for (auto allocaOp : allocaOps) {
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "Alloca Op : ";
       allocaOp->dump();
       int numUses = std::distance(allocaOp.getResult().use_begin(),
@@ -69,7 +66,7 @@ void HoistStaticallyBoundAllocationsPass::runOnOperation() {
     std::optional<Value> replacement =
         hoistStaticallyBoundAllocations(funcOp, builder, allocaOp);
     if (!replacement) continue;
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "Replacement : ";
       replacement->dump();
     });
