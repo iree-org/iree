@@ -118,6 +118,7 @@ iree_compiler_cc_library(
         "FoldTensorExtractOpPass.cpp",
         "ForOpCanonicalizationPass.cpp",
         "FuseTensorPadWithConsumer.cpp",
+        "HoistStaticallyBoundAllocations.cpp",
         "IREEComprehensiveBufferizePass.cpp",
         "MaterializeEncodingIntoPackUnPack.cpp",
         "OptimizeVectorTransferPass.cpp",
