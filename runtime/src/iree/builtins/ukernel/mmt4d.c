@@ -101,8 +101,7 @@ static void iree_uk_mmt4d_zero_out(const iree_uk_mmt4d_params_t* params) {
 // Early-return code paths, including trivial or near-trivial cases (when one
 // of the dimensions is 0) and in the future, hardware ports that specialize
 // the entire loop nest.
-// The value |true| is written to the out-param |*done| if an early-return path
-// was taken and the mmt4d work is already done.
+// Returns true if already done.
 static bool iree_uk_mmt4d_early(const iree_uk_mmt4d_params_t* params) {
   // Trivial cases
   if (params->M == 0 || params->N == 0) {
