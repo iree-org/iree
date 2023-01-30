@@ -365,7 +365,7 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
     // {"device_id": obj, "path": str, "name": str}.
     auto record_dict = py::cast<py::dict>(record);
     py::object found_device_id = record_dict["device_id"];
-    if (found_device_id.is(compare_device_id)) {
+    if (found_device_id.equal(compare_device_id)) {
       found = true;
       break;
     }
