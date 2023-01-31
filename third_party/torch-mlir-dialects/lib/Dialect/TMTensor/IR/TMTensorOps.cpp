@@ -250,7 +250,7 @@ static LogicalResult foldMemRefCast(Operation *op) {
   return success(folded);
 }
 
-LogicalResult ScanOp::fold(ArrayRef<Attribute>,
+LogicalResult ScanOp::fold(FoldAdaptor,
                            SmallVectorImpl<OpFoldResult> &) {
   return foldMemRefCast(*this);
 }
