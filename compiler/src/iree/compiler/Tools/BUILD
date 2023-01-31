@@ -98,6 +98,7 @@ cc_library(
         "//compiler/src/iree/compiler/Modules/HAL/Loader/IR:HALLoaderDialect",
         "//compiler/src/iree/compiler/Modules/HAL/Loader/Transforms",
         "//compiler/src/iree/compiler/Pipelines",
+        "//compiler/src/iree/compiler/Preprocessing:Passes",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",

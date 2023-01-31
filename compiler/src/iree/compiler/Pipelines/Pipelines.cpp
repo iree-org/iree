@@ -16,6 +16,7 @@
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h"
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h"
+#include "iree/compiler/Preprocessing/Passes.h"
 
 #ifdef IREE_HAVE_MHLO_INPUT
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
@@ -32,6 +33,7 @@ namespace iree_compiler {
 
 void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
+    PreprocessingOptions preprocessingOptions,
     HighLevelOptimizationOptions highLevelOptimizationOptions,
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,
@@ -120,6 +122,7 @@ void buildIREEVMTransformPassPipeline(
       // No flow/stream processing (implies no tensors).
       break;
     default:
+      IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions);
       IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
       if (compileTo == IREEVMPipelinePhase::Flow) return;  // early-exit
       IREE::Stream::buildStreamTransformPassPipeline(passManager,
@@ -168,7 +171,8 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
 
   buildIREEVMTransformPassPipeline(
       BindingOptions::FromFlags::get(), InputDialectOptions::FromFlags::get(),
-      highLevelOptimizations, SchedulingOptions::FromFlags::get(),
+      PreprocessingOptions::FromFlags::get(), highLevelOptimizations,
+      SchedulingOptions::FromFlags::get(),
       IREE::HAL::TargetOptions::FromFlags::get(),
       IREE::VM::TargetOptions::FromFlags::get(), defaultHooks, passManager);
 }

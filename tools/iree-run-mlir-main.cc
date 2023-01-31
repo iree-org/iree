@@ -204,6 +204,7 @@ void BuildDefaultIREEVMTransformPassPipeline(mlir::OpPassManager& passManager) {
   buildIREEVMTransformPassPipeline(
       mlir::iree_compiler::BindingOptions::FromFlags::get(),
       mlir::iree_compiler::InputDialectOptions::FromFlags::get(),
+      mlir::iree_compiler::PreprocessingOptions::FromFlags::get(),
       mlir::iree_compiler::HighLevelOptimizationOptions::FromFlags::get(),
       mlir::iree_compiler::SchedulingOptions::FromFlags::get(),
       mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::get(),
