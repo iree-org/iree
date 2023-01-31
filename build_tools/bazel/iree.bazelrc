@@ -44,7 +44,7 @@ build --enable_runfiles
 ###############################################################################
 # Build settings flag aliases. See https://bazel.build/rules/config
 ###############################################################################
-build --flag_alias=iree_drivers=//iree/hal/drivers:enabled_drivers
+build --flag_alias=iree_drivers=//runtime/src/iree/hal/drivers:enabled_drivers
 
 ###############################################################################
 # Options for "generic_gcc" builds

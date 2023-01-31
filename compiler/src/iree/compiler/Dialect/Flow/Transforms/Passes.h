@@ -74,10 +74,6 @@ std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
 // linalg.matmul
 std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass();
 
-// Creates a pass to convert linalg convolution ops into linalg.matmul ops
-// using im2col tranformation.
-std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
-
 // Creates a pass to convert dispatch.region ops to dispatch.workgroups ops.
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 
@@ -177,14 +173,6 @@ createInjectDispatchTracingPass();
 
 // Exports all functions and dispatch executables as `() -> ()` benchmark funcs.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExportBenchmarkFuncsPass();
-
-//===----------------------------------------------------------------------===//
-// Linalg transforms
-//===----------------------------------------------------------------------===//
-
-// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
-std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass(
-    int paddingSize = 4);
 
 //===----------------------------------------------------------------------===//
 // Optimizations

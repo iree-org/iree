@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Preprocessing/Common/PassDetail.h"
+#include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -17,7 +17,6 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace Flow {
 
 namespace {
 /// A pattern to pad statically shaped matmul operands to the next integer
@@ -179,7 +178,6 @@ std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass(int paddingSize) {
   return std::make_unique<PadLinalgOpsPass>(paddingSize);
 }
 
-}  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -122,6 +122,7 @@ struct ProgramExtractor {
 struct CompileOptions {
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
+  PreprocessingOptions preprocessingOptions;
   HighLevelOptimizationOptions highLevelOptimizationOptions;
   SchedulingOptions schedulingOptions;
   IREE::HAL::TargetOptions executableOptions;
@@ -146,9 +147,9 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
     buildIREEVMTransformPassPipeline(
         options->bindingOptions, options->inputOptions,
-        options->highLevelOptimizationOptions, options->schedulingOptions,
-        options->executableOptions, options->targetOptions, options->hooks,
-        compilePipeline);
+        options->preprocessingOptions, options->highLevelOptimizationOptions,
+        options->schedulingOptions, options->executableOptions,
+        options->targetOptions, options->hooks, compilePipeline);
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {

@@ -125,5 +125,17 @@ void SchedulingOptions::bindOptions(OptionsBinder &binder) {
                           llvm::cl::cat(category));
 }
 
+void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category(
+      "IREE options for apply custom preprocessing before normal IREE "
+      "compilation flow");
+
+  binder.opt<std::string>(
+      "iree-preprocessing-pass-pipeline", preprocessingPassPipeline,
+      llvm::cl::desc("Textual description of the pass pipeline to run before "
+                     "running normal IREE compilation pipelines"),
+      llvm::cl::cat(category));
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
