@@ -38,8 +38,6 @@ iree_runtime_cc_library(
         "nop_executable_cache.h",
         "pipeline_layout.c",
         "pipeline_layout.h",
-        "status_util.c",
-        "status_util.h",
         "stream_command_buffer.c",
         "stream_command_buffer.h",
         "tracing.c",
@@ -74,10 +72,10 @@ iree_runtime_cc_library(
         "cuda_headers.h",
         "dynamic_symbols.c",
         "status_util.c",
-        "status_util.h",
     ],
     hdrs = [
         "dynamic_symbols.h",
+        "status_util.h",
     ],
     textual_hdrs = [
         "dynamic_symbol_tables.h",
