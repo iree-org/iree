@@ -57,6 +57,7 @@ iree_cc_test(
     "ADTExtrasTest.cpp"
   DEPS
     ::Utils
+    LLVMSupport
     iree::testing::gtest
     iree::testing::gtest_main
 )

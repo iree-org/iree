@@ -58,7 +58,7 @@ Value BufferType::createSubrangeOp(Location loc, Value resource,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult parseListElementType(AsmParser &parser,
-                                          FailureOr<Type> &elementType) {
+                                          Type &elementType) {
   if (succeeded(parser.parseOptionalQuestion())) {
     elementType = IREE::Util::VariantType::get(parser.getContext());
     return success();

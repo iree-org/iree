@@ -584,7 +584,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPointToEnd(&region.front());
   b.create<scf::IfOp>(
-      loc, TypeRange{}, cond,
+      loc, cond,
       [&](OpBuilder &b, Location loc) {
         // Do not swap the pairs if true.
         b.create<scf::YieldOp>(loc);
@@ -972,7 +972,7 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   }
 
   auto scfIf = b.create<scf::IfOp>(
-      loc, TypeRange{}, cond,
+      loc, cond,
       [&](OpBuilder &b, Location loc) {
         if (isInclusive) {
           auto value = b.create<memref::LoadOp>(loc, input(), indices);
@@ -1919,7 +1919,7 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
     }
     scalar = builder
                  .create<scf::IfOp>(
-                     loc, packOp.getElementType(), isInBounds, /*thenBuilder=*/
+                     loc, isInBounds, /*thenBuilder=*/
                      [&](OpBuilder &b, Location l) {
                        b.create<scf::YieldOp>(l, createLoad());
                      },
