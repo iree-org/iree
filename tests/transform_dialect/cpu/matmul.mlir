@@ -64,7 +64,7 @@ func.func @matmul_static(
 // RUN: iree-run-module --entry_function=matmul_static \
 // RUN:   --function_input="3x5xf32=1" \
 // RUN:   --function_input="5x3xf32=2" \
-// RUN:   --function_input="3x3xf32=42"| \
+// RUN:   --function_input="3x3xf32=42" | \
 // RUN: FileCheck %s --check-prefixes=EXEC
 
 // EXEC: 3x3xf32=[52 52 52][52 52 52][52 52 52]
