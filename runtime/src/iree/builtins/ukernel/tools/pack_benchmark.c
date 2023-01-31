@@ -109,7 +109,7 @@ static iree_status_t iree_pack_benchmark(
   }
   params.in_size0 = iree_max(0, out_size0 * out_size2 - FLAG_padding_size);
   params.in_size1 = iree_max(0, out_size1 * out_size3 - FLAG_padding_size);
-  params.in_stride0 = out_size0 * out_size2;
+  params.in_stride0 = params.in_size1;
   params.out_stride0 = params.out_size1 * params.out_size2 * params.out_size3;
   iree_uk_ssize_t in_buffer_size = iree_uk_test_2d_buffer_length(
       in_type, params.in_size0, params.in_stride0);
