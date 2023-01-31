@@ -75,6 +75,8 @@ iree_cc_library(
   SRCS
     "cuda_headers.h"
     "dynamic_symbols.c"
+    "status_util.c"
+    "status_util.h"
   DEPS
     iree::base
     iree::base::core_headers

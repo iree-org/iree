@@ -11,6 +11,7 @@
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/cuda/status_util.h"
 
 static const char* kCUDALoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_WINDOWS)
@@ -127,6 +128,38 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_nccl_dynamic_symbols_resolve_all(out_syms);
   }
+
+  // Check the NCCL version compatibility
+  int nccl_version;
+  if (iree_status_is_ok(status)) {
+    status = NCCL_RESULT_TO_STATUS(out_syms, ncclGetVersion(&nccl_version));
+  }
+
+  if (iree_status_is_ok(status)) {
+    int major, minor;
+
+    if (nccl_version < 20000) {
+      major = nccl_version / 1000;
+      minor = (nccl_version % 1000) / 100;
+    } else {
+      major = nccl_version / 10000;
+      minor = (nccl_version % 10000) / 100;
+    }
+
+    if (major != NCCL_MAJOR) {
+      return iree_make_status(IREE_STATUS_INTERNAL,
+                              "Unsupported major NCCL version %d is used. The "
+                              "support version is %d.",
+                              major, NCCL_MAJOR);
+    }
+    if (minor < NCCL_MINOR) {
+      return iree_make_status(IREE_STATUS_INTERNAL,
+                              "Unsupported NCCL version %d.%d is used. The "
+                              "minimum support version is %d.%d.",
+                              major, minor, NCCL_MAJOR, NCCL_MINOR);
+    }
+  }
+
   if (!iree_status_is_ok(status)) {
     iree_hal_cuda_dynamic_symbols_deinitialize(out_syms);
   }
