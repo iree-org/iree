@@ -1377,6 +1377,9 @@ def FLOW_AllGatherOp : FLOW_Op<"allgather", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
+  let summary = [{performs all-gather operation}];
+  let description = [{It gathers data from all ranks and concatenates them on the 0-th dimension.}];
+
   let arguments = (ins
     FLOW_CollectiveElementTypeAttr:$element_type,
     AnyTypeOf<[AnyTensor, AnyMemRef]>:$target,
@@ -1397,6 +1400,9 @@ def FLOW_AllReduceOp : FLOW_Op<"allreduce", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
+  let summary = [{performs all-reduce operation}];
+  let description = [{The operation reduces data across all the ranks in the channel.}];
+
   let arguments = (ins
     FLOW_CollectiveReductionOpAttr:$reduction_op,
     FLOW_CollectiveElementTypeAttr:$element_type,
@@ -1418,6 +1424,10 @@ def FLOW_ReduceScatterOp : FLOW_Op<"reduce_scatter", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
+  let summary = [{performs reduce and scatter operations}];
+  let description = [{The operation reduces data across all the ranks in the channel and
+    scatters the result to each rank.}];
+
   let arguments = (ins
     FLOW_CollectiveReductionOpAttr:$reduction_op,
     FLOW_CollectiveElementTypeAttr:$element_type,
