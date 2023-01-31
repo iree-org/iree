@@ -6,7 +6,9 @@
 
 #include "iree/builtins/ukernel/query_tile_sizes.h"
 
-#include "iree/builtins/ukernel/arch/query_tile_sizes_arch.h"
+#if defined(IREE_UK_ARCH_ARM_64)
+#include "iree/builtins/ukernel/arch/arm_64/query_tile_sizes_arm_64.h"
+#endif
 
 static bool iree_uk_query_tile_sizes_operation_is_matmul(
     iree_uk_uint32_t flags) {
@@ -38,6 +40,15 @@ static iree_uk_matmul_tile_sizes_t iree_uk_query_matmul_tile_sizes_generic(
   // some tests have been written against.
   (void)params;
   return (iree_uk_matmul_tile_sizes_t){.M = 8, .K = 4, .N = 8};
+}
+
+static bool iree_uk_query_matmul_tile_sizes_arch(
+    const iree_uk_query_tile_sizes_2d_params_t* params,
+    iree_uk_matmul_tile_sizes_t* out_matmul_tile_sizes) {
+#if defined(IREE_UK_ARCH_ARM_64)
+  return iree_uk_query_matmul_tile_sizes_arm_64(params, out_matmul_tile_sizes);
+#endif
+  return false;
 }
 
 static void iree_uk_query_tile_sizes_2d_matmul(
