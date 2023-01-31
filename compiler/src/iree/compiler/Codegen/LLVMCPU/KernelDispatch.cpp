@@ -193,24 +193,32 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
     return VectorPreProcStrategy::None;
   }
 
-  if (isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
-    // Peeling is only enabled on fully dynamic shape ops for now.
-    return VectorPreProcStrategy::Peeling;
-  }
+  // if (isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
+  //   // Peeling is only enabled on fully dynamic shape ops for now.
+  //   return VectorPreProcStrategy::Peeling;
+  // }
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
 
   // Default X86 specific strategy.
-  if (isX86(targetAttr) && enableVectorPadding) {
-    // Padding is only enabled on x86. It leads to too much overhead on RISC-V
-    // and ARM.
-    return VectorPreProcStrategy::Padding;
+  if (isX86(targetAttr)) {
+    // No pre-processing strategy for generic ops. Masking will catch
+    // unaligned cases.
+    if (isa<linalg::GenericOp>(linalgOp.getOperation())) {
+      return VectorPreProcStrategy::None;
+    }
+
+    if (enableVectorPadding) {
+      // Padding is only enabled on x86. It leads to too much overhead on
+      // RISC-V and ARM.
+      return VectorPreProcStrategy::Padding;
+    }
   }
 
-  // Default RISC-V specific strategies.
-  if (isRISCV(targetAttr) && enableVectorPeeling) {
-    return VectorPreProcStrategy::Peeling;
-  }
+  //// Default RISC-V specific strategies.
+  // if (isRISCV(targetAttr) && enableVectorPeeling) {
+  //   return VectorPreProcStrategy::Peeling;
+  // }
 
   return VectorPreProcStrategy::None;
 }
@@ -429,18 +437,33 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   return distributedTileSizes;
 }
 
+/// Returns the nearest power of two of `size` if `predicate` is true.
+/// Otherwise, returns `size`.
+static int64_t roundUpToPow2(int64_t size, bool predicate) {
+  if (!predicate) {
+    return size;
+  }
+  assert(size > 0 && "Negative size");
+  return 1 << llvm::Log2_64_Ceil(size);
+}
+
 /// Adjusts the workload per workgroup to be a multiple of vector size to ensure
 /// that the op vectorizes.
 static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
                               int64_t vectorSize,
-                              bool allowIncompleteTile = false) {
+                              bool allowIncompleteTile = false,
+                              bool enforcePowerOfTwo = false) {
   if (ub == ShapedType::kDynamic || lb == ShapedType::kDynamic) {
-    return maxSize;
+    return roundUpToPow2(maxSize, enforcePowerOfTwo);
   }
   int64_t numIters = ub - lb;
   if (numIters <= maxSize && numIters < vectorSize) {
-    return numIters;
+    return roundUpToPow2(numIters, enforcePowerOfTwo);
   }
+
+  // Return the largest suitable power of two if power of two is enforced.
+  if (enforcePowerOfTwo)
+    return roundUpToPow2(std::min(maxSize, numIters), enforcePowerOfTwo);
 
   int64_t scaledUB = std::min(maxSize, numIters) / vectorSize * vectorSize;
   for (int64_t i = scaledUB; i > 0; i -= vectorSize) {
@@ -580,8 +603,6 @@ static void setVectorSizesForDynamicShapes(
                                          parallelSizes.end());
   SmallVector<int64_t> origReductionSizes(reductionSizes.begin(),
                                           reductionSizes.end());
-  setAlwaysVectorizeSizes(op, parallelSizes, reductionSizes);
-
   // If peeling is enabled and the 'op' is fully dynamic, we only vectorize the
   // lowest order parallel dimension for now to avoid peeling higher level
   // dimensions. If no parallel dimension is found to be vectorized, we try to
@@ -591,6 +612,8 @@ static void setVectorSizesForDynamicShapes(
       vecPreProcStrategy != VectorPreProcStrategy::Peeling) {
     return;
   }
+
+  setAlwaysVectorizeSizes(op, parallelSizes, reductionSizes);
 
   bool isParallelDimVectorized = false;
   for (int i = origParallelSizes.size() - 1; i >= 0; --i) {
@@ -1145,7 +1168,7 @@ static LogicalResult setRootConfig(
 static void setX86WorkgroupTileSizes(
     linalg::GenericOp genericOp, unsigned numLoops,
     ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> minTileSizes,
-    ArrayRef<int64_t> maxTileSizes,
+    ArrayRef<int64_t> maxTileSizes, VectorPreProcStrategy vecPreProcStrategy,
     SmallVectorImpl<int64_t> &workgroupTileSizes) {
   workgroupTileSizes.append(numLoops, 0);
   SmallVector<int64_t, 4> staticLoopRanges = genericOp.getStaticLoopRanges();
@@ -1153,7 +1176,9 @@ static void setX86WorkgroupTileSizes(
     if (flowTileSizes[loopNum]) {
       workgroupTileSizes[loopNum] =
           getMaxTileSize(0, flowTileSizes[loopNum], minTileSizes[loopNum],
-                         minTileSizes[loopNum]);
+                         minTileSizes[loopNum], /*allowIncompleteTile=*/false,
+                         /*enforcePowerOfTwo=*/vecPreProcStrategy ==
+                             VectorPreProcStrategy::None);
     } else {
       // If the flow level tile size is zero, and static loop range is 0 as
       // well, set the tile sizes here to zero as well.
@@ -1201,6 +1226,8 @@ static LogicalResult setDefaultGenericOpRootConfig(
     return success();
   }
 
+  LLVM_DEBUG(KD_DBGS() << "Setting default generic op root configuration\n");
+
   // If there are no loops, there is nothing to do.
   unsigned numLoops = genericOp.getNumLoops();
   if (numLoops == 0) {
@@ -1215,21 +1242,38 @@ static LogicalResult setDefaultGenericOpRootConfig(
   // allocation limit See #9469 for example.
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize / 2);
 
+  LLVM_DEBUG(KD_DBGS() << "Min tile sizes for distribution: " << minTileSizes
+                       << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Max tile sizes for distribution: " << maxTileSizes
+                       << "\n");
+
   // Set the flow level tiling to the default.
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
       genericOp, minTileSizes, maxTileSizes);
+
+  LLVM_DEBUG(KD_DBGS() << "Final tile sizes for distribution: " << flowTileSizes
+                       << "\n");
+
+  auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   setX86WorkgroupTileSizes(genericOp, numLoops, flowTileSizes, minTileSizes,
-                           maxTileSizes, parallelTileSizes);
+                           maxTileSizes, vecPreProcStrategy, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
 
-  auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
-  setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
-                                 parallelTileSizes, reductionTileSizes);
+  LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (parallel): "
+                       << parallelTileSizes << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (reduction): "
+                       << reductionTileSizes << "\n");
+
+  // setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
+  //                                parallelTileSizes, reductionTileSizes);
+
+  LLVM_DEBUG(KD_DBGS() << "Vectorization pre-processing strategy "
+                       << vecPreProcStrategy << "\n");
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
@@ -1319,10 +1363,12 @@ static LogicalResult setTransposeLikeOpRootConfig(
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
       genericOp, minTileSizes, maxTileSizes);
 
+  auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
   setX86WorkgroupTileSizes(genericOp, numLoops, flowTileSizes, minTileSizes,
-                           maxTileSizes, parallelTileSizes);
+                           maxTileSizes, vecPreProcStrategy, parallelTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
