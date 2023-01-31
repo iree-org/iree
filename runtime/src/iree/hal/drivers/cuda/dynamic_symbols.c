@@ -130,7 +130,8 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
   }
 
   // Check the NCCL version compatibility
-  int nccl_version;
+  int nccl_version = 0;
+
   if (iree_status_is_ok(status)) {
     status = NCCL_RESULT_TO_STATUS(out_syms, ncclGetVersion(&nccl_version));
   }
@@ -146,17 +147,12 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
       minor = (nccl_version % 10000) / 100;
     }
 
-    if (major != NCCL_MAJOR) {
-      return iree_make_status(IREE_STATUS_INTERNAL,
-                              "Unsupported major NCCL version %d is used. The "
-                              "support version is %d.",
-                              major, NCCL_MAJOR);
-    }
-    if (minor < NCCL_MINOR) {
-      return iree_make_status(IREE_STATUS_INTERNAL,
-                              "Unsupported NCCL version %d.%d is used. The "
-                              "minimum support version is %d.%d.",
-                              major, minor, NCCL_MAJOR, NCCL_MINOR);
+    if (nccl_version < NCCL_VERSION(NCCL_MAJOR, NCCL_MINOR, 0) ||
+        major != NCCL_MAJOR) {
+      return iree_make_status(
+          IREE_STATUS_INTERNAL,
+          "NCCL version %d.%d found but at least version %d.%d is required",
+          major, minor, NCCL_MAJOR, NCCL_MINOR);
     }
   }
 
