@@ -37,6 +37,7 @@ def IREECodegen_Dialect : Dialect {
     void initializeCodegenAttrs();
   }];
   let useDefaultAttributePrinterParser = 1;
+  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGEN_DIALECT

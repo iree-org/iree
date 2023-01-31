@@ -1085,8 +1085,7 @@ LogicalResult ScanOp::getResultTilePosition(
   return failure();
 }
 
-LogicalResult ScanOp::fold(ArrayRef<Attribute>,
-                           SmallVectorImpl<OpFoldResult> &) {
+LogicalResult ScanOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {
   return memref::foldMemRefCast(*this);
 }
 
@@ -2583,7 +2582,7 @@ LogicalResult WinogradInputTransformOp::getResultTilePosition(
   return failure();
 }
 
-LogicalResult WinogradInputTransformOp::fold(ArrayRef<Attribute>,
+LogicalResult WinogradInputTransformOp::fold(FoldAdaptor,
                                              SmallVectorImpl<OpFoldResult> &) {
   return memref::foldMemRefCast(*this);
 }
@@ -2745,7 +2744,7 @@ LogicalResult WinogradOutputTransformOp::getResultTilePosition(
   return failure();
 }
 
-LogicalResult WinogradOutputTransformOp::fold(ArrayRef<Attribute>,
+LogicalResult WinogradOutputTransformOp::fold(FoldAdaptor,
                                               SmallVectorImpl<OpFoldResult> &) {
   return memref::foldMemRefCast(*this);
 }
@@ -2834,8 +2833,7 @@ LogicalResult SoftmaxOp::getResultTilePosition(
   return failure();
 }
 
-LogicalResult SoftmaxOp::fold(ArrayRef<Attribute>,
-                              SmallVectorImpl<OpFoldResult> &) {
+LogicalResult SoftmaxOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {
   return memref::foldMemRefCast(*this);
 }
 
@@ -2959,8 +2957,7 @@ LogicalResult AttentionOp::getResultTilePosition(
   return failure();
 }
 
-LogicalResult AttentionOp::fold(ArrayRef<Attribute>,
-                                SmallVectorImpl<OpFoldResult> &) {
+LogicalResult AttentionOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {
   return memref::foldMemRefCast(*this);
 }
 
