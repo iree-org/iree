@@ -525,5 +525,45 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
   return laneVal;
 }
 
+Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
+  // Currently hardcode the size of wmma operation. When more cases are
+  // supported this should be picked based on what the backend supports.
+  int64_t m = 16;
+  int64_t n = 16;
+  if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
+    int64_t k = contract.getLhsType().getElementType().isF16() ? 16 : 8;
+    SmallVector<int64_t> nativeSize(contract.getIteratorTypes().size() - 3, 1);
+    nativeSize.append({m, n, k});
+    return nativeSize;
+  }
+  if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
+    SmallVector<int64_t> nativeSize(writeOp.getVectorType().getRank() - 2, 1);
+    nativeSize.append({m, n});
+    return nativeSize;
+  }
+  if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
+    // Transfer read ops may need different shapes based on how they are being
+    // used. For simplicity just match the shape used by the extract strided op.
+    VectorType sliceType;
+    for (Operation *users : op->getUsers()) {
+      auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
+      if (!extract) return std::nullopt;
+      auto vecType = extract.getResult().getType().cast<VectorType>();
+      if (sliceType && sliceType != vecType) return std::nullopt;
+      sliceType = vecType;
+    }
+    return llvm::to_vector<>(sliceType.getShape());
+  }
+  if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
+    if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
+      SmallVector<int64_t> nativeSize(vecType.getRank() - 2, 1);
+      // Map elementwise ops to the output shape.
+      nativeSize.append({m, n});
+      return nativeSize;
+    }
+  }
+  return std::nullopt;
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
