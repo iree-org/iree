@@ -21,70 +21,102 @@
 // String utils
 //===----------------------------------------------------------------------===//
 
+static const iree_bitfield_string_mapping_t iree_hal_memory_type_mappings[] = {
+    // Combined:
+    {IREE_HAL_MEMORY_TYPE_HOST_LOCAL, IREE_SVL("HOST_LOCAL")},
+    {IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL, IREE_SVL("DEVICE_LOCAL")},
+    // Separate:
+    {IREE_HAL_MEMORY_TYPE_OPTIMAL, IREE_SVL("OPTIMAL")},
+    {IREE_HAL_MEMORY_TYPE_HOST_VISIBLE, IREE_SVL("HOST_VISIBLE")},
+    {IREE_HAL_MEMORY_TYPE_HOST_COHERENT, IREE_SVL("HOST_COHERENT")},
+    {IREE_HAL_MEMORY_TYPE_HOST_CACHED, IREE_SVL("HOST_CACHED")},
+    {IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE, IREE_SVL("DEVICE_VISIBLE")},
+};
+
+IREE_API_EXPORT iree_status_t iree_hal_memory_type_parse(
+    iree_string_view_t value, iree_hal_memory_type_t* out_value) {
+  return iree_bitfield_parse(value,
+                             IREE_ARRAYSIZE(iree_hal_memory_type_mappings),
+                             iree_hal_memory_type_mappings, out_value);
+}
+
 IREE_API_EXPORT iree_string_view_t iree_hal_memory_type_format(
     iree_hal_memory_type_t value, iree_bitfield_string_temp_t* out_temp) {
-  static const iree_bitfield_string_mapping_t mappings[] = {
-      // Combined:
-      {IREE_HAL_MEMORY_TYPE_HOST_LOCAL, IREE_SVL("HOST_LOCAL")},
-      {IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL, IREE_SVL("DEVICE_LOCAL")},
-      // Separate:
-      {IREE_HAL_MEMORY_TYPE_OPTIMAL, IREE_SVL("OPTIMAL")},
-      {IREE_HAL_MEMORY_TYPE_HOST_VISIBLE, IREE_SVL("HOST_VISIBLE")},
-      {IREE_HAL_MEMORY_TYPE_HOST_COHERENT, IREE_SVL("HOST_COHERENT")},
-      {IREE_HAL_MEMORY_TYPE_HOST_CACHED, IREE_SVL("HOST_CACHED")},
-      {IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE, IREE_SVL("DEVICE_VISIBLE")},
-  };
-  return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
-                                     out_temp);
+  return iree_bitfield_format_inline(
+      value, IREE_ARRAYSIZE(iree_hal_memory_type_mappings),
+      iree_hal_memory_type_mappings, out_temp);
+}
+static const iree_bitfield_string_mapping_t iree_hal_memory_access_mappings[] =
+    {
+        // Combined:
+        {IREE_HAL_MEMORY_ACCESS_ALL, IREE_SVL("ALL")},
+        {IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, IREE_SVL("DISCARD_WRITE")},
+        // Separate:
+        {IREE_HAL_MEMORY_ACCESS_READ, IREE_SVL("READ")},
+        {IREE_HAL_MEMORY_ACCESS_WRITE, IREE_SVL("WRITE")},
+        {IREE_HAL_MEMORY_ACCESS_DISCARD, IREE_SVL("DISCARD")},
+        {IREE_HAL_MEMORY_ACCESS_MAY_ALIAS, IREE_SVL("MAY_ALIAS")},
+        {IREE_HAL_MEMORY_ACCESS_ANY, IREE_SVL("ANY")},
+};
+
+IREE_API_EXPORT iree_status_t iree_hal_memory_access_parse(
+    iree_string_view_t value, iree_hal_memory_access_t* out_value) {
+  uint32_t value_u32 = 0;
+  IREE_RETURN_IF_ERROR(iree_bitfield_parse(
+      value, IREE_ARRAYSIZE(iree_hal_memory_access_mappings),
+      iree_hal_memory_access_mappings, &value_u32));
+  *out_value = (iree_hal_memory_access_t)value_u32;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_string_view_t iree_hal_memory_access_format(
     iree_hal_memory_access_t value, iree_bitfield_string_temp_t* out_temp) {
-  static const iree_bitfield_string_mapping_t mappings[] = {
-      // Combined:
-      {IREE_HAL_MEMORY_ACCESS_ALL, IREE_SVL("ALL")},
-      {IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, IREE_SVL("DISCARD_WRITE")},
-      // Separate:
-      {IREE_HAL_MEMORY_ACCESS_READ, IREE_SVL("READ")},
-      {IREE_HAL_MEMORY_ACCESS_WRITE, IREE_SVL("WRITE")},
-      {IREE_HAL_MEMORY_ACCESS_DISCARD, IREE_SVL("DISCARD")},
-      {IREE_HAL_MEMORY_ACCESS_MAY_ALIAS, IREE_SVL("MAY_ALIAS")},
-      {IREE_HAL_MEMORY_ACCESS_ANY, IREE_SVL("ANY")},
-  };
-  return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
-                                     out_temp);
+  return iree_bitfield_format_inline(
+      value, IREE_ARRAYSIZE(iree_hal_memory_access_mappings),
+      iree_hal_memory_access_mappings, out_temp);
+}
+
+// clang-format off
+static const iree_bitfield_string_mapping_t iree_hal_buffer_usage_mappings[] = {
+  // Combined:
+  {IREE_HAL_BUFFER_USAGE_TRANSFER, IREE_SVL("TRANSFER")},
+  {IREE_HAL_BUFFER_USAGE_DISPATCH, IREE_SVL("DISPATCH")},
+  {IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE, IREE_SVL("DISPATCH_STORAGE")},
+  {IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE, IREE_SVL("DISPATCH_IMAGE")},
+  {IREE_HAL_BUFFER_USAGE_MAPPING, IREE_SVL("MAPPING")},
+  // Separate:
+  {IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE, IREE_SVL("TRANSFER_SOURCE")},
+  {IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET, IREE_SVL("TRANSFER_TARGET")},
+  {IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS, IREE_SVL("DISPATCH_INDIRECT_PARAMS")},
+  {IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ, IREE_SVL("DISPATCH_UNIFORM_READ")},
+  {IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_READ, IREE_SVL("DISPATCH_STORAGE_READ")},
+  {IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_WRITE, IREE_SVL("DISPATCH_STORAGE_WRITE")},
+  {IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_READ, IREE_SVL("DISPATCH_IMAGE_READ")},
+  {IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_WRITE, IREE_SVL("DISPATCH_IMAGE_WRITE")},
+  {IREE_HAL_BUFFER_USAGE_SHARING_EXPORT, IREE_SVL("SHARING_EXPORT")},
+  {IREE_HAL_BUFFER_USAGE_SHARING_REPLICATE, IREE_SVL("SHARING_REPLICATE")},
+  {IREE_HAL_BUFFER_USAGE_SHARING_CONCURRENT, IREE_SVL("SHARING_CONCURRENT")},
+  {IREE_HAL_BUFFER_USAGE_SHARING_IMMUTABLE, IREE_SVL("SHARING_IMMUTABLE")},
+  {IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED, IREE_SVL("MAPPING_SCOPED")},
+  {IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT, IREE_SVL("MAPPING_PERSISTENT")},
+  {IREE_HAL_BUFFER_USAGE_MAPPING_OPTIONAL, IREE_SVL("MAPPING_OPTIONAL")},
+  {IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM, IREE_SVL("MAPPING_ACCESS_RANDOM")},
+  {IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_SEQUENTIAL_WRITE, IREE_SVL("MAPPING_ACCESS_SEQUENTIAL_WRITE")},
+};
+// clang-format on
+
+IREE_API_EXPORT iree_status_t iree_hal_buffer_usage_parse(
+    iree_string_view_t value, iree_hal_buffer_usage_t* out_value) {
+  return iree_bitfield_parse(value,
+                             IREE_ARRAYSIZE(iree_hal_buffer_usage_mappings),
+                             iree_hal_buffer_usage_mappings, out_value);
 }
 
 IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
     iree_hal_buffer_usage_t value, iree_bitfield_string_temp_t* out_temp) {
-  // clang-format off
-  static const iree_bitfield_string_mapping_t mappings[] = {
-    // Combined:
-    {IREE_HAL_BUFFER_USAGE_TRANSFER, IREE_SVL("TRANSFER")},
-    {IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE, IREE_SVL("DISPATCH_STORAGE")},
-    {IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE, IREE_SVL("DISPATCH_IMAGE")},
-    {IREE_HAL_BUFFER_USAGE_MAPPING, IREE_SVL("MAPPING")},
-    // Separate:
-    {IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE, IREE_SVL("TRANSFER_SOURCE")},
-    {IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET, IREE_SVL("TRANSFER_TARGET")},
-    {IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS, IREE_SVL("DISPATCH_INDIRECT_PARAMS")},
-    {IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ, IREE_SVL("DISPATCH_UNIFORM_READ")},
-    {IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_READ, IREE_SVL("DISPATCH_STORAGE_READ")},
-    {IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_WRITE, IREE_SVL("DISPATCH_STORAGE_WRITE")},
-    {IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_READ, IREE_SVL("DISPATCH_IMAGE_READ")},
-    {IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_WRITE, IREE_SVL("DISPATCH_IMAGE_WRITE")},
-    {IREE_HAL_BUFFER_USAGE_SHARING_EXPORT, IREE_SVL("SHARING_EXPORT")},
-    {IREE_HAL_BUFFER_USAGE_SHARING_REPLICATE, IREE_SVL("SHARING_REPLICATE")},
-    {IREE_HAL_BUFFER_USAGE_SHARING_CONCURRENT, IREE_SVL("SHARING_CONCURRENT")},
-    {IREE_HAL_BUFFER_USAGE_SHARING_IMMUTABLE, IREE_SVL("SHARING_IMMUTABLE")},
-    {IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED, IREE_SVL("MAPPING_SCOPED")},
-    {IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT, IREE_SVL("MAPPING_PERSISTENT")},
-    {IREE_HAL_BUFFER_USAGE_MAPPING_OPTIONAL, IREE_SVL("MAPPING_OPTIONAL")},
-    {IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM, IREE_SVL("MAPPING_ACCESS_RANDOM")},
-    {IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_SEQUENTIAL_WRITE, IREE_SVL("MAPPING_ACCESS_SEQUENTIAL_WRITE")},
-  };
-  return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
-                                     out_temp);
+  return iree_bitfield_format_inline(
+      value, IREE_ARRAYSIZE(iree_hal_buffer_usage_mappings),
+      iree_hal_buffer_usage_mappings, out_temp);
 }
 
 //===----------------------------------------------------------------------===//

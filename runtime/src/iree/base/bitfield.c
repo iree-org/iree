@@ -9,6 +9,61 @@
 #include <stdlib.h>
 #include <string.h>
 
+static bool iree_bitfield_lookup_mapping(
+    iree_string_view_t value, iree_host_size_t mapping_count,
+    const iree_bitfield_string_mapping_t* mappings, uint32_t* out_bits) {
+  *out_bits = 0;
+  for (iree_host_size_t mapping_index = 0; mapping_index < mapping_count;
+       ++mapping_index) {
+    const iree_bitfield_string_mapping_t mapping = mappings[mapping_index];
+    if (iree_string_view_equal_case(mapping.string, value)) {
+      *out_bits = mapping.bits;
+      return true;
+    }
+  }
+  return false;
+}
+
+static inline bool iree_isdigit(char c) { return (unsigned)c - '0' < 10; }
+
+IREE_API_EXPORT iree_status_t iree_bitfield_parse(
+    iree_string_view_t value, iree_host_size_t mapping_count,
+    const iree_bitfield_string_mapping_t* mappings, uint32_t* out_value) {
+  uint32_t bits_value = 0;
+  while (!iree_string_view_is_empty(value)) {
+    // Slice off the next part (or the tail).
+    iree_string_view_t part = iree_string_view_empty();
+    iree_string_view_split(value, '|', &part, &value);
+    part = iree_string_view_trim(part);
+    if (iree_string_view_is_empty(part)) continue;
+
+    // Scan the mapping table and match case-insensitive.
+    uint32_t mapping_bits = 0;
+    if (iree_bitfield_lookup_mapping(part, mapping_count, mappings,
+                                     &mapping_bits)) {
+      bits_value |= mapping_bits;
+      continue;
+    }
+
+    // If it starts with a number we try to parse it like one.
+    if (iree_isdigit(part.data[0])) {
+      uint32_t int_bits = 0;
+      if (iree_string_view_atoi_uint32(part, &int_bits)) {
+        bits_value |= int_bits;
+        continue;
+      }
+    }
+
+    // Unknown bitfield value.
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unrecognized bitfield member '%.*s'",
+                            (int)part.size, part.data);
+  }
+
+  *out_value = bits_value;
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t
 iree_bitfield_format(uint32_t value, iree_host_size_t mapping_count,
                      const iree_bitfield_string_mapping_t* mappings,

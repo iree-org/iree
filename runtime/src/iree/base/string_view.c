@@ -18,11 +18,30 @@ static inline size_t iree_min_host_size(size_t a, size_t b) {
   return a < b ? a : b;
 }
 
+// Here to ensure that we don't pull in locale-specific code:
+static bool iree_isupper(char c) { return (unsigned)c - 'A' < 26; }
+static bool iree_islower(char c) { return (unsigned)c - 'a' < 26; }
+static inline char iree_toupper(char c) {
+  return iree_islower(c) ? (c & 0x5F) : c;
+}
+static inline char iree_tolower(char c) {
+  return iree_isupper(c) ? (c | 32) : c;
+}
+
 IREE_API_EXPORT bool iree_string_view_equal(iree_string_view_t lhs,
                                             iree_string_view_t rhs) {
   if (lhs.size != rhs.size) return false;
   for (iree_host_size_t i = 0; i < lhs.size; ++i) {
     if (lhs.data[i] != rhs.data[i]) return false;
+  }
+  return true;
+}
+
+IREE_API_EXPORT bool iree_string_view_equal_case(iree_string_view_t lhs,
+                                                 iree_string_view_t rhs) {
+  if (lhs.size != rhs.size) return false;
+  for (iree_host_size_t i = 0; i < lhs.size; ++i) {
+    if (iree_tolower(lhs.data[i]) != iree_tolower(rhs.data[i])) return false;
   }
   return true;
 }
