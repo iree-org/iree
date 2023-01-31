@@ -51,11 +51,24 @@ void *operator new[](std::size_t count) {
   return ptr;
 }
 void *operator new(std::size_t count, std::align_val_t al) {
-  auto ptr = malloc(count);
+#if defined(_WIN32) || defined(__CYGWIN__)
+  auto ptr = _aligned_malloc(count, static_cast<std::size_t>(al));
+#else
+  auto ptr = aligned_alloc(static_cast<std::size_t>(al), count);
+#endif
   IREE_TRACE_ALLOC(ptr, count);
   return ptr;
 }
 void *operator new[](std::size_t count, std::align_val_t al) {
+#if defined(_WIN32) || defined(__CYGWIN__)
+  auto ptr = _aligned_malloc(count, static_cast<std::size_t>(al));
+#else
+  auto ptr = aligned_alloc(static_cast<std::size_t>(al), count);
+#endif
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+
   auto ptr = malloc(count);
   IREE_TRACE_ALLOC(ptr, count);
   return ptr;
@@ -79,19 +92,35 @@ void operator delete[](void *ptr, size_t sz) noexcept {
 }
 void operator delete(void *ptr, std::align_val_t al) noexcept {
   IREE_TRACE_FREE(ptr);
+#if defined(_WIN32) || defined(__CYGWIN__)
+  _aligned_free(ptr);
+#else
   free(ptr);
+#endif
 }
 void operator delete[](void *ptr, std::align_val_t al) noexcept {
   IREE_TRACE_FREE(ptr);
+#if defined(_WIN32) || defined(__CYGWIN__)
+  _aligned_free(ptr);
+#else
   free(ptr);
+#endif
 }
 void operator delete(void *ptr, size_t sz, std::align_val_t al) noexcept {
   IREE_TRACE_FREE(ptr);
+#if defined(_WIN32) || defined(__CYGWIN__)
+  _aligned_free(ptr);
+#else
   free(ptr);
+#endif
 }
 void operator delete[](void *ptr, size_t sz, std::align_val_t al) noexcept {
   IREE_TRACE_FREE(ptr);
+#if defined(_WIN32) || defined(__CYGWIN__)
+  _aligned_free(ptr);
+#else
   free(ptr);
+#endif
 }
 
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
