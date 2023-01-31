@@ -16,7 +16,7 @@
 // RUN:     --iree-flow-enable-aggressive-fusion \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_v2_codegen_spec.mlir | \
-// RUN: iree-run-module --entry_function=softmax --device=cuda | \
+// RUN: iree-run-module --function=softmax --device=cuda | \
 // RUN: FileCheck %s
 
 !tmp_tensor_t = tensor<16x128xf32>

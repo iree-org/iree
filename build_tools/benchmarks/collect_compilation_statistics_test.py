@@ -86,8 +86,7 @@ class CollectCompilationStatistics(unittest.TestCase):
             BytesIO(module_file_data), len(module_file_data)))
 
   def test_get_module_path(self):
-    flag_file = StringIO(
-        f"--function_inputs=1x2x3xf32\n--module_file=/abcd.vmfb")
+    flag_file = StringIO(f"--module=/abcd.vmfb\n--inputs=1x2x3xf32")
 
     moduel_path = get_module_path(flag_file)
 

@@ -76,8 +76,8 @@ if(IREE_BUILD_TESTS AND
     DRIVER
       "local-sync"
     RUNNER_ARGS
-      "--entry_function=abs"
-      "--function_input=f32=-10"
+      "--function=abs"
+      "--input=f32=-10"
     EXPECTED_OUTPUT
       "f32=10"
     DEPS

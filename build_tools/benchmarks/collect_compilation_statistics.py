@@ -124,7 +124,7 @@ def get_module_path(flag_file: TextIO) -> Optional[str]:
 
   module_path = None
   for line in flag_file:
-    match = re.match("--module_file=(.+)", line.strip())
+    match = re.match("--module=(.+)", line.strip())
     if match:
       module_name, module_ext = os.path.splitext(match.group(1))
       module_path = f"{module_name}-{COMPILATION_STATS_MODULE_SUFFIX}{module_ext}"

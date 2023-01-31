@@ -139,7 +139,7 @@ static llvm::cl::list<std::string> run_args_flag{
 };
 
 IREE_FLAG_LIST(
-    string, function_input,
+    string, input,
     "An input value or buffer of the format:\n"
     "  [shape]xtype=[value]\n"
     "  2x2xi32=1 2 3 4\n"
@@ -322,8 +322,8 @@ Status EvaluateFunction(iree_vm_context_t* context, iree_hal_device_t* device,
   // Parse input values from the flags.
   vm::ref<iree_vm_list_t> inputs;
   IREE_RETURN_IF_ERROR(iree_tooling_parse_to_variant_list(
-      device_allocator, FLAG_function_input_list().values,
-      FLAG_function_input_list().count, host_allocator, &inputs));
+      device_allocator, FLAG_input_list().values, FLAG_input_list().count,
+      host_allocator, &inputs));
 
   // If the function is async add fences so we can invoke it synchronously.
   vm::ref<iree_hal_fence_t> finish_fence;

@@ -21,7 +21,7 @@
 /// --iree-flow-enable-aggressive-fusion.
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir | \
-// RUN: iree-run-module --entry_function=softmax --device=cuda | \
+// RUN: iree-run-module --function=softmax --device=cuda | \
 // RUN: FileCheck %s
 
 

@@ -58,8 +58,8 @@ class IreeWrapper(IreeBenchmarkCommand):
                      num_runs,
                      taskset=taskset)
     self.driver = driver
-    self.args.append("--entry_function=main")
-    self.args.append('--function_input="%s"' % function_input)
+    self.args.append("--function=main")
+    self.args.append('--input="%s"' % function_input)
 
 
 class SimpleCommandFactory(BenchmarkCommandFactory):

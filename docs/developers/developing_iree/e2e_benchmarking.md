@@ -116,16 +116,16 @@ on VMVX run:
 
 ```shell
 $ tools/iree-benchmark-module \
-  --module_file=/tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb \
+  --module=/tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb \
   --device=local-task \
-  --entry_function=matmul_lhs_batch \
-  --function_input=256x64x32xf32=2 \
-  --function_input=32x16xf32=3
+  --function=matmul_lhs_batch \
+  --input=256x64x32xf32=2 \
+  --input=32x16xf32=3
 
 
 ```
 
-Note that the arguments to `--function_input` are shapes plus an arbitrary value
+Note that the arguments to `--input` are shapes plus an arbitrary value
 to populate a splat. Some more complicated models might have very different
 performance characteristics depending on the input data, so this manual
 specification will not work well.
@@ -220,11 +220,11 @@ $ adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/* \
 
 ```shell
 $ adb shell /data/local/tmp/iree-benchmark-module \
-  --module_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb" \
+  --module="/data/local/tmp/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb" \
   --device=local-task \
-  --entry_function=matmul_lhs_batch \
-  --function_input=256x64x32xf32=2 \
-  --function_input=32x16xf32=3
+  --function=matmul_lhs_batch \
+  --input=256x64x32xf32=2 \
+  --input=32x16xf32=3
 ```
 
 ## 5. Benchmarking TFLite on Android

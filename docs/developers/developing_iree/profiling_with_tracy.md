@@ -177,9 +177,9 @@ Example:
 TRACY_NO_EXIT=1 IREE_PRESERVE_DYLIB_TEMP_FILES=1 \
   /data/local/tmp/iree-benchmark-module \
     --driver=local-task \
-    --module_file=/data/local/tmp/android_module.fbvm \
-    --entry_function=serving_default \
-    --function_input=1x384xi32
+    --module=/data/local/tmp/android_module.fbvm \
+    --function=serving_default \
+    --input=1x384xi32
 ```
 
 Explanation:
