@@ -54,6 +54,8 @@ void PassTracing::runAfterPassFailed(Pass *pass, Operation *op) {
 // https://www.cppstories.com/2019/08/newnew-align/#custom-overloads
 // Note: always disable exceptions, so no `if (!ptr) throw std::bad_alloc{};`
 
+#include "iree/base/target_platform.h"
+
 // Avoid potential sharp edge by making allocation tracking and sanitizers
 // mutually exclusive. They _might_ work together, but here's a warning anyway.
 #if defined(IREE_SANITIZER_ADDRESS) || defined(IREE_SANITIZER_MEMORY) || \
@@ -62,6 +64,14 @@ void PassTracing::runAfterPassFailed(Pass *pass, Operation *op) {
 #endif  // IREE_SANITIZER_*
 
 #include <new>
+
+void *iree_aligned_new(std::size_t count, std::align_val_t al) {
+#if defined(_WIN32) || defined(__CYGWIN__)
+  return _aligned_malloc(count, static_cast<std::size_t>(al));
+#else
+  return aligned_alloc(static_cast<std::size_t>(al), count);
+#endif
+}
 
 // replaceable allocation functions
 void *operator new(std::size_t count) {
@@ -75,20 +85,12 @@ void *operator new[](std::size_t count) {
   return ptr;
 }
 void *operator new(std::size_t count, std::align_val_t al) {
-#if defined(_WIN32) || defined(__CYGWIN__)
-  auto ptr = _aligned_malloc(count, static_cast<std::size_t>(al));
-#else
-  auto ptr = aligned_alloc(static_cast<std::size_t>(al), count);
-#endif
+  auto ptr = iree_aligned_new(count, al);
   IREE_TRACE_ALLOC(ptr, count);
   return ptr;
 }
 void *operator new[](std::size_t count, std::align_val_t al) {
-#if defined(_WIN32) || defined(__CYGWIN__)
-  auto ptr = _aligned_malloc(count, static_cast<std::size_t>(al));
-#else
-  auto ptr = aligned_alloc(static_cast<std::size_t>(al), count);
-#endif
+  auto ptr = iree_aligned_new(count, al);
   IREE_TRACE_ALLOC(ptr, count);
   return ptr;
 }
@@ -107,23 +109,23 @@ void *operator new[](std::size_t count, const std::nothrow_t &tag) noexcept {
 }
 void *operator new(std::size_t count, std::align_val_t al,
                    const std::nothrow_t &) noexcept {
-#if defined(_WIN32) || defined(__CYGWIN__)
-  auto ptr = _aligned_malloc(count, static_cast<std::size_t>(al));
-#else
-  auto ptr = aligned_alloc(static_cast<std::size_t>(al), count);
-#endif
+  auto ptr = iree_aligned_new(count, al);
   IREE_TRACE_ALLOC(ptr, count);
   return ptr;
 }
 void *operator new[](std::size_t count, std::align_val_t al,
                      const std::nothrow_t &) noexcept {
-#if defined(_WIN32) || defined(__CYGWIN__)
-  auto ptr = _aligned_malloc(count, static_cast<std::size_t>(al));
-#else
-  auto ptr = aligned_alloc(static_cast<std::size_t>(al), count);
-#endif
+  auto ptr = iree_aligned_new(count, al);
   IREE_TRACE_ALLOC(ptr, count);
   return ptr;
+}
+
+void iree_aligned_free(void *ptr) {
+#if defined(_WIN32) || defined(__CYGWIN__)
+  _aligned_free(ptr);
+#else
+  free(ptr);
+#endif
 }
 
 // replaceable usual deallocation functions
@@ -145,35 +147,19 @@ void operator delete[](void *ptr, size_t sz) noexcept {
 }
 void operator delete(void *ptr, std::align_val_t al) noexcept {
   IREE_TRACE_FREE(ptr);
-#if defined(_WIN32) || defined(__CYGWIN__)
-  _aligned_free(ptr);
-#else
-  free(ptr);
-#endif
+  iree_aligned_free(ptr);
 }
 void operator delete[](void *ptr, std::align_val_t al) noexcept {
   IREE_TRACE_FREE(ptr);
-#if defined(_WIN32) || defined(__CYGWIN__)
-  _aligned_free(ptr);
-#else
-  free(ptr);
-#endif
+  iree_aligned_free(ptr);
 }
 void operator delete(void *ptr, size_t sz, std::align_val_t al) noexcept {
   IREE_TRACE_FREE(ptr);
-#if defined(_WIN32) || defined(__CYGWIN__)
-  _aligned_free(ptr);
-#else
-  free(ptr);
-#endif
+  iree_aligned_free(ptr);
 }
 void operator delete[](void *ptr, size_t sz, std::align_val_t al) noexcept {
   IREE_TRACE_FREE(ptr);
-#if defined(_WIN32) || defined(__CYGWIN__)
-  _aligned_free(ptr);
-#else
-  free(ptr);
-#endif
+  iree_aligned_free(ptr);
 }
 
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
