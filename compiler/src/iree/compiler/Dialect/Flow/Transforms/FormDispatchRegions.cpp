@@ -16,13 +16,11 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -42,15 +40,6 @@
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-flow-form-dispatch-regions"
-
-// NOTE: These flags are added for experimental purposes only
-// for developer control. These should be treated as internal
-// compiler implementation details.
-static llvm::cl::opt<int> clInlineConstantByteLength(
-    "iree-flow-inline-constants-max-byte-length",
-    llvm::cl::desc("Maximum byte-length of tensor constant that can be inlined "
-                   "into a dispatch region or 0 to disable inlining."),
-    llvm::cl::init(256));
 
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
@@ -201,44 +190,6 @@ static bool isRootOp(Operation *op) {
   // now.
   return (isa<TilingInterface>(op) && !isa<tensor::PadOp>(op)) ||
          isa<LinalgExt::SetEncodingOp, LinalgExt::UnsetEncodingOp>(op);
-}
-
-/// Operations that are cloned into dispatch regions formed with other
-/// operations as roots.
-bool isClonableIntoDispatchOp(Operation *op) {
-  // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
-  // trivially clonable too, but they cause problems
-  // with bufferization. Make them clonable when fixed.
-  if (isa<AffineApplyOp, arith::IndexCastOp, linalg::FillOp, tensor::EmptyOp,
-          tensor::CastOp, tensor::ExtractOp, tensor::ExtractSliceOp,
-          tensor::PadOp>(op)) {
-    return true;
-  }
-  if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    if (clInlineConstantByteLength == 0) return false;
-    auto constantValueAttr = constantOp.getValue();
-    auto constantType = constantOp.getType();
-    if (constantValueAttr.isa<SplatElementsAttr>()) {
-      return true;
-    } else if (auto denseAttr =
-                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      auto shapedType = constantOp.getType().cast<ShapedType>();
-      uint64_t estimatedByteLength =
-          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
-          8;
-      return denseAttr.isSplat() ||
-             estimatedByteLength <= clInlineConstantByteLength;
-    } else if (constantType.isIntOrIndexOrFloat()) {
-      return true;
-    }
-  }
-  if (llvm::all_of(op->getOperands(),
-                   [&](Value v) { return v.getType().isIntOrFloat(); }) &&
-      llvm::all_of(op->getResults(),
-                   [&](Value v) { return v.getType().isIntOrFloat(); })) {
-    return true;
-  }
-  return false;
 }
 
 //===----------------------------------------------------------------------===//
