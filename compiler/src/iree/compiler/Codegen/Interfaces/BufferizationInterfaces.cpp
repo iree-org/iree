@@ -24,6 +24,8 @@
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Support/LLVM.h"
 
+using mlir::bufferization::AliasingOpOperandList;
+using mlir::bufferization::AliasingOpResultList;
 using mlir::bufferization::AnalysisState;
 using mlir::bufferization::BufferizableOpInterface;
 using mlir::bufferization::BufferizationAliasInfo;
@@ -172,7 +174,7 @@ struct DispatchTensorStoreOpInterface
     return false;
   }
 
-  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+  AliasingOpResultList getAliasingOpResults(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
     return {};
   }
@@ -263,11 +265,11 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
   AnalysisState analysisState(options);
   SmallVector<Value> newOutputBuffers;
   for (OpResult opResult : op->getOpResults()) {
-    SmallVector<OpOperand *> aliasingOpOperands =
-        analysisState.getAliasingOpOperand(opResult);
-    assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
-    FailureOr<Value> resultBuffer =
-        getBuffer(rewriter, aliasingOpOperands.front()->get(), options);
+    AliasingOpOperandList aliasingOpOperands =
+        analysisState.getAliasingOpOperands(opResult);
+    assert(aliasingOpOperands.getNumAliases() == 1 && "expected 1 OpOperand");
+    FailureOr<Value> resultBuffer = getBuffer(
+        rewriter, aliasingOpOperands.getAliases()[0].opOperand->get(), options);
     if (failed(resultBuffer)) return failure();
     newOutputBuffers.push_back(*resultBuffer);
   }
@@ -320,15 +322,17 @@ struct LinalgExtOpInterface
                                const AnalysisState &state) const {
     // Operand is written to if it has an aliasing OpResult.
     auto bufferizableOp = cast<BufferizableOpInterface>(op);
-    return !bufferizableOp.getAliasingOpResult(opOperand, state).empty();
+    return bufferizableOp.getAliasingOpResults(opOperand, state)
+               .getNumAliases() != 0;
   }
 
-  SmallVector<OpOperand *> getAliasingOpOperand(
+  AliasingOpOperandList getAliasingOpOperands(
       Operation *op, OpResult opResult, const AnalysisState &state) const {
     auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
 
     // The i-th OpResult may alias with the i-th "out" tensor.
-    return {linalgExtOp.getOutputOperand(opResult.getResultNumber())};
+    return {{linalgExtOp.getOutputOperand(opResult.getResultNumber()),
+             bufferization::BufferRelation::Equivalent}};
   }
 
   SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
@@ -338,11 +342,6 @@ struct LinalgExtOpInterface
     // The i-th "out" tensor may alias with the i-th OpResult.
     if (dspOp.isDpsInit(&opOperand)) return {dspOp.getTiedOpResult(&opOperand)};
     return {};
-  }
-
-  bufferization::BufferRelation bufferRelation(
-      Operation *op, OpResult opResult, const AnalysisState &state) const {
-    return bufferization::BufferRelation::Equivalent;
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
