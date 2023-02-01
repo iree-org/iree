@@ -42,6 +42,7 @@ static void iree_uk_unpack_validate(const iree_uk_unpack_params_t* params) {
 #endif  // IREE_UK_ENABLE_ASSERTS
 }
 
+// Early-return implementation for this ukernel. Returns true if already done.
 static bool iree_uk_unpack_early(const iree_uk_unpack_params_t* params) {
   return (params->out_size0 == 0 || params->out_size1 == 0);
 }

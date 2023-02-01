@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -81,6 +82,73 @@ SliceAndDynamicDims cloneOffsetsSizesAndStrides(
   return cloneOffsetsSizesAndStridesImpl(
       builder, loadOp, ValueRange{loadOp.getSource()}, loadOp.getMixedOffsets(),
       loadOp.getMixedSizes(), loadOp.getMixedStrides(), loadOp.getSourceDims());
+}
+
+std::optional<Value> hoistStaticallyBoundAllocations(
+    func::FuncOp funcOp, OpBuilder &builder, Location loc,
+    MemRefType allocaType, ValueRange dynamicSizes,
+    std::optional<uint64_t> alignment) {
+  IntegerAttr alignmentAttr =
+      alignment ? builder.getI64IntegerAttr(alignment.value()) : nullptr;
+  // For static case just create a new allocation in the entry block of the
+  // same size. No need to insert a subview.
+  if (dynamicSizes.empty()) {
+    OpBuilder::InsertionGuard g(builder);
+    builder.setInsertionPointToStart(&funcOp.getBody().front());
+    Value allocation =
+        builder.create<memref::AllocaOp>(loc, allocaType, alignmentAttr);
+    return allocation;
+  }
+
+  /// For the dynamic but bounded case, insert an allocation
+  /// of the shape of the bounds, and a subview of the
+  /// required size to be used as a replacement.
+  SmallVector<int64_t> staticShape;
+  SmallVector<OpFoldResult> subviewSizes;
+  staticShape.reserve(allocaType.getRank());
+  subviewSizes.reserve(allocaType.getRank());
+
+  int index = 0;
+  for (auto dimSize : allocaType.getShape()) {
+    if (!ShapedType::isDynamic(dimSize)) {
+      staticShape.push_back(dimSize);
+      subviewSizes.push_back(builder.getIndexAttr(dimSize));
+      continue;
+    }
+    Value dynamicSize = dynamicSizes[index++];
+    auto ub = linalg::getConstantUpperBoundForIndex(dynamicSize);
+    if (failed(ub)) {
+      return std::nullopt;
+    }
+    staticShape.push_back(ub.value());
+    subviewSizes.push_back(dynamicSize);
+  }
+  SmallVector<OpFoldResult> offsets(allocaType.getRank(),
+                                    builder.getIndexAttr(0));
+  SmallVector<OpFoldResult> strides(allocaType.getRank(),
+                                    builder.getIndexAttr(1));
+
+  Value allocation;
+  {
+    OpBuilder::InsertionGuard g(builder);
+    builder.setInsertionPointToStart(&funcOp.getBody().front());
+    auto allocationType =
+        MemRefType::get(staticShape, allocaType.getElementType());
+    allocation =
+        builder.create<memref::AllocaOp>(loc, allocationType, alignmentAttr);
+  }
+
+  Value subviewOp = builder.create<memref::SubViewOp>(loc, allocation, offsets,
+                                                      subviewSizes, strides);
+  return subviewOp;
+}
+std::optional<Value> hoistStaticallyBoundAllocations(
+    func::FuncOp funcOp, OpBuilder &builder, memref::AllocaOp allocaOp) {
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPoint(allocaOp);
+  return hoistStaticallyBoundAllocations(
+      funcOp, builder, allocaOp.getLoc(), allocaOp.getType(),
+      allocaOp.getDynamicSizes(), allocaOp.getAlignment());
 }
 
 }  // namespace iree_compiler

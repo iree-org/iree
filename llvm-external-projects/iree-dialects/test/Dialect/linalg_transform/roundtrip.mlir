@@ -7,8 +7,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %0 = pdl_match @match1 in %arg0 : (!pdl.operation) -> !pdl.operation
   // CHECK: %[[TILED:.*]], %{{.*}}:3 = transform.structured.tile %[[OPS]][4, 4, 4]
   %1, %loops1:3 = transform.structured.tile %0 [4, 4, 4]
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
   // CHECK: %[[TILED2:.*]], %{{.*}}:3 = transform.structured.tile %[[TILED]]
   %2, %loops2:3  = transform.structured.tile %1 [2, 2, 2]
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
   // CHECK: %[[PADDED:.*]] = transform.structured.pad %[[TILED2]] {pack_paddings = [1, 1, 0]}
   %3 = transform.structured.pad %2 {pack_paddings = [1, 1, 0]}
   // CHECK: %{{.*}} = transform.structured.vectorize %[[PADDED]] {vectorize_padding}

@@ -62,5 +62,6 @@ iree_runtime_cc_test(
         ":Utils",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
+        "@llvm-project//llvm:Support",
     ],
 )

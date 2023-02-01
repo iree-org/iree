@@ -386,7 +386,7 @@ static UploadResult buildTryMapConstantResources(
   // if ok: return mapped resources
   // else: allocate and upload
   auto ifOp = builder.create<scf::IfOp>(
-      loc, resultTypes, ok,
+      loc, ok,
       [&](OpBuilder &thenBuilder, Location loc) {
         // Just return the resources + an immediate timepoint.
         SmallVector<Value> ifResults = mappedResources;

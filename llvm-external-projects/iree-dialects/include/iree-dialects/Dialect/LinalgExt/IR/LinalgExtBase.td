@@ -24,6 +24,7 @@ def IREELinalgExt_Dialect : Dialect {
   }];
   let hasCanonicalizer = 1;
   let useDefaultAttributePrinterParser = 1;
+  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 //===----------------------------------------------------------------------===//

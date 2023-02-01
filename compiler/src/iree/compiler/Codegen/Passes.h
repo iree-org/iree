@@ -100,6 +100,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
         std::nullopt,
     Optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+createHoistStaticallyBoundAllocationsPass();
+
 /// Creates a pass to remove single iteration distributed loops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRemoveSingleIterationLoopPass();

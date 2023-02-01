@@ -192,7 +192,7 @@ struct VectorizePadWithConditions final
       }
 
       auto ifOp = rewriter.create<scf::IfOp>(
-          loc, sliceVectorType, condition,
+          loc, condition,
           [&](OpBuilder builder, Location Loc) {
             Value read = builder.create<vector::TransferReadOp>(
                 loc, sliceVectorType, padOp.getSource(), readIndices,

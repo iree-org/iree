@@ -77,6 +77,10 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
                             vector::CombiningKind kind, uint32_t size,
                             const int warpSize);
 
+/// Return the native size of an operation used in contraction calculation.
+// TODO: Make this take HW specific sizes.
+Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

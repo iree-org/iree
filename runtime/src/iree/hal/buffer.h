@@ -279,6 +279,13 @@ enum iree_hal_buffer_usage_bits_t {
       IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_READ |
       IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_WRITE,
 
+  // Buffer contents are available for use by all dispatch-related operations.
+  IREE_HAL_BUFFER_USAGE_DISPATCH =
+      IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
+      IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
+      IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+      IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE,
+
   // ==== IREE_HAL_BUFFER_USAGE_SHARING_* ======================================
 
   // Buffer can be exported via iree_hal_allocator_export_buffer.
@@ -449,15 +456,30 @@ typedef struct iree_hal_buffer_mapping_t {
   iree_hal_buffer_mapping_impl_t impl;
 } iree_hal_buffer_mapping_t;
 
+// Parses a memory type bitfield from a string.
+// See iree_bitfield_parse for usage.
+IREE_API_EXPORT iree_status_t iree_hal_memory_type_parse(
+    iree_string_view_t value, iree_hal_memory_type_t* out_value);
+
 // Formats a memory type bitfield as a string.
 // See iree_bitfield_format for usage.
 IREE_API_EXPORT iree_string_view_t iree_hal_memory_type_format(
     iree_hal_memory_type_t value, iree_bitfield_string_temp_t* out_temp);
 
+// Parses a memory access bitfield from a string.
+// See iree_bitfield_parse for usage.
+IREE_API_EXPORT iree_status_t iree_hal_memory_access_parse(
+    iree_string_view_t value, iree_hal_memory_access_t* out_value);
+
 // Formats a memory access bitfield as a string.
 // See iree_bitfield_format for usage.
 IREE_API_EXPORT iree_string_view_t iree_hal_memory_access_format(
     iree_hal_memory_access_t value, iree_bitfield_string_temp_t* out_temp);
+
+// Parses a buffer usage bitfield from a string.
+// See iree_bitfield_parse for usage.
+IREE_API_EXPORT iree_status_t iree_hal_buffer_usage_parse(
+    iree_string_view_t value, iree_hal_buffer_usage_t* out_value);
 
 // Formats a buffer usage bitfield as a string.
 // See iree_bitfield_format for usage.

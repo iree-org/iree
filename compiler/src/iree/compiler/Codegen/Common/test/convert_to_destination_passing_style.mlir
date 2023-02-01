@@ -849,3 +849,50 @@ func.func @unpack() {
 // CHECK-DAG:     %[[IN:.+]] = flow.dispatch.tensor.load %[[IN_BINDING]]
 // CHECK-DAG:     %[[OUT:.+]] = flow.dispatch.tensor.load %[[OUT_BINDING]]
 // CHECK:         tensor.unpack %[[IN]] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %[[OUT]]
+
+// -----
+
+func.func @multi_result_dispatches() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<120x240xf32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<240x360xf32>>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<120xf32>>
+  %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<writeonly:tensor<120x360xf32>>
+  %30 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<writeonly:tensor<120x360xf32>>
+  %4 = tensor.empty() : tensor<120x360xf32>
+  %cst = arith.constant 0.0 : f32
+  %5 = linalg.fill ins(%cst : f32) outs(%4 : tensor<120x360xf32>) -> tensor<120x360xf32>
+  %6 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [120, 240], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<120x240xf32>> -> tensor<120x240xf32>
+  %7 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [240, 360], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<240x360xf32>> -> tensor<240x360xf32>
+  %8 = linalg.matmul ins(%6, %7 : tensor<120x240xf32>, tensor<240x360xf32>)
+      outs(%5 : tensor<120x360xf32>) -> tensor<120x360xf32>
+  %9 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [120], strides = [1]
+      : !flow.dispatch.tensor<readonly:tensor<120xf32>> -> tensor<120xf32>
+  %10 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%8, %9 : tensor<120x360xf32>, tensor<120xf32>)
+      outs(%4 : tensor<120x360xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+      %10 = arith.addf %b0, %b1 : f32
+      linalg.yield %10 : f32
+    } -> tensor<120x360xf32>
+  flow.dispatch.tensor.store %8, %30, offsets = [0, 0], sizes = [120, 360], strides = [1, 1]
+      : tensor<120x360xf32> -> !flow.dispatch.tensor<writeonly:tensor<120x360xf32>>
+  flow.dispatch.tensor.store %10, %3, offsets = [0, 0], sizes = [120, 360], strides = [1, 1]
+      : tensor<120x360xf32> -> !flow.dispatch.tensor<writeonly:tensor<120x360xf32>>
+  return
+}
+// CHECK-LABEL: func @multi_result_dispatches()
+//   CHECK-DAG:   %[[RESULT_BINDING0:.+]] = hal.interface.binding.subspan set(0) binding(3)
+//   CHECK-DAG:   %[[RESULT_BINDING1:.+]] = hal.interface.binding.subspan set(0) binding(4)
+//       CHECK:   %[[LOAD1:.+]] = flow.dispatch.tensor.load %[[RESULT_BINDING1]]
+//       CHECK:   linalg.fill
+//  CHECK-SAME:       outs(%[[LOAD1]] :

@@ -130,6 +130,7 @@ iree_cc_library(
     iree::compiler::Modules::HAL::Loader::IR::HALLoaderDialect
     iree::compiler::Modules::HAL::Loader::Transforms
     iree::compiler::Pipelines
+    iree::compiler::Preprocessing::Passes
   PUBLIC
 )
 
