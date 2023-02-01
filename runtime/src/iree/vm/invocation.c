@@ -394,16 +394,16 @@ IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_vm_function_call_compute_cconv_fragment_size(
               cconv_results, /*segment_size_list=*/NULL, &results.data_length));
-  memset(results.data, 0, results.data_length);
   iree_host_size_t result_storage_size =
       iree_host_align(results.data_length, iree_max_align_t);
   if (result_storage_size > sizeof(state->stack_storage)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many results for inlined storage (%" PRIhsz
-                            ")",
+                            "B storage requested)",
                             result_storage_size);
   }
+  memset(results.data, 0, result_storage_size);
 
   iree_vm_function_call_t call = {
       .function = function,
