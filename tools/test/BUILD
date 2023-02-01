@@ -24,6 +24,7 @@ iree_lit_test_suite(
             "iree-run-mlir.mlir",
             "iree-run-module.mlir",
             "iree-run-module-expected.mlir",
+            "iree-run-module-outputs.mlir",
             "multiple_args.mlir",
             "multiple_exported_functions.mlir",
             "null_values.mlir",
@@ -33,6 +34,9 @@ iree_lit_test_suite(
         include = ["*.mlir"],
     ),
     cfg = "//tools:lit.cfg.py",
+    data = [
+        "echo_npy.py",
+    ],
     tags = [
         "driver=local-task",
         "driver=vulkan",

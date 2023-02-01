@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "iree-benchmark-module.mlir"
     "iree-run-mlir.mlir"
     "iree-run-module-expected.mlir"
+    "iree-run-module-outputs.mlir"
     "iree-run-module.mlir"
     "multiple_args.mlir"
     "multiple_exported_functions.mlir"
@@ -33,6 +34,8 @@ iree_lit_test_suite(
     iree-run-mlir
     iree-run-module
     not
+  DATA
+    echo_npy.py
   LABELS
     "driver=local-task"
     "driver=vulkan"
