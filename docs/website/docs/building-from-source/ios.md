@@ -78,10 +78,10 @@ We could test the generated module by running the macOS version of
 
 ```shell
 ../iree-build/install/bin/iree-run-module \
-  --module_file=/tmp/simple_abs_vmvx.vmfb \
+  --module=/tmp/simple_abs_vmvx.vmfb \
   --device=local-task \
-  --entry_function=abs \
-  --function_input="f32=-5"
+  --function=abs \
+  --input="f32=-5"
 ```
 
 To run it on the iOS simulator, we need to copy the vmfb file into the
@@ -141,7 +141,7 @@ xcrun simctl launch --console \
   <UDID> \
   dev.iree.runmodule \
   --device=local-task \
-  --entry_function=abs \
-  --function_input="f32=-5" \
-  --module_file=$(xcrun simctl get_app_container <UDID> dev.iree.iree-run-module)/simple_abs_vmvx.vmfb
+  --function=abs \
+  --input="f32=-5" \
+  --module=$(xcrun simctl get_app_container <UDID> dev.iree.iree-run-module)/simple_abs_vmvx.vmfb
 ```

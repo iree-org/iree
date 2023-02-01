@@ -31,7 +31,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_v2_codegen_spec.mlir | \
-// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="33x34567xf32=1" |\
+// RUN: iree-run-module --function=reduce --device=cuda --input="33x34567xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
@@ -39,7 +39,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //     CHECK-DAG: %[[F0:.*]] = arith.constant dense<0.000000e+00> : vector<4xf32>
   //     CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
   //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x128xf32, #gpu.address_space<workgroup>>
-  
+
   //         CHECK: %[[TIDX:.]] = gpu.thread_id  x
   //         CHECK: %[[IDX:.*]] = affine.apply{{.*}}%[[TIDX]]
   //         CHECK: gpu.barrier

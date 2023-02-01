@@ -53,8 +53,8 @@ endfunction()
 #   DRIVER
 #     "local-sync"
 #   RUNNER_ARGS
-#     "--entry_function=abs"
-#     "--function_input=f32=-10"
+#     "--function=abs"
+#     "--input=f32=-10"
 #   EXPECTED_OUTPUT
 #     "f32=10"
 # )
@@ -67,8 +67,8 @@ endfunction()
 #   DRIVER
 #     "local-sync"
 #   RUNNER_ARGS
-#     "--entry_function=main"
-#     "--function_input=1x224x224x3xf32=0"
+#     "--function=main"
+#     "--input=1x224x224x3xf32=0"
 #   EXPECTED_OUTPUT
 #     "mobilenet_v1_fp32_expected_output.txt"
 #   UNSUPPORTED_PLATFORMS
@@ -102,7 +102,7 @@ function(iree_run_module_test)
 
   # All the file paths referred in the _RUNNER_FILE_ARGS are absolute paths and
   # the portability is handled by `iree_native_test`.
-  list(APPEND _RUNNER_FILE_ARGS "--module_file={{${_RULE_MODULE_SRC}}}")
+  list(APPEND _RUNNER_FILE_ARGS "--module={{${_RULE_MODULE_SRC}}}")
 
   if(_RULE_EXPECTED_OUTPUT)
     # this may be a file or a literal output. In the latter case, the
@@ -150,7 +150,7 @@ function(iree_run_module_test)
   endif(_RULE_EXPECTED_OUTPUT)
 
   # Dump the flags into a flag file to avoid CMake's naive handling of spaces
-  # in expected output. `--module_file` is coded separatedly to make it portable.
+  # in expected output. `--module` is coded separatedly to make it portable.
   if(_RULE_RUNNER_ARGS)
     # Write each argument in a new line.
     string(REPLACE ";" "\n" _OUTPUT_FLAGS "${_RULE_RUNNER_ARGS}")
@@ -244,8 +244,8 @@ endfunction()
 #   DRIVER
 #     "local-sync"
 #   RUNNER_ARGS
-#     "--entry_function=main"
-#     "--function_input=1x224x224x3xf32=0"
+#     "--function=main"
+#     "--input=1x224x224x3xf32=0"
 #   EXPECTED_OUTPUT
 #     "mobilenet_v1_fp32_expected_output.txt"
 #   UNSUPPORTED_PLATFORMS

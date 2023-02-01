@@ -23,8 +23,8 @@
 #include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 
-IREE_FLAG(string, entry_function, "",
-          "Name of a function contained in the module specified by module_file "
+IREE_FLAG(string, function, "",
+          "Name of a function contained in the module specified by --module= "
           "to run.");
 
 IREE_FLAG(int32_t, print_max_element_count, 1024,
@@ -35,14 +35,14 @@ IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
 IREE_FLAG_LIST(
-    string, function_input,
+    string, input,
     "An input (a) value or (b) buffer of the format:\n"
     "  (a) scalar value\n"
     "     value\n"
-    "     e.g.: --function_input=\"3.14\"\n"
+    "     e.g.: --input=\"3.14\"\n"
     "  (b) buffer:\n"
     "     [shape]xtype=[value]\n"
-    "     e.g.: --function_input=\"2x2xi32=1 2 3 4\"\n"
+    "     e.g.: --input=\"2x2xi32=1 2 3 4\"\n"
     "Optionally, brackets may be used to separate the element values:\n"
     "  2x2xi32=[[1 2][3 4]]\n"
     "Raw binary files can be read to provide buffer contents:\n"
@@ -54,7 +54,7 @@ IREE_FLAG_LIST(
 
 IREE_FLAG_LIST(string, expected_output,
                "An expected function output following the same format as "
-               "--function_input. When present the results of the "
+               "--input. When present the results of the "
                "invocation will be compared against these values and the "
                "tool will return non-zero if any differ. If the value of a "
                "particular output is not of interest provide `(ignored)`.");
@@ -82,11 +82,11 @@ iree_status_t Run(int* out_exit_code) {
       /*default_device_uri=*/iree_string_view_empty(), host_allocator, &context,
       &device, &device_allocator));
 
-  std::string function_name = std::string(FLAG_entry_function);
+  std::string function_name = std::string(FLAG_function);
   iree_vm_function_t function;
   if (function_name.empty()) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no --entry_function= specified");
+                            "no --function= specified");
   } else {
     IREE_RETURN_IF_ERROR(
         iree_vm_module_lookup_function_by_name(
@@ -100,8 +100,8 @@ iree_status_t Run(int* out_exit_code) {
 
   vm::ref<iree_vm_list_t> inputs;
   IREE_RETURN_IF_ERROR(iree_tooling_parse_to_variant_list(
-      device_allocator.get(), FLAG_function_input_list().values,
-      FLAG_function_input_list().count, host_allocator, &inputs));
+      device_allocator.get(), FLAG_input_list().values, FLAG_input_list().count,
+      host_allocator, &inputs));
 
   // If the function is async add fences so we can invoke it synchronously.
   vm::ref<iree_hal_fence_t> finish_fence;

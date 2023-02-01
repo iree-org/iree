@@ -155,9 +155,9 @@ Run the following command:
     ``` shell hl_lines="2"
     iree-run-module \
         --device=cuda \
-        --module_file=mobilenet-cuda.vmfb \
-        --entry_function=predict \
-        --function_input="1x224x224x3xf32=0"
+        --module=mobilenet-cuda.vmfb \
+        --function=predict \
+        --input="1x224x224x3xf32=0"
     ```
 
 === "AMD/ROCm"
@@ -165,9 +165,9 @@ Run the following command:
     ``` shell hl_lines="2"
     iree-run-module \
         --device=rocm \
-        --module_file=mobilenet-rocm.vmfb \
-        --entry_function=predict \
-        --function_input="1x224x224x3xf32=0"
+        --module=mobilenet-rocm.vmfb \
+        --function=predict \
+        --input="1x224x224x3xf32=0"
     ```
 
 The above assumes the exported function in the model is named as `predict` and

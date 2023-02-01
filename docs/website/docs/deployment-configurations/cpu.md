@@ -129,9 +129,9 @@ In the build directory, run the following command:
 ``` shell hl_lines="2"
 tools/iree-run-module \
     --device=local-task \
-    --module_file=mobilenet_cpu.vmfb \
-    --entry_function=predict \
-    --function_input="1x224x224x3xf32=0"
+    --module=mobilenet_cpu.vmfb \
+    --function=predict \
+    --input="1x224x224x3xf32=0"
 ```
 
 The above assumes the exported function in the model is named as `predict` and

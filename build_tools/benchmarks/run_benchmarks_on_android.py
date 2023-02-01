@@ -168,11 +168,11 @@ def get_vmfb_full_path_for_benchmark_case(
   flagfile = benchmark_case_dir / MODEL_FLAGFILE_NAME
   for line in flagfile.read_text().splitlines():
     flag_name, flag_value = line.strip().split("=")
-    if flag_name == "--module_file":
+    if flag_name == "--module":
       # Realpath canonicalization matters. The caller may rely on that to track
       # which files it already pushed.
       return (benchmark_case_dir / flag_value).resolve()
-  raise ValueError(f"{flagfile} does not contain a --module_file flag")
+  raise ValueError(f"{flagfile} does not contain a --module flag")
 
 
 class AndroidBenchmarkDriver(BenchmarkDriver):

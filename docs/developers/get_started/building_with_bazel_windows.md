@@ -116,5 +116,5 @@ and execute a function in the compiled module:
 
 ```powershell
 > REM iree-run-mlir <compiler flags> [input.mlir] <runtime flags>
-> .\bazel-bin\tools\iree-run-mlir.exe --iree-hal-target-backends=vmvx --print-mlir .\iree\samples\models\simple_abs.mlir --function_input=f32=-2
+> .\bazel-bin\tools\iree-run-mlir.exe --iree-hal-target-backends=vmvx --print-mlir .\iree\samples\models\simple_abs.mlir --input=f32=-2
 ```

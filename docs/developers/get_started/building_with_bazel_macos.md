@@ -116,5 +116,5 @@ and execute a function in the compiled module:
 $ ./bazel-bin/tools/iree-run-mlir \
   --iree-hal-target-backends=vmvx --print-mlir \
   ./samples/models/simple_abs.mlir \
-  --function_input=f32=-2
+  --input=f32=-2
 ```

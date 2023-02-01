@@ -93,10 +93,10 @@ $ ../iree-build/tools/iree-compile \
 # Run the module through CUDA HAL backend.
 $ ../iree-build/tools/iree-run-module \
   --device=cuda \
-  --module_file=/tmp/add.vmfb \
-  --entry_function=add \
-  --function_input="4xf32=[1 2 3 4]" \
-  --function_input="4xf32=[2 2 2 2]"
+  --module=/tmp/add.vmfb \
+  --function=add \
+  --input="4xf32=[1 2 3 4]" \
+  --input="4xf32=[2 2 2 2]"
 
 EXEC @add
 4xf32=3 4 5 6

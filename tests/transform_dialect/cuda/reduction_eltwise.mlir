@@ -21,7 +21,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
     indexing_maps = [affine_map<(d0) -> (d0)>,
                      affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]}
-    ins(%5 : !out_tensor_t) outs(%6 : !out_tensor_t) {  
+    ins(%5 : !out_tensor_t) outs(%6 : !out_tensor_t) {
     ^bb0(%arg3: f32, %arg4: f32):
       %4 = math.sqrt %arg3 : f32
       linalg.yield %4 : f32
@@ -42,12 +42,12 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_eltwise_codegen_spec.mlir | \
-// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="8x64xf32=1" |\
+// RUN: iree-run-module --function=reduce --device=cuda --input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 /// Note: the current --iree-codegen-llvmgpu-enable-transform-dialect-jit only works for exactly this reduction atm.
 // RUN: iree-compile %s --iree-hal-target-backends=cuda | \
-// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="8x64xf32=1" |\
+// RUN: iree-run-module --function=reduce --device=cuda --input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index

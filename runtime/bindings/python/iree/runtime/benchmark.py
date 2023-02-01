@@ -62,7 +62,7 @@ def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
   flatbuffer = module.stashed_flatbuffer_blob
   function = module.lookup_function(entry_functiong)
   args = [iree.runtime.benchmark_exe()]
-  args.append(f"--entry_function={funcs[0]}")
+  args.append(f"--function={funcs[0]}")
 
   for k in kwargs:
     v = kwargs[k]
@@ -70,7 +70,7 @@ def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
 
   for inp in inputs:
     if isinstance(inp, str):
-      args.append(f"--function_input={inp}")
+      args.append(f"--input={inp}")
       continue
     shape = "x".join([str(d) for d in inp.shape])
     abitype = DTYPE_TO_ABI_TYPE[inp.dtype]
@@ -80,7 +80,7 @@ def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
     else:
       values = ",".join([str(v) for v in values])
 
-    args.append(f"--function_input={shape}x{abitype}={values}")
+    args.append(f"--input={shape}x{abitype}={values}")
 
   call = subprocess.Popen(args=args,
                           stdin=subprocess.PIPE,

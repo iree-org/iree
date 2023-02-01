@@ -29,9 +29,9 @@ cat mnist_test.png | python3 convert_image.py > /tmp/mnist_test.bin
 
 # Run the program, passing the path to the binary file as a function input.
 iree-run-module \
-  --module_file=/tmp/mnist_cpu.vmfb \
-  --entry_function=predict \
-  --function_input=1x28x28x1xf32=@/tmp/mnist_test.bin
+  --module=/tmp/mnist_cpu.vmfb \
+  --function=predict \
+  --input=1x28x28x1xf32=@/tmp/mnist_test.bin
 
 # Observe the results - a list of prediction confidence scores for each digit.
 ```

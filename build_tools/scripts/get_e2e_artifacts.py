@@ -108,14 +108,14 @@ def check_collision(filename: str, test_name: str, written_paths: Set[str],
 
 
 def update_path(archive_path: str):
-  """Update the --module_file flag with the new location of the compiled.vmfb"""
+  """Update the --module flag with the new location of the compiled.vmfb"""
   backend_path = archive_path.split('traces')[0]  # 'ModuleName/backend_name'.
   compiled_path = os.path.join(FLAGS.artifacts_dir, backend_path,
                                'compiled.vmfb')
   flagfile_path = os.path.join(FLAGS.artifacts_dir, archive_path)
   for line in fileinput.input(files=[flagfile_path], inplace=True):
-    if line.strip().startswith('--module_file'):
-      print(f'--module_file={compiled_path}\n', end='')
+    if line.strip().startswith('--module'):
+      print(f'--module={compiled_path}\n', end='')
     else:
       print(line, end='')
 

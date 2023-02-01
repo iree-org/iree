@@ -22,7 +22,7 @@ include(CMakeParseArguments)
 # ARGS: additional arguments passed to the test binary. TEST_INPUT_FILE_ARG and
 #     --device=DRIVER are automatically added if specified.
 #     File-related arguments can be passed with `{{}}` locator,
-#     e.g., --function_input=@{{foo.npy}}. The locator is used to portably
+#     e.g., --input=@{{foo.npy}}. The locator is used to portably
 #     pass the file arguments to tests and add the file to DATA.
 # SRC: binary target to run as the test.
 # WILL_FAIL: The target will run, but its pass/fail status will be inverted.

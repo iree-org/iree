@@ -91,7 +91,7 @@ iree_status_t Run(std::string module_file_path, iree_allocator_t host_allocator,
   IREE_RETURN_IF_ERROR(
       iree_check_module_create(instance, host_allocator, &check_module));
 
-  // TODO(benvanik): use --module_file= flag in order to reuse
+  // TODO(benvanik): use --module= flag in order to reuse
   // iree_tooling_load_module_from_flags.
   iree_file_contents_t* flatbuffer_contents = NULL;
   if (module_file_path == "-") {

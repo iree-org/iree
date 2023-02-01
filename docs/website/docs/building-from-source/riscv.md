@@ -118,9 +118,9 @@ ${QEMU_BIN} \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/tools/iree-run-module \
   --device=local-task \
-  --module_file=/tmp/simple_abs_vmvx.vmfb \
-  --entry_function=abs \
-  --function_input=f32=-5
+  --module=/tmp/simple_abs_vmvx.vmfb \
+  --function=abs \
+  --input=f32=-5
 ```
 
 ## Optional configuration
@@ -163,7 +163,7 @@ ${QEMU_BIN} \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/tools/iree-run-module \
   --device=local-task \
-  --module_file=mobilenet_cpu.vmfb \
-  --entry_function=predict \
-  --function_input="1x224x224x3xf32=0"
+  --module=mobilenet_cpu.vmfb \
+  --function=predict \
+  --input="1x224x224x3xf32=0"
 ```
