@@ -168,19 +168,17 @@ private:
 /// Apply the `tiling` transformation as a pattern.
 /// `filter` controls LinalgTransformMarker matching and update when specified.
 /// See `tiling` for more details.
-struct LinalgSCFTilingPattern
-    : public OpInterfaceRewritePattern<TilingInterface> {
+struct SCFTilingPattern : public OpInterfaceRewritePattern<TilingInterface> {
   /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
-  LinalgSCFTilingPattern(
-      MLIRContext *context, scf::SCFTilingOptions options,
-      LinalgTransformationFilter f = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1);
+  SCFTilingPattern(MLIRContext *context, scf::SCFTilingOptions options,
+                   LinalgTransformationFilter f = LinalgTransformationFilter(),
+                   PatternBenefit benefit = 1);
 
   /// Construct a pattern specifically applied to `opName`.
-  LinalgSCFTilingPattern(
-      StringRef opName, MLIRContext *context, scf::SCFTilingOptions options,
-      LinalgTransformationFilter f = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1);
+  SCFTilingPattern(StringRef opName, MLIRContext *context,
+                   scf::SCFTilingOptions options,
+                   LinalgTransformationFilter f = LinalgTransformationFilter(),
+                   PatternBenefit benefit = 1);
 
   /// `matchAndRewrite` implementation that returns the significant transformed
   /// pieces of IR.
@@ -226,30 +224,34 @@ public:
 /// Linalg SCF tile and fuse patterns.
 ///
 /// `filter` controls LinalgTransformMarker matching and update when specified.
-struct LinalgSCFTileAndFusePattern
+struct SCFTileAndFusePattern
     : public OpInterfaceRewritePattern<TilingInterface> {
   /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
-  LinalgSCFTileAndFusePattern(
+  SCFTileAndFusePattern(
       MLIRContext *context,
-      scf::SCFTileAndFuseOptions options = scf::SCFTileAndFuseOptions(),
-      LinalgTransformationFilter f = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1);
+      scf::SCFTilingOptions options = scf::SCFTilingOptions(),
+      LinalgTransformationFilter filter = LinalgTransformationFilter(),
+      PatternBenefit benefit = 1)
+      : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
+        options(std::move(options)), filter(std::move(filter)) {}
 
   /// Construct a pattern specifically applied to `opName`.
-  LinalgSCFTileAndFusePattern(
+  SCFTileAndFusePattern(
       StringRef opName, MLIRContext *context,
-      scf::SCFTileAndFuseOptions options = scf::SCFTileAndFuseOptions(),
-      LinalgTransformationFilter f = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1);
+      scf::SCFTilingOptions options = scf::SCFTilingOptions(),
+      LinalgTransformationFilter filter = LinalgTransformationFilter(),
+      PatternBenefit benefit = 1)
+      : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
+        options(std::move(options)), filter(filter.addOpNameFilter(opName)) {}
 
   LogicalResult matchAndRewrite(TilingInterface op,
                                 PatternRewriter &rewriter) const override;
 
 private:
+  scf::SCFTilingOptions options;
+
   /// LinalgTransformMarker handles special attribute manipulations.
   LinalgTransformationFilter filter;
-
-  scf::SCFTileAndFuseOptions options;
 };
 
 ///
