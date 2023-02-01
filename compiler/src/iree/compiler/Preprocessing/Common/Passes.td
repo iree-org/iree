@@ -19,6 +19,11 @@ def PadLinalgOps :
     Pass<"iree-flow-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
   let constructor = "mlir::iree_compiler::IREE::createPadLinalgOpsToIntegerMultiplePass()";
+  let options = [
+    Option<"paddingSize", "pad-size", "int",
+           /*default=*/"4",
+           "Specify the padding size">,
+  ];
 }
 
 #endif  // IREE_PREPROCESSING_COMMON_PASSES
