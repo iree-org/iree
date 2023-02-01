@@ -153,6 +153,10 @@ createCollapseDimensionsPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCloneProducersIntoDispatchRegionsPass();
 
+// Pass to turn static shapes into dynamic ones.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDynamicizeStaticShapesPass();
+
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)
 //===----------------------------------------------------------------------===//

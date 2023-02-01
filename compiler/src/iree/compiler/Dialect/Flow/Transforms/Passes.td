@@ -127,6 +127,12 @@ def DispatchWithTransformDialect :
   ];
 }
 
+def DynamicizeStaticShapes :
+    InterfacePass<"iree-flow-dynamicize-static-shapes-pass", "mlir::FunctionOpInterface"> {
+  let summary = "Turn static shapes into dynamic ones in dispatch regions";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createDynamicizeStaticShapesPass()";
+}
+
 def EraseUnusedLinalgOperands :
     Pass<"iree-flow-erase-unused-linalg-operands", "mlir::ModuleOp"> {
   let summary = "Erase unused linalg operand and remove dead code.";

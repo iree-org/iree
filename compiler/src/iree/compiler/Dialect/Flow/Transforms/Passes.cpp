@@ -107,6 +107,11 @@ static llvm::cl::opt<bool> clZeroFillEmptyTensors(
         "Zero fill empty tensors instead of leaving them uninitialized"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clDynamicizeStaticShapes(
+    "iree-flow-dynamicize-static-shapes",
+    llvm::cl::desc("Dynamicize static shapes in dispatch regions"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -258,6 +263,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // handle explicit captures as materialized as dispatch workgroup operands
       // and block arguments.
       .addPass(createCloneProducersIntoDispatchRegionsPass)
+      // Turn static shapes into dynamic ones in dispatch regions.
+      .addPredicatedPass(clDynamicizeStaticShapes,
+                         createDynamicizeStaticShapesPass)
       // Form dispatch region into dispatch workgroups
       .addPass([&]() {
         return createFormDispatchWorkgroupsPass(
