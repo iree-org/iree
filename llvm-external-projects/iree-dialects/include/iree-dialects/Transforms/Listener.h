@@ -31,6 +31,9 @@ struct RewriteListener {
   /// These are the callback methods that subclasses can choose to implement if
   /// they would like to be notified about certain types of mutations.
 
+  /// Notification handler for when an operation is modified in-place.
+  virtual void finalizeRootUpdate(Operation *op) {}
+
   /// Notification handler for when an operation is inserted into the builder.
   /// op` is the operation that was inserted.
   virtual void notifyOperationInserted(Operation *op) {}
@@ -69,6 +72,9 @@ public:
   /// Add a listener to the list.
   void addListener(RewriteListener *listener) { listeners.push_back(listener); }
 
+  /// Send notification of an operation being modified in-place to all
+  /// listeners.
+  void finalizeRootUpdate(Operation *op) override;
   /// Send notification of an operation being inserted to all listeners.
   void notifyOperationInserted(Operation *op) override;
   /// Send notification of a block being created to all listeners.
@@ -97,6 +103,10 @@ private:
 class PatternRewriterListener : public PatternRewriter, public ListenerList {
 public:
   PatternRewriterListener(MLIRContext *context) : PatternRewriter(context) {}
+
+  void finalizeRootUpdate(Operation *op) override {
+    ListenerList::finalizeRootUpdate(op);
+  }
 
   /// When an operation is about to be replaced, send out an event to all
   /// attached listeners.

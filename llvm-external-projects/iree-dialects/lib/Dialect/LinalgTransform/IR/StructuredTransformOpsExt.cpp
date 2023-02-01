@@ -522,7 +522,7 @@ static LogicalResult performEnablerTransformations(
   RewritePatternSet patterns(ctx);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-  if (failed(applyPatternsTrackAndFoldGreedily(func, listener,
+  if (failed(applyPatternsTrackAndFoldGreedily(&listener, func,
                                                std::move(patterns))))
     return failure();
 
@@ -693,7 +693,7 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
   auto performCanonicalization = [&patterns](Operation *root,
                                              RewriteListener &listener) {
     LogicalResult result =
-        applyPatternsTrackAndFoldGreedily(root, listener, patterns);
+        applyPatternsTrackAndFoldGreedily(&listener, root, patterns);
     LLVM_DEBUG(
         DBGS() << (succeeded(result) ? "successfully performed" : "failed")
                << " canonicalization\n");

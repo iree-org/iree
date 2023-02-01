@@ -18,6 +18,11 @@ RewriteListener::~RewriteListener() = default;
 // ListenerList
 //===----------------------------------------------------------------------===//
 
+void ListenerList::finalizeRootUpdate(Operation *op) {
+  for (RewriteListener *listener : listeners)
+    listener->finalizeRootUpdate(op);
+}
+
 void ListenerList::notifyOperationInserted(Operation *op) {
   for (RewriteListener *listener : listeners)
     listener->notifyOperationInserted(op);

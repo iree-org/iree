@@ -213,8 +213,8 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
 
   TrackingListener listener(state);
   GreedyRewriteConfig config;
-  LogicalResult result = applyPatternsAndFoldGreedily(
-      target, std::move(patterns), config, &listener);
+  LogicalResult result = applyPatternsTrackAndFoldGreedily(
+      &listener, target, std::move(patterns), config);
   LogicalResult listenerResult = listener.checkErrorState();
   if (failed(result)) {
     return mlir::emitDefiniteFailure(target,
@@ -969,8 +969,8 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
     TrackingListener listener(state);
     GreedyRewriteConfig config;
-    LogicalResult result = applyPatternsAndFoldGreedily(
-        state.getTopLevel(), std::move(patterns), config, &listener);
+    LogicalResult result = applyPatternsTrackAndFoldGreedily(
+        &listener, state.getTopLevel(), std::move(patterns), config);
     LogicalResult listenerResult = listener.checkErrorState();
     if (failed(result)) {
       return mlir::emitDefiniteFailure(state.getTopLevel(),
