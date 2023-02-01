@@ -6,8 +6,7 @@
 
 #include "iree/builtins/ukernel/pack.h"
 
-#include "iree/builtins/ukernel/arch/pack_arch.h"
-#include "iree/builtins/ukernel/pack_generic.h"
+#include "iree/builtins/ukernel/pack_tile.h"
 
 enum { iree_uk_pack_tmp_buf_size = 4096 };
 
@@ -104,18 +103,6 @@ static void iree_uk_pack_validate(const iree_uk_pack_params_t* params) {
 static bool iree_uk_pack_early(const iree_uk_pack_params_t* params) {
   return (params->out_size0 == 0 || params->out_size1 == 0 ||
           params->out_size2 == 0 || params->out_size3 == 0);
-}
-
-// Select the 'tile function' that is the typically target-optimized inner loop
-// implementation.
-static iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func(
-    const iree_uk_pack_params_t* params) {
-  iree_uk_pack_tile_func_t arch_tile_func =
-      iree_uk_pack_select_tile_func_arch(params);
-  if (arch_tile_func) {
-    return arch_tile_func;
-  }
-  return iree_uk_pack_select_tile_func_generic(params);
 }
 
 // Fills `buf` with `num_elems` times the `pattern` of size `elem_size`.

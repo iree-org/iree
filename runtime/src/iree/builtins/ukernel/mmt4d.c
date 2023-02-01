@@ -6,8 +6,7 @@
 
 #include "iree/builtins/ukernel/mmt4d.h"
 
-#include "iree/builtins/ukernel/arch/mmt4d_arch.h"
-#include "iree/builtins/ukernel/mmt4d_generic.h"
+#include "iree/builtins/ukernel/mmt4d_tile.h"
 
 #define OUTSIDE_UINT_RANGE(value, bits) (((value) < 0) || ((value) >> (bits)))
 
@@ -33,18 +32,6 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
                      iree_uk_type_size(iree_uk_mmt4d_out_type(params->type)) <=
                  iree_uk_mmt4d_tile_generic_max_bytes);
 #endif  // IREE_UK_ENABLE_ASSERTS
-}
-
-// On success, *out_tile_func is the tile function to use to perform the mmt4d
-// with the given *params.
-static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func(
-    const iree_uk_mmt4d_params_t* params) {
-  iree_uk_mmt4d_tile_func_t arch_tile_func =
-      iree_uk_mmt4d_select_tile_func_arch(params);
-  if (arch_tile_func) {
-    return arch_tile_func;
-  }
-  return iree_uk_mmt4d_select_tile_func_generic(params);
 }
 
 // General mmt4d implementation, shared among all cases. The idea is that the
