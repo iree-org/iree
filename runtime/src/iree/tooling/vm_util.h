@@ -49,13 +49,24 @@ iree_status_t iree_tooling_append_async_fence_inputs(
 // described in
 // https://github.com/iree-org/iree/tree/main/iree/hal/api.h
 iree_status_t iree_tooling_append_variant_list_lines(
-    iree_vm_list_t* variant_list, size_t max_element_count,
+    iree_vm_list_t* list, iree_host_size_t max_element_count,
     iree_string_builder_t* builder);
 
 // Prints a variant list to a file.
-iree_status_t iree_tooling_variant_list_fprint(iree_vm_list_t* variant_list,
-                                               size_t max_element_count,
-                                               FILE* file);
+iree_status_t iree_tooling_variant_list_fprint(
+    iree_vm_list_t* list, iree_host_size_t max_element_count, FILE* file);
+
+// Prints a variant |list| to targets based on the provided |output_strings|.
+//
+// |output_strings| format:
+//   (empty): ignore output
+//   `-`: print textual form to |file|
+//   `@file.npy`: create/overwrite a numpy .npy file.
+//   `+file.npy': create/append a numpy .npy file.
+iree_status_t iree_tooling_output_variant_list(
+    iree_vm_list_t* list, const iree_string_view_t* output_strings,
+    iree_host_size_t output_strings_count, iree_host_size_t max_element_count,
+    FILE* file);
 
 #ifdef __cplusplus
 }  // extern "C"
