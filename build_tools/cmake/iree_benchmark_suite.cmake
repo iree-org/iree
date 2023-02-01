@@ -65,19 +65,19 @@ endfunction()
 # Parameters:
 #   TARGET_NAME: The target name to be created for this module.
 #   SOURCE: Source TF model direcotry
-#   ENTRY_FUNCTION: The entry function name for the input module.
+#   IMPORT_FLAGS: Flags to include in the import command.
 #   OUTPUT_MLIR_FILE: The path to output the generated MLIR file.
 function(iree_import_tf_model)
   cmake_parse_arguments(
     PARSE_ARGV 0
     _RULE
     ""
-    "TARGET_NAME;SOURCE;ENTRY_FUNCTION;OUTPUT_MLIR_FILE"
+    "TARGET_NAME;SOURCE;IMPORT_FLAGS;OUTPUT_MLIR_FILE"
     ""
   )
   iree_validate_required_arguments(
     _RULE
-    "TARGET_NAME;SOURCE;ENTRY_FUNCTION;OUTPUT_MLIR_FILE"
+    "TARGET_NAME;SOURCE;OUTPUT_MLIR_FILE"
     ""
   )
 
@@ -95,7 +95,7 @@ function(iree_import_tf_model)
       OUTPUT "${_RULE_OUTPUT_MLIR_FILE}"
       COMMAND
         "${IREE_IMPORT_TF_PATH}"
-        "--tf-savedmodel-exported-names=${_RULE_ENTRY_FUNCTION}"
+        "${_RULE_IMPORT_FLAGS}"
         "${_RULE_SOURCE}"
         "-o=${_RULE_OUTPUT_MLIR_FILE}"
       DEPENDS
@@ -214,7 +214,7 @@ function(iree_benchmark_suite)
     cmake_parse_arguments(
       _MODULE
       ""
-      "NAME;TAGS;SOURCE;ENTRY_FUNCTION;FUNCTION_INPUTS"
+      "NAME;TAGS;SOURCE;ENTRY_FUNCTION;IMPORT_FLAGS;FUNCTION_INPUTS"
       ""
       ${_MODULE}
     )
@@ -278,7 +278,7 @@ function(iree_benchmark_suite)
       iree_import_tf_model(
         TARGET_NAME "${_MODULE_SOURCE_TARGET}"
         SOURCE "${_MODULE_SOURCE}"
-        ENTRY_FUNCTION "${_MODULE_ENTRY_FUNCTION}"
+        IMPORT_FLAGS "${_MODULE_IMPORT_FLAGS}"
         OUTPUT_MLIR_FILE "${_MODULE_SOURCE}.mlir"
       )
       set(_MODULE_SOURCE "${_MODULE_SOURCE}.mlir")

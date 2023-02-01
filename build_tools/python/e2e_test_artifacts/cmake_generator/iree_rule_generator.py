@@ -72,7 +72,7 @@ class IreeRuleBuilder(object):
           cmake_builder.rules.build_iree_import_tf_model(
               target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
-              entry_function=model.entry_function,
+              import_flags=imported_model.import_flags,
               output_mlir_file=str(output_file_path))
       ]
     else:

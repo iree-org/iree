@@ -102,8 +102,8 @@ iree_import_tf_model(
     "${PACKAGE_NAME}_iree-imported-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
-  ENTRY_FUNCTION
-    "predict"
+  IMPORT_FLAGS
+    "--tf-savedmodel-exported-names=predict"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
 )
@@ -113,8 +113,8 @@ iree_import_tf_model(
     "${PACKAGE_NAME}_iree-imported-model-39d157ad-f0ec-4a76-963b-d783beaed60f"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF"
-  ENTRY_FUNCTION
-    "forward"
+  IMPORT_FLAGS
+    "--tf-savedmodel-exported-names=forward"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF.mlir"
 )
@@ -124,8 +124,8 @@ iree_import_tf_model(
     "${PACKAGE_NAME}_iree-imported-model-ebe7897f-5613-435b-a330-3cb967704e5e"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF"
-  ENTRY_FUNCTION
-    "forward"
+  IMPORT_FLAGS
+    "--tf-savedmodel-exported-names=forward"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.mlir"
 )
@@ -135,8 +135,8 @@ iree_import_tf_model(
     "${PACKAGE_NAME}_iree-imported-model-c393b4fa-beb4-45d5-982a-c6328aa05d08"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_c393b4fa-beb4-45d5-982a-c6328aa05d08_Resnet50TF"
-  ENTRY_FUNCTION
-    "forward"
+  IMPORT_FLAGS
+    "--tf-savedmodel-exported-names=forward"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_c393b4fa-beb4-45d5-982a-c6328aa05d08_Resnet50TF.mlir"
 )
