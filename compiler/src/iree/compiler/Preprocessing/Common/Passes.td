@@ -10,13 +10,13 @@
 include "mlir/Pass/PassBase.td"
 
 def ConvertConv2DToImg2Col :
-    Pass<"iree-flow-convert-conv2d-to-img2col", ""> {
+    Pass<"iree-preprocessing-convert-conv2d-to-img2col", ""> {
   let summary = "Convert linalg convolution ops to matmul img2col based implementation";
   let constructor = "mlir::iree_compiler::IREE::createConvertConv2DToImg2ColPass()";
 }
 
 def PadLinalgOps :
-    Pass<"iree-flow-pad-linalg-ops", ""> {
+    Pass<"iree-preprocessing-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
   let constructor = "mlir::iree_compiler::IREE::createPadLinalgOpsToIntegerMultiplePass()";
   let options = [

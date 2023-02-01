@@ -1,10 +1,8 @@
-# Copyright 2019 The IREE Authors
+# Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
-# Tests for common transforms.
 
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
@@ -18,17 +16,14 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "executable_benchmarks.mlir",
-            "hal_executable.mlir",
-            "preprocessing_flags.mlir",
-            "smoketest.mlir",
-            "streams.mlir",
+            "conv2d_to_img2col.mlir",
+            "pad_linalg_ops.mlir",
         ],
         include = ["*.mlir"],
     ),
-    cfg = "//tests:lit.cfg.py",
+    cfg = "//compiler:lit.cfg.py",
     tools = [
-        "//tools:iree-compile",
+        "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
 )
