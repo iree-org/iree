@@ -336,6 +336,79 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
   }];
 }
 
+def FLOW_DispatchDynamicizeShapeOp : FLOW_PureOp<"dispatch.dynamicize_shape", [
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{Dynamicize static shapes}];
+  let description = [{
+    Turn static shapes into dynamic one, and capture the maximal power of two
+    divisors of the original static shape dimensions.
+
+    Dynamicizing the input shape ensures the CodeGen flow does not rely on the
+    exact static dimension values; instead, we use more coarse-grained signals
+    (like the maximal power of two divisors) for deducing kernel CodeGen
+    parameters. This helps to reduce the amount of kernel specialization towards
+    input shapes.
+
+    This operation is meant to act as an intermediate inside dispatch region
+    formation. We dynamicize the shape and capture coarse-grained signals
+    after forming `flow.dispatch.region` but before finalizing
+    `flow.dispatch.workgroups`. Thus we can make SSA values injected for the new
+    dynamic dimensions to be captured consistently like others. After forming
+    `flow.dispatch.workgroups`, the information carried in this op would be
+    forwarded to `flow.dispatch.tie_shape`.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$source,
+    FLOW_ShapeDynamicDims:$dynamic_dims,
+    DenseI64ArrayAttr:$dim_divisors
+  );
+  let results = (outs AnyRankedTensor:$result);
+
+  let assemblyFormat = [{
+    $source attr-dict
+      `:` type($source) custom<StaticDimDivisorList>($dim_divisors)
+      `->` type($result) (`{` $dynamic_dims^ `}`)?
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return getDynamicDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getDynamicDims(); }
+
+    /// Builds an op instance that takes in the given `sourceValue` and
+    /// symbolicizes all static dimensions inside, by creating all the
+    /// constant values for static dimensions and shape dimension query
+    /// ops for dynamic dimensions.
+    static DispatchDynamicizeShapeOp build(
+        OpBuilder &builder, Location loc, Value sourceValue);
+  }];
+
+  let hasVerifier = 1;
+}
+
+def FLOW_DispatchDynamicizeDimOp : FLOW_PureOp<"dispatch.dynamicize_dim"> {
+  let summary = [{Dynamicize constant dimension sizes}];
+  let description = [{
+    This is effectively a constant index, but we have this separate operation
+    for it to help guaranteeing region boundaries for dispatch formation, as
+    normal constants are subject to transformations like folding and can be
+    moved across region boundary as canonicalization woule like.
+  }];
+
+  let arguments = (ins IndexAttr:$value);
+  let results = (outs Index:$result);
+
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+
+  let assemblyFormat = [{ attr-dict $value `:` type($result) }];
+}
+
 def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
   AllTypesMatch<["operand", "result"]>,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
