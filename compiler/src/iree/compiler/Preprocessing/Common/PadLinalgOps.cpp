@@ -154,7 +154,6 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 
 class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
  public:
-  PadLinalgOpsPass(int size) : paddingSize(size) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
@@ -167,15 +166,12 @@ class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
       return signalPassFailure();
     }
   }
-
- private:
-  int paddingSize;
 };
 
 }  // namespace
 
-std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass(int paddingSize) {
-  return std::make_unique<PadLinalgOpsPass>(paddingSize);
+std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass() {
+  return std::make_unique<PadLinalgOpsPass>();
 }
 
 }  // namespace IREE
