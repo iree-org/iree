@@ -609,6 +609,13 @@ void transform_dialect::VectorWarpDistributionOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
+void transform_dialect::VectorToMMAConversionOp::build(OpBuilder &builder,
+                                                       OperationState &result,
+                                                       Value target) {
+  result.addOperands(target);
+  result.addTypes({pdl::OperationType::get(builder.getContext())});
+}
+
 DiagnosedSilenceableFailure
 transform_dialect::VectorToMMAConversionOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
@@ -644,13 +651,8 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   }
   convertVectorToMMAOps(target);
 
+  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::VectorToMMAConversionOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES
