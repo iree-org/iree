@@ -123,19 +123,17 @@ struct FuseElementwiseOpsWithMultipleUses
     consumerOp->removeAttr(getConsumerAttributeName());
     producerOp->removeAttr(getProducerAttributeName());
 
-    FailureOr<linalg::ElementwiseOpFusionResult> fusedOperation =
+    FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
         linalg::fuseElementwiseOps(rewriter, fusedOperand);
-    if (failed(fusedOperation)) {
+    if (failed(fusionResult)) {
       return rewriter.notifyMatchFailure(consumerOp,
                                          "failed to fuse with producer");
     }
-    assert(fusedOperation.value().fusedOp->getNumResults() ==
-           producerOp->getNumResults() + consumerOp->getNumResults());
-    auto fusedResults = fusedOperation.value().fusedOp->getResults();
-    rewriter.replaceOp(producerOp,
-                       fusedResults.take_front(producerOp->getNumResults()));
-    rewriter.replaceOp(consumerOp,
-                       fusedResults.take_back(consumerOp->getNumResults()));
+    for (auto replacement : fusionResult->replacements) {
+      rewriter.replaceUseIf(
+          replacement.first, replacement.second,
+          [&](OpOperand &use) { return use.getOwner() != consumerOp; });
+    }
     return success();
   }
 };
