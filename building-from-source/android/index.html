@@ -1285,9 +1285,9 @@ adb<span class="w"> </span>push<span class="w"> </span>/tmp/simple_abs_vmvx.vmfb
 </code></pre></div>
 <p>Run the tool:</p>
 <div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span>/data/local/tmp/iree-run-module<span class="w"> </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--module_file<span class="o">=</span>/data/local/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--entry_function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--function_input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span>
+<span class="w">  </span>--module<span class="o">=</span>/data/local/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span>
 </code></pre></div>
 
 

@@ -1429,17 +1429,17 @@ Here are a table of commonly used architecture</p>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--device<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>--module_file<span class="o">=</span>mobilenet-cuda.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--entry_function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
+</span><span class="w">    </span>--module<span class="o">=</span>mobilenet-cuda.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--device<span class="o">=</span>rocm<span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>--module_file<span class="o">=</span>mobilenet-rocm.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--entry_function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
+</span><span class="w">    </span>--module<span class="o">=</span>mobilenet-rocm.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
 </code></pre></div>
 </div>
 </div>

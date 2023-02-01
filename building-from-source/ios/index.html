@@ -1225,10 +1225,10 @@ of the <code>-DCMAKE OSX SYSROOT</code> option to:</p>
 <p>We could test the generated module by running the macOS version of
 <code>iree-run-module</code> on the host.</p>
 <div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-run-module<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--module_file<span class="o">=</span>/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--entry_function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--function_input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span>
+<span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span>
 </code></pre></div>
 <p>To run it on the iOS simulator, we need to copy the vmfb file into the
 <code>iree-run-module</code> iOS app bundle.</p>
@@ -1265,9 +1265,9 @@ module <code>simple_abs_vmvx.vmfb</code>.</p>
 <span class="w">  </span>&lt;UDID&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>dev.iree.runmodule<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--entry_function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--function_input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--module_file<span class="o">=</span><span class="k">$(</span>xcrun<span class="w"> </span>simctl<span class="w"> </span>get_app_container<span class="w"> </span>&lt;UDID&gt;<span class="w"> </span>dev.iree.iree-run-module<span class="k">)</span>/simple_abs_vmvx.vmfb
+<span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span><span class="k">$(</span>xcrun<span class="w"> </span>simctl<span class="w"> </span>get_app_container<span class="w"> </span>&lt;UDID&gt;<span class="w"> </span>dev.iree.iree-run-module<span class="k">)</span>/simple_abs_vmvx.vmfb
 </code></pre></div>
 
 
