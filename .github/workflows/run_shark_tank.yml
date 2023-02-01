@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: '0 13 * * *'
   workflow_dispatch:
+  # Uncomment `pull_request` below to test your PR on SHARK.
+  # Results will be uploaded to gs://shark-benchmark-artifacts.
+  # See the workflow's `SHARK -> generate_report` log output for exact results URL.
+  # pull_request:
 
 jobs:
   setup:
@@ -49,6 +53,9 @@ jobs:
           export SHARK_SHA=`git rev-parse --short=4 HEAD`
           echo "shark-sha=${SHARK_SHA}" >> $GITHUB_OUTPUT
           export DIR_NAME="$(date +'%Y-%m-%d').sha_${SHARK_SHA}.timestamp_$(date +'%s')"
+          if ${{ github.event_name  == 'pull_request' }}; then
+            export DIR_NAME="${DIR_NAME}.presubmit"
+          fi
           export GCS_ARTIFACT_DIR="gs://shark-benchmark-artifacts/${DIR_NAME}"
           echo "artifact-upload-dir=${GCS_ARTIFACT_DIR}" >> $GITHUB_OUTPUT
 
@@ -63,6 +70,7 @@ jobs:
       - os-family=Linux
     env:
       SHARK_SHA: ${{ needs.setup.outputs.shark-sha }}
+      IREE_SOURCE_DIR: ${{ github.event_name  == 'pull_request' && '.' || '' }}
       GCS_UPLOAD_DIR: ${{ needs.setup.outputs.artifact-upload-dir }}
       SHARK_OUTPUT_DIR: shark-output-dir
     steps:
@@ -71,11 +79,10 @@ jobs:
         with:
           submodules: true
       - name: "Benchmarking SHARK tank on CPU"
-        # Only Tensorflow is working at the moment so limit benchmarking to TF models.
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/shark@sha256:1fa2d51110c47ac12826754b66d95e3d68336a8ecf141db8be1eec74f39c42e2 \
-          ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cpu" --driver "cpu" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "true"
+            gcr.io/iree-oss/shark@sha256:5716f77da8022ec7fa18ebfadd9510f673d39b97a6fca145c81e90146de400c7 \
+          ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cpu" --driver "cpu" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "true" --iree-source-dir "${IREE_SOURCE_DIR}"
       - name: "Uploading artifacts"
         run: |
           gcloud storage cp "${SHARK_OUTPUT_DIR}/**" "${GCS_UPLOAD_DIR}/"
@@ -91,6 +98,7 @@ jobs:
       - os-family=Linux
     env:
       SHARK_SHA: ${{ needs.setup.outputs.shark-sha }}
+      IREE_SOURCE_DIR: ${{ github.event_name  == 'pull_request' && '.' || '' }}
       GCS_UPLOAD_DIR: ${{ needs.setup.outputs.artifact-upload-dir }}
       SHARK_OUTPUT_DIR: shark-output-dir
     steps:
@@ -99,12 +107,11 @@ jobs:
         with:
           submodules: true
       - name: "Benchmarking SHARK tank on CUDA"
-        # Only Tensorflow is working at the moment so limit benchmarking to TF models.
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --gpus all \
-            gcr.io/iree-oss/shark@sha256:1fa2d51110c47ac12826754b66d95e3d68336a8ecf141db8be1eec74f39c42e2 \
-          ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cuda" --driver "cuda" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "false"
+            gcr.io/iree-oss/shark@sha256:5716f77da8022ec7fa18ebfadd9510f673d39b97a6fca145c81e90146de400c7 \
+          ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cuda" --driver "cuda" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "false" --iree-source-dir "${IREE_SOURCE_DIR}"
       - name: "Uploading artifacts"
         run: |
           gcloud storage cp "${SHARK_OUTPUT_DIR}/**" "${GCS_UPLOAD_DIR}/"
@@ -138,7 +145,7 @@ jobs:
       - name: "Generating report"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/shark@sha256:1fa2d51110c47ac12826754b66d95e3d68336a8ecf141db8be1eec74f39c42e2 \
+            gcr.io/iree-oss/shark@sha256:5716f77da8022ec7fa18ebfadd9510f673d39b97a6fca145c81e90146de400c7 \
           ./build_tools/benchmarks/shark/run_report.sh "${BENCHMARK_RESULTS_DIR}" \
             "${BENCHMARK_RESULTS_DIR}/cpu_baseline.csv" \
             "${BENCHMARK_RESULTS_DIR}/cuda_baseline.csv" \
@@ -147,5 +154,6 @@ jobs:
         run: |
           gcloud storage cp "${BENCHMARK_RESULTS_DIR}/summary.html" "${GCS_UPLOAD_DIR}/"
       - name: "Updating latest"
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           gcloud storage cp "${BENCHMARK_RESULTS_DIR}/summary.html" "${GCS_LATEST_DIR}/"

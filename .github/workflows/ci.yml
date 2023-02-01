@@ -519,61 +519,6 @@ jobs:
   ######################## Community Model Coverage ############################
   # Jobs that test IREE behavior on a set of models.
   ##############################################################################
-  test_shark_model_suite:
-    needs: [setup, build_all, build_tf_integrations]
-    # Disabled while failing. See https://github.com/iree-org/iree/issues/10653
-    if: false && needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - gpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
-      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-        with:
-          submodules: true
-      - name: "Downloading TF binaries archive"
-        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
-      - name: "Extracting TF binaries archive"
-        run: tar -xf "${TF_BINARIES_ARCHIVE}"
-      - name: "Symlinking TF binaries"
-        run: |
-          ./integrations/tensorflow/symlink_binaries.sh "$(realpath "${TF_BINARIES_DIR}")"
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
-      - name: "Downloading SHARK"
-        id: download_shark
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-        with:
-          repository: nod-ai/SHARK
-          path: ${{ github.workspace }}/SHARK
-      - name: "Testing Shark Model Suite"
-        run: |
-          cd "${GITHUB_WORKSPACE}/SHARK"
-          NO_BACKEND=1 ./setup_venv.sh
-          source shark.venv/bin/activate
-          export TFPYBASE="${GITHUB_WORKSPACE}/integrations/tensorflow/python_projects"
-          export PYTHONPATH="${PYTHONPATH}:${BUILD_DIR}/compiler/bindings/python:${BUILD_DIR}/runtime/bindings/python"
-          export PYTHONPATH="${PYTHONPATH}:$TFPYBASE/iree_tf:$TFPYBASE/iree_tflite"
-          export SHARK_SKIP_TESTS="--ignore=shark/tests/test_shark_importer.py \
-            --ignore=benchmarks/tests/test_hf_benchmark.py \
-            --ignore=benchmarks/tests/test_benchmark.py"
-          export MODEL_LIST="bert_base_cased or mobilebert_uncased or MiniLM_L12_H384_uncased or module_resnet50 or mobilenet_v3 or squeezenet1_0 or vit_base_patch16_224"
-          pytest tank/test_models.py -k "cpu and ($MODEL_LIST)" $SHARK_SKIP_TESTS
-          pytest tank/test_models.py -k "vulkan and ($MODEL_LIST)" $SHARK_SKIP_TESTS
-          pytest tank/test_models.py -k "cuda and ($MODEL_LIST)" $SHARK_SKIP_TESTS
-
   # TODO(#11263): Drop this job once the IREE_BUILD_BENCHMARKS is removed.
   test_build_benchmark_suites:
     needs: [setup, build_all, build_tf_integrations]
@@ -1329,7 +1274,6 @@ jobs:
 
       # Model Coverage
       - test_build_benchmark_suites
-      - test_shark_model_suite
 
       # Configurations
       - asan
