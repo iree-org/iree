@@ -143,8 +143,8 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     // No loops if tile size is zero. Set offset and size to the loop
     // offset and size.
     if (matchPattern(tileSizeVals[index], m_Zero())) {
-      offsets[index] = lb;
-      sizes[index] = ub;
+      offsets[index] = getAsOpFoldResult(lb);
+      sizes[index] = getAsOpFoldResult(ub);
       continue;
     }
 
