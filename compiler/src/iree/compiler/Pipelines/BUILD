@@ -34,6 +34,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":Options",
+        "//runtime/src/iree/base:tracing",
         "//compiler/src/iree/compiler/Bindings/Native/Transforms",
         "//compiler/src/iree/compiler/Bindings/TFLite/Transforms",
         "//compiler/src/iree/compiler/Dialect/Flow/Transforms",

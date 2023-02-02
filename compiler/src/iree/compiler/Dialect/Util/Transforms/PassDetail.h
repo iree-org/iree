@@ -16,6 +16,19 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 
+// Defines the names (compile phases) that can be used with TraceFrameMarkPass.
+enum class TraceFrameName {
+  // No name.
+  None = 0,
+  // Phases from IREEVMPipelinePhase.
+  Input,
+  ABI,
+  Flow,
+  Stream,
+  HAL,
+  VM,
+};
+
 #define GEN_PASS_CLASSES
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"  // IWYU pragma: keep
 

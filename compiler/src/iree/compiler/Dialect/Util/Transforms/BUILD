@@ -33,6 +33,7 @@ iree_compiler_cc_library(
         "StripDebugOps.cpp",
         "TestConversion.cpp",
         "TestFloatRangeAnalysis.cpp",
+        "TraceFrameMark.cpp",
     ],
     hdrs = [
         "Passes.h",
