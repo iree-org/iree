@@ -145,8 +145,7 @@ class IreeRuleBuilder(object):
       flags = [
           f"--iree-llvm-target-triple=riscv64-pc-{target.target_abi.value}",
           "--iree-llvm-target-cpu=generic-rv64", "--iree-llvm-target-abi=lp64d",
-          "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+v",
-          "--riscv-v-vector-bits-min=512",
+          "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v",
           "--riscv-v-fixed-length-vector-lmul-max=8"
       ]
     elif arch_info.architecture == "riscv_32":
@@ -154,7 +153,6 @@ class IreeRuleBuilder(object):
           f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
           "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
           "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x",
-          "--riscv-v-vector-bits-min=512",
           "--riscv-v-fixed-length-vector-lmul-max=8"
       ]
     elif arch_info.architecture == "adreno":
@@ -189,7 +187,7 @@ def generate_rules(
         iree_definitions.ModuleGenerationConfig],
     model_rule_map: Dict[str, model_rule_generator.ModelRule]) -> List[str]:
   """Generates all rules to build IREE artifacts.
-  
+
   Args:
     package_name: CMake package name for rules.
     root_path: path of the root artifact directory.
