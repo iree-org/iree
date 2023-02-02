@@ -42,6 +42,21 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    caching_allocator
+  HDRS
+    "caching_allocator.h"
+  SRCS
+    "caching_allocator.c"
+  DEPS
+    iree::base
+    iree::base::internal::synchronization
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     deferred_command_buffer
   HDRS
     "deferred_command_buffer.h"
