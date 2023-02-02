@@ -468,7 +468,12 @@ void BufferizationPlan::dump() {
   for (auto it = mappedTensors.begin(), ie = mappedTensors.end(); it != ie;
        ++it) {
     if (!it->isLeader()) continue;
-    llvm::dbgs() << "\tSet " << numSets << ":\n";
+    llvm::dbgs() << "\tSet " << numSets;
+    if (storeLeaders.count(
+            getLeaderValue(getValue(*mappedTensors.member_begin(it))))) {
+      llvm::dbgs() << "(StoreSet) ";
+    }
+    llvm::dbgs() << ":\n";
     for (auto member : llvm::make_range(mappedTensors.member_begin(it),
                                         mappedTensors.member_end())) {
       llvm::dbgs() << "\t\t";
@@ -476,6 +481,11 @@ void BufferizationPlan::dump() {
       llvm::dbgs() << "\n";
     }
     numSets++;
+  }
+  llvm::dbgs() << "StoreLeaders : \n";
+  for (auto storeLeader : storeLeaders) {
+    storeLeader.print(llvm::dbgs());
+    llvm::dbgs() << "\n";
   }
 }
 
@@ -588,16 +598,6 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
     plan.dump();
   });
 
-  // Tie operands to allow for operand fusion support. To be dropped once the
-  // operand fusion is generalized in IREE.
-  funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    return tieOperandsForOperandFusion(linalgOp, plan);
-  });
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
-    llvm::dbgs() << "After union for supporting operand fusion";
-    plan.dump();
-  });
-
   if (funcOp
           .walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
             return analyseInterfaceStoreTensorOp(storeOp, plan);
@@ -605,6 +605,11 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
           .wasInterrupted()) {
     return failure();
   }
+
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    llvm::dbgs() << "After Store walk ";
+    plan.dump();
+  });
 
   return success();
 }

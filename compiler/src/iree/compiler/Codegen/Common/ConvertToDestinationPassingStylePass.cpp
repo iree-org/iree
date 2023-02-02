@@ -281,26 +281,26 @@ static LogicalResult duplicateInitTensorOps(OpBuilder &b,
   return success();
 }
 
-// Checks if the `inOperand` can be used in place of the `outOperand`
+// Checks if the `inOperand` can be used in place of the `initOperand`
 // to mimic in-place update behavior for parallel elementwise ops.
-static bool canUseInOperandAsOutOperand(
-    OpOperand *inOperand, OpOperand *outOperand,
+static bool canUseInOperandAsInitOperand(
+    OpOperand *inOperand, OpOperand *initOperand,
     bool useWARForCooperativeMatrixCodegen = false) {
   if (isReadOnly(inOperand->get())) {
     return false;
   }
 
-  if (inOperand->getOwner() != outOperand->getOwner()) return false;
+  if (inOperand->getOwner() != initOperand->getOwner()) return false;
 
   auto linalgOp = dyn_cast<linalg::LinalgOp>(inOperand->getOwner());
   if (!linalgOp) return false;
 
   if (linalgOp.getMatchingIndexingMap(inOperand) !=
-      linalgOp.getMatchingIndexingMap(outOperand)) {
+      linalgOp.getMatchingIndexingMap(initOperand)) {
     return false;
   }
 
-  if (inOperand->get().getType() != outOperand->get().getType()) return false;
+  if (inOperand->get().getType() != initOperand->get().getType()) return false;
 
   if (useWARForCooperativeMatrixCodegen) {
     return true;
@@ -315,70 +315,155 @@ static bool canUseInOperandAsOutOperand(
   return true;
 }
 
-namespace {
-/// Adapts Linalg ops input operand to output operand. This is required for not
-/// creating extra alloca ops. For more details, see
-/// https://github.com/iree-org/iree/issues/8303
-struct AdaptLinalgInputOperandToOutputOperand
-    : public OpRewritePattern<linalg::GenericOp> {
-  AdaptLinalgInputOperandToOutputOperand(MLIRContext *context,
-                                         bool useWARForCooperativeMatrixCodegen,
-                                         PatternBenefit benefit = 1)
-      : OpRewritePattern(context, benefit),
-        useWARForCooperativeMatrixCodegen(useWARForCooperativeMatrixCodegen) {}
+/// Checks if the use of a result of a compute op can be modified
+/// so that it can be moved into a store set.
+static std::optional<OpOperand *> canModifyUseToGetValueIntoStoreSet(
+    BufferizationPlan &plan, OpOperand *use,
+    bool useWARForCooperativeMatrixCodegen) {
+  assert(!plan.isInStoreSet(use->get()) &&
+         "attempting to move a value into a store set, when it is already part "
+         "of one");
 
-  LogicalResult matchAndRewrite(linalg::GenericOp op,
-                                PatternRewriter &rewriter) const override {
-    // All the loops should be parallel loops.
-    if (op.getNumLoops() != op.getNumParallelLoops()) return failure();
-    // There is only one result tensor.
-    if (op->getNumResults() != 1) return failure();
-    // The output tensor is unused in the body computation.
-    auto outputOperand = op.getDpsInitOperand(0);
-    if (op.payloadUsesValueFromOperand(outputOperand)) return failure();
+  // Currently only look at use in linalg.generic ops.
+  auto genericOpConsumer = dyn_cast<linalg::GenericOp>(use->getOwner());
+  if (!genericOpConsumer) return std::nullopt;
 
-    // Find an input operand which meets:
-    //   1. It has the same indexing map and type.
-    //   2. It is not from a readonly tensor.
-    OpOperand *operand = nullptr;
-    SmallVector<Value> newOperands;
-    SmallVector<AffineMap> maps;
-    for (auto in : op.getDpsInputOperands()) {
-      if (!operand &&
-          canUseInOperandAsOutOperand(in, outputOperand,
-                                      useWARForCooperativeMatrixCodegen)) {
-        operand = in;
-      } else {
-        newOperands.push_back(in->get());
-        maps.push_back(op.getMatchingIndexingMap(in));
-      }
-    }
-    if (!operand) return failure();
-    maps.push_back(op.getMatchingIndexingMap(operand));
-
-    Location loc = op.getLoc();
-    SmallVector<utils::IteratorType> iterTypes(op.getNumLoops(),
-                                               utils::IteratorType::parallel);
-    auto newOp = rewriter.create<linalg::GenericOp>(
-        loc, op.getResultTypes(), newOperands, operand->get(), maps, iterTypes,
-        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(op));
-    rewriter.inlineRegionBefore(op.getRegion(), newOp.getRegion(),
-                                newOp.getRegion().begin());
-
-    // Repair the payload entry block.
-    Block &payload = newOp.getRegion().front();
-    payload.getArgument(operand->getOperandNumber())
-        .replaceAllUsesWith(payload.getArgument(op.getNumDpsInputs()));
-    payload.eraseArgument(operand->getOperandNumber());
-
-    rewriter.replaceOp(op, newOp.getResults());
-    return success();
+  // All loops need to be parallel.
+  if (genericOpConsumer.getNumLoops() !=
+      genericOpConsumer.getNumParallelLoops()) {
+    return std::nullopt;
   }
 
- private:
-  bool useWARForCooperativeMatrixCodegen;
-};
+  if (genericOpConsumer.isDpsInit(use)) return std::nullopt;
 
+  for (auto [index, initOperand] :
+       llvm::enumerate(genericOpConsumer.getDpsInitOperands())) {
+    // Output tensor is unused in the body computation.
+    if (genericOpConsumer.payloadUsesValueFromOperand(initOperand)) continue;
+    // The result of this operation needs to be in a store set.
+    if (!plan.isInStoreSet(genericOpConsumer->getResult(index))) continue;
+    if (!canUseInOperandAsInitOperand(use, initOperand,
+                                      useWARForCooperativeMatrixCodegen)) {
+      continue;
+    }
+    return initOperand;
+  }
+  return std::nullopt;
+}
+
+/// For a compute op which has a result not in the store set, but has a user
+/// with an `inOperand`/`initOperand` pair (`inOperand` being the use of result
+/// of the compute op) modify the user to replace `initOperand` with a use of
+/// the result. This avoids the need for a temporary stack for result of the
+/// `initOperand`.
+static LogicalResult modifyUseToGetValueIntoStoreSet(RewriterBase &rewriter,
+                                                     OpOperand *inOperand,
+                                                     OpOperand *initOperand) {
+  /// Currently handle only uses as `ins` of `linalg.generic`. Replace the
+  /// `initOperand` with the `inOperand`, and drop its use from the `ins`
+  /// operand list.
+  auto genericOp = cast<linalg::GenericOp>(inOperand->getOwner());
+  assert(genericOp == initOperand->getOwner() &&
+         "expected in operand and out operand to be the same op");
+  SmallVector<Value> newInputs;
+  SmallVector<Value> newOutputs;
+  SmallVector<Type> newResultTypes;
+  SmallVector<AffineMap> maps;
+  for (OpOperand *in : genericOp.getDpsInputOperands()) {
+    if (in != inOperand) {
+      newInputs.push_back(in->get());
+      maps.push_back(genericOp.getMatchingIndexingMap(in));
+    }
+  }
+  for (OpOperand *out : genericOp.getDpsInitOperands()) {
+    maps.push_back(genericOp.getMatchingIndexingMap(out));
+    if (initOperand == out) {
+      newOutputs.push_back(inOperand->get());
+      newResultTypes.push_back(inOperand->get().getType());
+    } else {
+      newOutputs.push_back(out->get());
+      newResultTypes.push_back(out->get().getType());
+    }
+  }
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(genericOp);
+
+  Location loc = genericOp.getLoc();
+  SmallVector<utils::IteratorType> iterTypes(genericOp.getNumLoops(),
+                                             utils::IteratorType::parallel);
+  auto newOp = rewriter.create<linalg::GenericOp>(
+      loc, newResultTypes, newInputs, newOutputs, maps, iterTypes,
+      /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
+  rewriter.inlineRegionBefore(genericOp.getRegion(), newOp.getRegion(),
+                              newOp.getRegion().begin());
+
+  // Repair the payload entry block.
+  Block &payload = newOp.getRegion().front();
+  payload.getArgument(inOperand->getOperandNumber())
+      .replaceAllUsesWith(payload.getArgument(initOperand->getOperandNumber()));
+  payload.eraseArgument(inOperand->getOperandNumber());
+
+  rewriter.replaceOp(genericOp, newOp.getResults());
+  return success();
+}
+
+/// For results of compute ops that are not part of a store set, tries to modify
+/// its users to get the result into a store set, avoiding the use of stack
+/// allocation. This is done by looking for users
+/// 1) The result of the user is in the store set.
+/// 2) The use of the result of the compute op can be updated such that
+///    the new use is tied to the result of the user.
+/// This makes the result of the compute op be in the store set, and
+/// bufferizable without using a new stack. See
+/// https://github.com/iree-org/iree/issues/8303.
+static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
+    func::FuncOp funcOp, bool useWARForCooperativeMatrixCodegen) {
+  IRRewriter rewriter(funcOp.getContext());
+
+  constexpr int kMaxNumIterations = 6;
+  int numIterations = 0;
+  while (numIterations < kMaxNumIterations) {
+    numIterations++;
+    BufferizationPlan plan;
+    if (failed(createTensorEquivalenceClasses(funcOp, plan))) {
+      return funcOp.emitOpError("failed to create tensor equivalance classes");
+    }
+
+    auto resultMovedIntoStoreSet =
+        [&](TilingInterface computeOp) -> WalkResult {
+      for (auto result : computeOp->getResults()) {
+        // If result is already in a store set. Nothing to do.
+        if (plan.isInStoreSet(result)) continue;
+
+        // Check if there are any uses that can be modified to reuse the output
+        // buffer.
+        for (OpOperand &use : result.getUses()) {
+          std::optional<OpOperand *> reusableOperand =
+              canModifyUseToGetValueIntoStoreSet(
+                  plan, &use, useWARForCooperativeMatrixCodegen);
+          if (!reusableOperand) continue;
+          if (failed(modifyUseToGetValueIntoStoreSet(rewriter, &use,
+                                                     reusableOperand.value())))
+            continue;
+          return WalkResult::interrupt();
+        }
+      }
+      return WalkResult::advance();
+    };
+
+    // If walk wasnt interrupted, then there wasnt any modifications. So break;
+    if (!funcOp.walk(resultMovedIntoStoreSet).wasInterrupted()) {
+      break;
+    }
+  }
+  if (numIterations >= kMaxNumIterations) {
+    return funcOp.emitOpError(
+        "Hit maximum number of iterations to avoid stack allocation");
+  }
+  return success();
+}
+
+namespace {
 struct RemoveCstOutsDependency
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
@@ -418,16 +503,6 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
   MLIRContext *context = &getContext();
 
-  {
-    RewritePatternSet patterns(context);
-    patterns.insert<AdaptLinalgInputOperandToOutputOperand>(
-        context, useWARForCooperativeMatrixCodegen);
-    patterns.insert<RemoveCstOutsDependency>(context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
-    }
-  }
-
   OpBuilder b(context);
   SmallVector<tensor::EmptyOp> emptyTensorOps;
   funcOp.walk([&](tensor::EmptyOp emptyTensorOp) {
@@ -437,6 +512,19 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
         return failed(duplicateInitTensorOps(b, emptyTensorOp));
       })) {
     return signalPassFailure();
+  }
+
+  if (failed(adaptComputeConsumerToAvoidStackAllocation(
+          funcOp, useWARForCooperativeMatrixCodegen))) {
+    return signalPassFailure();
+  }
+
+  {
+    RewritePatternSet patterns(context);
+    patterns.insert<RemoveCstOutsDependency>(context);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 
   if (failed(convertToDestinationPassingStyle(b, funcOp))) {
