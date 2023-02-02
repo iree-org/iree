@@ -17,17 +17,18 @@ TESTING="${TEMPLATE_TESTING:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 TESTING_SELF_DELETER="${TESTING_SELF_DELETER:-0}"
 
-GPU_IMAGE="github-runner-gpu-2023-01-30-1675109292"
-GPU_DISK_SIZE_GB=100
-CPU_IMAGE="github-runner-cpu-2023-01-30-1675109033"
-CPU_DISK_SIZE_GB=100
+GPU_IMAGE="${GPU_IMAGE:-github-runner-gpu-2023-01-30-1675109292}"
+GPU_DISK_SIZE_GB="${GPU_DISK_SIZE_GB:-100}"
+CPU_IMAGE="${CPU_IMAGE:-github-runner-cpu-2023-01-30-1675109033}"
+CPU_DISK_SIZE_GB="${CPU_DISK_SIZE_GB:-100}"
 
-PROD_TEMPLATE_BASE_NAME="github-runner"
-PROD_TEMPLATE_CONFIG_REPO="iree-org/iree"
+PROD_TEMPLATE_NAME_PREFIX="${PROD_TEMPLATE_NAME_PREFIX:-github-runner}"
+PROD_TEMPLATE_CONFIG_REPO="${PROD_TEMPLATE_CONFIG_REPO:-iree-org/iree}"
+GITHUB_RUNNER_SCOPE="${GITHUB_RUNNER_SCOPE:-iree-org}"
 
 TEMPLATE_CONFIG_REPO="${TEMPLATE_CONFIG_REPO:-${PROD_TEMPLATE_CONFIG_REPO}}"
 TEMPLATE_CONFIG_REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
-TEMPLATE_BASE_NAME="${TEMPLATE_BASE_NAME:-${PROD_TEMPLATE_BASE_NAME}}"
+TEMPLATE_NAME_PREFIX="${TEMPLATE_NAME_PREFIX:-${PROD_TEMPLATE_NAME_PREFIX}}"
 
 if (( TESTING==0 )) && ! git merge-base --is-ancestor "${TEMPLATE_CONFIG_REF}" main; then
   echo "Creating testing template because TEMPLATE_CONFIG_REF='${TEMPLATE_CONFIG_REF}' is not on the main branch" >&2
@@ -37,8 +38,8 @@ if (( TESTING==0 )) && [[ "${TEMPLATE_CONFIG_REPO}" != "${PROD_TEMPLATE_CONFIG_R
   echo "Creating testing template because TEMPLATE_CONFIG_REPO '${TEMPLATE_CONFIG_REPO}'!='${PROD_TEMPLATE_CONFIG_REPO}'" >&2
   TESTING=1
 fi
-if (( TESTING==0 )) && [[ "${TEMPLATE_BASE_NAME}" != "${PROD_TEMPLATE_BASE_NAME}" ]]; then
-  echo "Creating testing template because TEMPLATE_BASE_NAME '${TEMPLATE_BASE_NAME}'!='${PROD_TEMPLATE_BASE_NAME}'" >&2
+if (( TESTING==0 )) && [[ "${TEMPLATE_NAME_PREFIX}" != "${PROD_TEMPLATE_NAME_PREFIX}" ]]; then
+  echo "Creating testing template because TEMPLATE_NAME_PREFIX '${TEMPLATE_NAME_PREFIX}'!='${PROD_TEMPLATE_NAME_PREFIX}'" >&2
   TESTING=1
 fi
 
@@ -56,7 +57,6 @@ VERSION="${SHORT_REF}-${SUFFIX}"
 if (( TESTING!=0 )); then
   VERSION="${VERSION}-testing"
 fi
-GITHUB_RUNNER_SCOPE=iree-org
 GITHUB_RUNNER_VERSION="2.300.2"
 GITHUB_RUNNER_ARCHIVE_DIGEST="ed5bf2799c1ef7b2dd607df66e6b676dff8c44fb359c6fedc9ebf7db53339f0c"
 GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
@@ -128,7 +128,7 @@ function create_template() {
   )
 
   cmd+=(
-    "${TEMPLATE_BASE_NAME}-${group}-${type}-${VERSION}"
+    "${TEMPLATE_NAME_PREFIX}-${group}-${type}-${VERSION}"
     "${common_args[@]}"
     --service-account="github-runner-${trust}-trust@iree-oss.iam.gserviceaccount.com"
     --metadata="${metadata_string}"

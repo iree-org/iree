@@ -14,25 +14,31 @@
 
 set -euo pipefail
 
-# For now, just change these parameters
-VERSION=7138511883-62g-testing
-REGION=us-west1
-ZONES=us-west1-a,us-west1-b,us-west1-c
-AUTOSCALING=1
-GROUP=presubmit
-TYPE=cpu
+VERSION="${VERSION:-7138511883-62g-testing}"
+REGION="${REGION:-us-west1}"
+ZONES="${ZONES:-us-west1-a,us-west1-b,us-west1-c}"
+AUTOSCALING="${AUTOSCALING:-1}"
+GROUP="${GROUP:-presubmit}"
+TYPE="${TYPE:-cpu}"
+MIG_NAME_PREFIX="${MIG_NAME_PREFIX:-github-runner}"
+
 # For GPU groups, these should both be set to the target group size, as
 # autoscaling currently does not work for these.
-MIN_SIZE=3
-MAX_SIZE=3
+MIN_SIZE="${MIN_SIZE:-3}"
+MAX_SIZE="${MAX_SIZE:-3}"
 # Whether this is a testing MIG (i.e. not prod)
-TESTING=1
+TESTING="${TESTING:-1}"
+
+if (( TESTING==0 )) && [[ "${VERSION}" == *testing* ]]; then
+  echo "Creating testing mig because VERSION='${VERSION}' contains 'testing'" >&2
+  TESTING=1
+fi
 
 function create_mig() {
   local runner_group="$1"
   local type="$2"
 
-  local mig_name="github-runner"
+  local mig_name="${MIG_NAME_PREFIX}"
   if (( TESTING == 1 )); then
     mig_name+="-testing"
   fi
