@@ -34,7 +34,6 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":Options",
-        "//runtime/src/iree/base:tracing",
         "//compiler/src/iree/compiler/Bindings/Native/Transforms",
         "//compiler/src/iree/compiler/Bindings/TFLite/Transforms",
         "//compiler/src/iree/compiler/Dialect/Flow/Transforms",
@@ -54,6 +53,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Modules/HAL/Inline/Transforms",
         "//compiler/src/iree/compiler/Modules/HAL/Loader/Transforms",
         "//compiler/src/iree/compiler/Preprocessing:Passes",
+        "//runtime/src/iree/base:tracing",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
