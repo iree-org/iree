@@ -63,6 +63,12 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
         continue;
       }
       targetResource = updateOp.getTarget();
+      if (targetResource.getDefiningOp() == dispatchOp) {
+        // NOTE: we may have already replaced the update target with one of our
+        // results - if so we need to find the operand to capture tied to that
+        // new result instead of our own new result (which would make a cycle).
+        targetResource = dispatchOp.getTiedResultOperand(targetResource);
+      }
       targetResourceSize = updateOp.getTargetSize();
       targetOffset = updateOp.getTargetOffset();
       targetEnd = updateOp.getTargetEnd();
