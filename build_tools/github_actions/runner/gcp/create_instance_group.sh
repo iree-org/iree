@@ -21,6 +21,7 @@ AUTOSCALING="${AUTOSCALING:-1}"
 GROUP="${GROUP:-presubmit}"
 TYPE="${TYPE:-cpu}"
 MIG_NAME_PREFIX="${MIG_NAME_PREFIX:-github-runner}"
+DRY_RUN="${DRY_RUN:-0}"
 
 # For GPU groups, these should both be set to the target group size, as
 # autoscaling currently does not work for these.
@@ -45,7 +46,8 @@ function create_mig() {
   mig_name+="-${runner_group}-${type}-${REGION}"
   template="github-runner-${runner_group}-${type}-${VERSION}"
 
-  local -a create_args=(
+  local -a create_cmd=(
+    gcloud beta compute instance-groups managed create
     "${mig_name}"
     --project=iree-oss
     --base-instance-name="${mig_name}"
@@ -57,10 +59,16 @@ function create_mig() {
     --health-check=http-8080-ok
   )
 
-  (set -x; gcloud beta compute instance-groups managed create "${create_args[@]}")
-  echo ""
+  if (( DRY_RUN==1 )); then
+    # Prefix the command with a noop. It will still be printed by set -x
+    create_cmd=(":" "${create_cmd[@]}")
+  fi
 
-  local -a autoscaling_args=(
+  (set -x; "${create_cmd[@]}") >&2
+  echo '' >&2
+
+  local -a autoscaling_cmd=(
+    gcloud beta compute instance-groups managed set-autoscaling
     "${mig_name}"
     --project=iree-oss
     --region="${REGION}"
@@ -71,8 +79,13 @@ function create_mig() {
     --target-cpu-utilization=0.6
   )
 
-  (set -x; gcloud beta compute instance-groups managed set-autoscaling "${autoscaling_args[@]}")
-  echo ""
+  if (( DRY_RUN==1 )); then
+    # Prefix the command with a noop. It will still be printed by set -x
+    autoscaling_cmd=(":" "${autoscaling_cmd[@]}")
+  fi
+
+  (set -x; "${autoscaling_cmd[@]}") >&2
+  echo '' >&2
 }
 
 create_mig "${GROUP}" "${TYPE}"
