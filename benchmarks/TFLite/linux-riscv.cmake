@@ -21,8 +21,7 @@ set(LINUX_RV64_GENERIC_CPU_COMPILATION_FLAGS
   "--iree-llvm-target-triple=riscv64"
   "--iree-llvm-target-cpu=generic-rv64"
   "--iree-llvm-target-abi=lp64d"
-  "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+v"
-  "--riscv-v-vector-bits-min=512"
+  "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
   "--riscv-v-fixed-length-vector-lmul-max=8"
 )
 
@@ -32,7 +31,6 @@ set(LINUX_RV32_GENERIC_CPU_COMPILATION_FLAGS
   "--iree-llvm-target-cpu=generic-rv32"
   "--iree-llvm-target-abi=ilp32"
   "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
-  "--riscv-v-vector-bits-min=512"
   "--riscv-v-fixed-length-vector-lmul-max=8"
 )
 

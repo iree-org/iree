@@ -150,8 +150,8 @@ tools/iree-compile \
   --iree-llvm-target-triple=riscv64 \
   --iree-llvm-target-cpu=generic-rv64 \
   --iree-llvm-target-abi=lp64d \
-  --iree-llvm-target-cpu-features="+m,+a,+f,+d,+v" \
-  --riscv-v-vector-bits-min=512 --riscv-v-fixed-length-vector-lmul-max=8 \
+  --iree-llvm-target-cpu-features="+m,+a,+f,+d,+zvl512b,+v" \
+  --riscv-v-fixed-length-vector-lmul-max=8 \
   iree_input.mlir -o mobilenet_cpu.vmfb
 ```
 
