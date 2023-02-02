@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 
+#include "iree/base/tracing.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
@@ -118,6 +119,10 @@ class TranslateExecutablesPass
       passManager.addNestedPass<IREE::HAL::ExecutableVariantOp>(
           createTranslateTargetExecutableVariantsPass(targetName));
     }
+
+    IREE_TRACE_MESSAGE_DYNAMIC(INFO, executableOp.getSymName().str().data(),
+                               executableOp.getSymName().str().size());
+
     if (failed(runPipeline(passManager, executableOp))) {
       executableOp.emitError() << "failed to serialize executables";
       return signalPassFailure();

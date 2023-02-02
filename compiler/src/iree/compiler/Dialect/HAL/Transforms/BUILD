@@ -37,6 +37,7 @@ iree_compiler_cc_library(
         "Passes.h",
     ],
     deps = [
+        "//runtime/src/iree/base:tracing",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/Analysis",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion",
