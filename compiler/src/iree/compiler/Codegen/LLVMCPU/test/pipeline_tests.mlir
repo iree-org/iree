@@ -282,3 +282,51 @@ hal.executable private @vectorize_fill_conv2d_generic {
 // CHECK:        vector.outerproduct %{{.+}}, %{{.+}}, %{{.+}} {kind = #vector.kind<add>}
 // CHECK-NOT:    linalg.generic
 // CHECK:        arith.cmpf olt, %{{.+}}, %{{.+}} : vector<4x8xf32>
+
+// -----
+
+hal.executable private @multi_result {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
+    hal.executable.export public @multi_result ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @multi_result() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %cst_0 = arith.constant 1.000000e-03 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x128xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x256xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256xf32>>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<writeonly:tensor<128x256xf32>>
+        %5 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x256xf32>>
+        %6 = hal.interface.binding.subspan set(0) binding(5) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x256xf32>>
+        %7 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x128xf32>> -> tensor<64x128xf32>
+        %8 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [128, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x256xf32>> -> tensor<128x256xf32>
+        %9 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [256], strides = [1] : !flow.dispatch.tensor<readonly:tensor<256xf32>> -> tensor<256xf32>
+        %13 = tensor.empty() : tensor<64x256xf32>
+        %14 = linalg.fill ins(%cst : f32) outs(%13 : tensor<64x256xf32>) -> tensor<64x256xf32>
+        %15 = linalg.matmul ins(%7, %8 : tensor<64x128xf32>, tensor<128x256xf32>) outs(%14 : tensor<64x256xf32>) -> tensor<64x256xf32>
+        %16 = linalg.generic {
+            indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+            iterator_types = ["parallel", "parallel"]}
+          ins(%15, %9 : tensor<64x256xf32>, tensor<256xf32>) outs(%13 : tensor<64x256xf32>) {
+        ^bb0(%in: f32, %in_1: f32, %out: f32):
+          %17 = arith.addf %in, %in_1 : f32
+          linalg.yield %17 : f32
+        } -> tensor<64x256xf32>
+        flow.dispatch.tensor.store %15, %5, offsets = [0, 0], sizes = [64, 256], strides = [1, 1] : tensor<64x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<64x256xf32>>
+        flow.dispatch.tensor.store %16, %6, offsets = [0, 0], sizes = [64, 256], strides = [1, 1] : tensor<64x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<64x256xf32>>
+        return
+      }
+    }
+  }
+}
+//    CHECK-LABEL: func @multi_result
+//          CHECK:   scf.for
+//          CHECK:     scf.for
+//          CHECK:       scf.for
+// CHECK-COUNT-16:         vector.outerproduct
+//          CHECK:       arith.addf %{{.+}}, %{{.+}} : vector<8x32xf32>
