@@ -289,6 +289,11 @@ IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+IREE_API_EXPORT iree_allocator_t
+iree_vm_stack_allocator(const iree_vm_stack_t* stack) {
+  return stack->allocator;
+}
+
 IREE_API_EXPORT iree_vm_invocation_flags_t
 iree_vm_stack_invocation_flags(const iree_vm_stack_t* stack) {
   return stack->flags;

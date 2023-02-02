@@ -234,6 +234,7 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":bytecode_module",
+        ":bytecode_module_test_module_c",
         ":vm",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
@@ -241,6 +242,14 @@ iree_runtime_cc_test(
         "//runtime/src/iree/vm/test:all_bytecode_modules_c",
         "//runtime/src/iree/vm/test:async_bytecode_modules_c",
     ],
+)
+
+iree_bytecode_module(
+    name = "bytecode_module_test_module",
+    testonly = True,
+    src = "bytecode_module_test.mlir",
+    c_identifier = "iree_vm_bytecode_module_test_module",
+    flags = ["--compile-mode=vm"],
 )
 
 cc_binary_benchmark(
