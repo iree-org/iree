@@ -870,7 +870,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -888,7 +888,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -906,7 +906,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -2529,7 +2529,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
@@ -2549,7 +2549,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
@@ -2569,7 +2569,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"

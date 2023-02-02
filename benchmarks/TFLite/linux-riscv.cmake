@@ -30,7 +30,7 @@ set(LINUX_RV32_GENERIC_CPU_COMPILATION_FLAGS
   "--iree-llvm-target-triple=riscv32-pc-linux-elf"
   "--iree-llvm-target-cpu=generic-rv32"
   "--iree-llvm-target-abi=ilp32"
-  "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+  "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
   "--riscv-v-fixed-length-vector-lmul-max=8"
 )
 

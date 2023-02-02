@@ -160,7 +160,7 @@ class IreeRuleBuilder(object):
       flags = [
           f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
           "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
-          "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x",
+          "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
           "--riscv-v-fixed-length-vector-lmul-max=8"
       ]
     elif arch_info.architecture == "armv8.2-a":
