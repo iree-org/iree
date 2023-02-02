@@ -158,6 +158,7 @@ Session::Session(GlobalInit &globalInit)
   if (globalInit.usesCommandLine) {
     bindingOptions = *globalInit.clBindingOptions;
     inputOptions = *globalInit.clInputOptions;
+    preprocessingOptions = *globalInit.clPreprocessingOptions;
     highLevelOptimizationOptions = *globalInit.clHighLevelOptimizationOptions;
     schedulingOptions = *globalInit.clSchedulingOptions;
     halTargetOptions = *globalInit.clHalTargetOptions;
@@ -172,6 +173,7 @@ Session::Session(GlobalInit &globalInit)
   // Register each options struct with the binder so we can manipulate
   // mnemonically via the API.
   bindingOptions.bindOptions(binder);
+  preprocessingOptions.bindOptions(binder);
   inputOptions.bindOptions(binder);
   highLevelOptimizationOptions.bindOptions(binder);
   schedulingOptions.bindOptions(binder);

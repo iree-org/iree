@@ -50,6 +50,7 @@ struct CompilerOptions {
   CompilerOptions() : binder(OptionsBinder::local()) {
     bindingOptions.bindOptions(binder);
     inputDialectOptions.bindOptions(binder);
+    preprocessingOptions.bindOptions(binder);
     highLevelOptimizationOptions.bindOptions(binder);
     schedulingOptions.bindOptions(binder);
     halTargetOptions.bindOptions(binder);
