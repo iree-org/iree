@@ -1370,8 +1370,8 @@ with the additional command-line flags</p>
 <span class="hll"><span class="w">  </span>--iree-llvm-target-triple<span class="o">=</span>riscv64<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">  </span>--iree-llvm-target-cpu<span class="o">=</span>generic-rv64<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">  </span>--iree-llvm-target-abi<span class="o">=</span>lp64d<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--iree-llvm-target-cpu-features<span class="o">=</span><span class="s2">&quot;+m,+a,+f,+d,+v&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--riscv-v-vector-bits-min<span class="o">=</span><span class="m">512</span><span class="w"> </span>--riscv-v-fixed-length-vector-lmul-max<span class="o">=</span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--iree-llvm-target-cpu-features<span class="o">=</span><span class="s2">&quot;+m,+a,+f,+d,+zvl512b,+v&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--riscv-v-fixed-length-vector-lmul-max<span class="o">=</span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">  </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_cpu.vmfb
 </span></code></pre></div>
 <p>Then run on the RISC-V QEMU:</p>
