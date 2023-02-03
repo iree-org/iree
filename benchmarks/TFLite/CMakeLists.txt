@@ -175,6 +175,45 @@ set(EFFICIENTNET_INT8_MODULE
     "1x224x224x3xui8"
 )
 
+set(SSD_MOBILENET_V2_DYNAMIC_F32_MODULE
+  NAME
+  "SSDMobileNetV2DynamicF32"
+  TAGS
+    "fp32,dynamic"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/ssd_mobilenet_v2_dynamic_1.0_float.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+)
+
+set(SSD_MOBILENET_V2_DYNAMIC_INT8_MODULE
+  NAME
+  "SSDMobileNetV2DynamicInt8"
+  TAGS
+    "int8,dynamic"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/ssd_mobilenet_v2_dynamic_1.0_int8.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xi8"
+)
+
+set(RESNET_V1_DYNAMIC_F32_MODULE
+  NAME
+  "ResNetV1DynamicF32"
+  TAGS
+    "f32,dynamic"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/resnet_v1_101_dynamic.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "7x224x224x3xf32"
+)
+
 ################################################################################
 # Add benchmarks for all platforms.                                            #
 ################################################################################

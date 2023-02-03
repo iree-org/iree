@@ -38,6 +38,9 @@ iree_benchmark_suite(
     "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
     "${EFFICIENTNET_INT8_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_F32_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_INT8_MODULE}"
+    "${RESNET_V1_DYNAMIC_F32_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
@@ -70,6 +73,9 @@ iree_benchmark_suite(
     "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
     "${EFFICIENTNET_INT8_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_F32_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_INT8_MODULE}"
+    "${RESNET_V1_DYNAMIC_F32_MODULE}"
 
   BENCHMARK_MODES
     "1-thread,full-inference,default-flags"
@@ -104,6 +110,9 @@ iree_benchmark_suite(
     "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
     "${EFFICIENTNET_INT8_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_F32_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_INT8_MODULE}"
+    "${RESNET_V1_DYNAMIC_F32_MODULE}"
 
   BENCHMARK_MODES
     "4-thread,full-inference,default-flags"
@@ -138,6 +147,9 @@ iree_benchmark_suite(
     "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
     "${EFFICIENTNET_INT8_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_F32_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_INT8_MODULE}"
+    "${RESNET_V1_DYNAMIC_F32_MODULE}"
 
   BENCHMARK_MODES
     "8-thread,full-inference,default-flags"
@@ -178,6 +190,9 @@ iree_benchmark_suite(
     "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
     "${EFFICIENTNET_INT8_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_F32_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_INT8_MODULE}"
+    "${RESNET_V1_DYNAMIC_F32_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,experimental-flags"
@@ -212,6 +227,10 @@ iree_benchmark_suite(
     "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
     "${EFFICIENTNET_INT8_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_F32_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_INT8_MODULE}"
+    "${RESNET_V1_DYNAMIC_F32_MODULE}"
+
 
   BENCHMARK_MODES
     "1-thread,full-inference,experimental-flags"
@@ -248,6 +267,9 @@ iree_benchmark_suite(
     "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
     "${EFFICIENTNET_INT8_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_F32_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_INT8_MODULE}"
+    "${RESNET_V1_DYNAMIC_F32_MODULE}"
 
   BENCHMARK_MODES
     "4-thread,full-inference,experimental-flags"
@@ -284,6 +306,9 @@ iree_benchmark_suite(
     "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
     "${EFFICIENTNET_INT8_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_F32_MODULE}"
+    "${SSD_MOBILENET_V2_DYNAMIC_INT8_MODULE}"
+    "${RESNET_V1_DYNAMIC_F32_MODULE}"
 
   BENCHMARK_MODES
     "8-thread,full-inference,experimental-flags"
