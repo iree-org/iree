@@ -7,11 +7,11 @@
 #include <memory>
 #include <utility>
 
-#include "iree/base/tracing.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Utils/TracingUtils.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/IR/Attributes.h"
@@ -120,8 +120,7 @@ class TranslateExecutablesPass
           createTranslateTargetExecutableVariantsPass(targetName));
     }
 
-    IREE_TRACE_MESSAGE_DYNAMIC(INFO, executableOp.getSymName().str().data(),
-                               executableOp.getSymName().str().size());
+    IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(INFO, executableOp.getSymName().str());
 
     if (failed(runPipeline(passManager, executableOp))) {
       executableOp.emitError() << "failed to serialize executables";

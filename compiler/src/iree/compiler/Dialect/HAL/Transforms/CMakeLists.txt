@@ -47,7 +47,6 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTransforms
-    iree::base::tracing
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::Conversion

@@ -34,6 +34,19 @@ struct PassTracing : public PassInstrumentation {
 #if IREE_ENABLE_COMPILER_TRACING && \
     IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
+enum {
+  IREE_TRACING_COMPILER_MESSAGE_LEVEL_ERROR = 0xFF0000u,
+  IREE_TRACING_COMPILER_MESSAGE_LEVEL_WARNING = 0xFFFF00u,
+  IREE_TRACING_COMPILER_MESSAGE_LEVEL_INFO = 0xFFFFFFu,
+  IREE_TRACING_COMPILER_MESSAGE_LEVEL_VERBOSE = 0xC0C0C0u,
+  IREE_TRACING_COMPILER_MESSAGE_LEVEL_DEBUG = 0x00FF00u,
+};
+
+// Fork of IREE_TRACE_MESSAGE_DYNAMIC.
+#define IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(level, value_string)   \
+  ___tracy_emit_messageC(value_string.data(), value_string.size(), \
+                         IREE_TRACING_COMPILER_MESSAGE_LEVEL_##level, 0)
+
 #define IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, frameName) \
   passManager.addPass(createTraceFrameMarkBeginPass(frameName));
 #define IREE_TRACE_ADD_END_FRAME_PASS(passManager, frameName) \
@@ -47,6 +60,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createTraceFrameMarkEndPass(
     llvm::StringRef name = "");
 
 #else
+#define IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(level, value_string)
 #define IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, frameName)
 #define IREE_TRACE_ADD_END_FRAME_PASS(passManager, frameName)
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
