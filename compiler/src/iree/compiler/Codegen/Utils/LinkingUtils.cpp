@@ -156,18 +156,21 @@ static void replaceEntryPointUses(
       auto oldAttr = use.getSymbolRef();
       auto newAttr = map.lookup(oldAttr);
       if (!newAttr) continue;
-      auto newDict = use.getUser()->getAttrDictionary().replace(
+      mlir::AttrTypeReplacer replacer;
+      AttrTypeReplacer::ReplaceFn<Attribute> fn =
           [&](Attribute attr) -> std::pair<Attribute, WalkResult> {
-            if (attr == oldAttr) {
-              // Found old->new replacement.
-              return {newAttr, WalkResult::skip()};
-            } else if (attr.isa<SymbolRefAttr>()) {
-              // Don't recurse into symbol refs - we only want to match roots.
-              return {attr, WalkResult::skip()};
-            }
-            // Non-symbol ref attr.
-            return {attr, WalkResult::advance()};
-          });
+        if (attr == oldAttr) {
+          // Found old->new replacement.
+          return {newAttr, WalkResult::skip()};
+        } else if (attr.isa<SymbolRefAttr>()) {
+          // Don't recurse into symbol refs - we only want to match roots.
+          return {attr, WalkResult::skip()};
+        }
+        // Non-symbol ref attr.
+        return {attr, WalkResult::advance()};
+      };
+      replacer.addReplacement(fn);
+      auto newDict = replacer.replace(use.getUser()->getAttrDictionary());
       use.getUser()->setAttrs(newDict.cast<DictionaryAttr>());
     }
   };
