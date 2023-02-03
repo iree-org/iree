@@ -42,18 +42,25 @@ enum {
   IREE_TRACING_COMPILER_MESSAGE_LEVEL_DEBUG = 0x00FF00u,
 };
 
-// Fork of IREE_TRACE_MESSAGE_DYNAMIC.
+// Fork of IREE_TRACE_MESSAGE_DYNAMIC, taking std::string (or llvm::StringRef).
 #define IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(level, value_string)   \
   ___tracy_emit_messageC(value_string.data(), value_string.size(), \
                          IREE_TRACING_COMPILER_MESSAGE_LEVEL_##level, 0)
 
+// Adds a pass to |passManager| that marks the beginning of a named frame.
+// * |frameName| must be a null-terminated string
+// * |frameName| must use the same underlying storage as the name used with
+//   IREE_TRACE_ADD_END_FRAME_PASS
 #define IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, frameName) \
   passManager.addPass(createTraceFrameMarkBeginPass(frameName));
+
+// Adds a pass to |passManager| that marks the end of a named frame.
+// * |frameName| must be a null-terminated string
+// * |frameName| must use the same underlying storage as the name used with
+//   IREE_TRACE_ADD_BEGIN_FRAME_PASS
 #define IREE_TRACE_ADD_END_FRAME_PASS(passManager, frameName) \
   passManager.addPass(createTraceFrameMarkEndPass(frameName));
 
-// Warning: 'name' must be null-terminated and calls to Begin and End must use
-// the same underlying string data.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createTraceFrameMarkBeginPass(
     llvm::StringRef name = "");
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createTraceFrameMarkEndPass(
