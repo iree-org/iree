@@ -296,7 +296,8 @@ int main(int argc, char **argv) {
   }
 
   // Run passes.
-  PassManager pm(&context, "builtin.module", PassManager::Nesting::Implicit);
+  PassManager pm(&context, module.get()->getName().getStringRef(),
+                 PassManager::Nesting::Implicit);
   applyPassManagerCLOptions(pm);
   applyDefaultTimingPassManagerCLOptions(pm);
 

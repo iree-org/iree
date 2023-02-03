@@ -248,7 +248,8 @@ int main(int argc, char **argv) {
 
   // Run passes.
   {
-    PassManager pm(&context, PassManager::Nesting::Implicit);
+    PassManager pm(&context, module.get()->getName().getStringRef(),
+                   PassManager::Nesting::Implicit);
     applyPassManagerCLOptions(pm);
 
     if (prettifyTfDebugInfo) {
