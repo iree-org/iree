@@ -659,26 +659,25 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
 DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  OpBuilder builder(getContext());
-  OpBuilder::InsertionGuard g(builder);
-  builder.setInsertionPoint(target);
+  IRRewriter rewriter(getContext());
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(target);
   SmallVector<int64_t> indices = llvm::to_vector(getIndices());
-  auto numOperands = target->getNumOperands();
+  int64_t numOperands = target->getNumOperands();
   bufferization::BufferizationOptions options;
   for (int64_t index : indices) {
     if ((index >= 0) && (index < numOperands)) {
       FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-          builder, target->getLoc(), target->getOperand(index), false, options,
+          rewriter, target->getLoc(), target->getOperand(index), false, options,
           true);
       if (failed(ret)) {
-        target->emitOpError("failed to promote operand");
-        return emitDefaultDefiniteFailure(target);
+        return emitDefaultDefiniteFailure(target)
+               << "failed to promote operand";
       }
       target->setOperand(index, ret.value());
       results.push_back(ret.value().getDefiningOp());
     } else {
-      target->emitOpError("invalid index specified");
-      return emitDefaultDefiniteFailure(target);
+      return emitDefaultDefiniteFailure(target) << "invalid index specified";
     }
   }
   return DiagnosedSilenceableFailure::success();
