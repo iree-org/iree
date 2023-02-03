@@ -23,7 +23,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   bufferize
   // CHECK: %[[FUNC:.*]] = transform.structured.match ops{["func.func"]} in %arg0
   // CHECK: lower_vectors %[[FUNC]] {{.*}} multireduction_lowering = innerreduction
-  %6 = transform.structured.match ops{["func.func"]} in %arg0
+  %6 = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation
   transform.vector.lower_vectors %6 multireduction_lowering = "innerreduction"
   // CHECK: lower_to_llvm
   lower_to_llvm
