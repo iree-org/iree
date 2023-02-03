@@ -10,6 +10,7 @@
     IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Pass/PassManager.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -182,5 +183,62 @@ void operator delete[](void *ptr, size_t sz, std::align_val_t al) noexcept {
 }
 
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+
+namespace mlir {
+namespace iree_compiler {
+
+namespace {
+
+class TraceFrameMarkBeginPass
+    : public PassWrapper<TraceFrameMarkBeginPass, OperationPass<ModuleOp>> {
+ public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TraceFrameMarkBeginPass);
+
+  TraceFrameMarkBeginPass() = default;
+  TraceFrameMarkBeginPass(llvm::StringRef name) { this->name = name; }
+
+  void runOnOperation() override {
+    // Always mark the top level (unnamed) frame.
+    IREE_TRACE_FRAME_MARK();
+
+    if (!name.empty()) {
+      IREE_TRACE_FRAME_MARK_BEGIN_NAMED(name.data());
+    }
+  }
+
+  llvm::StringRef name;
+};
+
+class TraceFrameMarkEndPass
+    : public PassWrapper<TraceFrameMarkEndPass, OperationPass<ModuleOp>> {
+ public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TraceFrameMarkEndPass);
+
+  TraceFrameMarkEndPass() = default;
+  TraceFrameMarkEndPass(llvm::StringRef name) { this->name = name; }
+
+  void runOnOperation() override {
+    if (!name.empty()) {
+      IREE_TRACE_FRAME_MARK_END_NAMED(name.data());
+    }
+  }
+
+  llvm::StringRef name;
+};
+
+}  // namespace
+
+std::unique_ptr<OperationPass<ModuleOp>> createTraceFrameMarkBeginPass(
+    llvm::StringRef name) {
+  return std::make_unique<TraceFrameMarkBeginPass>(name);
+}
+
+std::unique_ptr<OperationPass<ModuleOp>> createTraceFrameMarkEndPass(
+    llvm::StringRef name) {
+  return std::make_unique<TraceFrameMarkEndPass>(name);
+}
+
+}  // namespace iree_compiler
+}  // namespace mlir
 
 #endif  // IREE_ENABLE_COMPILER_TRACING + IREE_TRACING_FEATURE_INSTRUMENTATION

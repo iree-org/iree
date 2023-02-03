@@ -43,7 +43,6 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSupport
-    iree::base::tracing
     iree::compiler::Bindings::Native::Transforms
     iree::compiler::Bindings::TFLite::Transforms
     iree::compiler::Dialect::Flow::Transforms
@@ -59,5 +58,6 @@ iree_cc_library(
     iree::compiler::Modules::HAL::Loader::Transforms
     iree::compiler::InputConversion::Common
     iree::compiler::Preprocessing::Passes
+    iree::compiler::Utils
   PUBLIC
 )

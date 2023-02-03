@@ -39,12 +39,6 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createTestConversionPass();
 std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass();
 
-// Tracing passes.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createTraceFrameMarkBeginPass(
-    llvm::StringRef name = "");
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createTraceFrameMarkEndPass(
-    llvm::StringRef name = "");
-
 // Register all Passes
 void registerTransformPasses();
 
