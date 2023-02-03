@@ -83,7 +83,7 @@ static LogicalResult mergeModuleInto(
           // Private symbols can be safely folded into duplicates or renamed.
           if (OperationEquivalence::isEquivalentTo(
                   targetOp, op, OperationEquivalence::exactValueMatch,
-                  OperationEquivalence::exactValueMatch,
+                  /*markEquivalent=*/nullptr,
                   OperationEquivalence::Flags::IgnoreLocations)) {
             // Optimization: skip over duplicate private symbols.
             // We could let CSE do this later, but we may as well check here.
@@ -156,21 +156,18 @@ static void replaceEntryPointUses(
       auto oldAttr = use.getSymbolRef();
       auto newAttr = map.lookup(oldAttr);
       if (!newAttr) continue;
-      mlir::AttrTypeReplacer replacer;
-      AttrTypeReplacer::ReplaceFn<Attribute> fn =
+      auto newDict = use.getUser()->getAttrDictionary().replace(
           [&](Attribute attr) -> std::pair<Attribute, WalkResult> {
-        if (attr == oldAttr) {
-          // Found old->new replacement.
-          return {newAttr, WalkResult::skip()};
-        } else if (attr.isa<SymbolRefAttr>()) {
-          // Don't recurse into symbol refs - we only want to match roots.
-          return {attr, WalkResult::skip()};
-        }
-        // Non-symbol ref attr.
-        return {attr, WalkResult::advance()};
-      };
-      replacer.addReplacement(fn);
-      auto newDict = replacer.replace(use.getUser()->getAttrDictionary());
+            if (attr == oldAttr) {
+              // Found old->new replacement.
+              return {newAttr, WalkResult::skip()};
+            } else if (attr.isa<SymbolRefAttr>()) {
+              // Don't recurse into symbol refs - we only want to match roots.
+              return {attr, WalkResult::skip()};
+            }
+            // Non-symbol ref attr.
+            return {attr, WalkResult::advance()};
+          });
       use.getUser()->setAttrs(newDict.cast<DictionaryAttr>());
     }
   };
