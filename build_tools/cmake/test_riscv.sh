@@ -83,12 +83,6 @@ if [[ "${RISCV_PLATFORM}-${RISCV_ARCH}" == "linux-riscv_32" ]]; then
   # 32-bit.
   test_exclude_args+=(
     "xla.*llvm-cpu.*pow"
-    "llvm-cpu*task_pack"
-    "llvm-cpu*strided_slice"
-    "llvm-cpu*extract_slice"
-    "llvm-cpu*table"
-    "llvm-cpu*iota"
-    "llvm-cpu*rng_uniform"
   )
 fi
 
