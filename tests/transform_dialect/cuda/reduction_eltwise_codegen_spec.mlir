@@ -33,7 +33,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op : (!pdl.operation) -> !pdl.operation
   %grid_more_parallel_op = transform.structured.match ops{["linalg.generic"]}
-    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op
+    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %foreach_thread_block_more_parallel_op, %block_more_parallel_op =
     transform.structured.tile_to_foreach_thread_op %grid_more_parallel_op tile_sizes [1, 1] 
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
