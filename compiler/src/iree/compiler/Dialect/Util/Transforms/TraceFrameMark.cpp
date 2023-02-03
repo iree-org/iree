@@ -15,37 +15,35 @@ namespace Util {
 
 namespace {
 
+// Warning: the 'name' used must be null-terminated and the same underlying
+// string data must be used with matching calls to Begin and End
+//
+// These patterns should both work, for example:
+//   createTraceFrameMarkBeginPass("Foo");
+//   createTraceFrameMarkEndPass("Foo");
+//
+//   const char phaseName[] = "Foo\0";
+//   createTraceFrameMarkBeginPass(phaseName);
+//   createTraceFrameMarkEndPass(phaseName);
+//
+// This will *not* work:
+//   std::string phaseNameBegin = "Foo";
+//   std::string phaseNameEnd = "Foo";
+//   createTraceFrameMarkBeginPass(phaseNameBegin);
+//   createTraceFrameMarkEndPass(phaseNameEnd);
+
 class TraceFrameMarkBeginPass
     : public TraceFrameMarkBeginBase<TraceFrameMarkBeginPass> {
  public:
   TraceFrameMarkBeginPass() = default;
-  TraceFrameMarkBeginPass(TraceFrameName name) { this->name = name; }
+  TraceFrameMarkBeginPass(llvm::StringRef name) { this->name = name; }
 
   void runOnOperation() override {
     // Always mark the top level (unnamed) frame.
     IREE_TRACE_FRAME_MARK();
 
-    switch (name) {
-      case TraceFrameName::None:
-        break;
-      case TraceFrameName::Input:
-        IREE_TRACE_FRAME_MARK_BEGIN_NAMED("Input");
-        break;
-      case TraceFrameName::ABI:
-        IREE_TRACE_FRAME_MARK_BEGIN_NAMED("ABI");
-        break;
-      case TraceFrameName::Flow:
-        IREE_TRACE_FRAME_MARK_BEGIN_NAMED("Flow");
-        break;
-      case TraceFrameName::Stream:
-        IREE_TRACE_FRAME_MARK_BEGIN_NAMED("Stream");
-        break;
-      case TraceFrameName::HAL:
-        IREE_TRACE_FRAME_MARK_BEGIN_NAMED("HAL");
-        break;
-      case TraceFrameName::VM:
-        IREE_TRACE_FRAME_MARK_BEGIN_NAMED("VM");
-        break;
+    if (!name.empty()) {
+      IREE_TRACE_FRAME_MARK_BEGIN_NAMED(name.data());
     }
   }
 };
@@ -54,30 +52,11 @@ class TraceFrameMarkEndPass
     : public TraceFrameMarkEndBase<TraceFrameMarkEndPass> {
  public:
   TraceFrameMarkEndPass() = default;
-  TraceFrameMarkEndPass(TraceFrameName name) { this->name = name; }
+  TraceFrameMarkEndPass(llvm::StringRef name) { this->name = name; }
 
   void runOnOperation() override {
-    switch (name) {
-      case TraceFrameName::None:
-        break;
-      case TraceFrameName::Input:
-        IREE_TRACE_FRAME_MARK_END_NAMED("Input");
-        break;
-      case TraceFrameName::ABI:
-        IREE_TRACE_FRAME_MARK_END_NAMED("ABI");
-        break;
-      case TraceFrameName::Flow:
-        IREE_TRACE_FRAME_MARK_END_NAMED("Flow");
-        break;
-      case TraceFrameName::Stream:
-        IREE_TRACE_FRAME_MARK_END_NAMED("Stream");
-        break;
-      case TraceFrameName::HAL:
-        IREE_TRACE_FRAME_MARK_END_NAMED("HAL");
-        break;
-      case TraceFrameName::VM:
-        IREE_TRACE_FRAME_MARK_END_NAMED("VM");
-        break;
+    if (!name.empty()) {
+      IREE_TRACE_FRAME_MARK_END_NAMED(name.data());
     }
   }
 };
@@ -85,12 +64,12 @@ class TraceFrameMarkEndPass
 }  // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createTraceFrameMarkBeginPass(
-    TraceFrameName name) {
+    llvm::StringRef name) {
   return std::make_unique<TraceFrameMarkBeginPass>(name);
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createTraceFrameMarkEndPass(
-    TraceFrameName name) {
+    llvm::StringRef name) {
   return std::make_unique<TraceFrameMarkEndPass>(name);
 }
 

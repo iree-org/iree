@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -42,9 +41,9 @@ std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass();
 
 // Tracing passes.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createTraceFrameMarkBeginPass(
-    TraceFrameName name = TraceFrameName::None);
+    llvm::StringRef name = "");
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createTraceFrameMarkEndPass(
-    TraceFrameName name = TraceFrameName::None);
+    llvm::StringRef name = "");
 
 // Register all Passes
 void registerTransformPasses();

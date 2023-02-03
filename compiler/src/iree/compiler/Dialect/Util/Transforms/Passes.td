@@ -163,8 +163,8 @@ def TestFloatRangeAnalysis : Pass<"iree-util-test-float-range-analysis", ""> {
 def TraceFrameMarkBegin : Pass<"iree-util-trace-frame-mark-begin", "mlir::ModuleOp"> {
   let summary = "Begins a frame group when using instrumentation tracing.";
   let options = [
-    Option<"name", "name", "IREE::Util::TraceFrameName",
-           "IREE::Util::TraceFrameName::None",
+    Option<"name", "name",
+           "llvm::StringRef", /*default=*/"llvm::StringRef(\"\")",
            "Name of the frame to mark (always marks the top-level/unnamed frame).">,
   ];
   let constructor = [{
@@ -175,9 +175,9 @@ def TraceFrameMarkBegin : Pass<"iree-util-trace-frame-mark-begin", "mlir::Module
 def TraceFrameMarkEnd : Pass<"iree-util-trace-frame-mark-end", "mlir::ModuleOp"> {
   let summary = "Ends a frame group when using instrumentation tracing.";
   let options = [
-    Option<"name", "name", "IREE::Util::TraceFrameName",
-           "IREE::Util::TraceFrameName::None",
-           "Name of the frame to mark (no-op if None).">,
+    Option<"name", "name",
+           "llvm::StringRef", /*default=*/"llvm::StringRef(\"\")",
+           "Name of the frame to mark (always marks the top-level/unnamed frame).">,
   ];
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createTraceFrameMarkEndPass()
