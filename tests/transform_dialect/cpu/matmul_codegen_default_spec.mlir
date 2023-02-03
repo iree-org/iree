@@ -2,7 +2,7 @@
 
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
-  %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
+  %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!pdl.operation) -> !pdl.operation
 
   // Step 1. Tile to foreach_thread with tile_sizes [2].
   // ===================================================
@@ -15,11 +15,11 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // =========================================================
   %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
   %variant_op_3 = transform.iree.bufferize %variant_op_2
-  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3
+  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   transform.iree.erase_hal_descriptor_type_from_memref %memref_func
 
   // Step 3. Post-bufferization mapping workgroup.
   // =========================================================
-  %func = transform.structured.match ops{["func.func"]} in %variant_op_3
+  %func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   transform.iree.foreach_thread_to_workgroup %func
 }

@@ -4,7 +4,7 @@
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %ops = transform.structured.match ops{["linalg.fill", "linalg.generic"]}
-    in %variant_op
+    in %variant_op : (!pdl.operation) -> !pdl.operation
   %input_max_fill,
   %input_max,
   %exps_sum_fill,
@@ -41,7 +41,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   // ================================================================
   %tiled_ops = transform.structured.match ops{["linalg.fill", "linalg.generic"]}
-    in %variant_op
+    in %variant_op : (!pdl.operation) -> !pdl.operation
   %tiled_input_max_fill,
   %tiled_input_max,
   %tiled_exps_sum_fill,
@@ -70,7 +70,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   // Step 3. Rank-reduce and vectorize.
   // ==================================
-  %func = transform.structured.match ops{["func.func"]} in %variant_op
+  %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %funcx = transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector }
   transform.structured.vectorize %funcx
 
@@ -78,21 +78,21 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // =========================================================
   %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op_2
-  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3
+  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   transform.iree.erase_hal_descriptor_type_from_memref %memref_func
 
   // Step 5. Post-bufferization mapping to blocks and threads.
   // =========================================================
-  %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_3
+  %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   %func_3 = transform.iree.foreach_thread_to_workgroup %func_2
   transform.iree.map_nested_foreach_thread_to_gpu_threads %func_3
     { workgroup_size = [32, 4, 1] }
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   // ===================================================================
-  %end_func = transform.structured.match ops{["func.func"]} in %variant_op_3
+  %end_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   %end_func_2 = transform.iree.apply_patterns %end_func { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases }
-  %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3
+  %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
   transform.iree.vector.warp_distribute %end_func_2
 }
