@@ -145,8 +145,8 @@ you only need Tracy to see into the IREE runtime, leaving IREE CPU codegen
 modules opaque.
 
 For tracing the compiler, additionally set `IREE_ENABLE_COMPILER_TRACING` to
-`ON`. Compiler tracing is less stable, particularly on Linux with MLIR threading
-enabled (https://github.com/iree-org/iree/issues/6404).
+`ON`. Compiler tracing is less stable, particularly when using sampling
+(running with elevated permissions).
 
 Once done configuring CMake, proceed to rebuild, e.g.
 

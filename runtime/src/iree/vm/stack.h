@@ -243,6 +243,10 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(
 // Frees a dynamically-allocated |stack| from iree_vm_stack_allocate.
 IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack);
 
+// Returns the allocator used for growing the stack.
+IREE_API_EXPORT iree_allocator_t
+iree_vm_stack_allocator(const iree_vm_stack_t* stack);
+
 // Returns the flags controlling the invocation this stack is used with.
 IREE_API_EXPORT iree_vm_invocation_flags_t
 iree_vm_stack_invocation_flags(const iree_vm_stack_t* stack);

@@ -272,10 +272,11 @@ IREE_API_EXPORT void iree_vm_ref_move(iree_vm_ref_t* ref,
   *out_ref = temp_ref;
 }
 
-IREE_API_EXPORT bool iree_vm_ref_is_null(iree_vm_ref_t* ref) {
+IREE_API_EXPORT bool iree_vm_ref_is_null(const iree_vm_ref_t* ref) {
   return ref->type == IREE_VM_REF_TYPE_NULL;
 }
 
-IREE_API_EXPORT bool iree_vm_ref_equal(iree_vm_ref_t* lhs, iree_vm_ref_t* rhs) {
+IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
+                                       const iree_vm_ref_t* rhs) {
   return lhs == rhs || memcmp(lhs, rhs, sizeof(*lhs)) == 0;
 }

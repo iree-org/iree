@@ -222,11 +222,12 @@ IREE_API_EXPORT void iree_vm_ref_move(iree_vm_ref_t* ref,
                                       iree_vm_ref_t* out_ref);
 
 // Returns true if the given |ref| is NULL.
-IREE_API_EXPORT bool iree_vm_ref_is_null(iree_vm_ref_t* ref);
+IREE_API_EXPORT bool iree_vm_ref_is_null(const iree_vm_ref_t* ref);
 
 // Returns true if the two references point at the same value (or are both
 // null).
-IREE_API_EXPORT bool iree_vm_ref_equal(iree_vm_ref_t* lhs, iree_vm_ref_t* rhs);
+IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
+                                       const iree_vm_ref_t* rhs);
 
 #ifdef __cplusplus
 }  // extern "C"
