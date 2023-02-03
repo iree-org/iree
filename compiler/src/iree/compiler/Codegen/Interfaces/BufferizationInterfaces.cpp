@@ -172,8 +172,8 @@ struct DispatchTensorStoreOpInterface
     return false;
   }
 
-  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
-                                            const AnalysisState &state) const {
+  bufferization::AliasingOpResultList getAliasingOpResults(
+      Operation *op, OpOperand &opOperand, const AnalysisState &state) const {
     return {};
   }
 
@@ -264,7 +264,7 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
   SmallVector<Value> newOutputBuffers;
   for (OpResult opResult : op->getOpResults()) {
     SmallVector<OpOperand *> aliasingOpOperands =
-        analysisState.getAliasingOpOperand(opResult);
+        analysisState.getAliasingOpOperands(opResult);
     assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
     FailureOr<Value> resultBuffer =
         getBuffer(rewriter, aliasingOpOperands.front()->get(), options);
@@ -320,10 +320,10 @@ struct LinalgExtOpInterface
                                const AnalysisState &state) const {
     // Operand is written to if it has an aliasing OpResult.
     auto bufferizableOp = cast<BufferizableOpInterface>(op);
-    return !bufferizableOp.getAliasingOpResult(opOperand, state).empty();
+    return !bufferizableOp.getAliasingOpResults(opOperand, state).empty();
   }
 
-  SmallVector<OpOperand *> getAliasingOpOperand(
+  bufferization::AliasingOpOperandList getAliasingOpOperands(
       Operation *op, OpResult opResult, const AnalysisState &state) const {
     auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
 
@@ -331,8 +331,8 @@ struct LinalgExtOpInterface
     return {linalgExtOp.getOutputOperand(opResult.getResultNumber())};
   }
 
-  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
-                                            const AnalysisState &state) const {
+  bufferization::AliasingOpResultList getAliasingOpResults(
+      Operation *op, OpOperand &opOperand, const AnalysisState &state) const {
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.

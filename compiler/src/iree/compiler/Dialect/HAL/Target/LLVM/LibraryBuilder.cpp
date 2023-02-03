@@ -61,7 +61,10 @@ static llvm::StructType *makeImportTableType(llvm::LLVMContext &context) {
 static llvm::StructType *makeEnvironmentType(llvm::LLVMContext &context) {
   auto *type = llvm::StructType::getTypeByName(
       context, "iree_hal_executable_environment_v0_t");
-  assert(type && "environment type must be defined by ConvertToLLVM");
+  if (!type) {
+    type = llvm::StructType::create(context,
+                                    "iree_hal_executable_environment_v0_t");
+  }
   return type;
 }
 
@@ -71,7 +74,10 @@ static llvm::StructType *makeEnvironmentType(llvm::LLVMContext &context) {
 static llvm::StructType *makeDispatchStateType(llvm::LLVMContext &context) {
   auto *type = llvm::StructType::getTypeByName(
       context, "iree_hal_executable_dispatch_state_v0_t");
-  assert(type && "state type must be defined by ConvertToLLVM");
+  if (!type) {
+    type = llvm::StructType::create(context,
+                                    "iree_hal_executable_dispatch_state_v0_t");
+  }
   return type;
 }
 
@@ -81,7 +87,10 @@ static llvm::StructType *makeDispatchStateType(llvm::LLVMContext &context) {
 static llvm::StructType *makeWorkgroupStateType(llvm::LLVMContext &context) {
   auto *type = llvm::StructType::getTypeByName(
       context, "iree_hal_executable_workgroup_state_v0_t");
-  assert(type && "state type must be defined by ConvertToLLVM");
+  if (!type) {
+    type = llvm::StructType::create(context,
+                                    "iree_hal_executable_workgroup_state_v0_t");
+  }
   return type;
 }
 

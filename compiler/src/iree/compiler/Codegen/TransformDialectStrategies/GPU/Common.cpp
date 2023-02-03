@@ -158,7 +158,8 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
   // Locally suppress failures for this op only because it doesn't cover the
   // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.
   auto sequence = b.create<SequenceOp>(
-      TypeRange(), transform::FailurePropagationMode::Suppress, variantH);
+      TypeRange(), transform::FailurePropagationMode::Suppress, variantH,
+      /*extraBindings=*/ValueRange());
   {
     OpBuilder::InsertionGuard guard(b);
     b.createBlock(&sequence.getBody(), sequence.getBody().begin(),

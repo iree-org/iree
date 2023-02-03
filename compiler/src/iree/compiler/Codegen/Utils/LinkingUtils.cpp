@@ -156,7 +156,7 @@ static void replaceEntryPointUses(
       auto oldAttr = use.getSymbolRef();
       auto newAttr = map.lookup(oldAttr);
       if (!newAttr) continue;
-      auto newDict = use.getUser()->getAttrDictionary().replaceSubElements(
+      auto newDict = use.getUser()->getAttrDictionary().replace(
           [&](Attribute attr) -> std::pair<Attribute, WalkResult> {
             if (attr == oldAttr) {
               // Found old->new replacement.

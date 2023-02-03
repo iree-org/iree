@@ -49,7 +49,7 @@ func.func @matmul() {
 }
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
-  %func = transform.structured.match ops{["func.func"]} in %variant_op
+  %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   transform.iree.vector.vector_to_mma_conversion %func
 }
 }
