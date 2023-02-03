@@ -48,7 +48,6 @@ iree_benchmark_suite(
     "${EFFICIENTNET_INT8_MODULE}"
     "${SSD_MOBILENET_V2_DYNAMIC_F32_MODULE}"
     "${SSD_MOBILENET_V2_DYNAMIC_INT8_MODULE}"
-    "${RESNET_V1_DYNAMIC_F32_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
