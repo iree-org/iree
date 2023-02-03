@@ -201,19 +201,6 @@ set(SSD_MOBILENET_V2_DYNAMIC_INT8_MODULE
     "1x224x224x3xi8"
 )
 
-set(RESNET_V1_DYNAMIC_F32_MODULE
-  NAME
-  "ResNetV1DynamicF32"
-  TAGS
-    "f32,dynamic"
-  SOURCE
-    "https://storage.googleapis.com/iree-model-artifacts/resnet_v1_101_dynamic.tflite"
-  ENTRY_FUNCTION
-    "main"
-  FUNCTION_INPUTS
-    "7x224x224x3xf32"
-)
-
 ################################################################################
 # Add benchmarks for all platforms.                                            #
 ################################################################################
