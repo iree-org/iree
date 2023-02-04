@@ -11,7 +11,6 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/OpBase.td"
-include "mlir/IR/SubElementInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Buffer attributes
@@ -33,7 +32,6 @@ def Util_ByteRangeAttr : AttrDef<Util_Dialect, "ByteRange", []> {
 }
 
 def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
-  SubElementAttrInterface,
   DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [
     "serializeToBuffer",
     "serializeToStream",

@@ -52,6 +52,6 @@ func.func @static_tile(%arg0: index, %arg1: memref<?xf32>, %arg2: memref<?xf32>)
 
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%module_op: !pdl.operation):
-  %0 = transform.structured.match ops{["scf.foreach_thread"]} in %module_op
+  %0 = transform.structured.match ops{["scf.foreach_thread"]} in %module_op : (!pdl.operation) -> !pdl.operation
   %1 = foreach_thread_to_async %0
 }

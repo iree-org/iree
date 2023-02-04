@@ -12,7 +12,7 @@ transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
   transform.sequence %arg0 : !pdl.operation failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.iree.apply_patterns %0 { canonicalization }
   }
 }
@@ -54,7 +54,7 @@ func.func @promote() -> (tensor<16x128xf32>) {
 
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["scf.foreach_thread"]} in %arg1
+  %0 = transform.structured.match ops{["scf.foreach_thread"]} in %arg1 : (!pdl.operation) -> !pdl.operation
   %1 = transform.cast %0 : !pdl.operation to !transform.op<"scf.foreach_thread">
   transform.iree.share_foreach_thread_operands %1 share_operands = [0] : (!transform.op<"scf.foreach_thread">) -> !transform.op<"scf.foreach_thread">
 }
@@ -86,6 +86,6 @@ func.func @bubble_up(%arg0: tensor<32x64xf32>) -> tensor<32x2x32xf32> {
 
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["func.func"]} in %arg1
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %0 { bubble_collapse_expand }
 }

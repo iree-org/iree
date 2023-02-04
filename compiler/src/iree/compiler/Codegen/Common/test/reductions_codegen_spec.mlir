@@ -17,7 +17,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %grid_loop, %outer_tiled = transform.structured.tile_to_foreach_thread_op %fusion_root_1 tile_sizes [1]
     ( mapping = [#gpu.block<x>] )
   
-  %func = transform.structured.match ops{["func.func"]} in %arg0
+  %func = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation
   %func_1 = transform.iree.apply_patterns %func { bubble_collapse_expand }
 
   // Excessively eager canonicalization results in `fill`s being "fused" due to

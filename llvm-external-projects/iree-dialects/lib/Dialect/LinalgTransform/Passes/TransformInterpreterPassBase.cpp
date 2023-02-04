@@ -110,7 +110,7 @@ static LogicalResult applyTransformsInRegion(Region &transformRegion,
 #endif
     auto xform = cast<transform::TransformOpInterface>(b.clone(*transform));
     auto g = llvm::make_scope_exit([&]() { xform->erase(); });
-    if (failed(transform::applyTransforms(target, xform, options)))
+    if (failed(transform::applyTransforms(target, xform, {}, options)))
       return failure();
   }
   return success();

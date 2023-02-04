@@ -137,6 +137,7 @@ VER_0 {
     mlirAttributeIsAFloat;
     mlirAttributeIsAInteger;
     mlirAttributeIsAIntegerSet;
+    mlirAttributeIsALocation;
     mlirAttributeIsAOpaque;
     mlirAttributeIsASparseElements;
     mlirAttributeIsAStridedLayout;
@@ -348,7 +349,9 @@ VER_0 {
     mlirLocationCallSiteGet;
     mlirLocationEqual;
     mlirLocationFileLineColGet;
+    mlirLocationFromAttribute;
     mlirLocationFusedGet;
+    mlirLocationGetAttribute;
     mlirLocationGetContext;
     mlirLocationNameGet;
     mlirLocationPrint;
