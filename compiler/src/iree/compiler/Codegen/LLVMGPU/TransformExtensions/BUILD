@@ -64,6 +64,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUTransformOps",

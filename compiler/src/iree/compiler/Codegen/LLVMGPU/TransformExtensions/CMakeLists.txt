@@ -34,6 +34,7 @@ iree_cc_library(
     IREEDialectsTransforms
     IREELinalgTransformDialect
     MLIRArithDialect
+    MLIRBufferizationDialect
     MLIRFuncDialect
     MLIRGPUOps
     MLIRGPUTransformOps

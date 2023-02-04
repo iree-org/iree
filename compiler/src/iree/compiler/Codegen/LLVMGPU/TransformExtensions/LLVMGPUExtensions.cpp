@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
@@ -652,6 +653,33 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   convertVectorToMMAOps(target);
 
   results.push_back(target);
+  return DiagnosedSilenceableFailure::success();
+}
+
+DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
+    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(target);
+  SmallVector<int64_t> indices = llvm::to_vector(getIndices());
+  int64_t numOperands = target->getNumOperands();
+  bufferization::BufferizationOptions options;
+  for (int64_t index : indices) {
+    if ((index >= 0) && (index < numOperands)) {
+      FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
+          rewriter, target->getLoc(), target->getOperand(index), false, options,
+          true);
+      if (failed(ret)) {
+        return emitDefaultDefiniteFailure(target)
+               << "failed to promote operand";
+      }
+      target->setOperand(index, ret.value());
+      results.push_back(ret.value().getDefiningOp());
+    } else {
+      return emitDefaultDefiniteFailure(target) << "invalid index specified";
+    }
+  }
   return DiagnosedSilenceableFailure::success();
 }
 

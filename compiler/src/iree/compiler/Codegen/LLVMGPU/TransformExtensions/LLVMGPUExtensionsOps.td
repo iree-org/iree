@@ -350,4 +350,37 @@ def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_c
   }];
 }
 
+def PromoteOperandsOp :
+  Op<Transform_Dialect, "iree.promote_operands",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
+  let description = [{
+    This op promotes the specified operands of the provided target handle.
+
+    #### Return modes
+    This op returns a handle to an allocTensorOp for each of the provided
+    valid indices.
+  }];
+
+  let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$indices);
+  let results = (outs Variadic<PDL_Operation>:$result);
+
+  let assemblyFormat = [{ $target $indices attr-dict `:` functional-type(operands, results)}];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target, "ArrayRef<int64_t>":$indices)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
