@@ -9,7 +9,7 @@ for IREE. Images are uploaded to
 To build an image, use `docker build`, e.g.:
 
 ```shell
-docker build build_tools/docker/base --tag base
+docker build --file build_tools/docker/dockerfiles/base.Dockerfile --tag base .
 ```
 
 To explore an image interactively, use `docker run`, e.g.
