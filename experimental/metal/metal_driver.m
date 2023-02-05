@@ -7,6 +7,7 @@
 #import <Metal/Metal.h>
 
 #include "experimental/metal/api.h"
+#include "experimental/metal/metal_device.h"
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
@@ -304,20 +305,114 @@ static iree_status_t iree_hal_metal_driver_dump_device_info(iree_hal_driver_t* b
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_metal_driver_find_device_by_index(iree_hal_driver_t* base_driver,
+                                                                uint32_t device_index,
+                                                                iree_allocator_t host_allocator,
+                                                                id<MTLDevice>* found_device) {
+  iree_hal_metal_driver_t* driver = iree_hal_metal_driver_cast(base_driver);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)device_index);
+
+  NSArray<id<MTLDevice>>* devices = driver->devices;
+  if (device_index >= devices.count) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_NOT_FOUND, "%d devices enumerated; device #%d not found",
+                            (int)devices.count, device_index);
+  }
+  *found_device = devices[device_index];
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_metal_driver_create_device_by_id(iree_hal_driver_t* base_driver,
                                                                iree_hal_device_id_t device_id,
                                                                iree_host_size_t param_count,
                                                                const iree_string_pair_t* params,
                                                                iree_allocator_t host_allocator,
                                                                iree_hal_device_t** out_device) {
-  return iree_status_from_code(IREE_STATUS_UNIMPLEMENTED);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  id<MTLDevice> device = nil;
+  if (device_id == IREE_HAL_DEVICE_ID_DEFAULT) {
+    // Default to the first Metal device in the list.
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_driver_find_device_by_index(
+                                              base_driver, device_id, host_allocator, &device));
+  } else {
+    device = DEVICE_ID_TO_METAL_DEVICE(device_id);
+  }
+
+  iree_string_view_t device_name = iree_make_cstring_view("metal");
+
+  iree_status_t status =
+      iree_hal_metal_device_create(base_driver, device_name, device, host_allocator, out_device);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_metal_driver_create_device_by_registry_id(
+    iree_hal_driver_t* base_driver, iree_string_view_t driver_name, uint64_t device_registry_id,
+    iree_host_size_t param_count, const iree_string_pair_t* params, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
+  iree_hal_metal_driver_t* driver = iree_hal_metal_driver_cast(base_driver);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Scan the devices and find the one with the matching registry ID.
+  NSArray<id<MTLDevice>>* devices = driver->devices;
+  id<MTLDevice> found_device = nil;
+  for (iree_host_size_t i = 0, e = devices.count; i < e; ++i) {
+    if (device_registry_id == devices[i].registryID) {
+      found_device = devices[i];
+      break;
+    }
+  }
+
+  if (!found_device) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "Metal device with device registry ID %016" PRIx64 " not found",
+                            device_registry_id);
+  }
+
+  iree_status_t status = iree_hal_metal_driver_create_device_by_id(
+      base_driver, METAL_DEVICE_TO_DEVICE_ID(found_device), param_count, params, host_allocator,
+      out_device);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 static iree_status_t iree_hal_metal_driver_create_device_by_path(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name, iree_string_view_t device_path,
     iree_host_size_t param_count, const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
-  return iree_status_from_code(IREE_STATUS_UNIMPLEMENTED);
+  if (iree_string_view_is_empty(device_path)) {
+    return iree_hal_metal_driver_create_device_by_id(
+        base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params, host_allocator, out_device);
+  }
+
+  // Try parsing as a device ID.
+  uint8_t device_registry_id[8] = {0};
+  if (iree_string_view_parse_hex_bytes(device_path, IREE_ARRAYSIZE(device_registry_id),
+                                       device_registry_id)) {
+    return iree_hal_metal_driver_create_device_by_registry_id(
+        base_driver, driver_name, *(uint64_t*)device_registry_id, param_count, params,
+        host_allocator, out_device);
+  }
+
+  // Fallback and try to parse as a device index.
+  uint32_t device_index = 0;
+  if (iree_string_view_atoi_uint32(device_path, &device_index)) {
+    id<MTLDevice> found_device;
+    IREE_RETURN_IF_ERROR(iree_hal_metal_driver_find_device_by_index(base_driver, device_index,
+                                                                    host_allocator, &found_device));
+    return iree_hal_metal_driver_create_device_by_id(
+        base_driver, METAL_DEVICE_TO_DEVICE_ID(found_device), param_count, params, host_allocator,
+        out_device);
+  }
+
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unsupported device path");
 }
 
 static const iree_hal_driver_vtable_t iree_hal_metal_driver_vtable = {

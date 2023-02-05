@@ -21,6 +21,7 @@ iree_cc_library(
     "direct_allocator.m"
     "metal_buffer.h"
     "metal_buffer.m"
+    "metal_device.m"
     "metal_driver.m"
   DEPS
     iree::base
