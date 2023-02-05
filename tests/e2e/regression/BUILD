@@ -178,3 +178,22 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
+
+# Compilation-only (no driver specified, the default None means compile only)
+# regression testcases for VMVX backend with microkernels. Indeed we have had
+# a couple of hard-to-diagnose issues that were purely compilation issue, no
+# particular concern about correctness once compilation succeeds, and having
+# compilation-only tests allows us to import the original unmodified testcase.
+iree_check_single_backend_test_suite(
+    name = "check_regression_compilation_only_vmvx_ukernels",
+    srcs = [
+        "dynamic_matmuls_on_same_accumulator_issue_12060.mlir",
+        "dynamic_tosa_clamp.mlir",
+        "dynamic_tosa_quantized_fully_connected_issue_10859.mlir",
+    ],
+    compiler_flags = [
+        "--iree-input-type=tosa",
+        "--iree-vmvx-enable-microkernels",
+    ],
+    target_backend = "vmvx",
+)
