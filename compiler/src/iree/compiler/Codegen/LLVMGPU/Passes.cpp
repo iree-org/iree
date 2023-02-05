@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -353,9 +354,16 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
+  auto getWarpSize = [](func::FuncOp func) {
+    return getTargetInfo(func).warpSize;
+  };
+  auto hasRedux = [](func::FuncOp func) {
+    return getTargetInfo(func).hasRedux;
+  };
+
   // vector -> simt gpu + vector
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createConvertVectorReductionToGPUPass());
+      createConvertVectorReductionToGPUPass(getWarpSize, hasRedux));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }

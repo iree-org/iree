@@ -260,96 +260,43 @@ void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp) {
   });
 }
 
-//===----------------------------------------------------------------------===//
-// Reduction utils
-//===----------------------------------------------------------------------===//
-
-/// Packs scalar element to it's vector equivalent.
-/// (i.e f16 -> vector<1xf16> and f32 -> vector<1xf32>)
-static Value promoteElementToVector(Location loc, OpBuilder &builder,
-                                    Value input) {
-  VectorType vectorTypeBroadcast = VectorType::get({1}, input.getType());
-  Value vectorInput =
-      builder.create<vector::BroadcastOp>(loc, vectorTypeBroadcast, input);
-  return vectorInput;
+static gpu::AllReduceOperation convertVectorReductionToGPU(
+    vector::CombiningKind kind) {
+  switch (kind) {
+    case vector::CombiningKind::ADD:
+      return gpu::AllReduceOperation::ADD;
+    case vector::CombiningKind::MINUI:
+    case vector::CombiningKind::MINSI:
+    case vector::CombiningKind::MINF:
+      return gpu::AllReduceOperation::MIN;
+    case vector::CombiningKind::AND:
+      return gpu::AllReduceOperation::AND;
+    case vector::CombiningKind::OR:
+      return gpu::AllReduceOperation::OR;
+    case vector::CombiningKind::XOR:
+      return gpu::AllReduceOperation::XOR;
+    case vector::CombiningKind::MAXUI:
+    case vector::CombiningKind::MAXSI:
+    case vector::CombiningKind::MAXF:
+      return gpu::AllReduceOperation::MAX;
+    case vector::CombiningKind::MUL:
+      return gpu::AllReduceOperation::MUL;
+  }
+  assert(false);
 }
 
-/// Packs vector of lower precision into a single 32-bit width element.
-/// (i.e <2xf16> -> i32 and <4xi8> -> i32)
-static Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
-                                        Value input) {
-  LLVM_DEBUG({
-    auto vecType = input.getType().cast<VectorType>();
-    Type elementType = vecType.getElementType();
-    assert(vecType.getDimSize(0) * elementType.getIntOrFloatBitWidth() ==
-               kShuffleBitWidth &&
-           "vecSize * vecBitWidth needs to packable into 32-bitwidth.");
-    assert(elementType.isIntOrFloat() &&
-           "Only int and float packing is supported.");
-  });
-  VectorType packed32Type = VectorType::get({1}, builder.getI32Type());
-  Value packedInputVec =
-      builder.create<vector::BitCastOp>(loc, packed32Type, input);
-  Value packedInput = builder.create<vector::ExtractOp>(loc, packedInputVec, 0);
-  return packedInput;
-}
-
-/// Unpack single scalar element into a target vector type.
-/// (i.e i32 -> vector<4xi8> or f32 -> vector<2xf16>)
-static Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
-                            VectorType targetVecType) {
-  LLVM_DEBUG({
-    Type packedType = packedInput.getType();
-    assert(packedType.isIntOrFloat() && "Only ints and floats are unpackable.");
-    Type elementType = targetVecType.getElementType();
-    assert(targetVecType.getDimSize(0) * elementType.getIntOrFloatBitWidth() ==
-               packedType.getIntOrFloatBitWidth() &&
-           "packed width needs to be unpackable to vecSize * vecBitWidth.");
-  });
-  Value packedVector = promoteElementToVector(loc, builder, packedInput);
-  Value unpackedVector =
-      builder.create<vector::BitCastOp>(loc, targetVecType, packedVector);
-  return unpackedVector;
-}
-
-/// Emit warp reduction code sequence for a given input.
+/// Generated gpu.subgroup_reduce op for the warp reduction.
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            vector::CombiningKind kind, uint32_t warpSize,
                            uint32_t numLaneToReduce) {
-  VectorType unpackedType = input.getType().dyn_cast<VectorType>();
   Value laneVal = input;
   assert(llvm::isPowerOf2_32(numLaneToReduce));
-  // Parallel reduction using butterfly shuffles.
-  for (uint64_t i = 1; i < numLaneToReduce; i <<= 1) {
-    Value shuffleInput = laneVal;
-    if (unpackedType) {
-      shuffleInput = packVectorToSupportedWidth(loc, builder, laneVal);
-    }
-    Value shuffled = builder
-                         .create<gpu::ShuffleOp>(loc, shuffleInput, i,
-                                                 /*width=*/warpSize,
-                                                 /*mode=*/gpu::ShuffleMode::XOR)
-                         .getShuffleResult();
-    if (unpackedType) {
-      shuffled = unpackToVector(loc, builder, shuffled, unpackedType);
-    }
-    laneVal = makeArithReduction(builder, loc, kind, laneVal, shuffled);
-  }
-  // Broadcast the result to all the lanes.
-  if (warpSize != numLaneToReduce) {
-    if (unpackedType) {
-      laneVal = packVectorToSupportedWidth(loc, builder, laneVal);
-    }
-    laneVal = builder
-                  .create<gpu::ShuffleOp>(loc, laneVal, 0,
-                                          /*width=*/warpSize,
-                                          /*mode=*/gpu::ShuffleMode::IDX)
-                  .getShuffleResult();
-    if (unpackedType) {
-      laneVal = unpackToVector(loc, builder, laneVal, unpackedType);
-    }
-  }
-  return laneVal;
+  auto gpuKind = convertVectorReductionToGPU(kind);
+  bool isUniform = warpSize == numLaneToReduce;
+  Value reduced = builder.create<gpu::SubgroupReduceOp>(
+      loc, laneVal, gpuKind, isUniform,
+      builder.getIntegerAttr(builder.getI32Type(), numLaneToReduce));
+  return reduced;
 }
 
 // List of identity elements by operation.

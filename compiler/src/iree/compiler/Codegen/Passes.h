@@ -190,7 +190,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
 // If nullptr, warp size 32 will be used.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
-    std::function<int(func::FuncOp)> getWarpSize = nullptr);
+    std::function<int(func::FuncOp)> getWarpSize = nullptr,
+    std::function<bool(func::FuncOp)> hasRedux = nullptr);
 
 /// Fuses tensor.pad ops into their consumer ops' tiled loop nests.
 std::unique_ptr<OperationPass<func::FuncOp>>

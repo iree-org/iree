@@ -19,6 +19,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "reduction.mlir"
+    "reductioni32.mlir"
     "reduction_eltwise.mlir"
     "reduction_v2.mlir"
     "reduction_v2_uneven.mlir"

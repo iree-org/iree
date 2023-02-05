@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
@@ -120,8 +121,9 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
 class VectorReduceToGPUPass
     : public VectorReduceToGPUBase<VectorReduceToGPUPass> {
  public:
-  explicit VectorReduceToGPUPass(std::function<int(func::FuncOp)> getWarpSize)
-      : getWarpSize(getWarpSize) {}
+  explicit VectorReduceToGPUPass(std::function<int(func::FuncOp)> getWarpSize,
+                                 std::function<bool(func::FuncOp)> hasRedux)
+      : getWarpSize(getWarpSize), hasRedux(hasRedux) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, memref::MemRefDialect, gpu::GPUDialect,
@@ -195,6 +197,7 @@ class VectorReduceToGPUPass
     // distribution.
     {
       int warpSize = this->getWarpSize ? this->getWarpSize(funcOp) : 32;
+      bool enableRedux = this->hasRedux ? this->hasRedux(funcOp) : false;
       auto groupReductionFn = [&](Location loc, OpBuilder &builder, Value input,
                                   vector::CombiningKind kind, uint32_t size) {
         return emitGPUGroupReduction(loc, builder, input, kind, size, warpSize);
@@ -217,6 +220,7 @@ class VectorReduceToGPUPass
       vector::populateDistributeReduction(patterns, groupReductionFn);
       vector::populateDistributeTransferWriteOpPatterns(patterns,
                                                         distributionFn);
+      mlir::populateGpuSubgroupReducePatterns(patterns, warpSize, enableRedux);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
@@ -248,14 +252,16 @@ class VectorReduceToGPUPass
 
  private:
   std::function<int(func::FuncOp)> getWarpSize;
+  std::function<bool(func::FuncOp)> hasRedux;
 };
 
 }  // anonymous namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
-    std::function<int(func::FuncOp)> getWarpSize) {
-  return std::make_unique<VectorReduceToGPUPass>(getWarpSize);
+    std::function<int(func::FuncOp)> getWarpSize,
+    std::function<bool(func::FuncOp)> hasRedux) {
+  return std::make_unique<VectorReduceToGPUPass>(getWarpSize, hasRedux);
 }
 
 }  // namespace iree_compiler

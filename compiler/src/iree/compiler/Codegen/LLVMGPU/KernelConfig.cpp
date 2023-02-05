@@ -58,13 +58,6 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
 
 namespace {
 
-/// Structure to represent target features.
-struct TargetInfo {
-  // TODO: add finer grain control for other tensorcore types.
-  bool hasTF32TensorCore = false;
-  bool hasWarpShuffle = false;
-};
-
 struct TileWorkgroupSizePair {
   // How many scalar elements each workgroup should handle along each dimension.
   std::array<int64_t, 3> tileSize;
@@ -134,12 +127,13 @@ bool isCudaTarget(func::FuncOp entryPoint) {
   return false;
 }
 
-static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
+TargetInfo mlir::iree_compiler::getTargetInfo(func::FuncOp entryPoint) {
   TargetInfo info;
   // TODO: fill out target info for other vendors.
   if (!isCudaTarget(entryPoint)) return info;
   // All the cuda target are assumed to have warp support.
   info.hasWarpShuffle = true;
+  info.warpSize = cudaWarpSize;
   StringRef targetName = getTargetArch(entryPoint);
   // If no target name is set assume all the features are off.
   if (targetName == "") return info;
@@ -153,7 +147,10 @@ static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
     return info;
   }
   int64_t smVersion = version.getZExtValue();
-  if (smVersion >= 80) info.hasTF32TensorCore = true;
+  if (smVersion >= 80) {
+    info.hasTF32TensorCore = true;
+    info.hasRedux = true;
+  }
   return info;
 }
 
@@ -855,7 +852,7 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
-  TargetInfo targetInfo = getTargetInfo(entryPointFn);
+  TargetInfo targetInfo = mlir::iree_compiler::getTargetInfo(entryPointFn);
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(computeOp)) {
     // If the op already has a lowering config coming from the IR use this and

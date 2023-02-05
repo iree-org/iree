@@ -7,6 +7,7 @@
 #include "LLVMGPUExtensions.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
+#include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
@@ -14,6 +15,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -526,15 +528,23 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
 static void populatePropagateVectorDistribution(Operation *target,
                                                 RewritePatternSet &patterns,
                                                 PatternBenefit benefit) {
-  auto groupReductionFn = [](Location loc, OpBuilder &builder, Value input,
-                             vector::CombiningKind kind, uint32_t size) {
+  Optional<mlir::iree_compiler::TargetInfo> tinfo = std::nullopt;
+  target->walk([&](func::FuncOp funcOp) {
+    tinfo = mlir::iree_compiler::getTargetInfo(funcOp);
+  });
+  assert(tinfo.has_value());
+
+  auto groupReductionFn = [tinfo](Location loc, OpBuilder &builder, Value input,
+                                  vector::CombiningKind kind, uint32_t size) {
     return mlir::iree_compiler::emitGPUGroupReduction(loc, builder, input, kind,
-                                                      size, 32);
+                                                      size, tinfo->warpSize);
   };
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populatePropagateWarpVectorDistributionPatterns(
       patterns, simpleDistributionFunction, simpleWarpShuffleFunction, benefit);
   vector::populateDistributeReduction(patterns, groupReductionFn, benefit);
+  mlir::populateGpuSubgroupReducePatterns(patterns, tinfo->warpSize,
+                                          tinfo->hasRedux);
   patterns.add<WarpOpLoad, HoistSharedMemoryAlloc>(target->getContext(),
                                                    benefit);
 }
