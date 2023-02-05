@@ -17,12 +17,17 @@ iree_cc_library(
     "api.h"
   SRCS
     "api.h"
+    "direct_allocator.h"
+    "direct_allocator.m"
+    "metal_buffer.h"
+    "metal_buffer.m"
     "metal_driver.m"
   DEPS
     iree::base
     iree::base::core_headers
     iree::base::tracing
     iree::hal
+    iree::hal::utils::buffer_transfer
     iree::schemas::metal_executable_def_c_fbs
     "-framework Foundation"
     "-framework Metal"
