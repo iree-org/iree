@@ -149,10 +149,14 @@ def HAL_DescriptorTypeAttr :
 
 def HAL_DescriptorFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
 def HAL_DescriptorFlags_ReadOnly : I32BitEnumAttrCase<"ReadOnly", 0x0001>;
+def HAL_DescriptorFlags_Streaming : I32BitEnumAttrCase<"Streaming", 0x0002>;
+def HAL_DescriptorFlags_WriteOnly : I32BitEnumAttrCase<"WriteOnly", 0x0004>;
 def HAL_DescriptorFlagsAttr :
     I32BitEnumAttr<"DescriptorFlags", "valid Descriptor flags", [
       HAL_DescriptorFlags_None,
       HAL_DescriptorFlags_ReadOnly,
+      HAL_DescriptorFlags_WriteOnly,
+      HAL_DescriptorFlags_Streaming
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }

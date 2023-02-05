@@ -155,6 +155,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUDistributeSharedMemoryCopy();
 
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUCoalascedAccessPass();
+
 /// Apply multi-buffering transformation.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUMultiBuffering(
     unsigned numBuffers = 5);

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
+#include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -31,6 +32,10 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+static llvm::cl::opt<bool> enableCacheHints(
+    "iree-codegen-llvmgpu-enable-cache-hints", llvm::cl::init(true),
+    llvm::cl::desc("Enable cache eviction hints."));
 
 namespace {
 
@@ -76,6 +81,15 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     converter.addConversion([&](nvgpu::DeviceAsyncTokenType type) -> Type {
       return converter.convertType(IntegerType::get(type.getContext(), 32));
     });
+
+    auto hasCacheEvictionPriority = [](ModuleOp &m) {
+      bool hasCacheEvictionPriority = false;
+      m->walk([&](func::FuncOp funcOp) {
+        hasCacheEvictionPriority =
+            mlir::iree_compiler::getTargetInfo(funcOp).hasCacheEvictionPriority;
+      });
+      return hasCacheEvictionPriority;
+    };
     // Apply in-dialect lowering first. In-dialect lowering will replace ops
     // which need to be lowered further, which is not supported by a single
     // conversion pass.
@@ -83,6 +97,9 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     {
       RewritePatternSet patterns(&getContext());
       patterns.insert<DropSharedMemoryDeallocOp>(&getContext());
+      if (enableCacheHints && hasCacheEvictionPriority(m)) {
+        mlir::iree_compiler::populateSpecialLoadStore(patterns, &getContext());
+      }
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
@@ -132,6 +149,14 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       }
     }
     ConvertToDynamicSharedMemory(m);
+
+    {
+      RewritePatternSet patterns(&getContext());
+      mlir::iree_compiler::populateSpecialLoadStorePTX(patterns, &getContext());
+      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
   }
 };
 

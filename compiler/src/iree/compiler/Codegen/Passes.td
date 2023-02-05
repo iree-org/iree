@@ -193,6 +193,12 @@ def GPUDistributeSharedMemoryCopy :
   let constructor = "mlir::iree_compiler::createGPUDistributeSharedMemoryCopy()";
 }
 
+def GPUCoalascedAccess :
+    Pass<"iree-gpu-coalasced-access", "func::FuncOp"> {
+  let summary = "Pass to find coalasced memory access.";
+  let constructor = "mlir::iree_compiler::createGPUCoalascedAccessPass()";
+}
+
 def GPUReduceBankConflicts :
     Pass<"iree-gpu-reduce-bank-conflicts", "func::FuncOp"> {
   let summary = "Pass to try to reduce the number of bank conflicts.";

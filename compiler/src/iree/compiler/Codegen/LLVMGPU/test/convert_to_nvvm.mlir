@@ -335,3 +335,43 @@ hal.executable @check_not_readonly {
 }
 // CHECK-LABEL: llvm.func @check_not_readonly
 //  CHECK-NOT: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
+hal.executable @dispatchme {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+    hal.executable.export @dispatchme layout(#pipeline_layout)
+    builtin.module {
+      func.func @dispatchme() {
+        %c64 = arith.constant 64 : index
+        %c0 = arith.constant 0 : index
+        %c536870912 = arith.constant 536870912 : index
+        %c1073741824 = arith.constant 1073741824 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) flags("ReadOnly|Streaming") : memref<512x512x512xf32>
+        memref.assume_alignment %0, 64 : memref<512x512x512xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c536870912) alignment(64) flags(ReadOnly) : memref<512x512x512xf32>
+        memref.assume_alignment %1, 64 : memref<512x512x512xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c1073741824) alignment(64) flags(ReadOnly) : memref<512x512x512xf32>
+        memref.assume_alignment %2, 64 : memref<512x512x512xf32>
+        %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) flags(WriteOnly) : memref<512x512x512xf32>
+        memref.assume_alignment %3, 64 : memref<512x512x512xf32>
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_id_z = hal.interface.workgroup.id[2] : index
+        %4 = arith.muli %workgroup_id_x, %c64 : index
+        %5 = gpu.thread_id  x
+        %6 = arith.addi %4, %5 : index
+        %7 = memref.load %0[%workgroup_id_y, %workgroup_id_z, %6] : memref<512x512x512xf32>
+        %8 = memref.load %1[%workgroup_id_y, %6, %workgroup_id_y] : memref<512x512x512xf32>
+        %9 = memref.load %2[%workgroup_id_y, %6, %workgroup_id_z] : memref<512x512x512xf32>
+        %10 = arith.divf %7, %9 : f32
+        %11 = arith.mulf %10, %8 : f32
+        memref.store %11, %3[%workgroup_id_y, %6, %workgroup_id_z] : memref<512x512x512xf32>
+        return
+      }
+    }
+  }
+}

@@ -101,6 +101,12 @@ static PipelineLayout deriveExportLayout(
         // Read-only.
         bindingFlags[i] =
             bindingFlags[i] | IREE::HAL::DescriptorFlags::ReadOnly;
+      } else if (!bitEnumContainsAll(
+                     resourceAccess,
+                     IREE::Stream::ResourceAccessBitfield::Read)) {
+        // Write-only.
+        bindingFlags[i] =
+            bindingFlags[i] | IREE::HAL::DescriptorFlags::WriteOnly;
       }
     }
   }

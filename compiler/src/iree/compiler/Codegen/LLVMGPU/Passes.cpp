@@ -100,6 +100,9 @@ static void addBufferizePasses(OpPassManager &passManager) {
 
 static void tileAndDistributeToWorkgroup(
     OpPassManager &pm, bool useWARForCooperativeMatrixCodegen = false) {
+  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      createGPUCoalascedAccessPass());
+
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
 
   auto &nestedModulePM = pm.nest<ModuleOp>();

@@ -136,8 +136,16 @@ static void linkAndOptimize(llvm::Module &module,
   // Workaround run those passed ahead as they are temporarily disabled in NVPTX
   // target.
   llvm::legacy::PassManager legacyPM;
-  legacyPM.add(llvm::createNVVMIntrRangePass(35));
-  legacyPM.add(llvm::createNVVMReflectPass(35));
+  StringRef targetName(targetMachine.getTargetCPU());
+
+  unsigned smVersion = 35;
+  APInt version;
+  if (targetName.substr(3).getAsInteger(10, version)) {
+    smVersion = version.getZExtValue();
+  }
+
+  legacyPM.add(llvm::createNVVMIntrRangePass(smVersion));
+  legacyPM.add(llvm::createNVVMReflectPass(smVersion));
   legacyPM.run(module);
 
   llvm::LoopAnalysisManager lam;
@@ -332,7 +340,7 @@ class CUDATargetBackend final : public TargetBackend {
       {
         llvm::Triple triple("nvptx64-nvidia-cuda");
         std::string targetChip = clTargetChip;
-        std::string features = "+ptx60";
+        std::string features = "+ptx74";
         std::string error;
         const llvm::Target *target =
             llvm::TargetRegistry::lookupTarget("", triple, error);

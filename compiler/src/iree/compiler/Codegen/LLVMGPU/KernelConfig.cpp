@@ -58,13 +58,6 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
 
 namespace {
 
-/// Structure to represent target features.
-struct TargetInfo {
-  // TODO: add finer grain control for other tensorcore types.
-  bool hasTF32TensorCore = false;
-  bool hasWarpShuffle = false;
-};
-
 struct TileWorkgroupSizePair {
   // How many scalar elements each workgroup should handle along each dimension.
   std::array<int64_t, 3> tileSize;
@@ -132,29 +125,6 @@ bool isCudaTarget(func::FuncOp entryPoint) {
     }
   }
   return false;
-}
-
-static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
-  TargetInfo info;
-  // TODO: fill out target info for other vendors.
-  if (!isCudaTarget(entryPoint)) return info;
-  // All the cuda target are assumed to have warp support.
-  info.hasWarpShuffle = true;
-  StringRef targetName = getTargetArch(entryPoint);
-  // If no target name is set assume all the features are off.
-  if (targetName == "") return info;
-  if (!StringRef(targetName).starts_with("sm_")) {
-    entryPoint.emitError("unknown target name ") << targetName;
-    return info;
-  }
-  APInt version;
-  if (targetName.substr(3).getAsInteger(10, version)) {
-    entryPoint.emitError("unknown target version ") << targetName;
-    return info;
-  }
-  int64_t smVersion = version.getZExtValue();
-  if (smVersion >= 80) info.hasTF32TensorCore = true;
-  return info;
 }
 
 static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
@@ -904,6 +874,33 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 
 namespace mlir {
 namespace iree_compiler {
+
+TargetInfo getTargetInfo(func::FuncOp entryPoint) {
+  TargetInfo info;
+  // TODO: fill out target info for other vendors.
+  if (!isCudaTarget(entryPoint)) return info;
+  // All the cuda target are assumed to have warp support.
+  info.hasWarpShuffle = true;
+  StringRef targetName = getTargetArch(entryPoint);
+  // If no target name is set assume all the features are off.
+  if (targetName == "") return info;
+  if (!StringRef(targetName).starts_with("sm_")) {
+    entryPoint.emitError("unknown target name ") << targetName;
+    return info;
+  }
+  APInt version;
+  if (targetName.substr(3).getAsInteger(10, version)) {
+    entryPoint.emitError("unknown target version ") << targetName;
+    return info;
+  }
+  uint64_t smVersion = version.getZExtValue();
+  if (smVersion >= 80) info.hasTF32TensorCore = true;
+  if (smVersion >= 70) {
+    // https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#cache-eviction-priority-hints
+    info.hasCacheEvictionPriority = true;
+  }
+  return info;
+}
 
 LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =

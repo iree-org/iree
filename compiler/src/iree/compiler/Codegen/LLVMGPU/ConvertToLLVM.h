@@ -26,6 +26,13 @@ void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns);
 
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp);
 
+/// Add patterns to generates special load and store op if the source is subspan
+/// with special flags
+void populateSpecialLoadStore(RewritePatternSet &patterns, MLIRContext *ctx);
+
+/// Add patterns to generates special load and store op to PTX
+void populateSpecialLoadStorePTX(RewritePatternSet &patterns, MLIRContext *ctx);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
