@@ -237,6 +237,13 @@ iree_hal_cuda_allocator_query_buffer_compatibility(
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   }
 
+  // The buffer can be imported if it is host local and device visible.
+  if (iree_all_bits_set(params->type,
+                        IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+    compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE;
+  }
+
   // We are now optimal.
   params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
 
@@ -437,12 +444,16 @@ static iree_status_t iree_hal_cuda_allocator_import_buffer(
   // Coerce options into those required by the current device.
   iree_hal_buffer_params_t compat_params = *params;
   iree_device_size_t allocation_size = external_buffer->size;
-  if (!iree_all_bits_set(iree_hal_cuda_allocator_query_buffer_compatibility(
-                             base_allocator, &compat_params, &allocation_size),
+  iree_hal_buffer_compatibility_t compatibility =
+      iree_hal_cuda_allocator_query_buffer_compatibility(
+          base_allocator, &compat_params, &allocation_size);
+  if (!iree_all_bits_set(compatibility,
                          IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "allocator cannot import a buffer with the given parameters");
+        "allocator cannot import a buffer that is not IMPORTABLE "
+        "(provided=0x%x)",
+        (uint32_t)compatibility);
   }
 
   iree_status_t status = iree_ok_status();

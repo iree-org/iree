@@ -91,7 +91,7 @@ enum iree_hal_memory_type_bits_t {
   // performance penalties. Device local memory, on the other hand, is
   // guaranteed to be fast for all operations.
   IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL =
-      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE | (1u << 5),
+      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE | (1u << 6),
 
   // The allocator will choose the optimal memory type based on buffer usage,
   // preferring to place the allocation in device-local memory.
