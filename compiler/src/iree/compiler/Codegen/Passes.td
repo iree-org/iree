@@ -173,6 +173,14 @@ def TensorToVectorVectorizePad :
       "mlir::iree_compiler::createVectorizePadPass()";
 }
 
+def VectorizePackUnPackOps :
+    Pass<"iree-codegen-vectorize-pack-unpack-ops", "func::FuncOp"> {
+  let summary = "Vectorize a very specific form of tensor.pad with "
+                "control flows";
+  let constructor =
+      "mlir::iree_compiler::createVectorizePackUnPackOpsPass()";
+}
+
 def PolynomialApproximationPass :
     Pass<"iree-codegen-polynomial-approximation", ""> {
   let summary = "Convert math operations to their polynomial approximation";

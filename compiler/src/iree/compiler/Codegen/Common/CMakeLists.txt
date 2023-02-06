@@ -103,6 +103,7 @@ iree_cc_library(
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
+    "VectorizePackUnPackOps.cpp"
     "VectorizePad.cpp"
     "WorkgroupSpecializationPass.cpp"
   DEPS
