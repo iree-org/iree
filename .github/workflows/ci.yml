@@ -1062,8 +1062,6 @@ jobs:
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################
 
-  # emscripten is not in the test matrix because it is set as
-  # postsubmission-only.
   cross_compile_and_test:
     needs: [setup, build_all]
     if: needs.setup.outputs.should-run == 'true'
@@ -1263,7 +1261,6 @@ jobs:
 
       # Crosscompilation
       - cross_compile_and_test
-      - emscripten
 
       # Artifacts for e2e testing and benchmarking
       - build_benchmark_tools
