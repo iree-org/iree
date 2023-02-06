@@ -71,7 +71,7 @@ hal.executable @mma_fused_fp16 {
 //          CHECK:   llvm.br
 //          CHECK:   nvvm.cp.async.wait.group 3
 //  CHECK-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
-//  CHECK-COUNT-4:   nvvm.mma.sync {{.*}}, shape = #nvvm.shape<m = 16, n = 8, k = 16
+//  CHECK-COUNT-4:   nvvm.mma.sync {{.*}} {layoutA = #nvvm.mma_layout<row>, layoutB = #nvvm.mma_layout<col>, shape = #nvvm.shape<m = 16, n = 8, k = 16>} : (vector<2xf16>, vector<2xf16>, vector<2xf16>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>)>
 //  CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
 //          CHECK:   nvvm.cp.async.commit.group
 //          CHECK:   llvm.br
@@ -134,34 +134,34 @@ hal.executable @mma_fused {
 }
 
 // mma.sync.1688.f32.tf32 / TensorCore(f32):
-//    MMASYNC-LABEL: hal.executable public @mma_fused
-//          MMASYNC:   hal.executable.variant public @cuda
-//      MMASYNC-NOT:   llvm.store
-//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//          MMASYNC:   nvvm.cp.async.commit.group
-//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//          MMASYNC:   nvvm.cp.async.commit.group
-//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//          MMASYNC:   nvvm.cp.async.commit.group
-//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//          MMASYNC:   nvvm.cp.async.commit.group
-//          MMASYNC:   llvm.br
-//          MMASYNC:   nvvm.cp.async.wait.group 3
-//  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
-//  MMASYNC-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
-//          MMASYNC:   nvvm.cp.async.commit.group
-//          MMASYNC:   llvm.br
-//      MMASYNC-NOT:   nvvm.mma.sync {{.*}}, shape = #nvvm.shape<m = 16, n = 8, k = 8
-//  MMASYNC-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf32>, 3>
-//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
-//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
-//    MMASYNC-COUNT:   nvvm.barrier0
-//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//    MMASYNC-COUNT:   llvm.fadd {{.*}} : vector<4xf32>
-//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
-//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//    MMASYNC-COUNT:   llvm.fadd {{.*}} : vector<4xf32>
-//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//    CHECK-LABEL: hal.executable public @mma_fused
+//          CHECK:   hal.executable.variant public @cuda
+//      CHECK-NOT:   llvm.store
+//  CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          CHECK:   nvvm.cp.async.commit.group
+//  CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          CHECK:   nvvm.cp.async.commit.group
+//  CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          CHECK:   nvvm.cp.async.commit.group
+//  CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          CHECK:   nvvm.cp.async.commit.group
+//          CHECK:   llvm.br
+//          CHECK:   nvvm.cp.async.wait.group 3
+//  CHECK-COUNT-2:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-4:   nvvm.mma.sync {{.*}} {layoutA = #nvvm.mma_layout<row>, layoutB = #nvvm.mma_layout<col>, multiplicandAPtxType = #nvvm.mma_type<tf32>, multiplicandBPtxType = #nvvm.mma_type<tf32>, shape = #nvvm.shape<m = 16, n = 8, k = 8>} : (i32, i32, f32) -> !llvm.struct<(f32, f32, f32, f32)>
+//  CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
+//          CHECK:   nvvm.cp.async.commit.group
+//          CHECK:   llvm.br
+//      CHECK-NOT:   nvvm.mma.sync
+//  CHECK-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf32>, 3>
+//    CHECK-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    CHECK-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//    CHECK-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    CHECK-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//    CHECK-COUNT:   nvvm.barrier0
+//    CHECK-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    CHECK-COUNT:   llvm.fadd {{.*}} : vector<4xf32>
+//    CHECK-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//    CHECK-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    CHECK-COUNT:   llvm.fadd {{.*}} : vector<4xf32>
+//    CHECK-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
