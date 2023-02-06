@@ -41,6 +41,7 @@ iree_lit_test_suite(
             "reductions.mlir",
             "remove_dead_allocs.mlir",
             "remove_trivial_loops.mlir",
+            "repeated_matcher_use.mlir",
             "swizzle_workgroup.mlir",
             "test_partitionable_loops_interface.mlir",
             "tile_and_distribute_to_workgroups.mlir",
