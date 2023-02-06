@@ -1100,6 +1100,13 @@ jobs:
             docker_image: "gcr.io/iree-oss/riscv@sha256:a7e7b03236324f92e7c96925add02cf0b37eca5b68af54f64049fc689f770915"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./tests/riscv32/smoke.sh"
+          - platform: emscripten
+            arch: wasm32
+            abi: wasm32
+            docker_image: "gcr.io/iree-oss/emscripten@sha256:fdb2bf6b0701a6de80f4f708ea86b001279c8acd904c34ef4d05ee3802711e45"
+            build_script: "./build_tools/cmake/build_runtime_emscripten.sh"
+            # No test script
+
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
@@ -1145,35 +1152,6 @@ jobs:
             --env "BUILD_PRESET=test" \
             "${DOCKER_IMAGE}" \
             "${TEST_SCRIPT}"
-
-  emscripten:
-    needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
-      - name: "Extracting install from build dir archive"
-        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
-      - name: "Building the runtime for the web using Emscripten"
-        run: |
-          build_tools/github_actions/docker_run.sh \
-            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
-            gcr.io/iree-oss/emscripten@sha256:fdb2bf6b0701a6de80f4f708ea86b001279c8acd904c34ef4d05ee3802711e45 \
-            build_tools/cmake/build_runtime_emscripten.sh
 
   test_benchmark_suites:
     needs: [setup, build_all, build_e2e_test_artifacts]
