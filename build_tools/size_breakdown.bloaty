@@ -1,0 +1,29 @@
+# First build with:
+#   --config=bloaty --config=lto
+# Run with:
+# bloaty -c build_tools/size_breakdown.bloaty -d pjrt_plugin <path_to.so>
+custom_data_source: {
+  name: "pjrt_plugin"
+  base_data_source: "compileunits"
+
+  rewrite: {
+    pattern: "absl"
+    replacement: "absl"
+  }
+  rewrite: {
+    pattern: "cpuinfo"
+    replacement: "cpuinfo"
+  }
+  rewrite: {
+    pattern: "iree"
+    replacement: "iree"
+  }
+  rewrite: {
+    pattern: "protobuf"
+    replacement: "protobuf"
+  }
+  rewrite: {
+    pattern: "tensorflow"
+    replacement: "tensorflow"
+  }
+}

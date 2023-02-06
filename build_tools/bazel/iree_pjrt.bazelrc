@@ -1,0 +1,22 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+###############################################################################
+# Project specific globals.
+###############################################################################
+
+# We want everything built with visibility hidden, because we use explicit
+# visibility project wide for exports. There is no better way to do this
+# in bazel.
+build --copt="-fvisibility=hidden"
+build --copt="-fno-exceptions"
+
+###############################################################################
+# Configurations affecting the build.
+###############################################################################
+
+build:bloaty --compilation_mode=opt --strip=never --copt=-g
+build:lto --copt "-flto"
