@@ -42,6 +42,18 @@ bool transform_ext::StructuredOpMatcher::match(Operation *op) {
   auto debugRAII =
       llvm::make_scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
   LLVM_DEBUG(DBGS() << "matching: " << *op << "\n");
+
+  if (getCaptured()) {
+    LLVM_DEBUG(DBGS() << "found an already captured op: ");
+    if (getCaptured() == op) {
+      LLVM_DEBUG(llvm::dbgs() << "same\n");
+      return true;
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "different\n");
+      return false;
+    }
+  }
+
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) {
     LLVM_DEBUG(DBGS() << "not a structured op\n");
@@ -250,13 +262,17 @@ void transform_ext::StructuredOpMatcher::addInputMatcher(
     OptionalMatch optional) {
   predicates.push_back([position, optional, matcher = std::move(matcher)](
                            linalg::LinalgOp linalgOp) -> bool {
+    int64_t transformedPosition =
+        position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
+    if (transformedPosition >= linalgOp.getNumDpsInputs()) {
+      LLVM_DEBUG(DBGS() << "input operand #" << position
+                        << " does not exist but match required");
+      return false;
+    }
+
     LLVM_DEBUG(DBGS() << "input operand #" << position
                       << (optional.value ? " (optional match) " : " ")
                       << "produced by\n");
-    int64_t transformedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
-    if (transformedPosition >= linalgOp.getNumDpsInputs())
-      return false;
 
     Operation *definingOp =
         linalgOp.getDpsInputOperand(transformedPosition)->get().getDefiningOp();
