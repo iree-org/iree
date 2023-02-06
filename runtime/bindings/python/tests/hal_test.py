@@ -11,6 +11,7 @@ import numpy as np
 import unittest
 
 
+
 class NonDeviceHalTest(unittest.TestCase):
 
   def testEnums(self):
@@ -141,6 +142,14 @@ class DeviceHalTest(unittest.TestCase):
         repr(buffer),
         "<HalBufferView (3, 4), element_type=0x20000011, 48 bytes (at offset 0 into 48), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|DISPATCH_STORAGE|MAPPING>"
     )
+
+class IndexedDeviceHalTest(DeviceHalTest):
+
+  def setUp(self):
+    super().setUp()
+    self.driver = iree.runtime.get_driver("local-task")
+    self.device = self.driver.create_device(0)
+
 
 
 if __name__ == "__main__":
