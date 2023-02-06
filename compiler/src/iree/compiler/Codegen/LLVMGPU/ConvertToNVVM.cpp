@@ -63,6 +63,10 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();
+    if (failed(verifyLLVMConversionCompatibility(m))) {
+      signalPassFailure();
+      return;
+    }
 
     /// Customize the bitwidth used for the device side index computations.
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));

@@ -121,6 +121,7 @@ cc_library(
         "@llvm-project//mlir:ArmNeon2dToIntr",
         "@llvm-project//mlir:ArmNeonDialect",
         "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:ComplexDialect",
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:EmitCDialect",
