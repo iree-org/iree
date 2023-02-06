@@ -57,9 +57,9 @@ VERSION="${SHORT_REF}-${SUFFIX}"
 if (( TESTING!=0 )); then
   VERSION="${VERSION}-testing"
 fi
-GITHUB_RUNNER_VERSION="2.300.2"
-GITHUB_RUNNER_ARCHIVE_DIGEST="ed5bf2799c1ef7b2dd607df66e6b676dff8c44fb359c6fedc9ebf7db53339f0c"
-GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
+GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-2.300.2}"
+GITHUB_RUNNER_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARCHIVE_DIGEST:-ed5bf2799c1ef7b2dd607df66e6b676dff8c44fb359c6fedc9ebf7db53339f0c}"
+GITHUB_TOKEN_PROXY_URL="${GITHUB_TOKEN_PROXY_URL:-https://ght-proxy-zbhz5clunq-ue.a.run.app}"
 
 if (( TESTING_SELF_DELETER==1 )); then
   INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-testing-zbhz5clunq-uc.a.run.app"

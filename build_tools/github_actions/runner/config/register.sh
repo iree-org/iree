@@ -98,10 +98,7 @@ RUNNER_LABELS="$(IFS="," ; echo "${RUNNER_LABELS_ARRAY[*]}")"
 INSTANCE_ID="$(get_metadata instance/id)"
 GOOGLE_CLOUD_PROJECT="$(get_metadata project/project-id)"
 
-set +x
-GOOGLE_CLOUD_RUN_ID_TOKEN="$(get_metadata "instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}")"
-
-set +e
+set +xe
 REGISTER_TOKEN="$(get_runner_token register ${RUNNER_SCOPE})"
 
 if [ -z "${REGISTER_TOKEN}" ]; then
