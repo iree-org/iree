@@ -126,6 +126,25 @@ struct IsPermutation {};
 /// Predicate tag indicating that the affine map is a projected permutation.
 struct IsProjectedPermutation {};
 
+/// Predicate tag indicating that the affine map is a projection of given
+/// dimension.
+struct IsProjected : public SingleValuePredicateParam<int64_t> {
+  using Base::Base;
+};
+/// Predicate tag indicating that the affine map is an identity.
+struct IsIdentity {};
+
+/// Predicate tag indicating that the operand is a special float constant.
+struct ConstantFloatMin {};
+struct ConstantFloatZero {};
+
+/// Predicate indicating that the operand is the same value as its parent's
+/// operand.
+struct SameOperandAsParent
+    : public SingleValuePredicateParam<std::pair<int64_t, int64_t>> {
+  using Base::Base;
+};
+
 /// Indicates that the match optional. The matcher is still expected to run and
 /// capture if successful. The parameter can be set to false
 struct OptionalMatch : public SingleValuePredicateParam<bool> {
@@ -298,6 +317,9 @@ public:
     return *this;
   }
 
+  StructuredOpMatcher &input(int64_t position,
+                             SameOperandAsParent parentPosition);
+
   /// Adds a predicate checking that all input operands of the structured op
   /// have a permutation indexing map.
   StructuredOpMatcher &input(AllOperands tag, IsPermutation);
@@ -306,6 +328,21 @@ public:
   /// have a projected permutation indexing map.
   StructuredOpMatcher &input(AllOperands tag, IsProjectedPermutation);
 
+  /// Adds a predicate checking that all input operands of the structured op
+  /// have a
+  StructuredOpMatcher &input(SmallVector<int64_t> &&positions, IsProjected dim);
+  StructuredOpMatcher &input(int64_t position, IsProjected dim) {
+    return input(SmallVector<int64_t>{position}, dim);
+  }
+
+  /// Adds a predicate checking that all input operands of the structured op
+  /// have identity indexing map.
+  StructuredOpMatcher &input(AllOperands tag, IsIdentity);
+  StructuredOpMatcher &input(SmallVector<int64_t> &&positions, IsIdentity);
+  StructuredOpMatcher &input(int64_t position, IsIdentity) {
+    return input(SmallVector<int64_t>{position}, IsIdentity());
+  }
+
   /// Adds a predicate checking that the bit width of the elemental type of the
   /// structured op input at the given position is equal to the given value.
   StructuredOpMatcher &input(int64_t position, ElementTypeBitWidth width);
@@ -313,6 +350,12 @@ public:
   /// Capture the elemental type bitwidth of input operand `position`.
   StructuredOpMatcher &input(int64_t position,
                              CaptureElementTypeBitWidth width);
+
+  /// Check if input is equal to a known constant.
+  StructuredOpMatcher &input(int64_t position, ConstantFloatMin);
+  StructuredOpMatcher &input(int64_t position, ConstantFloatZero);
+  StructuredOpMatcher &input(int64_t position,
+                             std::function<bool(llvm::APFloat)> floatValueFn);
 
   //===-------------------------------------------------------------------===//
   // Constraints on adjacent ops.
@@ -350,6 +393,14 @@ public:
   /// Adds a predicate checking that all output operands of the structured op
   /// have a projected permutation indexing map.
   StructuredOpMatcher &output(AllOperands tag, IsProjectedPermutation);
+
+  /// Adds a predicate checking that all output operands of the structured op
+  /// have a
+  StructuredOpMatcher &output(AllOperands tag, IsProjected dim);
+
+  /// Adds a predicate checking that all output operands of the structured op
+  /// have identity indexing map.
+  StructuredOpMatcher &output(AllOperands tag, IsIdentity);
 
   /// Adds a predicate checking that the bit width of the elemental type of the
   /// structured op output at the given position is equal to the given value.
@@ -409,6 +460,36 @@ public:
     recordNestedMatcher(resultUserMatcher);
     return *this;
   }
+
+  //===-------------------------------------------------------------------===//
+  // Constraints on op region.
+  //===-------------------------------------------------------------------===//
+
+  template <typename OpType>
+  StructuredOpMatcher &containSingleOp() {
+    predicates.push_back([=](linalg::LinalgOp linalgOp) {
+      if (linalgOp.getBlock()->getOperations().size() != 2)
+        return false;
+      Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
+      if (!isa<OpType>(innerOp) || innerOp->getNumResults() != 1)
+        return false;
+      Operation *yieldOp = linalgOp.getBlock()->getTerminator();
+      if (yieldOp->getNumOperands() != 1)
+        return false;
+      if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
+        return false;
+      for (auto [index, operand] : llvm::enumerate(innerOp->getOperands())) {
+        auto arg = dyn_cast<BlockArgument>(operand);
+        if (!arg || arg.getParentBlock() != linalgOp.getBlock() ||
+            arg.getArgNumber() != index)
+          return false;
+      }
+      return true;
+    });
+    return *this;
+  }
+
+  StructuredOpMatcher &isFloatReciprocal();
 
 private:
   /// Checks that `matchers` captured all tilable ops nested in `parent` except
@@ -556,6 +637,24 @@ void makeReductionMatcher(StructuredOpMatcher &reduction,
                           StructuredOpMatcher &leading,
                           StructuredOpMatcher &trailing,
                           MatchedReductionCaptures &captures);
+
+/// Create a group of matchers for a sequence of operations matching exactly a
+/// softmax operation.
+///
+///  %red = reduce_max(%0)
+///  %sub = sub(%0, %red)
+///  %exp = exp(%sub)
+///  %sum = reduce_sum(%exp)
+///  %rec = reciprocal(%sum)
+///  %mul = mul(%exp, %rec)
+void makeSoftmaxMatcher(transform_ext::StructuredOpMatcher &fillMinusInf,
+                        transform_ext::StructuredOpMatcher &maxReduction,
+                        transform_ext::StructuredOpMatcher &sub,
+                        transform_ext::StructuredOpMatcher &expOperand,
+                        transform_ext::StructuredOpMatcher &fillzero,
+                        transform_ext::StructuredOpMatcher &sum,
+                        transform_ext::StructuredOpMatcher &divOperand,
+                        transform_ext::StructuredOpMatcher &softmaxroot);
 
 } // namespace transform_ext
 } // namespace mlir
