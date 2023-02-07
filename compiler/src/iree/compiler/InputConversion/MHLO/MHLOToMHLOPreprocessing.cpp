@@ -510,7 +510,7 @@ struct ScatterImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
                                 PatternRewriter &rewriter) const final {
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
-    auto indices = op.getScatterIndices();
+    auto indices = op.getScatterIndices().cast<Value>();
     auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();
 
     // Check whether indices has no batch dimension.
@@ -593,7 +593,7 @@ struct ScatterCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
                                 PatternRewriter &rewriter) const final {
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
-    auto indices = op.getScatterIndices();
+    auto indices = op.getScatterIndices().cast<Value>();
     auto indicesTy = indices.getType().cast<ShapedType>();
     auto updatedWindowDims = dimNumbers.getUpdateWindowDims();
 
@@ -1235,8 +1235,8 @@ struct DotGeneralIsMul : public OpRewritePattern<mhlo::DotGeneralOp> {
 
   LogicalResult matchAndRewrite(mhlo::DotGeneralOp op,
                                 PatternRewriter &rewriter) const override {
-    auto lhs = op.getLhs();
-    auto rhs = op.getRhs();
+    auto lhs = op.getLhs().cast<Value>();
+    auto rhs = op.getRhs().cast<Value>();
     auto lhsTy = lhs.getType().dyn_cast<RankedTensorType>();
     auto rhsTy = rhs.getType().dyn_cast<RankedTensorType>();
     auto resultTy = op.getType().dyn_cast<RankedTensorType>();
