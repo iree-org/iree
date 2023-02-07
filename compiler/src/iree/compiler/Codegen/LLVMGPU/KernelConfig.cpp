@@ -945,12 +945,8 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     }
 
     if (!rootOperation) {
-      // setTranslationInfo(
-      //    funcOp,
-      //    IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-      //    {1, 1, 1});
-      // continue;
-      return funcOp.emitOpError("unable to find root operation");
+      // No root operation found. Allow it to pass through without a config.
+      continue;
     }
 
     if (failed(setRootConfig(funcOp, rootOperation))) continue;
