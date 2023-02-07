@@ -78,6 +78,9 @@ macro(iree_llvm_configure_installed)
   list(APPEND CMAKE_MODULE_PATH "${LLD_CMAKE_DIR}")
   include_directories(${LLD_INCLUDE_DIRS})
 
+  find_package(Clang REQUIRED)
+  list(APPEND CMAKE_MODULE_PATH "${CLANG_CMAKE_DIR}")
+
   # Lit never gets installed with LLVM. So we have to reach into our copy
   # of the monorepo to get it. I'm sorry. If this doesn't work for you,
   # feel free to -DLLVM_EXTERNAL_LIT to provide your own.
@@ -118,7 +121,9 @@ macro(iree_llvm_set_bundled_cmake_options)
   set(MLIR_ENABLE_BINDINGS_PYTHON OFF CACHE BOOL "")
   set(MHLO_ENABLE_BINDINGS_PYTHON OFF CACHE BOOL "")
 
-  # If we are building LLD, this will be the target. Otherwise, empty.
+  # If we are building clang/lld/etc, these will be the targets.
+  # Otherwise, empty so scripts can detect unavailability.
+  set(IREE_CLANG_TARGET)
   set(IREE_LLD_TARGET)
 
   # Unconditionally enable mlir.
@@ -129,15 +134,18 @@ macro(iree_llvm_set_bundled_cmake_options)
   if(IREE_TARGET_BACKEND_CUDA)
     message(STATUS "  - cuda")
     list(APPEND LLVM_TARGETS_TO_BUILD NVPTX)
+    set(IREE_CLANG_TARGET clang)
   endif()
   if(IREE_TARGET_BACKEND_LLVM_CPU)
     message(STATUS "  - llvm-cpu")
     list(APPEND LLVM_TARGETS_TO_BUILD "${IREE_DEFAULT_CPU_LLVM_TARGETS}")
+    set(IREE_CLANG_TARGET clang)
     set(IREE_LLD_TARGET lld)
   endif()
   if(IREE_TARGET_BACKEND_LLVM_CPU_WASM)
     message(STATUS "  - llvm-cpu (wasm)")
     list(APPEND LLVM_TARGETS_TO_BUILD WebAssembly)
+    set(IREE_CLANG_TARGET clang)
     set(IREE_LLD_TARGET lld)
   endif()
   if(IREE_TARGET_BACKEND_METAL_SPIRV)
@@ -157,6 +165,9 @@ macro(iree_llvm_set_bundled_cmake_options)
     message(STATUS "  - webgpu")
   endif()
 
+  if(IREE_CLANG_TARGET)
+    list(APPEND LLVM_ENABLE_PROJECTS clang)
+  endif()
   if(IREE_LLD_TARGET)
     list(APPEND LLVM_ENABLE_PROJECTS lld)
   endif()
