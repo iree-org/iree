@@ -302,6 +302,20 @@ git commit ...
 git push UPSTREAM_AUTOMATION bump-llvm-...
 ```
 
+### Update C-API exported
+
+If a new symbol needs to be export in the C-API run this [script](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/API2/generate_exports.py)
+from IREE root directory:
+
+```
+python compiler/src/iree/compiler/API2/generate_exports.py
+```
+
+Missing symbols would usually cause the following kind of errors in python builf kind of error:
+```
+ImportError: /work/full-build-dir/compiler/bindings/python/iree/compiler/_mlir_libs/_mlir.cpython-37m-x86_64-linux-gnu.so: undefined symbol: mlirLocationFromAttribute
+```
+
 ### Cherry-picking
 
 Please add the integrator to reviewers in the cherry-pick PR, so the integrator

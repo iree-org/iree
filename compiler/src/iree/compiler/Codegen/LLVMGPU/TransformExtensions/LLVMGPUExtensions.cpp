@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
@@ -568,15 +569,26 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   // automatically get listening capabilities.
 
   MLIRContext *ctx = target->getContext();
-  RewritePatternSet patterns(ctx);
   // MultiReduction lowering is necessary until we have explicit support for
   // distributing that op.
-  populateMultiReductionLoweringPatterns(target, patterns, /*benefit=*/3);
+  RewritePatternSet preProcessingPatterns(ctx);
+  populateMultiReductionLoweringPatterns(target, preProcessingPatterns,
+                                         /*benefit=*/1);
+  vector::ShapeCastOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
+  vector::BroadcastOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
+  vector::ExtractOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
+  if (failed(applyPatternsAndFoldGreedily(target,
+                                          std::move(preProcessingPatterns)))) {
+    return mlir::emitDefiniteFailure(target,
+                                     "multi-reduce patterns failed to apply");
+  }
+
+  RewritePatternSet patterns(ctx);
   populateVectorTransferWriteDistribution(target, patterns, /*benefit=*/2);
   populatePropagateVectorDistribution(target, patterns, /*benefit=*/1);
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {
-    target->emitOpError("warp distribution patterns failed to apply");
-    return emitDefaultDefiniteFailure(target);
+    return mlir::emitDefiniteFailure(
+        target, "warp distribution patterns failed to apply");
   }
 
   RewritePatternSet endPatterns(ctx);
@@ -585,9 +597,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   options.warpSyncronizationFn = warpSyncronizationFn;
   populateWarpExecuteOnLane0ToScf(target, endPatterns, options, /*benefit=*/0);
   if (failed(applyPatternsAndFoldGreedily(target, std::move(endPatterns)))) {
-    target->emitOpError(
-        "warp execute on lane 0 to scf patterns failed to apply");
-    return emitDefaultDefiniteFailure(target);
+    return mlir::emitDefiniteFailure(
+        target, "warp execute on lane 0 to scf patterns failed to apply");
   }
 
   return DiagnosedSilenceableFailure::success();
@@ -597,6 +608,13 @@ void transform_dialect::VectorWarpDistributionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
+}
+
+void transform_dialect::VectorToMMAConversionOp::build(OpBuilder &builder,
+                                                       OperationState &result,
+                                                       Value target) {
+  result.addOperands(target);
+  result.addTypes({pdl::OperationType::get(builder.getContext())});
 }
 
 DiagnosedSilenceableFailure
@@ -610,6 +628,21 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
     return emitDefaultDefiniteFailure(target);
   }
   MLIRContext *ctx = target->getContext();
+
+  // Step 1. Unroll vectors to native size.
+  RewritePatternSet unrollPatterns(ctx);
+  vector::populateVectorUnrollPatterns(
+      unrollPatterns,
+      vector::UnrollVectorOptions().setNativeShapeFn(getWmmaNativeVectorSize));
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(unrollPatterns)))) {
+    target->emitOpError(
+        "failed to break up vector operations into mma native size");
+    return emitDefaultDefiniteFailure(target);
+  }
+
+  // TODO: Step 2. add pattern to propagate the extract through the scf.for ops.
+
+  // Step 3. Convert slice of contract operations to wmma ops.
   RewritePatternSet patterns(ctx);
   mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
   populatePrepareVectorToMMAPatterns(patterns, /*llvmgpuUseMMASync=*/false);
@@ -619,13 +652,35 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   }
   convertVectorToMMAOps(target);
 
+  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
 
-void transform_dialect::VectorToMMAConversionOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::modifiesPayload(effects);
+DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
+    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(target);
+  SmallVector<int64_t> indices = llvm::to_vector(getIndices());
+  int64_t numOperands = target->getNumOperands();
+  bufferization::BufferizationOptions options;
+  for (int64_t index : indices) {
+    if ((index >= 0) && (index < numOperands)) {
+      FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
+          rewriter, target->getLoc(), target->getOperand(index), false, options,
+          true);
+      if (failed(ret)) {
+        return emitDefaultDefiniteFailure(target)
+               << "failed to promote operand";
+      }
+      target->setOperand(index, ret.value());
+      results.push_back(ret.value().getDefiningOp());
+    } else {
+      return emitDefaultDefiniteFailure(target) << "invalid index specified";
+    }
+  }
+  return DiagnosedSilenceableFailure::success();
 }
 
 #define GET_OP_CLASSES

@@ -144,17 +144,47 @@ template <typename T>
 using has_get_capture_t = decltype(std::declval<T>().getCaptured());
 } // namespace detail
 
-/// Base class for op matchers that capture the matched operation. It doesn't
-/// specify how exactly the capture happens.
+/// Base class for op matchers that capture the matched operation.
 class CapturingOpMatcher {
 public:
   virtual ~CapturingOpMatcher() = default;
 
-  /// Resets the state of the matcher to not having captured anything.
-  virtual void resetCapture() = 0;
+  /// Resets the captured value to null. This should be called if the same
+  /// pattern needs to be applied more than once as it may keep captured values
+  /// for optional nested predicates from the previous application.
+  void resetCapture() {
+    captured = nullptr;
+    SmallVector<CapturingOpMatcher *> nested;
+    getAllNested(nested);
+    for (CapturingOpMatcher *matcher : nested) {
+      matcher->captured = nullptr;
+    }
+  }
 
-  /// Returns the captured operation.
-  virtual Operation *getCaptured() const = 0;
+  /// Returns the matched operation if the match was successful.
+  Operation *getCaptured() const { return captured; }
+
+protected:
+  /// Informs the matcher that it has another, nested matcher. Derived classes
+  /// must call this to keep track of nested matchers for capture resetting
+  /// purposes.
+  template <typename T>
+  void recordNestedMatcher(T &nested) {
+    if constexpr (std::is_base_of_v<CapturingOpMatcher, T>)
+      nestedCapturingMatchers.push_back(&nested);
+  }
+
+  /// Appends all nested capturing matchers, excluding this one, to `nested`.
+  void getAllNested(SmallVectorImpl<CapturingOpMatcher *> &nested);
+
+private:
+  /// A list of (recursively) nested capturing matchers that should be reset
+  /// when the current matcher is.
+  SmallVector<CapturingOpMatcher *> nestedCapturingMatchers;
+
+protected:
+  /// Matched value.
+  linalg::LinalgOp captured = nullptr;
 };
 
 /// Structured op matcher with additional predicates attachable through the
@@ -187,9 +217,6 @@ public:
       return isa<OpType...>(op.getOperation());
     });
   }
-
-  /// Returns the matched operation if the match was successful.
-  Operation *getCaptured() const override { return captured; }
 
   /// Matches the given operation, hook for `matchPattern`.
   bool match(Operation *op);
@@ -298,7 +325,9 @@ public:
   /// be added *after* all the other predicates that capture.
   template <typename OpTy>
   StructuredOpMatcher &allTilableOpsCaptured() {
-    SmallVector<CapturingOpMatcher *> copy = nestedCapturingMatchers;
+    SmallVector<CapturingOpMatcher *> copy;
+    copy.push_back(this);
+    getAllNested(copy);
     predicates.push_back([copy = std::move(copy)](linalg::LinalgOp linalgOp) {
       Operation *parent = linalgOp->getParentOfType<OpTy>();
       return checkAllTilableMatched(parent, linalgOp, copy);
@@ -381,27 +410,7 @@ public:
     return *this;
   }
 
-  /// Resets the captured value to null. This should be called if the same
-  /// pattern needs to be applied more than once as it may keep captured values
-  /// for optional nested predicates from the previous application.
-  void resetCapture() override {
-    captured = nullptr;
-    for (CapturingOpMatcher *nested : nestedCapturingMatchers)
-      nested->resetCapture();
-  }
-
 private:
-  /// Informs the matcher that it has another, nested matcher. Practically,
-  /// records the captured value cleanup function so it runs when required.
-  template <typename T>
-  void recordNestedMatcher(T &nested) {
-    nestedCapturingMatchers.push_back(&nested);
-    if constexpr (std::is_base_of_v<StructuredOpMatcher, T>) {
-      llvm::append_range(nestedCapturingMatchers,
-                         nested.nestedCapturingMatchers);
-    }
-  }
-
   /// Checks that `matchers` captured all tilable ops nested in `parent` except
   /// for `linalgOp`. This is an implementation detail of allTilableOpsCaptured.
   static bool checkAllTilableMatched(Operation *parent,
@@ -425,13 +434,6 @@ private:
 
   /// Additional predicates to be checked on the structured op.
   SmallVector<PredicateFn> predicates;
-
-  /// A list of (recursively) nested capturing matchers that should be reset
-  /// when the current matcher is.
-  SmallVector<CapturingOpMatcher *> nestedCapturingMatchers;
-
-  /// Matched value.
-  linalg::LinalgOp captured = nullptr;
 };
 
 /// Creates a matcher of an arbitrary structured op.

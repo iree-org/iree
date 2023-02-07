@@ -23,6 +23,7 @@ using namespace mlir;
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 // TODO: significantly better namespacing.
+using iree_compiler::IREE::transform_dialect::ApplyBufferOptimizationsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
@@ -250,16 +251,12 @@ mlir::iree_compiler::
       b, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
 
-/// Apply patterns and vectorize (for now always applies rank-reduction).
+/// Apply patterns and vectorize.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 // TODO: configure patterns.
 Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b,
                                           Value funcH) {
-  ApplyPatternsOpPatterns patterns;
-  patterns.rankReducingVector = true;
-  patterns.rankReducingLinalg = true;
-  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
   return b.create<VectorizeOp>(funcH);
 }
 
@@ -363,7 +360,7 @@ mlir::iree_compiler::buildTileReductionUsingScfForeach(
                          blockCombinerOpH);
 }
 
-std::tuple<Value, Value, Value, Value>
+std::tuple<Value, Value, Value, Value, Value>
 mlir::iree_compiler::buildReductionStrategyBlockDistribution(
     ImplicitLocOpBuilder &b, Value variantH,
     const AbstractReductionStrategy &strategy) {
@@ -395,5 +392,14 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
   auto [blockReductionH, maybeBlockTrailingH] = buildSelectFirstNonEmpty(
       b, tileResult.resultingFusedOpsHandles.front(), tileResult.tiledOpH);
   return std::make_tuple(maybeLeadingH, fillH, blockReductionH,
-                         maybeBlockTrailingH);
+                         maybeBlockTrailingH, tileResult.foreachThreadH);
+}
+
+Value mlir::iree_compiler::buildMemoryOptimizations(ImplicitLocOpBuilder &b,
+                                                    Value funcH) {
+  ApplyPatternsOpPatterns patterns;
+  patterns.lowerTransferOpPermutations = true;
+  patterns.rankReducingVector = true;
+  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+  return b.create<ApplyBufferOptimizationsOp>(funcH);
 }

@@ -55,11 +55,11 @@ hal.executable public @matmul_256x1024x128_div_add {
       %2 = gpu.thread_id  z
       %alloc = memref.alloc() : memref<32x32xf16, 3>
       %alloc_0 = memref.alloc() : memref<32x32xf16, 3>
-      %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<256x1024xf16>
-      %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<1024x128xf16>
-      %5 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<256x128xf16>
-      %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(64) : memref<256x128xf16>
-      %7 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) offset(%c0) alignment(64) : memref<256x128xf16>
+      %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<256x1024xf16>
+      %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<1024x128xf16>
+      %5 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<256x128xf16>
+      %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<256x128xf16>
+      %7 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64) offset(%c0) : memref<256x128xf16>
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %workgroup_id_y = hal.interface.workgroup.id[1] : index
       %8 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_y]
@@ -225,13 +225,13 @@ hal.executable public @matmul_256x1024x128_div_add {
         %2 = gpu.thread_id  z
         %alloc = memref.alloc() : memref<1x32x32xf16, 3>
         %alloc_0 = memref.alloc() : memref<1x32x32xf16, 3>
-        %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<16x128x512xf16>
+        %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<16x128x512xf16>
         memref.assume_alignment %3, 64 : memref<16x128x512xf16>
-        %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<16x512x256xf16>
+        %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<16x512x256xf16>
         memref.assume_alignment %4, 64 : memref<16x512x256xf16>
-        %5 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<16x128x256xf16>
+        %5 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<16x128x256xf16>
         memref.assume_alignment %5, 64 : memref<16x128x256xf16>
-        %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(64) : memref<16x128x256xf16>
+        %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<16x128x256xf16>
         memref.assume_alignment %6, 64 : memref<16x128x256xf16>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index

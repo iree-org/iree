@@ -52,9 +52,8 @@ if(RISCV_CPU STREQUAL "linux-riscv_64")
     "--iree-llvm-target-triple=riscv64"
     "--iree-llvm-target-cpu=generic-rv64"
     "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+c,+v"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+c,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
-    "--riscv-v-vector-bits-min=512"
     CACHE INTERNAL "Default llvm codegen flags for testing purposes")
 elseif(RISCV_CPU STREQUAL "linux-riscv_32")
   set(CMAKE_SYSTEM_PROCESSOR riscv32)
@@ -73,7 +72,6 @@ elseif(RISCV_CPU STREQUAL "linux-riscv_32")
     "--iree-llvm-target-abi=ilp32d"
     "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
-    "--riscv-v-vector-bits-min=512"
     CACHE INTERNAL "Default llvm codegen flags for testing purposes")
 elseif(RISCV_CPU STREQUAL "generic-riscv_32")
   set(CMAKE_SYSTEM_PROCESSOR riscv32)

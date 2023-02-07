@@ -127,7 +127,7 @@ Run the tool:
 
 ``` shell
 adb shell /data/local/tmp/iree-run-module --device=local-task \
-  --module_file=/data/local/tmp/simple_abs_vmvx.vmfb \
-  --entry_function=abs \
-  --function_input="f32=-5"
+  --module=/data/local/tmp/simple_abs_vmvx.vmfb \
+  --function=abs \
+  --input="f32=-5"
 ```

@@ -35,6 +35,25 @@ TEST(StringViewTest, Equal) {
   EXPECT_FALSE(equal("b", "ab"));
   EXPECT_TRUE(equal("abc", "abc"));
   EXPECT_FALSE(equal("abc", "aBc"));
+  EXPECT_TRUE(equal("a_c", "a_c"));
+}
+
+TEST(StringViewTest, EqualCase) {
+  auto equal_case = [](const char* lhs, const char* rhs) -> bool {
+    return iree_string_view_equal_case(iree_make_cstring_view(lhs),
+                                       iree_make_cstring_view(rhs));
+  };
+  EXPECT_TRUE(equal_case("", ""));
+  EXPECT_FALSE(equal_case("a", ""));
+  EXPECT_FALSE(equal_case("", "a"));
+  EXPECT_TRUE(equal_case("a", "a"));
+  EXPECT_TRUE(equal_case("A", "a"));
+  EXPECT_TRUE(equal_case("a", "A"));
+  EXPECT_FALSE(equal_case("a", "ab"));
+  EXPECT_FALSE(equal_case("b", "ab"));
+  EXPECT_TRUE(equal_case("abc", "abc"));
+  EXPECT_TRUE(equal_case("abc", "aBc"));
+  EXPECT_TRUE(equal_case("a_c", "a_C"));
 }
 
 TEST(StringViewTest, FindChar) {

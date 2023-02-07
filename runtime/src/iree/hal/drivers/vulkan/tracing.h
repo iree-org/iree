@@ -69,8 +69,6 @@ extern "C" {
 typedef struct iree_hal_vulkan_tracing_context_t
     iree_hal_vulkan_tracing_context_t;
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-
 // Allocates a tracing context for the given Vulkan queue.
 // Each context must only be used with the queue it was created with.
 //
@@ -98,6 +96,8 @@ void iree_hal_vulkan_tracing_context_free(
 // provided then collection will occur synchronously.
 void iree_hal_vulkan_tracing_context_collect(
     iree_hal_vulkan_tracing_context_t* context, VkCommandBuffer command_buffer);
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 // Begins a normal zone derived on the calling |src_loc|.
 // Must be perfectly nested and paired with a corresponding zone end.
@@ -140,24 +140,6 @@ void iree_hal_vulkan_tracing_zone_end_impl(
   iree_hal_vulkan_tracing_zone_end_impl(context, command_buffer)
 
 #else
-
-inline iree_status_t iree_hal_vulkan_tracing_context_allocate(
-    VkPhysicalDevice physical_device,
-    iree::hal::vulkan::VkDeviceHandle* logical_device, VkQueue queue,
-    iree_string_view_t queue_name, VkQueue maintenance_dispatch_queue,
-    iree::hal::vulkan::VkCommandPoolHandle* maintenance_command_pool,
-    iree_allocator_t host_allocator,
-    iree_hal_vulkan_tracing_context_t** out_context) {
-  *out_context = NULL;
-  return iree_ok_status();
-}
-
-inline void iree_hal_vulkan_tracing_context_free(
-    iree_hal_vulkan_tracing_context_t* context) {}
-
-inline void iree_hal_vulkan_tracing_context_collect(
-    iree_hal_vulkan_tracing_context_t* context,
-    VkCommandBuffer command_buffer) {}
 
 #define IREE_VULKAN_TRACE_ZONE_BEGIN(context, command_buffer)
 #define IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(                                 \

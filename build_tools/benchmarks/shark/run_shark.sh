@@ -14,29 +14,42 @@
 #        --sha <SHA of https://github.com/nod-ai/SHARK.git to pin to> \
 #        --pytest-regex e.g. "cpu", "cuda", "cuda and torch". \
 #        --driver e.g. "cpu", "cuda", "vulkan" \
-#        --output-dir <local output dir> \
-#        --save-version-info <true|false>
+#        --save-version-info <true|false> \
+#        --iree-source-dir <source directory IREE if a local version is used> \
+#        --output-dir <local output dir>
 
 set -xeuo pipefail
 
 export SAVE_VERSION_INFO=false
 export BENCHMARK_REGEX="cpu"
 export DRIVER="cpu"
+export IREE_SOURCE_DIR=""
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
-    -s|--sha) SHARK_SHA="$2"
-    shift;;
-    -r|--pytest-regex) BENCHMARK_REGEX="$2"
-    shift;;
-    -d|--driver) DRIVER="$2"
-    shift;;
-    -o|--output-dir) SHARK_OUTPUT_DIR="$(pwd)/$2"
-    shift;;
-    -v|--save-version-info) SAVE_VERSION_INFO="$2"
-    shift;;
-    *) echo "Unknown parameter passed: $1"
-    exit 1;;
+    --sha)
+      SHARK_SHA="$2"
+      shift;;
+    --pytest-regex)
+      BENCHMARK_REGEX="$2"
+      shift;;
+    -d|--driver)
+      DRIVER="$2"
+      shift;;
+    --save-version-info)
+      SAVE_VERSION_INFO="$2"
+      shift;;
+    -o|--output-dir)
+      SHARK_OUTPUT_DIR="$(realpath $2)"
+      shift;;
+    --iree-source-dir)
+      if [[ ! -z "$2" ]]; then
+        IREE_SOURCE_DIR="$(realpath $2)"
+      fi
+      shift;;
+    *)
+      echo "Unknown parameter passed: $1"
+      exit 1;;
 esac
 shift
 done
@@ -44,7 +57,7 @@ done
 mkdir "${SHARK_OUTPUT_DIR}"
 
 git clone https://github.com/nod-ai/SHARK.git
-cd SHARK
+pushd SHARK
 git reset --hard ${SHARK_SHA}
 
 # Remove existing data.
@@ -84,7 +97,41 @@ rm -rf ~/.local/shark_tank
 PYTHON=python3.10 VENV_DIR=iree.venv BENCHMARK=1 IMPORTER=1 USE_IREE=1 ./setup_venv.sh
 source iree.venv/bin/activate
 
-export IREE_VERSION=`pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g"`
+export IREE_VERSION=$(pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g")
+
+if [[ ! -z "${IREE_SOURCE_DIR}" ]]; then
+  # `setup_venv.sh` would have installed a nightly release of IREE so we uninstall here.
+  pip uninstall -y iree-compiler iree-runtime
+
+  pushd "${IREE_SOURCE_DIR}"
+
+  git submodule update --init
+  pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+
+  export IREE_VERSION="sha_$(git rev-parse --short=10 HEAD)"
+
+  # We build using the same Python Virtual Environment as SHARK to ensure compatibility.
+  cmake -GNinja -B iree-build -S . \
+      -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+      -DIREE_ENABLE_ASSERTIONS=ON \
+      -DCMAKE_C_COMPILER=clang \
+      -DCMAKE_CXX_COMPILER=clang++ \
+      -DIREE_ENABLE_LLD=ON \
+      -DIREE_BUILD_PYTHON_BINDINGS=ON \
+      -DPython3_EXECUTABLE="$(which python)" \
+      -DIREE_HAL_DRIVER_CUDA=ON \
+      -DIREE_TARGET_BACKEND_CUDA=ON
+
+  cmake --build iree-build
+
+  # Install Python bindings.
+  pushd iree-build
+  pip install -e compiler/
+  pip install -e runtime/
+  popd # iree-build
+  popd # ${IREE_SOURCE_DIR}
+fi
+
 pytest "${args[@]}" tank/test_models.py || true
 
 echo "######################################################"

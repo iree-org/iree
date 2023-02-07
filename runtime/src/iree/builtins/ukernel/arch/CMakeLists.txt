@@ -49,16 +49,7 @@ iree_cc_library(
 iree_cc_library(
   NAME
     ukernel_arch
-  HDRS
-    "mmt4d_arch.h"
-    "pack_arch.h"
-    "query_tile_sizes_arch.h"
-  SRCS
-    "mmt4d_arch.c"
-    "pack_arch.c"
-    "query_tile_sizes_arch.c"
   DEPS
-    iree::builtins::ukernel::headers
     ${IREE_UK_ARCH_DEPS}
   PUBLIC
 )

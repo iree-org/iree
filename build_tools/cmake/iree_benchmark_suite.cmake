@@ -402,16 +402,17 @@ function(iree_benchmark_suite)
       # Create the command and target for the flagfile spec used to execute
       # the generated artifacts.
       set(_FLAG_FILE "${_RUN_SPEC_DIR}/flagfile")
-      set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_RULE_RUNTIME_FLAGS}\"")
+      set(_BENCHMARK_FLAGS "--device_allocator=caching")
+      set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_RULE_RUNTIME_FLAGS}\" \"${_BENCHMARK_FLAGS}\"")
       file(RELATIVE_PATH _MODULE_FILE_FLAG "${_RUN_SPEC_DIR}" "${_VMFB_FILE}")
       add_custom_command(
         OUTPUT "${_FLAG_FILE}"
         COMMAND
           "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
-            --module_file="${_MODULE_FILE_FLAG}"
+            --module="${_MODULE_FILE_FLAG}"
             --device=${_RULE_DRIVER}
-            --entry_function=${_MODULE_ENTRY_FUNCTION}
-            --function_inputs=${_MODULE_FUNCTION_INPUTS}
+            --function=${_MODULE_ENTRY_FUNCTION}
+            --inputs=${_MODULE_FUNCTION_INPUTS}
             "${_ADDITIONAL_ARGS_CL}"
             -o "${_FLAG_FILE}"
         DEPENDS

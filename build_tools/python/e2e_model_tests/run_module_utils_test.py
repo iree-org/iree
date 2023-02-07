@@ -26,10 +26,8 @@ class RunModuleTuilsTest(unittest.TestCase):
     flags = run_module_utils.build_run_flags_for_model(
         model, common_definitions.ZEROS_MODEL_INPUT_DATA)
 
-    self.assertEqual(flags, [
-        "--entry_function=main", "--function_input=1xf32=0",
-        "--function_input=2x2xf32=0"
-    ])
+    self.assertEqual(
+        flags, ["--function=main", "--input=1xf32=0", "--input=2x2xf32=0"])
 
   def test_build_run_flags_for_execution_config(self):
     execution_config = iree_definitions.ModuleExecutionConfig(

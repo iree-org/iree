@@ -136,6 +136,7 @@ EXPORTS
   mlirAttributeIsAFloat
   mlirAttributeIsAInteger
   mlirAttributeIsAIntegerSet
+  mlirAttributeIsALocation
   mlirAttributeIsAOpaque
   mlirAttributeIsASparseElements
   mlirAttributeIsAStridedLayout
@@ -347,7 +348,9 @@ EXPORTS
   mlirLocationCallSiteGet
   mlirLocationEqual
   mlirLocationFileLineColGet
+  mlirLocationFromAttribute
   mlirLocationFusedGet
+  mlirLocationGetAttribute
   mlirLocationGetContext
   mlirLocationNameGet
   mlirLocationPrint

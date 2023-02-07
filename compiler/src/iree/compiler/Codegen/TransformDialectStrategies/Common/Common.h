@@ -187,7 +187,8 @@ std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
 /// The matched `maybeLeadingH`, `fillH`, `reductionH` and `maybeTrailingH` are
 /// fused into the top-level `scf.foreach_thread` and handles are returned to
 /// the fused versions of these ops, in order, that are all tiled and
-/// distributed accordingly.
+/// distributed accordingly. The scf.foreach_thread is returned as the last
+/// value.
 /// The mapping of the `scf.foreach_thread` dimensions is tied the first
 /// dimensions of `strategy.allBlockAttrs`.
 ///
@@ -201,9 +202,13 @@ std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
 ///
 /// Note: A future version of this op will be able to directly apply on the DAG
 /// and form the dispatch region.
-std::tuple<Value, Value, Value, Value> buildReductionStrategyBlockDistribution(
+std::tuple<Value, Value, Value, Value, Value>
+buildReductionStrategyBlockDistribution(
     ImplicitLocOpBuilder &b, Value variantH,
     const AbstractReductionStrategy &strategy);
+
+/// Build transform IR that applies memory optimizations.
+Value buildMemoryOptimizations(ImplicitLocOpBuilder &b, Value funcH);
 
 }  // namespace iree_compiler
 }  // namespace mlir

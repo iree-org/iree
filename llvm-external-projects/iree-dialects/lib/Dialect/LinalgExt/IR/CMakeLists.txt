@@ -12,12 +12,14 @@ add_mlir_library(IREELinalgExtDialect
   LINK_LIBS PUBLIC
   IREELinalgExtUtils
   MLIRAffineDialect
+  MLIRAffineUtils
   MLIRArithUtils
   MLIRDestinationStyleOpInterface
   MLIRDialectUtils
   MLIRIR
   MLIRInferTypeOpInterface
   MLIRLinalgDialect
+  MLIRLinalgUtils
   MLIRMathDialect
   MLIRMemRefDialect
   MLIRPass

@@ -99,6 +99,10 @@ static inline iree_string_pair_t iree_make_cstring_pair(const char* first,
 // Returns true if the two strings are equal (compare == 0).
 IREE_API_EXPORT bool iree_string_view_equal(iree_string_view_t lhs,
                                             iree_string_view_t rhs);
+// Returns true if the two strings are equal (compare == 0) ignoring case.
+// Equivalent to strcasecmp.
+IREE_API_EXPORT bool iree_string_view_equal_case(iree_string_view_t lhs,
+                                                 iree_string_view_t rhs);
 
 // Like std::string::compare but with iree_string_view_t values.
 IREE_API_EXPORT int iree_string_view_compare(iree_string_view_t lhs,

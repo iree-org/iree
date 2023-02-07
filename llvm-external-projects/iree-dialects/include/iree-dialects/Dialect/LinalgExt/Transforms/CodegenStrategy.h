@@ -39,7 +39,7 @@ struct Transformation {
 
 /// Represent one application of LinalgStrategyTileAndFusePass.
 struct TileAndFuse : public Transformation {
-  TileAndFuse(StringRef name, scf::SCFTileAndFuseOptions options,
+  TileAndFuse(StringRef name, scf::SCFTilingOptions options,
               LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr)
       : Transformation(std::move(f)), opName(name),
         options(std::move(options)) {}
@@ -52,7 +52,7 @@ struct TileAndFuse : public Transformation {
 
 private:
   std::string opName;
-  scf::SCFTileAndFuseOptions options;
+  scf::SCFTilingOptions options;
 };
 
 /// Represent one application of LinalgStrategyTilePass.
@@ -170,7 +170,7 @@ struct CodegenStrategy {
   /// Append a pattern to tile the Op `opName` and fuse its producers with
   /// tiling and fusion `options`.
   CodegenStrategy &
-  tileAndFuse(StringRef opName, const scf::SCFTileAndFuseOptions &options,
+  tileAndFuse(StringRef opName, const scf::SCFTilingOptions &options,
               const LinalgExt::LinalgTransformationFilter::FilterFunction &f =
                   nullptr) {
     transformationSequence.emplace_back(
@@ -180,7 +180,7 @@ struct CodegenStrategy {
   /// Conditionally append a pattern to tile the Op `opName` and fuse its
   /// producers with tiling and fusion `options`.
   CodegenStrategy &tileAndFuseIf(
-      bool b, StringRef opName, scf::SCFTileAndFuseOptions options,
+      bool b, StringRef opName, scf::SCFTilingOptions options,
       LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr) {
     return b ? tileAndFuse(opName, std::move(options), std::move(f)) : *this;
   }

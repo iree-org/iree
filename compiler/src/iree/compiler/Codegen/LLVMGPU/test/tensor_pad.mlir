@@ -4,8 +4,8 @@ func.func @transpose_no_align_dispatch_0_generic_48x32() {
   %c48 = arith.constant 48 : index
   %c32 = arith.constant 32 : index
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32x48xf32>>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<48x32xf32>>
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<32x48xf32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<48x32xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -34,8 +34,8 @@ func.func @transpose_no_align_dispatch_0_generic_48x32() {
 //       CHECK:  %[[C48:.*]] = arith.constant 48 : index
 //       CHECK:  %[[C32:.*]] = arith.constant 32 : index
 //       CHECK:  %[[C0:.*]] = arith.constant 0 : index
-//       CHECK:  %[[D0:.*]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[C0]]) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32x48xf32>>
-//       CHECK:  %[[D1:.*]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%[[C0]]) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<48x32xf32>>
+//       CHECK:  %[[D0:.*]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]]) : !flow.dispatch.tensor<readonly:tensor<32x48xf32>>
+//       CHECK:  %[[D1:.*]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[C0]]) : !flow.dispatch.tensor<writeonly:tensor<48x32xf32>>
 //       CHECK:  %[[WORKGROUP_ID_X:.*]] = hal.interface.workgroup.id[0] : index
 //       CHECK:  %[[WORKGROUP_COUNT_X:.*]] = hal.interface.workgroup.count[0] : index
 //       CHECK:  %[[WORKGROUP_ID_Y:.*]] = hal.interface.workgroup.id[1] : index

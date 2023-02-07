@@ -37,8 +37,6 @@ static void iree_pack_reference(const iree_uk_pack_params_t& params) {
   }
   assert(outer_size0 * tile_size0 >= params.in_size0);
   assert(outer_size1 * tile_size1 >= params.in_size1);
-  assert((outer_size0 - 1) * tile_size0 < params.in_size0);
-  assert((outer_size1 - 1) * tile_size1 < params.in_size1);
   for (iree_uk_ssize_t outer_i0 = 0; outer_i0 < outer_size0; ++outer_i0) {
     for (iree_uk_ssize_t outer_i1 = 0; outer_i1 < outer_size1; ++outer_i1) {
       for (iree_uk_ssize_t tile_i0 = 0; tile_i0 < tile_size0; ++tile_i0) {
@@ -165,47 +163,62 @@ static void pack_test_for_various_tile_shapes_and_flags(
       {3, 2},
       {8, 8},
       {11, 13},
-      {123, 45},
+      {13, 11},
+      {31, 33},
+      {33, 31},
+      {123, 89},
   };
+  enum class Pad { None, OneIncompleteTile, TonsOfPaddingTiles };
   for (const auto& outer_shape : outer_shapes) {
     for (bool transpose_inner : {false, true}) {
       for (bool transpose_outer : {false, true}) {
-        iree_uk_pack_params_t params = {};
-        params.type = type;
-        params.cpu_data = cpu_data;
-        iree_uk_ssize_t out_size0 = outer_shape.size0;
-        iree_uk_ssize_t out_size1 = outer_shape.size1;
-        iree_uk_ssize_t out_size2 = tile_size0;
-        iree_uk_ssize_t out_size3 = tile_size1;
-        params.out_size0 = out_size0;
-        params.out_size1 = out_size1;
-        params.out_size2 = out_size2;
-        params.out_size3 = out_size3;
-        params.flags = 0;
-        if (transpose_outer) {
-          params.flags |= IREE_UK_FLAG_PACK_TRANSPOSE_OUTER;
-          std::swap(out_size0, out_size1);
+        for (Pad pad :
+             {Pad::None, Pad::OneIncompleteTile, Pad::TonsOfPaddingTiles}) {
+          iree_uk_pack_params_t params = {};
+          params.type = type;
+          params.cpu_data = cpu_data;
+          iree_uk_ssize_t out_size0 = outer_shape.size0;
+          iree_uk_ssize_t out_size1 = outer_shape.size1;
+          iree_uk_ssize_t out_size2 = tile_size0;
+          iree_uk_ssize_t out_size3 = tile_size1;
+          params.out_size0 = out_size0;
+          params.out_size1 = out_size1;
+          if (pad == Pad::TonsOfPaddingTiles) {
+            params.out_size0 += 64;
+            params.out_size1 += 64;
+          }
+          params.out_size2 = out_size2;
+          params.out_size3 = out_size3;
+          params.flags = 0;
+          if (transpose_outer) {
+            params.flags |= IREE_UK_FLAG_PACK_TRANSPOSE_OUTER;
+            std::swap(out_size0, out_size1);
+          }
+          if (transpose_inner) {
+            params.flags |= IREE_UK_FLAG_PACK_TRANSPOSE_INNER;
+            std::swap(out_size2, out_size3);
+          }
+          params.in_size0 = out_size0 * out_size2;
+          params.in_size1 = out_size1 * out_size3;
+          if (pad == Pad::OneIncompleteTile) {
+            iree_uk_ssize_t pad_size0 =
+                iree_uk_test_random_engine_get_0_65535(engine) % out_size2;
+            iree_uk_ssize_t pad_size1 =
+                iree_uk_test_random_engine_get_0_65535(engine) % out_size3;
+            params.in_size0 =
+                std::max<iree_uk_ssize_t>(0, params.in_size0 - pad_size0);
+            params.in_size0 =
+                std::max<iree_uk_ssize_t>(0, params.in_size0 - pad_size1);
+          }
+          iree_uk_type_t out_type = iree_uk_pack_out_type(type);
+          int out_elem_size = iree_uk_type_size(out_type);
+          void* padding_value_buffer = malloc(out_elem_size);
+          iree_uk_test_write_random_buffer(padding_value_buffer, out_elem_size,
+                                           out_type, engine);
+          params.padding_value = padding_value_buffer;
+          test_one_pack_creating_input_for_given_shape(params, engine);
+          free(padding_value_buffer);
         }
-        if (transpose_inner) {
-          params.flags |= IREE_UK_FLAG_PACK_TRANSPOSE_INNER;
-          std::swap(out_size2, out_size3);
-        }
-        iree_uk_ssize_t pad_size0 =
-            iree_uk_test_random_engine_get_0_65535(engine) % out_size2;
-        iree_uk_ssize_t pad_size1 =
-            iree_uk_test_random_engine_get_0_65535(engine) % out_size3;
-        params.in_size0 =
-            std::max<iree_uk_ssize_t>(0, out_size0 * out_size2 - pad_size0);
-        params.in_size1 =
-            std::max<iree_uk_ssize_t>(0, out_size1 * out_size3 - pad_size1);
-        iree_uk_type_t out_type = iree_uk_pack_out_type(type);
-        int out_elem_size = iree_uk_type_size(out_type);
-        void* padding_value_buffer = malloc(out_elem_size);
-        iree_uk_test_write_random_buffer(padding_value_buffer, out_elem_size,
-                                         out_type, engine);
-        params.padding_value = padding_value_buffer;
-        test_one_pack_creating_input_for_given_shape(params, engine);
-        free(padding_value_buffer);
       }
     }
   }
@@ -255,6 +268,7 @@ static void pack_test(iree_uk_pack_type_t type, int tile_size0, int tile_size1,
 PACK_TEST(f32f32, 3, 5, generic, 0)
 PACK_TEST(i8i8, 4, 2, generic, 0)
 PACK_TEST(i32i32, 3, 4, generic, 0)
+PACK_TEST(i8i8, 8, 8, generic, 0)
 
 // ARM_64 tests.
 #if defined(IREE_UK_ARCH_ARM_64)

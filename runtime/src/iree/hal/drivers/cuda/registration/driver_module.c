@@ -24,6 +24,11 @@ IREE_FLAG(bool, cuda_allow_inline_execution, false,
           "Allow command buffers to execute inline against CUDA streams when "
           "possible.");
 
+IREE_FLAG(bool, cuda_tracing, true,
+          "Enables tracing of stream events when Tracy instrumentation is "
+          "enabled. Severely impacts benchmark timings and should only be used "
+          "when analyzing dispatch timings.");
+
 IREE_FLAG(int32_t, cuda_default_index, 0, "Index of the default CUDA device.");
 
 static iree_status_t iree_hal_cuda_driver_factory_enumerate(
@@ -95,6 +100,7 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
         IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM;
   }
   default_params.allow_inline_execution = FLAG_cuda_allow_inline_execution;
+  default_params.stream_tracing = FLAG_cuda_tracing;
 
   iree_status_t status =
       iree_hal_cuda_init_nccl_rank_and_count(&default_params);

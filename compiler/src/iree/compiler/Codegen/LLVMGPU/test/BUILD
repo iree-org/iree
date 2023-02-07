@@ -20,6 +20,7 @@ iree_lit_test_suite(
         [
             "conv_pipeline_test.mlir",
             "convert_to_nvvm.mlir",
+            "convert_to_nvvm_error.mlir",
             "convert_to_rocdl.mlir",
             "distribute_to_thread.mlir",
             "distribute_foreach.mlir",
@@ -39,6 +40,7 @@ iree_lit_test_suite(
             "tile_on_tensor.mlir",
             "transform_dialect_vector_distribution.mlir",
             "transform_dialect_bufferize.mlir",
+            "transform_dialect_promote_operands.mlir",
             "transform_vector_to_mma.mlir",
             "transpose_pipeline_test.mlir",
             "vector_to_gpu.mlir",

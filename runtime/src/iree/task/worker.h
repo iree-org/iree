@@ -160,8 +160,8 @@ static_assert(offsetof(iree_task_worker_t, local_task_queue) >=
 iree_status_t iree_task_worker_initialize(
     iree_task_executor_t* executor, iree_host_size_t worker_index,
     const iree_task_topology_group_t* topology_group,
-    iree_byte_span_t local_memory, iree_prng_splitmix64_state_t* seed_prng,
-    iree_task_worker_t* out_worker);
+    iree_host_size_t stack_size, iree_byte_span_t local_memory,
+    iree_prng_splitmix64_state_t* seed_prng, iree_task_worker_t* out_worker);
 
 // Requests that the worker begin exiting (if it hasn't already).
 // If the worker is actively processing tasks it will wait until it has

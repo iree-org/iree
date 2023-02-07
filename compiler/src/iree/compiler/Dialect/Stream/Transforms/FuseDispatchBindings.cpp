@@ -21,6 +21,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-stream-fuse-dispatch-bindings"
@@ -212,9 +213,12 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
         if (auto subspanOp =
                 dyn_cast<IREE::Stream::BindingSubspanOp>(use.getOwner())) {
           OpBuilder builder(subspanOp);
-          auto sum = builder.createOrFold<arith::AddIOp>(
-              newBindingArg.getLoc(), subspanOp.getByteOffset(), offsetArg);
-          subspanOp.getByteOffsetMutable().assign(sum);
+          Value offsetSum = offsetArg;
+          if (!mlir::matchPattern(subspanOp.getByteOffset(), m_Zero())) {
+            offsetSum = builder.createOrFold<arith::AddIOp>(
+                newBindingArg.getLoc(), subspanOp.getByteOffset(), offsetSum);
+          }
+          subspanOp.getByteOffsetMutable().assign(offsetSum);
         }
         use.set(newBindingArg);
       }

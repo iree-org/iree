@@ -86,6 +86,12 @@ def EliminateEmptyTensors :
   let constructor = "mlir::iree_compiler::createEliminateEmptyTensorsPass()";
 }
 
+def HoistStaticallyBoundAllocations :
+    Pass<"iree-hoist-statically-bound-allocations", "func::FuncOp"> {
+  let summary = "Hoist statically bound alloca ops to the entry block of functions";
+  let constructor = "mlir::iree_compiler::createHoistStaticallyBoundAllocationsPass()";
+}
+
 def IREEComprehensiveBufferize :
     Pass<"iree-codegen-iree-comprehensive-bufferize", "ModuleOp"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
@@ -165,6 +171,14 @@ def TensorToVectorVectorizePad :
                 "control flows";
   let constructor =
       "mlir::iree_compiler::createVectorizePadPass()";
+}
+
+def VectorizePackUnPackOps :
+    Pass<"iree-codegen-vectorize-pack-unpack-ops", "func::FuncOp"> {
+  let summary = "Vectorize a very specific form of tensor.pad with "
+                "control flows";
+  let constructor =
+      "mlir::iree_compiler::createVectorizePackUnPackOpsPass()";
 }
 
 def PolynomialApproximationPass :

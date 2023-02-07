@@ -12,6 +12,7 @@
 #include "iree/hal/drivers/cuda/api.h"
 #include "iree/hal/drivers/cuda/context_wrapper.h"
 #include "iree/hal/drivers/cuda/cuda_headers.h"
+#include "iree/hal/drivers/cuda/tracing.h"
 #include "iree/hal/utils/collective_batch.h"
 
 #ifdef __cplusplus
@@ -29,6 +30,7 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
 // Note that operations in the batch may apply to different channels.
 iree_status_t iree_hal_cuda_nccl_submit_batch(
     iree_hal_cuda_context_wrapper_t* context,
+    iree_hal_cuda_tracing_context_t* tracing_context,
     const iree_hal_collective_batch_t* batch, CUstream stream);
 
 #ifdef __cplusplus

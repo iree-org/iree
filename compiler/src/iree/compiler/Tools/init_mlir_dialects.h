@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -32,6 +33,7 @@
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/IR/TensorInferTypeOpInterfaceImpl.h"
+#include "mlir/Dialect/Tensor/IR/TensorTilingInterfaceImpl.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Dialect.h"
@@ -46,8 +48,9 @@ namespace mlir {
 inline void registerMlirDialects(DialectRegistry &registry) {
   // clang-format off
   registry.insert<AffineDialect,
-                  cf::ControlFlowDialect,
                   bufferization::BufferizationDialect,
+                  cf::ControlFlowDialect,
+                  complex::ComplexDialect,
                   gpu::GPUDialect,
                   nvgpu::NVGPUDialect,
                   LLVM::LLVMDialect,
@@ -69,6 +72,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   shape::ShapeDialect>();
   // clang-format on
   tensor::registerInferTypeOpInterfaceExternalModels(registry);
+  tensor::registerTilingInterfaceExternalModelsForPackUnPackOps(registry);
 
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
   registry.insert<emitc::EmitCDialect>();

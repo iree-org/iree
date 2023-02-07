@@ -28,7 +28,6 @@ LLVM_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
-    compiler_flags = ["--iree-input-type=none"],
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
@@ -37,7 +36,7 @@ iree_check_single_backend_test_suite(
     name = "check_winograd_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
     compiler_flags = [
-        "--iree-flow-enable-conv-winograd-transform",
+        "--iree-preprocessing-pass-pipeline=builtin.module\\(func.func\\(iree-linalg-ext-convert-conv2d-to-winograd\\)\\)",
     ],
     driver = "local-task",
     target_backend = "llvm-cpu",
@@ -53,9 +52,6 @@ VMVX_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_vmvx_local-task",
     srcs = VMVX_SRCS,
-    compiler_flags = [
-        "--iree-input-type=none",
-    ],
     driver = "local-task",
     target_backend = "vmvx",
 )
@@ -70,7 +66,6 @@ VULKAN_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = VULKAN_SRCS,
-    compiler_flags = ["--iree-input-type=none"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
@@ -79,10 +74,10 @@ iree_check_single_backend_test_suite(
     name = "check_winograd_vulkan-spirv_vulkan",
     srcs = VULKAN_SRCS,
     compiler_flags = [
-        "--iree-flow-enable-conv-winograd-transform",
+        "--iree-preprocessing-pass-pipeline=builtin.module\\(func.func\\(iree-linalg-ext-convert-conv2d-to-winograd\\)\\)",
     ],
-    driver = "local-task",
-    target_backend = "llvm-cpu",
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
 )
 
 test_suite(

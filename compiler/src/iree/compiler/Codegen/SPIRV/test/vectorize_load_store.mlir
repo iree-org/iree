@@ -238,7 +238,7 @@ func.func @scalarize_non_minor_identity_transfer_read(%memory: memref<4x2x4xi32>
 //  CHECK-SAME: (%[[VALUE:.+]]: vector<4xf32>, %[[I1:.+]]: index, %[[I2:.+]]: index)
 func.func @scalarize_non_minor_identity_transfer_write(%value: vector<4xf32>, %i1: index, %i2: index) {
   %c0 = arith.constant 0: index
-  %buffer = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<1x130x130x64xf32>
+  %buffer = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<1x130x130x64xf32>
   vector.transfer_write %value, %buffer[%c0, %i1, %i2, %c0] {in_bounds = [true], permutation_map = affine_map<(d0, d1, d2, d3) -> (d2)>} : vector<4xf32>, memref<1x130x130x64xf32>
   return
 }

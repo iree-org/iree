@@ -20,6 +20,7 @@ iree_lit_test_suite(
         [
             "executable_benchmarks.mlir",
             "hal_executable.mlir",
+            "preprocessing_flags.mlir",
             "smoketest.mlir",
             "streams.mlir",
         ],

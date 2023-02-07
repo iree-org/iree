@@ -473,7 +473,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateComplexToLLVMConversionPatterns(typeConverter, patterns);
   populateMathToLLVMConversionPatterns(typeConverter, patterns);
   memref::populateExpandStridedMetadataPatterns(patterns);
-  populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
+  populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
   populateFuncToLLVMConversionPatterns(typeConverter, patterns);
   arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
   populateVectorToSCFConversionPatterns(patterns);

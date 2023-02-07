@@ -306,8 +306,6 @@ enum iree_flags_parse_mode_bits_t {
 };
 typedef uint32_t iree_flags_parse_mode_t;
 
-#if IREE_FLAGS_ENABLE_CLI == 1
-
 // Sets the usage information printed when --help is passed on the command line.
 // Both strings must remain live for the lifetime of the program.
 void iree_flags_set_usage(const char* program_name, const char* usage);
@@ -345,19 +343,6 @@ void iree_flags_parse_checked(iree_flags_parse_mode_t mode, int* argc,
 
 // Dumps all flags and their current values to the given |file|.
 void iree_flags_dump(iree_flag_dump_mode_t mode, FILE* file);
-
-#else
-
-inline void iree_flags_set_usage(const char* program_name, const char* usage) {}
-inline int iree_flags_parse(iree_flags_parse_mode_t mode, int* argc,
-                            char*** argv) {
-  return 0;
-}
-inline void iree_flags_parse_checked(iree_flags_parse_mode_t mode, int* argc,
-                                     char*** argv) {}
-inline void iree_flags_dump(iree_flag_dump_mode_t mode, FILE* file) {}
-
-#endif  // IREE_FLAGS_ENABLE_CLI
 
 #ifdef __cplusplus
 }  // extern "C"

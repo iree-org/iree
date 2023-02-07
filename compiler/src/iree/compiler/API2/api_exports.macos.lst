@@ -135,6 +135,7 @@ _mlirAttributeIsAFlatSymbolRef
 _mlirAttributeIsAFloat
 _mlirAttributeIsAInteger
 _mlirAttributeIsAIntegerSet
+_mlirAttributeIsALocation
 _mlirAttributeIsAOpaque
 _mlirAttributeIsASparseElements
 _mlirAttributeIsAStridedLayout
@@ -346,7 +347,9 @@ _mlirLinalgFillBuiltinNamedOpRegion
 _mlirLocationCallSiteGet
 _mlirLocationEqual
 _mlirLocationFileLineColGet
+_mlirLocationFromAttribute
 _mlirLocationFusedGet
+_mlirLocationGetAttribute
 _mlirLocationGetContext
 _mlirLocationNameGet
 _mlirLocationPrint

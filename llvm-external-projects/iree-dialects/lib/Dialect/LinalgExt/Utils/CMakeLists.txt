@@ -5,6 +5,7 @@ add_mlir_library(IREELinalgExtUtils
   DEPENDS
   mlir-headers
 
+  LINK_LIBS PUBLIC
   MLIRDialectUtils
   MLIRIR
   MLIRTensorDialect

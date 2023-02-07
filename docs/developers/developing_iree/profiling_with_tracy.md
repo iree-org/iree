@@ -145,8 +145,8 @@ you only need Tracy to see into the IREE runtime, leaving IREE CPU codegen
 modules opaque.
 
 For tracing the compiler, additionally set `IREE_ENABLE_COMPILER_TRACING` to
-`ON`. Compiler tracing is less stable, particularly on Linux with MLIR threading
-enabled (https://github.com/iree-org/iree/issues/6404).
+`ON`. Compiler tracing is less stable, particularly when using sampling
+(running with elevated permissions).
 
 Once done configuring CMake, proceed to rebuild, e.g.
 
@@ -177,9 +177,9 @@ Example:
 TRACY_NO_EXIT=1 IREE_PRESERVE_DYLIB_TEMP_FILES=1 \
   /data/local/tmp/iree-benchmark-module \
     --driver=local-task \
-    --module_file=/data/local/tmp/android_module.fbvm \
-    --entry_function=serving_default \
-    --function_input=1x384xi32
+    --module=/data/local/tmp/android_module.fbvm \
+    --function=serving_default \
+    --input=1x384xi32
 ```
 
 Explanation:

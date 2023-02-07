@@ -63,6 +63,10 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();
+    if (failed(verifyLLVMConversionCompatibility(m))) {
+      signalPassFailure();
+      return;
+    }
 
     /// Customize the bitwidth used for the device side index computations.
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
@@ -112,7 +116,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
       memref::populateExpandStridedMetadataPatterns(llvmPatterns);
-      populateMemRefToLLVMConversionPatterns(converter, llvmPatterns);
+      populateFinalizeMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);

@@ -44,8 +44,7 @@ struct SimpleOperationInfo : public llvm::DenseMapInfo<Operation *> {
       return OperationEquivalence::isEquivalentTo(
           const_cast<Operation *>(lhsC), const_cast<Operation *>(rhsC),
           OperationEquivalence::exactValueMatch,
-          OperationEquivalence::ignoreValueEquivalence,
-          OperationEquivalence::IgnoreLocations);
+          /*markEquivalent=*/nullptr, OperationEquivalence::IgnoreLocations);
     }
 
     // If lhs or rhs does not have a single region with a single block, they
@@ -80,7 +79,8 @@ struct SimpleOperationInfo : public llvm::DenseMapInfo<Operation *> {
 
     // Callback to compare if operands of ops in the region of `lhs` and `rhs`
     // are equivalent.
-    auto mapOperands = [&](Value lhsValue, Value rhsValue) -> LogicalResult {
+    auto checkEquivalent = [&](Value lhsValue,
+                               Value rhsValue) -> LogicalResult {
       if (lhsValue == rhsValue)
         return success();
       if (areEquivalentValues.lookup(lhsValue) == rhsValue)
@@ -90,17 +90,15 @@ struct SimpleOperationInfo : public llvm::DenseMapInfo<Operation *> {
 
     // Callback to compare if results of ops in the region of `lhs` and `rhs`
     // are equivalent.
-    auto mapResults = [&](Value lhsResult, Value rhsResult) -> LogicalResult {
+    auto markEquivalent = [&](Value lhsResult, Value rhsResult) {
       if (getParent(lhsResult) == lhs && getParent(rhsResult) == rhs) {
-        auto insertion = areEquivalentValues.insert({lhsResult, rhsResult});
-        return success(insertion.first->second == rhsResult);
+        areEquivalentValues.insert({lhsResult, rhsResult});
       }
-      return success();
     };
 
     return OperationEquivalence::isEquivalentTo(
         const_cast<Operation *>(lhsC), const_cast<Operation *>(rhsC),
-        mapOperands, mapResults, OperationEquivalence::IgnoreLocations);
+        checkEquivalent, markEquivalent, OperationEquivalence::IgnoreLocations);
   }
 };
 } // namespace

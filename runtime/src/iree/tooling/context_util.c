@@ -32,7 +32,7 @@
 // either files or builtin module names in order to customize things. When we
 // support multiple types of dynamically loadable modules (lua/etc) we could
 // also allow mixes and use file ID snooping to choose a loader.
-IREE_FLAG(string, module_file, "-",
+IREE_FLAG(string, module, "-",
           "File containing the module to load. Defaults to stdin (`-`).");
 
 iree_status_t iree_tooling_load_module_from_flags(
@@ -42,13 +42,13 @@ iree_status_t iree_tooling_load_module_from_flags(
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_TEXT(z0, FLAG_module_file);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, FLAG_module);
 
   // Fetch the file contents into memory.
   // We could map the memory here if we wanted to and were coming from a file
   // on disk.
   iree_file_contents_t* file_contents = NULL;
-  if (strcmp(FLAG_module_file, "-") == 0) {
+  if (strcmp(FLAG_module, "-") == 0) {
     // Reading from stdin. We print it out here because people often get
     // confused when the tool hangs waiting for input.
     fprintf(stderr, "Reading module contents from stdin...\n");
@@ -56,8 +56,8 @@ iree_status_t iree_tooling_load_module_from_flags(
         z0, iree_stdin_read_contents(host_allocator, &file_contents));
   } else {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_file_read_contents(FLAG_module_file, host_allocator,
-                                    &file_contents));
+        z0,
+        iree_file_read_contents(FLAG_module, host_allocator, &file_contents));
   }
 
   // Try to load the module as bytecode (all we have today that we can use).

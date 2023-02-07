@@ -76,7 +76,7 @@ hal.executable @warp_reduction_dispatch {
 //         CHECK:    %[[WID:.+]] = arith.divui %{{.*}}, %{{.*}} : index
 //         CHECK:    %[[LANE_ID:.*]] = arith.remui %[[TID]], %[[C32I]] : index
 //         CHECK:    %[[LANE0:.*]] = arith.cmpi eq, %[[LANE_ID]], %[[C0]] : index
-//         CHECK:    scf.if %[[LANE0]] { 
+//         CHECK:    scf.if %[[LANE0]] {
 //         CHECK:      memref.store %[[R6]], %[[ALLOC]][%[[WID]]] : memref<4xf32, #gpu.address_space<workgroup>>
 //         CHECK:    }
 //         CHECK:    gpu.barrier
@@ -114,8 +114,8 @@ hal.executable @warp_reduction_dispatch {
       func.func @warp_reduction_dispatch() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f16
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<10x9216x9216xf16>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<10x9216x9216xf16>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x9216x9216xf16>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<10x9216x9216xf16>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [10, 9216, 9216], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<10x9216x9216xf16>> -> tensor<10x9216x9216xf16>
         %3 = tensor.empty() : tensor<10x9216x9216xf16>
         %4 = tensor.empty() : tensor<10x9216xf16>

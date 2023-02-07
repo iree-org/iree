@@ -31,11 +31,11 @@ func.func @matmul_static(
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:       builtin.module {
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:         func.func @matmul_static_dispatch_0_matmul_3x3x5() {
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           arith.constant 0 : index
-// CODEGEN-CUSTOM-DISPATCH-FORMATION:           hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset({{.*}}) alignment(64) flags(ReadOnly) : memref<3x5xf32>
+// CODEGEN-CUSTOM-DISPATCH-FORMATION:           hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset({{.*}}) flags(ReadOnly) : memref<3x5xf32>
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           memref.assume_alignment %{{.*}}, 64 : memref<3x5xf32>
-// CODEGEN-CUSTOM-DISPATCH-FORMATION:           hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset({{.*}}) alignment(64) flags(ReadOnly) : memref<5x3xf32>
+// CODEGEN-CUSTOM-DISPATCH-FORMATION:           hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset({{.*}}) flags(ReadOnly) : memref<5x3xf32>
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           memref.assume_alignment %{{.*}}, 64 : memref<5x3xf32>
-// CODEGEN-CUSTOM-DISPATCH-FORMATION:           hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset({{.*}}) alignment(64) : memref<3x3xf32>
+// CODEGEN-CUSTOM-DISPATCH-FORMATION:           hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset({{.*}}) : memref<3x3xf32>
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           memref.assume_alignment %{{.*}}, 64 : memref<3x3xf32>
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           affine.apply {{.*}}()[%workgroup_id_x]
@@ -61,10 +61,10 @@ func.func @matmul_static(
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
 // RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/matmul_codegen_default_spec.mlir | \
-// RUN: iree-run-module --entry_function=matmul_static \
-// RUN:   --function_input="3x5xf32=1" \
-// RUN:   --function_input="5x3xf32=2" \
-// RUN:   --function_input="3x3xf32=42"| \
+// RUN: iree-run-module --function=matmul_static \
+// RUN:   --input="3x5xf32=1" \
+// RUN:   --input="5x3xf32=2" \
+// RUN:   --input="3x3xf32=42" | \
 // RUN: FileCheck %s --check-prefixes=EXEC
 
 // EXEC: 3x3xf32=[52 52 52][52 52 52][52 52 52]

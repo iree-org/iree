@@ -93,6 +93,7 @@ iree_cc_library(
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
+    "HoistStaticallyBoundAllocations.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "MaterializeEncodingIntoPackUnPack.cpp"
     "OptimizeVectorTransferPass.cpp"
@@ -102,6 +103,7 @@ iree_cc_library(
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
+    "VectorizePackUnPackOps.cpp"
     "VectorizePad.cpp"
     "WorkgroupSpecializationPass.cpp"
   DEPS

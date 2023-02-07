@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -95,6 +96,14 @@ static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
                                         ValueRange dynamicSizes,
                                         unsigned alignment) {
+  auto funcOp = builder.getInsertionPoint()->getParentOfType<func::FuncOp>();
+  if (funcOp) {
+    std::optional<Value> hoistedAllocation = hoistStaticallyBoundAllocations(
+        funcOp, builder, loc, memRefType, dynamicSizes, alignment);
+    if (hoistedAllocation) {
+      return hoistedAllocation.value();
+    }
+  }
   return builder
       .create<memref::AllocaOp>(loc, memRefType, dynamicSizes,
                                 builder.getI64IntegerAttr(alignment))
@@ -128,6 +137,8 @@ static void addTileAndDistributePasses(
     OpPassManager &pm, bool useFuseTensorPadWithConsumerPass = true) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createDecomposeSoftmaxPass());
   if (clEnablePadConsumerFusion && useFuseTensorPadWithConsumerPass) {
@@ -707,6 +718,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   // math dialect elementry functions -> polynomial form.
   passManager.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
+
+  passManager.addNestedPass<func::FuncOp>(
+      createHoistStaticallyBoundAllocationsPass());
 
   // Checking stack allocation before converting to CF dialect is easier.
   // Do not check allocation if hoist-padding is enabled. It intends to allocate

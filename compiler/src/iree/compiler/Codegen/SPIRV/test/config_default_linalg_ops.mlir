@@ -160,8 +160,8 @@ hal.executable @avg_pool {
         %cst = arith.constant 0.000000e+00 : f32
         %cst_0 = arith.constant 4.900000e+01 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1x7x7x1280xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1x1x1x1280xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1x7x7x1280xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x1x1x1280xf32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 7, 7, 1280], strides = [1, 1, 1, 1]
           : !flow.dispatch.tensor<readonly:tensor<1x7x7x1280xf32>> -> tensor<1x7x7x1280xf32>
         %3 = tensor.empty() : tensor<7x7xf32>
@@ -386,8 +386,8 @@ hal.executable @outermost_reduction {
       func.func @outermost_reduction() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<4x2048x512xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<2048x512xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4x2048x512xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2048x512xf32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4, 2048, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x2048x512xf32>> -> tensor<4x2048x512xf32>
         %3 = tensor.empty() : tensor<2048x512xf32>
         %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<2048x512xf32>) -> tensor<2048x512xf32>
@@ -442,9 +442,9 @@ hal.executable private @innermost_reduction {
         %3 = arith.index_cast %0 {stream.alignment = 512 : index, stream.values = [0 : index, 394752 : index, 984064 : index]} : i32 to index
         %4 = arith.index_cast %1 {stream.alignment = 512 : index, stream.values = [0 : index, 196608 : index, 197120 : index]} : i32 to index
         %5 = arith.index_cast %2 {stream.alignment = 512 : index, stream.values = [512 : index, 197120 : index, 197632 : index]} : i32 to index
-        %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%3) alignment(64) : !flow.dispatch.tensor<readonly:tensor<128x384xf32>>
-        %7 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%4) alignment(64) : !flow.dispatch.tensor<readonly:tensor<128xf32>>
-        %8 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%5) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<128xf32>>
+        %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%3) : !flow.dispatch.tensor<readonly:tensor<128x384xf32>>
+        %7 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%4) : !flow.dispatch.tensor<readonly:tensor<128xf32>>
+        %8 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<128xf32>>
         %9 = flow.dispatch.tensor.load %6, offsets = [0, 0], sizes = [128, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x384xf32>> -> tensor<128x384xf32>
         %10 = flow.dispatch.tensor.load %7, offsets = [0], sizes = [128], strides = [1] : !flow.dispatch.tensor<readonly:tensor<128xf32>> -> tensor<128xf32>
         %11 = tensor.empty() : tensor<128xf32>
@@ -497,8 +497,8 @@ hal.executable @four_dim_elementwise {
     builtin.module {
       func.func @four_dim_elementwise() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<128x8x256x4xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<128x256x4x8xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<128x8x256x4xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x256x4x8xf32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [128, 8, 256, 4], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x8x256x4xf32>> -> tensor<128x8x256x4xf32>
         %3 = tensor.empty() : tensor<128x256x4x8xf32>
         %4 = linalg.generic {

@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
@@ -27,6 +28,7 @@ using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::
     MapNestedForeachThreadToGpuThreadsOp;
+using iree_compiler::IREE::transform_dialect::ShareForeachThreadOperandsOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
 using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
 using transform::FuseIntoContainingOp;
@@ -112,9 +114,20 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
   }
 }
 
+static Value shareForeachArgument(ImplicitLocOpBuilder &b, Value foreachThread,
+                                  ArrayRef<int64_t> indices) {
+  auto foreachType = transform::OperationType::get(
+      b.getContext(), scf::ForeachThreadOp::getOperationName());
+  foreachThread = b.create<transform::CastOp>(foreachType, foreachThread);
+  return b.create<
+      iree_compiler::IREE::transform_dialect::ShareForeachThreadOperandsOp>(
+      foreachType, foreachThread, indices);
+}
+
 static void buildStagedReductionStrategyThreadLevel(
-    ImplicitLocOpBuilder &b, Value gridReductionH, Value maybeTiledLeadingH,
-    Value maybeTiledTrailingH, const StagedReductionStrategy &strategy) {
+    ImplicitLocOpBuilder &b, Value gridReductionH, Value gridFillH,
+    Value maybeTiledLeadingH, Value maybeTiledTrailingH,
+    const StagedReductionStrategy &strategy) {
   // Map the potential maybeTiledLeadingH.
   // TODO: Consider fusing leading elementwise into threads.
   if (strategy.captures.maybeLeadingRank > 0) {
@@ -149,15 +162,36 @@ static void buildStagedReductionStrategyThreadLevel(
   // y only will trigger the insertion of an `scf.if (threadIdx.x == 0)`
   // predicate after `scf.foreach_thread` is lowered.
   // This predicate allows further vector distribution to kick in.
+  Value root = blockCombinerOpH;
+  SmallVector<Value> opsToFuse = {gridFillH};
+
+  // By the properties matching, we know the optional trailing op takes the
+  // result of the reduction as an input argument.
+  // It necessarily follows that maybeTrailingRank >= reductionRank - 1.
+  // When maybeTrailingRank == reductionRank - 1, by the properties of the
+  // transformations we have applied until now, we know that the elementwise is
+  // a simple scalar operation and it can be fused in the producing reduction
+  // without creating recomputations.
+  // TODO: Some `transform.assert` op that the shape of the op is indeed 1s only
+  // as a safety measure.
+  // TODO: More composable transform strategy parts require more matching after
+  // part of the strategy has been applied. See the discussion in #11951 for
+  // more context.
+  if (strategy.captures.maybeTrailingRank ==
+      strategy.captures.reductionRank - 1) {
+    root = maybeTiledTrailingH;
+    opsToFuse.push_back(blockCombinerOpH);
+  }
   iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
       /*b=*/b,
-      /*rootH=*/blockCombinerOpH,
-      /*opsToFuse=*/{},
+      /*rootH=*/root,
+      /*opsToFuse=*/opsToFuse,
       /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({1})),
       /*mappingAttr=*/b.getArrayAttr(strategy.allThreadAttrs[1]));
 
-  // Map the potential maybeTiledTrailingH.
-  if (strategy.captures.maybeTrailingRank > 0) {
+  // Map the potential maybeTiledTrailingH if it hasn't been fused with the
+  // reduction.
+  if (root != maybeTiledTrailingH && strategy.captures.maybeTrailingRank > 0) {
     int64_t vectorSize =
         iree_compiler::gpu::kCudaMaxVectorLoadBitWidth /
         strategy.captures.maybeTrailingOutputElementalTypeBitWidth;
@@ -182,26 +216,41 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
     const StagedReductionStrategy &strategy) {
   // Step 1. Match and tile to introduce the top-level scf.foreach_thread for
   // the block/workgroup level. Keep everything fused.
-  auto [maybeLeadingHBlock, gridFillH, gridReductionH,
-        maybeTiledTrailingHBlock] =
+  auto [maybeLeadingHBlock, gridFillH, gridReductionH, maybeTiledTrailingHBlock,
+        commonEnclosingForeachThreadH] =
       buildReductionStrategyBlockDistribution(b, variantH, strategy);
 
   // Step 2. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
-  // TODO: consider fusing gridFillH.
-  buildStagedReductionStrategyThreadLevel(b, gridReductionH, maybeLeadingHBlock,
+  buildStagedReductionStrategyThreadLevel(b, gridReductionH, gridFillH,
+                                          maybeLeadingHBlock,
                                           maybeTiledTrailingHBlock, strategy);
 
-  // Step 3-4. Common trailing steps.
+  // Step 3. Make sure we don't create allocation by sharing foreach_thread
+  // output. This amounts to injecting user-defined static information that each
+  // thread accesses only a private slice. This needs to be added late, once we
+  // don't need handles anymore, because contained handles are currently always
+  // invalidated, even when modified inplace.
+  // TODO: Relax nested invalidation for transforms that only move or modify
+  // contained ops inplace.
+  shareForeachArgument(b, commonEnclosingForeachThreadH,
+                       ArrayRef<int64_t>({0}));
+
+  // Step 4-5. Common trailing steps.
   auto [variantH2, funcH] = buildCommonTrailingStrategy(b, variantH, strategy);
 
-  // Step 5. The staged strategy has a post-bufferization vector distribution
+  // Step 6. The staged strategy has a post-bufferization vector distribution
   // with rank-reduction. The vector distribution occurs on multiple warps and
   // is itself internally staged in 2 stages.
   assert(strategy.getNumThreadsXInBlock() % kCudaWarpSize == 0 &&
          "strategy requires full warps");
   int64_t numWarpsToUse = strategy.getNumThreadsXInBlock() / kCudaWarpSize;
-  int64_t bitWidth = strategy.captures.reductionOutputElementalTypeBitWidth;
-  numWarpsToUse = adjustNumberOfWarpsForBlockShuffle(numWarpsToUse, bitWidth);
+  // Distribute the reduction on all the threads of the group. This allows us
+  // to have the same data layout for the partial reduction and the merge and
+  // therefore we can optimize away the temporary memory usage.
   buildDistributeVectors(b, variantH2, funcH, numWarpsToUse * kCudaWarpSize);
+
+  // Step 7. Apply clean up of memory operations.
+  funcH = b.create<MatchOp>(variantH2, func::FuncOp::getOperationName());
+  iree_compiler::buildMemoryOptimizations(b, funcH);
 }

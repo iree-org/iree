@@ -13,11 +13,11 @@ func.func @_matmul_f16_f16_dispatch_0_fill_3456x1024() {
   %3 = gpu.thread_id  z
   %4 = memref.alloc() : memref<4x32x40xf16, 3>
   %5 = memref.alloc() : memref<4x32x40xf16, 3>
-  %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<3456x2048xf16>
+  %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<3456x2048xf16>
   memref.assume_alignment %6, 64 : memref<3456x2048xf16>
-  %7 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<2048x1024xf16>
+  %7 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2048x1024xf16>
   memref.assume_alignment %7, 64 : memref<2048x1024xf16>
-  %8 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<3456x1024xf16>
+  %8 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<3456x1024xf16>
   memref.assume_alignment %8, 64 : memref<3456x1024xf16>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index

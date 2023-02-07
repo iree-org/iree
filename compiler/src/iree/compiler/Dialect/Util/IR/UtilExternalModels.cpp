@@ -146,6 +146,8 @@ void registerUtilExternalModels(DialectRegistry &registry) {
             *ctx);
         LinalgExt::SoftmaxOp::attachInterface<
             LinalgOpTiedOpInterface<LinalgExt::SoftmaxOp>>(*ctx);
+        LinalgExt::AttentionOp::attachInterface<
+            LinalgOpTiedOpInterface<LinalgExt::AttentionOp>>(*ctx);
       });
 }
 

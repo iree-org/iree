@@ -23,6 +23,7 @@
 typedef struct {
   iree_hal_command_buffer_t base;
   iree_hal_cuda_context_wrapper_t* context;
+  iree_hal_cuda_tracing_context_t* tracing_context;
   CUstream stream;
 
   // Maintains a reference to all resources used within the command buffer.
@@ -56,6 +57,7 @@ iree_hal_cuda_stream_command_buffer_cast(
 
 iree_status_t iree_hal_cuda_stream_command_buffer_create(
     iree_hal_device_t* device, iree_hal_cuda_context_wrapper_t* context,
+    iree_hal_cuda_tracing_context_t* tracing_context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_host_size_t binding_capacity, CUstream stream,
@@ -84,6 +86,7 @@ iree_status_t iree_hal_cuda_stream_command_buffer_create(
         binding_capacity, &iree_hal_cuda_stream_command_buffer_vtable,
         &command_buffer->base);
     command_buffer->context = context;
+    command_buffer->tracing_context = tracing_context;
     command_buffer->stream = stream;
     iree_arena_initialize(block_pool, &command_buffer->arena);
     for (size_t i = 0; i < IREE_HAL_CUDA_MAX_KERNEL_ARG; i++) {
@@ -147,8 +150,8 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_flush_collectives(
   }
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_hal_cuda_nccl_submit_batch(
-      command_buffer->context, &command_buffer->collective_batch,
-      command_buffer->stream);
+      command_buffer->context, command_buffer->tracing_context,
+      &command_buffer->collective_batch, command_buffer->stream);
   iree_hal_collective_batch_reset(&command_buffer->collective_batch);
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -159,6 +162,13 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_begin(
   iree_hal_cuda_stream_command_buffer_t* command_buffer =
       iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
   iree_arena_reset(&command_buffer->arena);
+
+  IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->stream,
+      /*file_name=*/NULL, 0,
+      /*line=*/0, /*func_name=*/NULL, 0, "iree_hal_cuda_stream_command_buffer",
+      strlen("iree_hal_cuda_stream_command_buffer"));
+
   return iree_ok_status();
 }
 
@@ -166,9 +176,43 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_end(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_cuda_stream_command_buffer_t* command_buffer =
       iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
+
   IREE_RETURN_IF_ERROR(
       iree_hal_cuda_stream_command_buffer_flush_collectives(command_buffer));
+
+  IREE_CUDA_TRACE_ZONE_END(command_buffer->tracing_context,
+                           command_buffer->stream);
+
   return iree_ok_status();
+}
+
+static void iree_hal_cuda_stream_command_buffer_begin_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
+    iree_hal_label_color_t label_color,
+    const iree_hal_label_location_t* location) {
+  iree_hal_cuda_stream_command_buffer_t* command_buffer =
+      iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
+  (void)command_buffer;
+
+  IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->stream,
+      location ? location->file.data : NULL, location ? location->file.size : 0,
+      location ? location->line : 0, /*func_name=*/NULL, 0, label.data,
+      label.size);
+
+  // TODO: pass along to CUPTI if available.
+}
+
+static void iree_hal_cuda_stream_command_buffer_end_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_cuda_stream_command_buffer_t* command_buffer =
+      iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
+  (void)command_buffer;
+
+  // TODO: pass along to CUPTI if available.
+
+  IREE_CUDA_TRACE_ZONE_END(command_buffer->tracing_context,
+                           command_buffer->stream);
 }
 
 static iree_status_t iree_hal_cuda_stream_command_buffer_execution_barrier(
@@ -439,34 +483,40 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
   IREE_RETURN_IF_ERROR(
       iree_hal_cuda_stream_command_buffer_flush_collectives(command_buffer));
 
-  iree_hal_pipeline_layout_t* layout =
-      iree_hal_cuda_executable_get_layout(executable, entry_point);
-  iree_host_size_t num_constants =
-      iree_hal_cuda_pipeline_layout_num_constants(layout);
-  iree_host_size_t constant_base_index =
-      iree_hal_cuda_push_constant_index(layout);
+  // Lookup kernel parameters used for side-channeling additional launch
+  // information from the compiler.
+  iree_hal_cuda_kernel_params_t kernel_params;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_cuda_native_executable_entry_point_kernel_params(
+          executable, entry_point, &kernel_params));
+
+  IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->stream,
+      kernel_params.function_name.data, kernel_params.function_name.size,
+      /*line=*/0, /*func_name=*/NULL, 0, kernel_params.function_name.data,
+      kernel_params.function_name.size);
 
   // Patch the push constants in the kernel arguments.
+  iree_host_size_t num_constants =
+      iree_hal_cuda_pipeline_layout_num_constants(kernel_params.layout);
+  iree_host_size_t constant_base_index =
+      iree_hal_cuda_push_constant_index(kernel_params.layout);
   for (iree_host_size_t i = 0; i < num_constants; i++) {
     *((uint32_t*)command_buffer->current_descriptor[i + constant_base_index]) =
         command_buffer->push_constant[i];
   }
 
-  int32_t block_size_x, block_size_y, block_size_z;
-  int32_t shared_memory_size;
-  IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_block_size(
-      executable, entry_point, &block_size_x, &block_size_y, &block_size_z));
-  IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_shared_memory_size(
-      executable, entry_point, &shared_memory_size));
-  CUfunction func =
-      iree_hal_cuda_native_executable_for_entry_point(executable, entry_point);
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      cuLaunchKernel(func, workgroup_x, workgroup_y, workgroup_z, block_size_x,
-                     block_size_y, block_size_z, shared_memory_size,
-                     command_buffer->stream, command_buffer->current_descriptor,
-                     NULL),
+      cuLaunchKernel(kernel_params.function, workgroup_x, workgroup_y,
+                     workgroup_z, kernel_params.block_size[0],
+                     kernel_params.block_size[1], kernel_params.block_size[2],
+                     kernel_params.shared_memory_size, command_buffer->stream,
+                     command_buffer->current_descriptor, NULL),
       "cuLaunchKernel");
+
+  IREE_CUDA_TRACE_ZONE_END(command_buffer->tracing_context,
+                           command_buffer->stream);
 
   return iree_ok_status();
 }
@@ -496,6 +546,9 @@ static const iree_hal_command_buffer_vtable_t
         .dyn_cast = iree_hal_cuda_stream_command_buffer_dyn_cast,
         .begin = iree_hal_cuda_stream_command_buffer_begin,
         .end = iree_hal_cuda_stream_command_buffer_end,
+        .begin_debug_group =
+            iree_hal_cuda_stream_command_buffer_begin_debug_group,
+        .end_debug_group = iree_hal_cuda_stream_command_buffer_end_debug_group,
         .execution_barrier =
             iree_hal_cuda_stream_command_buffer_execution_barrier,
         .signal_event = iree_hal_cuda_stream_command_buffer_signal_event,

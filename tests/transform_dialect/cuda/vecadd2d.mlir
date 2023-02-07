@@ -14,10 +14,10 @@ util.global private @"rhs" {noinline} = dense<2.0> : !type
 func.func @vecadd2d() -> (!type2) {
   %cst0 = arith.constant 0.000000e+00 : f32
   %cst1 = arith.constant 2.000000e+00 : f32
-  
-  %x_ptr = util.global.address @"rhs" : !util.ptr<!type>  
-  %x = util.global.load.indirect %x_ptr : !util.ptr<!type> -> !type  
-  %y_ptr = util.global.address @"lhs" : !util.ptr<!type2>  
+
+  %x_ptr = util.global.address @"rhs" : !util.ptr<!type>
+  %x = util.global.load.indirect %x_ptr : !util.ptr<!type> -> !type
+  %y_ptr = util.global.address @"lhs" : !util.ptr<!type2>
   %y = util.global.load.indirect %y_ptr : !util.ptr<!type2> -> !type2
 
   // Note: Two linalg.generics to fill the tensors will make IREE generate two
@@ -38,6 +38,7 @@ func.func @vecadd2d() -> (!type2) {
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/vecadd2d_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK
 
@@ -47,6 +48,7 @@ func.func @vecadd2d() -> (!type2) {
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/vecadd2d_codegen_spec_partial_tile.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK-PARTIAL-TILE
 
@@ -54,8 +56,9 @@ func.func @vecadd2d() -> (!type2) {
 // RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
 /// Constant JIT'ing must be disabled because the transform-dialect debug
 /// flags leak to the JIT session, which doesn't know what to do with them.
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/vecadd2d_codegen_spec.mlir | \
-// RUN: iree-run-module --entry_function=vecadd2d --device=cuda |\
+// RUN: iree-run-module --function=vecadd2d --device=cuda |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 //     CHECK:  hal.executable.export
@@ -69,7 +72,7 @@ func.func @vecadd2d() -> (!type2) {
 //     CHECK:  %[[BLKX:.*]] = hal.interface.workgroup.id[0] : index
 //     CHECK:  memref.subview %0[%[[BLKZ:.*]], %[[BLKX:.*]]]
 
-//     CHECK-PARTIAL-TILE:  hal.executable.export 
+//     CHECK-PARTIAL-TILE:  hal.executable.export
 //     CHECK-PARTIAL-TILE:  bb0(%[[DEV:.*]]: !hal.device, %[[A1:.*]]: index, %[[A2:.*]]: index):
 //     CHECK-PARTIAL-TILE:  %[[c1:.*]] = arith.constant 1 : index
 //     CHECK-PARTIAL-TILE:  %[[dim:.*]] = affine.apply #map()[%[[A2]]]

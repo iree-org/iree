@@ -388,7 +388,7 @@ iree_status_t iree_dynamic_library_attach_symbols_from_memory(
   // Extract the library to a temp file.
   char* temp_path = NULL;
   iree_status_t status = iree_dynamic_library_write_temp_file(
-      buffer, "mem_", "pdb", library->allocator, &temp_path);
+      buffer, "mem", "pdb", library->allocator, &temp_path);
   if (iree_status_is_ok(status)) {
     // Associate the temp path to the library; the temp_path string and the
     // backing file will be deleted when the library is closed.

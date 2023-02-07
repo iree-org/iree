@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-flow-pad-linalg-ops %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-preprocessing-pad-linalg-ops %s | FileCheck %s
 
 func.func @matmul_f32_11x13x17(%lhs: tensor<11x17xf32>, %rhs: tensor<17x13xf32>, %init: tensor<11x13xf32>) -> tensor<11x13xf32> {
     %result = linalg.matmul ins(%lhs, %rhs : tensor<11x17xf32>, tensor<17x13xf32>) outs(%init : tensor<11x13xf32>) -> tensor<11x13xf32>

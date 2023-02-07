@@ -26,9 +26,9 @@ echo ""
 print_usage_and_exit() {
   echo "Usage: $0 <artifact-directory> "
   echo "       --device <device>"
-  echo "       --module_file <input-module-file> "
-  echo "       --entry_function <entry-function> "
-  echo "       --function_inputs_file <input-buffer-file> "
+  echo "       --module <input-module-file> "
+  echo "       --function <entry-function> "
+  echo "       --inputs_file <input-buffer-file> "
   exit 1
 }
 
@@ -43,7 +43,7 @@ while (( "$#" )); do
         print_usage_and_exit
       fi
       ;;
-    --module_file)
+    --module)
       if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
         IREE_INPUT_MODULE_FILE=$(readlink -f $2)
         shift 2
@@ -52,7 +52,7 @@ while (( "$#" )); do
         print_usage_and_exit
       fi
       ;;
-    --entry_function)
+    --function)
       if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
         IREE_ENTRY_FUNCTION=$2
         shift 2
@@ -61,7 +61,7 @@ while (( "$#" )); do
         print_usage_and_exit
       fi
       ;;
-    --function_inputs_file)
+    --inputs_file)
       if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
         IREE_INPUT_BUFFER_FILE=$(readlink -f $2)
         shift 2

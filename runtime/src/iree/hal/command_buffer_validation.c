@@ -56,13 +56,14 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
     iree_hal_buffer_compatibility_t required_compatibility,
     iree_hal_buffer_usage_t intended_usage) {
   iree_hal_buffer_compatibility_t allowed_compatibility =
-      iree_hal_allocator_query_compatibility(
+      iree_hal_allocator_query_buffer_compatibility(
           iree_hal_device_allocator(validation_state->device),
           (iree_hal_buffer_params_t){
               .type = iree_hal_buffer_memory_type(buffer),
               .usage = iree_hal_buffer_allowed_usage(buffer) & intended_usage,
           },
-          iree_hal_buffer_allocation_size(buffer));
+          iree_hal_buffer_allocation_size(buffer), /*out_params=*/NULL,
+          /*out_allocation_size=*/NULL);
   if (!iree_all_bits_set(allowed_compatibility, required_compatibility)) {
 #if IREE_STATUS_MODE
     // Buffer cannot be used on the queue for the given usage.
@@ -374,6 +375,12 @@ iree_status_t iree_hal_command_buffer_collective_validation(
   if (op.kind > IREE_HAL_COLLECTIVE_KIND_MAX_VALUE) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unknown collective operation");
+  } else if (op.reduction > IREE_HAL_COLLECTIVE_REDUCTION_MAX_VALUE) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unknown collective reduction");
+  } else if (op.element_type > IREE_HAL_COLLECTIVE_ELEMENT_TYPE_MAX_VALUE) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unknown collective element type");
   }
   enum iree_hal_collective_info_bits_t {
     IREE_HAL_COLLECTIVE_IS_REDUCTION = 1u << 0,

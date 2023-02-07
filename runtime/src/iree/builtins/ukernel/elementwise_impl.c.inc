@@ -61,48 +61,6 @@ typedef enum {
 #define ASSI32(ptr) *((iree_uk_int32_t*)ptr)
 
 //===----------------------------------------------------------------------===//
-// Math helper functions (extracted from base/internal/math.h and adapted
-// to be able to be used standalone).
-//===----------------------------------------------------------------------===//
-
-// Clang on Windows has __builtin_clzll; otherwise we need to use the
-// windows intrinsic functions.
-#if defined(_MSC_VER)
-#include <intrin.h>
-#pragma intrinsic(_BitScanReverse)
-#pragma intrinsic(_BitScanForward)
-#endif  // IREE_COMPILER_MSVC
-
-static inline int iree_uk_count_leading_zeros_u32(const iree_uk_uint32_t n) {
-#if defined(_MSC_VER)
-  unsigned long result = 0;  // NOLINT(runtime/int)
-  if (_BitScanReverse(&result, n)) {
-    return (int)(31 - result);
-  }
-  return 32;
-#elif defined(__GNUC__) || defined(__clang__)
-#if defined(__LCZNT__)
-  // NOTE: LZCNT is a risky instruction; it is not supported on architectures
-  // before Haswell, yet it is encoded as 'rep bsr', which typically ignores
-  // invalid rep prefixes, and interprets it as the 'bsr' instruction, which
-  // returns the index of the value rather than the count, resulting in
-  // incorrect code.
-  return (int)__lzcnt32(n);
-#endif  // defined(__LCZNT__)
-
-  // Handle 0 as a special case because __builtin_clz(0) is undefined.
-  if (n == 0) return 32;
-  // Use __builtin_clz, which uses the following instructions:
-  //  x86: bsr
-  //  ARM64: clz
-  //  PPC: cntlzd
-  return (int)__builtin_clz(n);
-#else
-#error No clz for this arch.
-#endif  // MSVC / GCC / CLANG
-}
-
-//===----------------------------------------------------------------------===//
 // Implementation macros.
 //===----------------------------------------------------------------------===//
 

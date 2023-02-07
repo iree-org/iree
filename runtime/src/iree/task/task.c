@@ -586,6 +586,8 @@ void iree_task_dispatch_issue(iree_task_dispatch_t* dispatch_task,
   }
   const uint32_t* workgroup_count = dispatch_task->workgroup_count.value;
 
+#if IREE_HAL_VERBOSE_TRACING_ENABLE
+  // TODO(benvanik): tracing.h helper that speeds this up; too slow.
   IREE_TRACE({
     char xyz_string[32];
     int xyz_string_length =
@@ -593,6 +595,7 @@ void iree_task_dispatch_issue(iree_task_dispatch_t* dispatch_task,
                  workgroup_count[0], workgroup_count[1], workgroup_count[2]);
     IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, xyz_string, xyz_string_length);
   });
+#endif  // IREE_HAL_VERBOSE_TRACING_ENABLE
 
   // Setup the iteration space for shards to pull work from the complete grid.
   iree_atomic_store_int32(&dispatch_task->tile_index, 0,
@@ -784,12 +787,14 @@ void iree_task_dispatch_shard_execute(
                                   "iree_task_dispatch_shard_execute_tile");
       IREE_TRACE_ZONE_SET_COLOR(z_tile, iree_task_tile_to_color(&tile_context));
 
+#ifndef NDEBUG
       // NOTE: these are useful for debugging but dramatically increase our
       // cost here; only enable if needed for tracking work distribution:
       IREE_TRACE_ZONE_APPEND_VALUE(z_tile, tile_context.workgroup_xyz[0]);
       IREE_TRACE_ZONE_APPEND_VALUE(z_tile, tile_context.workgroup_xyz[1]);
       IREE_TRACE_ZONE_APPEND_VALUE(z_tile, tile_context.workgroup_xyz[2]);
       // IREE_TRACE_ZONE_APPEND_VALUE(z_tile, (uint64_t)task->closure.fn);
+#endif  // !NDEBUG
 
       iree_status_t status =
           dispatch_task->closure.fn(dispatch_task->closure.user_context,

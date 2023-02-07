@@ -72,6 +72,7 @@ void transform_dialect::ApplyPatternsOp::build(
               getEraseUnnecessaryTensorOperandsAttrName)
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
+  ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
   ADD_PATTERN(lowerTransferOpPermutations,
               getLowerTransferOpPermutationsAttrName)
   ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
@@ -106,6 +107,24 @@ struct GenerateToConstant : public OpRewritePattern<tensor::GenerateOp> {
     return success();
   }
 };
+
+/// Fold tensor.empty used by extract_slice if this the only use of
+/// extract_slice and the result is static.
+struct FoldTensorEmptyExtract
+    : public OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
+                                PatternRewriter &rewriter) const final {
+    auto tensorEmpty = extractOp.getSource().getDefiningOp<tensor::EmptyOp>();
+    if (!tensorEmpty || !extractOp.getType().hasStaticShape() ||
+        !tensorEmpty->hasOneUse())
+      return failure();
+    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
+        extractOp, extractOp.getType().getShape(),
+        extractOp.getType().getElementType());
+    return success();
+  }
+};
 }  // namespace
 
 static void addLowerTransferOpPermutationsPatterns(
@@ -115,6 +134,10 @@ static void addLowerTransferOpPermutationsPatterns(
 
 static void addFoldMemrefAliasPatterns(RewritePatternSet &patterns) {
   memref::populateFoldMemRefAliasOpPatterns(patterns);
+}
+
+static void addFoldTensorEmptyExtract(RewritePatternSet &patterns) {
+  patterns.add<FoldTensorEmptyExtract>(patterns.getContext());
 }
 
 static void addReassociativeReshapePatterns(RewritePatternSet &patterns) {
@@ -175,6 +198,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
+  if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
   if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
   if (getRankReducingVector()) addRankReducingVectorPatterns(patterns);
   if (getExpandMemrefStridedMetadata())
@@ -1180,6 +1204,7 @@ void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
 void transform_dialect::ApplyBufferOptimizationsOp::build(
     OpBuilder &builder, OperationState &result, Value target) {
   result.addOperands(target);
+  result.addTypes({pdl::OperationType::get(target.getContext())});
 }
 
 #define GET_OP_CLASSES

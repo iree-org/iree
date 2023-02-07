@@ -2,9 +2,9 @@
 // RUN:     --iree-hal-executable-object-search-path=$IREE_BINARY_DIR | \
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
-// RUN:     --entry_function=mixed_invocation \
-// RUN:     --function_input=8xf32=2 \
-// RUN:     --function_input=8xf32=4 | \
+// RUN:     --function=mixed_invocation \
+// RUN:     --input=8xf32=2 \
+// RUN:     --input=8xf32=4 | \
 // RUN: FileCheck %s
 
 // This example demonstrates authoring and dispatching retargetable executables
@@ -173,9 +173,9 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
           %tid = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
 
           // Bindings are accessed by reference.
-          %binding0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<?xf32>{%dim}
-          %binding1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<?xf32>{%dim}
-          %binding2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<?xf32>{%dim}
+          %binding0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
 
           // Call the externally defined C function with an (almost) plain C
           // calling convention (see above for details about the mess memrefs
@@ -207,8 +207,8 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
           %tid = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
 
           // Same as above but note that we're treating %binding1 as read/write.
-          %binding0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<?xf32>{%dim}
-          %binding1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<?xf32>{%dim}
+          %binding0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
 
           func.call @simple_mul_inplace_workgroup(%binding0, %binding1, %dim, %tid) : (memref<?xf32>, memref<?xf32>, index, index) -> ()
 
@@ -223,9 +223,9 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
   // Function demonstrating a few hand-authored dispatches mixed with codegen.
   // Invoke with:
   //  --device=local-sync
-  //  --entry_function=mixed_invocation
-  //  --function_input=8xf32=2
-  //  --function_input=8xf32=4
+  //  --function=mixed_invocation
+  //  --input=8xf32=2
+  //  --input=8xf32=4
   // CHECK-LABEL: EXEC @mixed_invocation
   func.func @mixed_invocation(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
     // The only externally available metadata in the dispatch are the values

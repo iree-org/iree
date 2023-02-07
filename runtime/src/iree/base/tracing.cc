@@ -32,6 +32,10 @@ void IREEDbgHelpUnlock(void) { ReleaseMutex(iree_dbghelp_mutex); }
 
 #if IREE_TRACING_FEATURES != 0
 
+int64_t iree_tracing_time(void) { return tracy::Profiler::GetTime(); }
+
+int64_t iree_tracing_frequency(void) { return tracy::GetFrequencyQpc(); }
+
 iree_zone_id_t iree_tracing_zone_begin_impl(
     const iree_tracing_location_t* src_loc, const char* name,
     size_t name_length) {
@@ -122,11 +126,127 @@ void iree_tracing_zone_end(iree_zone_id_t zone_id) {
   ___tracy_emit_zone_end(iree_tracing_make_zone_ctx(zone_id));
 }
 
+uint8_t iree_tracing_gpu_context_allocate(iree_tracing_gpu_context_type_t type,
+                                          const char* name, size_t name_length,
+                                          bool is_calibrated,
+                                          uint64_t cpu_timestamp,
+                                          uint64_t gpu_timestamp,
+                                          float timestamp_period) {
+  // Allocate the process-unique GPU context ID. There's a max of 255 available;
+  // if we are recreating devices a lot we may exceed that. Don't do that, or
+  // wrap around and get weird (but probably still usable) numbers.
+  uint8_t context_id =
+      tracy::GetGpuCtxCounter().fetch_add(1, std::memory_order_relaxed);
+  if (context_id >= 255) {
+    context_id %= 255;
+  }
+
+  uint8_t context_flags = 0;
+  if (is_calibrated) {
+    // Tell tracy we'll be passing calibrated timestamps and not to mess with
+    // the times. We'll periodically send GpuCalibration events in case the
+    // times drift.
+    context_flags |= tracy::GpuContextCalibration;
+  }
+  {
+    auto* item = tracy::Profiler::QueueSerial();
+    tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuNewContext);
+    tracy::MemWrite(&item->gpuNewContext.cpuTime, cpu_timestamp);
+    tracy::MemWrite(&item->gpuNewContext.gpuTime, gpu_timestamp);
+    memset(&item->gpuNewContext.thread, 0, sizeof(item->gpuNewContext.thread));
+    tracy::MemWrite(&item->gpuNewContext.period, timestamp_period);
+    tracy::MemWrite(&item->gpuNewContext.context, context_id);
+    tracy::MemWrite(&item->gpuNewContext.flags, context_flags);
+    tracy::MemWrite(&item->gpuNewContext.type, (tracy::GpuContextType)type);
+    tracy::Profiler::QueueSerialFinish();
+  }
+
+  // Send the name of the context along.
+  // NOTE: Tracy will unconditionally free the name so we must clone it here.
+  // Since internally Tracy will use its own rpmalloc implementation we must
+  // make sure we allocate from the same source.
+  char* cloned_name = (char*)tracy::tracy_malloc(name_length);
+  memcpy(cloned_name, name, name_length);
+  {
+    auto* item = tracy::Profiler::QueueSerial();
+    tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuContextName);
+    tracy::MemWrite(&item->gpuContextNameFat.context, context_id);
+    tracy::MemWrite(&item->gpuContextNameFat.ptr, (uint64_t)cloned_name);
+    tracy::MemWrite(&item->gpuContextNameFat.size, name_length);
+    tracy::Profiler::QueueSerialFinish();
+  }
+
+  return context_id;
+}
+
+void iree_tracing_gpu_context_calibrate(uint8_t context_id, int64_t cpu_delta,
+                                        int64_t cpu_timestamp,
+                                        int64_t gpu_timestamp) {
+  auto* item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuCalibration);
+  tracy::MemWrite(&item->gpuCalibration.gpuTime, gpu_timestamp);
+  tracy::MemWrite(&item->gpuCalibration.cpuTime, cpu_timestamp);
+  tracy::MemWrite(&item->gpuCalibration.cpuDelta, cpu_delta);
+  tracy::MemWrite(&item->gpuCalibration.context, context_id);
+  tracy::Profiler::QueueSerialFinish();
+}
+
+void iree_tracing_gpu_zone_begin(uint8_t context_id, uint16_t query_id,
+                                 const iree_tracing_location_t* src_loc) {
+  auto* item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneBeginSerial);
+  tracy::MemWrite(&item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime());
+  tracy::MemWrite(&item->gpuZoneBegin.srcloc, (uint64_t)src_loc);
+  tracy::MemWrite(&item->gpuZoneBegin.thread, tracy::GetThreadHandle());
+  tracy::MemWrite(&item->gpuZoneBegin.queryId, query_id);
+  tracy::MemWrite(&item->gpuZoneBegin.context, context_id);
+  tracy::Profiler::QueueSerialFinish();
+}
+
+void iree_tracing_gpu_zone_begin_external(
+    uint8_t context_id, uint16_t query_id, const char* file_name,
+    size_t file_name_length, uint32_t line, const char* function_name,
+    size_t function_name_length, const char* name, size_t name_length) {
+  const auto src_loc = tracy::Profiler::AllocSourceLocation(
+      line, file_name, file_name_length, function_name, function_name_length,
+      name, name_length);
+  auto* item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type,
+                  tracy::QueueType::GpuZoneBeginAllocSrcLocSerial);
+  tracy::MemWrite(&item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime());
+  tracy::MemWrite(&item->gpuZoneBegin.srcloc, (uint64_t)src_loc);
+  tracy::MemWrite(&item->gpuZoneBegin.thread, tracy::GetThreadHandle());
+  tracy::MemWrite(&item->gpuZoneBegin.queryId, query_id);
+  tracy::MemWrite(&item->gpuZoneBegin.context, context_id);
+  tracy::Profiler::QueueSerialFinish();
+}
+
+void iree_tracing_gpu_zone_end(uint8_t context_id, uint16_t query_id) {
+  auto* item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneEndSerial);
+  tracy::MemWrite(&item->gpuZoneEnd.cpuTime, tracy::Profiler::GetTime());
+  tracy::MemWrite(&item->gpuZoneEnd.thread, tracy::GetThreadHandle());
+  tracy::MemWrite(&item->gpuZoneEnd.queryId, query_id);
+  tracy::MemWrite(&item->gpuZoneEnd.context, context_id);
+  tracy::Profiler::QueueSerialFinish();
+}
+
+void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
+                                  int64_t gpu_timestamp) {
+  auto* item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuTime);
+  tracy::MemWrite(&item->gpuTime.gpuTime, gpu_timestamp);
+  tracy::MemWrite(&item->gpuTime.queryId, query_id);
+  tracy::MemWrite(&item->gpuTime.context, context_id);
+  tracy::Profiler::QueueSerialFinish();
+}
+
 void iree_tracing_set_plot_type_impl(const char* name_literal,
-                                     uint8_t plot_type) {
+                                     uint8_t plot_type, bool step, bool fill,
+                                     uint32_t color) {
   tracy::Profiler::ConfigurePlot(name_literal,
                                  static_cast<tracy::PlotFormatType>(plot_type),
-                                 false, true, 0);
+                                 step, fill, color);
 }
 
 void iree_tracing_plot_value_i64_impl(const char* name_literal, int64_t value) {

@@ -499,6 +499,8 @@ static iree_status_t iree_elf_module_apply_relocations(
   reloc_state.vaddr_bias = module->vaddr_bias;
   reloc_state.dyn_table = load_state->dyn_table;
   reloc_state.dyn_table_count = load_state->dyn_table_count;
+  reloc_state.dynsym = module->dynsym;
+  reloc_state.dynsym_count = module->dynsym_count;
   return iree_elf_arch_apply_relocations(&reloc_state);
 }
 

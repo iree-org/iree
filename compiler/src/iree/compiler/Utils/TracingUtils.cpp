@@ -6,11 +6,11 @@
 
 #include "iree/compiler/Utils/TracingUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-
 #if IREE_ENABLE_COMPILER_TRACING && \
     IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
+namespace mlir {
+namespace iree_compiler {
 
 namespace {
 thread_local llvm::SmallVector<iree_zone_id_t, 8> passTraceZonesStack;
@@ -31,7 +31,137 @@ void PassTracing::runAfterPassFailed(Pass *pass, Operation *op) {
   passTraceZonesStack.pop_back();
 }
 
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+
+// Mark memory events by overloading `operator new` and `operator delete` and
+// using the `IREE_TRACE_ALLOC` and `IREE_TRACE_FREE` annotations.
+//
+// The `new` and `delete` operators are designed to be replaceable, though this
+// is a very large and brittle hammer:
+// https://en.cppreference.com/w/cpp/memory/new/operator_new
+// https://en.cppreference.com/w/cpp/memory/new/operator_delete
+//   * "Versions (1-8) are replaceable: a user-provided non-member function
+//      with the same signature defined anywhere in the program, in any source
+//      file, replaces the default version"
+//   * "The program is ill-formed, no diagnostic required if more than one
+//      replacement is provided in the program for any of the replaceable
+//      allocation function."
+//
+// We should also still honor alignment:
+// https://www.cppstories.com/2019/08/newnew-align/#custom-overloads
+// Note: always disable exceptions, so no `if (!ptr) throw std::bad_alloc{};`
+
+#include "iree/base/target_platform.h"
+
+// Avoid potential sharp edge by making allocation tracking and sanitizers
+// mutually exclusive. They _might_ work together, but here's a warning anyway.
+#if defined(IREE_SANITIZER_ADDRESS) || defined(IREE_SANITIZER_MEMORY) || \
+    defined(IREE_SANITIZER_THREAD)
+#error Compiler IREE_TRACING_FEATURE_ALLOCATION_TRACKING not compatible with sanitizers
+#endif  // IREE_SANITIZER_*
+
+#include <new>
+
+void *iree_aligned_new(std::size_t count, std::align_val_t al) {
+#if defined(_WIN32) || defined(__CYGWIN__)
+  return _aligned_malloc(count, static_cast<std::size_t>(al));
+#else
+  return aligned_alloc(static_cast<std::size_t>(al), count);
+#endif
+}
+
+// replaceable allocation functions
+void *operator new(std::size_t count) {
+  auto ptr = malloc(count);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+void *operator new[](std::size_t count) {
+  auto ptr = malloc(count);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+void *operator new(std::size_t count, std::align_val_t al) {
+  auto ptr = iree_aligned_new(count, al);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+void *operator new[](std::size_t count, std::align_val_t al) {
+  auto ptr = iree_aligned_new(count, al);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+
+// replaceable non-throwing allocation functions
+// (even though we disable exceptions, these have unique signatures)
+void *operator new(std::size_t count, const std::nothrow_t &tag) noexcept {
+  auto ptr = malloc(count);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+void *operator new[](std::size_t count, const std::nothrow_t &tag) noexcept {
+  auto ptr = malloc(count);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+void *operator new(std::size_t count, std::align_val_t al,
+                   const std::nothrow_t &) noexcept {
+  auto ptr = iree_aligned_new(count, al);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+void *operator new[](std::size_t count, std::align_val_t al,
+                     const std::nothrow_t &) noexcept {
+  auto ptr = iree_aligned_new(count, al);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+
+void iree_aligned_free(void *ptr) {
+#if defined(_WIN32) || defined(__CYGWIN__)
+  _aligned_free(ptr);
+#else
+  free(ptr);
+#endif
+}
+
+// replaceable usual deallocation functions
+void operator delete(void *ptr) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+void operator delete[](void *ptr) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+void operator delete(void *ptr, size_t sz) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+void operator delete[](void *ptr, size_t sz) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+void operator delete(void *ptr, std::align_val_t al) noexcept {
+  IREE_TRACE_FREE(ptr);
+  iree_aligned_free(ptr);
+}
+void operator delete[](void *ptr, std::align_val_t al) noexcept {
+  IREE_TRACE_FREE(ptr);
+  iree_aligned_free(ptr);
+}
+void operator delete(void *ptr, size_t sz, std::align_val_t al) noexcept {
+  IREE_TRACE_FREE(ptr);
+  iree_aligned_free(ptr);
+}
+void operator delete[](void *ptr, size_t sz, std::align_val_t al) noexcept {
+  IREE_TRACE_FREE(ptr);
+  iree_aligned_free(ptr);
+}
+
+#endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+
+#endif  // IREE_ENABLE_COMPILER_TRACING + IREE_TRACING_FEATURE_INSTRUMENTATION

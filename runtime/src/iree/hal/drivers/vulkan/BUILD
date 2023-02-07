@@ -83,7 +83,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/utils:resource_set",
         "//runtime/src/iree/hal/utils:semaphore_base",
         "//runtime/src/iree/schemas:spirv_executable_def_c_fbs",
-        "@tracy_client//:runtime_impl",
         "@vulkan_headers",
         "@vulkan_memory_allocator//:impl_header_only",
     ],

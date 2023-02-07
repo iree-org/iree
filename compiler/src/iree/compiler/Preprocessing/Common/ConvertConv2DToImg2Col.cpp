@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Preprocessing/Common/PassDetail.h"
+#include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -22,7 +22,6 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace Flow {
 
 static bool hasAllOneValues(DenseIntElementsAttr attr) {
   return llvm::all_of(
@@ -549,7 +548,6 @@ std::unique_ptr<Pass> createConvertConv2DToImg2ColPass() {
   return std::make_unique<ConvertConv2DToImg2ColPass>();
 }
 
-}  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

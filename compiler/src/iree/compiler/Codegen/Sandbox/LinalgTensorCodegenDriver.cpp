@@ -441,14 +441,14 @@ void LinalgFusePass::runOnOperation() {
     derivedTileInterchange = llvm::to_vector(tileInterchange);
   }
 
-  scf::SCFTileAndFuseOptions tileAndFuseOptions;
+  scf::SCFTilingOptions tileAndFuseOptions;
   scf::SCFTilingOptions tilingOptions;
   auto anyNonZeroSizes = [](ArrayRef<int64_t> sizes) {
     return llvm::any_of(sizes, [](int64_t size) { return size > 0; });
   };
   bool doTileAndFuse = anyNonZeroSizes(derivedTileAndFuseSizes);
   if (doTileAndFuse) {
-    tileAndFuseOptions.tilingOptions
+    tileAndFuseOptions
         .setTileSizeComputationFunction(
             [derivedTileAndFuseSizes](OpBuilder &b, Operation *op) {
               return buildTileSizesForOp(b, op, derivedTileAndFuseSizes);

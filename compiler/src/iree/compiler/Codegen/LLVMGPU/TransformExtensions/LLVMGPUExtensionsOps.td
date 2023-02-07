@@ -154,7 +154,7 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
       func.func @foo() {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<128xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c1 : index
         scf.if %2 {
@@ -175,7 +175,7 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
         %c4 = arith.constant 4 : index
         %c32 = arith.constant 32 : index
         %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<128xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c32 : index
         // Single-warp guard filters out threads 32-63.
@@ -253,7 +253,7 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
         %c4 = arith.constant 4 : index
         %c32 = arith.constant 32 : index
         %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<128xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c32 : index
         // Single-warp guard filters out threads 32-63.
@@ -277,7 +277,7 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
         %c4 = arith.constant 4 : index
         %c32 = arith.constant 32 : index
         %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<128xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c32 : index
         // Single-warp guard filters out threads 32-63.
@@ -317,12 +317,15 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
 }
 
 def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_conversion",
-    [TransformEachOpTrait,
-     TransformOpInterface,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     This converts slices of operations containing vector.contract op into
-    mma operations, targetting warp level tensorcore operations.
+    mma operations, targetting warp level tensorcore operations. If the vector
+    operations are bigger than the native mma size it will first split up those
+    vector operations.
 
     #### Return modes
 
@@ -330,7 +333,7 @@ def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_c
   }];
 
   let arguments = (ins PDL_Operation:$target);
-  let results = (outs);
+  let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -339,6 +342,39 @@ def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_c
   let builders = [
     OpBuilder<(ins "Value":$target)>
   ];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def PromoteOperandsOp :
+  Op<Transform_Dialect, "iree.promote_operands",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
+  let description = [{
+    This op promotes the specified operands of the provided target handle.
+
+    #### Return modes
+    This op returns a handle to an allocTensorOp for each of the provided
+    valid indices.
+  }];
+
+  let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$indices);
+  let results = (outs Variadic<PDL_Operation>:$result);
+
+  let assemblyFormat = [{ $target $indices attr-dict `:` functional-type(operands, results)}];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target, "ArrayRef<int64_t>":$indices)>
+  ];
+
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,

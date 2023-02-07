@@ -4,7 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/mmt4d_generic.h"
+#include "iree/builtins/ukernel/mmt4d_tile.h"
+
+#if defined(IREE_UK_ARCH_ARM_64)
+#include "iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64.h"
+#endif
 
 // Generic implementation of matmul tile, i8*i8->i32 case.
 static void iree_uk_mmt4d_tile_i8i8i32_generic(
@@ -78,8 +82,7 @@ static void iree_uk_mmt4d_tile_f32f32f32_generic(
   for (int i = 0; i < M0 * N0; ++i) out_tile[i] = acc[i];
 }
 
-// Generic implementation of matmul tile
-iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
+static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
     const iree_uk_mmt4d_params_t* params) {
   switch (params->type) {
     case iree_uk_mmt4d_type_f32f32f32:
@@ -91,4 +94,20 @@ iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
       IREE_UK_ASSUME_UNREACHABLE;
       return 0;
   }
+}
+
+static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
+    const iree_uk_mmt4d_params_t* params) {
+#if defined(IREE_UK_ARCH_ARM_64)
+  return iree_uk_mmt4d_select_tile_func_arm_64(params);
+#endif
+  return 0;
+}
+
+iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func(
+    const iree_uk_mmt4d_params_t* params) {
+  iree_uk_mmt4d_tile_func_t arch_tile_func =
+      iree_uk_mmt4d_select_tile_func_arch(params);
+  if (arch_tile_func) return arch_tile_func;
+  return iree_uk_mmt4d_select_tile_func_generic(params);
 }

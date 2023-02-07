@@ -145,6 +145,7 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
       iree_task_worker_t* worker = &executor->workers[i];
       status = iree_task_worker_initialize(
           executor, i, iree_task_topology_get_group(topology, i),
+          options.worker_stack_size,
           iree_make_byte_span(worker_local_memory,
                               options.worker_local_memory_size),
           &seed_prng, worker);

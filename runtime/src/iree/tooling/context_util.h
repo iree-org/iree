@@ -19,7 +19,7 @@ extern "C" {
 // Module loading
 //===----------------------------------------------------------------------===//
 
-// Loads the module file specified by --module_file=.
+// Loads the module file specified by --module=.
 // Returns a retained reference to the loaded module handle.
 iree_status_t iree_tooling_load_module_from_flags(
     iree_vm_instance_t* instance, iree_allocator_t host_allocator,

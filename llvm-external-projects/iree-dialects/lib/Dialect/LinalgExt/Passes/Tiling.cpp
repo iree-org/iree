@@ -407,6 +407,11 @@ void TilingInterfaceTilingPass::runOnOperation() {
       IREE::LinalgExt::LinalgTransformationFilter(
           StringAttr::get(context, "tiling_winograd_input_nhwc")));
 
+  patterns.add<TilingInterfaceTilingPattern>(
+      context, linalg::LinalgTilingOptions().setTileSizes({10, 30, 0}),
+      IREE::LinalgExt::LinalgTransformationFilter(
+          StringAttr::get(context, "tiling_attention")));
+
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }

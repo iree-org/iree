@@ -38,12 +38,6 @@ def Convert1X1FilterConv2DToMatmul:
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvert1X1FilterConv2DToMatmulPass()";
 }
 
-def ConvertConv2DToImg2Col :
-    Pass<"iree-flow-convert-conv2d-to-img2col", ""> {
-  let summary = "Convert linalg convolution ops to matmul img2col based implementation";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2DToImg2ColPass()";
-}
-
 def ConvertRegionToWorkgroups :
     Pass<"iree-flow-convert-region-to-workgroups", ""> {
   let summary = "Convert DispatchRegion ops to Workgroups ops.";
@@ -194,12 +188,6 @@ def OutlineDispatchRegions :
     Pass<"iree-flow-outline-dispatch-regions", "mlir::ModuleOp"> {
   let summary = "Outlines dispatch regions into executables";
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
-}
-
-def PadLinalgOps :
-    Pass<"iree-flow-pad-linalg-ops", ""> {
-  let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createPadLinalgOpsToIntegerMultiplePass()";
 }
 
 def SetEncoding : Pass<"iree-flow-set-encoding", ""> {
