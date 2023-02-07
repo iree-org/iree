@@ -22,13 +22,12 @@ GPU_DISK_SIZE_GB="${GPU_DISK_SIZE_GB:-100}"
 CPU_IMAGE="${CPU_IMAGE:-github-runner-cpu-2023-01-30-1675109033}"
 CPU_DISK_SIZE_GB="${CPU_DISK_SIZE_GB:-100}"
 
-PROD_TEMPLATE_NAME_PREFIX="${PROD_TEMPLATE_NAME_PREFIX:-github-runner}"
 PROD_TEMPLATE_CONFIG_REPO="${PROD_TEMPLATE_CONFIG_REPO:-iree-org/iree}"
 GITHUB_RUNNER_SCOPE="${GITHUB_RUNNER_SCOPE:-iree-org}"
 
 TEMPLATE_CONFIG_REPO="${TEMPLATE_CONFIG_REPO:-${PROD_TEMPLATE_CONFIG_REPO}}"
 TEMPLATE_CONFIG_REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
-TEMPLATE_NAME_PREFIX="${TEMPLATE_NAME_PREFIX:-${PROD_TEMPLATE_NAME_PREFIX}}"
+TEMPLATE_NAME_PREFIX="${TEMPLATE_NAME_PREFIX:-github-runner}"
 
 if (( TESTING==0 )) && ! git merge-base --is-ancestor "${TEMPLATE_CONFIG_REF}" main; then
   echo "Creating testing template because TEMPLATE_CONFIG_REF='${TEMPLATE_CONFIG_REF}' is not on the main branch" >&2
@@ -38,11 +37,6 @@ if (( TESTING==0 )) && [[ "${TEMPLATE_CONFIG_REPO}" != "${PROD_TEMPLATE_CONFIG_R
   echo "Creating testing template because TEMPLATE_CONFIG_REPO '${TEMPLATE_CONFIG_REPO}'!='${PROD_TEMPLATE_CONFIG_REPO}'" >&2
   TESTING=1
 fi
-if (( TESTING==0 )) && [[ "${TEMPLATE_NAME_PREFIX}" != "${PROD_TEMPLATE_NAME_PREFIX}" ]]; then
-  echo "Creating testing template because TEMPLATE_NAME_PREFIX '${TEMPLATE_NAME_PREFIX}'!='${PROD_TEMPLATE_NAME_PREFIX}'" >&2
-  TESTING=1
-fi
-
 
 # We need something to avoid duplicate names. Occasional collisions aren't that
 # big a deal (user can just re-run), so we use few characters here, as the whole
