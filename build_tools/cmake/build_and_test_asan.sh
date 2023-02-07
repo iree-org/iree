@@ -50,10 +50,6 @@ echo "Building test deps"
 echo "------------------"
 "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-test-deps -- -k 0
 
-echo "Building sample deps"
-echo "------------------"
-"${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-sample-deps -- -k 0
-
 echo "Building microbenchmark suites"
 echo "------------------"
 "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
