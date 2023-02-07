@@ -774,8 +774,8 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
   auto funcOp = targetOps.front()->getParentOfType<func::FuncOp>();
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "couldn't find export op for func");
+    return mlir::emitDefiniteFailure(
+        state.getTopLevel(), "couldn't find top level HAL export op for func");
   }
 
   /// Lower the workgroup count region in keeping with the way dispatch
