@@ -273,6 +273,10 @@ createLLVMCPUCheckIRBeforeLLVMConversionPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass();
 
+/// Pass to lower a sequence of operations to a iree_codegen.micro_kernel
+/// operation.
+std::unique_ptr<OperationPass<>> createLLVMCPULowerToMicroKernelsPass();
+
 /// Materialize the encoding of operations. The layout to use for the encoded
 /// operations are LLVMCPU specific.
 std::unique_ptr<OperationPass<func::FuncOp>>

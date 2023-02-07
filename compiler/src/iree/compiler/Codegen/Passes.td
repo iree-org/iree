@@ -368,6 +368,14 @@ def LLVMCPULowerExecutableTarget :
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
 }
 
+def LLVMCPULowerToMicroKernels :
+    Pass<"iree-llvmcpu-lower-to-micro-kernels", ""> {
+  let summary =
+      "Separate out parts of the IR that lower to a micro-kernel";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPULowerToMicroKernelsPass()";
+}
+
 def LLVMCPUMaterializeEncoding :
     Pass<"iree-llvmcpu-materialize-encoding", "func::FuncOp"> {
   let summary = "Materialize the encoding for tensor as specified by the backend";
