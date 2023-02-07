@@ -8,6 +8,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <random>
 
 #include "iree/schemas/cpu_data.h"
@@ -31,6 +32,21 @@ iree_uk_ssize_t iree_uk_test_2d_buffer_length(iree_uk_type_t type,
                                               iree_uk_ssize_t stride0) {
   // Just for testing purposes, so it's OK to overestimate size.
   return size0 * stride0 << iree_uk_type_size_log2(type);
+}
+
+bool iree_uk_test_2d_buffers_equal(const void* buf1, const void* buf2,
+                                   iree_uk_type_t type, iree_uk_ssize_t size0,
+                                   iree_uk_ssize_t size1,
+                                   iree_uk_ssize_t stride0) {
+  iree_uk_ssize_t elem_size = iree_uk_type_size(type);
+  const char* buf1_ptr = static_cast<const char*>(buf1);
+  const char* buf2_ptr = static_cast<const char*>(buf2);
+  for (iree_uk_ssize_t i0 = 0; i0 < size0; ++i0) {
+    if (memcmp(buf1_ptr, buf2_ptr, elem_size * size1)) return false;
+    buf1_ptr += elem_size * stride0;
+    buf2_ptr += elem_size * stride0;
+  }
+  return true;
 }
 
 struct iree_uk_test_random_engine_t {

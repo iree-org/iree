@@ -82,4 +82,33 @@ iree_cc_test(
     iree::testing::gtest
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    unpack_benchmark
+  SRCS
+    "unpack_benchmark.c"
+  DEPS
+    ::ukernel_test_utils
+    iree::base
+    iree::base::internal::cpu
+    iree::base::internal::flags
+    iree::builtins::ukernel
+    iree::testing::benchmark
+  TESTONLY
+)
+
+iree_cc_test(
+  NAME
+    unpack_test
+  SRCS
+    "unpack_test.cc"
+  DEPS
+    ::ukernel_test_utils
+    iree::base
+    iree::base::internal::cpu
+    iree::base::internal::flags
+    iree::builtins::ukernel
+    iree::testing::gtest
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
