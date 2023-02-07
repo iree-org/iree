@@ -3495,7 +3495,7 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
-    SmallVector<Value, 4> unwrappedOperands;
+    SmallVector<Value> unwrappedOperands;
     for (auto &operand : llvm::enumerate(adaptor.getOperands())) {
       if (refArgumentIndices.contains(operand.index())) {
         Type originalType =
@@ -3543,7 +3543,7 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
       }
     }
 
-    SmallVector<Value, 4> resultOperands;
+    SmallVector<Value> resultOperands;
     if (failed(patchOperands(op, adaptor, rewriter, unwrappedOperands,
                              resultOperands))) {
       return op.emitError() << "failed to patch operands";
@@ -3579,8 +3579,8 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
 
   LogicalResult patchOperands(Operation *op, Adaptor adaptor,
                               ConversionPatternRewriter &rewriter,
-                              SmallVector<Value, 4> &operands,
-                              SmallVector<Value, 4> &results) const {
+                              SmallVector<Value> &operands,
+                              SmallVector<Value> &results) const {
     if (failable) {
       if (failed(createOutOperands(op, rewriter, operands, results))) {
         return failure();
@@ -3591,8 +3591,8 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
 
   LogicalResult createOutOperands(Operation *op,
                                   ConversionPatternRewriter &rewriter,
-                                  SmallVector<Value, 4> &operands,
-                                  SmallVector<Value, 4> &results) const {
+                                  SmallVector<Value> &operands,
+                                  SmallVector<Value> &results) const {
     auto loc = op->getLoc();
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
@@ -3621,7 +3621,7 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
 
   LogicalResult updateResultUsers(Operation *op,
                                   ConversionPatternRewriter &rewriter,
-                                  SmallVector<Value, 4> &results) const {
+                                  SmallVector<Value> &results) const {
     for (auto &pair : llvm::enumerate(op->getResults())) {
       size_t index = pair.index();
       OpResult result = pair.value();
@@ -3761,11 +3761,12 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
     return std::nullopt;
   }
 
-  Optional<SmallVector<Value, 4>> getOperands(
-      IREE::VM::ListAllocOp op, Adaptor adaptor,
-      ConversionPatternRewriter &rewriter, Type elementType, Value containerPtr,
-      Value allocator) const {
-    SmallVector<Value, 4> result;
+  Optional<SmallVector<Value>> getOperands(IREE::VM::ListAllocOp op,
+                                           Adaptor adaptor,
+                                           ConversionPatternRewriter &rewriter,
+                                           Type elementType, Value containerPtr,
+                                           Value allocator) const {
+    SmallVector<Value> result;
 
     Optional<emitc::ApplyOp> elementTypePtrOp =
         createVmTypeDefPtr(rewriter, op.getOperation(), elementType);
@@ -3784,14 +3785,15 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
     return result;
   }
 
-  Optional<SmallVector<Value, 4>> getOperands(
-      IREE::VM::BufferAllocOp op, Adaptor adaptor,
-      ConversionPatternRewriter &rewriter, Type elementType, Value containerPtr,
-      Value allocator) const {
+  Optional<SmallVector<Value>> getOperands(IREE::VM::BufferAllocOp op,
+                                           Adaptor adaptor,
+                                           ConversionPatternRewriter &rewriter,
+                                           Type elementType, Value containerPtr,
+                                           Value allocator) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
-    SmallVector<Value, 4> result;
+    SmallVector<Value> result;
 
     Value access =
         rewriter
@@ -3814,14 +3816,15 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
     return result;
   }
 
-  Optional<SmallVector<Value, 4>> getOperands(
-      IREE::VM::BufferCloneOp op, Adaptor adaptor,
-      ConversionPatternRewriter &rewriter, Type elementType, Value containerPtr,
-      Value allocator) const {
+  Optional<SmallVector<Value>> getOperands(IREE::VM::BufferCloneOp op,
+                                           Adaptor adaptor,
+                                           ConversionPatternRewriter &rewriter,
+                                           Type elementType, Value containerPtr,
+                                           Value allocator) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
-    SmallVector<Value, 4> result;
+    SmallVector<Value> result;
 
     Value access =
         rewriter
@@ -4597,6 +4600,10 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
       typeConverter, context, "vm_cmp_nz_i64");
 
   // ExtF64:
+  // ExtI64: Constants
+  patterns.add<ConstOpConversion<IREE::VM::ConstF64Op>>(typeConverter, context);
+  patterns.add<ConstZeroOpConversion<IREE::VM::ConstF64ZeroOp>>(typeConverter,
+                                                                context);
   // ExtF64: Buffer ops
   patterns.add<ContainerOpConversion<IREE::VM::BufferFillF64Op>>(
       typeConverter, context, "vm_buffer_fill_f64", DenseSet<size_t>({0}),
