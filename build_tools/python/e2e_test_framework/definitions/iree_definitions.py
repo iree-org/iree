@@ -109,14 +109,14 @@ class _MLIRDialectPair(object):
 # Next ID: 4
 class MLIRDialectType(_MLIRDialectPair, Enum):
   """Imported MLIR dialect type."""
-  LINALG = (1, "linalg")
+  NONE = (1, "none")
   TOSA = (2, "tosa")
   MHLO = (3, "mhlo")
 
 
 MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
     common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
-        MLIRDialectType.LINALG,
+        MLIRDialectType.NONE,
     common_definitions.ModelSourceType.EXPORTED_TFLITE:
         MLIRDialectType.TOSA,
     common_definitions.ModelSourceType.EXPORTED_TF:
