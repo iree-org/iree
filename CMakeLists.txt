@@ -336,6 +336,13 @@ if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
   endif()
 endif()
 
+if(IREE_LINK_COMPILER_SHARED_LIBRARY AND IREE_ENABLE_COMPILER_TRACING)
+  message(SEND_ERROR
+      "IREE_ENABLE_COMPILER_TRACING requires "
+      "-DIREE_LINK_COMPILER_SHARED_LIBRARY=OFF (the compiler library must not "
+      "be unloaded before Tracy finishes, static linking is one workaround)")
+endif()
+
 option(IREE_ENABLE_CCACHE
     "[DEPRECATED: Use CMAKE_<LANG>_COMPILER_LAUNCHER configure options or environment variables instead.] Use ccache if installed."
     OFF)
