@@ -15,15 +15,23 @@ endif()
 # inside of the IREE compiler and this is the minimum amount of hacking that
 # could be done to do that.
 
-include(CheckLanguage)
-check_language(CUDA)
-if(NOT CMAKE_CUDA_COMPILER)
-  message(STATUS "IREE custom_dispatch/cuda/kernels ignored -- nvcc not found")
-  return()
-endif()
-enable_language(CUDA)
+# Default to using our own clang. The NVCC route is preserved as an example but
+# to allow for consistent cross-compiling we default to clang - they should be
+# effectively the same for our purposes (device only code to LTO-IR/PTX).
+set(_BUILD_WITH_NVCC ON)
 
-function(cuda_kernel_ptx _ARCH)
+if(_BUILD_WITH_NVCC)
+  include(CheckLanguage)
+  check_language(CUDA)
+  if(NOT CMAKE_CUDA_COMPILER)
+    message(STATUS "IREE custom_dispatch/cuda/kernels ignored -- nvcc not found")
+    return()
+  endif()
+  enable_language(CUDA)
+endif()
+
+# Builds a PTX blob using cmake + nvcc from the CUDA SDK.
+function(cuda_kernel_ptx_nvcc _ARCH)
   set(_NAME iree_samples_custom_dispatch_cuda_kernels_ptx_${_ARCH})
   set(_PTX_SRC_NAME "kernels.cu")
   get_filename_component(_PTX_SRC_BASENAME ${_PTX_SRC_NAME} NAME_WE CACHE)
@@ -67,9 +75,44 @@ function(cuda_kernel_ptx _ARCH)
   add_dependencies(iree-sample-deps "${_NAME}")
 endfunction()
 
+# Builds a PTX blob using the clang built by IREE from tip-of-tree LLVM.
+function(cuda_kernel_ptx_clang _ARCH)
+  set(_NAME iree_samples_custom_dispatch_cuda_kernels_ptx_${_ARCH})
+  set(_PTX_SRC_NAME "kernels.cu")
+  get_filename_component(_PTX_SRC_BASENAME ${_PTX_SRC_NAME} NAME_WE CACHE)
+  set(_PTX_OBJ_NAME "${_PTX_SRC_BASENAME}_sm_${_ARCH}.ptx")
+  add_custom_command(
+    OUTPUT
+      ${_PTX_OBJ_NAME}
+    DEPENDS
+      ${_PTX_SRC_NAME}
+      ${IREE_CLANG_TARGET}
+    COMMAND ${IREE_CLANG_TARGET}
+      -x cuda
+      -Wno-unknown-cuda-version
+      --cuda-path=${CUDAToolkit_ROOT}
+      --cuda-device-only
+      --cuda-gpu-arch=sm_${_ARCH}
+      -O2
+      -S
+      ${CMAKE_CURRENT_SOURCE_DIR}/${_PTX_SRC_NAME}
+      -o ${CMAKE_CURRENT_BINARY_DIR}/${_PTX_OBJ_NAME}
+    VERBATIM
+  )
+  add_custom_target(${_NAME} DEPENDS
+    ${CMAKE_CURRENT_BINARY_DIR}/${_PTX_OBJ_NAME}
+  )
+  add_dependencies(iree-sample-deps "${_NAME}")
+endfunction()
+
 # Build the kernels_*.ptx files for each architecture we target.
-cuda_kernel_ptx(52)
-cuda_kernel_ptx(80)
+if(_BUILD_WITH_NVCC)
+  cuda_kernel_ptx_nvcc(52)
+  cuda_kernel_ptx_nvcc(80)
+else()
+  cuda_kernel_ptx_clang(52)
+  cuda_kernel_ptx_clang(80)
+endif()
 
 iree_lit_test_suite(
   NAME

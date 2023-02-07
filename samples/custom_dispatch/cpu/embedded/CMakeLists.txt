@@ -10,22 +10,6 @@ if(NOT IREE_TARGET_BACKEND_LLVM_CPU OR
   return()
 endif()
 
-# NOTE: this example uses clang to target only aarch64 and x86_64 as that's what
-# the example.mlir file is hardcoded to accept. It's possible to use arbitrary
-# compilers when using either the system linker or static library output options
-# of the CPU backend but embedded dynamic libraries have strict requirements and
-# it's easiest to always use clang (plus it is good at cross-compiling) and the
-# settings below.
-#
-# This example just shows how users can link in custom objects and is not
-# intended to demonstrate the infrastructure to produce the object files: when
-# using this custom kernel approach it is up to the user to handle that work.
-find_program(CLANG clang)
-if(NOT CLANG)
-  message(STATUS "IREE custom_dispatch/cpu/embedded ignored -- clang not found")
-  return()
-endif()
-
 # This only builds for x86-64 because this is just a sample and we don't feature
 # detect what backends are compiled into clang. We could extend this to build
 # for the current cmake target architecture but would also need to modify the
@@ -38,20 +22,25 @@ endif()
 function(embedded_function_object _ARCH)
   set(_NAME iree_samples_custom_dispatch_cpu_embedded_object_${_ARCH})
   add_custom_command(
-    OUTPUT functions_${_ARCH}.o
-    DEPENDS functions.c
-    COMMAND ${CLANG}
-        -target ${_ARCH}-unknown-unknown-eabi-elf
-        -std=c17
-        -fvisibility=hidden
-        -fno-plt
-        -fno-rtti
-        -fno-exceptions
-        -fdata-sections
-        -ffunction-sections
-        -funique-section-names
-        -c ${CMAKE_CURRENT_SOURCE_DIR}/functions.c
-        -o ${CMAKE_CURRENT_BINARY_DIR}/functions_${_ARCH}.o
+    OUTPUT
+      functions_${_ARCH}.o
+    DEPENDS
+      functions.c
+      ${IREE_CLANG_TARGET}
+    COMMAND ${IREE_CLANG_TARGET}
+      -target ${_ARCH}-unknown-unknown-eabi-elf
+      -isystem ${IREE_BINARY_DIR}/third_party/llvm-project/llvm/lib/clang/17/include
+      -std=c17
+      -ffreestanding
+      -fvisibility=hidden
+      -fno-plt
+      -fno-rtti
+      -fno-exceptions
+      -fdata-sections
+      -ffunction-sections
+      -funique-section-names
+      -c ${CMAKE_CURRENT_SOURCE_DIR}/functions.c
+      -o ${CMAKE_CURRENT_BINARY_DIR}/functions_${_ARCH}.o
     VERBATIM
   )
   add_custom_target(${_NAME} DEPENDS
