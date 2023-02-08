@@ -1210,7 +1210,7 @@ git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w
 </code></pre></div>
 <p>Configure then build all targets using CMake:</p>
 <p>Configure CMake:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Linux and MacOS</label><label for="__tabbed_2_2">Windows</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Linux</label><label for="__tabbed_2_2">macOS</label><label for="__tabbed_2_3">Windows</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><span class="c1"># Recommended for simple development using clang and lld:</span>
@@ -1223,12 +1223,19 @@ cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> <
 
 <span class="c1"># Alternately, with system compiler and your choice of CMake generator:</span>
 <span class="c1"># cmake -B ../iree-build/ -S .</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># Recommended for simple development using clang and lld:</span>
+cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DCMAKE_C_COMPILER<span class="o">=</span>clang<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DCMAKE_CXX_COMPILER<span class="o">=</span>clang++<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_ENABLE_LLD<span class="o">=</span>ON
 
-<span class="c1"># Additional quality of life CMake flags:</span>
-<span class="c1"># Enable ccache:</span>
-<span class="c1"># See https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/ccache.md</span>
-<span class="c1">#   -DCMAKE_C_COMPILER_LAUNCHER=ccache</span>
-<span class="c1">#   -DCMAKE_CXX_COMPILER_LAUNCHER=ccache</span>
+<span class="c1"># Alternately, with system compiler and your choice of CMake generator:</span>
+<span class="c1"># cmake -B ../iree-build/ -S .</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -1243,7 +1250,7 @@ cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> <
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/
 </code></pre></div>
 <details class="tip" open="open">
-<summary>Tip</summary>
+<summary>Tip - Build types</summary>
 <p>We recommend using the <code>RelWithDebInfo</code> build type by default for a good
 balance of debugging information and performance. The <code>Debug</code>, <code>Release</code>,
 and <code>MinSizeRel</code> build types are useful in more specific scenarios.
@@ -1251,6 +1258,15 @@ In particular, note that several useful LLVM debugging features are only
 available in <code>Debug</code> builds. See the
 <a href="https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html">official CMake documentation</a>
 for general details.</p>
+</details>
+<details class="tip" open="open">
+<summary>Tip - Faster recompilation with ccache</summary>
+<p>We recommend using <a href="https://ccache.dev/"><code>ccache</code></a> together with CMake. To
+use it, configure CMake with:</p>
+<div class="highlight"><pre><span></span><code>-DCMAKE_C_COMPILER_LAUNCHER<span class="o">=</span>ccache
+-DCMAKE_CXX_COMPILER_LAUNCHER<span class="o">=</span>ccache
+</code></pre></div>
+<p>See also our <a href="https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/ccache.md">developer documentation for ccache</a>.</p>
 </details>
 <h2 id="whats-next">What's next?<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
 <!-- TODO(scotttodd): "at this point you can..." -->
@@ -1279,6 +1295,8 @@ for general details.</p>
             </div>
           
           
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
         </div>
         
           <a href="#" class="md-top md-icon" data-md-component="top" hidden>
@@ -1350,7 +1368,7 @@ for general details.</p>
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.db81ec45.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "content.code.annotate", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.db81ec45.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.6df46069.min.js"></script>

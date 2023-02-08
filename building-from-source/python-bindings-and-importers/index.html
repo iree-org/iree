@@ -1174,12 +1174,12 @@ Note that mixed case of the option.</p>
 as through <code>venv</code>, which may need to be installed via your system
 package manager (<a href="https://docs.python.org/3/library/venv.html">about</a>,
 <a href="https://docs.python.org/3/tutorial/venv.html">tutorial</a>):</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Linux and MacOS</label><label for="__tabbed_1_2">Windows</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Linux</label><label for="__tabbed_1_2">macOS</label><label for="__tabbed_1_3">Windows</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><span class="c1"># Make sure your &#39;python&#39; is what you expect. Note that on multi-python</span>
-<span class="c1"># systems, this may have a version suffix, and on many Linuxes and MacOS where</span>
-<span class="c1"># python2 and python3 co-exist, you may also want to use `python3`.</span>
+<span class="c1"># systems, this may have a version suffix, and on many Linuxes where</span>
+<span class="c1"># python2 and python3 can co-exist, you may also want to use `python3`.</span>
 which<span class="w"> </span>python
 python<span class="w"> </span>--version
 
@@ -1193,6 +1193,28 @@ python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </s
 
 <span class="c1"># Upgrade PIP. On Linux, many packages cannot be installed for older</span>
 <span class="c1"># PIP versions. See: https://github.com/pypa/manylinux</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
+
+<span class="c1"># Install IREE build pre-requisites.</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>./runtime/bindings/python/iree/runtime/build_requirements.txt
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># Make sure your &#39;python&#39; is what you expect. Note that on multi-python</span>
+<span class="c1"># systems, this may have a version suffix, and on macOS where python2</span>
+<span class="c1"># and python3 can co-exist, you may also want to use `python3`.</span>
+which<span class="w"> </span>python
+python<span class="w"> </span>--version
+
+<span class="c1"># Create a persistent virtual environment (first time only).</span>
+python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>iree.venv
+
+<span class="c1"># Activate the virtual environment (per shell).</span>
+<span class="c1"># Now the `python` command will resolve to your virtual environment</span>
+<span class="c1"># (even on systems where you typically use `python3`).</span>
+<span class="nb">source</span><span class="w"> </span>iree.venv/bin/activate
+
+<span class="c1"># Upgrade PIP.</span>
 python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
 
 <span class="c1"># Install IREE build pre-requisites.</span>
@@ -1228,8 +1250,23 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 or running <code>deactivate</code>.</p>
 <h3 id="building-with-cmake">Building with CMake<a class="headerlink" href="#building-with-cmake" title="Permanent link">&para;</a></h3>
 <p>From the <code>iree-build</code> directory:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Linux and MacOS</label><label for="__tabbed_2_2">Windows</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Linux</label><label for="__tabbed_2_2">macOS</label><label for="__tabbed_2_3">Windows</label></div>
 <div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-GNinja<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_BUILD_PYTHON_BINDINGS<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DPython3_EXECUTABLE<span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>which<span class="w"> </span>python<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>.
+cmake<span class="w"> </span>--build<span class="w"> </span>.
+
+<span class="c1"># Add the bindings/python paths to PYTHONPATH and use the API.</span>
+<span class="nb">source</span><span class="w"> </span>.env<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">export</span><span class="w"> </span>PYTHONPATH
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.compiler&quot;</span>
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.runtime&quot;</span>
+</code></pre></div>
+</div>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-GNinja<span class="w"> </span><span class="se">\</span>
@@ -1314,6 +1351,8 @@ compilation on Linux with clang is supported. Other OS's and compilers are
             </div>
           
           
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
         </div>
         
           <a href="#" class="md-top md-icon" data-md-component="top" hidden>
@@ -1385,7 +1424,7 @@ compilation on Linux with clang is supported. Other OS's and compilers are
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.db81ec45.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "content.code.annotate", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.db81ec45.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.6df46069.min.js"></script>
