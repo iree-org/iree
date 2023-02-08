@@ -732,6 +732,18 @@ struct RemoveDynamicCastOp final : public OpRewritePattern<memref::CastOp> {
   }
 };
 
+struct RemoveDeadSubspanOp final
+    : public OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
+                                PatternRewriter &rewriter) const override {
+    if (!subspanOp.use_empty()) return failure();
+    rewriter.eraseOp(subspanOp);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -860,8 +872,8 @@ struct FlattenMemRefSubspanPass
         .add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
              FoldSubspanOffsetIntoLoadStore<memref::StoreOp>,
              FoldSubspanOffsetIntoLoadStore<gpu::SubgroupMmaLoadMatrixOp>,
-             FoldSubspanOffsetIntoLoadStore<gpu::SubgroupMmaStoreMatrixOp>>(
-            context);
+             FoldSubspanOffsetIntoLoadStore<gpu::SubgroupMmaStoreMatrixOp>,
+             RemoveDeadSubspanOp>(context);
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(foldPatterns)))) {

@@ -475,3 +475,13 @@ func.func @store_uniform_buffer(%value : i32, %offset: index, %i0: index, %i1 : 
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(uniform_buffer) offset(%[[C0]]) : memref<24xi32, #hal.descriptor_type<uniform_buffer>>
 //       CHECK:   %[[INDEX:.+]] = affine.apply #[[$MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[OFFSET]]]
 //       CHECK:   memref.store %[[VAL]], %[[SUBSPAN]][%[[INDEX]]] : memref<24xi32, #hal.descriptor_type<uniform_buffer>>
+
+// -----
+
+func.func @dead_subspan(%offset : index) {
+  %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<6x7x8xf32>
+  return
+}
+
+// CHECK: func.func @dead_subspan
+// CHECK-NEXT: return
