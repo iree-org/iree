@@ -49,7 +49,6 @@ verified by the following steps:
     If the showed version is lower than Vulkan 1.2, you will need to update the
     driver for your GPU.
 
-
 === "Windows"
 
     Run the following command in a shell:
@@ -64,7 +63,6 @@ verified by the following steps:
     If the showed version is lower than Vulkan 1.2, you will need to update the
     driver for your GPU.
 
-
 ## Get runtime and compiler
 
 ### Get IREE runtime with Vulkan HAL driver
@@ -73,7 +71,6 @@ Next you will need to get an IREE runtime that supports the Vulkan HAL driver
 so it can execute the model on GPU via Vulkan.
 
 <!-- TODO(??): vcpkg -->
-
 
 #### Build runtime from source
 
@@ -109,6 +106,7 @@ python -m pip install iree-compiler
     pip install with the user mode, it is under `${HOME}/.local/bin`, or
     `%APPDATA%Python` on Windows. You may want to include the path in your
     system's `PATH` environment variable.
+
     ``` shell
     export PATH=${HOME}/.local/bin:${PATH}
     ```
@@ -151,6 +149,7 @@ iree-compile \
     --iree-input-type=mhlo \
     iree_input.mlir -o mobilenet-vulkan.vmfb
 ```
+
 where `iree_input.mlir` is the imported program.
 
 Note that a target triple of the form `<vendor/arch>-<product>-<os>` is needed
@@ -186,7 +185,6 @@ it expects one 224x224 RGB image. We are feeding in an image with all 0 values
 here for brevity, see `iree-run-module --help` for the format to specify
 concrete values.
 
-
 <!-- TODO(??): Vulkan profiles / API versions / extensions -->
 
 <!-- TODO(??): deployment options -->
@@ -199,7 +197,6 @@ concrete values.
 with a target triple, given the allowed variances on extensions, properties,
 limits, etc. So the target triple is just an approximation for usage.
 
-
 [android-cc]: ../building-from-source/android.md
 [get-started]: ../building-from-source/getting-started.md
 [mlir]: https://mlir.llvm.org/
@@ -208,6 +205,5 @@ limits, etc. So the target triple is just an approximation for usage.
 [spirv]: https://www.khronos.org/registry/spir-v/
 [tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
 [tf-import]: ../getting-started/tensorflow.md
-[tflite-import]: ../getting-started/tensorflow-lite.md
 [vulkan]: https://www.khronos.org/vulkan/
 [vulkan-sdk]: https://vulkan.lunarg.com/sdk/home/

@@ -118,7 +118,6 @@ cmake --build ../iree-build/
     [official CMake documentation](https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html)
     for general details.
 
-
 ## What's next?
 
 <!-- TODO(scotttodd): "at this point you can..." -->
