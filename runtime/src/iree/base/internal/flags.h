@@ -31,7 +31,7 @@ extern "C" {
 
 // 1 to enable --flagfile= support.
 #if !defined(IREE_FLAGS_ENABLE_FLAG_FILE)
-//The feature only works when file IO is available.
+// The feature only works when file IO is available.
 #if IREE_FILE_IO_ENABLE
 #define IREE_FLAGS_ENABLE_FLAG_FILE 1
 #else
