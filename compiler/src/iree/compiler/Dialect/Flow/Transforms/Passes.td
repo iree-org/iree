@@ -229,6 +229,12 @@ def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {
   let constructor = "mlir::iree_compiler::IREE::Flow::createDumpDispatchGraphPass()";
 }
 
+def RaiseSpecialOps :
+    Pass<"iree-flow-raise-special-ops", ""> {
+  let summary = "raise special ops like softmax to the high level linalg.ext representation";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createRaiseSpecialOps()";
+}
+
 def SplitReduction :
     Pass<"iree-flow-split-reduction-ops", ""> {
   let summary = "Split reduction dimension to increase parallelism.";

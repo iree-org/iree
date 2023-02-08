@@ -79,6 +79,7 @@ steps:
     key: "build-linux-benchmark-tools"
     commands: |
       # Builds tools on the host and assumes the builder is Linux x86_64.
+      build_tools/scripts/git/update_runtime_submodules.sh
       docker run --user=$(id -u):$(id -g) \
         --volume="$${HOME?}:$${HOME?}" \
         --volume="/etc/passwd:/etc/passwd:ro" \

@@ -59,6 +59,8 @@ iree_runtime_cc_library(
         "pack_tile.c",
         "mmt4d_tile.h",
         "pack_tile.h",
+        "unpack_tile.c",
+        "unpack_tile.h",
     ] + ukernel_headers,
     hdrs = ["api.h"],
     deps = [

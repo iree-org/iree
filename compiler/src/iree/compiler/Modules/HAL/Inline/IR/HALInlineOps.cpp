@@ -161,7 +161,7 @@ struct FoldBufferViewCreateSubspan
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
-    auto newSourceOffset = op.getSourceOffset();
+    auto newSourceOffset = op.getSourceOffset().cast<Value>();
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();

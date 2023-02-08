@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -47,8 +48,9 @@ namespace mlir {
 inline void registerMlirDialects(DialectRegistry &registry) {
   // clang-format off
   registry.insert<AffineDialect,
-                  cf::ControlFlowDialect,
                   bufferization::BufferizationDialect,
+                  cf::ControlFlowDialect,
+                  complex::ComplexDialect,
                   gpu::GPUDialect,
                   nvgpu::NVGPUDialect,
                   LLVM::LLVMDialect,

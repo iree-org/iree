@@ -84,13 +84,6 @@ static void test_one_pack_using_given_input(
   iree_pack_reference(reference_params);
   iree_uk_pack(&actual_params);
 
-  // For now we use exact comparisons, even for float, even though the reference
-  // code accumulates in a different order compared to the actual code. This
-  // relies on picking input test matrix elements so that all intermediate
-  // values are exactly representable - i.e. small integer numerators. This
-  // become problematic when we do float16. See the comment at the top of this
-  // file explaining how we refrain from letting this grow into a 1000-line-long
-  // fully-featured test.
   if (memcmp(actual_params.out_buffer, reference_params.out_buffer,
              out_buffer_size)) {
     const auto& p = actual_params;
@@ -106,16 +99,6 @@ static void test_one_pack_using_given_input(
             (int)p.out_size1, (int)p.out_size2, (int)p.out_size3);
     fprintf(stderr, "  input stride: %d\n", (int)p.in_stride0);
     fprintf(stderr, "  output stride: %d\n", (int)p.out_stride0);
-    // Don't even try to pretty-print matrices. See the comment at the top of
-    // this file. Don't try to use GTest primitives to show expected vs actual
-    // since that would require dispatching to type-specific code paths.
-    // Also, at this point it's easy for the user to rerun this test
-    // in a debugger and manually inspect values.
-    //
-    // We want fatal here - that is what the user running this in a debugger
-    // wants us to do, so they can inspect values while they exist in memory.
-    // What's the GTest-sanctioned fatal error? GTEST_FAIL() has a comment that
-    // says that it's fatal, but that's a lie at least here on Android.
     iree_abort();
   }
 
@@ -159,9 +142,12 @@ static void pack_test_for_various_tile_shapes_and_flags(
       {1, 0},
       // Non-degenerate cases.
       {1, 1},
-      {2, 2},
-      {3, 2},
-      {8, 8},
+      {2, 3},
+      {3, 4},
+      {4, 5},
+      {5, 6},
+      {6, 7},
+      {7, 8},
       {11, 13},
       {13, 11},
       {31, 33},

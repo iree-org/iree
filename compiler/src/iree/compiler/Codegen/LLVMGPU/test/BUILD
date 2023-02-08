@@ -20,6 +20,7 @@ iree_lit_test_suite(
         [
             "conv_pipeline_test.mlir",
             "convert_to_nvvm.mlir",
+            "convert_to_nvvm_error.mlir",
             "convert_to_rocdl.mlir",
             "distribute_to_thread.mlir",
             "distribute_foreach.mlir",

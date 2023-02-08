@@ -16,6 +16,8 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = [
+        "contraction-packing.mlir",
+        "contraction-packing-and-dispatch.mlir",
         "eltwise_reduction_eltwise.mlir",
         "matmul.mlir",
     ],
