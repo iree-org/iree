@@ -898,16 +898,14 @@ void transform_ext::makeReductionMatcher(
                   .allTilableOpsCaptured<func::FuncOp>();
 }
 
-void transform_ext::makeSoftmaxMatcher(
-    transform_ext::StructuredOpMatcher &fillMinusInf,
-    transform_ext::StructuredOpMatcher &maxReduction,
-    transform_ext::StructuredOpMatcher &sub,
-    transform_ext::StructuredOpMatcher &expOperand,
-    transform_ext::StructuredOpMatcher &fillzero,
-    transform_ext::StructuredOpMatcher &sum,
-    transform_ext::StructuredOpMatcher &divOperand,
-    transform_ext::StructuredOpMatcher &softmaxroot) {
-
+static void
+makeSoftmaxMatcherTopPart(transform_ext::StructuredOpMatcher &fillMinusInf,
+                          transform_ext::StructuredOpMatcher &maxReduction,
+                          transform_ext::StructuredOpMatcher &sub,
+                          transform_ext::StructuredOpMatcher &expOperand,
+                          transform_ext::StructuredOpMatcher &fillzero,
+                          transform_ext::StructuredOpMatcher &sum) {
+  using namespace transform_ext;
   fillMinusInf = m_StructuredOp<linalg::FillOp>().input(0, ConstantFloatMin());
   maxReduction = transform_ext::m_StructuredOp<linalg::GenericOp>()
                      .singleOpWithCanonicaleArgs<arith::MaxFOp>()
@@ -953,7 +951,19 @@ void transform_ext::makeSoftmaxMatcher(
             .output(NumEqualsTo(1));
   sum = sum.input(0, expOperand);
   sum = sum.output(0, fillzero);
+}
 
+void transform_ext::makeSoftmaxWithRcpMatcher(
+    transform_ext::StructuredOpMatcher &fillMinusInf,
+    transform_ext::StructuredOpMatcher &maxReduction,
+    transform_ext::StructuredOpMatcher &sub,
+    transform_ext::StructuredOpMatcher &expOperand,
+    transform_ext::StructuredOpMatcher &fillZero,
+    transform_ext::StructuredOpMatcher &sum,
+    transform_ext::StructuredOpMatcher &divOperand,
+    transform_ext::StructuredOpMatcher &softmaxroot) {
+  makeSoftmaxMatcherTopPart(fillMinusInf, maxReduction, sub, expOperand,
+                            fillZero, sum);
   divOperand = m_StructuredOp<linalg::GenericOp>()
                    .isFloatReciprocal()
                    .dim(AllDims(), utils::IteratorType::parallel)
@@ -974,4 +984,28 @@ void transform_ext::makeSoftmaxMatcher(
 
   softmaxroot = softmaxroot.input(0, expOperand);
   softmaxroot = softmaxroot.input(1, divOperand);
+}
+
+void transform_ext::makeSoftmaxMatcher(
+    transform_ext::StructuredOpMatcher &fillMinusInf,
+    transform_ext::StructuredOpMatcher &maxReduction,
+    transform_ext::StructuredOpMatcher &sub,
+    transform_ext::StructuredOpMatcher &expOperand,
+    transform_ext::StructuredOpMatcher &fillZero,
+    transform_ext::StructuredOpMatcher &sum,
+    transform_ext::StructuredOpMatcher &softmaxroot) {
+  makeSoftmaxMatcherTopPart(fillMinusInf, maxReduction, sub, expOperand,
+                            fillZero, sum);
+
+  softmaxroot = transform_ext::m_StructuredOp<linalg::GenericOp>()
+                    .singleOpWithCanonicaleArgs<arith::DivFOp>()
+                    .dim(AllDims(), utils::IteratorType::parallel)
+                    .input(NumEqualsTo(2))
+                    .input(0, IsIdentity())
+                    .input(1, IsProjected(-1))
+                    .output(NumEqualsTo(1))
+                    .output(AllOperands(), IsIdentity());
+
+  softmaxroot = softmaxroot.input(0, expOperand);
+  softmaxroot = softmaxroot.input(1, sum);
 }

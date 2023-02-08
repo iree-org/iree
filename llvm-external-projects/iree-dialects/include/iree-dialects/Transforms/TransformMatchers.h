@@ -642,13 +642,29 @@ void makeReductionMatcher(StructuredOpMatcher &reduction,
 ///  %sum = reduce_sum(%exp)
 ///  %rec = reciprocal(%sum)
 ///  %mul = mul(%exp, %rec)
+void makeSoftmaxWithRcpMatcher(transform_ext::StructuredOpMatcher &fillMinusInf,
+                               transform_ext::StructuredOpMatcher &maxReduction,
+                               transform_ext::StructuredOpMatcher &sub,
+                               transform_ext::StructuredOpMatcher &expOperand,
+                               transform_ext::StructuredOpMatcher &fillZero,
+                               transform_ext::StructuredOpMatcher &sum,
+                               transform_ext::StructuredOpMatcher &divOperand,
+                               transform_ext::StructuredOpMatcher &softmaxroot);
+
+/// Create a group of matchers for a different code sequence of operations
+/// matching exactly a softmax operation.
+///
+///  %red = reduce_max(%0)
+///  %sub = sub(%0, %red)
+///  %exp = exp(%sub)
+///  %sum = reduce_sum(%exp)
+///  %mul = div(%exp, %%sum)
 void makeSoftmaxMatcher(transform_ext::StructuredOpMatcher &fillMinusInf,
                         transform_ext::StructuredOpMatcher &maxReduction,
                         transform_ext::StructuredOpMatcher &sub,
                         transform_ext::StructuredOpMatcher &expOperand,
-                        transform_ext::StructuredOpMatcher &fillzero,
+                        transform_ext::StructuredOpMatcher &fillZero,
                         transform_ext::StructuredOpMatcher &sum,
-                        transform_ext::StructuredOpMatcher &divOperand,
                         transform_ext::StructuredOpMatcher &softmaxroot);
 
 } // namespace transform_ext
