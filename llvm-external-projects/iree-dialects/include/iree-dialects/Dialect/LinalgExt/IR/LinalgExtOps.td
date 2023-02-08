@@ -1135,7 +1135,7 @@ def IREELinalgExt_SoftmaxOp : IREELinalgExt_Op<"softmax",
   );
 
   let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
+    OpBuilder<(ins "Value":$inputs, "Value":$outputs,
       CArg<"int64_t", "0">:$dimension)>
   ];
 
