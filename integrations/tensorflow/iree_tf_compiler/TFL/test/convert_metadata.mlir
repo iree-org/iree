@@ -12,4 +12,15 @@ module attributes {tfl.schema_version = 3 : i32} {
   } {
     return %arg0, %arg1 : tensor<?xf32>, tensor<?xf32>
   }
+
+  // CHECK: func.func @main(
+  // CHECK-SAME: ) -> (
+  // CHECK-SAME: tensor<?xf32> {iree.identifier = "output0"})
+  func.func @no_input() -> (tensor<1xf32>) attributes {
+    tf.entry_function = {outputs = "output0"}
+  } {
+    %0 = "tfl.pseudo_const"() {value = dense<0.000000e+00> : tensor<1xf32>} : () -> tensor<1xf32>
+    return %0 : tensor<1xf32>
+  }
+}
 }
