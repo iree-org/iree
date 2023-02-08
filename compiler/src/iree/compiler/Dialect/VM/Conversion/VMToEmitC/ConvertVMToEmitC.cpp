@@ -1214,6 +1214,16 @@ ResultOpTy lookupSymbolRef(Operation *accessOp, StringRef attrName) {
   return globalOp;
 }
 
+void updateResultUses(Operation *op, ConversionPatternRewriter &rewriter,
+                      SmallVector<Value> &resultOperands) {
+  for (auto [result, resultOperand] :
+       llvm::zip(op->getResults(), resultOperands)) {
+    if (!result.getType().isa<IREE::VM::RefType>()) {
+      result.replaceAllUsesWith(resultOperand);
+    }
+  }
+}
+
 // Convert vm operations to emitc calls. The resultiong call has the ops
 // operands as arguments followed by an argument for every attribute.
 template <typename SrcOpTy>
@@ -2344,8 +2354,8 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
                                     mlir::func::FuncOp funcOp) const {
     auto loc = op->getLoc();
 
-    SmallVector<Value, 4> updatedOperands;
-    SmallVector<Value, 4> resultOperands;
+    SmallVector<Value> updatedOperands;
+    SmallVector<Value> resultOperands;
 
     auto parentFuncOp = op->getParentOfType<mlir::func::FuncOp>();
 
@@ -2369,9 +2379,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
         /*typeConverter=*/
         *this->template getTypeConverter<IREE::VM::EmitCTypeConverter>());
 
-    if (failed(updateResultUsers(op, rewriter, resultOperands))) {
-      return failure();
-    }
+    updateResultUses(op, rewriter, resultOperands);
 
     rewriter.eraseOp(op);
 
@@ -2384,8 +2392,8 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
     auto ctx = op->getContext();
     auto loc = op->getLoc();
 
-    SmallVector<Value, 4> updatedOperands;
-    SmallVector<Value, 4> resultOperands;
+    SmallVector<Value> updatedOperands;
+    SmallVector<Value> resultOperands;
 
     auto moduleOp =
         importOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
@@ -2442,9 +2450,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
         rewriter, loc, callee, updatedOperands,
         *this->template getTypeConverter<IREE::VM::EmitCTypeConverter>());
 
-    if (failed(updateResultUsers(op, rewriter, resultOperands))) {
-      return failure();
-    }
+    updateResultUses(op, rewriter, resultOperands);
 
     rewriter.eraseOp(op);
 
@@ -2453,8 +2459,8 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
 
   LogicalResult updateOperands(Operation *op, IREE::VM::ImportOp importOp,
                                ConversionPatternRewriter &rewriter,
-                               SmallVector<Value, 4> &updatedOperands,
-                               SmallVector<Value, 4> &resultOperands) const {
+                               SmallVector<Value> &updatedOperands,
+                               SmallVector<Value> &resultOperands) const {
     auto loc = op->getLoc();
 
     OperandRange operands = op->getOperands();
@@ -2567,20 +2573,6 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
         ArrayRef<Value>{operandRef.value(), refPtr});
 
     return refPtr;
-  }
-
-  LogicalResult updateResultUsers(Operation *op,
-                                  ConversionPatternRewriter &rewriter,
-                                  SmallVector<Value, 4> &resultOperands) const {
-    for (auto &pair : llvm::enumerate(op->getResults())) {
-      size_t index = pair.index();
-      OpResult result = pair.value();
-
-      if (!result.getType().isa<IREE::VM::RefType>()) {
-        result.replaceAllUsesWith(resultOperands[index]);
-      }
-    }
-    return success();
   }
 };
 
@@ -3558,10 +3550,7 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
           /*operands=*/ArrayRef<Value>(unwrappedOperands),
           /*typeConverter=*/*typeConverter);
 
-      if (failed(
-              updateResultUsers(op.getOperation(), rewriter, resultOperands))) {
-        return failure();
-      }
+      updateResultUses(op.getOperation(), rewriter, resultOperands);
 
       rewriter.eraseOp(op);
     } else {
@@ -3616,21 +3605,6 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
         operands.push_back(resultPtr);
       }
     }
-    return success();
-  }
-
-  LogicalResult updateResultUsers(Operation *op,
-                                  ConversionPatternRewriter &rewriter,
-                                  SmallVector<Value> &results) const {
-    for (auto &pair : llvm::enumerate(op->getResults())) {
-      size_t index = pair.index();
-      OpResult result = pair.value();
-
-      if (!result.getType().isa<IREE::VM::RefType>()) {
-        result.replaceAllUsesWith(results[index]);
-      }
-    }
-
     return success();
   }
 
