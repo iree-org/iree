@@ -14,11 +14,11 @@ import urllib.parse
 import markdown_strings as md
 import math
 
-from common.benchmark_definition import BenchmarkResults, CompilationInfo, CompilationResults
+from common import benchmark_definition
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, COMPILATION_TIME_THRESHOLDS, TOTAL_ARTIFACT_SIZE_THRESHOLDS, TOTAL_DISPATCH_SIZE_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
 
 GetMetricFunc = Callable[[Any], Tuple[int, Optional[int]]]
-GetTableRowFunc = Callable[[str, Any], Tuple]
+GetMetricsObjNameFunc = Callable[[Any], str]
 
 PERFBOARD_SERIES_PREFIX = "https://perf.iree.dev/serie?IREE?"
 BENCHMARK_RESULTS_HEADERS = [
@@ -27,14 +27,21 @@ BENCHMARK_RESULTS_HEADERS = [
     "Median Latency (ms)",
     "Latency Standard Deviation (ms)",
 ]
+# Since We don't have a structural way to store metric data yet, each metric is
+# assigned with a fixed id generated from uuid.uuid4(), to identify the series.
+COMPILATION_TIME_METRIC_ID = "e54cd682-c079-4c42-b4ad-d92c4bedea13"
 COMPILATION_TIME_SERIES_SUFFIX = "compilation:module:compilation-time"
+TOTAL_DISPATCH_SIZE_METRIC_ID = "9e15f7e6-383c-47ec-bd38-ecba55a5f10a"
 TOTAL_DISPATCH_SIZE_SERIES_SUFFIX = "compilation:module:component-size:total-dispatch-size"
+TOTAL_ARTIFACT_SIZE_METRIC_ID = "2c8a9198-c01c-45b9-a7da-69c82cf749f7"
 TOTAL_ARTIFACT_SIZE_SERIES_SUFFIX = "compilation:module:total-artifact-size"
 
 
 @dataclass
 class AggregateBenchmarkLatency:
   """An object for describing aggregate latency numbers for a benchmark."""
+  name: str
+  benchmark_info: benchmark_definition.BenchmarkInfo
   mean_time: int
   median_time: int
   stddev_time: int
@@ -45,7 +52,8 @@ class AggregateBenchmarkLatency:
 @dataclass(frozen=True)
 class CompilationMetrics:
   """An object for describing the summary of statistics and the reference."""
-  compilation_info: CompilationInfo
+  name: str
+  compilation_info: benchmark_definition.CompilationInfo
   compilation_time_ms: int
   total_dispatch_component_bytes: int
   total_artifact_bytes: int
@@ -73,6 +81,21 @@ class MetricsToTableMapper(ABC, Generic[T]):
   @abstractmethod
   def get_current_and_base_value(self, obj: T) -> Tuple[int, Optional[int]]:
     """Returns the current and base (can be None) value."""
+    raise NotImplementedError()
+
+  def get_series_id(self, benchmark_id: str) -> str:
+    """Returns the dashboard series id."""
+    # TODO(#11076): Remove legacy path.
+    # Whitespace is used in the legacy benchmark id as the delimiter, while not
+    # used in the new benchmark id. This is a temporary solution to generate
+    # both ids during the migration.
+    if " " in benchmark_id:
+      return self.get_series_name(benchmark_id)
+    return f"{benchmark_id}-{self.get_metric_id()}"
+
+  @abstractmethod
+  def get_metric_id(self) -> str:
+    """Returns the dashboard series id."""
     raise NotImplementedError()
 
   @abstractmethod
@@ -114,6 +137,9 @@ class CompilationTimeToTable(MetricsToTableMapper[CompilationMetrics]):
     return (compile_metrics.compilation_time_ms,
             compile_metrics.base_compilation_time_ms)
 
+  def get_metric_id(self) -> str:
+    return COMPILATION_TIME_METRIC_ID
+
   def get_series_name(self, name: str) -> str:
     return f"{name} [{COMPILATION_TIME_SERIES_SUFFIX}]"
 
@@ -145,6 +171,9 @@ class TotalDispatchSizeToTable(MetricsToTableMapper[CompilationMetrics]):
     return (compile_metrics.total_dispatch_component_bytes,
             compile_metrics.base_total_dispatch_component_bytes)
 
+  def get_metric_id(self) -> str:
+    return TOTAL_DISPATCH_SIZE_METRIC_ID
+
   def get_series_name(self, name: str) -> str:
     return f"{name} [{TOTAL_DISPATCH_SIZE_SERIES_SUFFIX}]"
 
@@ -175,6 +204,9 @@ class TotalArtifactSizeToTable(MetricsToTableMapper[CompilationMetrics]):
       self, compile_metrics: CompilationMetrics) -> Tuple[int, Optional[int]]:
     return (compile_metrics.total_artifact_bytes,
             compile_metrics.base_total_artifact_bytes)
+
+  def get_metric_id(self) -> str:
+    return TOTAL_ARTIFACT_SIZE_METRIC_ID
 
   def get_series_name(self, name: str) -> str:
     return f"{name} [{TOTAL_ARTIFACT_SIZE_SERIES_SUFFIX}]"
@@ -218,9 +250,10 @@ def aggregate_all_benchmarks(
   """
 
   aggregate_results = {}
-
+  benchmark_names = set()
   for benchmark_file in benchmark_files:
-    file_results = BenchmarkResults.from_json_str(benchmark_file.read_text())
+    file_results = benchmark_definition.BenchmarkResults.from_json_str(
+        benchmark_file.read_text())
 
     if ((expected_pr_commit is not None) and
         (file_results.commit != expected_pr_commit)):
@@ -229,18 +262,31 @@ def aggregate_all_benchmarks(
     for benchmark_index in range(len(file_results.benchmarks)):
       benchmark_case = file_results.benchmarks[benchmark_index]
 
+      series_name = str(benchmark_case.benchmark_info)
       # Make sure each benchmark has a unique name.
-      name = str(benchmark_case.benchmark_info)
-      if name in aggregate_results:
-        raise ValueError(f"Duplicated benchmarks: {name}")
+      if series_name in benchmark_names:
+        raise ValueError(f"Duplicated benchmark name: {series_name}")
+      benchmark_names.add(series_name)
+
+      # TODO(#11076): Remove legacy path.
+      series_id = benchmark_case.benchmark_info.run_config_id
+      if series_id is None:
+        series_id = series_name
+
+      if series_id in aggregate_results:
+        raise ValueError(f"Duplicated benchmark id: {series_id}")
 
       # Now scan all benchmark iterations and find the aggregate results.
       mean_time = file_results.get_aggregate_time(benchmark_index, "mean")
       median_time = file_results.get_aggregate_time(benchmark_index, "median")
       stddev_time = file_results.get_aggregate_time(benchmark_index, "stddev")
 
-      aggregate_results[name] = AggregateBenchmarkLatency(
-          mean_time, median_time, stddev_time)
+      aggregate_results[series_id] = AggregateBenchmarkLatency(
+          name=series_name,
+          benchmark_info=benchmark_case.benchmark_info,
+          mean_time=mean_time,
+          median_time=median_time,
+          stddev_time=stddev_time)
 
   return aggregate_results
 
@@ -259,10 +305,11 @@ def collect_all_compilation_metrics(
       A dict of benchmark names to CompilationMetrics.
   """
   compile_metrics = {}
-
+  target_names = set()
   for compile_stats_file in compile_stats_files:
     with compile_stats_file.open("r") as f:
-      file_results = CompilationResults.from_json_object(json.load(f))
+      file_results = benchmark_definition.CompilationResults.from_json_object(
+          json.load(f))
 
     if ((expected_pr_commit is not None) and
         (file_results.commit != expected_pr_commit)):
@@ -270,8 +317,22 @@ def collect_all_compilation_metrics(
 
     for compile_stats in file_results.compilation_statistics:
       component_sizes = compile_stats.module_component_sizes
-      name = str(compile_stats.compilation_info)
-      compile_metrics[name] = CompilationMetrics(
+
+      target_name = str(compile_stats.compilation_info)
+      if target_name in target_names:
+        raise ValueError(f"Duplicated target name: {target_name}")
+      target_names.add(target_name)
+
+      target_id = compile_stats.compilation_info.gen_config_id
+      # TODO(#11076): Remove legacy path.
+      if target_id is None:
+        target_id = target_name
+
+      if target_id in compile_metrics:
+        raise ValueError(f"Duplicated target id: {target_id}")
+
+      compile_metrics[target_id] = CompilationMetrics(
+          name=target_name,
           compilation_info=compile_stats.compilation_info,
           compilation_time_ms=compile_stats.compilation_time_ms,
           total_artifact_bytes=component_sizes.file_bytes,
@@ -281,16 +342,14 @@ def collect_all_compilation_metrics(
   return compile_metrics
 
 
-def _make_series_link(name: str, series: Optional[str] = None) -> str:
+def _make_series_link(name: str, series_id: str) -> str:
   """Add link to the given benchmark name.
 
     Args:
       name: the text to show on the link.
-      series: the dashboard series name. Use name if None.
+      series_id: the dashboard series id.
   """
-  if series is None:
-    series = name
-  url = PERFBOARD_SERIES_PREFIX + urllib.parse.quote(series, safe="()[]@,")
+  url = PERFBOARD_SERIES_PREFIX + urllib.parse.quote(series_id, safe="()[]@,")
   return md.link(name, url)
 
 
@@ -405,16 +464,16 @@ def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
     returns a markdown table for it.
 
     Args:
-      benchmarks_map: map of (name, benchmark object).
+      benchmarks_map: map of (series_id, benchmark object).
       size_cut: If not None, only show the top N results for each table.
   """
   sorted_rows = []
-  for name, benchmark in benchmarks.items():
+  for series_id, benchmark in benchmarks.items():
     current = benchmark.mean_time / 1e6
     base = benchmark.base_mean_time / 1e6
     ratio = abs(current - base) / base
     str_mean = _get_compare_text(current, base)
-    clickable_name = _make_series_link(name)
+    clickable_name = _make_series_link(benchmark.name, series_id)
     sorted_rows.append(
         (ratio, (clickable_name, str_mean,
                  f"{_get_fixed_point_str(benchmark.median_time / 1e6)}",
@@ -457,12 +516,11 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     tables.append(_sort_benchmarks_and_get_table(similar, size_cut))
   if raw:
     tables.append(md.header("Raw Latencies", 3))
-    raw_list = [
-        (_make_series_link(k), f"{_get_fixed_point_str(v.mean_time / 1e6)}",
-         f"{_get_fixed_point_str(v.median_time / 1e6)}",
-         f"{_get_fixed_point_str(v.stddev_time / 1e6)}")
-        for k, v in raw.items()
-    ]
+    raw_list = [(_make_series_link(name=v.name, series_id=k),
+                 f"{_get_fixed_point_str(v.mean_time / 1e6)}",
+                 f"{_get_fixed_point_str(v.median_time / 1e6)}",
+                 f"{_get_fixed_point_str(v.stddev_time / 1e6)}")
+                for k, v in raw.items()]
     tables.append(
         _add_header_and_get_markdown_table(BENCHMARK_RESULTS_HEADERS,
                                            raw_list,
@@ -470,28 +528,33 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
   return "\n\n".join(tables)
 
 
-def _sort_metrics_objects_and_get_table(metrics_objs: Dict[str, T],
-                                        mapper: MetricsToTableMapper[T],
-                                        headers: Sequence[str],
-                                        size_cut: Optional[int] = None) -> str:
+def _sort_metrics_objects_and_get_table(
+    metrics_objs: Dict[str, T],
+    metrics_obj_name_func: GetMetricsObjNameFunc,
+    mapper: MetricsToTableMapper[T],
+    headers: Sequence[str],
+    size_cut: Optional[int] = None) -> str:
   """Sorts all metrics objects according to the improvement/regression ratio and
     returns a markdown table for it.
 
     Args:
-      metrics_objs: map of (name, metrics object). All objects must contain base
-        value.
+      metrics_objs: map of (target_id, CompilationMetrics). All objects must
+        contain base value.
+      metrics_obj_name_func: function that returns the display name of a metrics
+        object.
       mapper: MetricsToTableMapper for metrics_objs.
       headers: list of table headers.
       size_cut: If not None, only show the top N results for each table.
   """
   sorted_rows = []
-  for name, metrics_obj in metrics_objs.items():
+  for target_id, metrics_obj in metrics_objs.items():
     current, base = mapper.get_current_and_base_value(metrics_obj)
     if base is None:
       raise AssertionError("Base can't be None for sorting.")
     ratio = abs(current - base) / base
     sorted_rows.append((ratio, (
-        _make_series_link(name, mapper.get_series_name(name)),
+        _make_series_link(metrics_obj_name_func(metrics_obj),
+                          mapper.get_series_id(target_id)),
         _get_compare_text(current, base),
     )))
   sorted_rows.sort(key=lambda row: row[0], reverse=True)
@@ -526,15 +589,21 @@ def categorize_compilation_metrics_into_tables(
     if regressed:
       tables.append(md.header(f"Regressed {table_title} 🚩", 3))
       tables.append(
-          _sort_metrics_objects_and_get_table(regressed, mapper,
-                                              ["Benchmark Name", table_header],
-                                              size_cut))
+          _sort_metrics_objects_and_get_table(
+              metrics_objs=regressed,
+              metrics_obj_name_func=lambda obj: obj.name,
+              mapper=mapper,
+              headers=["Benchmark Name", table_header],
+              size_cut=size_cut))
     if improved:
       tables.append(md.header(f"Improved {table_title} 🎉", 3))
       tables.append(
-          _sort_metrics_objects_and_get_table(improved, mapper,
-                                              ["Benchmark Name", table_header],
-                                              size_cut))
+          _sort_metrics_objects_and_get_table(
+              metrics_objs=improved,
+              metrics_obj_name_func=lambda obj: obj.name,
+              mapper=mapper,
+              headers=["Benchmark Name", table_header],
+              size_cut=size_cut))
 
   # If we want to abbreviate, similar results won't be interesting.
   if size_cut is None and compile_metrics_map:
@@ -544,13 +613,13 @@ def categorize_compilation_metrics_into_tables(
         for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS
     ]
     rows = []
-    for name, metrics in compile_metrics_map.items():
-      row = [name]
+    for target_id, metrics in compile_metrics_map.items():
+      row = [metrics.name]
       for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
         current, base = mapper.get_current_and_base_value(metrics)
         row.append(
             _make_series_link(_get_compare_text(current, base),
-                              mapper.get_series_name(name)))
+                              mapper.get_series_id(target_id)))
       rows.append(tuple(row))
 
     tables.append(
