@@ -27,6 +27,10 @@ theme:
 
     - navigation.indexes # section names can link to index.md pages
 
+    - content.code.annotate # Allow inline annotations
+    - content.code.copy # Enable copy button
+    - content.tabs.link # Link content tabs across site (e.g. Windows/Linux)
+
   palette:
     # Light mode
     - media: "(prefers-color-scheme: light)"
