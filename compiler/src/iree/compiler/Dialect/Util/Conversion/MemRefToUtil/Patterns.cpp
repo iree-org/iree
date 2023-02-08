@@ -70,6 +70,22 @@ static Value getByteOffsetForIndices(OpBuilder &builder, Location loc,
   return builder.create<arith::MulIOp>(loc, elementTypeByteSize, elementCount);
 }
 
+static Value getByteLength(OpBuilder &builder, Location loc,
+                           Value memrefValue) {
+  auto memrefType = memrefValue.getType().cast<MemRefType>();
+  if (memrefType.getRank() == 0) {
+    return builder.createOrFold<arith::ConstantIndexOp>(loc, 0);
+  }
+  if (memrefType.getRank() != 1) {
+    emitError(loc, "memrefs should have been flattened");
+    return {};
+  }
+  Value size = builder.create<memref::DimOp>(loc, memrefValue, 0);
+  Value elementTypeByteSize = getElementTypeByteSize(builder, loc, memrefValue);
+  return getByteOffsetForIndices(builder, loc, memrefValue, {size},
+                                 elementTypeByteSize);
+}
+
 /// Pattern to lower operations that become a no-ops at this level.
 /// Passes through operands to results.
 template <typename OpTy>
@@ -160,17 +176,8 @@ struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
   LogicalResult matchAndRewrite(
       memref::AllocaOp allocaOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto type = allocaOp.getType().cast<ShapedType>();
-    if (!type.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(
-          allocaOp, "unable to create buffers for dynamic shapes");
-    }
-    auto numElements = rewriter.create<arith::ConstantIndexOp>(
-        allocaOp.getLoc(), type.getNumElements());
-    auto elementSize = rewriter.createOrFold<IREE::Util::SizeOfOp>(
-        allocaOp.getLoc(), type.getElementType());
-    auto allocationSize = rewriter.createOrFold<arith::MulIOp>(
-        allocaOp.getLoc(), numElements, elementSize);
+    Location loc = allocaOp.getLoc();
+    auto allocationSize = getByteLength(rewriter, loc, allocaOp.getMemref());
     rewriter.replaceOpWithNewOp<IREE::Util::BufferAllocOp>(
         allocaOp, rewriter.getType<IREE::Util::BufferType>(), allocationSize);
     return success();
