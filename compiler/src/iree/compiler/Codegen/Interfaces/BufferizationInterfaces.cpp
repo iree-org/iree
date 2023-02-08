@@ -263,11 +263,11 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
   AnalysisState analysisState(options);
   SmallVector<Value> newOutputBuffers;
   for (OpResult opResult : op->getOpResults()) {
-    SmallVector<OpOperand *> aliasingOpOperands =
+    bufferization::AliasingOpOperandList aliasingOpOperands =
         analysisState.getAliasingOpOperands(opResult);
-    assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
-    FailureOr<Value> resultBuffer =
-        getBuffer(rewriter, aliasingOpOperands.front()->get(), options);
+    assert(aliasingOpOperands.getNumAliases() == 1 && "expected 1 OpOperand");
+    FailureOr<Value> resultBuffer = getBuffer(
+        rewriter, aliasingOpOperands.getAliases()[0].opOperand->get(), options);
     if (failed(resultBuffer)) return failure();
     newOutputBuffers.push_back(*resultBuffer);
   }
@@ -318,9 +318,8 @@ struct LinalgExtOpInterface
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) const {
-    // Operand is written to if it has an aliasing OpResult.
-    auto bufferizableOp = cast<BufferizableOpInterface>(op);
-    return !bufferizableOp.getAliasingOpResults(opOperand, state).empty();
+    auto dstOp = cast<DestinationStyleOpInterface>(op);
+    return dstOp.isDpsInit(&opOperand);
   }
 
   bufferization::AliasingOpOperandList getAliasingOpOperands(
@@ -328,7 +327,8 @@ struct LinalgExtOpInterface
     auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
 
     // The i-th OpResult may alias with the i-th "out" tensor.
-    return {linalgExtOp.getOutputOperand(opResult.getResultNumber())};
+    return {{linalgExtOp.getOutputOperand(opResult.getResultNumber()),
+             bufferization::BufferRelation::Equivalent}};
   }
 
   bufferization::AliasingOpResultList getAliasingOpResults(
@@ -336,13 +336,10 @@ struct LinalgExtOpInterface
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
-    if (dspOp.isDpsInit(&opOperand)) return {dspOp.getTiedOpResult(&opOperand)};
+    if (dspOp.isDpsInit(&opOperand))
+      return {{dspOp.getTiedOpResult(&opOperand),
+               bufferization::BufferRelation::Equivalent}};
     return {};
-  }
-
-  bufferization::BufferRelation bufferRelation(
-      Operation *op, OpResult opResult, const AnalysisState &state) const {
-    return bufferization::BufferRelation::Equivalent;
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
