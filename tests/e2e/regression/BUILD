@@ -36,29 +36,14 @@ BACKEND_TESTS = [
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = enforce_glob(
-        [
-            "fill_i64.mlir",
-            "globals.mlir",
-            "libm_linking.mlir",
-            "scalar.mlir",
-            "trace_dispatch_tensors.mlir",
-            "unused_args.mlir",
-        ],
-        include =
-            ["*.mlir"],
-        # TODO(#5897): enable these for codegen linalg on tensors/etc.
-        exclude = [
-            "associative_reordering.mlir",
-            "disable_demote_f64_to_f32.mlir",
-            "globals_ml_program.mlir",
-            "large_reduction.mlir",
-            "layernorm.mlir",
-            "linalg_quantized_matmul_vs_linalg_matmul.mlir",
-            "lowering_config.mlir",
-            "softmax_large.mlir",
-        ] + BACKEND_TESTS,
-    ),
+    srcs = [
+        "fill_i64.mlir",
+        "globals.mlir",
+        "libm_linking.mlir",
+        "scalar.mlir",
+        "trace_dispatch_tensors.mlir",
+        "unused_args.mlir",
+    ],
     cfg = "//tests:lit.cfg.py",
     tags = [
         "driver=local-task",
