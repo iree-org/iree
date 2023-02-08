@@ -21,5 +21,6 @@ iree_hal_cts_test_suite(
     "allocator"
     "buffer_mapping"
     "driver"
+    "semaphore"
 )
 

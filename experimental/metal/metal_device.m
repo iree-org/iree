@@ -7,6 +7,7 @@
 #include "experimental/metal/metal_device.h"
 
 #include "experimental/metal/direct_allocator.h"
+#include "experimental/metal/metal_shared_event.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
@@ -25,6 +26,11 @@ typedef struct iree_hal_metal_device_t {
   iree_hal_allocator_t* device_allocator;
 
   id<MTLDevice> device;
+
+  // A dispatch queue and associated event listener for running Objective-C blocks to singal
+  // semaphores and wake up threads.
+  dispatch_queue_t semaphore_notification_queue;
+  MTLSharedEventListener* event_listener;
 } iree_hal_metal_device_t;
 
 static const iree_hal_device_vtable_t iree_hal_metal_device_vtable;
@@ -54,6 +60,9 @@ static iree_status_t iree_hal_metal_device_create_internal(iree_hal_driver_t* dr
     iree_hal_driver_retain(device->driver);
     device->host_allocator = host_allocator;
     device->device = [metal_device retain];  // +1
+    device->semaphore_notification_queue = dispatch_queue_create("dev.iree.queue.metal", NULL);
+    device->event_listener = [[MTLSharedEventListener alloc]
+        initWithDispatchQueue:device->semaphore_notification_queue];  // +1
 
     *out_device = (iree_hal_device_t*)device;
   } else {
@@ -79,6 +88,9 @@ static void iree_hal_metal_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  [device->event_listener release];  // -1
+  dispatch_release(device->semaphore_notification_queue);
 
   iree_hal_allocator_release(device->device_allocator);
   [device->device release];  // -1
@@ -165,12 +177,22 @@ static iree_status_t iree_hal_metal_device_create_pipeline_layout(
 static iree_status_t iree_hal_metal_device_create_semaphore(iree_hal_device_t* base_device,
                                                             uint64_t initial_value,
                                                             iree_hal_semaphore_t** out_semaphore) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplmented semaphore create");
+  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  return iree_hal_metal_shared_event_create(device->device, initial_value, device->event_listener,
+                                            device->host_allocator, out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t iree_hal_metal_device_query_semaphore_compatibility(
     iree_hal_device_t* base_device, iree_hal_semaphore_t* semaphore) {
-  return IREE_HAL_SEMAPHORE_COMPATIBILITY_NONE;
+  if (iree_hal_metal_shared_event_isa(semaphore)) {
+    // Fast-path for semaphores related to this device.
+    // TODO(benvanik): ensure the creating devices are compatible in cases where
+    // multiple devices are used.
+    return IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL;
+  }
+  // TODO(benvanik): semaphore APIs for querying allowed export formats. We
+  // can check device caps to see what external semaphore types are supported.
+  return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
 static iree_status_t iree_hal_metal_device_queue_alloca(
@@ -205,7 +227,7 @@ static iree_status_t iree_hal_metal_device_queue_flush(iree_hal_device_t* base_d
 static iree_status_t iree_hal_metal_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplmented semaphore wait");
+  return iree_hal_metal_shared_event_multi_wait(wait_mode, &semaphore_list, timeout);
 }
 
 static iree_status_t iree_hal_metal_device_profiling_begin(

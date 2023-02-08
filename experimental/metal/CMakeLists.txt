@@ -23,6 +23,8 @@ iree_cc_library(
     "metal_buffer.m"
     "metal_device.m"
     "metal_driver.m"
+    "metal_shared_event.h"
+    "metal_shared_event.m"
   DEPS
     iree::base
     iree::base::core_headers
