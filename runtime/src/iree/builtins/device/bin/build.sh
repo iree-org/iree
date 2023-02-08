@@ -8,16 +8,21 @@
 #   LLVM_AS=/usr/bin/llvm-as \
 #   CLANG=/usr/bin/clang-13 \
 #   ./iree/builtins/device/bin/build.sh
+#
+# Or use the defaults by building them from the IREE tree:
+#   cmake --build ../build/ --target clang --target llvm-as
+#   ./iree/builtins/device/bin/build.sh
 
 set -x
 set -e
 
-CLANG="${CLANG:-clang}"
-# TODO(benvanik): figure out how to get this path from clang itself.
-CLANG_INCLUDE="${CLANG_INCLUDE:-/usr/lib/llvm-13/lib/clang/13.0.0/include/}"
 IREE_SRC_DIR="$(git rev-parse --show-toplevel)"
 IREE_BUILD_DIR="${IREE_BUILD_DIR:-${IREE_SRC_DIR?}/../build}"
-LLVM_AS="${LLVM_AS:-${IREE_BUILD_DIR}/llvm-project/bin/llvm-as}"
+
+CLANG="${CLANG:-${IREE_BUILD_DIR}/llvm-project/bin/bin/clang}"
+# TODO(benvanik): figure out how to get this path from clang itself.
+CLANG_INCLUDE="${CLANG_INCLUDE:-${IREE_BUILD_DIR}/llvm-project/bin/lib/clang/17/include/}"
+LLVM_AS="${LLVM_AS:-${IREE_BUILD_DIR}/llvm-project/bin/bin/llvm-as}"
 
 SCRIPT_DIR="$(realpath `dirname $0`)"
 OUT="${SCRIPT_DIR?}/"
