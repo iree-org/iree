@@ -19,17 +19,20 @@ DOCKER_CONTAINER_WORKDIR="${DOCKER_CONTAINER_WORKDIR:-/work}"
 # for anything else.
 # Requires that DOCKER_HOST_WORKDIR and DOCKER_HOST_TMPDIR have been set
 function docker_run() {
+    DOCKER_RUN_ARGS=(
+      # Don't print noisy pull output
+      --quiet
+      # Delete the container after the run is complete.
+      --rm
+    )
+
     # Make the source repository available and launch containers in that
     # directory.
-    DOCKER_RUN_ARGS=(
+    DOCKER_RUN_ARGS+=(
       --mount="type=bind,source=${DOCKER_HOST_WORKDIR},dst=${DOCKER_CONTAINER_WORKDIR}"
       --workdir="${DOCKER_CONTAINER_WORKDIR}"
       --env "CCACHE_BASE_DIR=${DOCKER_CONTAINER_WORKDIR}"
     )
-
-    # Delete the container after the run is complete.
-    DOCKER_RUN_ARGS+=(--rm)
-
 
     # Run as the current user and group. If only it were this simple...
     DOCKER_RUN_ARGS+=(--user="$(id -u):$(id -g)")
