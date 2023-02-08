@@ -48,6 +48,7 @@ frontend and typically involves a number of stages:
 This fully legalized form can then be compiled without dependencies on the
 source model language.
 
+
 ## Compilation
 
 During compilation we load an MLIR file and compile for the specified set of
