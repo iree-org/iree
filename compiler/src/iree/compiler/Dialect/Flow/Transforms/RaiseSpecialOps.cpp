@@ -33,10 +33,9 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
   }
 
   void runOnOperation() override {
-    SmallVector<linalg::LinalgOp> softmaxRoots;
+    SmallVector<std::pair<linalg::LinalgOp, Value>> softmaxRoots;
     getOperation()->walk([&](linalg::LinalgOp op) {
       StructuredOpMatcher reduction, fill, leading, trailing;
-      transform_ext::MatchedReductionCaptures captures;
       transform_ext::StructuredOpMatcher fillMinusInf;
       transform_ext::StructuredOpMatcher maxReduction;
       transform_ext::StructuredOpMatcher sub;
@@ -48,21 +47,17 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       makeSoftmaxMatcher(fillMinusInf, maxReduction, sub, expOperand, fillzero,
                          sum, divOperand, softmaxroot);
       if (matchPattern(op, softmaxroot)) {
-        softmaxRoots.push_back(op);
+        Value src = maxReduction.getCaptured()->getOperand(0);
+        softmaxRoots.push_back(std::make_pair(op, src));
       }
     });
-    for (linalg::LinalgOp op : softmaxRoots) {
-      Value src = op->getOperand(0)
-                      .getDefiningOp()
-                      ->getOperand(0)
-                      .getDefiningOp()
-                      ->getOperand(0);
-      OpBuilder builder(op);
-      auto softmax = builder.create<IREE::LinalgExt::SoftmaxOp>(
-          op.getLoc(), src, op.getDpsInitOperand(0)->get(),
-          op.getNumLoops() - 1);
-      op->replaceAllUsesWith(softmax->getResults());
-      op->erase();
+    for (std::pair<linalg::LinalgOp, Value> softmax : softmaxRoots) {
+      linalg::LinalgOp op = softmax.first;
+      Value src = softmax.second;
+      IRRewriter rewriter(op.getContext());
+      rewriter.setInsertionPoint(softmax.first);
+      rewriter.replaceOpWithNewOp<IREE::LinalgExt::SoftmaxOp>(
+          op, src, op.getDpsInitOperand(0)->get(), op.getNumLoops() - 1);
     }
   }
 };

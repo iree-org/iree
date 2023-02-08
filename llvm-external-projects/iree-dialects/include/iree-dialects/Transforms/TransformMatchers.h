@@ -138,9 +138,9 @@ struct IsIdentity {};
 struct ConstantFloatMin {};
 struct ConstantFloatZero {};
 
-/// Predicate indicating that the operand is the same value as its parent's
+/// Predicate indicating that the operand is the same value as its producer's
 /// operand.
-struct SameOperandAsParent
+struct SameOperandAsProducer
     : public SingleValuePredicateParam<std::pair<int64_t, int64_t>> {
   using Base::Base;
 };
@@ -318,7 +318,7 @@ public:
   }
 
   StructuredOpMatcher &input(int64_t position,
-                             SameOperandAsParent parentPosition);
+                             SameOperandAsProducer parentPosition);
 
   /// Adds a predicate checking that all input operands of the structured op
   /// have a permutation indexing map.
@@ -329,7 +329,7 @@ public:
   StructuredOpMatcher &input(AllOperands tag, IsProjectedPermutation);
 
   /// Adds a predicate checking that all input operands of the structured op
-  /// have a
+  /// are projected along the given dimension.
   StructuredOpMatcher &input(SmallVector<int64_t> &&positions, IsProjected dim);
   StructuredOpMatcher &input(int64_t position, IsProjected dim) {
     return input(SmallVector<int64_t>{position}, dim);
@@ -352,10 +352,9 @@ public:
                              CaptureElementTypeBitWidth width);
 
   /// Check if input is equal to a known constant.
+  // TODO: Support matching for constant ops.
   StructuredOpMatcher &input(int64_t position, ConstantFloatMin);
   StructuredOpMatcher &input(int64_t position, ConstantFloatZero);
-  StructuredOpMatcher &input(int64_t position,
-                             std::function<bool(llvm::APFloat)> floatValueFn);
 
   //===-------------------------------------------------------------------===//
   // Constraints on adjacent ops.
@@ -465,30 +464,22 @@ public:
   // Constraints on op region.
   //===-------------------------------------------------------------------===//
 
+  /// Return true if the linalg op only contains a single ops and the arguments
+  /// of the operation match the order of the linalg operand.
+  /// Example:
+  ///   linalg.generic
+  ///     ins(%0, %1 : tensor<?x?x?xf32>, tensor<?x?xf32>)
+  ///     outs(%2 : tensor<?x?x?xf32>) {
+  ///     ^bb0(%arg0: f32, %arg1: f32):
+  ///     %3 = arith.maxf %arg0, %arg1 : f32
+  ///     linalg.yield %3 : f32
+  ///   } -> tensor<?x?xf32>
   template <typename OpType>
-  StructuredOpMatcher &containSingleOp() {
-    predicates.push_back([=](linalg::LinalgOp linalgOp) {
-      if (linalgOp.getBlock()->getOperations().size() != 2)
-        return false;
-      Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
-      if (!isa<OpType>(innerOp) || innerOp->getNumResults() != 1)
-        return false;
-      Operation *yieldOp = linalgOp.getBlock()->getTerminator();
-      if (yieldOp->getNumOperands() != 1)
-        return false;
-      if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
-        return false;
-      for (auto [index, operand] : llvm::enumerate(innerOp->getOperands())) {
-        auto arg = dyn_cast<BlockArgument>(operand);
-        if (!arg || arg.getParentBlock() != linalgOp.getBlock() ||
-            arg.getArgNumber() != index)
-          return false;
-      }
-      return true;
-    });
-    return *this;
+  StructuredOpMatcher &singleOpWithCanonicaleArgs() {
+    return singleOpWithCanonicaleArgs(OpType::getOperationName());
   }
-
+  StructuredOpMatcher &singleOpWithCanonicaleArgs(StringRef opname);
+  /// Check if the op is a linalg of with a single float reciprocal op.
   StructuredOpMatcher &isFloatReciprocal();
 
 private:
@@ -512,6 +503,10 @@ private:
   void addResultMatcher(int64_t position, HasAnyUse tag,
                         std::function<bool(Operation *)> matcher,
                         OptionalMatch optional);
+
+  // Common util for constant matcher.
+  StructuredOpMatcher &input(int64_t position,
+                             std::function<bool(llvm::APFloat)> floatValueFn);
 
   /// Additional predicates to be checked on the structured op.
   SmallVector<PredicateFn> predicates;
