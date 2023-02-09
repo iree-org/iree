@@ -331,12 +331,12 @@ class TransposeReshapeGenericDotGeneral
     auto rhsContractingDims = dimNumbers.getRhsContractingDimensions();
 
     // No contraction dims means this can be represented as a mul.
-    if (lhsContractingDims.size() == 0) return failure();
-    if (rhsContractingDims.size() == 0) return failure();
+    if (lhsContractingDims.size() == 0 || rhsContractingDims.size() == 0)
+      return rewriter.notifyMatchFailure(op, "can be represented as mhlo.mul");
 
     // No batching dimensions means this can be represented a dot.
-    if (lhsBatchingDims.size() == 0) return failure();
-    if (rhsBatchingDims.size() == 0) return failure();
+    if (lhsBatchingDims.size() == 0 || rhsBatchingDims.size() == 0)
+      return rewriter.notifyMatchFailure(op, "can be represented as mhlo.dot");
 
     SmallVector<bool> isLhsParallel(lhsShapeType.getRank(), true);
     for (auto i : lhsBatchingDims) {
@@ -392,12 +392,16 @@ class TransposeReshapeGenericDotGeneral
     rhs = ReshapeIfMorethan3D(rewriter, op.getLoc(), rhs,
                               rhsBatchingDims.size(), numRhsContractionDims);
 
-    if (lhs == op.getLhs() && rhs == op.getRhs()) return failure();
+    if (lhs == op.getLhs() && rhs == op.getRhs())
+      return rewriter.notifyMatchFailure(op, "already in canonical form");
 
     auto dimensionNumbers = mhlo::DotDimensionNumbersAttr::get(
         rewriter.getContext(), /*lhsBatchingDimensions=*/0,
         /*rhsBatchingDimensions=*/0,
-        /*lhsContractingDimensions=*/2, /*rhsContractingDimensions=*/1);
+        /*lhsContractingDimensions=*/
+            lhs.getType().cast<ShapedType>().getRank() -
+            1,
+        /*rhsContractingDimensions=*/1);
     auto lhsNewType = lhs.getType().cast<RankedTensorType>();
     auto rhsNewType = rhs.getType().cast<RankedTensorType>();
 
