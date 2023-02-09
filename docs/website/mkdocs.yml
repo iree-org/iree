@@ -103,6 +103,7 @@ nav:
       - TensorFlow: "getting-started/tensorflow.md"
       - TensorFlow Lite: "getting-started/tflite.md"
       - JAX: "getting-started/jax.md"
+      - PyTorch: "getting-started/pytorch.md"
   - "Deployment configurations":
       - "deployment-configurations/index.md"
       - CPU: "deployment-configurations/cpu.md"
