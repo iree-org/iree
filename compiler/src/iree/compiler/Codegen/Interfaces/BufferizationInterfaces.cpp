@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Support/LLVM.h"
@@ -352,6 +353,138 @@ struct LinalgExtOpInterface
   }
 };
 
+static LogicalResult bufferizePackOp(RewriterBase &rewriter, tensor::PackOp op,
+                                     const BufferizationOptions &options) {
+  // Take a guard before anything else.
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(op);
+
+  Value source;
+  {
+    auto maybeBuffer = getBuffer(rewriter, op.getSource(), options);
+    if (failed(maybeBuffer)) return failure();
+    source = *maybeBuffer;
+  }
+
+  Value dest;
+  AnalysisState analysisState(options);
+  {
+    SmallVector<OpOperand *> aliasingOpOperands =
+        analysisState.getAliasingOpOperands(op->getOpResult(0));
+    assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
+    FailureOr<Value> resultBuffer =
+        getBuffer(rewriter, aliasingOpOperands.front()->get(), options);
+    if (failed(resultBuffer)) return failure();
+    dest = *resultBuffer;
+  }
+
+  // Set insertion point now that potential alloc/dealloc are introduced.
+  rewriter.setInsertionPoint(op);
+  rewriter.create<IREE::LinalgExt::PackOp>(
+      op.getLoc(), source, dest, op.getInnerDimsPos(), op.getMixedTiles(),
+      op.getPaddingValue(), op.getOuterDimsPerm());
+
+  // Replace the results of the old op with the new output buffers.
+  bufferization::replaceOpWithBufferizedValues(rewriter, op, dest);
+
+  return success();
+}
+
+static LogicalResult bufferizeUnPackOp(RewriterBase &rewriter,
+                                       tensor::UnPackOp op,
+                                       const BufferizationOptions &options) {
+  // Take a guard before anything else.
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(op);
+
+  Value source;
+  {
+    auto maybeBuffer = getBuffer(rewriter, op.getSource(), options);
+    if (failed(maybeBuffer)) return failure();
+    source = *maybeBuffer;
+  }
+
+  Value dest;
+  AnalysisState analysisState(options);
+  {
+    SmallVector<OpOperand *> aliasingOpOperands =
+        analysisState.getAliasingOpOperands(op->getOpResult(0));
+    assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
+    FailureOr<Value> resultBuffer =
+        getBuffer(rewriter, aliasingOpOperands.front()->get(), options);
+    if (failed(resultBuffer)) return failure();
+    dest = *resultBuffer;
+  }
+
+  // Set insertion point now that potential alloc/dealloc are introduced.
+  rewriter.setInsertionPoint(op);
+  rewriter.create<IREE::LinalgExt::UnPackOp>(
+      op.getLoc(), source, dest, op.getInnerDimsPos(), op.getMixedTiles(),
+      op.getOuterDimsPerm());
+
+  // Replace the results of the old op with the new output buffers.
+  bufferization::replaceOpWithBufferizedValues(rewriter, op, dest);
+
+  return success();
+}
+
+template <typename OpTy>
+struct PackUnPackOpInterface
+    : public BufferizableOpInterface::ExternalModel<PackUnPackOpInterface<OpTy>,
+                                                    OpTy> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    // Operand is written to if it has an aliasing OpResult.
+    auto dpsOp = cast<DestinationStyleOpInterface>(op);
+    return dpsOp.isDpsInit(&opOperand);
+  }
+
+  SmallVector<OpOperand *> getAliasingOpOperand(
+      Operation *op, OpResult opResult, const AnalysisState &state) const {
+    auto dpsOp = cast<DestinationStyleOpInterface>(op);
+    return {dpsOp.getDpsInitOperand(opResult.getResultNumber())};
+  }
+
+  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+                                            const AnalysisState &state) const {
+    auto dspOp = cast<DestinationStyleOpInterface>(op);
+
+    // The i-th "out" tensor may alias with the i-th OpResult.
+    if (dspOp.isDpsInit(&opOperand)) return {dspOp.getTiedOpResult(&opOperand)};
+    return {};
+  }
+
+  bufferization::AliasingOpResultList getAliasingOpResults(
+      Operation *op, OpOperand &opOperand, const AnalysisState &state) const {
+    auto dspOp = cast<DestinationStyleOpInterface>(op);
+
+    // The i-th "out" tensor may alias with the i-th OpResult.
+    if (dspOp.isDpsInit(&opOperand)) return {dspOp.getTiedOpResult(&opOperand)};
+    return {};
+  }
+
+  bufferization::BufferRelation bufferRelation(
+      Operation *op, OpResult opResult, const AnalysisState &state) const {
+    return bufferization::BufferRelation::Equivalent;
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options) const {
+    return TypeSwitch<Operation *, LogicalResult>(op)
+        .template Case<tensor::PackOp>(
+            [&](auto pack) { return bufferizePackOp(rewriter, pack, options); })
+        .template Case<tensor::UnPackOp>([&](auto unpack) {
+          return bufferizeUnPackOp(rewriter, unpack, options);
+        })
+        .Default([](auto) { return failure(); });
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // IREE specific post analysis transformations.
 //===----------------------------------------------------------------------===//
@@ -460,6 +593,12 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         LinalgExtOpInterface<IREE::LinalgExt::SoftmaxOp>>(*ctx);
     IREE::LinalgExt::AttentionOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::AttentionOp>>(*ctx);
+  });
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    tensor::PackOp::attachInterface<PackUnPackOpInterface<tensor::PackOp>>(
+        *ctx);
+    tensor::UnPackOp::attachInterface<PackUnPackOpInterface<tensor::UnPackOp>>(
+        *ctx);
   });
 }
 
