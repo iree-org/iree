@@ -9,7 +9,6 @@
 
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
-include "mlir/Dialect/Transform/IR/TransformEffects.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
@@ -102,7 +101,7 @@ def WrapInDispatchRegionOp : Op<
     handle (i.e., the `dispatch.region` op).
   }];
 
-  let arguments = (ins PDL_Operation:$target, 
+  let arguments = (ins PDL_Operation:$target,
                        DefaultValuedAttr<BoolAttr, "true">:$generateWorkload);
   let results = (outs PDL_Operation:$transformed);
 

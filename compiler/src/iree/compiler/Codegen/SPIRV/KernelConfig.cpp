@@ -1432,8 +1432,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     }
 
     if (computeOps.empty()) {
-      return funcOp.emitOpError(
-          "unhandled translation of function without compute ops");
+      // No compute operations found. Allow to pass through without a config.
+      continue;
     }
 
     Operation *rootOperation = nullptr;

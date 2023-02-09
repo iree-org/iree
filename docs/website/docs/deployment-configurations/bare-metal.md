@@ -26,7 +26,7 @@ to retrieve the IREE compiler.
 The model can be compiled with the following command (assuming the path to
 `iree-compile` is in your system's `PATH`):
 
-```shell
+``` shell
 iree-compile \
     --iree-stream-partitioning-favor=min-peak-memory \
     --iree-hal-target-backends=llvm-cpu \
@@ -39,14 +39,14 @@ iree-compile \
 
 In which
 
-*   `-iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak
+* `-iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak
     memory usage at the cost of concurrency - include when targeting
     single-threaded execution to reduce memory consumption.
-*   `iree-hal-target-backends=llvm-cpu`: Compile using the LLVM CPU target
-*   `iree-llvm-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple
+* `iree-hal-target-backends=llvm-cpu`: Compile using the LLVM CPU target
+* `iree-llvm-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple
     so the artifact has a fixed ABI to be rendered by the
     [elf_module library](https://github.com/iree-org/iree/tree/main/iree/hal/local/elf)
-*   `iree-llvm-debug-symbols=false`: To reduce the artifact size
+* `iree-llvm-debug-symbols=false`: To reduce the artifact size
 
 See [generate.sh](https://github.com/iree-org/iree/blob/main/iree/hal/local/elf/testdata/generate.sh)
 for example command-line instructions of some common architectures
@@ -77,17 +77,20 @@ model execution is in a single-thread synchronous fashion.
 
 * `set(IREE_BUILD_COMPILER OFF)`: Build IREE runtime only
 * `set(CMAKE_SYSTEM_NAME Generic)`: Tell CMake to skip targeting a specific
-operating system
+  operating system
 * `set(IREE_BINDINGS_TFLITE OFF)`: Disable the TFLite binding support
 * `set(IREE_ENABLE_THREADING OFF)`: Disable multi-thread library support
 * `set(IREE_HAL_DRIVER_DEFAULTS OFF)`: Disable HAL drivers by default, then
-enable the synchronous HAL drivers with `set(IREE_HAL_DRIVER_LOCAL_SYNC ON)`
-* `set(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS OFF)`: Disable HAL executable loaders by default, then enable the CPU codegen and VMVX loaders with `set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF ON)` and `set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)`
-* `set(IREE_BUILD_TESTS OFF)`: Disable tests until IREE supports running them on
-bare-metal platforms
+  enable the synchronous HAL drivers with `set(IREE_HAL_DRIVER_LOCAL_SYNC ON)`
+* `set(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS OFF)`: Disable HAL executable
+  loaders by default, then enable the CPU codegen and VMVX loaders with
+  `set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF ON)` and
+  `set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)`
+* `set(IREE_BUILD_TESTS OFF)`: Disable tests until IREE supports running them
+  on bare-metal platforms
 * `set(IREE_BUILD_SAMPLES ON)`: Build
-[simple_embedding](https://github.com/iree-org/iree/tree/main/samples/simple_embedding)
-example
+  [simple_embedding](https://github.com/iree-org/iree/tree/main/samples/simple_embedding)
+  example
 
 !!! todo
     Clean the list up after [#6353](https://github.com/iree-org/iree/issues/6353)
@@ -99,16 +102,16 @@ architecture, target abi, linker script, system library path, etc.
 ### Define IREE macros
 
 * `-DIREE_PLATFORM_GENERIC`: Let IREE to build the runtime library without
-targeting a specific platform.
+  targeting a specific platform.
 * `-DIREE_SYNCHRONIZATION_DISABLE_UNSAFE=1`: Disable thread synchronization
-support. Must only be used if there's a single thread.
+  support. Must only be used if there's a single thread.
 * `-DIREE_FILE_IO_ENABLE=0`: Disable file I/O.
 * `-DIREE_TIME_NOW_FN`: A function to return the system time. For the bare-metal
-system, it can be set as `-DIREE_TIME_NOW_FN=\"\{ return 0;\}\"` as there's no
-asynchronous wait handling.
+  system, it can be set as `-DIREE_TIME_NOW_FN=\"\{ return 0;\}\"` as there's no
+  asynchronous wait handling.
 * `-DIREE_WAIT_UNTIL_FN`: A function to wait until the given time in
-nanoseconds. Must match the signature `bool(uint64_t nanos)` and return
-false if the wait failed.
+  nanoseconds. Must match the signature `bool(uint64_t nanos)` and return
+  false if the wait failed.
 
 Examples of how to setup the CMakeLists.txt and .cmake file:
 

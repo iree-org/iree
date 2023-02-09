@@ -49,6 +49,18 @@ func.func @alloca() -> memref<16xi32> {
 }
 
 // -----
+// CHECK-LABEL: @alloca_dynamic_size
+// CHECK-SAME: (%[[LENGTH:.+]]: index)
+func.func @alloca_dynamic_size(%length : index) -> memref<?xi32> {
+  // CHECK: %[[ELEM_SIZE:.+]] = arith.constant 4 : index
+  // CHECK: %[[ALLOCATION_SIZE:.+]] = arith.muli %[[LENGTH]], %[[ELEM_SIZE]] : index
+  // CHECK: %[[BUFFER:.+]] = util.buffer.alloc uninitialized : !util.buffer{%[[ALLOCATION_SIZE]]}
+  %0 = memref.alloca(%length) : memref<?xi32>
+  // CHECK: return %[[BUFFER]]
+  return %0 : memref<?xi32>
+}
+
+// -----
 // CHECK-LABEL: @alloc_i16
 // CHECK-SAME: (%[[IDX0:.+]]: index) -> !util.buffer {
 func.func @alloc_i16(%idx0: index) -> memref<4xi16> {

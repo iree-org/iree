@@ -75,3 +75,29 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest",
     ],
 )
+
+cc_binary_benchmark(
+    name = "unpack_benchmark",
+    srcs = ["unpack_benchmark.c"],
+    deps = [
+        ":ukernel_test_utils",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:cpu",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/testing:benchmark",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "unpack_test",
+    srcs = ["unpack_test.cc"],
+    deps = [
+        ":ukernel_test_utils",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:cpu",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)

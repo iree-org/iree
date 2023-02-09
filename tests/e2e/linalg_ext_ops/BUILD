@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
@@ -81,6 +82,14 @@ iree_check_single_backend_test_suite(
     target_backend = "cuda",
 )
 
+iree_cmake_extra_content(
+    content = """
+# Failing on Emscripten: https://github.com/iree-org/iree/issues/12129
+if(NOT EMSCRIPTEN)
+""",
+    inline = True,
+)
+
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = enforce_glob(
@@ -102,6 +111,13 @@ iree_check_single_backend_test_suite(
     ),
     driver = "local-task",
     target_backend = "llvm-cpu",
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )
 
 iree_check_single_backend_test_suite(

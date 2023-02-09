@@ -22,8 +22,7 @@ class IreeArtifactsTest(unittest.TestCase):
         source_url="https://example.com/xyz.tflite",
         entry_function="main",
         input_types=["1xf32"])
-    imported_model = iree_definitions.ImportedModel(
-        model=model, dialect_type=iree_definitions.MLIRDialectType.TOSA)
+    imported_model = iree_definitions.ImportedModel.from_model(model)
     root_path = pathlib.PurePath("root")
 
     path = iree_artifacts.get_imported_model_path(imported_model=imported_model,
@@ -42,8 +41,7 @@ class IreeArtifactsTest(unittest.TestCase):
         source_url="https://example.com/xyz.mlir",
         entry_function="main",
         input_types=["3xf32"])
-    imported_model = iree_definitions.ImportedModel(
-        model=model, dialect_type=iree_definitions.MLIRDialectType.LINALG)
+    imported_model = iree_definitions.ImportedModel.from_model(model)
     root_path = pathlib.PurePath("root")
 
     path = iree_artifacts.get_imported_model_path(imported_model=imported_model,
@@ -61,8 +59,7 @@ class IreeArtifactsTest(unittest.TestCase):
         source_url="https://example.com/xyz.tflite",
         entry_function="main",
         input_types=["1xf32"])
-    imported_model = iree_definitions.ImportedModel(
-        model=model, dialect_type=iree_definitions.MLIRDialectType.TOSA)
+    imported_model = iree_definitions.ImportedModel.from_model(model)
     compile_config = iree_definitions.CompileConfig(
         id="config_a",
         tags=["defaults"],
@@ -102,10 +99,8 @@ class IreeArtifactsTest(unittest.TestCase):
         source_url="https://example.com/xyz.mlir",
         entry_function="main",
         input_types=["3xf32"])
-    imported_model_a = iree_definitions.ImportedModel(
-        model=model_a, dialect_type=iree_definitions.MLIRDialectType.TOSA)
-    imported_model_b = iree_definitions.ImportedModel(
-        model=model_b, dialect_type=iree_definitions.MLIRDialectType.LINALG)
+    imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
+    imported_model_b = iree_definitions.ImportedModel.from_model(model_b)
     compile_config_a = iree_definitions.CompileConfig(
         id="config_a",
         tags=["defaults"],

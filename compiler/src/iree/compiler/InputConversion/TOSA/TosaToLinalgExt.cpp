@@ -38,7 +38,7 @@ class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
   LogicalResult matchAndRewrite(tosa::ScatterOp op,
                                 PatternRewriter &rewriter) const final {
     auto values = op.getValuesIn();
-    auto indices = op.getIndices();
+    auto indices = op.getIndices().cast<Value>();
     auto updates = op.getInput();
     auto valuesTy = values.getType().dyn_cast<RankedTensorType>();
     auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();

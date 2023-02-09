@@ -15,6 +15,6 @@ include "mlir/IR/PatternBase.td"
 // Canonicalize unnecessary tensor_load when the load is used just for
 // an extract
 def : Pat<(Tensor_ExtractOp (Bufferization_ToTensorOp $value), $indices),
-          (LoadOp $value, $indices)>;
+          (LoadOp $value, $indices, ConstBoolAttrFalse)>;
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_FOLDTENSOREXTRACTOP

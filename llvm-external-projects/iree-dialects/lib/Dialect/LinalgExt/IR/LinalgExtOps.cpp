@@ -2844,6 +2844,12 @@ SoftmaxOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+void SoftmaxOp::build(OpBuilder &builder, OperationState &state, Value source,
+                      Value output, int64_t dimension) {
+  build(builder, state, TypeRange({output.getType()}), ValueRange(source),
+        ValueRange(output), dimension);
+}
+
 //===----------------------------------------------------------------------===//
 // AttentionOp
 //===----------------------------------------------------------------------===//

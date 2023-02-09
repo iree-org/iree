@@ -40,7 +40,7 @@ cmake --build ../iree-build/ --target install
 
 Build the runtime for the iOS Simulator.
 
-```shell
+``` shell
 cmake -S . -B ../build-ios-sim -GNinja \
   -DCMAKE_SYSTEM_NAME=iOS \
   -DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphonesimulator Path) \
@@ -58,7 +58,7 @@ cmake --build ../build-ios-sim --config Release --target install
 Or, we can build the runtime for iOS devices it by changing the value
 of the `-DCMAKE OSX SYSROOT` option to:
 
-```shell
+``` shell
   -DCMAKE_OSX_SYSROOT=$(xcodebuild -version -sdk iphoneos Path)
 ```
 
@@ -76,7 +76,7 @@ Run the IREE compiler on the host to generate a module.
 We could test the generated module by running the macOS version of
 `iree-run-module` on the host.
 
-```shell
+``` shell
 ../iree-build/install/bin/iree-run-module \
   --module=/tmp/simple_abs_vmvx.vmfb \
   --device=local-task \
@@ -87,27 +87,27 @@ We could test the generated module by running the macOS version of
 To run it on the iOS simulator, we need to copy the vmfb file into the
 `iree-run-module` iOS app bundle.
 
-```
+``` shell
 cp /tmp/simple_abs_vmvx.vmfb \
    ../build-ios-sim/install/bin/iree-run-module.app/
 ```
 
 Open the iOS Simulator Manager on the host.
 
-```shell
+``` shell
 open -a Simulator
 ```
 
 After creating and booting a simulator in this app, you can list it
 from the command-line.
 
-```shell
+``` shell
 xcrun simctl list devices | grep Booted
 ```
 
 This is what should come out of the command:
 
-```
+``` text
     iPhone 14 Pro (12341234-ABCD-ABCD-ABCD-123412341234) (Booted)
 ```
 
@@ -117,14 +117,14 @@ device ID_ (UDID).
 
 Install the app `iree-run-module` on the simulator, given its UDID.
 
-```shell
+``` shell
 xcrun simctl install <UDID> ../build-ios-sim/install/bin/iree-run-module.app
 ```
 
 Check the path to the installed bundle, where the
 `simple_abs_vmvx.vmfb` module should be found.
 
-```shell
+``` shell
 ls $(xcrun simctl get_app_container <UDID> dev.iree.iree-run-module)
 ```
 
@@ -136,7 +136,7 @@ the _property list_ (plist) file
 Launch the `iree-run-module` app on the simulator to run the IREE
 module `simple_abs_vmvx.vmfb`.
 
-```shell
+``` shell
 xcrun simctl launch --console \
   <UDID> \
   dev.iree.runmodule \

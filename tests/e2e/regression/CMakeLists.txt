@@ -206,4 +206,18 @@ iree_check_single_backend_test_suite(
     "--iree-flow-enable-aggressive-fusion"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_compilation_only_vmvx_ukernels
+  SRCS
+    "dynamic_matmuls_on_same_accumulator_issue_12060.mlir"
+    "dynamic_tosa_clamp.mlir"
+    "dynamic_tosa_quantized_fully_connected_issue_10859.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  COMPILER_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-vmvx-enable-microkernels"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

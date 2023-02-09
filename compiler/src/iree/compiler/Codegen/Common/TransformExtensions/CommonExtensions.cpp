@@ -65,11 +65,16 @@ void transform_dialect::ApplyPatternsOp::build(
 #define ADD_PATTERN(NAME, ATTR) \
   if (patterns.NAME)            \
     result.addAttribute(ApplyPatternsOp::ATTR(result.name), unitAttr);
+  ///
+  /// When touching something here, do not forget to update CommonExtensions.h.
+  ///
   ADD_PATTERN(additionalIreePatterns, getAdditionalIreePatternsAttrName)
   ADD_PATTERN(bubbleCollapseExpand, getBubbleCollapseExpandAttrName)
   ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
   ADD_PATTERN(eraseUnnecessaryTensorOperands,
               getEraseUnnecessaryTensorOperandsAttrName)
+  ADD_PATTERN(expandMemrefStridedMetadata,
+              getExpandMemrefStridedMetadataAttrName)
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
@@ -77,8 +82,7 @@ void transform_dialect::ApplyPatternsOp::build(
               getLowerTransferOpPermutationsAttrName)
   ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
   ADD_PATTERN(rankReducingVector, getRankReducingVectorAttrName)
-  ADD_PATTERN(expandMemrefStridedMetadata,
-              getExpandMemrefStridedMetadataAttrName)
+  ADD_PATTERN(rewritePackOps, getRewritePackOpsAttrName)
   ADD_PATTERN(swapPaddingElideConditional,
               getSwapPaddingElideConditionalAttrName)
   ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
@@ -125,6 +129,32 @@ struct FoldTensorEmptyExtract
     return success();
   }
 };
+
+/// Trivial 1-1 pattern to retire once IREE adopts tensor.pack.
+struct TensorPackToLinalgExt : public OpRewritePattern<tensor::PackOp> {
+  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::PackOp packOp,
+                                PatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<LinalgExt::PackOp>(
+        packOp, packOp.getSource(), packOp.getDest(), packOp.getInnerDimsPos(),
+        packOp.getMixedTiles(), packOp.getPaddingValue(),
+        packOp.getOuterDimsPerm());
+    return success();
+  }
+};
+
+/// Trivial 1-1 pattern to retire once IREE adopts tensor.unpack.
+struct TensorUnPackToLinalgExt : public OpRewritePattern<tensor::UnPackOp> {
+  using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
+                                PatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<LinalgExt::UnPackOp>(
+        unPackOp, unPackOp.getSource(), unPackOp.getDest(),
+        unPackOp.getInnerDimsPos(), unPackOp.getMixedTiles(),
+        unPackOp.getOuterDimsPerm());
+    return success();
+  }
+};
 }  // namespace
 
 static void addLowerTransferOpPermutationsPatterns(
@@ -156,6 +186,11 @@ static void addRankReducingLinalgPatterns(RewritePatternSet &patterns) {
 
 static void addRankReducingVectorPatterns(RewritePatternSet &patterns) {
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+}
+
+static void addRewritePackOpsPatterns(RewritePatternSet &patterns) {
+  patterns.add<TensorPackToLinalgExt, TensorUnPackToLinalgExt>(
+      patterns.getContext());
 }
 
 static void addSwappingPatterns(RewritePatternSet &patterns,
@@ -196,13 +231,14 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addLowerTransferOpPermutationsPatterns(patterns);
   if (getEraseUnnecessaryTensorOperands())
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
+  if (getExpandMemrefStridedMetadata())
+    memref::populateExpandStridedMetadataPatterns(patterns);
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
   if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
   if (getRankReducingVector()) addRankReducingVectorPatterns(patterns);
-  if (getExpandMemrefStridedMetadata())
-    memref::populateExpandStridedMetadataPatterns(patterns);
+  if (getRewritePackOps()) addRewritePackOpsPatterns(patterns);
   if (getSwappingPatterns())
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());
   if (getAdditionalIreePatterns()) addAdditionalIreePatterns(patterns);
@@ -738,8 +774,8 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
   auto funcOp = targetOps.front()->getParentOfType<func::FuncOp>();
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "couldn't find export op for func");
+    return mlir::emitDefiniteFailure(
+        state.getTopLevel(), "couldn't find top level HAL export op for func");
   }
 
   /// Lower the workgroup count region in keeping with the way dispatch

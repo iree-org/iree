@@ -38,7 +38,7 @@ class DeviceQueryIntCastOpConversion
         op.getLoc(), rewriter.getI1Type(), rewriter.getI64Type(),
         adaptor.getDevice(), op.getCategoryAttr(), op.getKeyAttr(),
         Attribute{});
-    auto ok = queryOp.getOk();
+    auto ok = queryOp.getOk().cast<Value>();
     auto value = queryOp.getValue();
 
     // Truncate or extend based on the target type.
