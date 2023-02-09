@@ -41,6 +41,19 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_vmvx_local-task
+  SRCS
+    "extract_slice.mlir"
+    "pack.mlir"
+    "tensor_insert_slice.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_cuda
   SRCS
     "extract_slice.mlir"
