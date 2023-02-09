@@ -426,14 +426,16 @@ static SmallVector<Operation *> getAllFusableProducers(TilingInterface op) {
     Operation *currOp = worklist.front();
     worklist.pop_front();
     for (OpOperand &operand : currOp->getOpOperands()) {
-      auto tilingInterfaceProducer =
-          operand.get().getDefiningOp<TilingInterface>();
-      if (!tilingInterfaceProducer ||
-          producers.count(tilingInterfaceProducer)) {
+      Operation *producerOp = operand.get().getDefiningOp();
+      // Do not fuse pad operation producers for now. The `tensor.pad` does not
+      // implement the methods needed to fuse the producer using tile + fuse.
+      // These are handled separately. So for now, ignore these operations.
+      if (!isa<TilingInterface>(producerOp) || isa<tensor::PadOp>(producerOp) ||
+          producers.count(producerOp)) {
         continue;
       }
-      worklist.push_back(tilingInterfaceProducer);
-      producers.insert(tilingInterfaceProducer);
+      worklist.push_back(producerOp);
+      producers.insert(producerOp);
     }
   }
 
