@@ -39,7 +39,14 @@ To use IREE's Python bindings, you will first need to install
     ([about](https://docs.python.org/3/library/venv.html),
     [tutorial](https://docs.python.org/3/tutorial/venv.html)):
 
-    === "Linux and MacOS"
+    === "Linux"
+
+        ``` shell
+        python -m venv .venv
+        source .venv/bin/activate
+        ```
+
+    === "macOS"
 
         ``` shell
         python -m venv .venv

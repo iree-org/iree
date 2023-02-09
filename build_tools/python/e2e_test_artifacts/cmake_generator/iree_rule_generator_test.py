@@ -26,8 +26,8 @@ class IreeRuleBuilderTest(unittest.TestCase):
         source_url="https://example.com/xyz.tflite",
         entry_function="main",
         input_types=["1xf32"])
-    tflite_imported_model = iree_definitions.ImportedModel(
-        model=tflite_model, dialect_type=iree_definitions.MLIRDialectType.TOSA)
+    tflite_imported_model = iree_definitions.ImportedModel.from_model(
+        tflite_model)
     model_rule = model_rule_generator.ModelRule(
         target_name="model-1234",
         file_path=pathlib.PurePath("root/models/x.tflite"),
@@ -52,9 +52,8 @@ class IreeRuleBuilderTest(unittest.TestCase):
         source_url="https://example.com/xyz.mlir",
         entry_function="main",
         input_types=["3xf32"])
-    linalg_imported_model = iree_definitions.ImportedModel(
-        model=linalg_model,
-        dialect_type=iree_definitions.MLIRDialectType.LINALG)
+    linalg_imported_model = iree_definitions.ImportedModel.from_model(
+        linalg_model)
     model_rule = model_rule_generator.ModelRule(
         target_name="model-5678",
         file_path=pathlib.PurePath("root/models/y.mlir"),
@@ -78,8 +77,7 @@ class IreeRuleBuilderTest(unittest.TestCase):
         source_url="https://example.com/xyz.tflite",
         entry_function="main",
         input_types=["1xf32"])
-    imported_model_a = iree_definitions.ImportedModel(
-        model=model_a, dialect_type=iree_definitions.MLIRDialectType.TOSA)
+    imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
     compile_config_a = iree_definitions.CompileConfig(
         id="config_a",
         tags=["defaults"],
@@ -133,10 +131,8 @@ class IreeGeneratorTest(unittest.TestCase):
         source_url="https://example.com/xyz_saved_model",
         entry_function="predict",
         input_types=["2xf32"])
-    imported_model_a = iree_definitions.ImportedModel(
-        model=model_a, dialect_type=iree_definitions.MLIRDialectType.TOSA)
-    imported_model_b = iree_definitions.ImportedModel(
-        model=model_b, dialect_type=iree_definitions.MLIRDialectType.LINALG)
+    imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
+    imported_model_b = iree_definitions.ImportedModel.from_model(model_b)
     compile_config_a = iree_definitions.CompileConfig(
         id="config_a",
         tags=["defaults"],

@@ -38,6 +38,7 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "extract_slice.mlir",
+            "pack.mlir",
             "tensor_insert_slice.mlir",
         ],
         include = ["*.mlir"],
@@ -50,6 +51,24 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
+    name = "check_vmvx_local-task",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "extract_slice.mlir",
+            "tensor_insert_slice.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "pack.mlir",
+            "tensor_cast.mlir",
+        ],
+    ),
+    driver = "local-task",
+    target_backend = "vmvx",
+)
+
+iree_check_single_backend_test_suite(
     name = "check_cuda",
     srcs = enforce_glob(
         # keep sorted
@@ -59,6 +78,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "pack.mlir",
             "tensor_cast.mlir",
         ],
     ),
@@ -83,6 +103,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "pack.mlir",
             "tensor_cast.mlir",
         ],
     ),

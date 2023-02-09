@@ -37,6 +37,7 @@ iree_lit_test_suite(
     "interchange_transpose_generic_ops.mlir"
     "optimize_numerics.mlir"
     "outline_dispatch_regions.mlir"
+    "raise_special_ops.mlir"
     "set_encoding.mlir"
     "strip_and_splat_constant_variables.mlir"
     "strip_signedness.mlir"

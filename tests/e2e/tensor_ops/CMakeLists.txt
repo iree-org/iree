@@ -31,9 +31,22 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "extract_slice.mlir"
+    "pack.mlir"
     "tensor_insert_slice.mlir"
   TARGET_BACKEND
     "llvm-cpu"
+  DRIVER
+    "local-task"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_local-task
+  SRCS
+    "extract_slice.mlir"
+    "tensor_insert_slice.mlir"
+  TARGET_BACKEND
+    "vmvx"
   DRIVER
     "local-task"
 )
