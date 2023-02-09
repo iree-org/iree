@@ -185,8 +185,14 @@ SCFTilingPattern::SCFTilingPattern(StringRef opName, MLIRContext *context,
 LogicalResult
 SCFTilingPattern::returningMatchAndRewrite(TilingInterface op,
                                            PatternRewriter &rewriter) const {
-  if (failed(filter.checkAndNotify(rewriter, op)))
+  if (failed(filter.checkAndNotify(rewriter, op)) ||
+      // For now do not tile `tensor.pad` operations. The `tensor.pad`
+      // operations might be those introduced by the padding-based
+      // codegeneration strategy. Thos are not meant to be tiled again.
+      // Need a better way for handling this, but this works for now.
+      isa<tensor::PadOp>(op.getOperation())) {
     return failure();
+  }
 
   FailureOr<scf::SCFTilingResult> tiledResults =
       scf::tileUsingSCFForOp(rewriter, op, options);
