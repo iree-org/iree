@@ -445,8 +445,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
       tensor::populateFoldTensorEmptyPatterns(patterns);
       populateFoldAffineMinInDistributedLoopsPatterns(patterns);
-      context->getOrLoadDialect<IREE::LinalgExt::IREELinalgExtDialect>()
-          ->getCanonicalizationPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         funcOp.emitOpError("tiling canonicalizations failed");
         return signalPassFailure();

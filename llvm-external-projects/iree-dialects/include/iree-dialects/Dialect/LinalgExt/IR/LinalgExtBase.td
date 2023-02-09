@@ -22,7 +22,6 @@ def IREELinalgExt_Dialect : Dialect {
     The `iree_linalg_ext` dialect is intended to experiment more support for
     non-structured operations, ie, can not be represented in Linalg operations.
   }];
-  let hasCanonicalizer = 1;
   let useDefaultAttributePrinterParser = 1;
   let useFoldAPI = kEmitFoldAdaptorFolder;
 }
