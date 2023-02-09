@@ -30,7 +30,6 @@ static void splitFunctionIONames(StringAttr namesAttr,
 class ConvertModuleMetadataPass
     : public ConvertModuleMetadataBase<ConvertModuleMetadataPass> {
  public:
-
   void runOnOperation() override {
     // None currently handled.
   }
@@ -39,7 +38,6 @@ class ConvertModuleMetadataPass
 class ConvertFunctionMetadataPass
     : public ConvertFunctionMetadataBase<ConvertFunctionMetadataPass> {
  public:
-
   void runOnOperation() override {
     auto funcOp = getOperation();
 
@@ -59,37 +57,54 @@ class ConvertFunctionMetadataPass
   void setupEntryPointAttrs(func::FuncOp funcOp,
                             DictionaryAttr entryFunctionAttr) {
     funcOp.setPublic();
+    bool nonZeroInputs = funcOp.getNumArguments() > 0;
+    bool nonZeroOutputs = funcOp.getNumResults() > 0;
 
-    auto inputsAttr =
-        entryFunctionAttr.get("inputs").template dyn_cast_or_null<StringAttr>();
-    auto outputsAttr = entryFunctionAttr.get("outputs")
-                           .template dyn_cast_or_null<StringAttr>();
-    if (!inputsAttr || !outputsAttr) {
-      funcOp.emitError() << "functions with tf.entry_function must have "
-                            "input and output names to be handled by IREE";
-      signalPassFailure();
-      return;
+    if (nonZeroInputs) {
+      auto inputsAttr = entryFunctionAttr.get("inputs")
+                            .template dyn_cast_or_null<StringAttr>();
+      if (!inputsAttr) {
+        funcOp.emitError() << "functions with tf.entry_function must have "
+                              "input names to be handled by IREE";
+        signalPassFailure();
+        return;
+      }
+      SmallVector<std::string, 4> inputNames;
+      splitFunctionIONames(inputsAttr, inputNames);
+      if (inputNames.size() != funcOp.getNumArguments()) {
+        funcOp.emitError()
+            << "tf.entry_function attribute malformed: inputs don't "
+               "match the function signature";
+        signalPassFailure();
+        return;
+      }
+      for (unsigned i = 0; i < inputNames.size(); ++i) {
+        funcOp.setArgAttr(i, "iree.identifier",
+                          StringAttr::get(&getContext(), inputNames[i]));
+      }
     }
-
-    SmallVector<std::string, 4> inputNames;
-    SmallVector<std::string, 4> outputNames;
-    splitFunctionIONames(inputsAttr, inputNames);
-    splitFunctionIONames(outputsAttr, outputNames);
-    if (inputNames.size() != funcOp.getNumArguments() ||
-        outputNames.size() != funcOp.getNumResults()) {
-      funcOp.emitError()
-          << "tf.entry_function attribute malformed: inputs/outputs don't "
-             "match the function signature";
-      signalPassFailure();
-      return;
-    }
-    for (unsigned i = 0; i < inputNames.size(); ++i) {
-      funcOp.setArgAttr(i, "iree.identifier",
-                        StringAttr::get(&getContext(), inputNames[i]));
-    }
-    for (unsigned i = 0; i < outputNames.size(); ++i) {
-      funcOp.setResultAttr(i, "iree.identifier",
-                           StringAttr::get(&getContext(), outputNames[i]));
+    if (nonZeroOutputs) {
+      auto outputsAttr = entryFunctionAttr.get("outputs")
+                             .template dyn_cast_or_null<StringAttr>();
+      if (!outputsAttr) {
+        funcOp.emitError() << "functions with tf.entry_function must have "
+                              "output names to be handled by IREE";
+        signalPassFailure();
+        return;
+      }
+      SmallVector<std::string, 4> outputNames;
+      splitFunctionIONames(outputsAttr, outputNames);
+      if (outputNames.size() != funcOp.getNumResults()) {
+        funcOp.emitError()
+            << "tf.entry_function attribute malformed: outputs don't "
+               "match the function signature";
+        signalPassFailure();
+        return;
+      }
+      for (unsigned i = 0; i < outputNames.size(); ++i) {
+        funcOp.setResultAttr(i, "iree.identifier",
+                             StringAttr::get(&getContext(), outputNames[i]));
+      }
     }
   }
 };
