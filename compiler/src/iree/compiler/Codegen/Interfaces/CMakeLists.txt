@@ -76,6 +76,7 @@ iree_cc_library(
     "MicroKernelOpInterface.cpp"
   DEPS
     ::MicroKernelOpInterfaceGen
+    MLIRFuncDialect
     MLIRIR
   PUBLIC
 )

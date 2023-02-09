@@ -13,7 +13,8 @@ include "mlir/Interfaces/DestinationStyleOpInterface.td"
 
 class IREECodegen_MicroKernelOp<string mnemonic, list<Trait> traits = []> : 
   Op<IREECodegen_Dialect, mnemonic, !listconcat(traits,
-    [DeclareOpInterfaceMethods<MicroKernelOpInterface>,
+    [DeclareOpInterfaceMethods<MicroKernelOpInterface,
+        ["lowerToFunctionCall"]>,
      DeclareOpInterfaceMethods<DestinationStyleOpInterface>])> {}
   
 def IREECodegen_GenericMicroKernelOp :
@@ -59,7 +60,7 @@ def IREECodegen_GenericMicroKernelOp :
   let assemblyFormat = [{
     attr-dict $micro_kernel_fn_name
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-    `outs` `(` $outputs  `:` type($outputs) `)`
+    (`outs` `(` $outputs^  `:` type($outputs) `)`)?
     (`(` $other_operands^ `:` type($other_operands) `)`)? (`->` type($results)^)?
   }];
 }
@@ -90,6 +91,17 @@ def IREECodegen_Mmt4DMicroKernelOp :
     `rhs` `(` $rhs `:` type($rhs) `)`
     `outs` `(` $output `:` type($output) `)`
     `accumulate` `(` $accumulate `)` (`->` type($result)^)?
+  }];
+  let extraClassDeclaration = [{
+    Type getLhsElementType() {
+      return getLhs().getType().cast<ShapedType>().getElementType();
+    }
+    Type getRhsElementType() {
+      return getRhs().getType().cast<ShapedType>().getElementType();
+    }
+    Type getOutputElementType() {
+      return getOutput().getType().cast<ShapedType>().getElementType();
+    }
   }];
 }
 

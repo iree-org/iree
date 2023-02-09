@@ -15,6 +15,18 @@ def MicroKernelOpInterface : OpInterface<"MicroKernelOpInterface"> {
   let description = [{
     An interface for ops that wrap a call to microkernels.
   }];
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Method to lower the Micro Kernel operation into a function call.
+      }],
+      /*retType=*/"FailureOr<func::CallOp>",
+      /*methodName=*/"lowerToFunctionCall",
+      /*args=*/(ins "RewriterBase &":$rewriter),
+      /*methodBody=*/"",
+      /*defautImplementation=*/"return failure();"
+    >,
+  ];
 }
 
 #endif // IREE_CODEGEN_INTERFACES_MICRO_KERNEL_OP_INTERFACE

@@ -127,6 +127,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePackUnPackOpsPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
     bool flatten = false);
 
+/// Pass to lower micro_kernel operations into their defined function calls.
+std::unique_ptr<OperationPass<ModuleOp>> createLowerMicroKernelOpsToCallsPass();
+
 /// Pass to optimize vector transfer_read and transfer_write. See Passes.td for
 /// `option` details.
 std::unique_ptr<OperationPass<func::FuncOp>>

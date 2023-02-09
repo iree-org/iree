@@ -42,6 +42,7 @@ iree_cc_library(
     MLIRParser
     MLIRSupport
     iree::builtins::ukernel::exported_bits
+    iree::compiler::Codegen::Interfaces::MicroKernelOpInterface
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
   PUBLIC

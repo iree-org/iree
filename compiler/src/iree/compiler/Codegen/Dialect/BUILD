@@ -19,6 +19,7 @@ exports_files([
     "IREECodegenAttributes.td",
     "IREECodegenDialect.td",
     "LoweringConfig.td",
+    "MicroKernelOps.td",
 ])
 
 td_library(
@@ -28,13 +29,13 @@ td_library(
             "IREECodegenAttributes.td",
             "IREECodegenDialect.td",
             "LoweringConfig.td",
-            "MicroKernelOps.td"
+            "MicroKernelOps.td",
         ],
         include = ["*.td"],
     ),
     deps = [
-        "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:DestinationStyleOpInterfaceTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
 
@@ -66,6 +67,7 @@ iree_compiler_cc_library(
         ":MicroKernelOpsGen",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:MicroKernelOpInterface",
         "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",

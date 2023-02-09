@@ -16,6 +16,7 @@ package(
 )
 
 exports_files([
+    "MicroKernelOpInterface.td",
     "ProcessorOpInterfaces.td",
 ])
 
@@ -106,6 +107,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":MicroKernelOpInterfaceGen",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
     ],
 )

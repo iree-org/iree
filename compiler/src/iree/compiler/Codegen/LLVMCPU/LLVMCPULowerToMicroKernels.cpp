@@ -96,7 +96,7 @@ static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
   Type outElemType = outType.getElementType();
   if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
       outElemType.isSignlessInteger(32)) {
-    fnName = "vmvx.matmul.i8i8i32";
+    fnName = "vmvx.matmul.i8.i8.i32";
   } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
              outElemType.isF32()) {
     fnName = "vmvx.matmul.f32.f32.f32";

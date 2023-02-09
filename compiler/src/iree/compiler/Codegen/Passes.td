@@ -106,6 +106,12 @@ def IREEComprehensiveBufferize :
   ];
 }
 
+def LowerMicroKernelOpsToCalls :
+    Pass<"iree-codegen-lower-micro-kernel-ops-to-calls", "ModuleOp"> {
+  let summary = "Lower micro-kernel wrapper ops into function calls";
+  let constructor = "mlir::iree_compiler::createLowerMicroKernelOpsToCallsPass()";
+}
+
 def OptimizeVectorTransfer :
     Pass<"iree-codegen-optimize-vector-transfer", "func::FuncOp"> {
   let summary =

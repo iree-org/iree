@@ -6,7 +6,10 @@
 
 #include "iree/compiler/Codegen/Interfaces/MicroKernelOpInterface.h"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+
+using namespace mlir;
 
 // clang-format off
 #include "iree/compiler/Codegen/Interfaces/MicroKernelOpInterface.cpp.inc" // IWYU pragma: keep

@@ -120,6 +120,7 @@ iree_compiler_cc_library(
         "FuseTensorPadWithConsumer.cpp",
         "HoistStaticallyBoundAllocations.cpp",
         "IREEComprehensiveBufferizePass.cpp",
+        "LowerMicroKernelsToCalls.cpp",
         "MaterializeEncodingIntoPackUnPack.cpp",
         "OptimizeVectorTransferPass.cpp",
         "PolynomialApproximationPass.cpp",

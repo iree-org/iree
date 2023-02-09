@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics %s | FileCheck %s
 
 func.func @generic_micro_kernel(
     %in0: tensor<?x?xf32>, %in1: tensor<?xf32>,
