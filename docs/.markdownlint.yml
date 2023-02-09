@@ -19,23 +19,16 @@ default: true
 #          Please manually verify that your ordered lists are not indented.
 #          See https://github.com/DavidAnson/markdownlint/issues/138.
 # 3. You may use one or zero blank lines between list items.
-# 4. Nested list items should be indented to align with the first character of
-#    the first line. For bullet lists, that means 2 spaces. For numbered
-#    lists, that's 3 spaces (but 4 spaces is okay if that's easier).
-# 5. In multiline list items, subsequent lines are indented by 2 spaces.
-#    This is not checked automatically, so we're documenting this convention
-#    to make sure the codebase stays consistent.
+# 4. Nested list items should be indented 4 spaces.
+# 5. In multiline list items, subsequent lines are indented to align with the
+#    first character of the first line. This is not checked automatically, so
+#    we're documenting this convention for consistency.
 #
 # Examples:
 #
 # * This is a list item that has multiple
 #   lines and each line aligns with the text from the first line.
-#   * This is a nested list, also aligned with the first line.
-#
-# For ordered lists, that means three spaces for wrapped lines:
-#
-# 1. This is an ordered list item.
-#    1. The nested list aligns with the first line.
+#     * This is a nested list, indented 4 spaces so it stands out.
 ul-indent:
   indent: 4
 
