@@ -11,24 +11,6 @@
 
 #include "iree/builtins/ukernel/common.h"
 
-static inline int8x16x2_t iree_uk_neon_load_32(
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr) {
-  int8x16x2_t v;
-  v.val[0] = vld1q_s8(in_ptr);
-  v.val[1] = vld1q_s8(in_ptr + 16);
-  return v;
-}
-
-static inline int8x16x4_t iree_uk_neon_load_64(
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr) {
-  int8x16x4_t v;
-  v.val[0] = vld1q_s8(in_ptr);
-  v.val[1] = vld1q_s8(in_ptr + 16);
-  v.val[2] = vld1q_s8(in_ptr + 32);
-  v.val[3] = vld1q_s8(in_ptr + 48);
-  return v;
-}
-
 static inline int8x16x2_t iree_uk_neon_load_8x4xi8_strided(
     const iree_uk_int8_t* src, iree_uk_ssize_t stride) {
   int32x4_t v0_i32 = vdupq_n_s32(0);
@@ -157,34 +139,13 @@ iree_uk_neon_copy_8x8xi8_tiled_1x4_transpose_strided_to_strided(
   vst1q_s8(out_ptr + 16 + 1 * out_stride, vreinterpretq_s8_s32(c1.val[1]));
 }
 
-static inline void iree_uk_neon_copy_8x8xi8_unstrided_to_strided(
+static inline void iree_uk_neon_copy_8x32xi8_strided_to_strided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride) {
-  int8x16x4_t in = iree_uk_neon_load_64(in_ptr);
-  vst1_s8(out_ptr + 0 * out_stride, vget_low_s8(in.val[0]));
-  vst1_s8(out_ptr + 1 * out_stride, vget_high_s8(in.val[0]));
-  vst1_s8(out_ptr + 2 * out_stride, vget_low_s8(in.val[1]));
-  vst1_s8(out_ptr + 3 * out_stride, vget_high_s8(in.val[1]));
-  vst1_s8(out_ptr + 4 * out_stride, vget_low_s8(in.val[2]));
-  vst1_s8(out_ptr + 5 * out_stride, vget_high_s8(in.val[2]));
-  vst1_s8(out_ptr + 6 * out_stride, vget_low_s8(in.val[3]));
-  vst1_s8(out_ptr + 7 * out_stride, vget_high_s8(in.val[3]));
-}
-
-static inline void iree_uk_neon_copy_8x8xi8_transpose_unstrided_to_strided(
-    iree_uk_int8_t* out_ptr, iree_uk_ssize_t out_stride,
-    const iree_uk_int8_t* in_ptr) {
-  int8x16x4_t in = vld4q_s8(in_ptr);
-  int8x16x2_t t0 = vuzpq_s8(in.val[0], in.val[1]);
-  int8x16x2_t t1 = vuzpq_s8(in.val[2], in.val[3]);
-  vst1q_lane_s64(out_ptr + 0 * out_stride, vreinterpretq_s64_s8(t0.val[0]), 0);
-  vst1q_lane_s64(out_ptr + 1 * out_stride, vreinterpretq_s64_s8(t0.val[0]), 1);
-  vst1q_lane_s64(out_ptr + 2 * out_stride, vreinterpretq_s64_s8(t1.val[0]), 0);
-  vst1q_lane_s64(out_ptr + 3 * out_stride, vreinterpretq_s64_s8(t1.val[0]), 1);
-  vst1q_lane_s64(out_ptr + 4 * out_stride, vreinterpretq_s64_s8(t0.val[1]), 0);
-  vst1q_lane_s64(out_ptr + 5 * out_stride, vreinterpretq_s64_s8(t0.val[1]), 1);
-  vst1q_lane_s64(out_ptr + 6 * out_stride, vreinterpretq_s64_s8(t1.val[1]), 0);
-  vst1q_lane_s64(out_ptr + 7 * out_stride, vreinterpretq_s64_s8(t1.val[1]), 1);
+    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
+    iree_uk_ssize_t in_stride) {
+  for (int i = 0; i < 8; ++i) {
+    iree_uk_memcpy(out_ptr + i * out_stride, in_ptr + i * in_stride, 32);
+  }
 }
 
 static inline void iree_uk_neon_copy_8x8xi8_transpose_strided_to_strided(
@@ -225,57 +186,6 @@ static inline void iree_uk_neon_copy_8x8xi8_transpose_strided_to_unstrided(
   // specialized for out_stride==8 using longer contiguous stores!
   iree_uk_neon_copy_8x8xi8_transpose_strided_to_strided(out_ptr, in_ptr, 8,
                                                         in_stride);
-}
-
-static inline void
-iree_uk_neon_copy_8x8xi8_tiled_8x4_transpose_strided_to_strided(
-    iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
-    iree_uk_ssize_t in_stride) {
-  int32x4_t in0 = vreinterpretq_s32_s8(vld1q_s8(in_ptr));
-  int32x4_t in1 = vreinterpretq_s32_s8(vld1q_s8(in_ptr + 16));
-  int32x4_t in2 = vreinterpretq_s32_s8(vld1q_s8(in_ptr + in_stride));
-  int32x4_t in3 = vreinterpretq_s32_s8(vld1q_s8(in_ptr + in_stride + 16));
-  int64x2x2_t c0 = iree_uk_neon_zip_4xi32_as_2xi64(in0, in2);
-  int64x2x2_t c1 = iree_uk_neon_zip_4xi32_as_2xi64(in1, in3);
-  vst1q_lane_s64(out_ptr + 0 * out_stride, c0.val[0], 0);
-  vst1q_lane_s64(out_ptr + 1 * out_stride, c0.val[0], 1);
-  vst1q_lane_s64(out_ptr + 2 * out_stride, c0.val[1], 0);
-  vst1q_lane_s64(out_ptr + 3 * out_stride, c0.val[1], 1);
-  vst1q_lane_s64(out_ptr + 4 * out_stride, c1.val[0], 0);
-  vst1q_lane_s64(out_ptr + 5 * out_stride, c1.val[0], 1);
-  vst1q_lane_s64(out_ptr + 6 * out_stride, c1.val[1], 0);
-  vst1q_lane_s64(out_ptr + 7 * out_stride, c1.val[1], 1);
-}
-
-static inline void iree_uk_neon_copy_8x1xi8_unstrided_to_strided(
-    iree_uk_int8_t* IREE_UK_RESTRICT out_ptr, iree_uk_ssize_t out_stride,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr) {
-  int8x8_t v = vld1_s8(in_ptr);
-  vst1_lane_s8(out_ptr + 0 * out_stride, v, 0);
-  vst1_lane_s8(out_ptr + 1 * out_stride, v, 1);
-  vst1_lane_s8(out_ptr + 2 * out_stride, v, 2);
-  vst1_lane_s8(out_ptr + 3 * out_stride, v, 3);
-  vst1_lane_s8(out_ptr + 4 * out_stride, v, 4);
-  vst1_lane_s8(out_ptr + 5 * out_stride, v, 5);
-  vst1_lane_s8(out_ptr + 6 * out_stride, v, 6);
-  vst1_lane_s8(out_ptr + 7 * out_stride, v, 7);
-}
-
-static inline void iree_uk_neon_copy_8x4_unstrided_to_strided(
-    iree_uk_int8_t* IREE_UK_RESTRICT out_ptr, iree_uk_ssize_t out_stride,
-    const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr) {
-  int8x16x2_t in = iree_uk_neon_load_32(in_ptr);
-  int32x4_t v0 = vreinterpretq_s32_s8(in.val[0]);
-  int32x4_t v1 = vreinterpretq_s32_s8(in.val[1]);
-  vst1q_lane_s32(out_ptr + 0 * out_stride, v0, 0);
-  vst1q_lane_s32(out_ptr + 1 * out_stride, v0, 1);
-  vst1q_lane_s32(out_ptr + 2 * out_stride, v0, 2);
-  vst1q_lane_s32(out_ptr + 3 * out_stride, v0, 3);
-  vst1q_lane_s32(out_ptr + 4 * out_stride, v1, 0);
-  vst1q_lane_s32(out_ptr + 5 * out_stride, v1, 1);
-  vst1q_lane_s32(out_ptr + 6 * out_stride, v1, 2);
-  vst1q_lane_s32(out_ptr + 7 * out_stride, v1, 3);
 }
 
 #endif  // IREE_BUILTINS_UKERNEL_ARCH_ARM_64_COMMON_ARM_NEON_H_

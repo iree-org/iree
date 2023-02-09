@@ -30,7 +30,6 @@ static void splitFunctionIONames(StringAttr namesAttr,
 class ConvertModuleMetadataPass
     : public ConvertModuleMetadataBase<ConvertModuleMetadataPass> {
  public:
-
   void runOnOperation() override {
     // None currently handled.
   }
@@ -39,7 +38,6 @@ class ConvertModuleMetadataPass
 class ConvertFunctionMetadataPass
     : public ConvertFunctionMetadataBase<ConvertFunctionMetadataPass> {
  public:
-
   void runOnOperation() override {
     auto funcOp = getOperation();
 
