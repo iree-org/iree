@@ -27,6 +27,13 @@ def MaterializeEncoding :
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createMaterializeEncodingPass()";
 }
 
+def MaterializeEncoding2 :
+    Pass<"iree-linalg-ext-materialize-encoding2", "func::FuncOp"> {
+  let summary = "Test pass to materialize ops with tensor encoding into ops with explicit data movement";
+  let constructor =
+  "mlir::iree_compiler::IREE::LinalgExt::createMaterializeEncodingPass2()";
+}
+
 def FoldIntoPackAndUnpackOps :
     Pass<"iree-linalg-ext-fold-into-pack-unpack-ops", "func::FuncOp"> {
   let summary = "Test pass to fold operations into pack and unpacl operations";

@@ -4,6 +4,7 @@ add_mlir_library(IREELinalgExtPasses
   DecomposeSoftmax.cpp
   FoldIntoPackAndUnpackOps.cpp
   MaterializeEncoding.cpp
+  MaterializeEncoding2.cpp
   PadContractionToBlockSize.cpp
   Passes.cpp
   SplitReduction.cpp

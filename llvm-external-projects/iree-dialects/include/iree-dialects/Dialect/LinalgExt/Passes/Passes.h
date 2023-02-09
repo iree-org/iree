@@ -130,9 +130,15 @@ void populateMaterializeEncodingPatterns(
     MaterializeEncodingConversionTarget &conversionTarget,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn = {});
+void populateMaterializeEncodingPatterns2(
+    RewritePatternSet &patterns,
+    MaterializeEncodingConversionTarget &conversionTarget,
+    MaterializeEncodingTypeConverter &typeConverter,
+    MaterializeEncodingValueFn materializeEncodingValueFn = {});
 
 /// Pass to apply patterns specified by `populateMaterializeEncodingPass`.
 std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass2();
 
 /// Patterns to fold operations like `tensor.pad` and `tensor.extract_slice`
 /// into `linalg_ext.pack` and `linalg_ext.unpack` operations respectively.
