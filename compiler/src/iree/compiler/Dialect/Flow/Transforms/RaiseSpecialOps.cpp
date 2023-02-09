@@ -38,38 +38,25 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       {
         transform_ext::StructuredOpMatcher fillMinusInf;
         transform_ext::StructuredOpMatcher maxReduction;
+        transform_ext::StructuredOpMatcher maybeBroadcastMax;
         transform_ext::StructuredOpMatcher sub;
+        transform_ext::StructuredOpMatcher broadcastedSub;
         transform_ext::StructuredOpMatcher expOperand;
         transform_ext::StructuredOpMatcher fillzero;
         transform_ext::StructuredOpMatcher sum;
+        transform_ext::StructuredOpMatcher maybeBroadcastSum;
+        transform_ext::StructuredOpMatcher rcpOperand;
+        transform_ext::StructuredOpMatcher matmulOperand;
         transform_ext::StructuredOpMatcher divOperand;
         transform_ext::StructuredOpMatcher softmaxroot;
-        makeSoftmaxWithRcpMatcher(fillMinusInf, maxReduction, sub, expOperand,
-                                  fillzero, sum, divOperand, softmaxroot);
-        if (matchPattern(op, softmaxroot)) {
-          Value src = maxReduction.getCaptured()->getOperand(0);
-          softmaxRoots.push_back(std::make_pair(op, src));
-          return WalkResult::advance();
-        }
-      }
-      // Match a second version of the code sequence
-      {
-        transform_ext::StructuredOpMatcher fillMinusInf;
-        transform_ext::StructuredOpMatcher maxReduction;
-        transform_ext::StructuredOpMatcher sub;
-        transform_ext::StructuredOpMatcher expOperand;
-        transform_ext::StructuredOpMatcher fillzero;
-        transform_ext::StructuredOpMatcher sum;
-        transform_ext::StructuredOpMatcher softmaxroot;
         makeSoftmaxMatcher(fillMinusInf, maxReduction, sub, expOperand,
-                           fillzero, sum, softmaxroot);
+                           fillzero, sum, rcpOperand, matmulOperand, divOperand,
+                           softmaxroot);
         if (matchPattern(op, softmaxroot)) {
           Value src = maxReduction.getCaptured()->getOperand(0);
           softmaxRoots.push_back(std::make_pair(op, src));
-          return WalkResult::advance();
         }
       }
-      return WalkResult::advance();
     });
     for (std::pair<linalg::LinalgOp, Value> softmax : softmaxRoots) {
       linalg::LinalgOp op = softmax.first;
