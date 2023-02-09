@@ -1068,10 +1068,15 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
   return workgroupTileSizes;
 }
 
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   IREE::LinalgExt::PackOp op) {
-  SmallVector<int64_t> tileSizes =
-      getLinalgExtDefaultWorkgroupTileSizes(op, defaultWorkgroupTileSize);
+template <typename OpTy>
+static LogicalResult setPackOpRootConfig(func::FuncOp entryPointFn, OpTy op) {
+  // TODO(hanchung): Retire IREE::LinalgExt::PackOp. This is for having
+  // consistent configurations for pack ops.
+  static_assert(
+      llvm::is_one_of<OpTy, IREE::LinalgExt::PackOp, tensor::PackOp>::value,
+      "applies to only pack operations");
+  SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
+      cast<TilingInterface>(op.getOperation()), defaultWorkgroupTileSize);
 
   // The default function aims to returns the number of workload per workgroup,
   // but it does not know that it is working on packed domain. We need to take
@@ -1702,14 +1707,16 @@ static LogicalResult setRootConfigImpl(
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
         })
-        .Case<IREE::LinalgExt::FftOp, IREE::LinalgExt::PackOp,
-              IREE::LinalgExt::UnPackOp, linalg::Mmt4DOp,
-              linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-              linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-              linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-              linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+        .Case<IREE::LinalgExt::FftOp, IREE::LinalgExt::UnPackOp,
+              linalg::Mmt4DOp, linalg::Conv2DNhwcHwcfOp,
+              linalg::Conv2DNchwFchwOp, linalg::PoolingNhwcSumOp,
+              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
+              linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp,
+              linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<IREE::LinalgExt::PackOp, tensor::PackOp>(
+            [&](auto op) { return setPackOpRootConfig(entryPointFn, op); })
         .Case<linalg::ContractionOpInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<linalg::LinalgOp>(
