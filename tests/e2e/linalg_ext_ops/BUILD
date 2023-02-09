@@ -84,7 +84,7 @@ iree_check_single_backend_test_suite(
 
 iree_cmake_extra_content(
     content = """
-# Failing on Emscripten: https://github.com/iree-org/iree/pull/12041#discussion_r1101777536
+# Failing on Emscripten: https://github.com/iree-org/iree/issues/12129
 if(NOT EMSCRIPTEN)
 """,
     inline = True,

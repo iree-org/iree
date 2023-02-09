@@ -71,7 +71,7 @@ iree_check_single_backend_test_suite(
     "requires-gpu-nvidia"
 )
 
-# Failing on Emscripten: https://github.com/iree-org/iree/pull/12041#discussion_r1101777536
+# Failing on Emscripten: https://github.com/iree-org/iree/issues/12129
 if(NOT EMSCRIPTEN)
 
 iree_check_single_backend_test_suite(
