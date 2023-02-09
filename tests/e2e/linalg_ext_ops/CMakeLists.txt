@@ -71,6 +71,9 @@ iree_check_single_backend_test_suite(
     "requires-gpu-nvidia"
 )
 
+# Failing on Emscripten: https://github.com/iree-org/iree/pull/12041#discussion_r1101777536
+if(NOT EMSCRIPTEN)
+
 iree_check_single_backend_test_suite(
   NAME
     check_llvm-cpu_local-task
@@ -91,6 +94,8 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
 )
+
+endif()
 
 iree_check_single_backend_test_suite(
   NAME
