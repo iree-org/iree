@@ -117,6 +117,7 @@ iree_benchmark_suite(
     "${RESNET50_TF_FP32_MODULE}"
     "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
     "${EFFICIENTNET_V2_S_TF_FP32_MODULE}"
+    "${3DUNET_KITS19_128x128x128_TF_FP32_MODULE}"
 
   BENCHMARK_MODES
     "8-thread,full-inference,default-flags"

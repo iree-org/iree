@@ -72,6 +72,21 @@ set(EFFICIENTNET_V2_S_TF_FP32_MODULE
     "1x384x384x3xf32"
 )
 
+
+set(3DUNET_KITS19_128x128x128_TF_FP32_MODULE
+  NAME
+    "3dUnetKits19TF"
+  TAGS
+    "fp32"
+  SOURCE
+    # Derived from https://github.com/mlcommons/inference/tree/master/vision/medical_imaging/3d-unet-kits19.
+    "https://storage.googleapis.com/iree-model-artifacts/3dunet_kits19_128x128x128-tf-model.tar.gz"
+  ENTRY_FUNCTION
+    "__call__"
+  FUNCTION_INPUTS
+    "1x1x128x128x128xf32"
+)
+
 ################################################################################
 # Add benchmarks for all platforms.                                            #
 ################################################################################
