@@ -22,7 +22,6 @@ the import, compilation, and execution of the provided model.
 * [TensorFlow](./tensorflow.md)
 * [TensorFlow Lite](./tflite.md)
 * [JAX](./jax.md)
-* [PyTorch](./pytorch.md)
 
 Importing from other frameworks is planned - stay tuned!
 
