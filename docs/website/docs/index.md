@@ -149,19 +149,10 @@ IREE offers a low level C API, as well as several specialized sets of
 ## Roadmap
 
 IREE is in the early stages of development and is not yet ready for broad
-adoption. Check out the
-[long-term design roadmap](https://github.com/iree-org/iree/blob/main/docs/developers/design_roadmap.md)
-to get a sense of where we're headed.
-
-We plan on a quarterly basis using [OKRs](https://en.wikipedia.org/wiki/OKR).
-Review our latest
-[objectives](https://github.com/iree-org/iree/blob/main/docs/developers/objectives.md)
-to see what we're up to.
-
-We use [GitHub Projects](https://github.com/iree-org/iree/projects) to track
-progress on IREE components and specific efforts and
-[GitHub Milestones](https://github.com/iree-org/iree/milestones) to track the
-work associated with plans for each quarter.
+adoption. We use both
+[GitHub Projects](https://github.com/iree-org/iree/projects) and
+[GitHub Milestones](https://github.com/iree-org/iree/milestones) to track
+progress.
 
 [^1]:
   Pronounced "eerie" and often styled with the :iree-ghost: emoji
