@@ -399,8 +399,7 @@ class TransposeReshapeGenericDotGeneral
         rewriter.getContext(), /*lhsBatchingDimensions=*/0,
         /*rhsBatchingDimensions=*/0,
         /*lhsContractingDimensions=*/
-            lhs.getType().cast<ShapedType>().getRank() -
-            1,
+        lhs.getType().cast<ShapedType>().getRank() - 1,
         /*rhsContractingDimensions=*/1);
     auto lhsNewType = lhs.getType().cast<RankedTensorType>();
     auto rhsNewType = rhs.getType().cast<RankedTensorType>();
