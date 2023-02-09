@@ -502,8 +502,8 @@ def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
   let options = [
     Option<"enableFastMathOption", "enable-fast-math", "bool", /*default=*/"false",
           "Enable fast math mode during type conversion (i.e. assume no NaN/infinity)">,
-    Option<"use64bitIndexOption", "use-64bit-index", "bool", /*default=*/"false",
-          "Set the bit width of indices to 64 bits">,
+    Option<"indexBitsOption", "index-bits", "unsigned", /*default=*/"32",
+          "Specify the bit widths for SPIR-V indices">,
   ];
 }
 

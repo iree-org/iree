@@ -44,6 +44,11 @@
 namespace mlir {
 namespace iree_compiler {
 
+static llvm::cl::opt<int> clSPIRVIndexingBits(
+    "iree-spirv-index-bits",
+    llvm::cl::desc("Set the bit width of indices in SPIR-V."),
+    llvm::cl::init(32));
+
 // Allocation callbacks to use with upstream comprehensive bufferization
 static FailureOr<Value> gpuAllocateWorkgroupMemoryFn(OpBuilder &builder,
                                                      Location loc,
@@ -198,8 +203,7 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
 }
 
 /// Adds passes to perform the final SPIR-V conversion.
-static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath,
-                                   bool use64bitIndex) {
+static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -217,7 +221,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath,
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(createConvertToSPIRVPass(enableFastMath, use64bitIndex));
+  pm.addPass(createConvertToSPIRVPass(enableFastMath, clSPIRVIndexingBits));
 
   auto getTargetEnv = [](spirv::ModuleOp moduleOp) {
     return getSPIRVTargetEnvAttr(moduleOp);
@@ -509,8 +513,7 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath,
-                                   bool use64bitIndex) {
+void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
   pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
   pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
   pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
@@ -521,7 +524,7 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath,
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
-  addSPIRVLoweringPasses(pm.nest<ModuleOp>(), enableFastMath, use64bitIndex);
+  addSPIRVLoweringPasses(pm.nest<ModuleOp>(), enableFastMath);
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using SPIR-V pass pipeline:\n";
