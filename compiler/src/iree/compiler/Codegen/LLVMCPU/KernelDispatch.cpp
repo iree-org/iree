@@ -74,7 +74,7 @@ static llvm::cl::opt<int> defaultWorkgroupTileSizeForUnpackOp(
     "iree-codegen-llvm-generic-ops-workgroup-size-for-unpack-op",
     llvm::cl::desc("Like iree-codegen-llvm-generic-ops-workgroup-size but "
                    "specifically for UnpackOp"),
-    llvm::cl::init(64));
+    llvm::cl::init(16));
 
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
