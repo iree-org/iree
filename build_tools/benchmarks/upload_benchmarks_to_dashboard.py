@@ -21,7 +21,7 @@ import os
 import pathlib
 import requests
 
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 from common.common_arguments import expand_and_check_file_paths
 from common.benchmark_presentation import (COMPILATION_METRICS_TO_TABLE_MAPPERS,
@@ -114,9 +114,8 @@ def get_git_commit_info(commit: str, verbose: bool = False) -> Dict[str, str]:
 def compose_series_payload(project_id: str,
                            series_id: str,
                            series_unit: str,
-                           series_description: Optional[str] = None,
-                           series_config_id: Optional[str] = None,
-                           average_range: Union[int, str] = '5%',
+                           series_description: bool = None,
+                           average_range: str = '5%',
                            average_min_count: int = 3,
                            better_criterion: str = 'smaller',
                            override: bool = False) -> Dict[str, Any]:
@@ -136,8 +135,6 @@ def compose_series_payload(project_id: str,
   }
   if series_description is not None:
     payload['description'] = series_description
-  if series_config_id is not None:
-    payload['infos'] = {"config_id": series_config_id}
   return payload
 
 
@@ -214,7 +211,6 @@ def post_to_dashboard(url: str,
 def add_new_iree_series(series_id: str,
                         series_unit: str,
                         series_description: Optional[str] = None,
-                        series_config_id: Optional[str] = None,
                         override: bool = False,
                         dry_run: bool = False,
                         verbose: bool = False):
@@ -231,7 +227,6 @@ def add_new_iree_series(series_id: str,
                                    series_id,
                                    series_unit,
                                    series_description,
-                                   series_config_id=series_config_id,
                                    average_range=average_range,
                                    override=override)
   post_to_dashboard(f'{IREE_DASHBOARD_URL}/apis/v2/addSerie',
@@ -351,7 +346,6 @@ def main(args):
     add_new_iree_series(series_id=series_id,
                         series_unit="ns",
                         series_description=description,
-                        series_config_id=benchmark_info.run_config_id,
                         override=True,
                         dry_run=args.dry_run,
                         verbose=args.verbose)
@@ -378,14 +372,12 @@ def main(args):
       series_unit = mapper.get_unit()
 
       # Override by default to allow updates to the series.
-      add_new_iree_series(
-          series_id=series_id,
-          series_unit=series_unit,
-          series_description=description,
-          series_config_id=compile_metrics.compilation_info.gen_config_id,
-          override=True,
-          dry_run=args.dry_run,
-          verbose=args.verbose)
+      add_new_iree_series(series_id=series_id,
+                          series_unit=series_unit,
+                          series_description=description,
+                          override=True,
+                          dry_run=args.dry_run,
+                          verbose=args.verbose)
       add_new_sample(series_id=series_id,
                      build_id=commit_count,
                      sample_unit=series_unit,
