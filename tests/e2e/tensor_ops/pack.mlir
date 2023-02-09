@@ -438,6 +438,8 @@ func.func @dynamic_pack_pad_transpose_inner_and_outer_dims_large() {
   return
 }
 
+// TODO(hanchung): Enable the test once we have better ideas about supporting
+// dynamic inner tiling sizes. We are not able to vectorized this case today.
 // func.func @fully_dynamic_pack_simple() {
 //   %iree_input = flow.tensor.constant dense<[
 //     [0, 1, 2, 3],
@@ -458,13 +460,13 @@ func.func @dynamic_pack_pad_transpose_inner_and_outer_dims_large() {
 //   check.expect_eq_const(%cast, dense<[[[[0, 1], [4, 5]], [[2, 3], [6, 7]]], [[[8, 9], [12, 13]], [[10 ,11], [14, 15]]]]> : tensor<2x2x2x2xi32>) : tensor<2x2x2x2xi32>
 //   return
 // }
-// 
+//
 // func.func @fully_dynamic_pack_pad_transpose_inner_and_outer_dims_large() {
 //   %d0 = util.unfoldable_constant 100 : index
 //   %d1 = util.unfoldable_constant 250 : index
 //   %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
 //   %padding_value = arith.constant 42 : i32
-// 
+//
 //   %c16 = util.unfoldable_constant 16 : index
 //   %c32 = util.unfoldable_constant 32 : index
 //   %tiled_d0 = arith.ceildivui %d0, %c32 : index
@@ -474,12 +476,12 @@ func.func @dynamic_pack_pad_transpose_inner_and_outer_dims_large() {
 //       outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [%c16, %c32] into %init_pack
 //       : tensor<?x?xi32> -> tensor<?x?x?x?xi32>
 //   %cast_pack = tensor.cast %pack : tensor<?x?x?x?xi32> to tensor<16x4x16x32xi32>
-// 
+//
 //   %c100 = arith.constant 100 : index
 //   %c250 = arith.constant 250 : index
 //   %source2 = call @generate_2D_source(%c100, %c250) : (index, index) -> tensor<?x?xi32>
 //   %static_source = tensor.cast %source2 : tensor<?x?xi32> to tensor<100x250xi32>
-// 
+//
 //   %pad = tensor.pad %static_source low[0, 0] high[28, 6] {
 //     ^bb0(%b0 : index, %b1 : index):
 //       tensor.yield %padding_value : i32
@@ -490,7 +492,7 @@ func.func @dynamic_pack_pad_transpose_inner_and_outer_dims_large() {
 //     ins(%reshape : tensor<4x32x16x16xi32>)
 //     outs(%init_transpose : tensor<16x4x16x32xi32>)
 //     permutation = [2, 0, 3, 1]
-// 
+//
 //   check.expect_eq(%cast_pack, %transpose) : tensor<16x4x16x32xi32>
 //   return
 // }
