@@ -678,8 +678,10 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
       // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
       // fused with anything else into their own dispatches since it is better
       // to convert them to splats.
-      if (!isa<linalg::LinalgOp, tensor::PackOp>(op) || isa<linalg::FillOp>(op))
+      if (!isa<linalg::LinalgOp, tensor::PackOp, tensor::UnPackOp>(op) ||
+          isa<linalg::FillOp>(op)) {
         continue;
+      }
 
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);
