@@ -1413,9 +1413,9 @@ details. The core <code>iree-compiler</code> package includes the SPIR-V compile
 <p><code>iree-compile</code> is installed to your python module installation path. If you
 pip install with the user mode, it is under <code>${HOME}/.local/bin</code>, or
 <code>%APPDATA%Python</code> on Windows. You may want to include the path in your
-system's <code>PATH</code> environment variable.
+system's <code>PATH</code> environment variable.</p>
 <div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/.local/bin:<span class="si">${</span><span class="nv">PATH</span><span class="si">}</span>
-</code></pre></div></p>
+</code></pre></div>
 </div>
 <h4 id="build-compiler-from-source">Build compiler from source<a class="headerlink" href="#build-compiler-from-source" title="Permanent link">&para;</a></h4>
 <p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
@@ -1438,13 +1438,13 @@ weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classifi
 <h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>Run the following command (passing <code>--iree-input-type=</code> as needed for your
 import tool):</p>
-<p><div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>vulkan-spirv<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-vulkan-target-triple<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>--iree-input-type<span class="o">=</span>mhlo<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet-vulkan.vmfb
 </code></pre></div>
-where <code>iree_input.mlir</code> is the imported program.</p>
+<p>where <code>iree_input.mlir</code> is the imported program.</p>
 <p>Note that a target triple of the form <code>&lt;vendor/arch&gt;-&lt;product&gt;-&lt;os&gt;</code> is needed
 to compile towards each GPU architecture. If no triple is specified then a safe but
 more limited default will be used.

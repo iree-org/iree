@@ -1232,8 +1232,8 @@ of the <code>-DCMAKE OSX SYSROOT</code> option to:</p>
 </code></pre></div>
 <p>To run it on the iOS simulator, we need to copy the vmfb file into the
 <code>iree-run-module</code> iOS app bundle.</p>
-<div class="highlight"><pre><span></span><code>cp /tmp/simple_abs_vmvx.vmfb \
-   ../build-ios-sim/install/bin/iree-run-module.app/
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">   </span>../build-ios-sim/install/bin/iree-run-module.app/
 </code></pre></div>
 <p>Open the iOS Simulator Manager on the host.</p>
 <div class="highlight"><pre><span></span><code>open<span class="w"> </span>-a<span class="w"> </span>Simulator

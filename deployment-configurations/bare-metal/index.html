@@ -1231,17 +1231,20 @@ model execution is in a single-thread synchronous fashion.</p>
 <ul>
 <li><code>set(IREE_BUILD_COMPILER OFF)</code>: Build IREE runtime only</li>
 <li><code>set(CMAKE_SYSTEM_NAME Generic)</code>: Tell CMake to skip targeting a specific
-operating system</li>
+  operating system</li>
 <li><code>set(IREE_BINDINGS_TFLITE OFF)</code>: Disable the TFLite binding support</li>
 <li><code>set(IREE_ENABLE_THREADING OFF)</code>: Disable multi-thread library support</li>
 <li><code>set(IREE_HAL_DRIVER_DEFAULTS OFF)</code>: Disable HAL drivers by default, then
-enable the synchronous HAL drivers with <code>set(IREE_HAL_DRIVER_LOCAL_SYNC ON)</code></li>
-<li><code>set(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS OFF)</code>: Disable HAL executable loaders by default, then enable the CPU codegen and VMVX loaders with <code>set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF ON)</code> and <code>set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)</code></li>
-<li><code>set(IREE_BUILD_TESTS OFF)</code>: Disable tests until IREE supports running them on
-bare-metal platforms</li>
+  enable the synchronous HAL drivers with <code>set(IREE_HAL_DRIVER_LOCAL_SYNC ON)</code></li>
+<li><code>set(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS OFF)</code>: Disable HAL executable
+  loaders by default, then enable the CPU codegen and VMVX loaders with
+  <code>set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF ON)</code> and
+  <code>set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)</code></li>
+<li><code>set(IREE_BUILD_TESTS OFF)</code>: Disable tests until IREE supports running them
+  on bare-metal platforms</li>
 <li><code>set(IREE_BUILD_SAMPLES ON)</code>: Build
-<a href="https://github.com/iree-org/iree/tree/main/samples/simple_embedding">simple_embedding</a>
-example</li>
+  <a href="https://github.com/iree-org/iree/tree/main/samples/simple_embedding">simple_embedding</a>
+  example</li>
 </ul>
 <div class="admonition todo">
 <p class="admonition-title">Todo</p>
@@ -1253,16 +1256,16 @@ architecture, target abi, linker script, system library path, etc.</p>
 <h3 id="define-iree-macros">Define IREE macros<a class="headerlink" href="#define-iree-macros" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>-DIREE_PLATFORM_GENERIC</code>: Let IREE to build the runtime library without
-targeting a specific platform.</li>
+  targeting a specific platform.</li>
 <li><code>-DIREE_SYNCHRONIZATION_DISABLE_UNSAFE=1</code>: Disable thread synchronization
-support. Must only be used if there's a single thread.</li>
+  support. Must only be used if there's a single thread.</li>
 <li><code>-DIREE_FILE_IO_ENABLE=0</code>: Disable file I/O.</li>
 <li><code>-DIREE_TIME_NOW_FN</code>: A function to return the system time. For the bare-metal
-system, it can be set as <code>-DIREE_TIME_NOW_FN=\"\{ return 0;\}\"</code> as there's no
-asynchronous wait handling.</li>
+  system, it can be set as <code>-DIREE_TIME_NOW_FN=\"\{ return 0;\}\"</code> as there's no
+  asynchronous wait handling.</li>
 <li><code>-DIREE_WAIT_UNTIL_FN</code>: A function to wait until the given time in
-nanoseconds. Must match the signature <code>bool(uint64_t nanos)</code> and return
-false if the wait failed.</li>
+  nanoseconds. Must match the signature <code>bool(uint64_t nanos)</code> and return
+  false if the wait failed.</li>
 </ul>
 <p>Examples of how to setup the CMakeLists.txt and .cmake file:</p>
 <ul>

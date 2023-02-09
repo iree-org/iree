@@ -1262,27 +1262,34 @@
 
 
 <h1 id="cuda-and-rocm-gpu-hal-driver">CUDA and ROCm GPU HAL Driver<a class="headerlink" href="#cuda-and-rocm-gpu-hal-driver" title="Permanent link">&para;</a></h1>
-<p>IREE can accelerate model execution on NVIDIA GPUs using CUDA and on AMD GPUs using ROCm. Due to the similarity of CUDA and ROCm APIs and infrastructure, the CUDA and ROCm backends share much of their implementation in IREE:</p>
+<p>IREE can accelerate model execution on NVIDIA GPUs using CUDA and on AMD GPUs
+using ROCm. Due to the similarity of CUDA and ROCm APIs and infrastructure, the
+CUDA and ROCm backends share much of their implementation in IREE:</p>
 <ul>
-<li>The IREE compiler uses a similar GPU code generation pipeline for each, but generates PTX for CUDA and hsaco for ROCm</li>
-<li>The IREE runtime HAL driver for ROCm mirrors the one for CUDA, except for command buffers implementations - where CUDA has "direct", "stream", and "graph" command buffers, and ROCm has only "direct" command buffers</li>
+<li>The IREE compiler uses a similar GPU code generation pipeline for each, but
+  generates PTX for CUDA and hsaco for ROCm</li>
+<li>The IREE runtime HAL driver for ROCm mirrors the one for CUDA, except for
+  command buffers implementations - where CUDA has "direct", "stream", and
+  "graph" command buffers, and ROCm has only "direct" command buffers</li>
 </ul>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<p>In order to use CUDA or ROCm to drive the GPU, you need to have a functional CUDA or ROCm
-environment. It can be verified by the following steps:</p>
+<p>In order to use CUDA or ROCm to drive the GPU, you need to have a functional
+CUDA or ROCm environment. It can be verified by the following steps:</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Nvidia/CUDA</label><label for="__tabbed_1_2">AMD/ROCm</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>Run the following command in a shell:</p>
 <div class="highlight"><pre><span></span><code>nvidia-smi<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>CUDA
 </code></pre></div>
-<p>If <code>nvidia-smi</code> does not exist, you will need to <a href="https://developer.nvidia.com/cuda-downloads">install the latest CUDA Toolkit SDK</a>.</p>
+<p>If <code>nvidia-smi</code> does not exist, you will need to
+<a href="https://developer.nvidia.com/cuda-downloads">install the latest CUDA Toolkit SDK</a>.</p>
 </div>
 <div class="tabbed-block">
 <p>Run the following command in a shell:</p>
 <div class="highlight"><pre><span></span><code>rocm-smi<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>rocm
 </code></pre></div>
-<p>If <code>rocm-smi</code> does not exist, you will need to <a href="https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html">install the latest ROCm Toolkit SDK</a>.</p>
+<p>If <code>rocm-smi</code> does not exist, you will need to
+<a href="https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html">install the latest ROCm Toolkit SDK</a>.</p>
 </div>
 </div>
 </div>
@@ -1300,7 +1307,7 @@ to build IREE from source, then enable the CUDA HAL driver with the
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>Python packages for various IREE functionalities are regularly published
-to <a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the <a href="../../bindings/python/">Python Bindings</a> page for more
+to [PyPI][pypi]. See the <a href="../../bindings/python/">Python Bindings</a> page for more
 details. The core <code>iree-compiler</code> package includes the CUDA compiler:</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-compiler
 </code></pre></div>
@@ -1325,7 +1332,8 @@ to build the IREE compiler, then enable the CUDA compiler target with the
 <code>IREE_TARGET_BACKEND_CUDA</code> option or the ROCm compiler target with the
 <code>IREE_TARGET_BACKEND_ROCM</code> option.</p>
 <h2 id="compile-and-run-the-model">Compile and run the model<a class="headerlink" href="#compile-and-run-the-model" title="Permanent link">&para;</a></h2>
-<p>With the compiler and runtime ready, we can now compile a model and run it on the GPU.</p>
+<p>With the compiler and runtime ready, we can now compile a model and run it on
+the GPU.</p>
 <h3 id="compile-the-model">Compile the model<a class="headerlink" href="#compile-the-model" title="Permanent link">&para;</a></h3>
 <p>IREE compilers transform a model into its final deployable format in many
 sequential steps. A model authored with Python in an ML framework should use the
@@ -1336,7 +1344,8 @@ weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classifi
 <a href="../../getting-started/tensorflow/">TensorFlow importer</a>. Then,</p>
 <h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>Let <code>iree_input.mlir</code> be the model's initial MLIR representation generated by
-IREE's TensorFlow importer. We can now compile them for each GPU by running the following command:</p>
+IREE's TensorFlow importer. We can now compile them for each GPU by running the
+following command:</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Nvidia/CUDA</label><label for="__tabbed_3_2">AMD/ROCm</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
@@ -1351,7 +1360,7 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 the form <code>sm_&lt;arch_number&gt;</code> is needed to compile towards each GPU
 architecture. If no architecture is specified then we will default to
 <code>sm_35</code>.</p>
-<p>Here are a table of commonly used architectures:</p>
+<p>Here is a table of commonly used architectures:</p>
 <table>
 <thead>
 <tr>
@@ -1388,10 +1397,15 @@ architecture. If no architecture is specified then we will default to
 </span><span class="w">    </span>--iree-input-type<span class="o">=</span>mhlo<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet-rocm.vmfb
 </code></pre></div>
-<p>Note ROCm Bitcode Dir(<code>iree-rocm-bc-dir</code>) path is required. If the system you are compiling IREE in has ROCm installed, then the default value of <code>/opt/rocm/amdgcn/bitcode</code> will usually suffice. If you intend on building ROCm compiler in a non-ROCm capable system, please set <code>iree-rocm-bc-dir</code> to the absolute path where you might have saved the amdgcn bitcode.</p>
-<p>Note that a ROCm target chip(<code>iree-rocm-target-chip</code>) of the form <code>gfx&lt;arch_number&gt;</code> is needed
-to compile towards each GPU architecture. If no architecture is specified then we will default to <code>gfx908</code>
-Here are a table of commonly used architecture</p>
+<p>Note ROCm Bitcode Dir(<code>iree-rocm-bc-dir</code>) path is required. If the system
+you are compiling IREE in has ROCm installed, then the default value of
+<code>/opt/rocm/amdgcn/bitcode</code> will usually suffice. If you intend on building
+ROCm compiler in a non-ROCm capable system, please set <code>iree-rocm-bc-dir</code>
+to the absolute path where you might have saved the amdgcn bitcode.</p>
+<p>Note that a ROCm target chip(<code>iree-rocm-target-chip</code>) of the form
+<code>gfx&lt;arch_number&gt;</code> is needed to compile towards each GPU architecture. If
+no architecture is specified then we will default to <code>gfx908</code>.</p>
+<p>Here is a table of commonly used architectures:</p>
 <table>
 <thead>
 <tr>

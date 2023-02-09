@@ -1058,13 +1058,14 @@
 <h1 id="getting-started-guide">Getting Started Guide<a class="headerlink" href="#getting-started-guide" title="Permanent link">&para;</a></h1>
 <h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h2>
 <p>Use the following command for the default installation, or check out the
-comprehensive installation <a href="../bindings/python/">guide</a> if your needs are more complex.</p>
-<div class="highlight"><pre><span></span><code>python -m pip install \
-  iree-compiler \
-  iree-runtime \
-  iree-tools-tf \
-  iree-tools-tflite \
-  iree-tools-xla
+comprehensive installation <a href="../bindings/python/">guide</a> if your needs are
+more complex.</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-runtime<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-tools-tf<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-tools-tflite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-tools-xla
 </code></pre></div>
 <h2 id="supported-frameworks">Supported frameworks<a class="headerlink" href="#supported-frameworks" title="Permanent link">&para;</a></h2>
 <p>See end-to-end examples of how to execute a variety models on IREE. This covers
@@ -1082,9 +1083,9 @@ the import, compilation, and execution of the provided model.</p>
 as well as the <a href="https://github.com/iree-org/iree-samples">iree-samples repository</a>,
 which contains workflow comparisons across frameworks.</p>
 <h2 id="import">Import<a class="headerlink" href="#import" title="Permanent link">&para;</a></h2>
-<p>Importing models takes known file types and imports into a form that the core IREE
-compiler is able to ingest. This import process is specific to each frontend and typically
-involves a number of stages:</p>
+<p>Importing models takes known file types and imports into a form that the core
+IREE compiler is able to ingest. This import process is specific to each
+frontend and typically involves a number of stages:</p>
 <ul>
 <li>Load the source format</li>
 <li>Legalize operations specific each specific frontend to legal IR</li>
@@ -1094,15 +1095,16 @@ involves a number of stages:</p>
 <p>This fully legalized form can then be compiled without dependencies on the
 source model language.</p>
 <h2 id="compilation">Compilation<a class="headerlink" href="#compilation" title="Permanent link">&para;</a></h2>
-<p>During compilation we load an MLIR file and compile for the specified set of backends
-(CPU, GPU, etc).  Each of these backends creates custom native code to execute on the
-target device.  Once compiled, the resulting bytecode is exported to an IREE bytecode
-file that can be executed on the specified devices.</p>
+<p>During compilation we load an MLIR file and compile for the specified set of
+backends (CPU, GPU, etc).  Each of these backends creates custom native code to
+execute on the target device.  Once compiled, the resulting bytecode is
+exported to an IREE bytecode file that can be executed on the specified devices.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<p>The final stage is executing the now compiled module. This involves selecting what
-compute devices should be used, loading the module, and executing the module with the
-intended inputs. For testing, IREE includes a Python API. However, on mobile and embedded devices you
-will want to use the <a href="../deployment-configurations/">C API</a>.</p>
+<p>The final stage is executing the now compiled module. This involves selecting
+what compute devices should be used, loading the module, and executing the
+module with the intended inputs. For testing, IREE includes a Python API.
+However, on mobile and embedded devices you will want to use the
+<a href="../deployment-configurations/">C API</a>.</p>
 
 
 

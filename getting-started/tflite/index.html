@@ -1158,10 +1158,10 @@ imported into an IREE-compatible format then compiled to a series of backends.</
 <p>IREE's tooling is divided into two components: import and compilation.</p>
 <ol>
 <li>The import tool converts the TFLite FlatBuffer to an IREE compatible form,
-validating that only IREE compatible operations remain. Containing a combination of TOSA
-and IREE operations.</li>
-<li>The compilation stage generates the bytecode module for a list of targets, which can
-be executed by IREE.</li>
+  validating that only IREE compatible operations remain. Containing a combination
+  of TOSA and IREE operations.</li>
+<li>The compilation stage generates the bytecode module for a list of targets,
+  which can be executed by IREE.</li>
 </ol>
 <h3 id="using-command-line-tools">Using Command Line Tools<a class="headerlink" href="#using-command-line-tools" title="Permanent link">&para;</a></h3>
 <p>These two stages can be completed entirely via the command line.</p>
@@ -1188,9 +1188,9 @@ iree-compile<span class="w"> </span><span class="se">\</span>
 <p>The example below demonstrates downloading, compiling, and executing a TFLite
 model using the Python API. This includes some initial setup to declare global
 variables, download the sample module, and download the sample inputs.</p>
-<p>Declaration of absolute paths for the sample repo and import all required libraries.
-The default setup uses the CPU backend as the only target. This can be reconfigured
-to select alternative targets.</p>
+<p>Declaration of absolute paths for the sample repo and import all required
+libraries. The default setup uses the CPU backend as the only target. This can
+be reconfigured to select alternative targets.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">iree.compiler.tflite</span> <span class="k">as</span> <span class="nn">iree_tflite_compile</span>
 <span class="kn">import</span> <span class="nn">iree.runtime</span> <span class="k">as</span> <span class="nn">iree_rt</span>
 <span class="kn">import</span> <span class="nn">numpy</span>
@@ -1218,8 +1218,9 @@ to select alternative targets.</p>
 <span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">urlretrieve</span><span class="p">(</span><span class="n">tfliteUrl</span><span class="p">,</span> <span class="n">tfliteFile</span><span class="p">)</span>
 <span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">urlretrieve</span><span class="p">(</span><span class="n">jpgUrl</span><span class="p">,</span> <span class="n">jpgFile</span><span class="p">)</span>
 </code></pre></div>
-<p>Once downloaded we can compile the model for the selected backends. Both the TFLite and TOSA representations
-of the model are saved for debugging purposes. This is optional and can be omitted.</p>
+<p>Once downloaded we can compile the model for the selected backends. Both the
+TFLite and TOSA representations of the model are saved for debugging purposes.
+This is optional and can be omitted.</p>
 <div class="highlight"><pre><span></span><code><span class="n">iree_tflite_compile</span><span class="o">.</span><span class="n">compile_file</span><span class="p">(</span>
   <span class="n">tfliteFile</span><span class="p">,</span>
   <span class="n">input_type</span><span class="o">=</span><span class="s2">&quot;tosa&quot;</span><span class="p">,</span>
@@ -1229,17 +1230,18 @@ of the model are saved for debugging purposes. This is optional and can be omitt
   <span class="n">target_backends</span><span class="o">=</span><span class="n">backends</span><span class="p">,</span>
   <span class="n">import_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </code></pre></div>
-<p>After compilation is completed we configure the VmModule using the local-task configuration and compiled
-IREE module.</p>
+<p>After compilation is completed we configure the VmModule using the local-task
+configuration and compiled IREE module.</p>
 <div class="highlight"><pre><span></span><code><span class="n">config</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;local-task&quot;</span><span class="p">)</span>
 <span class="n">context</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">SystemContext</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
 <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">bytecodeModule</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
   <span class="n">vm_module</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">VmModule</span><span class="o">.</span><span class="n">from_flatbuffer</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">vm_instance</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
   <span class="n">context</span><span class="o">.</span><span class="n">add_vm_module</span><span class="p">(</span><span class="n">vm_module</span><span class="p">)</span>
 </code></pre></div>
-<p>Finally, the IREE module is loaded and ready for execution. Here we load the sample image, manipulate to
-the expected input size, and execute the module. By default TFLite models include a single
-function named 'main'. The final results are printed.</p>
+<p>Finally, the IREE module is loaded and ready for execution. Here we load the
+sample image, manipulate to the expected input size, and execute the module. By
+default TFLite models include a single function named 'main'. The final results
+are printed.</p>
 <div class="highlight"><pre><span></span><code><span class="n">im</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">jpgFile</span><span class="p">)</span><span class="o">.</span><span class="n">resize</span><span class="p">((</span><span class="mi">192</span><span class="p">,</span> <span class="mi">192</span><span class="p">)))</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">192</span><span class="p">,</span> <span class="mi">192</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
 <span class="n">args</span> <span class="o">=</span> <span class="p">[</span><span class="n">im</span><span class="p">]</span>
 

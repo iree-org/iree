@@ -1266,7 +1266,7 @@
 
 
 <p>Friday, October 15, 2021<br>
- By Thomas Raoux</p>
+By Thomas Raoux</p>
 <h1 id="cuda-backend-in-iree">CUDA Backend in IREE<a class="headerlink" href="#cuda-backend-in-iree" title="Permanent link">&para;</a></h1>
 <p>IREE is being designed with re-targetability as a core goal: it should be
 possible to use IREE to target a broad spectrum of power regimes, from embedded
@@ -1298,7 +1298,8 @@ Those can be run to make sure a system has the required CUDA support.</p>
 <p>CUDA has an open source backend in LLVM generating PTX that we are leveraging.
 Therefore IREE can create <a href="https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html">NVVM</a>
 (CUDA LLVM variant) and use LLVM's backend to generate PTX. The CUDA driver
-will do the "last mile compilation" at runtime to convert PTX into the GPU's native ISA.</p>
+will do the "last mile compilation" at runtime to convert PTX into the GPU's
+native ISA.</p>
 <p>IREE compiler pipeline starts from <a href="https://mlir.llvm.org/docs/Dialects/Linalg/">linalg</a>
 with tensor operands. A large part of the compiler is independent of the target.</p>
 <p>The linalg on tensor representation of the graph is broken up into dispatch
@@ -1347,7 +1348,7 @@ decide on the tile size for a workgroup. For CUDA we also decide the number of
 threads per block.
 We will then have a pass tiling the ops in the dispatch region a second time to
 distribute the work onto threads within the block.</p>
-<p>At this stage the IR looks like the following:
+<p>At this stage the IR looks like the following:</p>
 <div class="highlight"><pre><span></span><code>    %8 = &quot;gpu.thread_id&quot;() {dimension = &quot;x&quot;} : () -&gt; index
     %9 = affine.apply affine_map&lt;()[s0] -&gt; (s0 * 4)&gt;()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
@@ -1366,7 +1367,7 @@ distribute the work onto threads within the block.</p>
       %13 = addf %arg1, %arg2 : f32
       linalg.yield %13 : f32
     }
-</code></pre></div></p>
+</code></pre></div>
 <h3 id="vectorization">Vectorization<a class="headerlink" href="#vectorization" title="Permanent link">&para;</a></h3>
 <p>Even though GPUs execute most operations as scalar, memory operations are
 optimized to access 128 bits of data per thread. Therefore it is critical to
@@ -1374,7 +1375,7 @@ vectorize load/store operations.
 After tiling to a size we vectorize the IR to get vector read/write mapping to
 load4/store4. This significantly improves the memory access pattern of the code
 generated.</p>
-<p>This convert the previous IR to:
+<p>This convert the previous IR to:</p>
 <div class="highlight"><pre><span></span><code>    %8 = &quot;gpu.thread_id&quot;() {dimension = &quot;x&quot;} : () -&gt; index
     %9 = affine.apply affine_map&lt;()[s0] -&gt; (s0 * 4)&gt;()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
@@ -1384,7 +1385,7 @@ generated.</p>
     %14 = vector.transfer_read %11[%c0], %cst {in_bounds = [true]} : memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;, vector&lt;4xf32&gt;
     %15 = addf %13, %14 : vector&lt;4xf32&gt;
     vector.transfer_write %15, %12[%c0] {in_bounds = [true]} : vector&lt;4xf32&gt;, memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
-</code></pre></div></p>
+</code></pre></div>
 <h3 id="shared-memory-optimization">Shared memory optimization<a class="headerlink" href="#shared-memory-optimization" title="Permanent link">&para;</a></h3>
 <p>Nvidia GPUs have a fast shared memory that needs to be leveraged to optimize
 cases where we may be memory bound and have the potential to re-use memory
