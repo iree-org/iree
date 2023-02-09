@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
+#include <optional>
+
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
@@ -24,6 +26,8 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
+#include "llvm/Support/LineIterator.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO.h"
@@ -53,6 +57,11 @@ static llvm::cl::opt<bool> clDisableLoopNounrollWa(
 static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
     llvm::cl::init("sm_35"));
+
+static llvm::cl::opt<std::string> clReadPtxFromFile(
+    "iree-hal-cuda-read-ptx-from-file",
+    llvm::cl::desc("File with a mapping of function names to ptx files"),
+    llvm::cl::Hidden);
 
 namespace llvm {
 class FunctionPass;
@@ -172,6 +181,37 @@ static void linkAndOptimize(llvm::Module &module,
   mpm.run(module, mam);
 }
 
+std::optional<std::string> getPathToPTXReplacementFile(
+    llvm::StringRef funcToFilenameFile, llvm::StringRef funcName) {
+  // Parse the input file.
+  // Format is:
+  // function name,path to replacement file
+  // We ignore blank lines and lines starting with #
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileWithMapping =
+      llvm::MemoryBuffer::getFile(funcToFilenameFile, /*IsText=*/true);
+
+  if (!fileWithMapping) {
+    llvm::dbgs() << "Failed to open '" << funcToFilenameFile
+                 << "': " << fileWithMapping.getError().message() << '\n';
+    return std::nullopt;
+  }
+  for (llvm::line_iterator lineIt(*fileWithMapping.get(), /*SkipBlanks=*/true,
+                                  /*CommentMarker=*/'#'),
+       endIt;
+       lineIt != endIt; ++lineIt) {
+    StringRef line = *lineIt;
+    SmallVector<StringRef, 2> funcNameAndFile;
+    line.split(funcNameAndFile, ",");
+    if (funcNameAndFile.size() != 2) {
+      llvm::dbgs() << "Expected two entries separated by ',' at line "
+                   << lineIt.line_number() << " but got: '" << line << "'\n";
+      continue;
+    }
+    if (funcName == funcNameAndFile[0]) return funcNameAndFile[1].str();
+  }
+  return std::nullopt;
+}
+
 class CUDATargetBackend final : public TargetBackend {
  public:
   CUDATargetBackend() = default;
@@ -251,108 +291,142 @@ class CUDATargetBackend final : public TargetBackend {
 
     SmallVector<std::string> entryPointNames;
     std::string ptxImage;
-    if (variantOp.isExternal()) {
-      if (!variantOp.getObjects().has_value()) {
-        return variantOp.emitOpError()
-               << "no objects defined for external variant";
-      } else if (variantOp.getObjects()->getValue().size() != 1) {
-        // For now we assume there will be exactly one object file.
-        // In the future we will want to perform a linking step here and ideally
-        // support _also_ linking in the codegen results.
-        return variantOp.emitOpError() << "only one object reference is "
-                                          "supported for external variants";
-      }
-
-      // Take exported names verbatim. The user must have already sanitized
-      // these to match the names in their kernels. We don't support any kind of
-      // mangling and if the user was silly enough to rely on nvcc C++ mangling
-      // they'll have to figure that out.
-      for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-        entryPointNames.emplace_back(exportOp.getSymName());
-      }
-
-      auto objectAttr = variantOp.getObjects()
-                            ->getValue()
-                            .front()
-                            .cast<IREE::HAL::ExecutableObjectAttr>();
-      if (auto data = objectAttr.loadData()) {
-        ptxImage = data.value();
-      } else {
-        return variantOp.emitOpError()
-               << "object file could not be loaded: " << objectAttr;
-      }
-    } else {
+    if (!clReadPtxFromFile.empty()) {
       ModuleOp innerModuleOp = variantOp.getInnerModule();
+      auto functions =
+          llvm::to_vector<1>(innerModuleOp.getOps<LLVM::LLVMFuncOp>());
 
-      // Remove all the functions that are not part of the CUDA kernel.
-      // TODO(thomasraoux): remove this? this should not be required.
-      auto illegalFuncOps =
-          llvm::to_vector<4>(innerModuleOp.getOps<func::FuncOp>());
-      for (auto funcOp : illegalFuncOps) {
-        funcOp.erase();
+      if (functions.size() > 1) {
+        llvm::dbgs() << "Not smart enough to replace functions individually\n";
+        llvm::dbgs() << "Will replace the whole module if we match the name of "
+                        "the first function in that module\n";
       }
-
-      auto llvmModule =
-          mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
-      if (!llvmModule) {
-        return variantOp.emitError() << "failed to translate the MLIR LLVM "
-                                        "dialect to the native llvm::Module";
-      }
-
-      for (auto [exportOp, workgroupSize] :
-           llvm::zip_equal(variantOp.getOps<IREE::HAL::ExecutableExportOp>(),
-                           workgroupSizes)) {
-        auto *llvmFunc = llvmModule->getFunction(exportOp.getName());
-        if (llvmFunc->isDeclaration()) continue;
-
-        // setName will make sure the function name is unique.
-        llvmFunc->setName(sanitizeSymbolName(exportOp.getName()));
-        entryPointNames.emplace_back(llvmFunc->getName());
-
-        auto *annotations =
-            llvmModule->getOrInsertNamedMetadata("nvvm.annotations");
-        auto setMetadataValueI32 = [&](StringRef name, int value) {
-          llvm::Metadata *llvmMetadata[] = {
-              llvm::ValueAsMetadata::get(llvmFunc),
-              llvm::MDString::get(llvmModule->getContext(), name),
-              llvm::ValueAsMetadata::get(llvm::ConstantInt::get(
-                  llvm::Type::getInt32Ty(llvmModule->getContext()), value))};
-          annotations->addOperand(
-              llvm::MDNode::get(llvmModule->getContext(), llvmMetadata));
-        };
-        // Mark the entry point as a kernel.
-        setMetadataValueI32("kernel", 1);
-        // Set the maximum number of threads in the thread block (CTA).
-        setMetadataValueI32("maxntidx", workgroupSize[0]);
-        setMetadataValueI32("maxntidy", workgroupSize[1]);
-        setMetadataValueI32("maxntidz", workgroupSize[2]);
-      }
-
-      std::unique_ptr<llvm::TargetMachine> targetMachine;
-      {
-        llvm::Triple triple("nvptx64-nvidia-cuda");
-        std::string targetChip = clTargetChip;
-        std::string features = "+ptx60";
-        std::string error;
-        const llvm::Target *target =
-            llvm::TargetRegistry::lookupTarget("", triple, error);
-        if (target == nullptr) {
-          return variantOp.emitError() << "cannot initialize target triple";
-        }
-        targetMachine.reset(target->createTargetMachine(
-            triple.str(), targetChip, features, {}, {}));
-        if (targetMachine == nullptr) {
-          return variantOp.emitError() << "cannot initialize target machine";
+      if (!functions.empty()) {
+        StringRef funcName = functions[0].getSymName();
+        std::optional<std::string> pathToPTXFile =
+            getPathToPTXReplacementFile(clReadPtxFromFile, funcName);
+        if (pathToPTXFile) {
+          llvm::dbgs() << "Found: '" << *pathToPTXFile << "' for '" << funcName
+                       << "'\n";
+          llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ptxFileContent =
+              llvm::MemoryBuffer::getFile(*pathToPTXFile);
+          if (!ptxFileContent) {
+            llvm::dbgs() << "Failed to open '" << *pathToPTXFile
+                         << "': " << ptxFileContent.getError().message()
+                         << '\n';
+          } else {
+            ptxImage = std::string(ptxFileContent.get()->getBuffer());
+            for (auto function : functions)
+              entryPointNames.emplace_back(function.getSymName());
+          }
         }
       }
+    }
+    if (ptxImage.empty()) {
+      if (variantOp.isExternal()) {
+        if (!variantOp.getObjects().has_value()) {
+          return variantOp.emitOpError()
+                 << "no objects defined for external variant";
+        } else if (variantOp.getObjects()->getValue().size() != 1) {
+          // For now we assume there will be exactly one object file.
+          // In the future we will want to perform a linking step here and
+          // ideally support _also_ linking in the codegen results.
+          return variantOp.emitOpError() << "only one object reference is "
+                                            "supported for external variants";
+        }
 
-      llvmModule->setDataLayout(targetMachine->createDataLayout());
+        // Take exported names verbatim. The user must have already sanitized
+        // these to match the names in their kernels. We don't support any kind
+        // of mangling and if the user was silly enough to rely on nvcc C++
+        // mangling they'll have to figure that out.
+        for (auto exportOp :
+             variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+          entryPointNames.emplace_back(exportOp.getSymName());
+        }
 
-      linkAndOptimize(*llvmModule, *targetMachine);
+        auto objectAttr = variantOp.getObjects()
+                              ->getValue()
+                              .front()
+                              .cast<IREE::HAL::ExecutableObjectAttr>();
+        if (auto data = objectAttr.loadData()) {
+          ptxImage = data.value();
+        } else {
+          return variantOp.emitOpError()
+                 << "object file could not be loaded: " << objectAttr;
+        }
+      } else {
+        ModuleOp innerModuleOp = variantOp.getInnerModule();
 
-      // Serialize CUDA kernel into the binary that we will embed in the
-      // final FlatBuffer.
-      ptxImage = translateModuleToISA(*llvmModule, *targetMachine);
+        // Remove all the functions that are not part of the CUDA kernel.
+        // TODO(thomasraoux): remove this? this should not be required.
+        auto illegalFuncOps =
+            llvm::to_vector<4>(innerModuleOp.getOps<func::FuncOp>());
+        for (auto funcOp : illegalFuncOps) {
+          funcOp.erase();
+        }
+
+        auto llvmModule =
+            mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
+        if (!llvmModule) {
+          return variantOp.emitError() << "failed to translate the MLIR LLVM "
+                                          "dialect to the native llvm::Module";
+        }
+
+        for (auto [exportOp, workgroupSize] :
+             llvm::zip_equal(variantOp.getOps<IREE::HAL::ExecutableExportOp>(),
+                             workgroupSizes)) {
+          auto *llvmFunc = llvmModule->getFunction(exportOp.getName());
+          if (llvmFunc->isDeclaration()) continue;
+
+          // setName will make sure the function name is unique.
+          llvmFunc->setName(sanitizeSymbolName(exportOp.getName()));
+          entryPointNames.emplace_back(llvmFunc->getName());
+
+          auto *annotations =
+              llvmModule->getOrInsertNamedMetadata("nvvm.annotations");
+          auto setMetadataValueI32 = [&](StringRef name, int value) {
+            llvm::Metadata *llvmMetadata[] = {
+                llvm::ValueAsMetadata::get(llvmFunc),
+                llvm::MDString::get(llvmModule->getContext(), name),
+                llvm::ValueAsMetadata::get(llvm::ConstantInt::get(
+                    llvm::Type::getInt32Ty(llvmModule->getContext()), value))};
+            annotations->addOperand(
+                llvm::MDNode::get(llvmModule->getContext(), llvmMetadata));
+          };
+          // Mark the entry point as a kernel.
+          setMetadataValueI32("kernel", 1);
+          // Set the maximum number of threads in the thread block (CTA).
+          setMetadataValueI32("maxntidx", workgroupSize[0]);
+          setMetadataValueI32("maxntidy", workgroupSize[1]);
+          setMetadataValueI32("maxntidz", workgroupSize[2]);
+        }
+
+        std::unique_ptr<llvm::TargetMachine> targetMachine;
+        {
+          llvm::Triple triple("nvptx64-nvidia-cuda");
+          std::string targetChip = clTargetChip;
+          std::string features = "+ptx60";
+          std::string error;
+          const llvm::Target *target =
+              llvm::TargetRegistry::lookupTarget("", triple, error);
+          if (target == nullptr) {
+            return variantOp.emitError() << "cannot initialize target triple";
+          }
+          targetMachine.reset(target->createTargetMachine(
+              triple.str(), targetChip, features, {}, {}));
+          if (targetMachine == nullptr) {
+            return variantOp.emitError() << "cannot initialize target machine";
+          }
+        }
+
+        llvmModule->setDataLayout(targetMachine->createDataLayout());
+
+        linkAndOptimize(*llvmModule, *targetMachine);
+
+        // Serialize CUDA kernel into the binary that we will embed in the
+        // final FlatBuffer.
+        ptxImage = translateModuleToISA(*llvmModule, *targetMachine);
+      }
     }
 
     if (dumpPtx) {
