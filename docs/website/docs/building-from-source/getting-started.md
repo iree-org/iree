@@ -138,7 +138,6 @@ cmake --build ../iree-build/
 
     See also our [developer documentation for ccache](https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/ccache.md).
 
-
 ## What's next?
 
 <!-- TODO(scotttodd): "at this point you can..." -->

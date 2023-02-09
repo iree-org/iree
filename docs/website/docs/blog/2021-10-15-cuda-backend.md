@@ -1,6 +1,5 @@
-
- Friday, October 15, 2021<br>
- By Thomas Raoux
+Friday, October 15, 2021<br>
+By Thomas Raoux
 
 # CUDA Backend in IREE
 
@@ -42,7 +41,8 @@ Those can be run to make sure a system has the required CUDA support.
 CUDA has an open source backend in LLVM generating PTX that we are leveraging.
 Therefore IREE can create [NVVM](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
 (CUDA LLVM variant) and use LLVM's backend to generate PTX. The CUDA driver
-will do the "last mile compilation" at runtime to convert PTX into the GPU's native ISA.
+will do the "last mile compilation" at runtime to convert PTX into the GPU's
+native ISA.
 
 IREE compiler pipeline starts from [linalg](https://mlir.llvm.org/docs/Dialects/Linalg/)
 with tensor operands. A large part of the compiler is independent of the target.
@@ -64,7 +64,7 @@ Kernels are encoded in a FlatBuffer containing the PTX code as well as the
 workgroup size to use for the dispatch. This allows serialization of the kernels
 in the IR, it is then de-serialized by the HAL layer.
 
-```
+``` tablegen
 table CUDAExecutableDef {
   // A map of entry point ordinals to string names as used in the shader
   // library.
@@ -109,7 +109,8 @@ We will then have a pass tiling the ops in the dispatch region a second time to
 distribute the work onto threads within the block.
 
 At this stage the IR looks like the following:
-```
+
+``` mlir
     %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
     %9 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref<128xf32, affine_map<(d0)[s0] -> (d0 + s0)>> to memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
@@ -140,7 +141,8 @@ load4/store4. This significantly improves the memory access pattern of the code
 generated.
 
 This convert the previous IR to:
-```
+
+``` mlir
     %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
     %9 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref<128xf32, affine_map<(d0)[s0] -> (d0 + s0)>> to memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
