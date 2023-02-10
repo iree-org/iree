@@ -244,6 +244,8 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::PackOp::attachInterface<
         OuterParallelAsPartitionableLoops<tensor::PackOp>>(*ctx);
+    tensor::UnPackOp::attachInterface<
+        OuterParallelAsPartitionableLoops<tensor::UnPackOp>>(*ctx);
   });
 }
 

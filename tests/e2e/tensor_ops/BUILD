@@ -40,6 +40,7 @@ iree_check_single_backend_test_suite(
             "extract_slice.mlir",
             "pack.mlir",
             "tensor_insert_slice.mlir",
+            "unpack.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
@@ -62,6 +63,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "pack.mlir",
             "tensor_cast.mlir",
+            "unpack.mlir",
         ],
     ),
     driver = "local-task",
@@ -80,6 +82,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "pack.mlir",
             "tensor_cast.mlir",
+            "unpack.mlir",
         ],
     ),
     driver = "cuda",
@@ -105,6 +108,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "pack.mlir",
             "tensor_cast.mlir",
+            "unpack.mlir",
         ],
     ),
     driver = "vulkan",

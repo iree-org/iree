@@ -33,6 +33,7 @@ iree_check_single_backend_test_suite(
     "extract_slice.mlir"
     "pack.mlir"
     "tensor_insert_slice.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
