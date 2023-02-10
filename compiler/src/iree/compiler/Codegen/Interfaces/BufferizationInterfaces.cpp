@@ -353,30 +353,36 @@ struct LinalgExtOpInterface
   }
 };
 
+template <typename OpTy>
+static FailureOr<std::pair<Value, Value>> getSourceAndDestFromPackUnPackOp(
+    RewriterBase &rewriter, OpTy op, const BufferizationOptions &options) {
+  Value source;
+  auto maybeBuffer = getBuffer(rewriter, op.getSource(), options);
+  if (failed(maybeBuffer)) return failure();
+  source = *maybeBuffer;
+
+  Value dest;
+  AnalysisState analysisState(options);
+  SmallVector<OpOperand *> aliasingOpOperands =
+      analysisState.getAliasingOpOperands(op->getOpResult(0));
+  assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
+  FailureOr<Value> resultBuffer =
+      getBuffer(rewriter, aliasingOpOperands.front()->get(), options);
+  if (failed(resultBuffer)) return failure();
+  dest = *resultBuffer;
+  return std::make_pair(source, dest);
+}
+
 static LogicalResult bufferizePackOp(RewriterBase &rewriter, tensor::PackOp op,
                                      const BufferizationOptions &options) {
   // Take a guard before anything else.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(op);
 
-  Value source;
-  {
-    auto maybeBuffer = getBuffer(rewriter, op.getSource(), options);
-    if (failed(maybeBuffer)) return failure();
-    source = *maybeBuffer;
-  }
-
-  Value dest;
-  AnalysisState analysisState(options);
-  {
-    SmallVector<OpOperand *> aliasingOpOperands =
-        analysisState.getAliasingOpOperands(op->getOpResult(0));
-    assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
-    FailureOr<Value> resultBuffer =
-        getBuffer(rewriter, aliasingOpOperands.front()->get(), options);
-    if (failed(resultBuffer)) return failure();
-    dest = *resultBuffer;
-  }
+  auto maybeSrcAndDest =
+      getSourceAndDestFromPackUnPackOp(rewriter, op, options);
+  if (failed(maybeSrcAndDest)) return failure();
+  auto [source, dest] = *maybeSrcAndDest;
 
   // Set insertion point now that potential alloc/dealloc are introduced.
   rewriter.setInsertionPoint(op);
@@ -397,24 +403,10 @@ static LogicalResult bufferizeUnPackOp(RewriterBase &rewriter,
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(op);
 
-  Value source;
-  {
-    auto maybeBuffer = getBuffer(rewriter, op.getSource(), options);
-    if (failed(maybeBuffer)) return failure();
-    source = *maybeBuffer;
-  }
-
-  Value dest;
-  AnalysisState analysisState(options);
-  {
-    SmallVector<OpOperand *> aliasingOpOperands =
-        analysisState.getAliasingOpOperands(op->getOpResult(0));
-    assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
-    FailureOr<Value> resultBuffer =
-        getBuffer(rewriter, aliasingOpOperands.front()->get(), options);
-    if (failed(resultBuffer)) return failure();
-    dest = *resultBuffer;
-  }
+  auto maybeSrcAndDest =
+      getSourceAndDestFromPackUnPackOp(rewriter, op, options);
+  if (failed(maybeSrcAndDest)) return failure();
+  auto [source, dest] = *maybeSrcAndDest;
 
   // Set insertion point now that potential alloc/dealloc are introduced.
   rewriter.setInsertionPoint(op);
