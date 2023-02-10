@@ -257,6 +257,30 @@ transform_ext::StructuredOpMatcher::dim(AllDims tag, CaptureDims captures) {
   return *this;
 }
 
+transform_ext::StructuredOpMatcher::StructuredOpMatcher(
+    StructuredOpMatcher &A, StructuredOpMatcher &B) {
+
+  predicates.push_back([&A, &B](linalg::LinalgOp linalgOp) -> bool {
+    LLVM_DEBUG(DBGS() << "start recursive lhs OR match {\n");
+    {
+      auto debugRAII = llvm::make_scope_exit(
+          [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
+      if (A.match(linalgOp))
+        return true;
+    }
+    LLVM_DEBUG(DBGS() << "start recursive rhs OR match {\n");
+    {
+      auto debugRAII = llvm::make_scope_exit(
+          [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
+      if (B.match(linalgOp))
+        return true;
+    }
+    return false;
+  });
+  recordNestedMatcher(A);
+  recordNestedMatcher(B);
+}
+
 //===---------------------------------------------------------------------===//
 // Constraints on input operands.
 //===---------------------------------------------------------------------===//
@@ -903,11 +927,12 @@ void transform_ext::makeSoftmaxMatcher(
     transform_ext::StructuredOpMatcher &maxReduction,
     transform_ext::StructuredOpMatcher &sub,
     transform_ext::StructuredOpMatcher &expOperand,
-    transform_ext::StructuredOpMatcher &fillzero,
+    transform_ext::StructuredOpMatcher &fillZero,
     transform_ext::StructuredOpMatcher &sum,
+    transform_ext::StructuredOpMatcher &rcpOperand,
+    transform_ext::StructuredOpMatcher &mulOperand,
     transform_ext::StructuredOpMatcher &divOperand,
     transform_ext::StructuredOpMatcher &softmaxroot) {
-
   fillMinusInf = m_StructuredOp<linalg::FillOp>().input(0, ConstantFloatMin());
   maxReduction = transform_ext::m_StructuredOp<linalg::GenericOp>()
                      .singleOpWithCanonicaleArgs<arith::MaxFOp>()
@@ -941,7 +966,7 @@ void transform_ext::makeSoftmaxMatcher(
                    .output(NumEqualsTo(1));
   expOperand = expOperand.input(0, sub);
 
-  fillzero = m_StructuredOp<linalg::FillOp>().input(0, ConstantFloatZero());
+  fillZero = m_StructuredOp<linalg::FillOp>().input(0, ConstantFloatZero());
   sum = m_StructuredOp<linalg::GenericOp>()
             .singleOpWithCanonicaleArgs<arith::AddFOp>()
             // Only handle most inner reduction for now.
@@ -952,26 +977,40 @@ void transform_ext::makeSoftmaxMatcher(
             .output(AllOperands(), IsProjected(-1))
             .output(NumEqualsTo(1));
   sum = sum.input(0, expOperand);
-  sum = sum.output(0, fillzero);
+  sum = sum.output(0, fillZero);
 
-  divOperand = m_StructuredOp<linalg::GenericOp>()
+  rcpOperand = m_StructuredOp<linalg::GenericOp>()
                    .isFloatReciprocal()
                    .dim(AllDims(), utils::IteratorType::parallel)
                    .input(NumEqualsTo(1))
                    .input(AllOperands(), IsIdentity())
                    .output(AllOperands(), IsIdentity())
                    .output(NumEqualsTo(1));
-  divOperand = divOperand.input(0, sum);
+  rcpOperand = rcpOperand.input(0, sum);
 
-  softmaxroot = transform_ext::m_StructuredOp<linalg::GenericOp>()
-                    .singleOpWithCanonicaleArgs<arith::MulFOp>()
-                    .dim(AllDims(), utils::IteratorType::parallel)
-                    .input(NumEqualsTo(2))
-                    .input(0, IsIdentity())
-                    .input(1, IsProjected(-1))
-                    .output(NumEqualsTo(1))
-                    .output(AllOperands(), IsIdentity());
+  mulOperand = transform_ext::m_StructuredOp<linalg::GenericOp>()
+                   .singleOpWithCanonicaleArgs<arith::MulFOp>()
+                   .dim(AllDims(), utils::IteratorType::parallel)
+                   .input(NumEqualsTo(2))
+                   .input(0, IsIdentity())
+                   .input(1, IsProjected(-1))
+                   .output(NumEqualsTo(1))
+                   .output(AllOperands(), IsIdentity());
 
-  softmaxroot = softmaxroot.input(0, expOperand);
-  softmaxroot = softmaxroot.input(1, divOperand);
+  mulOperand = mulOperand.input(0, expOperand);
+  mulOperand = mulOperand.input(1, rcpOperand);
+
+  divOperand = transform_ext::m_StructuredOp<linalg::GenericOp>()
+                   .singleOpWithCanonicaleArgs<arith::DivFOp>()
+                   .dim(AllDims(), utils::IteratorType::parallel)
+                   .input(NumEqualsTo(2))
+                   .input(0, IsIdentity())
+                   .input(1, IsProjected(-1))
+                   .output(NumEqualsTo(1))
+                   .output(AllOperands(), IsIdentity());
+
+  divOperand = divOperand.input(0, expOperand);
+  divOperand = divOperand.input(1, sum);
+
+  softmaxroot = transform_ext::m_StructuredOp_Or(mulOperand, divOperand);
 }

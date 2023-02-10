@@ -246,7 +246,6 @@ static void unpack_test(iree_uk_unpack_type_t type, int tile_size0,
 UNPACK_TEST(f32f32, 3, 5, generic, 0)
 UNPACK_TEST(i8i8, 4, 2, generic, 0)
 UNPACK_TEST(i32i32, 3, 4, generic, 0)
-UNPACK_TEST(i8i8, 8, 8, generic, 0)
 
 // ARM_64 tests.
 #if defined(IREE_UK_ARCH_ARM_64)
@@ -254,15 +253,8 @@ UNPACK_TEST(i8i8, 8, 8, generic, 0)
 #define UNPACK_ARM_64_TEST(type, tile_size0, tile_size1) \
   UNPACK_TEST(type, tile_size0, tile_size1, arm_64, 0)
 
-#define UNPACK_ARM_64_TEST_WITH_CPU_FEATURE(type, tile_size0, tile_size1, \
-                                            FEATURE)                      \
-  UNPACK_TEST(type, tile_size0, tile_size1, arm_64_##FEATURE,             \
-              IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_##FEATURE)
-
-UNPACK_ARM_64_TEST(f32f32, 8, 1)
-UNPACK_ARM_64_TEST(i8i8, 8, 1)
-UNPACK_ARM_64_TEST_WITH_CPU_FEATURE(i8i8, 8, 4, DOTPROD)
-UNPACK_ARM_64_TEST_WITH_CPU_FEATURE(i8i8, 8, 8, I8MM)
+UNPACK_ARM_64_TEST(f32f32, 8, 8)
+UNPACK_ARM_64_TEST(i32i32, 8, 8)
 
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 

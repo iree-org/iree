@@ -20,7 +20,7 @@ class Android_Adreno_Benchmarks(object):
   ADRENO_GPU_COMPILE_TARGET = iree_definitions.CompileTarget(
       target_backend=iree_definitions.TargetBackend.VULKAN_SPIRV,
       target_architecture=common_definitions.DeviceArchitecture.ADRENO_GENERIC,
-      target_abi=iree_definitions.TargetABI.LINUX_ANDROID31)
+      target_abi=iree_definitions.TargetABI.VULKAN_ANDROID31)
   DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ADRENO_GENERIC_DEFAULTS,
       tags=["default-flags"],

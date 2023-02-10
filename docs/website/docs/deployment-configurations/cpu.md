@@ -45,8 +45,9 @@ python -m pip install iree-compiler
     `iree-compile` is installed to your python module installation path. If you
     pip install with the user mode, it is under `${HOME}/.local/bin`, or
     `%APPDATA%Python` on Windows. You may want to include the path in your
-    system's `PATH` environment variable.
-    ``` shell
+    system's `PATH` environment variable:
+
+    ```shell
     export PATH=${HOME}/.local/bin:${PATH}
     ```
 
@@ -139,7 +140,6 @@ it expects one 224x224 RGB image. We are feeding in an image with all 0 values
 here for brevity, see `iree-run-module --help` for the format to specify
 concrete values.
 
-
 <!-- TODO(??): deployment options -->
 
 <!-- TODO(??): measuring performance -->
@@ -155,4 +155,3 @@ concrete values.
 [python-bindings]: ../bindings/python.md
 [tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
 [tf-import]: ../getting-started/tensorflow.md
-[tflite-import]: ../getting-started/tensorflow-lite.md

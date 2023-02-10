@@ -16,18 +16,20 @@ python -m pip install \
 ```
 
 ## Importing and Compiling
+
 IREE's tooling is divided into two components: import and compilation.
 
 1. The import tool converts the TFLite FlatBuffer to an IREE compatible form,
-validating that only IREE compatible operations remain. Containing a combination of TOSA
-and IREE operations.
-2. The compilation stage generates the bytecode module for a list of targets, which can
-be executed by IREE.
+  validating that only IREE compatible operations remain. Containing a combination
+  of TOSA and IREE operations.
+2. The compilation stage generates the bytecode module for a list of targets,
+  which can be executed by IREE.
 
 ### Using Command Line Tools
+
 These two stages can be completed entirely via the command line.
 
-```shell
+``` shell
 WORKDIR="/tmp/workdir"
 TFLITE_URL="https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8.tflite"
 TFLITE_PATH=${WORKDIR}/model.tflite
@@ -49,15 +51,16 @@ iree-compile \
 ```
 
 ### Using the Python API
+
 The example below demonstrates downloading, compiling, and executing a TFLite
 model using the Python API. This includes some initial setup to declare global
 variables, download the sample module, and download the sample inputs.
 
-Declaration of absolute paths for the sample repo and import all required libraries.
-The default setup uses the CPU backend as the only target. This can be reconfigured
-to select alternative targets.
+Declaration of absolute paths for the sample repo and import all required
+libraries. The default setup uses the CPU backend as the only target. This can
+be reconfigured to select alternative targets.
 
-```python
+``` python
 import iree.compiler.tflite as iree_tflite_compile
 import iree.runtime as iree_rt
 import numpy
@@ -81,7 +84,7 @@ config = "local-task"
 
 The TFLite sample model and input are downloaded locally.
 
-```python
+``` python
 tfliteUrl = "https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8.tflite"
 jpgUrl = "https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8_input.jpg"
 
@@ -89,10 +92,11 @@ urllib.request.urlretrieve(tfliteUrl, tfliteFile)
 urllib.request.urlretrieve(jpgUrl, jpgFile)
 ```
 
-Once downloaded we can compile the model for the selected backends. Both the TFLite and TOSA representations
-of the model are saved for debugging purposes. This is optional and can be omitted.
+Once downloaded we can compile the model for the selected backends. Both the
+TFLite and TOSA representations of the model are saved for debugging purposes.
+This is optional and can be omitted.
 
-```python
+``` python
 iree_tflite_compile.compile_file(
   tfliteFile,
   input_type="tosa",
@@ -103,10 +107,10 @@ iree_tflite_compile.compile_file(
   import_only=False)
 ```
 
-After compilation is completed we configure the VmModule using the local-task configuration and compiled
-IREE module.
+After compilation is completed we configure the VmModule using the local-task
+configuration and compiled IREE module.
 
-```python
+``` python
 config = iree_rt.Config("local-task")
 context = iree_rt.SystemContext(config=config)
 with open(bytecodeModule, 'rb') as f:
@@ -114,11 +118,12 @@ with open(bytecodeModule, 'rb') as f:
   context.add_vm_module(vm_module)
 ```
 
-Finally, the IREE module is loaded and ready for execution. Here we load the sample image, manipulate to
-the expected input size, and execute the module. By default TFLite models include a single
-function named 'main'. The final results are printed.
+Finally, the IREE module is loaded and ready for execution. Here we load the
+sample image, manipulate to the expected input size, and execute the module. By
+default TFLite models include a single function named 'main'. The final results
+are printed.
 
-```python
+``` python
 im = numpy.array(Image.open(jpgFile).resize((192, 192))).reshape((1, 192, 192, 3))
 args = [im]
 
@@ -134,7 +139,6 @@ TensorFlow Lite's operations to TOSA, the intermediate representation used by
 IREE. Many TensorFlow Lite operations are not fully supported, particularly
 those than use dynamic shapes. File an issue to IREE's TFLite model support
 [project](https://github.com/iree-org/iree/projects/42).
-
 
 ## Additional Samples
 

@@ -184,6 +184,25 @@ static void iree_uk_pack_tile_8x8_x8_arm_64_transpose(
   }
 }
 
+static void iree_uk_pack_tile_8x8_x32_arm_64_direct(
+    void* IREE_UK_RESTRICT out_tile_ptr,
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
+    iree_uk_ssize_t out_stride1, iree_uk_ssize_t in_stride0,
+    iree_uk_ssize_t elem_size, iree_uk_ssize_t tile_size0,
+    iree_uk_ssize_t tile_size1) {
+  IREE_UK_ASSERT(elem_size == 4);
+  IREE_UK_ASSERT(tile_size0 == 8);
+  IREE_UK_ASSERT(tile_size1 == 8);
+  const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr = in_tile_ptr;
+  iree_uk_int8_t* IREE_UK_RESTRICT out_ptr = out_tile_ptr;
+  for (; outer_size1 > 0; --outer_size1) {
+    iree_uk_neon_copy_8x32xi8_strided_to_strided(out_ptr, in_ptr, 32,
+                                                 4 * in_stride0);
+    out_ptr += 4 * out_stride1;
+    in_ptr += 32;
+  }
+}
+
 iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func_arm_64(
     const iree_uk_pack_params_t* params) {
   // At the moment, as sum-reductions are not yet part of pack ops,
@@ -191,7 +210,10 @@ iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func_arm_64(
   // size matters, not the type itself.
   int esize = iree_uk_type_size(iree_uk_pack_out_type(params->type));
   bool transpose = params->flags & IREE_UK_FLAG_PACK_TRANSPOSE_INNER;
-  if (esize == 4 && params->out_size2 == 8 && params->out_size3 == 1) {
+  if (esize == 4 && params->out_size2 == 8 && params->out_size3 == 8) {
+    // Currently only used for accumulators, which are never transposed.
+    return transpose ? 0 : iree_uk_pack_tile_8x8_x32_arm_64_direct;
+  } else if (esize == 4 && params->out_size2 == 8 && params->out_size3 == 1) {
     return transpose ? iree_uk_pack_tile_8x1_x32_arm_64_transpose
                      : iree_uk_pack_tile_8x1_x32_arm_64_direct;
   } else if (esize == 1 && params->out_size2 == 8 && params->out_size3 == 1) {

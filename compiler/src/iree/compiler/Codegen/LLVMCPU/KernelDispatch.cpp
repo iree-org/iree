@@ -69,6 +69,13 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
+// TODO(#12135): remove defaultWorkgroupTileSizeForUnpackOp
+static llvm::cl::opt<int> defaultWorkgroupTileSizeForUnpackOp(
+    "iree-codegen-llvm-generic-ops-workgroup-size-for-unpack-op",
+    llvm::cl::desc("Like iree-codegen-llvm-generic-ops-workgroup-size but "
+                   "specifically for UnpackOp"),
+    llvm::cl::init(16));
+
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
 
@@ -1109,7 +1116,8 @@ static LogicalResult setUnPackOpRootConfig(
   // TODO(#11505): Consider multi-level tiling for handling unpack + generic
   // cases.
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
-      cast<TilingInterface>(op.getOperation()), /*defaultSize=*/16);
+      cast<TilingInterface>(op.getOperation()),
+      /*defaultSize=*/defaultWorkgroupTileSizeForUnpackOp);
 
   // Fixup for making tileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();

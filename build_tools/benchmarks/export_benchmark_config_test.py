@@ -41,7 +41,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
     device_spec_b = common_definitions.DeviceSpec(
         id="dev_a_gpu",
         device_name="dev_a_gpu",
-        architecture=common_definitions.DeviceArchitecture.MALI_VALHALL,
+        architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     device_spec_c = common_definitions.DeviceSpec(
         id="dev_c",
@@ -89,7 +89,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
     device_spec_b = common_definitions.DeviceSpec(
         id="dev_a_gpu",
         device_name="dev_a_gpu",
-        architecture=common_definitions.DeviceArchitecture.MALI_VALHALL,
+        architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     device_spec_c = common_definitions.DeviceSpec(
         id="dev_a_second_gpu",
@@ -131,7 +131,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
     device_spec_b = common_definitions.DeviceSpec(
         id="dev_b",
         device_name="dev_b",
-        architecture=common_definitions.DeviceArchitecture.MALI_VALHALL,
+        architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     run_config_a = iree_definitions.E2EModelRunConfig(
         module_generation_config=COMMON_GEN_CONFIG,
@@ -187,7 +187,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
     device_spec_b = common_definitions.DeviceSpec(
         id="dev_b",
         device_name="dev_b",
-        architecture=common_definitions.DeviceArchitecture.MALI_VALHALL,
+        architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     run_config_a = iree_definitions.E2EModelRunConfig(
         module_generation_config=small_gen_config,

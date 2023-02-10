@@ -50,6 +50,7 @@ struct ApplyPatternsOpPatterns {
   bool rewritePackOps = false;
   bool swapPaddingElideConditional = false;
   bool swappingPatterns = false;
+  bool unrollVectorsGpuMma = false;
 };
 }  // namespace transform_dialect
 }  // namespace IREE

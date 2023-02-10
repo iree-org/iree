@@ -126,7 +126,11 @@ void buildIREEVMTransformPassPipeline(
       // No flow/stream processing (implies no tensors).
       break;
     default:
+      IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Preprocessing");
       IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions);
+      IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Preprocessing");
+      if (compileTo == IREEVMPipelinePhase::Preprocessing)
+        return;  // early-exit
 
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");
       IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);

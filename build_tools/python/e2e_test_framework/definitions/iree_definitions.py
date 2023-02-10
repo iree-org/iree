@@ -5,13 +5,30 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Classes for IREE compilation and run definitions."""
 
+import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-from typing import List
-import dataclasses
+import hashlib
+from typing import List, Sequence
 
 from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework import serialization
+
+
+def _hash_composite_id(keys: Sequence[str]) -> str:
+  """Computes the composite hash id from string keys.
+
+  String keys are the component ids that compose this composite object. We hash
+  the composite id since the id isn't designed to be inspected and insufficient
+  to reconstruct the original composite object.
+
+  Args:
+    keys: list of string keys.
+
+  Returns:
+    Unique hash id.
+  """
+  return hashlib.sha256(":".join(keys).encode("utf-8")).hexdigest()
 
 
 class TargetBackend(Enum):
@@ -28,7 +45,10 @@ class TargetABI(Enum):
   VMVX = "vmvx"
   LINUX_GNU = "linux-gnu"
   LINUX_ANDROID29 = "linux-android29"
-  LINUX_ANDROID31 = "linux-android31"
+  # IREE defined OS name for vulkan target. See:
+  # compiler/src/iree/compiler/Dialect/Vulkan/IR/VulkanBase.td
+  VULKAN_ANDROID30 = "android30"
+  VULKAN_ANDROID31 = "android31"
 
 
 class RuntimeLoader(Enum):
@@ -78,16 +98,28 @@ class ModuleExecutionConfig(object):
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
-class MLIRDialectType(Enum):
+@dataclass(frozen=True)
+class _MLIRDialectPair(object):
+  """MLIR dialect with its unique artificial id."""
+  # Unique artificial id.
+  id: int
+  # Name of an IREE supported input type (--iree-input-type).
+  dialect_name: str
+
+
+# Please use and update the next id when adding a new dialect, so we won't reuse
+# the old deprecated id.
+# Next ID: 4
+class MLIRDialectType(_MLIRDialectPair, Enum):
   """Imported MLIR dialect type."""
-  LINALG = "linalg"
-  TOSA = "tosa"
-  MHLO = "mhlo"
+  NONE = (1, "none")
+  TOSA = (2, "tosa")
+  MHLO = (3, "mhlo")
 
 
 MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
     common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
-        MLIRDialectType.LINALG,
+        MLIRDialectType.NONE,
     common_definitions.ModelSourceType.EXPORTED_TFLITE:
         MLIRDialectType.TOSA,
     common_definitions.ModelSourceType.EXPORTED_TF:
@@ -95,20 +127,20 @@ MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
 }
 
 
-@serialization.serializable
+@serialization.serializable(type_key="iree_imported_models")
 @dataclass(frozen=True)
 class ImportedModel(object):
   """Describes an imported MLIR model."""
+  id: str
   model: common_definitions.Model
   dialect_type: MLIRDialectType
 
   @staticmethod
   def from_model(model: common_definitions.Model):
-    # Currently we assume the model source type and its imported dialect is an
-    # 1-1 mapping.
-    return ImportedModel(
-        model=model,
-        dialect_type=MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type])
+    dialect_type = MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type]
+    return ImportedModel(id=f"{model.id}-{dialect_type.id}",
+                         model=model,
+                         dialect_type=dialect_type)
 
 
 @serialization.serializable
@@ -117,6 +149,9 @@ class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
   imported_model: ImportedModel
   compile_config: CompileConfig
+
+  def composite_id(self):
+    return _hash_composite_id([self.imported_model.id, self.compile_config.id])
 
 
 @serialization.serializable
@@ -127,3 +162,10 @@ class E2EModelRunConfig(object):
   module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
   input_data: common_definitions.ModelInputData
+
+  def composite_id(self):
+    return _hash_composite_id([
+        self.module_generation_config.composite_id(),
+        self.module_execution_config.id, self.target_device_spec.id,
+        self.input_data.id
+    ])
