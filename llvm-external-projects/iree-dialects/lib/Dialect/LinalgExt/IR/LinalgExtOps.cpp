@@ -1705,7 +1705,8 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
   SmallVector<Type> resultType;
   auto outputType = output.getType();
-  if (outputType.isa<RankedTensorType>()) resultType.push_back(outputType);
+  if (outputType.isa<RankedTensorType>())
+    resultType.push_back(outputType);
   build(builder, state, resultType, source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getDenseI64ArrayAttr(outerDimsPerm),
@@ -2130,7 +2131,8 @@ void UnPackOp::build(OpBuilder &builder, OperationState &state, Value source,
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
   SmallVector<Type> resultType;
   auto outputType = output.getType();
-  if (outputType.isa<RankedTensorType>()) resultType.push_back(outputType);
+  if (outputType.isa<RankedTensorType>())
+    resultType.push_back(outputType);
   build(builder, state, resultType, source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getDenseI64ArrayAttr(outerDimsPerm),
