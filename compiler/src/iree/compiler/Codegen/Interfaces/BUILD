@@ -58,6 +58,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:BufferizationTransformOps",
         "@llvm-project//mlir:GPUTransformOps",
         "@llvm-project//mlir:LinalgTransformOps",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:MemRefTransformOps",
         "@llvm-project//mlir:SCFTransformOps",
         "@llvm-project//mlir:VectorTransformOps",
