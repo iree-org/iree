@@ -237,6 +237,9 @@ public:
     });
   }
 
+  /// Matches a structured operation if either patterns A or B match.
+  StructuredOpMatcher(StructuredOpMatcher &A, StructuredOpMatcher &B);
+
   /// Matches the given operation, hook for `matchPattern`.
   bool match(Operation *op);
 
@@ -515,6 +518,11 @@ private:
 /// Creates a matcher of an arbitrary structured op.
 inline StructuredOpMatcher m_StructuredOp() { return StructuredOpMatcher(); }
 
+inline StructuredOpMatcher m_StructuredOp_Or(StructuredOpMatcher &A,
+                                             StructuredOpMatcher &B) {
+  return StructuredOpMatcher(A, B);
+}
+
 /// Creates a matcher of a structured op with kinds provided as template
 /// arguments.
 template <typename... OpType>
@@ -633,21 +641,22 @@ void makeReductionMatcher(StructuredOpMatcher &reduction,
                           StructuredOpMatcher &trailing,
                           MatchedReductionCaptures &captures);
 
-/// Create a group of matchers for a sequence of operations matching exactly a
-/// softmax operation.
+/// Create a group of matchers for a different code sequence of operations
+/// matching exactly a softmax operation.
 ///
 ///  %red = reduce_max(%0)
 ///  %sub = sub(%0, %red)
 ///  %exp = exp(%sub)
 ///  %sum = reduce_sum(%exp)
-///  %rec = reciprocal(%sum)
-///  %mul = mul(%exp, %rec)
+///  %mul = div(%exp, %%sum)
 void makeSoftmaxMatcher(transform_ext::StructuredOpMatcher &fillMinusInf,
                         transform_ext::StructuredOpMatcher &maxReduction,
                         transform_ext::StructuredOpMatcher &sub,
                         transform_ext::StructuredOpMatcher &expOperand,
-                        transform_ext::StructuredOpMatcher &fillzero,
+                        transform_ext::StructuredOpMatcher &fillZero,
                         transform_ext::StructuredOpMatcher &sum,
+                        transform_ext::StructuredOpMatcher &rcpOperand,
+                        transform_ext::StructuredOpMatcher &mulOperand,
                         transform_ext::StructuredOpMatcher &divOperand,
                         transform_ext::StructuredOpMatcher &softmaxroot);
 

@@ -35,20 +35,27 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
   void runOnOperation() override {
     SmallVector<std::pair<linalg::LinalgOp, Value>> softmaxRoots;
     getOperation()->walk([&](linalg::LinalgOp op) {
-      StructuredOpMatcher reduction, fill, leading, trailing;
-      transform_ext::StructuredOpMatcher fillMinusInf;
-      transform_ext::StructuredOpMatcher maxReduction;
-      transform_ext::StructuredOpMatcher sub;
-      transform_ext::StructuredOpMatcher expOperand;
-      transform_ext::StructuredOpMatcher fillzero;
-      transform_ext::StructuredOpMatcher sum;
-      transform_ext::StructuredOpMatcher divOperand;
-      transform_ext::StructuredOpMatcher softmaxroot;
-      makeSoftmaxMatcher(fillMinusInf, maxReduction, sub, expOperand, fillzero,
-                         sum, divOperand, softmaxroot);
-      if (matchPattern(op, softmaxroot)) {
-        Value src = maxReduction.getCaptured()->getOperand(0);
-        softmaxRoots.push_back(std::make_pair(op, src));
+      {
+        transform_ext::StructuredOpMatcher fillMinusInf;
+        transform_ext::StructuredOpMatcher maxReduction;
+        transform_ext::StructuredOpMatcher maybeBroadcastMax;
+        transform_ext::StructuredOpMatcher sub;
+        transform_ext::StructuredOpMatcher broadcastedSub;
+        transform_ext::StructuredOpMatcher expOperand;
+        transform_ext::StructuredOpMatcher fillzero;
+        transform_ext::StructuredOpMatcher sum;
+        transform_ext::StructuredOpMatcher maybeBroadcastSum;
+        transform_ext::StructuredOpMatcher rcpOperand;
+        transform_ext::StructuredOpMatcher matmulOperand;
+        transform_ext::StructuredOpMatcher divOperand;
+        transform_ext::StructuredOpMatcher softmaxroot;
+        makeSoftmaxMatcher(fillMinusInf, maxReduction, sub, expOperand,
+                           fillzero, sum, rcpOperand, matmulOperand, divOperand,
+                           softmaxroot);
+        if (matchPattern(op, softmaxroot)) {
+          Value src = maxReduction.getCaptured()->getOperand(0);
+          softmaxRoots.push_back(std::make_pair(op, src));
+        }
       }
     });
     for (std::pair<linalg::LinalgOp, Value> softmax : softmaxRoots) {
