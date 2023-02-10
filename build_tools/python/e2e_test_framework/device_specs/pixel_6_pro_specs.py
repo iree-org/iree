@@ -26,5 +26,5 @@ LITTLE_CORES = common_definitions.DeviceSpec(
 GPU = common_definitions.DeviceSpec(
     id=unique_ids.DEVICE_SPEC_MOBILE_PIXEL_6_PRO + "-gpu",
     device_name=DEVICE_NAME,
-    architecture=common_definitions.DeviceArchitecture.MALI_VALHALL,
+    architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
