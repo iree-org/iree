@@ -157,3 +157,54 @@ module {
     }
   }
 }
+
+// -----
+
+module {
+  transform.structured.canonicalized_sequence failures(propagate) {
+  ^bb0(%arg0: !pdl.operation):
+    transform.iree.register_match_callbacks
+
+    %first, %second =
+      transform.iree.match_callback failures(propagate) "_test_value_matcher_callback"(%arg0)
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+
+    transform.iree.emit_remark "first" at %first : !pdl.operation
+    transform.iree.emit_remark "second" at %second : !pdl.operation
+  }
+
+  module {
+    func.func private @f1(f32) -> f32
+    func.func private @f2(f32, f32) -> f32
+
+    func.func @foo() -> tensor<10xf32> {
+      %dummy1 = tensor.empty() : tensor<10xf32>
+      %dummy2 = tensor.empty() : tensor<10xf32>
+      %dummy3 = tensor.empty() : tensor<10xf32>
+      %operand = tensor.empty() : tensor<10xf32>
+
+      // expected-remark @below {{first}}
+      %first = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]
+      } ins(%operand : tensor<10xf32>)
+        outs(%dummy2 : tensor<10xf32>) {
+      ^bb0(%arg0: f32, %arg1: f32):
+        %0 = func.call @f1(%arg0) : (f32) -> f32
+        linalg.yield %0 : f32
+      } -> tensor<10xf32>
+
+      // expected-remark @below {{second}}
+      %second = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]
+      } ins(%operand, %first : tensor<10xf32>, tensor<10xf32>)
+        outs(%dummy3 : tensor<10xf32>) {
+      ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+        %0 = func.call @f2(%arg0, %arg1) : (f32, f32) -> f32
+        linalg.yield %0 : f32
+      } -> tensor<10xf32>
+      return %second : tensor<10xf32>
+    }
+  }
+}

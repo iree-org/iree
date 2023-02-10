@@ -1127,6 +1127,38 @@ static DiagnosedSilenceableFailure testRepeatedMatcherUseCallback(
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
+static DiagnosedSilenceableFailure
+testValueMatcherCallback(transform_ext::MatchCallbackResult &res, Location loc,
+                         const mlir::transform::TransformState &state,
+                         ValueRange handles) {
+  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+  Operation *root = state.getPayloadOps(handles[0])[0];
+
+  transform_ext::MatcherContext matcherContext;
+  auto &operand = transform_ext::m_Value(matcherContext);
+  auto &first = transform_ext::m_StructuredOp(matcherContext).input(0, operand);
+  auto &second = transform_ext::m_StructuredOp(matcherContext)
+                     .input(0, operand)
+                     .input(1, first);
+
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    second.resetCapture();
+    if (!matchPattern(op, second))
+      return WalkResult::advance();
+
+    res.addPayloadGroup({first.getCaptured()});
+    res.addPayloadGroup({second.getCaptured()});
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
 /// Match callback for a reduction with optional leading and trailing
 /// elementwise operations. Matches *the first* occurrence of such a reduction
 /// within an op associated with the given handle.
@@ -1196,6 +1228,8 @@ DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
   registry.registerCallback("_test_match_callback", testMatchCallbackCallback);
   registry.registerCallback("_test_repeated_matcher_use_callback",
                             testRepeatedMatcherUseCallback);
+  registry.registerCallback("_test_value_matcher_callback",
+                            testValueMatcherCallback);
   registry.registerCallback("reduction", reductionCallback);
   return DiagnosedSilenceableFailure::success();
 }
