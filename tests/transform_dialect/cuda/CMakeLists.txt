@@ -18,6 +18,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "matmul.mlir"
     "reduction.mlir"
     "reduction_eltwise.mlir"
     "reduction_v2.mlir"
@@ -33,6 +34,7 @@ iree_lit_test_suite(
     iree-opt
     iree-run-module
   DATA
+    matmul_codegen_spec.mlir
     reduction_codegen_spec.mlir
     reduction_eltwise_codegen_spec.mlir
     reduction_v2_codegen_spec.mlir

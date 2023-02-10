@@ -26,6 +26,7 @@ endif()
 iree_lit_test_suite(
     name = "lit",
     srcs = [
+        "matmul.mlir",
         "reduction.mlir",
         "reduction_eltwise.mlir",
         "reduction_v2.mlir",
@@ -41,6 +42,7 @@ iree_lit_test_suite(
     # transform dialect spec files are MLIR files that specify a transformation,
     # they need to be included as data.
     data = [
+        "matmul_codegen_spec.mlir",
         "reduction_codegen_spec.mlir",
         "reduction_eltwise_codegen_spec.mlir",
         "reduction_v2_codegen_spec.mlir",

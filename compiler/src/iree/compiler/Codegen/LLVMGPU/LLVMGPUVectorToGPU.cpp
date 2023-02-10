@@ -85,10 +85,6 @@ struct LLVMGPUVectorToGPUPass
       if (failed(convertVectorToMMAOps(rewriter, funcOp))) {
         return signalPassFailure();
       }
-    }
-    createAsyncGroups(funcOp, llvmgpuUseMMASync);
-
-    if (llvmgpuUseMMASync) {
       swizzleSharedMemory(funcOp);
     }
   }

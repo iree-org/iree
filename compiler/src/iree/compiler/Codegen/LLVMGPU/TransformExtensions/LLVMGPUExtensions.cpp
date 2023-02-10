@@ -25,6 +25,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Region.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -663,7 +664,6 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
     target->emitOpError("vector to mma patterns failed to apply");
     return emitDefaultDefiniteFailure(target);
   }
-
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
