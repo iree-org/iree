@@ -153,8 +153,11 @@ static OneShotBufferizationOptions getBufferizationOptions() {
 
 LogicalResult eliminateEmptyTensors(
     Operation *op, const OneShotBufferizationOptions &options) {
-  // Analyze IR.
-  OneShotAnalysisState state(op, options);
+  // Analyze IR. Returning new allocations is allowed here. This function
+  // may remove such cases.
+  OneShotBufferizationOptions updatedOptions = options;
+  updatedOptions.allowReturnAllocs = true;
+  OneShotAnalysisState state(op, updatedOptions);
   if (failed(analyzeOp(op, state))) return success();
 
   // Rewrite tensor.empty ops that are anchored on specific ops.
