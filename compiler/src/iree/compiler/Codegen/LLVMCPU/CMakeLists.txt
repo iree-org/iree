@@ -86,6 +86,7 @@ iree_cc_library(
     MLIRVectorToLLVM
     MLIRVectorToSCF
     MLIRVectorTransforms
+    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect

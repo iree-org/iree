@@ -39,6 +39,7 @@ iree_cc_library(
     MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRIR
+    MLIRMemRefDialect
     MLIRParser
     MLIRSupport
     iree::builtins::ukernel::exported_bits

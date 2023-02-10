@@ -143,6 +143,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Common:FoldTensorExtractOpIncGen",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:MicroKernelOpInterface",
         "//compiler/src/iree/compiler/Codegen/Interfaces:PartitionableLoopsInterface",
         "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Codegen/Utils",

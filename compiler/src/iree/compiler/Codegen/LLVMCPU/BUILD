@@ -60,6 +60,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialectPasses",
+        "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:BinaryFormat",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
