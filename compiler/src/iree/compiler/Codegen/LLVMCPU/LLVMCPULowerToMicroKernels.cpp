@@ -37,7 +37,7 @@ static bool isInitializedToZero(Value outsOperand) {
 }
 
 /// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
-/// it into a iree_codegen.mmt4d_micro_kernel operation, that is later lowered
+/// it into a iree_codegen.mmt4d.ukernel operation, that is later lowered
 /// into a call to the microkernel.
 static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
     RewriterBase &rewriter, linalg::Mmt4DOp op) {
@@ -69,14 +69,14 @@ static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
     }
   }
   Location loc = op.getLoc();
-  auto microKernelOp = rewriter.create<IREE::Codegen::Mmt4DMicroKernelOp>(
+  auto microKernelOp = rewriter.create<IREE::Codegen::Mmt4DUKernelOp>(
       loc, outType, lhs, rhs, out, rewriter.getBoolAttr(accumulate));
   return cast<IREE::Codegen::MicroKernelOpInterface>(
       microKernelOp.getOperation());
 }
 
 /// Matches an (linalg.fill -> )? linalg.matmul operation sequence and converts
-/// it into a iree_codegen.generic_micro_kernel operation, that is lowered
+/// it into a iree_codegen.generic.ukernel operation, that is lowered
 /// into a call to the microkernel.
 static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
     RewriterBase &rewriter, linalg::MatmulOp op) {
@@ -121,10 +121,9 @@ static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
   Value k = rewriter.create<tensor::DimOp>(loc, out, 1);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
-  auto genericMicroKernelOp =
-      rewriter.create<IREE::Codegen::GenericMicroKernelOp>(
-          loc, outType, fnName, ValueRange{lhs, rhs}, out,
-          ValueRange{m, n, k, flagsVal});
+  auto genericMicroKernelOp = rewriter.create<IREE::Codegen::GenericUKernelOp>(
+      loc, outType, fnName, ValueRange{lhs, rhs}, out,
+      ValueRange{m, n, k, flagsVal});
   return cast<IREE::Codegen::MicroKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
@@ -132,7 +131,7 @@ static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
 namespace {
 
 /// Pattern to lower (linalg.fill -> )? linalg.matmul operation sequence and
-/// converts it into a iree_codegen.generic_micro_kernel operation
+/// converts it into a iree_codegen.generic.ukernel operation
 struct MatmulMicroKernelPattern : OpRewritePattern<linalg::MatmulOp> {
   using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
 
@@ -150,8 +149,8 @@ struct MatmulMicroKernelPattern : OpRewritePattern<linalg::MatmulOp> {
 };
 
 /// Pattern to lower (linalg.fill -> )? linalg.mmt4d operation sequence and
-/// converts it into a iree_codegen.mmt4d_micro_kernel operation
-struct Mmt4DMicroKernelPattern : OpRewritePattern<linalg::Mmt4DOp> {
+/// converts it into a iree_codegen.mmt4d.ukernel operation
+struct Mmt4DUKernelPattern : OpRewritePattern<linalg::Mmt4DOp> {
   using OpRewritePattern<linalg::Mmt4DOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Mmt4DOp matmulOp,
@@ -171,7 +170,7 @@ struct Mmt4DMicroKernelPattern : OpRewritePattern<linalg::Mmt4DOp> {
 void LLVMCPULowerToMicroKernelsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  patterns.insert<MatmulMicroKernelPattern, Mmt4DMicroKernelPattern>(context);
+  patterns.insert<MatmulMicroKernelPattern, Mmt4DUKernelPattern>(context);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();

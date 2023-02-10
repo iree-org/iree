@@ -17,8 +17,8 @@ class IREECodegen_MicroKernelOp<string mnemonic, list<Trait> traits = []> :
         ["lowerToFunctionCall"]>,
      DeclareOpInterfaceMethods<DestinationStyleOpInterface>])> {}
   
-def IREECodegen_GenericMicroKernelOp :
-    IREECodegen_MicroKernelOp<"generic_micro_kernel", [
+def IREECodegen_GenericUKernelOp :
+    IREECodegen_MicroKernelOp<"generic.ukernel", [
       AttrSizedOperandSegments]> {
   let summary = "Generic Microkernel operator";
 
@@ -65,8 +65,8 @@ def IREECodegen_GenericMicroKernelOp :
   }];
 }
 
-def IREECodegen_Mmt4DMicroKernelOp :
-    IREECodegen_MicroKernelOp<"mmt4d_micro_kernel", []>  {
+def IREECodegen_Mmt4DUKernelOp :
+    IREECodegen_MicroKernelOp<"mmt4d.ukernel", []>  {
   let summary = "Mmt4D Microkernel operator";
 
   let description = [{
@@ -74,7 +74,7 @@ def IREECodegen_Mmt4DMicroKernelOp :
     forwarded to a microkernel.
 
     This operation is meant to wrap a DAG whose is `linalg.mmt4d`-like
-    operation and forwarded to a micro kernel. Unlike `generic_micro_kernel`,
+    operation and forwarded to a micro kernel. Unlike `generic.ukernel`,
     lowering into this operation does not fix the ABI of the micro kernel
     function. When lowering to a function, the function call is expected
     to match the ABI of the corresponding micro-kernel used.

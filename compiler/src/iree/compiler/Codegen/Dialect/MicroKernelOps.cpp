@@ -75,15 +75,15 @@ static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
 }
 
 //===---------------------------------------------------------------------===//
-// GenericMicroKernelOp
+// GenericUKernelOp
 //===---------------------------------------------------------------------===//
 
-std::pair<int64_t, int64_t> GenericMicroKernelOp::getDpsInitsPositionRange() {
+std::pair<int64_t, int64_t> GenericUKernelOp::getDpsInitsPositionRange() {
   auto [pos, size] = getODSOperandIndexAndLength(1);
   return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
 }
 
-/// Map type of operand of a `iree_codegen.generic_micro_kernel` operation to
+/// Map type of operand of a `iree_codegen.generic.ukernel` operation to
 /// the type(s) of the function call arguments(s) it lowers to.
 static LogicalResult getCallOpType(MLIRContext *context,
                                    Type microKernelOpOperandType,
@@ -115,7 +115,7 @@ static LogicalResult getCallOpType(MLIRContext *context,
       .Default([&](Type t) { return failure(); });
 }
 
-/// Map `operand` of a `generic_micro_kernel` operation to the operand(s) of
+/// Map `operand` of a `generic.ukernel` operation to the operand(s) of
 /// the function call it lowers to.
 static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
                                          Value operand,
@@ -144,7 +144,7 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
       .Default([](Type) { return failure(); });
 }
 
-FailureOr<func::CallOp> GenericMicroKernelOp::lowerToFunctionCall(
+FailureOr<func::CallOp> GenericUKernelOp::lowerToFunctionCall(
     RewriterBase &rewriter) {
   // Create the function type based on the operands and results.
   SmallVector<Type> callArgumentTypes;
@@ -188,20 +188,20 @@ FailureOr<func::CallOp> GenericMicroKernelOp::lowerToFunctionCall(
 // MMT4DMicroKernelOp
 //===---------------------------------------------------------------------===//
 
-std::pair<int64_t, int64_t> Mmt4DMicroKernelOp::getDpsInitsPositionRange() {
+std::pair<int64_t, int64_t> Mmt4DUKernelOp::getDpsInitsPositionRange() {
   auto [pos, size] = getODSOperandIndexAndLength(2);
   return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
 }
 
 static FailureOr<SmallVector<Type>> getFunctionArgTypesForMMT4DMicroKernel(
-    MLIRContext *context, Mmt4DMicroKernelOp mmt4dMicroKernelOp) {
+    MLIRContext *context, Mmt4DUKernelOp mmt4dUKernelOp) {
   SmallVector<Type> callArgumentTypes;
   auto indexType = IndexType::get(context);
 
   auto processMemrefTypeOperand = [&](Value memRefValue) -> LogicalResult {
     auto memRefType = memRefValue.getType().dyn_cast<MemRefType>();
     if (!memRefType) {
-      return mmt4dMicroKernelOp->emitOpError(
+      return mmt4dUKernelOp->emitOpError(
           llvm::formatv("unable to lower {0} to function call argument types",
                         memRefValue.getType()));
     }
@@ -216,9 +216,9 @@ static FailureOr<SmallVector<Type>> getFunctionArgTypesForMMT4DMicroKernel(
     return success();
   };
   /// LHS, RHS, Out
-  if (failed(processMemrefTypeOperand(mmt4dMicroKernelOp.getLhs())) ||
-      failed(processMemrefTypeOperand(mmt4dMicroKernelOp.getRhs())) ||
-      failed(processMemrefTypeOperand(mmt4dMicroKernelOp.getOutput()))) {
+  if (failed(processMemrefTypeOperand(mmt4dUKernelOp.getLhs())) ||
+      failed(processMemrefTypeOperand(mmt4dUKernelOp.getRhs())) ||
+      failed(processMemrefTypeOperand(mmt4dUKernelOp.getOutput()))) {
     return failure();
   }
   // m, n, k
@@ -232,8 +232,7 @@ static FailureOr<SmallVector<Type>> getFunctionArgTypesForMMT4DMicroKernel(
 }
 
 static FailureOr<SmallVector<Value>> getFunctionArgValuesForMMT4DMicroKernel(
-    RewriterBase &rewriter, Location loc,
-    Mmt4DMicroKernelOp mmt4dMicroKernelOp) {
+    RewriterBase &rewriter, Location loc, Mmt4DUKernelOp mmt4dUKernelOp) {
   SmallVector<Value> callOperands;
   auto processMemrefTypeOperand = [&](Value memRefValue) {
     auto extractStridedMetadataOp =
@@ -252,29 +251,29 @@ static FailureOr<SmallVector<Value>> getFunctionArgValuesForMMT4DMicroKernel(
     callOperands.push_back(asI32);
   };
   // LHS
-  processMemrefTypeOperand(mmt4dMicroKernelOp.getLhs());
+  processMemrefTypeOperand(mmt4dUKernelOp.getLhs());
   // RHS
-  processMemrefTypeOperand(mmt4dMicroKernelOp.getRhs());
+  processMemrefTypeOperand(mmt4dUKernelOp.getRhs());
   // Out
-  processMemrefTypeOperand(mmt4dMicroKernelOp.getOutput());
+  processMemrefTypeOperand(mmt4dUKernelOp.getOutput());
   // M
   callOperands.push_back(
-      rewriter.create<memref::DimOp>(loc, mmt4dMicroKernelOp.getLhs(), 0));
+      rewriter.create<memref::DimOp>(loc, mmt4dUKernelOp.getLhs(), 0));
   // N
   callOperands.push_back(
-      rewriter.create<memref::DimOp>(loc, mmt4dMicroKernelOp.getRhs(), 0));
+      rewriter.create<memref::DimOp>(loc, mmt4dUKernelOp.getRhs(), 0));
   // K
   callOperands.push_back(
-      rewriter.create<memref::DimOp>(loc, mmt4dMicroKernelOp.getLhs(), 1));
+      rewriter.create<memref::DimOp>(loc, mmt4dUKernelOp.getLhs(), 1));
   // M0
-  getDimAsI32(mmt4dMicroKernelOp.getLhs(), 2);
+  getDimAsI32(mmt4dUKernelOp.getLhs(), 2);
   // N0
-  getDimAsI32(mmt4dMicroKernelOp.getRhs(), 2);
+  getDimAsI32(mmt4dUKernelOp.getRhs(), 2);
   // K0
-  getDimAsI32(mmt4dMicroKernelOp.getLhs(), 3);
+  getDimAsI32(mmt4dUKernelOp.getLhs(), 3);
   // Flags;
   int flags = 0;
-  if (mmt4dMicroKernelOp.getAccumulate()) {
+  if (mmt4dUKernelOp.getAccumulate()) {
     flags |= IREE_UK_FLAG_ACCUMULATE;
   }
   callOperands.push_back(rewriter.create<arith::ConstantOp>(
@@ -282,7 +281,7 @@ static FailureOr<SmallVector<Value>> getFunctionArgValuesForMMT4DMicroKernel(
   return callOperands;
 }
 
-FailureOr<func::CallOp> Mmt4DMicroKernelOp::lowerToFunctionCall(
+FailureOr<func::CallOp> Mmt4DUKernelOp::lowerToFunctionCall(
     RewriterBase &rewriter) {
   // TODO: handle op with return values if they are scalar.
   if (getNumResults() != 0) {
