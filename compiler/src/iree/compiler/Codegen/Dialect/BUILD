@@ -34,6 +34,7 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
+        "//compiler/src/iree/compiler/Codegen/Interfaces:td_files",
         "@llvm-project//mlir:DestinationStyleOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
     ],
@@ -65,9 +66,9 @@ iree_compiler_cc_library(
         ":IREECodegenDialectGen",
         ":LoweringConfigGen",
         ":MicroKernelOpsGen",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:MicroKernelOpInterface",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
-        "//compiler/src/iree/compiler/Codegen/Interfaces:MicroKernelOpInterface",
         "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
@@ -136,5 +137,8 @@ iree_gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "MicroKernelOps.td",
-    deps = [":td_files"],
+    deps = [
+        ":td_files",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:td_files",
+    ],
 )

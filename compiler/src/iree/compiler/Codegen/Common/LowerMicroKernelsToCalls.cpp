@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Interfaces/MicroKernelOpInterface.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -17,7 +18,7 @@ namespace {
 struct LowerMicroKernelOpsToCallsPass
     : LowerMicroKernelOpsToCallsBase<LowerMicroKernelOpsToCallsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<memref::MemRefDialect>();
+    registry.insert<memref::MemRefDialect, func::FuncDialect>();
   }
   void runOnOperation() override;
 };

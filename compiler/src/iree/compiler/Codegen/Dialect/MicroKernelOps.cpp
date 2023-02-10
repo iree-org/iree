@@ -43,11 +43,12 @@ static bool areShapesCompatible(ArrayRef<int64_t> lhs, ArrayRef<int64_t> rhs) {
 
 /// Helper method to generate a function declaration at a module scope,
 /// and a call to that function
-FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
-                                           Operation *op, StringRef fnName,
-                                           TypeRange callArgumentTypes,
-                                           TypeRange callReturnTypes,
-                                           ValueRange callOperands) {
+static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
+                                                  Operation *op,
+                                                  StringRef fnName,
+                                                  TypeRange callArgumentTypes,
+                                                  TypeRange callReturnTypes,
+                                                  ValueRange callOperands) {
   FunctionType functionType =
       rewriter.getFunctionType(callArgumentTypes, callReturnTypes);
 
@@ -57,20 +58,18 @@ FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
   // Check for duplicates.
   auto fnDecl = dyn_cast_or_null<func::FuncOp>(
       SymbolTable::lookupSymbolIn(moduleOp, fnName));
-  if (fnDecl) {
-    if (fnDecl.getFunctionType() != functionType) {
-      return rewriter.notifyMatchFailure(
-          op,
-          llvm::formatv("mismatch in function type computed during lowering "
-                        "({0}) and already declared function ({1})",
-                        functionType, fnDecl.getFunctionType()));
-    }
-  } else {
+  if (!fnDecl) {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointToStart(&moduleOp->getRegion(0).front());
     fnDecl = rewriter.create<func::FuncOp>(loc, fnName, functionType);
     SymbolTable::setSymbolVisibility(fnDecl, SymbolTable::Visibility::Private);
+  } else if (fnDecl.getFunctionType() != functionType) {
+    return rewriter.notifyMatchFailure(
+        op, llvm::formatv("mismatch in function type computed during lowering "
+                          "({0}) and already declared function ({1})",
+                          functionType, fnDecl.getFunctionType()));
   }
+
   // Insert the function call.
   return rewriter.create<func::CallOp>(loc, fnDecl, callOperands);
 }
@@ -80,16 +79,15 @@ FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
 //===---------------------------------------------------------------------===//
 
 std::pair<int64_t, int64_t> GenericMicroKernelOp::getDpsInitsPositionRange() {
-  std::pair<unsigned, unsigned> outsPosAndSize = getODSOperandIndexAndLength(1);
-  return {static_cast<int64_t>(outsPosAndSize.first),
-          static_cast<int64_t>(outsPosAndSize.first + outsPosAndSize.second)};
+  auto [pos, size] = getODSOperandIndexAndLength(1);
+  return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
 }
 
-/// Map type of operand of a `generic_micro_kernel` operation to the type(s) of
-/// the function call arguments(s) it lowers to.
-static LogicalResult getCallArgumentTypeForOperand(
-    MLIRContext *context, Type microKernelOpOperandType,
-    SmallVector<Type> &callOperandTypes) {
+/// Map type of operand of a `iree_codegen.generic_micro_kernel` operation to
+/// the type(s) of the function call arguments(s) it lowers to.
+static LogicalResult getCallOpType(MLIRContext *context,
+                                   Type microKernelOpOperandType,
+                                   SmallVector<Type> &callOperandTypes) {
   return TypeSwitch<Type, LogicalResult>(microKernelOpOperandType)
       .Case<FloatType, IndexType, IntegerType>([&](auto scalarType) {
         callOperandTypes.push_back(scalarType);
@@ -148,22 +146,32 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
 
 FailureOr<func::CallOp> GenericMicroKernelOp::lowerToFunctionCall(
     RewriterBase &rewriter) {
-  // TODO handle op with return values if they are scalar.
-  if (getNumResults() != 0) {
-    return rewriter.notifyMatchFailure(
-        getOperation(), "cannot lower to function call operation with results");
-  }
-  // Create the function type based on the operands.
+  // Create the function type based on the operands and results.
   SmallVector<Type> callArgumentTypes;
   for (auto microKernelOpOperandType : getOperation()->getOperandTypes()) {
-    if (failed(getCallArgumentTypeForOperand(rewriter.getContext(),
-                                             microKernelOpOperandType,
-                                             callArgumentTypes))) {
+    if (failed(getCallOpType(rewriter.getContext(), microKernelOpOperandType,
+                             callArgumentTypes))) {
       return rewriter.notifyMatchFailure(
           getOperation(), llvm::formatv("failed to lower operand type {0}",
                                         microKernelOpOperandType));
     }
   }
+  SmallVector<Type> callResultTypes;
+  for (auto resultType : getResultTypes()) {
+    if (resultType.isa<ShapedType>()) {
+      return rewriter.notifyMatchFailure(
+          getOperation(),
+          "cannot lower a `ShapedType` return value to function call");
+    }
+    if (failed(getCallOpType(rewriter.getContext(), resultType,
+                             callResultTypes))) {
+      return rewriter.notifyMatchFailure(
+          getOperation(),
+          llvm::formatv("failed to lower result type {0}", resultType));
+    }
+  }
+
+  // Get the operands for the function call.
   SmallVector<Value> callOperands;
   Location loc = getLoc();
   for (auto operand : getOperands()) {
@@ -173,8 +181,7 @@ FailureOr<func::CallOp> GenericMicroKernelOp::lowerToFunctionCall(
     }
   }
   return createFunctionCall(rewriter, getOperation(), getMicroKernelFnName(),
-                            callArgumentTypes, /*callReturnTypes=*/TypeRange{},
-                            callOperands);
+                            callArgumentTypes, callResultTypes, callOperands);
 }
 
 //===---------------------------------------------------------------------===//
@@ -182,9 +189,8 @@ FailureOr<func::CallOp> GenericMicroKernelOp::lowerToFunctionCall(
 //===---------------------------------------------------------------------===//
 
 std::pair<int64_t, int64_t> Mmt4DMicroKernelOp::getDpsInitsPositionRange() {
-  std::pair<unsigned, unsigned> outsPosAndSize = getODSOperandIndexAndLength(2);
-  return {static_cast<int64_t>(outsPosAndSize.first),
-          static_cast<int64_t>(outsPosAndSize.first + outsPosAndSize.second)};
+  auto [pos, size] = getODSOperandIndexAndLength(2);
+  return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
 }
 
 static FailureOr<SmallVector<Type>> getFunctionArgTypesForMMT4DMicroKernel(
