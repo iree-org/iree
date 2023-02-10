@@ -1080,8 +1080,7 @@ static LogicalResult setPackOpRootConfig(func::FuncOp entryPointFn, OpTy op) {
   // TODO(hanchung): Retire IREE::LinalgExt::PackOp. This is for having
   // consistent configurations for pack ops.
   static_assert(
-      llvm::is_one_of<OpTy, IREE::LinalgExt::PackOp, tensor::PackOp>::value,
-      "applies to only pack operations");
+      llvm::is_one_of<OpTy, IREE::LinalgExt::PackOp, tensor::PackOp>::value);
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
       cast<TilingInterface>(op.getOperation()), defaultWorkgroupTileSize);
 
@@ -1109,9 +1108,8 @@ static LogicalResult setUnPackOpRootConfig(
         DispatchLoweringPassPipeline::CPUDataTiling) {
   // TODO(hanchung): Retire IREE::LinalgExt::UnPackOp. This is for having
   // consistent configurations for unpack ops.
-  static_assert(
-      llvm::is_one_of<OpTy, IREE::LinalgExt::UnPackOp, tensor::UnPackOp>::value,
-      "applies to only pack operations");
+  static_assert(llvm::is_one_of<OpTy, IREE::LinalgExt::UnPackOp,
+                                tensor::UnPackOp>::value);
 
   // TODO(#11505): Consider multi-level tiling for handling unpack + generic
   // cases.

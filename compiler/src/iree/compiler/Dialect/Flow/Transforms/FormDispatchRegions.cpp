@@ -675,9 +675,9 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
     for (Operation &op : llvm::reverse(block)) {
       // If it is part of a fusion group or root op, ignore it.
       if (hasFusionGroupsAttribute(&op) || hasRootOpAttribute(&op)) continue;
-      // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
-      // fused with anything else into their own dispatches since it is better
-      // to convert them to splats.
+      // Only look for Linalg ops here. Avoid moving `linalg.fill`,
+      // `tensor.pack`, and `tensor.unpack` that aren't fused with anything else
+      // into their own dispatches since it is better to convert them to splats.
       if (!isa<linalg::LinalgOp, tensor::PackOp, tensor::UnPackOp>(op) ||
           isa<linalg::FillOp>(op)) {
         continue;
