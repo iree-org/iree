@@ -2032,6 +2032,150 @@ def HAL_ExecutableCalculateWorkgroupsOp : HAL_PureOp<"executable.calculate_workg
 }
 
 //===----------------------------------------------------------------------===//
+// hal.instrument.*
+//===----------------------------------------------------------------------===//
+
+def HAL_InstrumentWorkgroupOp : HAL_Op<"instrument.workgroup", []> {
+  let summary = [{emits a dispatch workgroup instrumentation event}];
+  let description = [{
+    Emits an `iree_instrument_dispatch_workgroup_t` event into the
+    instrumentation stream. The workgroup event identifies the unique dispatch,
+    its workgroup count, and the ID of the emitting workgroup within the
+    dispatch. Optionally targets that support querying the processor ID
+    executing the workgroup can attach that information for tracking purposes.
+
+    On targets such as CPUs where entire workgroups execute as atomic units
+    only one workgroup event should be emitted. On targets such as GPUs where
+    there may be multiple invocations executing as part of a single workgroup
+    only the first invocation within the workgroup should emit the workgroup
+    event (by checking if the LocalInvocationIndex or threadIdx == 0, etc).
+
+    The resulting workgroup key is used by subsequent workgroup-specific
+    instrumentation events.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$buffer,
+    I32:$dispatchId
+  );
+  let results = (outs
+    Index:$workgroupKey
+  );
+
+  let assemblyFormat = [{
+    `` `[` $buffer `:` type($buffer) `]`
+    `dispatch` `(` $dispatchId `)`
+    attr-dict `:` type($workgroupKey)
+  }];
+}
+
+def HAL_InstrumentPrintOp : HAL_Op<"instrument.print", []> {
+  let summary = [{emits a human-readable printf-style string event}];
+  let description = [{
+    Formats a string using a limited subset of printf format specifiers and the
+    provided values and then emits an `iree_instrument_dispatch_print_t` event. Final
+    formatted string lengths may be limited to as much as 1024 characters and
+    should be kept as small as possible to avoid easily exceeding the
+    instrumentation storage buffers with redundant strings.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$buffer,
+    Index:$workgroupKey,
+    StrAttr:$format,
+    Variadic<AnyType>:$values
+  );
+
+  let assemblyFormat = [{
+    `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
+    $format (`*` `(` $values^ `:` type($values) `)`)?
+    attr-dict
+  }];
+}
+
+def HAL_InstrumentValueOp : HAL_Op<"instrument.value", [
+    AllTypesMatch<["operand", "result"]>,
+  ]> {
+  let summary = [{emits a scalar value instrumentation event}];
+  let description = [{
+    Emits a workgroup-specific typed value with the given workgroup-relative
+    ordinal.
+
+    This op will be preserved even if the output is not used as it is only for
+    debugging purposes.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$buffer,
+    Index:$workgroupKey,
+    AnyI8Attr:$ordinal,
+    AnyType:$operand
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
+    $ordinal `=` $operand attr-dict `:` type($operand)
+  }];
+}
+
+def HAL_InstrumentMemoryLoadOp : HAL_PureOp<"instrument.memory.load", [
+    AllTypesMatch<["loadValue", "result"]>,
+  ]> {
+  let summary = [{emits a memory load instrumentation event}];
+  let description = [{
+    Emits a workgroup-specific memory load event indicating that a number of
+    bytes from the given resolved pointer have been loaded by the workgroup.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$buffer,
+    Index:$workgroupKey,
+    AnyType:$loadValue,
+    AnyMemRef:$base,
+    Variadic<Index>:$indices
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
+    $base `[` $indices `]` `,` $loadValue
+    attr-dict `:` type($base) `,` type($result)
+  }];
+}
+
+def HAL_InstrumentMemoryStoreOp : HAL_PureOp<"instrument.memory.store", [
+    AllTypesMatch<["storeValue", "result"]>,
+  ]> {
+  let summary = [{emits a memory store instrumentation event}];
+  let description = [{
+    Emits a workgroup-specific memory store event indicating that a number of
+    bytes have been stored to the given resolved pointer by the workgroup.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$buffer,
+    Index:$workgroupKey,
+    AnyType:$storeValue,
+    AnyMemRef:$base,
+    Variadic<Index>:$indices
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
+    $base `[` $indices `]` `,` $storeValue
+    attr-dict `:` type($base) `,` type($result)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // hal.interface
 //===----------------------------------------------------------------------===//
 

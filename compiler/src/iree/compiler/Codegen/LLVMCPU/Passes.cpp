@@ -69,6 +69,12 @@ static llvm::cl::opt<bool> clEnableReassociateFpReductions(
     llvm::cl::desc("Enables reassociation for FP reductions"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
+    "iree-llvmcpu-instrument-memory-accesses",
+    llvm::cl::desc("Instruments memory accesses in dispatches when dispatch "
+                   "instrumentation is enabled."),
+    llvm::cl::init(false)};
+
 // MLIR file containing a top-level module that specifies the transformations to
 // apply to form dispatch regions.
 // Defined externally in KernelDispatch.cpp to control the codegen pass
@@ -742,6 +748,10 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // (HAL, IREE, Linalg, CF) -> LLVM
   passManager.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   passManager.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+  if (clInstrumentMemoryAccesses) {
+    passManager.addNestedPass<func::FuncOp>(
+        createInstrumentMemoryAccessesPass());
+  }
   passManager.addPass(createConvertToLLVMPass(clEnableReassociateFpReductions));
   passManager.addPass(createReconcileUnrealizedCastsPass());
 

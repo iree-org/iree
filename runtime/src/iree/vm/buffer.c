@@ -181,6 +181,11 @@ iree_vm_buffer_length(const iree_vm_buffer_t* buffer) {
   return buffer->data.data_length;
 }
 
+IREE_API_EXPORT uint8_t* iree_vm_buffer_data(const iree_vm_buffer_t* buffer) {
+  IREE_ASSERT_ARGUMENT(buffer);
+  return buffer->data.data;
+}
+
 IREE_API_EXPORT iree_status_t iree_vm_buffer_copy_bytes(
     const iree_vm_buffer_t* source_buffer, iree_host_size_t source_offset,
     const iree_vm_buffer_t* target_buffer, iree_host_size_t target_offset,

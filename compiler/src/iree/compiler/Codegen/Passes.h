@@ -221,6 +221,10 @@ createEraseHALDescriptorTypeFromMemRefPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRematerializeParallelOpsPass();
 
+/// Instruments memory reads and writes for address tracking.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createInstrumentMemoryAccessesPass();
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
