@@ -14,7 +14,6 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -87,7 +86,6 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(swapPaddingElideConditional,
               getSwapPaddingElideConditionalAttrName)
   ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
-  ADD_PATTERN(unrollVectorsGpuMma, getUnrollVectorsGpuMmaAttrName)
 #undef ADD_PATTERN
   result.addTypes({pdl::OperationType::get(ctx)});
 }
@@ -204,23 +202,6 @@ static void addSwappingPatterns(RewritePatternSet &patterns,
       });
 }
 
-static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeVectorSize(
-    Operation *op) {
-  return getWmmaNativeVectorSize(op);
-}
-
-static void addUnrollVectorsGpuMmaPatterns(RewritePatternSet &patterns) {
-  auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
-    auto contract = dyn_cast<vector::ContractionOp>(op);
-    if (!contract) return std::nullopt;
-    return mlir::iree_compiler::gpuMmaUnrollOrder(contract);
-  };
-  vector::populateVectorUnrollPatterns(
-      patterns, vector::UnrollVectorOptions()
-                    .setNativeShapeFn(getGPUTensorCoreNativeVectorSize)
-                    .setUnrollTraversalOrderFn(unrollOrder));
-}
-
 static void addAdditionalIreePatterns(RewritePatternSet &patterns) {
   patterns.add<GenerateToConstant>(patterns.getContext());
 }
@@ -265,7 +246,6 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     linalg::populateFoldReshapeOpsByExpansionPatterns(
         patterns, [](OpOperand *) { return true; });
   }
-  if (getUnrollVectorsGpuMma()) addUnrollVectorsGpuMmaPatterns(patterns);
 
   TrackingListener listener(state);
   GreedyRewriteConfig config;
@@ -790,22 +770,12 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
-  if (targetOps.empty()) {
-    transformResults.set(getForeachThreadOp().cast<OpResult>(), {});
-    transformResults.set(getTiledOp().cast<OpResult>(), {});
-    return DiagnosedSilenceableFailure::success();
-  }
-  if (targetOps.size() != 1) {
-    return mlir::emitDefiniteFailure(
-               state.getTopLevel(),
-               "expected single target op in payload, got: ")
-           << targetOps.size();
-  }
+  assert(targetOps.size() == 1 && "expected single target op in payload");
   auto funcOp = targetOps.front()->getParentOfType<func::FuncOp>();
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "couldn't find export op for func");
+    return mlir::emitDefiniteFailure(
+        state.getTopLevel(), "couldn't find top level HAL export op for func");
   }
 
   /// Lower the workgroup count region in keeping with the way dispatch

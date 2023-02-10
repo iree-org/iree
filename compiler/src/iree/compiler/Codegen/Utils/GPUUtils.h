@@ -48,11 +48,6 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
                                            int64_t threadCount,
                                            int64_t vectorSize);
 
-/// Pick an unrolling order that will allow tensorcore operation to reuse LHS
-/// register. This is needed to get good performance on sm_80 target.
-Optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
-    vector::ContractionOp contract);
-
 //===----------------------------------------------------------------------===//
 // GPU workgroup memory
 //===----------------------------------------------------------------------===//

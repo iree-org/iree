@@ -104,6 +104,9 @@ static void tileAndDistributeToWorkgroup(
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass(
+          useWARForCooperativeMatrixCodegen));
+  nestedModulePM.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createTileAndDecomposeAttentionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass(

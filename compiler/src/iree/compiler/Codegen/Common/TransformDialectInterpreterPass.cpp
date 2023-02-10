@@ -21,7 +21,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/TransformOps/BufferizationTransformOps.h"
 #include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -100,7 +99,6 @@ class TransformDialectInterpreterPass
     iree_compiler::registerTransformDialectLLVMCPUExtension(registry);
     iree_compiler::registerTransformDialectLLVMGPUExtension(registry);
     affine::registerTransformDialectExtension(registry);
-    bufferization::registerTransformDialectExtension(registry);
     gpu::registerTransformDialectExtension(registry);
     linalg::registerTransformDialectExtension(registry);
     memref::registerTransformDialectExtension(registry);
