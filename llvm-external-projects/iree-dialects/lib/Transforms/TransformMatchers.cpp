@@ -261,15 +261,20 @@ transform_ext::StructuredOpMatcher::StructuredOpMatcher(
     StructuredOpMatcher &A, StructuredOpMatcher &B) {
 
   predicates.push_back([&A, &B](linalg::LinalgOp linalgOp) -> bool {
-    LLVM_DEBUG(DBGS() << "start recursive match {\n");
+    LLVM_DEBUG(DBGS() << "start recursive lhs OR match {\n");
     {
       auto debugRAII = llvm::make_scope_exit(
           [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
       if (A.match(linalgOp))
         return true;
     }
-    if (B.match(linalgOp))
-      return true;
+    LLVM_DEBUG(DBGS() << "start recursive rhs OR match {\n");
+    {
+      auto debugRAII = llvm::make_scope_exit(
+          [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
+      if (B.match(linalgOp))
+        return true;
+    }
     return false;
   });
   recordNestedMatcher(A);
