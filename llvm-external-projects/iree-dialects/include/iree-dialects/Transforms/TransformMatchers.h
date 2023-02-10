@@ -25,7 +25,8 @@ namespace transform_ext {
 //===---------------------------------------------------------------------===//
 
 class StructuredOpMatcher;
-StructuredOpMatcher m_StructuredOp();
+class MatcherContext;
+StructuredOpMatcher &m_StructuredOp(MatcherContext &);
 
 /// A tag indicating the shape being static or dynamic, for use with the
 /// structured op matcher.
@@ -163,6 +164,33 @@ template <typename T>
 using has_get_capture_t = decltype(std::declval<T>().getCaptured());
 } // namespace detail
 
+class CapturingOpMatcher;
+
+/// A context object holding capturing matchers, must outlive any individual
+/// matcher. When matching complex subgraphs, the caller often doesn't care
+/// about all intermediate nodes (operations) in the graph and shouldn't need to
+/// hold matcher objects for those. These matchers can be created in this
+/// context.
+class MatcherContext {
+public:
+  /// Create a new matcher of the specified type owned by this contxt.
+  template <typename T, typename... Args>
+  std::enable_if_t<std::is_base_of_v<CapturingOpMatcher, T>, T> &
+  allocate(Args &&...args) {
+    // Need to call "new" explicitly as make_unique wouldn't have access to the
+    // private constructor when this class would.
+    ownedMatchers.emplace_back(
+        std::unique_ptr<T>(new T(std::forward<Args>(args)...)));
+    return *static_cast<T *>(ownedMatchers.back().get());
+  }
+
+private:
+  /// Owning list of matchers.
+  // TODO: If this becomes inefficient, consider something like BumpPtrAllocator
+  // that derived classes can use to store their members as well.
+  SmallVector<std::unique_ptr<CapturingOpMatcher>> ownedMatchers;
+};
+
 /// Base class for op matchers that capture the matched operation.
 class CapturingOpMatcher {
 public:
@@ -214,10 +242,13 @@ protected:
 /// declarative format using PDL and/or Transform dialect in the future. The
 /// latter will become impossible with arbitrary C++ callbacks.
 class StructuredOpMatcher : public CapturingOpMatcher {
-  friend StructuredOpMatcher m_StructuredOp();
+  friend class MatcherContext;
+
   using PredicateFn = std::function<bool(linalg::LinalgOp)>;
   using CaptureResetFn = std::function<void()>;
   using GetCapturedFn = std::function<Operation *()>;
+
+  StructuredOpMatcher() = default;
 
   /// Matches a structured operation if the given predicate is satisfied.
   StructuredOpMatcher(PredicateFn &&firstPredicate) {
@@ -225,9 +256,6 @@ class StructuredOpMatcher : public CapturingOpMatcher {
   }
 
 public:
-  /// Matches any structured operation, i.e., operation with LinalgOp interface.
-  StructuredOpMatcher() {}
-
   /// Creates a matcher for a structured operation with one of the given types.
   template <typename... OpType>
   static StructuredOpMatcher create() {
@@ -516,18 +544,29 @@ private:
 };
 
 /// Creates a matcher of an arbitrary structured op.
-inline StructuredOpMatcher m_StructuredOp() { return StructuredOpMatcher(); }
+inline StructuredOpMatcher &m_StructuredOp(MatcherContext &matcherContext) {
+  return matcherContext.allocate<StructuredOpMatcher>();
+}
 
-inline StructuredOpMatcher m_StructuredOp_Or(StructuredOpMatcher &A,
-                                             StructuredOpMatcher &B) {
-  return StructuredOpMatcher(A, B);
+/// Creates a matcher that is a copy of the given matcher.
+inline StructuredOpMatcher &m_StructuredOp(MatcherContext &matcherContext,
+                                           const StructuredOpMatcher &other) {
+  return matcherContext.allocate<StructuredOpMatcher>(other);
+}
+
+/// Creates a matcher that accepts as disjunction of the two given matchers.
+inline StructuredOpMatcher &m_StructuredOp_Or(MatcherContext &matcherContext,
+                                              StructuredOpMatcher &A,
+                                              StructuredOpMatcher &B) {
+  return matcherContext.allocate<StructuredOpMatcher>(A, B);
 }
 
 /// Creates a matcher of a structured op with kinds provided as template
 /// arguments.
 template <typename... OpType>
-inline StructuredOpMatcher m_StructuredOp() {
-  return StructuredOpMatcher::create<OpType...>();
+inline StructuredOpMatcher &m_StructuredOp(MatcherContext &matcherContext) {
+  return matcherContext.allocate<StructuredOpMatcher>(
+      StructuredOpMatcher::create<OpType...>());
 }
 
 //===---------------------------------------------------------------------===//
@@ -635,10 +674,14 @@ struct MatchedReductionCaptures {
 ///
 /// where trailing and leading are elementwise operations whose presence is
 /// optional. Each matcher will capture the corresponding operation.
-void makeReductionMatcher(StructuredOpMatcher &reduction,
-                          StructuredOpMatcher &fill,
-                          StructuredOpMatcher &leading,
-                          StructuredOpMatcher &trailing,
+void makeReductionMatcher(transform_ext::MatcherContext &context,
+                          StructuredOpMatcher *&reductionCapture,
+                          StructuredOpMatcher *&fillCapture,
+                          StructuredOpMatcher *&leadingCapture,
+                          StructuredOpMatcher *&trailingCapture,
+                          MatchedReductionCaptures &captures);
+void makeReductionMatcher(transform_ext::MatcherContext &context,
+                          StructuredOpMatcher *&reductionCapture,
                           MatchedReductionCaptures &captures);
 
 /// Create a group of matchers for a different code sequence of operations
@@ -649,16 +692,10 @@ void makeReductionMatcher(StructuredOpMatcher &reduction,
 ///  %exp = exp(%sub)
 ///  %sum = reduce_sum(%exp)
 ///  %mul = div(%exp, %%sum)
-void makeSoftmaxMatcher(transform_ext::StructuredOpMatcher &fillMinusInf,
-                        transform_ext::StructuredOpMatcher &maxReduction,
-                        transform_ext::StructuredOpMatcher &sub,
-                        transform_ext::StructuredOpMatcher &expOperand,
-                        transform_ext::StructuredOpMatcher &fillZero,
-                        transform_ext::StructuredOpMatcher &sum,
-                        transform_ext::StructuredOpMatcher &rcpOperand,
-                        transform_ext::StructuredOpMatcher &mulOperand,
-                        transform_ext::StructuredOpMatcher &divOperand,
-                        transform_ext::StructuredOpMatcher &softmaxroot);
+void makeSoftmaxMatcher(
+    transform_ext::MatcherContext &context,
+    transform_ext::StructuredOpMatcher *&maxReductionCapture,
+    transform_ext::StructuredOpMatcher *&softmaxRootCapture);
 
 } // namespace transform_ext
 } // namespace mlir
