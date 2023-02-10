@@ -180,6 +180,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(IREE::Flow::createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass);
+  passManager.addPass(IREE::Flow::createEraseUnusedLinalgOperands());
 
   // Start of Flow pipeline, verify input legality.
   passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
@@ -200,6 +201,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
       .addPass(mlir::createLinalgFoldUnitExtentDimsPass)
+      .addPass(createRaiseSpecialOps)
       .addPass(createInterchangeGenericOpsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)
