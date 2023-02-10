@@ -11,8 +11,8 @@
 #include <string>
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/IR/Module.h"
+#include "llvm/TargetParser/Triple.h"
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir {

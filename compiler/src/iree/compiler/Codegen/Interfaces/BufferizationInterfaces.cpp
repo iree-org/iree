@@ -24,10 +24,13 @@
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Support/LLVM.h"
 
+using mlir::bufferization::AliasingOpOperand;
+using mlir::bufferization::AliasingOpOperandList;
+using mlir::bufferization::AliasingOpResult;
 using mlir::bufferization::AnalysisState;
 using mlir::bufferization::BufferizableOpInterface;
-using mlir::bufferization::BufferizationAliasInfo;
 using mlir::bufferization::BufferizationOptions;
+using mlir::bufferization::BufferRelation;
 using mlir::bufferization::eliminateEmptyTensors;
 using mlir::bufferization::OneShotAnalysisState;
 using mlir::bufferization::OneShotBufferizationOptions;
@@ -263,11 +266,12 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
   AnalysisState analysisState(options);
   SmallVector<Value> newOutputBuffers;
   for (OpResult opResult : op->getOpResults()) {
-    SmallVector<OpOperand *> aliasingOpOperands =
+    AliasingOpOperandList aliasingOpOperands =
         analysisState.getAliasingOpOperands(opResult);
-    assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
-    FailureOr<Value> resultBuffer =
-        getBuffer(rewriter, aliasingOpOperands.front()->get(), options);
+    assert(aliasingOpOperands.getNumAliases() == 1 && "expected 1 OpOperand");
+    FailureOr<Value> resultBuffer = getBuffer(
+        rewriter, aliasingOpOperands.getAliases().front().opOperand->get(),
+        options);
     if (failed(resultBuffer)) return failure();
     newOutputBuffers.push_back(*resultBuffer);
   }
@@ -320,7 +324,9 @@ struct LinalgExtOpInterface
                                const AnalysisState &state) const {
     // Operand is written to if it has an aliasing OpResult.
     auto bufferizableOp = cast<BufferizableOpInterface>(op);
-    return !bufferizableOp.getAliasingOpResults(opOperand, state).empty();
+    return !bufferizableOp.getAliasingOpResults(opOperand, state)
+                .getAliases()
+                .empty();
   }
 
   bufferization::AliasingOpOperandList getAliasingOpOperands(
@@ -328,7 +334,10 @@ struct LinalgExtOpInterface
     auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
 
     // The i-th OpResult may alias with the i-th "out" tensor.
-    return {linalgExtOp.getOutputOperand(opResult.getResultNumber())};
+    return {
+        {linalgExtOp.getOutputOperand(opResult.getResultNumber()) /*result*/,
+         BufferRelation::Equivalent,
+         /*isDefinite=*/false}};
   }
 
   bufferization::AliasingOpResultList getAliasingOpResults(
@@ -336,7 +345,11 @@ struct LinalgExtOpInterface
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
-    if (dspOp.isDpsInit(&opOperand)) return {dspOp.getTiedOpResult(&opOperand)};
+    if (dspOp.isDpsInit(&opOperand)) {
+      return {{dspOp.getTiedOpResult(&opOperand) /*result*/,
+               BufferRelation::Equivalent,
+               /*isDefinite=*/false}};
+    }
     return {};
   }
 
@@ -359,7 +372,7 @@ struct LinalgExtOpInterface
 /// Returns true if the value of a `storeOp` bufferizes to an equivalent
 /// DispatchTensorLoadOp result that bufferizes inplace.
 static bool isValueEquivalentToAnInplaceTensorLoadOp(
-    const BufferizationAliasInfo &aliasInfo,
+    const OneShotAnalysisState &aliasInfo,
     IREE::Flow::DispatchTensorStoreOp storeOp) {
   bool foundOp = false;
   aliasInfo.applyOnEquivalenceClass(storeOp.getValue(), [&](Value value) {
@@ -385,7 +398,7 @@ static bool isValueEquivalentToAnInplaceTensorLoadOp(
 ///   DispatchTensorStoreOp to the tensor::EmptyOp must have bufferized
 ///   in-place.
 LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
-    RewriterBase &rewriter, Operation *op, AnalysisState &state) {
+    RewriterBase &rewriter, Operation *op, OneShotAnalysisState &state) {
   return eliminateEmptyTensors(
       rewriter, op, state,
       /*anchorMatchFunc=*/
