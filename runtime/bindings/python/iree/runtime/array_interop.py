@@ -208,8 +208,8 @@ def asdevicearray(device: HalDevice,
     # device, so transfer back to the host.
     logging.warn(
         "Implicit dtype conversion of a DeviceArray forces a host transfer")
-  # First get an ndarray.
-  a = np.asarray(a, dtype=dtype)
+  # First get an ndarray. Needs to be C-contiguous, enforcing it here.
+  a = np.asarray(a, dtype=dtype, order="C")
   element_type = map_dtype_to_element_type(a.dtype)
   if element_type is None:
     raise ValueError(f"Could not map dtype {a.dtype} to IREE element type")
