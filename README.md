@@ -8,63 +8,68 @@ Jax (and TensorFlow in the future) to OpenXLA/IREE.
 Support for dynamically loaded PJRT plugins is brand new as of 12/21/2022 and
 there are sharp edges still. The following procedure is being used to develop.
 
-It is recommended to checkout `jax`, `iree`, `iree-samples`, and `tensorflow`
-side by side, as we will be overriding them all to build at head.
+There are multiple development workflows, ranked from easiest to hardest (but
+most powerful).
 
-Note that although Jax is emitting serialized stablehlo bytecode, which should
-be compatible across versions eventually, it is still early days and things
-are not stable yet. It is recommended to use a `tensorflow` repo at the same
-commit that IREE uses.
+## Setup options
 
-## Build and install custom jaxlib
+The below presumes that you have a compatible Jax/Jaxlib installed. Since 
+PJRT plugin support is moving fast, it is rare that released versions are 
+appropriate. See "Building Jax from Source" below.
 
-From a Jax checkout:
+### Option 1: Synchronize to a nightly IREE release
+
+This will install compiler binaries from IREE's nightly releases and will then
+sync a local clone of IREE's runtime to the same commit used to build the
+compiler. This is the easiest way to work on pure-runtime/plugin features and
+involves building the least.
+
+```
+# Run at any time to sync to the then-current nightly.
+python build_tools/sync.py nightly
+
+# Source environment variables to run interactively.
+# The above generates a .env and .env.sh file with key setup vars.
+source .env.sh
+
+# Replace with actual compiler binaries if multiple.
+CC=clang CXX=clang++ python external/iree/configure_bazel.py
+
+# Configure path to CUDA SDK (for building CUDA plugin).
+# Replace $CUDA_SDK_DIR as appropriate.
+echo "build --action_env IREE_CUDA_DEPS_DIR=$CUDA_SDK_DIR" > user.bazelrc
+
+# Build.
+bazel build iree/integrations/pjrt/...
+
+# Run a sample.
+JAX_PLATFORMS=iree_cpu python test/test_simple.py
+JAX_PLATFORMS=iree_cuda python test/test_simple.py
+```
+
+### Option 2: Set up for a full at-head dev rig
+
+TODO: Document how to symlink existing repos and manually sync
+
+
+## Building Jax from Source
+
+Install Jax with Python sources:
+
+```
+pip install -e external/jax
+```
+
+Build a compatible jaxlib:
 
 ```
 # Currently pluggable PJRT is commingled with TPU support... folks are
 # working on it :/
-pip install -e .
+cd external/jax
 python build/build.py \
   --bazel_options=--override_repository=org_tensorflow=$PWD/../tensorflow \
   --enable_tpu
 pip install dist/*.whl --force-reinstall
-```
-
-## Build this project and look at a plugin
-
-Currently, enabling Bazel build support for IREE is manual and requires
-setting an environment variable in a way that Bazel uses. In the IREE source
-directory, open `configured.bazelrc` and add a line like this (replacing
-`PATH_TO_IREE_BUILD_DIR` with an actual path to a build dir or set the
-location to a manually installed SDK):
-
-```
-build --action_env IREE_CUDA_TOOLKIT_ROOT="PATH_TO_IREE_BUILD_DIR/build_tools/third_party/cuda/11.6.2/linux-x86_64"
-```
-
-```
-bazel build ...
-IREE_PLUGIN_PATH="$PWD/bazel-bin/iree/integrations/pjrt/cpu/lib_pjrt_plugin_iree_cpu.so"
-ls -lh $IREE_PLUGIN_PATH
-```
-
-## Run a Jax test program.
-
-Note that the JAX plugin initialization sequence needs a patch:
-https://github.com/google/jax/pull/14011
-
-```
-# Tells the IREE plugin where to find the compiler. Only needed for now.
-export IREE_PJRT_COMPILER_LIB_PATH=$IREE_BUILD_DIR/lib/libIREECompiler.so
-export PJRT_NAMES_AND_LIBRARY_PATHS="iree_cpu:$PWD/bazel-bin/iree/integrations/pjrt/cpu/pjrt_plugin_iree_cpu.so,iree_cuda:$PWD/bazel-bin/iree/integrations/pjrt/cuda/pjrt_plugin_iree_cuda.so"
-# Jax only enable the plugin path if TPUs enabled for the moment.
-export JAX_USE_PJRT_C_API_ON_TPU=1
-
-# Optional: path to libcuda.so
-# export LD_LIBRARY_PATH=/usr/lib/wsl/lib
-
-JAX_PLATFORMS=iree_cpu python test/test_simple.py
-JAX_PLATFORMS=iree_cuda python test/test_simple.py
 ```
 
 ## Generating runtime traces
@@ -78,7 +83,7 @@ that exit too quickly to stream all events.
 ## ASAN
 
 Developing with ASAN is recommended but requires some special steps because
-of we need to arrange for the plugin to be able to link with undefined
+we need to arrange for the plugin to be able to link with undefined
 symbols and load the ASAN runtime library.
 
 * Edit out the `"-Wl,--no-undefined"` from `build_defs.bzl`
