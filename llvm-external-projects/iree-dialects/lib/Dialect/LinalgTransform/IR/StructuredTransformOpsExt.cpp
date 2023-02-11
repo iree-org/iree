@@ -1105,10 +1105,12 @@ static DiagnosedSilenceableFailure testRepeatedMatcherUseCallback(
   }
   Operation *root = state.getPayloadOps(handles[0])[0];
 
-  auto operand = transform_ext::m_StructuredOp();
-  auto first = transform_ext::m_StructuredOp().input(0, operand);
-  auto second =
-      transform_ext::m_StructuredOp().input(0, operand).input(1, first);
+  transform_ext::MatcherContext matcherContext;
+  auto &operand = transform_ext::m_StructuredOp(matcherContext);
+  auto &first = transform_ext::m_StructuredOp(matcherContext).input(0, operand);
+  auto &second = transform_ext::m_StructuredOp(matcherContext)
+                     .input(0, operand)
+                     .input(1, first);
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     second.resetCapture();
@@ -1148,35 +1150,37 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
            << "expected one handle to one operation";
   }
 
-  transform_ext::StructuredOpMatcher pattern, fill, leading, trailing;
+  transform_ext::StructuredOpMatcher *pattern, *fill, *leading, *trailing;
   transform_ext::MatchedReductionCaptures ignore;
-  makeReductionMatcher(pattern, fill, leading, trailing, ignore);
+  transform_ext::MatcherContext matcherContext;
+  makeReductionMatcher(matcherContext, pattern, fill, leading, trailing,
+                       ignore);
 
   // TODO: need a mechanism for this to go around the entire IR,
   // potentially with list matches for each group.
   Operation *root = state.getPayloadOps(handles[0])[0];
 
   WalkResult walkResult = root->walk([&](Operation *op) {
-    pattern.resetCapture();
-    if (!matchPattern(op, pattern))
+    pattern->resetCapture();
+    if (!matchPattern(op, *pattern))
       return WalkResult::advance();
 
     // TODO: notify properly.
     LLVM_DEBUG({
       DBGS() << "leading:\n";
-      if (leading.getCaptured())
-        DBGS() << leading.getCaptured() << "\n";
-      DBGS() << "fill: " << fill.getCaptured() << "\n";
-      DBGS() << "pattern: " << pattern.getCaptured() << "\n";
+      if (leading->getCaptured())
+        DBGS() << leading->getCaptured() << "\n";
+      DBGS() << "fill: " << fill->getCaptured() << "\n";
+      DBGS() << "pattern: " << pattern->getCaptured() << "\n";
       DBGS() << "trailing:\n";
-      if (trailing.getCaptured())
-        DBGS() << trailing.getCaptured() << "\n";
+      if (trailing->getCaptured())
+        DBGS() << trailing->getCaptured() << "\n";
     });
 
-    res.addPotentiallyEmptyPayloadGroup(leading.getCaptured());
-    res.addPayloadGroup({fill.getCaptured()});
-    res.addPayloadGroup({pattern.getCaptured()});
-    res.addPotentiallyEmptyPayloadGroup(trailing.getCaptured());
+    res.addPotentiallyEmptyPayloadGroup(leading->getCaptured());
+    res.addPayloadGroup({fill->getCaptured()});
+    res.addPayloadGroup({pattern->getCaptured()});
+    res.addPotentiallyEmptyPayloadGroup(trailing->getCaptured());
     return WalkResult::interrupt();
   });
 
