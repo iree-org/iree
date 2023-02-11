@@ -527,7 +527,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm);
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass(
-    bool enableFastMath = false);
+    bool enableFastMath = false, unsigned indexWidth = 32);
 
 /// Creates a pass to fold processor ID uses where possible.
 std::unique_ptr<OperationPass<func::FuncOp>>
