@@ -245,11 +245,59 @@ class EventInstance {
 };
 
 //===----------------------------------------------------------------------===//
-// ExecutableInstance
+// LoadedExecutableInstance
+// PJRT models a LoadedExecutable, which can produce an Executable that can
+// be used to serialize and get metadata.
+// We have one additional layer, because our executables are just flat binary
+// data until loaded onto a device context. We call this a ResidentExecutable
+// to avoid name collisions.
+//
+// Correspondance:
+//   PJRT_Executable -> ExecutableImage
+//   PJRT_LoadedExecutable -> LoadedExecutableInstance
+//   <None> -> ResidentExecutable
+//
+// Since we need to query metadata from a ResidentExecutable, we populate the
+// metadata on an ExecutableImage lazily before returning it. The
+// ExecutableImage is managed with ref counted semantics and owns the backing
+// binary data (as well as doubling as a user-level PJRT_Executable).
 //===----------------------------------------------------------------------===//
 
+struct ExecutableImage {
+  ExecutableImage(std::unique_ptr<CompilerOutput> binary)
+      : ref_count(1), binary(std::move(binary)) {}
+  operator PJRT_Executable*() {
+    return reinterpret_cast<PJRT_Executable*>(this);
+  }
+  static ExecutableImage* Unwrap(PJRT_Executable* exe) {
+    return reinterpret_cast<ExecutableImage*>(exe);
+  }
+  static void BindApi(PJRT_Api* api);
+
+  void AddRef() { ref_count.fetch_add(1); }
+  void DecRef() {
+    if (ref_count.fetch_sub(1) == 0) {
+      delete this;
+    }
+  }
+
+ private:
+  // The reference count. Must be disposed when reaching zero.
+  std::atomic<int> ref_count;
+
+ public:
+  // Raw compiler output.
+  std::unique_ptr<CompilerOutput> binary;
+
+  // Meta-data about the executable is lazily set when an Executable is obtained
+  // from a LoadedExecutable.
+  iree_host_size_t arg_count;
+  iree_host_size_t result_count;
+  bool metadata_initialized = false;
+};
+
 // An executable loaded on all available devices.
-struct LoadedExecutable {
+struct ResidentExecutable {
   DeviceInstance* device_instance;
   iree::vm::ref<iree_vm_context_t> vm_context;
   iree::vm::ref<iree_vm_module_t> main_module;
@@ -258,20 +306,22 @@ struct LoadedExecutable {
   iree_host_size_t result_count;
 };
 
-class ExecutableInstance {
+class LoadedExecutableInstance {
  public:
-  ExecutableInstance(ClientInstance& client,
-                     std::unique_ptr<CompilerOutput> binary,
-                     const std::vector<DeviceInstance*>& addressable_devices)
+  LoadedExecutableInstance(
+      ClientInstance& client, ExecutableImage* image,
+      const std::vector<DeviceInstance*>& addressable_devices)
       : client_(client),
-        binary_(std::move(binary)),
+        image_(image),
         addressable_devices_(addressable_devices) {}
-  operator PJRT_Executable*() {
-    return reinterpret_cast<PJRT_Executable*>(this);
+  ~LoadedExecutableInstance() { image_->DecRef(); }
+
+  operator PJRT_LoadedExecutable*() {
+    return reinterpret_cast<PJRT_LoadedExecutable*>(this);
   }
   static void BindApi(PJRT_Api* api);
-  static ExecutableInstance* Unwrap(PJRT_Executable* exe) {
-    return reinterpret_cast<ExecutableInstance*>(exe);
+  static LoadedExecutableInstance* Unwrap(PJRT_LoadedExecutable* exe) {
+    return reinterpret_cast<LoadedExecutableInstance*>(exe);
   }
 
   const std::vector<DeviceInstance*>& addressable_devices() {
@@ -283,7 +333,7 @@ class ExecutableInstance {
 
   // Gets one loaded executable that can be used for querying metadata
   // and such.
-  iree_status_t GetDefaultLoadedExecutable(LoadedExecutable** out_loaded);
+  iree_status_t GetDefaultResidentExecutable(ResidentExecutable** out_loaded);
 
   // Gets the number of outputs.
   iree_status_t GetArgResultCount(iree_host_size_t* out_arg_count,
@@ -291,13 +341,13 @@ class ExecutableInstance {
 
   // Executes on a batch of devices. Since this is a complicated call,
   // we just give it the raw C argument struct vs breaking it down.
-  iree_status_t BatchExecute(PJRT_Executable_Execute_Args* args);
+  iree_status_t BatchExecute(PJRT_LoadedExecutable_Execute_Args* args);
 
  private:
   ClientInstance& client_;
-  std::unique_ptr<CompilerOutput> binary_;
+  ExecutableImage* image_;  // Ref-counted semantics.
   std::vector<DeviceInstance*> addressable_devices_;
-  std::vector<LoadedExecutable> loaded_executables_;
+  std::vector<ResidentExecutable> resident_executables_;
 };
 
 //===----------------------------------------------------------------------===//
@@ -337,7 +387,8 @@ struct ClientInstance {
 
   // Compiles.
   // See TODOs in PJRT_Client_Compile.
-  PJRT_Error* Compile(PJRT_Program* program, ExecutableInstance** executable);
+  PJRT_Error* Compile(PJRT_Program* program,
+                      LoadedExecutableInstance** executable);
 
   // ---------------------------------------------------------------------------
   // Subclass hooks.

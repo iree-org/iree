@@ -886,7 +886,7 @@ void ClientInstance::BindApi(PJRT_Api* api) {
     // Looks like what I need is buried in the compile options... need to
     // work on that.
     auto* client = ClientInstance::Unwrap(args->client);
-    ExecutableInstance* executable;
+    LoadedExecutableInstance* executable;
     auto* error = client->Compile(args->program, &executable);
     if (error) return error;
     args->executable = *executable;
@@ -966,7 +966,7 @@ iree_status_t ClientInstance::PopulateDevices() {
 }
 
 PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
-                                    ExecutableInstance** out_executable) {
+                                    LoadedExecutableInstance** out_executable) {
   std::unique_ptr<ArtifactDumper::Transaction> artifact_tx;
   if (platform().artifact_dumper().enabled()) {
     artifact_tx = platform().artifact_dumper().CreateTransaction();
@@ -1032,8 +1032,8 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
                          output->GetDataSize()));
   }
 
-  auto executable = std::make_unique<ExecutableInstance>(
-      *this, std::move(output), addressable_devices_);
+  auto executable = std::make_unique<LoadedExecutableInstance>(
+      *this, new ExecutableImage(std::move(output)), addressable_devices_);
   status = executable->LoadAll();
   if (!iree_status_is_ok(status)) {
     return MakeError(status);
@@ -1176,102 +1176,138 @@ void EventInstance::ExternalSignalReady(iree_status_t status) {
 }
 
 //===----------------------------------------------------------------------===//
-// ExecutableInstance
+// LoadedExecutableInstance
 //===----------------------------------------------------------------------===//
 
-void ExecutableInstance::BindApi(PJRT_Api* api) {
+void ExecutableImage::BindApi(PJRT_Api* api) {
   api->PJRT_Executable_Destroy =
       +[](PJRT_Executable_Destroy_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE0("PJRT_Executable_Destroy");
-    delete ExecutableInstance::Unwrap(args->executable);
+    ExecutableImage::Unwrap(args->executable)->DecRef();
     return nullptr;
   };
   api->PJRT_Executable_Name =
       +[](PJRT_Executable_Name_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0(PJRT_Executable_Name);
     const char* dummy_name = "iree_vmfb";
     args->executable_name = dummy_name;
     args->executable_name_size = strlen(dummy_name);
     return nullptr;
   };
-  api->PJRT_Executable_AddressableDevices =
-      +[](PJRT_Executable_AddressableDevices_Args* args) -> PJRT_Error* {
-    auto& devices =
-        ExecutableInstance::Unwrap(args->executable)->addressable_devices();
-    args->addressable_devices = const_cast<PJRT_Device**>(
-        reinterpret_cast<PJRT_Device* const*>(devices.data()));
-    args->num_addressable_devices = devices.size();
+  api->PJRT_Executable_SizeOfGeneratedCodeInBytes =
+      +[](PJRT_Executable_SizeOfGeneratedCodeInBytes_Args* args)
+      -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_Executable_SizeOfGeneratedCodeInBytes");
+    args->size_in_bytes =
+        ExecutableImage::Unwrap(args->executable)->binary->GetDataSize();
     return nullptr;
-  };
-  api->PJRT_Executable_OptimizedProgram =
-      +[](PJRT_Executable_OptimizedProgram_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Executable_OptimizedProgram"));
-  };
-  api->PJRT_Executable_Delete =
-      +[](PJRT_Executable_Delete_Args* args) -> PJRT_Error* {
-    return MakeError(
-        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Executable_Delete"));
-  };
-  api->PJRT_Executable_IsDeleted =
-      +[](PJRT_Executable_IsDeleted_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Executable_IsDeleted"));
-  };
-  api->PJRT_Executable_Execute =
-      +[](PJRT_Executable_Execute_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE0("PJRT_Executable_Execute");
-    return MakeError(
-        ExecutableInstance::Unwrap(args->executable)->BatchExecute(args));
   };
   api->PJRT_Executable_NumOutputs =
       +[](PJRT_Executable_NumOutputs_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE0("PJRT_Executable_NumOutputs");
-    auto* exec = ExecutableInstance::Unwrap(args->executable);
-    iree_host_size_t arg_count;
-    iree_host_size_t result_count;
-    auto status = exec->GetArgResultCount(&arg_count, &result_count);
-    args->num_outputs = result_count;
-    return MakeError(status);
-  };
-  api->PJRT_Executable_SizeOfGeneratedCodeInBytes =
-      +[](PJRT_Executable_SizeOfGeneratedCodeInBytes_Args* args)
-      -> PJRT_Error* {
-    return MakeError(
-        iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                         "PJRT_Executable_SizeOfGeneratedCodeInBytes_Args"));
-  };
-  api->PJRT_Executable_GetCostAnalysis =
-      +[](PJRT_Executable_GetCostAnalysis_Args* args) -> PJRT_Error* {
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Executable_GetCostAnalysis"));
+    auto* exec = ExecutableImage::Unwrap(args->executable);
+    assert(exec->metadata_initialized);
+    args->num_outputs = exec->result_count;
+    return nullptr;
   };
   api->PJRT_Executable_Serialize =
       +[](PJRT_Executable_Serialize_Args* args) -> PJRT_Error* {
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_Executable_Serialize"));
   };
-  api->PJRT_Executable_Deserialize =
-      +[](PJRT_Executable_Deserialize_Args* args) -> PJRT_Error* {
+  api->PJRT_Executable_DeserializeAndLoad =
+      +[](PJRT_Executable_DeserializeAndLoad_Args* args) -> PJRT_Error* {
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "PJRT_Executable_Deserialize"));
+                                      "PJRT_Executable_DeserializeAndLoad"));
+  };
+  api->PJRT_Executable_Serialize =
+      +[](PJRT_Executable_Serialize_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_Serialize"));
+  };
+  api->PJRT_Executable_OptimizedProgram =
+      +[](PJRT_Executable_OptimizedProgram_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_OptimizedProgram"));
   };
 }
 
-iree_status_t ExecutableInstance::LoadAll() {
-  IREE_TRACE_SCOPE();
-  if (!loaded_executables_.empty()) return iree_ok_status();
+void LoadedExecutableInstance::BindApi(PJRT_Api* api) {
+  api->PJRT_LoadedExecutable_Destroy =
+      +[](PJRT_LoadedExecutable_Destroy_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_LoadedExecutable_Destroy");
+    delete LoadedExecutableInstance::Unwrap(args->executable);
+    return nullptr;
+  };
+  api->PJRT_LoadedExecutable_AddressableDevices =
+      +[](PJRT_LoadedExecutable_AddressableDevices_Args* args) -> PJRT_Error* {
+    auto& devices = LoadedExecutableInstance::Unwrap(args->executable)
+                        ->addressable_devices();
+    args->addressable_devices = const_cast<PJRT_Device**>(
+        reinterpret_cast<PJRT_Device* const*>(devices.data()));
+    args->num_addressable_devices = devices.size();
+    return nullptr;
+  };
+  api->PJRT_LoadedExecutable_Delete =
+      +[](PJRT_LoadedExecutable_Delete_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_LoadedExecutable_Delete"));
+  };
+  api->PJRT_LoadedExecutable_IsDeleted =
+      +[](PJRT_LoadedExecutable_IsDeleted_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_LoadedExecutable_IsDeleted"));
+  };
+  api->PJRT_LoadedExecutable_Execute =
+      +[](PJRT_LoadedExecutable_Execute_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_LoadedExecutable_Execute");
+    return MakeError(
+        LoadedExecutableInstance::Unwrap(args->executable)->BatchExecute(args));
+  };
+  api->PJRT_LoadedExecutable_GetCostAnalysis =
+      +[](PJRT_LoadedExecutable_GetCostAnalysis_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_LoadedExecutable_GetCostAnalysis"));
+  };
+  api->PJRT_LoadedExecutable_GetExecutable =
+      +[](PJRT_LoadedExecutable_GetExecutable_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE0("PJRT_LoadedExecutable_GetExecutable");
+    auto* loaded_exe =
+        LoadedExecutableInstance::Unwrap(args->loaded_executable);
+    ExecutableImage* image = loaded_exe->image_;
+    if (!image->metadata_initialized) {
+      auto status = loaded_exe->GetArgResultCount(&image->arg_count,
+                                                  &image->result_count);
+      if (!iree_status_is_ok(status)) {
+        return MakeError(status);
+      }
+      image->metadata_initialized = true;
+    }
 
-  std::vector<LoadedExecutable> new_list;
+    image->AddRef();
+    args->executable = *image;
+    return nullptr;
+  };
+}
+
+iree_status_t LoadedExecutableInstance::LoadAll() {
+  IREE_TRACE_SCOPE();
+  if (!resident_executables_.empty()) return iree_ok_status();
+
+  std::vector<ResidentExecutable> new_list;
   for (DeviceInstance* device_instance : addressable_devices_) {
     iree_hal_device_t* hal_device;
     IREE_RETURN_IF_ERROR(device_instance->GetHalDevice(&hal_device));
     new_list.push_back({});
-    LoadedExecutable& loaded = new_list.back();
+    ResidentExecutable& loaded = new_list.back();
     loaded.device_instance = device_instance;
 
+    // Only de-reference through the image_ shared_ptr once to get the
+    // binary CompilerOutput (mmap).
+    auto* binary = image_->binary.get();
     IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
         client_.vm_instance(),
-        iree_make_const_byte_span(binary_->GetData(), binary_->GetDataSize()),
+        iree_make_const_byte_span(binary->GetData(), binary->GetDataSize()),
         /*archive_allocator=*/iree_allocator_null(), client_.host_allocator(),
         &loaded.main_module));
 
@@ -1303,32 +1339,32 @@ iree_status_t ExecutableInstance::LoadAll() {
         module_ptrs.data(), iree_allocator_system(), &loaded.vm_context));
   }
 
-  new_list.swap(loaded_executables_);
+  new_list.swap(resident_executables_);
   return iree_ok_status();
 }
 
-iree_status_t ExecutableInstance::GetDefaultLoadedExecutable(
-    LoadedExecutable** out_loaded) {
+iree_status_t LoadedExecutableInstance::GetDefaultResidentExecutable(
+    ResidentExecutable** out_loaded) {
   IREE_RETURN_IF_ERROR(LoadAll());
-  if (loaded_executables_.empty()) {
+  if (resident_executables_.empty()) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "no executables could be loaded");
   }
-  *out_loaded = &loaded_executables_.front();
+  *out_loaded = &resident_executables_.front();
   return iree_ok_status();
 }
 
-iree_status_t ExecutableInstance::GetArgResultCount(
+iree_status_t LoadedExecutableInstance::GetArgResultCount(
     iree_host_size_t* out_arg_count, iree_host_size_t* out_result_count) {
-  LoadedExecutable* loaded;
-  IREE_RETURN_IF_ERROR(GetDefaultLoadedExecutable(&loaded));
+  ResidentExecutable* loaded;
+  IREE_RETURN_IF_ERROR(GetDefaultResidentExecutable(&loaded));
   *out_arg_count = loaded->arg_count;
   *out_result_count = loaded->result_count;
   return iree_ok_status();
 }
 
-iree_status_t ExecutableInstance::BatchExecute(
-    PJRT_Executable_Execute_Args* args) {
+iree_status_t LoadedExecutableInstance::BatchExecute(
+    PJRT_LoadedExecutable_Execute_Args* args) {
   // Early exit for unsupported features and illegal input.
   if (args->execute_device) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -1351,9 +1387,9 @@ iree_status_t ExecutableInstance::BatchExecute(
 
   // Initialize invocations.
   auto allocator = client_.host_allocator();
-  auto& loaded_execs = loaded_executables_;
+  auto& resident_executables_ecs = resident_executables_;
   struct Invocation {
-    LoadedExecutable* dev_exe;
+    ResidentExecutable* res_exe;
     iree::vm::ref<iree_vm_list_t> inputs;
     iree::vm::ref<iree_vm_list_t> outputs;
     iree::vm::ref<iree_hal_fence_t> wait_fence;
@@ -1363,7 +1399,7 @@ iree_status_t ExecutableInstance::BatchExecute(
   invs.resize(args->num_devices);
   for (size_t dev_index = 0; dev_index < args->num_devices; ++dev_index) {
     auto& inv = invs[dev_index];
-    inv.dev_exe = &loaded_execs[dev_index];
+    inv.res_exe = &resident_executables_ecs[dev_index];
 
     // Wait fence initial value.
     // We allocate it to be able to hold two semaphores (main timeline and
@@ -1373,21 +1409,21 @@ iree_status_t ExecutableInstance::BatchExecute(
     // all dependencies are ready. This at most represents two unique
     // semaphores.
     IREE_RETURN_IF_ERROR(
-        inv.dev_exe->device_instance->CreateFence(&inv.wait_fence));
+        inv.res_exe->device_instance->CreateFence(&inv.wait_fence));
     IREE_RETURN_IF_ERROR(iree_hal_fence_insert(
-        inv.wait_fence.get(), inv.dev_exe->device_instance->main_timeline(),
+        inv.wait_fence.get(), inv.res_exe->device_instance->main_timeline(),
         wait_timepoint));
 
     // Signal fence. This signals the next tick on the main execution
     // timeline.
     IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(
-        inv.dev_exe->device_instance->main_timeline(), signal_timepoint,
+        inv.res_exe->device_instance->main_timeline(), signal_timepoint,
         client_.host_allocator(), &inv.signal_fence));
 
     IREE_RETURN_IF_ERROR(iree_vm_list_create(
         /*element_type=*/nullptr, args->num_args, allocator, &inv.inputs));
     IREE_RETURN_IF_ERROR(iree_vm_list_create(
-        /*element_type=*/nullptr, inv.dev_exe->result_count, allocator,
+        /*element_type=*/nullptr, inv.res_exe->result_count, allocator,
         &inv.outputs));
 
     // Populate inputs.
@@ -1403,7 +1439,7 @@ iree_status_t ExecutableInstance::BatchExecute(
           iree_hal_fence_extend(inv.wait_fence.get(), buffer->ready_fence()));
 
       // And extend the buffer's done fence to close over this execution.
-      buffer->AdvanceDoneFence(inv.dev_exe->device_instance->main_timeline(),
+      buffer->AdvanceDoneFence(inv.res_exe->device_instance->main_timeline(),
                                signal_timepoint);
     }
 
@@ -1421,7 +1457,7 @@ iree_status_t ExecutableInstance::BatchExecute(
   for (size_t dev_index = 0; dev_index < args->num_devices; ++dev_index) {
     auto& inv = invs[dev_index];
     status = iree_vm_invoke(
-        inv.dev_exe->vm_context.get(), inv.dev_exe->main_function,
+        inv.res_exe->vm_context.get(), inv.res_exe->main_function,
         IREE_VM_INVOCATION_FLAG_NONE,
         /*policy=*/nullptr, inv.inputs.get(), inv.outputs.get(), allocator);
     if (!iree_status_is_ok(status)) break;
@@ -1432,18 +1468,18 @@ iree_status_t ExecutableInstance::BatchExecute(
   if (!iree_status_is_ok(status)) return status;
   for (size_t dev_index = 0; dev_index < args->num_devices; ++dev_index) {
     auto& inv = invs[dev_index];
-    for (size_t i = 0; i < inv.dev_exe->result_count; ++i) {
+    for (size_t i = 0; i < inv.res_exe->result_count; ++i) {
       iree::vm::ref<iree_hal_buffer_view_t> ret_buffer_view =
           retain_ref((iree_hal_buffer_view_t*)iree_vm_list_get_ref_deref(
               inv.outputs.get(), i, iree_hal_buffer_view_get_descriptor()));
       // This should not be possible so just hard-assert.
       IREE_ASSERT_ARGUMENT(ret_buffer_view);
       auto result_buffer = std::make_unique<BufferInstance>(
-          *inv.dev_exe->device_instance, std::move(ret_buffer_view));
+          *inv.res_exe->device_instance, std::move(ret_buffer_view));
       IREE_RETURN_IF_ERROR(result_buffer->AdvanceReadyFence(
-          inv.dev_exe->device_instance->main_timeline(), signal_timepoint));
+          inv.res_exe->device_instance->main_timeline(), signal_timepoint));
       IREE_RETURN_IF_ERROR(result_buffer->AdvanceDoneFence(
-          inv.dev_exe->device_instance->main_timeline(), signal_timepoint));
+          inv.res_exe->device_instance->main_timeline(), signal_timepoint));
       args->output_lists[dev_index][i] = *(result_buffer.release());
     }
 
@@ -1472,7 +1508,8 @@ void BindMonomorphicApi(PJRT_Api* api) {
   DeviceInstance::BindApi(api);
   ErrorInstance::BindApi(api);
   EventInstance::BindApi(api);
-  ExecutableInstance::BindApi(api);
+  ExecutableImage::BindApi(api);
+  LoadedExecutableInstance::BindApi(api);
 }
 
 }  // namespace iree::pjrt
