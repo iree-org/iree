@@ -210,12 +210,18 @@ iree_hal_cuda_allocator_query_buffer_compatibility(
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
 
-  if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
-    compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
+  // Buffers are importable in CUDA under most cases, though performance may
+  // vary wildly. We don't fully verify that the buffer parameters are
+  // self-consistent and just look at whether we can get a device pointer.
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+    compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE;
   }
 
   // Buffers can only be used on the queue if they are device visible.
   if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+    if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
+      compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
+    }
     if (iree_any_bit_set(params->usage,
                          IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
@@ -282,12 +288,30 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
 
   // Coerce options into those required by the current device.
   iree_hal_buffer_params_t compat_params = *params;
-  if (!iree_all_bits_set(iree_hal_cuda_allocator_query_buffer_compatibility(
-                             base_allocator, &compat_params, &allocation_size),
+  iree_hal_buffer_compatibility_t compatibility =
+      iree_hal_cuda_allocator_query_buffer_compatibility(
+          base_allocator, &compat_params, &allocation_size);
+  if (!iree_all_bits_set(compatibility,
                          IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE)) {
+#if IREE_STATUS_MODE
+    iree_bitfield_string_temp_t temp0, temp1, temp2;
+    iree_string_view_t memory_type_str =
+        iree_hal_memory_type_format(params->type, &temp0);
+    iree_string_view_t usage_str =
+        iree_hal_buffer_usage_format(params->usage, &temp1);
+    iree_string_view_t compatibility_str =
+        iree_hal_buffer_compatibility_format(compatibility, &temp2);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "allocator cannot allocate a buffer with the given parameters; "
+        "memory_type=%.*s, usage=%.*s, compatibility=%.*s",
+        (int)memory_type_str.size, memory_type_str.data, (int)usage_str.size,
+        usage_str.data, (int)compatibility_str.size, compatibility_str.data);
+#else
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "allocator cannot allocate a buffer with the given parameters");
+#endif  // IREE_STATUS_MODE
   }
 
   iree_status_t status = iree_ok_status();
@@ -437,12 +461,30 @@ static iree_status_t iree_hal_cuda_allocator_import_buffer(
   // Coerce options into those required by the current device.
   iree_hal_buffer_params_t compat_params = *params;
   iree_device_size_t allocation_size = external_buffer->size;
-  if (!iree_all_bits_set(iree_hal_cuda_allocator_query_buffer_compatibility(
-                             base_allocator, &compat_params, &allocation_size),
+  iree_hal_buffer_compatibility_t compatibility =
+      iree_hal_cuda_allocator_query_buffer_compatibility(
+          base_allocator, &compat_params, &allocation_size);
+  if (!iree_all_bits_set(compatibility,
                          IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE)) {
+#if IREE_STATUS_MODE
+    iree_bitfield_string_temp_t temp0, temp1, temp2;
+    iree_string_view_t memory_type_str =
+        iree_hal_memory_type_format(params->type, &temp0);
+    iree_string_view_t usage_str =
+        iree_hal_buffer_usage_format(params->usage, &temp1);
+    iree_string_view_t compatibility_str =
+        iree_hal_buffer_compatibility_format(compatibility, &temp2);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "allocator cannot import a buffer with the given parameters; "
+        "memory_type=%.*s, usage=%.*s, compatibility=%.*s",
+        (int)memory_type_str.size, memory_type_str.data, (int)usage_str.size,
+        usage_str.data, (int)compatibility_str.size, compatibility_str.data);
+#else
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "allocator cannot import a buffer with the given parameters");
+#endif  // IREE_STATUS_MODE
   }
 
   iree_status_t status = iree_ok_status();
