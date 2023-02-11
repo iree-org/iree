@@ -15,7 +15,7 @@ most powerful).
 
 The below presumes that you have a compatible Jax/Jaxlib installed. Since 
 PJRT plugin support is moving fast, it is rare that released versions are 
-appropriate. See "Building Jax from Source" below.
+appropriate. See ["Building Jax from Source"](#building-jax-from-source) below.
 
 ### Option 1: Synchronize to a nightly IREE release
 
@@ -40,9 +40,11 @@ CC=clang CXX=clang++ python external/iree/configure_bazel.py
 echo "build --action_env IREE_CUDA_DEPS_DIR=$CUDA_SDK_DIR" > user.bazelrc
 
 # Build.
+
 bazel build iree/integrations/pjrt/...
 
 # Run a sample.
+
 JAX_PLATFORMS=iree_cpu python test/test_simple.py
 JAX_PLATFORMS=iree_cuda python test/test_simple.py
 ```
@@ -129,9 +131,9 @@ compilation artifacts, reproducers, etc.
 
 ## Contacts
 
-* (GitHub issues)[https://github.com/openxla/openxla-pjrt-plugin/issues]:
+* [GitHub issues](https://github.com/openxla/openxla-pjrt-plugin/issues):
   Feature requests, bugs, and other work tracking
-* (OpenXLA discord)[https://discord.gg/pvuUmVQa]: Daily development discussions
+* [OpenXLA discord](https://discord.gg/pvuUmVQa): Daily development discussions
   with the core team and collaborators
 
 ## License
