@@ -9,12 +9,12 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 local_repository(
     name = "org_tensorflow",
-    path = "../../tensorflow",
+    path = "external/tensorflow",
 )
 
 local_repository(
     name = "iree_core",
-    path = "../../iree",
+    path = "external/iree",
 )
 
 # Import all of the tensorflow dependencies.
@@ -40,7 +40,7 @@ load("@iree_core//build_tools/bazel:workspace.bzl", "configure_iree_submodule_de
 # TODO: Path hard-coding is... not great. Oh bazel.
 configure_iree_submodule_deps(
     iree_repo_alias = "@iree_core",
-    iree_path = "../../iree",
+    iree_path = "external/iree",
 )
 
 configure_iree_cuda_deps()

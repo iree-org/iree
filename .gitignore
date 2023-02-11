@@ -1,2 +1,7 @@
 bazel-*
 *.egg-info
+.env
+.env.sh
+env.bazelrc
+external/
+.vscode/

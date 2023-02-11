@@ -5,9 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import %workspace%/build_tools/bazel/iree_pjrt.bazelrc
+import %workspace%/env.bazelrc
 
 # Import the main IREE bazel configuration.
-import %workspace%/../../iree/build_tools/bazel/iree.bazelrc
-try-import %workspace%/../../iree/configured.bazelrc
+import %workspace%/external/iree/build_tools/bazel/iree.bazelrc
+try-import %workspace%/external/iree/configured.bazelrc
 
 try-import %workspace%/user.bazelrc
