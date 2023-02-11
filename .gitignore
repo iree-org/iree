@@ -5,3 +5,4 @@ bazel-*
 env.bazelrc
 external/
 .vscode/
+user.bazelrc
