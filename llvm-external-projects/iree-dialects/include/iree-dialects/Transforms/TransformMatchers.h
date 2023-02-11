@@ -136,7 +136,7 @@ struct IsProjected : public SingleValuePredicateParam<int64_t> {
 struct IsIdentity {};
 
 /// Predicate tag indicating that the operand is a special float constant.
-struct ConstantFloatMin {};
+struct ConstantFloatMinOrMinusInf {};
 struct ConstantFloatZero {};
 
 /// Indicates that the match optional. The matcher is still expected to run and
@@ -442,7 +442,7 @@ public:
 
   /// Check if input is equal to a known constant.
   // TODO: Support matching for constant ops.
-  StructuredOpMatcher &input(int64_t position, ConstantFloatMin);
+  StructuredOpMatcher &input(int64_t position, ConstantFloatMinOrMinusInf);
   StructuredOpMatcher &input(int64_t position, ConstantFloatZero);
 
   //===-------------------------------------------------------------------===//
@@ -563,13 +563,18 @@ public:
   ///     %3 = arith.maxf %arg0, %arg1 : f32
   ///     linalg.yield %3 : f32
   ///   } -> tensor<?x?xf32>
+  /// If commutative is set binary operations can have their operands swapped.
   template <typename OpType>
-  StructuredOpMatcher &singleOpWithCanonicaleArgs() {
-    return singleOpWithCanonicaleArgs(OpType::getOperationName());
+  StructuredOpMatcher &singleOpWithCanonicaleArgs(bool commutative = false) {
+    return singleOpWithCanonicaleArgs(OpType::getOperationName(), commutative);
   }
-  StructuredOpMatcher &singleOpWithCanonicaleArgs(StringRef opname);
+  StructuredOpMatcher &singleOpWithCanonicaleArgs(StringRef opname,
+                                                  bool commutative);
   /// Check if the op is a linalg of with a single float reciprocal op.
   StructuredOpMatcher &isFloatReciprocal();
+  /// Check if the op is a linalg of with a region containing only a yield op
+  /// using block arguments in order.
+  StructuredOpMatcher &passThroughOp();
 
 private:
   /// Checks that `matchers` captured all tilable ops nested in `parent` except
