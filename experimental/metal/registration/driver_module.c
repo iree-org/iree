@@ -45,8 +45,11 @@ static iree_status_t iree_hal_metal_driver_factory_try_create(
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status =
-      iree_hal_metal_driver_create(driver_name, host_allocator, out_driver);
+  iree_hal_metal_device_params_t device_params;
+  iree_hal_metal_device_params_initialize(&device_params);
+
+  iree_status_t status = iree_hal_metal_driver_create(
+      driver_name, &device_params, host_allocator, out_driver);
 
   IREE_TRACE_ZONE_END(z0);
 

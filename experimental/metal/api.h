@@ -17,6 +17,38 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
+// iree_hal_metal_device_params_t
+//===----------------------------------------------------------------------===//
+
+typedef enum iree_hal_metal_command_dispatch_type_e {
+  // Dispatch commands in command buffer in parallel.
+  IREE_HAL_METAL_COMMAND_DISPATCH_TYPE_CONCURRENT = 0,
+  // Dispatch commands in command buffer sequentially.
+  IREE_HAL_METAL_COMMAND_DISPATCH_TYPE_SERIAL = 1,
+} iree_hal_metal_command_dispatch_type_t;
+
+// Parameters configuring an iree_hal_metal_device_t.
+// Must be initialized with iree_hal_metal_device_params_initialize prior to
+// use.
+typedef struct iree_hal_metal_device_params_t {
+  // Total size of each block in the device shared block pool.
+  // Larger sizes will lower overhead and ensure the heap isn't hit for
+  // transient allocations while also increasing memory consumption.
+  iree_host_size_t arena_block_size;
+
+  // Command dispatch type in command buffers.
+  // Normally we want to dispatch commands in command buffers in parallel, given
+  // that IREE performs explicit dependency tracking and synchronization by
+  // itself. Though being able to specify serial command dispatching helps
+  // debugging in certain cases.
+  iree_hal_metal_command_dispatch_type_t command_dispatch_type;
+} iree_hal_metal_device_params_t;
+
+// Initializes |out_params| to default values.
+void iree_hal_metal_device_params_initialize(
+    iree_hal_metal_device_params_t* out_params);
+
+//===----------------------------------------------------------------------===//
 // iree_hal_metal_driver_t
 //===----------------------------------------------------------------------===//
 
@@ -25,8 +57,9 @@ extern "C" {
 //
 // |out_driver| must be released by the caller (see iree_hal_driver_release).
 IREE_API_EXPORT iree_status_t iree_hal_metal_driver_create(
-    iree_string_view_t identifier, iree_allocator_t host_allocator,
-    iree_hal_driver_t** out_driver);
+    iree_string_view_t identifier,
+    const iree_hal_metal_device_params_t* device_params,
+    iree_allocator_t host_allocator, iree_hal_driver_t** out_driver);
 
 #ifdef __cplusplus
 }  // extern "C"

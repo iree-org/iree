@@ -32,6 +32,9 @@ typedef struct iree_hal_metal_driver_t {
   // multiple Metal versions can be exposed in the same process.
   iree_string_view_t identifier;
 
+  // Parameters used to control device behavior.
+  iree_hal_metal_device_params_t device_params;
+
   // The list of GPUs available when creating the driver. We retain them here to make sure
   // id<MTLDevice>, which is used for creating devices and such, remains valid.
   NSArray<id<MTLDevice>>* devices;
@@ -42,6 +45,12 @@ static const iree_hal_driver_vtable_t iree_hal_metal_driver_vtable;
 static iree_hal_metal_driver_t* iree_hal_metal_driver_cast(iree_hal_driver_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_driver_vtable);
   return (iree_hal_metal_driver_t*)base_value;
+}
+
+static const iree_hal_metal_driver_t* iree_hal_metal_driver_const_cast(
+    const iree_hal_driver_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_driver_vtable);
+  return (const iree_hal_metal_driver_t*)base_value;
 }
 
 // Returns an retained array of available Metal GPU devices; the caller should release later.
@@ -57,9 +66,18 @@ static NSArray<id<MTLDevice>>* iree_hal_metal_device_copy() {
 #endif  // IREE_PLATFORM_MACOS
 }
 
-static iree_status_t iree_hal_metal_driver_create_internal(iree_string_view_t identifier,
-                                                           iree_allocator_t host_allocator,
-                                                           iree_hal_driver_t** out_driver) {
+static iree_status_t iree_hal_metal_device_check_params(
+    const iree_hal_metal_device_params_t* params) {
+  if (params->arena_block_size < 4096) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "arena block size too small (< 4096 bytes)");
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_metal_driver_create_internal(
+    iree_string_view_t identifier, const iree_hal_metal_device_params_t* device_params,
+    iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {
   iree_hal_metal_driver_t* driver = NULL;
   iree_host_size_t total_size = iree_sizeof_struct(*driver) + identifier.size;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, total_size, (void**)&driver));
@@ -68,6 +86,7 @@ static iree_status_t iree_hal_metal_driver_create_internal(iree_string_view_t id
   driver->host_allocator = host_allocator;
   iree_string_view_append_to_buffer(identifier, &driver->identifier,
                                     (char*)driver + iree_sizeof_struct(*driver));
+  driver->device_params = *device_params;
 
   // Get all available Metal devices.
   driver->devices = iree_hal_metal_device_copy();
@@ -76,14 +95,15 @@ static iree_status_t iree_hal_metal_driver_create_internal(iree_string_view_t id
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_metal_driver_create(iree_string_view_t identifier,
-                                                           iree_allocator_t host_allocator,
-                                                           iree_hal_driver_t** out_driver) {
+IREE_API_EXPORT iree_status_t iree_hal_metal_driver_create(
+    iree_string_view_t identifier, const iree_hal_metal_device_params_t* device_params,
+    iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(out_driver);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_device_check_params(device_params));
   iree_status_t status =
-      iree_hal_metal_driver_create_internal(identifier, host_allocator, out_driver);
+      iree_hal_metal_driver_create_internal(identifier, device_params, host_allocator, out_driver);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -331,6 +351,7 @@ static iree_status_t iree_hal_metal_driver_create_device_by_id(iree_hal_driver_t
                                                                const iree_string_pair_t* params,
                                                                iree_allocator_t host_allocator,
                                                                iree_hal_device_t** out_device) {
+  iree_hal_metal_driver_t* driver = iree_hal_metal_driver_cast(base_driver);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   id<MTLDevice> device = nil;
@@ -344,8 +365,8 @@ static iree_status_t iree_hal_metal_driver_create_device_by_id(iree_hal_driver_t
 
   iree_string_view_t device_name = iree_make_cstring_view("metal");
 
-  iree_status_t status =
-      iree_hal_metal_device_create(base_driver, device_name, device, host_allocator, out_device);
+  iree_status_t status = iree_hal_metal_device_create(device_name, &driver->device_params, device,
+                                                      host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

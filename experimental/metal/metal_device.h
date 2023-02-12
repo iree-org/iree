@@ -9,6 +9,7 @@
 
 #import <Metal/Metal.h>
 
+#include "experimental/metal/api.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
@@ -16,12 +17,18 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Creates a Metal device.
-iree_status_t iree_hal_metal_device_create(iree_hal_driver_t* driver,
-                                           iree_string_view_t identifier,
-                                           id<MTLDevice> device,
-                                           iree_allocator_t host_allocator,
-                                           iree_hal_device_t** out_device);
+// Creates a Metal device by wrapping |device| from the given |driver| with the
+// specific |params|.
+//
+// |out_device| must be released by the caller (see iree_hal_device_release).
+iree_status_t iree_hal_metal_device_create(
+    iree_string_view_t identifier, const iree_hal_metal_device_params_t* params,
+    id<MTLDevice> device, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device);
+
+// Returns the parameters used for creating the device.
+const iree_hal_metal_device_params_t* iree_hal_metal_device_params(
+    const iree_hal_device_t* device);
 
 #ifdef __cplusplus
 }  // extern "C"
