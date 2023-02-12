@@ -100,7 +100,7 @@ class RulesTest(unittest.TestCase):
     rule = cmake_builder.rules.build_iree_import_tf_model(
         target_path="pkg_abcd",
         source="abcd/model",
-        entry_function="main",
+        import_flags=["--tf-savedmodel-exported-names=main"],
         output_mlir_file="abcd.mlir")
 
     self.assertEqual(
@@ -111,8 +111,8 @@ class RulesTest(unittest.TestCase):
             "pkg_abcd"
           SOURCE
             "abcd/model"
-          ENTRY_FUNCTION
-            "main"
+          IMPORT_FLAGS
+            "--tf-savedmodel-exported-names=main"
           OUTPUT_MLIR_FILE
             "abcd.mlir"
         )
