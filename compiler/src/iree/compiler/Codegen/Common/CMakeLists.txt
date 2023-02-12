@@ -103,6 +103,7 @@ iree_cc_library(
     "OptimizeVectorTransferPass.cpp"
     "PolynomialApproximationPass.cpp"
     "RematerializeParallelOps.cpp"
+    "ReplacePushConstants.cpp"
     "SplitFullPartialTransferPass.cpp"
     "TestExecutablePreprocessing.cpp"
     "TestPartitionableLoopsInterface.cpp"

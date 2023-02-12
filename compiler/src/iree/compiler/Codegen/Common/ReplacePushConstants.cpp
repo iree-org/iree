@@ -21,8 +21,8 @@ namespace iree_compiler {
 namespace {
 
 // These must match what the runtime uses.
-#define IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX 3
-#define IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX 0
+#define IREE_HAL_PUSH_CONSTANT_SET_INDEX 3
+#define IREE_HAL_PUSH_CONSTANT_BINDING_INDEX 0
 
 static Value convertOpTypeFromI32(IREE::HAL::InterfaceConstantLoadOp loadOp,
                                   vector::ExtractElementOp extractElementOp) {
@@ -85,8 +85,8 @@ static void replaceConstantLoadOp(IREE::Flow::DispatchTensorLoadOp loadOp,
   op.erase();
 }
 
-class WGSLReplacePushConstantsPass
-    : public WGSLReplacePushConstantsBase<WGSLReplacePushConstantsPass> {
+class ReplacePushConstantsPass
+    : public ReplacePushConstantsBase<ReplacePushConstantsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithDialect, mlir::func::FuncDialect,
                     mlir::tensor::TensorDialect, mlir::vector::VectorDialect,
@@ -155,8 +155,8 @@ class WGSLReplacePushConstantsPass
     // analysis using the hint should have been performed by earlier passes.
     auto subspanOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
         loc, dispatchTensorType,
-        /*set=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX),
-        /*binding=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX),
+        /*set=*/APInt(64, IREE_HAL_PUSH_CONSTANT_SET_INDEX),
+        /*binding=*/APInt(64, IREE_HAL_PUSH_CONSTANT_BINDING_INDEX),
         IREE::HAL::DescriptorType::UniformBuffer,
         /*byte_offset=*/maxConstantValue, dynamicDims, alignmentAttr, nullptr);
 
@@ -175,9 +175,8 @@ class WGSLReplacePushConstantsPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
-createWGSLReplacePushConstantsPass() {
-  return std::make_unique<WGSLReplacePushConstantsPass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createReplacePushConstantsPass() {
+  return std::make_unique<ReplacePushConstantsPass>();
 }
 
 }  // namespace iree_compiler

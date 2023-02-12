@@ -94,7 +94,7 @@ class WebGPUTargetBackend : public TargetBackend {
     // The corresponding runtime code must perform similar emulation, based
     // on the push constant count listed in the executable layout.
     passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
-        createWGSLReplacePushConstantsPass());
+        createReplacePushConstantsPass());
 
     // From WGSL spec, "Floating Point Evaluation"
     // (https://www.w3.org/TR/WGSL/#floating-point-evaluation):

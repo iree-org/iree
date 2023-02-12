@@ -342,6 +342,14 @@ def InstrumentMemoryAccesses :
   let constructor = "mlir::iree_compiler::createInstrumentMemoryAccessesPass()";
 }
 
+def ReplacePushConstants :
+    Pass<"iree-codegen-replace-push-constants", "func::FuncOp"> {
+  let summary =
+      "Replaces push constant loads with binding loads for targets without "
+      "push constant support";
+  let constructor = "mlir::iree_compiler::createReplacePushConstantsPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -668,18 +676,6 @@ def VMVXAssignConstantOrdinals :
     Pass<"iree-vmvx-assign-constant-ordinals", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Assigns executable constant ordinals across all VMVX variants.";
   let constructor = "mlir::iree_compiler::createVMVXAssignConstantOrdinalsPass()";
-}
-
-//------------------------------------------------------------------------------
-// WGSL Passes
-//------------------------------------------------------------------------------
-
-def WGSLReplacePushConstants :
-    Pass<"iree-wgsl-replace-push-constants", "func::FuncOp"> {
-  let summary =
-      "Replaces push constant loads with binding loads for when using "
-      "WGSL without push constant support";
-  let constructor = "mlir::iree_compiler::createWGSLReplacePushConstantsPass()";
 }
 
 //------------------------------------------------------------------------------
