@@ -20,10 +20,12 @@ iree_hal_cts_test_suite(
   INCLUDED_TESTS
     "allocator"
     "buffer_mapping"
+    "command_buffer_dispatch"
     "executable_cache"
     "descriptor_set_layout"
     "driver"
     "pipeline_layout"
     "semaphore"
+    "semaphore_submission"
 )
 

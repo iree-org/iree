@@ -19,6 +19,8 @@ iree_cc_library(
     "api.h"
     "direct_allocator.h"
     "direct_allocator.m"
+    "direct_command_buffer.h"
+    "direct_command_buffer.m"
     "metal_buffer.h"
     "metal_buffer.m"
     "metal_device.m"
@@ -35,10 +37,12 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::tracing
     iree::hal
     iree::hal::utils::buffer_transfer
+    iree::hal::utils::resource_set
     iree::schemas::metal_executable_def_c_fbs
     "-framework Foundation"
     "-framework Metal"

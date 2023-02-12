@@ -14,6 +14,16 @@
 extern "C" {
 #endif  // __cplusplus
 
+// The max number of total binding slots across all descriptor sets by the Metal
+// HAL implementation.
+//
+// - Argument buffer tier 1 binding limits:
+//   - iOS: 31 buffers (on A11 and later, 96 buffers)
+//   - macOS: 64 buffers
+// - Argument buffer tier 2 binding limits:
+//   - 500,000 buffers or textures
+#define IREE_HAL_METAL_MAX_BINDING_COUNT 64
+
 //===----------------------------------------------------------------------===//
 // iree_hal_metal_descriptor_set_layout_t
 //===----------------------------------------------------------------------===//
