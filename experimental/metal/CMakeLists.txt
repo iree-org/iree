@@ -23,13 +23,19 @@ iree_cc_library(
     "metal_buffer.m"
     "metal_device.m"
     "metal_driver.m"
+    "metal_kernel_library.h"
+    "metal_kernel_library.m"
     "metal_shared_event.h"
     "metal_shared_event.m"
+    "nop_executable_cache.h"
+    "nop_executable_cache.m"
     "pipeline_layout.h"
     "pipeline_layout.m"
   DEPS
     iree::base
     iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::flatcc::parsing
     iree::base::tracing
     iree::hal
     iree::hal::utils::buffer_transfer

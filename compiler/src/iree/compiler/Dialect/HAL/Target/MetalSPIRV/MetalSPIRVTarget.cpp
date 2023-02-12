@@ -135,9 +135,9 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     // The runtime use ordinals instead of names but Metal requires function
     // names for constructing pipeline states. Get an ordered list of the entry
     // point names.
-    SmallVector<StringRef, 8> entryPointNames;
+    SmallVector<StringRef, 8> spirvEntryPointNames;
     spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
-      entryPointNames.push_back(exportOp.getFn());
+      spirvEntryPointNames.push_back(exportOp.getFn());
     });
 
     // 1. Serialize the spirv::ModuleOp into binary format.
@@ -152,16 +152,21 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     }
 
     // 2. Cross compile SPIR-V to MSL source code.
-    llvm::SmallVector<MetalShader, 2> mslShaders;
-    for (const auto &entryPoint : entryPointNames) {
-      std::optional<MetalShader> mslShader = crossCompileSPIRVToMSL(
-          // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
-          llvm::ArrayRef(spvBinary.data(), spvBinary.size()), entryPoint);
-      if (!mslShader) {
+    SmallVector<MetalShader, 2> mslShaders;
+    SmallVector<std::string, 2> mslEntryPointNames;
+    mslShaders.reserve(spirvEntryPointNames.size());
+    mslEntryPointNames.reserve(spirvEntryPointNames.size());
+    for (const auto &entryPoint : spirvEntryPointNames) {
+      // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
+      ArrayRef spvData(spvBinary.data(), spvBinary.size());
+      std::optional<std::pair<MetalShader, std::string>> msl =
+          crossCompileSPIRVToMSL(spvData, entryPoint);
+      if (!msl) {
         return variantOp.emitError()
                << "failed to cross compile SPIR-V to Metal shader";
       }
-      mslShaders.push_back(std::move(*mslShader));
+      mslShaders.push_back(std::move(msl->first));
+      mslEntryPointNames.push_back(std::move(msl->second));
     }
 
     // 3. Compile MSL to MTLLibrary.
@@ -196,7 +201,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     }
     auto threadgroupSizesRef = iree_hal_metal_ThreadgroupSize_vec_end(builder);
 
-    auto entryPointNamesRef = builder.createStringVec(entryPointNames);
+    auto entryPointNamesRef = builder.createStringVec(mslEntryPointNames);
 
     iree_hal_metal_ExecutableDef_entry_points_add(builder, entryPointNamesRef);
     iree_hal_metal_ExecutableDef_threadgroup_sizes_add(builder,

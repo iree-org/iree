@@ -8,6 +8,7 @@
 
 #include "experimental/metal/direct_allocator.h"
 #include "experimental/metal/metal_shared_event.h"
+#include "experimental/metal/nop_executable_cache.h"
 #include "experimental/metal/pipeline_layout.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
@@ -167,7 +168,9 @@ static iree_status_t iree_hal_metal_device_create_event(iree_hal_device_t* base_
 static iree_status_t iree_hal_metal_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier, iree_loop_t loop,
     iree_hal_executable_cache_t** out_executable_cache) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplmented executable cache create");
+  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  return iree_hal_metal_nop_executable_cache_create(device->device, device->host_allocator,
+                                                    identifier, out_executable_cache);
 }
 
 static iree_status_t iree_hal_metal_device_create_pipeline_layout(

@@ -89,7 +89,7 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
     SPIRVToMSLCompiler::Options spvCrossOptions;
     spvCrossOptions.platform = SPIRVToMSLCompiler::Options::Platform::macOS;
     spvCrossOptions.msl_version =
-        SPIRVToMSLCompiler::Options::make_msl_version(2, 0);
+        SPIRVToMSLCompiler::Options::make_msl_version(3, 0);
     // Eanble using Metal argument buffers. It is more akin to Vulkan descriptor
     // sets, which is how IREE HAL models resource bindings and mappings.
     spvCrossOptions.argument_buffers = true;
@@ -98,7 +98,7 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
 };
 }  // namespace
 
-std::optional<MetalShader> crossCompileSPIRVToMSL(
+std::optional<std::pair<MetalShader, std::string>> crossCompileSPIRVToMSL(
     llvm::ArrayRef<uint32_t> spvBinary, StringRef entryPoint) {
   SPIRVToMSLCompiler spvCrossCompiler(spvBinary.data(), spvBinary.size());
 
@@ -110,11 +110,6 @@ std::optional<MetalShader> crossCompileSPIRVToMSL(
   // Explicitly set the argument buffer index for each SPIR-V resource variable.
   auto descriptors = spvCrossCompiler.getBufferSetBindingPairs();
   for (const auto& descriptor : descriptors) {
-    if (descriptor.set != 0) {
-      assert(false &&
-             "multiple descriptor set unimplemented in SPIRVToMSLCompiler");
-    }
-
     SPIRV_CROSS_NAMESPACE::MSLResourceBinding binding = {};
     binding.stage = spv::ExecutionModelGLCompute;
     binding.desc_set = descriptor.set;
@@ -129,16 +124,27 @@ std::optional<MetalShader> crossCompileSPIRVToMSL(
   spvCrossCompiler.set_msl_options(spvCrossOptions);
 
   std::string mslSource = spvCrossCompiler.compile();
-  LLVM_DEBUG(llvm::dbgs()
-             << "Cross compiled Metal Shading Language source code:\n-----\n"
-             << mslSource << "\n-----\n");
+  // Get the revised entry point name. Cross compiling to MSL generates source
+  // code, where we may run into the case that we are using reserved keyword for
+  // the entry point name, e.g., `abs`. Under such circumstances, it will be
+  // revised to avoid collision.
+  const auto& spirvEntryPoint = spvCrossCompiler.get_entry_point(
+      entryPoint.str(), spv::ExecutionModel::ExecutionModelGLCompute);
+  LLVM_DEBUG({
+    llvm::dbgs() << "Original entry point name: '" << spirvEntryPoint.orig_name
+                 << "'\n";
+    llvm::dbgs() << "Revised entry point name: '" << spirvEntryPoint.name
+                 << "'\n";
+    llvm::dbgs() << "Generated MSL:\n-----\n" << mslSource << "\n-----\n";
+  });
 
   auto workgroupSize =
       spvCrossCompiler.getWorkgroupSizeForEntryPoint(entryPoint);
   if (!workgroupSize.x || !workgroupSize.y || !workgroupSize.z) {
     return std::nullopt;
   }
-  return MetalShader{std::move(mslSource), workgroupSize};
+  return std::make_pair(MetalShader{std::move(mslSource), workgroupSize},
+                        spirvEntryPoint.name);
 }
 
 }  // namespace iree_compiler
