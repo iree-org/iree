@@ -13,6 +13,7 @@
 #include "experimental/metal/metal_kernel_library.h"
 #include "experimental/metal/pipeline_layout.h"
 #include "iree/base/api.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/utils/resource_set.h"
@@ -291,25 +292,175 @@ static iree_status_t iree_hal_metal_command_buffer_discard_buffer(
   return iree_ok_status();
 }
 
+// Fills |value| with the duplicated single byte value if the given |pattern| has duplicated values
+// for each of its |pattern_length| bytes.
+static iree_status_t iree_hal_metal_get_duplicated_single_byte_value(const void* pattern,
+                                                                     size_t pattern_length,
+                                                                     uint8_t* value) {
+  switch (pattern_length) {
+    case 1: {
+      *value = *(uint8_t*)pattern;
+      return iree_ok_status();
+    }
+    case 2: {
+      uint16_t two_bytes = *(uint16_t*)pattern;
+      uint16_t byte0 = two_bytes & 0xffu;
+      uint16_t byte1 = two_bytes >> 8u;
+      if (byte0 == byte1) {
+        *value = (int8_t)byte0;
+        return iree_ok_status();
+      }
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unimplemented non-duplicated 2-byte-pattern fill: 0x%04x",
+                              two_bytes);
+    }
+    case 4: {
+      uint32_t four_bytes = *(uint32_t*)pattern;
+      uint32_t byte0 = four_bytes & 0xffu;
+      uint32_t byte1 = (four_bytes >> 8u) & 0xffu;
+      uint32_t byte2 = (four_bytes >> 16u) & 0xffu;
+      uint32_t byte3 = four_bytes >> 24u;
+      if (byte0 == byte1 && byte0 == byte2 && byte0 == byte3) {
+        *value = (int8_t)byte0;
+        return iree_ok_status();
+      }
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unimplemented non-duplicated 4-byte-pattern fill: 0x%08x",
+                              four_bytes);
+    }
+    default:
+      break;
+  }
+  return iree_make_status(IREE_STATUS_INTERNAL, "fill pattern should contain 1/2/4 bytes");
+}
+
 static iree_status_t iree_hal_metal_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length, const void* pattern,
     iree_host_size_t pattern_length) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplemented fill buffer");
+  iree_hal_metal_command_buffer_t* command_buffer =
+      iree_hal_metal_command_buffer_cast(base_command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  target_offset += iree_hal_buffer_byte_offset(target_buffer);
+
+  // Per the spec for fillBuffer:range:value: "The alignment and length of the range must both be a
+  // multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS."
+#if defined(IREE_PLATFORM_MACOS)
+  if (target_offset % 4 != 0 || length % 4 != 0) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "unimplemented fill buffer with non-4-multiple offset/length");
+  }
+#endif
+
+  IREE_RETURN_IF_ERROR(
+      iree_hal_resource_set_insert(command_buffer->resource_set, 1, &target_buffer));
+
+  // Note that fillBuffer:range:value: only accepts a single byte as the pattern but FillBuffer
+  // can accept 1/2/4 bytes. If the pattern itself contains repeated bytes, we can call into
+  // fillBuffer:range:value:. Otherwise we need to emulate the support.
+  uint8_t single_byte_value = 0u;
+  iree_status_t status =
+      iree_hal_metal_get_duplicated_single_byte_value(pattern, pattern_length, &single_byte_value);
+  if (iree_status_is_ok(status)) {
+    id<MTLBlitCommandEncoder> encoder = iree_hal_metal_get_or_begin_blit_encoder(command_buffer);
+    id<MTLBuffer> target_device_buffer =
+        iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(target_buffer));
+    [encoder fillBuffer:target_device_buffer
+                  range:NSMakeRange(target_offset, length)
+                  value:single_byte_value];
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 static iree_status_t iree_hal_metal_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplemented update buffer");
+  // There are no direct corresponding APIs in Metal. We emulate it by creating a buffer with the
+  // content and then copy it over.
+  iree_hal_metal_command_buffer_t* command_buffer =
+      iree_hal_metal_command_buffer_cast(base_command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Per the spec for copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size, the source/target
+  // offset and length must be a multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS.
+#if defined(IREE_PLATFORM_MACOS)
+  if (source_offset % 4 != 0 || target_offset % 4 != 0 || length % 4 != 0) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "unimplemented buffer update with non-4-multiple offset/length");
+  }
+#endif
+
+  id<MTLDevice> device = command_buffer->command_buffer.device;
+  MTLResourceOptions options = MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined;
+  id<MTLBuffer> data_buffer = [device newBufferWithBytes:((uint8_t*)source_buffer + source_offset)
+                                                  length:length
+                                                 options:options];  // +1
+  [command_buffer->command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cmdbuf) {
+    [data_buffer release];  // -1
+  }];
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1, &target_buffer));
+
+  id<MTLBuffer> target_device_buffer =
+      iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(target_buffer));
+  target_offset += iree_hal_buffer_byte_offset(target_buffer);
+
+  id<MTLBlitCommandEncoder> encoder = iree_hal_metal_get_or_begin_blit_encoder(command_buffer);
+  [encoder copyFromBuffer:data_buffer
+             sourceOffset:0
+                 toBuffer:target_device_buffer
+        destinationOffset:target_offset
+                     size:length];
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_metal_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* source_buffer,
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplemented copy buffer");
+  iree_hal_metal_command_buffer_t* command_buffer =
+      iree_hal_metal_command_buffer_cast(base_command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Per the spec for copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size, the source/target
+  // offset and length must be a multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS.
+#if defined(IREE_PLATFORM_MACOS)
+  if (source_offset % 4 != 0 || target_offset % 4 != 0 || length % 4 != 0) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "unimplemented copy buffer with non-4-multiple offset/length");
+  }
+#endif
+
+  const iree_hal_buffer_t* buffers[2] = {source_buffer, target_buffer};
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_resource_set_insert(command_buffer->resource_set, 2, buffers));
+
+  id<MTLBuffer> source_device_buffer =
+      iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(source_buffer));
+  id<MTLBuffer> target_device_buffer =
+      iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(target_buffer));
+
+  source_offset += iree_hal_buffer_byte_offset(source_buffer);
+  target_offset += iree_hal_buffer_byte_offset(target_buffer);
+
+  id<MTLBlitCommandEncoder> encoder = iree_hal_metal_get_or_begin_blit_encoder(command_buffer);
+  [encoder copyFromBuffer:source_device_buffer
+             sourceOffset:source_offset
+                 toBuffer:target_device_buffer
+        destinationOffset:target_offset
+                     size:length];
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_metal_command_buffer_collective(
