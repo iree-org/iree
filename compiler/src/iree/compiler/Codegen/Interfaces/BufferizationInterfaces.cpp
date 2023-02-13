@@ -353,9 +353,12 @@ struct LinalgExtOpInterface
   }
 };
 
+/// Returns the buffers of the source and destination for pack and unpack ops.
+/// Returns a failure if the buffers can not be found.
 template <typename OpTy>
 static FailureOr<std::pair<Value, Value>> getSourceAndDestFromPackUnPackOp(
     RewriterBase &rewriter, OpTy op, const BufferizationOptions &options) {
+  static_assert(llvm::is_one_of<OpTy, tensor::PackOp, tensor::UnPackOp>::value);
   Value source;
   auto maybeBuffer = getBuffer(rewriter, op.getSource(), options);
   if (failed(maybeBuffer)) return failure();
