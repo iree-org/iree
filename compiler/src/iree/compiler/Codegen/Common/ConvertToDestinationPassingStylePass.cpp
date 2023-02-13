@@ -253,6 +253,22 @@ static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
       [&](tensor::EmptyOp emptyTensorOp) -> WalkResult {
         for (auto result : emptyTensorOp->getResults()) {
           if (!result.getType().isa<RankedTensorType>()) continue;
+
+          // The tensor.empty op created by tiling unpack ops is intended to be
+          // a stack allocation. We can't replace it with destination buffer
+          // because it is larger than the destination buffer.
+          bool isUsedByNonPerfectUnpack = false;
+          for (const auto &use : emptyTensorOp->getUses()) {
+            if (auto unpack =
+                    dyn_cast<IREE::LinalgExt::UnPackOp>(use.getOwner())) {
+              if (unpack->hasOneUse() &&
+                  isa<tensor::ExtractSliceOp>(*(unpack->user_begin()))) {
+                isUsedByNonPerfectUnpack = true;
+              }
+            }
+          }
+          if (isUsedByNonPerfectUnpack) continue;
+
           if (plan.isInStoreSet(result) && !processed.count(result)) {
             return modifyResultToUseStoreBuffer(b, result, plan, processed);
           }
