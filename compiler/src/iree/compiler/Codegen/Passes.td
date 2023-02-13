@@ -106,10 +106,10 @@ def IREEComprehensiveBufferize :
   ];
 }
 
-def LowerMicroKernelOpsToCalls :
-    Pass<"iree-codegen-lower-micro-kernel-ops-to-calls", "ModuleOp"> {
+def LowerUKernelOpsToCalls :
+    Pass<"iree-codegen-lower-ukernel-ops-to-calls", "ModuleOp"> {
   let summary = "Lower micro-kernel wrapper ops into function calls";
-  let constructor = "mlir::iree_compiler::createLowerMicroKernelOpsToCallsPass()";
+  let constructor = "mlir::iree_compiler::createLowerUKernelOpsToCallsPass()";
 }
 
 def OptimizeVectorTransfer :
@@ -374,12 +374,12 @@ def LLVMCPULowerExecutableTarget :
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
 }
 
-def LLVMCPULowerToMicroKernels :
-    Pass<"iree-llvmcpu-lower-to-micro-kernels", ""> {
+def LLVMCPULowerToUKernels :
+    Pass<"iree-llvmcpu-lower-to-ukernels", ""> {
   let summary =
       "Separate out parts of the IR that lower to a micro-kernel";
   let constructor =
-      "mlir::iree_compiler::createLLVMCPULowerToMicroKernelsPass()";
+      "mlir::iree_compiler::createLLVMCPULowerToUKernelsPass()";
 }
 
 def LLVMCPUMaterializeEncoding :

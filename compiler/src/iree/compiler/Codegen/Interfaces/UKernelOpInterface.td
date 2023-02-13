@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_CODEGEN_INTERFACES_MICRO_KERNEL_OP_INTERFACE
-#define IREE_CODEGEN_INTERFACES_MICRO_KERNEL_OP_INTERFACE
+#ifndef IREE_CODEGEN_INTERFACES_UKERNEL_OP_INTERFACE
+#define IREE_CODEGEN_INTERFACES_UKERNEL_OP_INTERFACE
 
 include "mlir/IR/OpBase.td"
 
-def MicroKernelOpInterface : OpInterface<"MicroKernelOpInterface"> {
+def UKernelOpInterface : OpInterface<"UKernelOpInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
 
   let description = [{
@@ -29,4 +29,4 @@ def MicroKernelOpInterface : OpInterface<"MicroKernelOpInterface"> {
   ];
 }
 
-#endif // IREE_CODEGEN_INTERFACES_MICRO_KERNEL_OP_INTERFACE
+#endif // IREE_CODEGEN_INTERFACES_UKERNEL_OP_INTERFACE
