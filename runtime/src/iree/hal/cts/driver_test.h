@@ -123,6 +123,7 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByPath) {
         /*params=*/NULL, iree_allocator_system(), &device);
     IREE_ASSERT_TRUE(iree_status_is_not_found(status));
     std::cout << "    Failed as expected\n";
+    iree_status_consume_code(status);
     iree_hal_device_release(device);
   }
 
@@ -140,6 +141,7 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByPath) {
         /*params=*/NULL, iree_allocator_system(), &device);
     IREE_ASSERT_TRUE(iree_status_is_unimplemented(status));
     std::cout << "    Failed as expected\n";
+    iree_status_consume_code(status);
     iree_hal_device_release(device);
   }
 
