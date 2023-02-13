@@ -1,15 +1,16 @@
 # Profiling with Tracy
 
 [Tracy](https://github.com/wolfpld/tracy) is a profiler that puts together in a
-single view:
-
-*   Both CPU and GPU profiling.
-*   Both sampling and instrumentation.
-*   Both specifics of our own process, and whole-system profiling a la
-    "systrace".
-
-Since Tracy relies on instrumentation, it requires IREE binaries to be built
-with a special flag to enable it.
+single view both instrumentation and system profiling (sampling, systrace). It's
+key to understand the nuance here.
+* *Instrumentation* is code built into the process being profiled, collecting
+  timestamps at the start and end of "zones". Once it's enabled at build time,
+  it typically just works &emdash; it is a part of our application logic just
+  like anything else, so there's no reason why it would not work.
+* *Sampling* and *SysTrace* rely on specific
+  system features to collect information on what is *actually* running. These
+  rely on OS and binary (ELF) file features, so they can take a bit more care to
+  get to work properly.
 
 There are two components to Tracy. They communicate over a TCP socket.
 
@@ -26,6 +27,22 @@ a PDF manual that's part of each numbered release.
 [Download](https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf)
 or
 [view in browser](https://docs.google.com/viewer?url=https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf).
+
+## Overview
+
+We will go through each steps below, but here is an overview. It highlights the simpler subset of instructions when only instrumentation is needed, vs. the additional steps needed when Sampling is also wanted.
+
+Component | Instrumentation only | Instrumentation and Sampling
+--- | --- | ---
+Build Tracy capture (`iree-tracy-capture`) | Base instructions below for [dependencies](#install-dependencies) and [build](#build-the-tracy-tools) | Same
+Build Tracy profiler (`iree-tracy-profiler`) | Base instructions below for [dependencies](#install-dependencies) and [build](#build-the-tracy-tools) | Same plus [`capstone-next` instructions](#do-you-need-capstone-next) for CPU disassembly to work
+Build the IREE compiler (`iree-compile`) for profiling your own modules  | [Nothing particular](#build-the-iree-compiler-iree-compile) | Same
+Build the IREE compiler (`iree-compile`) for profiling the compiler itself | [Also need](#build-the-iree-compiler-iree-compile) Cmake setting: `IREE_ENABLE_COMPILER_TRACING` | Same
+Compile your IREE module (run `iree-compile`) | [Nothing particular](#compile-your-iree-module-run-iree-compile) | [Also need](#additional-steps-for-sampling) to pass `--iree-llvm-link-embedded=false`, and also `--iree-llvm-debug-symbols=true` but that is currently default.
+Build IREE device binaries (`iree-run-module` etc) | [Base instructions below](#build-iree-device-binaries-with-tracy-instrumentation-clients) (Cmake: set `IREE_ENABLE_RUNTIME_TRACING`) | [Also need](#additional-steps-for-sampling-1) debug information (Set `CMAKE_BUILD_TYPE` to `RelWithDebInfo`).
+Run IREE device binaries loading your modules | [Nothing particular](#running-the-profiled-program) (May need to set the environment variable `TRACY_NO_EXIT=1` for short-running benchmarks) | [Also need](#additional-steps-for-sampling-2) to set the environment variable `IREE_PRESERVE_DYLIB_TEMP_FILES` and adjust device security settings or run as root depending on OS.
+Run Tracy capture (`iree-tracy-capture`) to collect the trace | If device!=host (e.g. Android), [set up TCP port forwarding](#running-the-tracy-capture-cli-connecting-and-saving-profiles). | Same
+Build IREE's own tests and benchmark suites with Tracy instrumentation | [As above](#build-iree-device-binaries-with-tracy-instrumentation-clients), CMake: set `IREE_ENABLE_RUNTIME_TRACING`. | [Also need](#additional-steps-for-sampling) the CMake setting `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` so that `--iree-llvm-link-embedded=false` will be passed to `iree-compile`.
 
 ## Install dependencies
 
@@ -123,85 +140,80 @@ $ find . -name iree-tracy-*
 ./tracy/iree-tracy-csvexport
 ```
 
-## Build IREE binaries with Tracy instrumentation ("clients")
+## Build the IREE compiler (`iree-compile`)
 
-In your IREE device build directory, set the following CMake options:
+Most people don't need to rebuild `iree-compile` at all for Tracy and can skip this section.
 
-```shell
-$ cmake \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DIREE_ENABLE_RUNTIME_TRACING=ON \
-  -DIREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON \
-  .
+If you want to profile `iree-compile` itself as opposed to just profiling modules compiled with it, then rebuild it with the CMake setting `IREE_ENABLE_COMPILER_TRACING` set to `ON`.
+
+## Compile your IREE module (run `iree-compile`)
+
+You you only want Instrumentation and not Sampling then you don't need anything particular here. Just run `iree-compile` as usual.
+
+### Additional steps for Sampling
+
+In order for Sampling to work with your compiled modules, add this flag to your `iree-compile` command line: `--iree-llvm-link-embedded=false`.
+
+Sampling features also rely on debug information in the compiled module, enabled by `--iree-llvm-debug-symbols=true`, but that is currently the default.
+
+When building IREE's own test and benchmark suites, if Tracy Sampling support is wanted, set the CMake setting `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` to `ON`. It has the effect of passing that `--iree-llvm-link-embedded=false` when compiling test/benchmark modules.
+
+## Build IREE device binaries with Tracy instrumentation ("clients")
+
+Set the CMake setting `IREE_ENABLE_RUNTIME_TRACING` to `ON` and rebuild IREE device binaries, e.g.
+
 ```
-
-The `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` option is only needed for
-Tracy to see into IREE CPU codegen module code in any IREE benchmark or test
-that involves such modules. Its effect is to pass
-`--iree-llvm-link-embedded=false` to the compiler, so when you build CPU-codegen
-modules by manually invoking `iree-compile`, you also need to pass that flag in
-order for the resulting code to be transparent to Tracy. You can omit that if
-you only need Tracy to see into the IREE runtime, leaving IREE CPU codegen
-modules opaque.
-
-For tracing the compiler, additionally set `IREE_ENABLE_COMPILER_TRACING` to
-`ON`. Compiler tracing is less stable, particularly when using sampling
-(running with elevated permissions).
-
-Once done configuring CMake, proceed to rebuild, e.g.
-
-```shell
+cd iree-device-build-dir
+cmake -DIREE_ENABLE_RUNTIME_TRACING=ON .
 cmake --build .
 ```
 
-Or if interested in running the benchmark suites,
+### Additional steps for Sampling
 
-```shell
-cmake --build . --target iree-benchmark-suites
+In order for Sampling features to work, make sure that binaries contain debug information. That usually means changing the `CMAKE_BUILD_TYPE` to `RelWithDebInfo` instead of `Release`.
+
+In your IREE device build directory, set the following CMake options:
+
+```
+cd iree-device-build-dir
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo .
 ```
 
 ## Running the profiled program
 
-There are platform-specific additional prerequisites to get sampling to work,
-but we will get to that below, focusing for now on the basic recipe:
+The basic recipe is to just run your program as usual on the device and, while it is running, run `iree-tracy-capture` on the host to connect to it.
 
-Run the instrumented program as usual, but with the following environment
-variables set:
-
-*   `TRACY_NO_EXIT=1`
-*   `IREE_PRESERVE_DYLIB_TEMP_FILES=1`
+In the typical case of a short-running benchmark, one usually runs with the environment variable `TRACY_NO_EXIT` defined so that the benchmark does not exit until `iree-tracy-capture` has connected to it.
 
 Example:
 
 ```shell
-TRACY_NO_EXIT=1 IREE_PRESERVE_DYLIB_TEMP_FILES=1 \
-  /data/local/tmp/iree-benchmark-module \
-    --driver=local-task \
-    --module=/data/local/tmp/android_module.fbvm \
-    --function=serving_default \
-    --input=1x384xi32
+TRACY_NO_EXIT=1 /data/local/tmp/iree-benchmark-module ... (usual flags)
 ```
 
-Explanation:
+### Additional steps for Sampling
 
-*   `TRACY_NO_EXIT=1` ensures that your program does not exit until a Tracy
-    server (either `iree-tracy-capture` or `iree-tracy-profiler`) has connected
-    to it and obtained the trace.
-*   `IREE_PRESERVE_DYLIB_TEMP_FILES=1` is only needed if you want Tracy to see
-    into IREE CPU codegen module code. It is also possible to pass an explicit
-    path, e.g. `IREE_PRESERVE_DYLIB_TEMP_FILES=/tmp/iree-tmpfiles` (make sure to
-    create that directory), to better control proliferation of temporary files.
+In order for Sampling to work, the IREE compiled module code mapping must still be
+accessible by the time Tracy tries to read symbols code. This requires setting the environment variable `IREE_PRESERVE_DYLIB_TEMP_FILES`. It is easiest to set it to `1` but one may also set it to an explicit path where to preserve the temporary files.
+
+Example:
+
+```shell
+TRACY_NO_EXIT=1 IREE_PRESERVE_DYLIB_TEMP_FILES=1 /data/local/tmp/iree-benchmark-module ... (usual flags)
+```
 
 Tracing doesn't work properly on VMs (see "Problematic Platforms / Virtual
 Machines" section 2.1.6.4 of the [manual](#the-tracy-manual)). To get sampling,
 you should run the profiled program on bare metal.
 
-### Permissions issues on desktop Linux
+## Operating system settings required for Sampling and SysTrace
+
+### Desktop Linux
 
 On desktop Linux, the profiled application must be run as root, e.g. with
 `sudo`. Otherwise, profile data will lack important components.
 
-### Permissions issues on Android
+### Android
 
 When profiling on an Android device, in order to get the most useful information
 in the trace, tweak system permissions as follows before profiling. This needs
@@ -241,12 +253,12 @@ Internally, Tracy executes `su` commands to perform certain actions, so it too
 relies on the device being *rooted* without relying on the benchmark process
 being run as root.
 
-## "RESOURCE_EXHAUSTED; failed to open file" issue
+### "RESOURCE_EXHAUSTED; failed to open file" issue
 
 This is a
 [known issue with how tracy operates](https://github.com/wolfpld/tracy/issues/512).
 One way to workaround it is to manually increase the total number of files
-that can be kept opened simultanously and run the benchmark command with that
+that can be kept opened simultaneously and run the benchmark command with that
 setting:
 ```
 sudo sh -c "ulimit -n <bigNum> && <myTracyInstrumentedProgram>"
