@@ -269,9 +269,9 @@ def main(args):
     comparable_results = None
   else:
     required_benchmark_keys = set(execution_benchmarks.keys())
-    for target_name in compilation_metrics:
+    for target_id in compilation_metrics:
       for mapper in benchmark_presentation.COMPILATION_METRICS_TO_TABLE_MAPPERS:
-        required_benchmark_keys.add(mapper.get_series_name(target_name))
+        required_benchmark_keys.add(mapper.get_series_id(target_id))
 
     comparable_results = _find_comparable_benchmark_results(
         start_commit=pr_base_commit,
@@ -290,16 +290,16 @@ def main(args):
       execution_benchmarks[bench].base_mean_time = base_benchmark["sample"]
 
     # Update the compilation metrics with base numbers.
-    for target_name, metrics in compilation_metrics.items():
+    for target_id, metrics in compilation_metrics.items():
       updated_metrics = metrics
       for mapper in benchmark_presentation.COMPILATION_METRICS_TO_TABLE_MAPPERS:
-        metric_key = mapper.get_series_name(target_name)
-        base_benchmark = comparable_results.benchmark_results[metric_key]
+        base_benchmark = comparable_results.benchmark_results[
+            mapper.get_series_id(target_id)]
         if base_benchmark["sampleUnit"] != mapper.get_unit():
           raise ValueError("Unit of the queried sample is mismatched.")
         updated_metrics = mapper.update_base_value(updated_metrics,
                                                    base_benchmark["sample"])
-      compilation_metrics[target_name] = updated_metrics
+      compilation_metrics[target_id] = updated_metrics
 
   pr_commit_link = md.link(pr_commit,
                            f"{GITHUB_IREE_REPO_PREFIX}/commit/{pr_commit}")
