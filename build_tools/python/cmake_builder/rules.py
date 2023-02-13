@@ -137,8 +137,7 @@ def build_iree_import_tf_model(target_path: str, source: str,
                                output_mlir_file: str) -> str:
   target_name_block = _get_string_arg_block("TARGET_NAME", target_path)
   source_block = _get_string_arg_block("SOURCE", source)
-  import_flags_block = _get_string_arg_block("IMPORT_FLAGS",
-                                             " ".join(import_flags))
+  import_flags_block = _get_string_list_arg_block("IMPORT_FLAGS", import_flags)
   output_mlir_file_block = _get_string_arg_block("OUTPUT_MLIR_FILE",
                                                  output_mlir_file)
   return _convert_block_to_string(

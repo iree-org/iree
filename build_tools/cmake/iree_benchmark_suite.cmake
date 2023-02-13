@@ -72,8 +72,8 @@ function(iree_import_tf_model)
     PARSE_ARGV 0
     _RULE
     ""
-    "TARGET_NAME;SOURCE;IMPORT_FLAGS;OUTPUT_MLIR_FILE"
-    ""
+    "TARGET_NAME;SOURCE;OUTPUT_MLIR_FILE"
+    "IMPORT_FLAGS"
   )
   iree_validate_required_arguments(
     _RULE
@@ -95,9 +95,9 @@ function(iree_import_tf_model)
       OUTPUT "${_RULE_OUTPUT_MLIR_FILE}"
       COMMAND
         "${IREE_IMPORT_TF_PATH}"
-        "${_RULE_IMPORT_FLAGS}"
         "${_RULE_SOURCE}"
         "-o=${_RULE_OUTPUT_MLIR_FILE}"
+        ${_RULE_IMPORT_FLAGS}
       DEPENDS
         "${_RULE_SOURCE}"
       COMMENT "Importing TF model ${_MODEL_BASENAME}"

@@ -122,7 +122,9 @@ MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
         MLIRDialectType.NONE,
     common_definitions.ModelSourceType.EXPORTED_TFLITE:
         MLIRDialectType.TOSA,
-    common_definitions.ModelSourceType.EXPORTED_TF:
+    common_definitions.ModelSourceType.EXPORTED_TF_V1:
+        MLIRDialectType.MHLO,
+    common_definitions.ModelSourceType.EXPORTED_TF_V2:
         MLIRDialectType.MHLO,
 }
 
@@ -139,10 +141,18 @@ class ImportedModel(object):
   @staticmethod
   def from_model(model: common_definitions.Model):
     dialect_type = MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type]
-    import_flags = []
-    if model.source_type == common_definitions.ModelSourceType.EXPORTED_TF:
-      import_flags.append(
-          f"--tf-savedmodel-exported-names={model.entry_function}")
+    if model.source_type == common_definitions.ModelSourceType.EXPORTED_TF_V1:
+      import_flags = [
+          "--tf-import-type=savedmodel_v1",
+          f"--tf-savedmodel-exported-names={model.entry_function}"
+      ]
+    elif model.source_type == common_definitions.ModelSourceType.EXPORTED_TF_V2:
+      import_flags = [
+          "--tf-import-type=savedmodel_v2",
+          f"--tf-savedmodel-exported-names={model.entry_function}"
+      ]
+    else:
+      import_flags = []
     return ImportedModel(id=f"{model.id}-{dialect_type.id}",
                          model=model,
                          dialect_type=dialect_type,

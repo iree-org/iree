@@ -12,7 +12,7 @@ MINILM_L12_H384_UNCASED_INT32_SEQLEN128 = common_definitions.Model(
     id=unique_ids.MODEL_MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
     name="MiniLML12H384Uncased",
     tags=["int32", "seqlen128"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_TF,
+    source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
     # Converted from https://huggingface.co/microsoft/MiniLM-L12-H384-uncased/commit/44acabbec0ef496f6dbc93adadea57f376b7c0ec
     source_url=
     "https://storage.googleapis.com/iree-model-artifacts/minilm-l12-h384-uncased-seqlen128-tf-model.tar.gz",
@@ -23,7 +23,7 @@ BERT_FOR_MASKED_LM_FP32_SEQLEN512 = common_definitions.Model(
     id=unique_ids.MODEL_BERT_FOR_MASKED_LM_FP32_SEQLEN512_TF,
     name="BertForMaskedLMTF",
     tags=["fp32", "seqlen512", "tensorflow"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_TF,
+    source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
     # Converted from https://huggingface.co/transformers/v3.0.2/model_doc/bert.html#tfbertformaskedlm
     source_url=
     "https://storage.googleapis.com/iree-model-artifacts/bert-for-masked-lm-seq512-tf-model.tar.gz",
@@ -34,7 +34,7 @@ EFFICIENTNET_V2_S_FP32 = common_definitions.Model(
     id=unique_ids.MODEL_EFFICIENTNET_V2_S_FP32_TF,
     name="EfficientNetV2STF",
     tags=["fp32", "cnn", "tensorflow"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_TF,
+    source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
     # Converted from https://github.com/keras-team/keras/blob/v2.10.0/keras/applications/efficientnet_v2.py
     source_url=
     "https://storage.googleapis.com/iree-model-artifacts/efficientnet-v2-s-tf-model.tar.gz",
@@ -45,7 +45,7 @@ RESNET50_TF_FP32 = common_definitions.Model(
     id=unique_ids.MODEL_RESNET50_TF_FP32,
     name="Resnet50TF",
     tags=["fp32"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_TF,
+    source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
     # Derived from https://github.com/keras-team/keras/blob/v2.10.0/keras/applications/resnet.py.
     source_url=
     "https://storage.googleapis.com/iree-model-artifacts/resnet50-tf-model.tar.gz",

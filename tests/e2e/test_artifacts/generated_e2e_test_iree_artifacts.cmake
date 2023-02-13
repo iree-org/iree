@@ -103,6 +103,7 @@ iree_import_tf_model(
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
   IMPORT_FLAGS
+    "--tf-import-type=savedmodel_v2"
     "--tf-savedmodel-exported-names=predict"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
@@ -114,6 +115,7 @@ iree_import_tf_model(
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF"
   IMPORT_FLAGS
+    "--tf-import-type=savedmodel_v2"
     "--tf-savedmodel-exported-names=forward"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF.mlir"
@@ -125,6 +127,7 @@ iree_import_tf_model(
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF"
   IMPORT_FLAGS
+    "--tf-import-type=savedmodel_v2"
     "--tf-savedmodel-exported-names=forward"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.mlir"
@@ -136,6 +139,7 @@ iree_import_tf_model(
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_c393b4fa-beb4-45d5-982a-c6328aa05d08_Resnet50TF"
   IMPORT_FLAGS
+    "--tf-import-type=savedmodel_v2"
     "--tf-savedmodel-exported-names=forward"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_c393b4fa-beb4-45d5-982a-c6328aa05d08_Resnet50TF.mlir"

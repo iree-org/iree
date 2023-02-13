@@ -143,7 +143,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         id="tf",
         name="model_tf",
         tags=["fp32"],
-        source_type=common_definitions.ModelSourceType.EXPORTED_TF,
+        source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
         source_url="",
         entry_function="predict",
         input_types=["1xf32"])
@@ -203,7 +203,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
     suite = BenchmarkSuite.load_from_run_configs(run_configs=run_configs)
 
     self.assertEqual(suite.list_categories(),
-                     [("exported_tf", pathlib.Path("exported_tf")),
+                     [("exported_tf_v2", pathlib.Path("exported_tf_v2")),
                       ("exported_tflite", pathlib.Path("exported_tflite"))])
     self.assertEqual(
         suite.filter_benchmarks_for_category(category="exported_tflite"), [
@@ -226,7 +226,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         ])
     self.assertEqual(
         suite.filter_benchmarks_for_category(
-            category="exported_tf",
+            category="exported_tf_v2",
             cpu_target_arch_filter="cpu-riscv_32-generic",
             model_name_filter="model_tf.*fp32",
             mode_filter="defaults"),
@@ -242,7 +242,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         ])
     self.assertEqual(
         suite.filter_benchmarks_for_category(
-            category="exported_tf",
+            category="exported_tf_v2",
             cpu_target_arch_filter="cpu-riscv_32-generic",
             mode_filter="experimental"), [])
 

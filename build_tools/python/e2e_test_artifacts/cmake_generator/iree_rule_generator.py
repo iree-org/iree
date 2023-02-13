@@ -67,7 +67,10 @@ class IreeRuleBuilder(object):
               source=str(source_model_rule.file_path),
               output_mlir_file=str(output_file_path))
       ]
-    elif model.source_type == common_definitions.ModelSourceType.EXPORTED_TF:
+    elif model.source_type in [
+        common_definitions.ModelSourceType.EXPORTED_TF_V1,
+        common_definitions.ModelSourceType.EXPORTED_TF_V2
+    ]:
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tf_model(
               target_path=self.build_target_path(target_name),
