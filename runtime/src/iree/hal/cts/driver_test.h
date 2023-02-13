@@ -102,7 +102,7 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByPath) {
     char index[8];
     IREE_ASSERT_LT(snprintf(index, 8, "%d", i), 8);
     IREE_ASSERT_OK(iree_hal_driver_create_device_by_path(
-        driver_, name, iree_string_view_literal(index),
+        driver_, name, IREE_SV(index),
         /*param_count=*/0,
         /*params=*/NULL, iree_allocator_system(), &device));
     iree_string_view_t device_id = iree_hal_device_id(device);
@@ -118,7 +118,7 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByPath) {
     char index[8];
     IREE_ASSERT_LT(snprintf(index, 8, "%d", device_info_count), 8);
     iree_status_t status = iree_hal_driver_create_device_by_path(
-        driver_, name, iree_string_view_literal(index),
+        driver_, name, IREE_SV(index),
         /*param_count=*/0,
         /*params=*/NULL, iree_allocator_system(), &device);
     IREE_ASSERT_TRUE(iree_status_is_not_found(status));
@@ -135,7 +135,7 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByPath) {
               << "' with unsupported path..\n";
     iree_hal_device_t* device = NULL;
     iree_status_t status = iree_hal_driver_create_device_by_path(
-        driver_, name, iree_string_view_literal("magic-path"),
+        driver_, name, IREE_SV("magic-path"),
         /*param_count=*/0,
         /*params=*/NULL, iree_allocator_system(), &device);
     IREE_ASSERT_TRUE(iree_status_is_unimplemented(status));
