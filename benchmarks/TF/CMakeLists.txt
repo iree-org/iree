@@ -78,6 +78,7 @@ set(BERT_LARGE_TF_FP32_SEQLEN384_MODULE
     "serving_default"
   IMPORT_FLAGS
     "--tf-import-type=savedmodel_v1"
+    "--tf-savedmodel-exported-names=serving_default"
   FUNCTION_INPUTS
     "1x384xi32,1x384xi32,1x384xi32"
 )
