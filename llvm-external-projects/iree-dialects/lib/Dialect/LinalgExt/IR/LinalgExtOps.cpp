@@ -2329,7 +2329,7 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
       bindSymbols(builder.getContext(), tile);
       // Do not create an Affine ops for output size because the affine op is
       // too complicated which would trigger an issue in affine ops
-      // simplication.
+      // simplification.
       OpFoldResult size = builder.createOrFold<arith::MulIOp>(
           loc, getValueOrCreateConstantIndexOp(builder, loc, inputSizes.back()),
           getValueOrCreateConstantIndexOp(builder, loc,
