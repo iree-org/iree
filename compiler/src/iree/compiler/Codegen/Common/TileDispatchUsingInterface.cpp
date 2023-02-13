@@ -653,8 +653,7 @@ void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options) {
   MLIRContext *context = patterns.getContext();
   patterns.insert<SwapExtractSliceWithDispatchTensorLoad,
-                  SwapExtractSliceWithInitTensor,
-                  SwapExtractSliceWithTiledProducer>(context);
+                  SwapExtractSliceWithInitTensor>(context);
 }
 
 }  // namespace iree_compiler
