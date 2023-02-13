@@ -268,6 +268,8 @@ function(iree_benchmark_suite)
       iree_import_tflite_model(
         TARGET_NAME "${_MODULE_SOURCE_TARGET}"
         SOURCE "${_MODULE_SOURCE}"
+        IMPORT_FLAGS
+          ${_MODULE_IMPORT_FLAGS}
         OUTPUT_MLIR_FILE "${_MODULE_SOURCE}.mlir"
       )
       set(_MODULE_SOURCE "${_MODULE_SOURCE}.mlir")
