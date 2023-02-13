@@ -1,7 +1,7 @@
 // RUN: iree-opt --iree-codegen-lower-micro-kernel-ops-to-calls -split-input-file --verify-diagnostics --cse %s | FileCheck %s
 
 func.func @scalar_types(%arg0: i32, %arg1 : f64, %arg2 : index, %arg3 : memref<f32>) {
-  iree_codegen.generic.ukernel "scalar_fn" ins(%arg0, %arg1, %arg2 : i32, f64, index) outs(%arg3 : memref<f32>)
+  iree_codegen.ukernel.generic "scalar_fn" ins(%arg0, %arg1, %arg2 : i32, f64, index) outs(%arg3 : memref<f32>)
   return
 }
 //      CHECK: func.func private @scalar_fn(i32, f64, index, memref<f32>)
@@ -16,7 +16,7 @@ func.func @scalar_types(%arg0: i32, %arg1 : f64, %arg2 : index, %arg3 : memref<f
 // -----
 
 func.func @memref_1D(%arg0 : memref<?xf32, strided<[1], offset: ?>>) {
-  iree_codegen.generic.ukernel "test1d" outs(%arg0 : memref<?xf32, strided<[1], offset: ?>>)
+  iree_codegen.ukernel.generic "test1d" outs(%arg0 : memref<?xf32, strided<[1], offset: ?>>)
   return
 }
 //      CHECK: func.func private @test1d(memref<f32>, index)
@@ -28,7 +28,7 @@ func.func @memref_1D(%arg0 : memref<?xf32, strided<[1], offset: ?>>) {
 // -----
 
 func.func @memref_3D(%arg0 : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>) {
-  iree_codegen.generic.ukernel "test3d" outs(%arg0 : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>)
+  iree_codegen.ukernel.generic "test3d" outs(%arg0 : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>)
   return
 }
 //      CHECK: func.func private @test3d(memref<f32>, index, index, index)
@@ -41,7 +41,7 @@ func.func @memref_3D(%arg0 : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>) {
 
 func.func @return_value(%arg0 : tensor<f32>) -> tensor<f32> {
   // expected-error @+1 {{failed to lower micro kernel operation to function call}}
-  %0 = iree_codegen.generic.ukernel "err" outs(%arg0 : tensor<f32>) -> tensor<f32>
+  %0 = iree_codegen.ukernel.generic "err" outs(%arg0 : tensor<f32>) -> tensor<f32>
   return %0 : tensor<f32>
 }
 
@@ -55,7 +55,7 @@ func.func @generic_ukernel(%arg0 : memref<?x?xf32>, %arg1 : memref<?x?xf32>,
   %dim_1 = memref.dim %arg0, %c0 : memref<?x?xf32>
   %dim_2 = memref.dim %arg1, %c1 : memref<?x?xf32>
   %dim_3 = memref.dim %arg2, %c1 : memref<?x?xf32>
-  iree_codegen.generic.ukernel "vmvx.matmul.f32.f32.f32" ins(%arg0, %arg1 : memref<?x?xf32>, memref<?x?xf32>) outs(%arg2 : memref<?x?xf32>) (%dim_1, %dim_2, %dim_3, %c0_i32 : index, index, index, i32)
+  iree_codegen.ukernel.generic "vmvx.matmul.f32.f32.f32" ins(%arg0, %arg1 : memref<?x?xf32>, memref<?x?xf32>) outs(%arg2 : memref<?x?xf32>) (%dim_1, %dim_2, %dim_3, %c0_i32 : index, index, index, i32)
   return
 }
 // CHECK-LABEL: func.func private @vmvx.matmul.f32.f32.f32
@@ -83,7 +83,7 @@ func.func @generic_ukernel(%arg0 : memref<?x?xf32>, %arg1 : memref<?x?xf32>,
 
 func.func @mmt4d_ukernel(%arg0 : memref<?x?x?x?xf32>, %arg1 : memref<?x?x?x?xf32>,
     %arg2 : memref<?x?x?x?xf32>) {
-  iree_codegen.mmt4d.ukernel lhs(%arg0 : memref<?x?x?x?xf32>) rhs(%arg1 : memref<?x?x?x?xf32>)
+  iree_codegen.ukernel.mmt4d lhs(%arg0 : memref<?x?x?x?xf32>) rhs(%arg1 : memref<?x?x?x?xf32>)
       outs(%arg2 : memref<?x?x?x?xf32>) accumulate(false)
   return
 }
@@ -121,7 +121,7 @@ func.func @mmt4d_ukernel(%arg0 : memref<?x?x?x?xf32>, %arg1 : memref<?x?x?x?xf32
 
 func.func @mmt4d_ukernel_i8i8i32(%arg0 : memref<?x?x?x?xi8>, %arg1 : memref<?x?x?x?xi8>,
     %arg2 : memref<?x?x?x?xi32>) {
-  iree_codegen.mmt4d.ukernel lhs(%arg0 : memref<?x?x?x?xi8>) rhs(%arg1 : memref<?x?x?x?xi8>)
+  iree_codegen.ukernel.mmt4d lhs(%arg0 : memref<?x?x?x?xi8>) rhs(%arg1 : memref<?x?x?x?xi8>)
       outs(%arg2 : memref<?x?x?x?xi32>) accumulate(false)
   return
 }

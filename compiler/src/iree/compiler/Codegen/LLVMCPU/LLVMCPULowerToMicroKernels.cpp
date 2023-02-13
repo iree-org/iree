@@ -37,7 +37,7 @@ static bool isInitializedToZero(Value outsOperand) {
 }
 
 /// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
-/// it into a iree_codegen.mmt4d.ukernel operation, that is later lowered
+/// it into a iree_codegen.ukernel.mmt4d operation, that is later lowered
 /// into a call to the microkernel.
 static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
     RewriterBase &rewriter, linalg::Mmt4DOp op) {
@@ -76,7 +76,7 @@ static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
 }
 
 /// Matches an (linalg.fill -> )? linalg.matmul operation sequence and converts
-/// it into a iree_codegen.generic.ukernel operation, that is lowered
+/// it into a iree_codegen.ukernel.generic operation, that is lowered
 /// into a call to the microkernel.
 static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
     RewriterBase &rewriter, linalg::MatmulOp op) {
@@ -131,7 +131,7 @@ static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
 namespace {
 
 /// Pattern to lower (linalg.fill -> )? linalg.matmul operation sequence and
-/// converts it into a iree_codegen.generic.ukernel operation
+/// converts it into a iree_codegen.ukernel.generic operation
 struct MatmulMicroKernelPattern : OpRewritePattern<linalg::MatmulOp> {
   using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
 
@@ -149,7 +149,7 @@ struct MatmulMicroKernelPattern : OpRewritePattern<linalg::MatmulOp> {
 };
 
 /// Pattern to lower (linalg.fill -> )? linalg.mmt4d operation sequence and
-/// converts it into a iree_codegen.mmt4d.ukernel operation
+/// converts it into a iree_codegen.ukernel.mmt4d operation
 struct Mmt4DUKernelPattern : OpRewritePattern<linalg::Mmt4DOp> {
   using OpRewritePattern<linalg::Mmt4DOp>::OpRewritePattern;
 

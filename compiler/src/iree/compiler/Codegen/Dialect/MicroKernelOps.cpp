@@ -83,7 +83,7 @@ std::pair<int64_t, int64_t> GenericUKernelOp::getDpsInitsPositionRange() {
   return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
 }
 
-/// Map type of operand of a `iree_codegen.generic.ukernel` operation to
+/// Map type of operand of a `iree_codegen.ukernel.generic` operation to
 /// the type(s) of the function call arguments(s) it lowers to.
 static LogicalResult getCallOpType(MLIRContext *context,
                                    Type microKernelOpOperandType,
@@ -115,7 +115,7 @@ static LogicalResult getCallOpType(MLIRContext *context,
       .Default([&](Type t) { return failure(); });
 }
 
-/// Map `operand` of a `generic.ukernel` operation to the operand(s) of
+/// Map `operand` of a `ukernel.generic` operation to the operand(s) of
 /// the function call it lowers to.
 static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
                                          Value operand,
