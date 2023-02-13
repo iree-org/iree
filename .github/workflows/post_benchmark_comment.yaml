@@ -55,7 +55,9 @@ jobs:
         id: check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BENCHMARK_PROCESS_JOB: process_benchmark_results
+          # TODO(#11076): Temporarily matches nonexistent job to only enable in
+          # test until we migrate the benchmark pipeline.
+          BENCHMARK_PROCESS_JOB: process_benchmark_results_disabled
         run: |
           # Assume the workflow has fewer than 100 jobs.
           export CONCLUSION=$(gh api \
@@ -76,8 +78,7 @@ jobs:
             "${PR_CI_GCS_URL}/${BENCHMARK_COMMENT_ARTIFACT}"
           echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
       - name: Posting comments
-        # TODO(#11076): Temporarily disabled until we migrate the database.
-        if: false && steps.check.outputs.job-conclusion == 'success'
+        if: steps.check.outputs.job-conclusion == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIST_BOT_TOKEN: ${{ secrets.GIST_BOT_TOKEN }}
