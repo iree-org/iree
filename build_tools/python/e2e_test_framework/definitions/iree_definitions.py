@@ -132,7 +132,7 @@ DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
-        "--tf-import-type=savedmodel_v1",
+        "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v1",
         f"--tf-savedmodel-exported-names={IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER}"
     ])
 
@@ -140,13 +140,14 @@ DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
-        "--tf-import-type=savedmodel_v2",
+        "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v2",
         f"--tf-savedmodel-exported-names={IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER}"
     ])
 
 DEFAULT_TFLITE_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TFLITE_DEFAULT,
-    dialect_type=MLIRDialectType.TOSA)
+    dialect_type=MLIRDialectType.TOSA,
+    import_flags=["--output-format=mlir-bytecode"])
 
 DEFAULT_LINALG_MLIR_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_LINALG_MLIR_DEFAULT,
