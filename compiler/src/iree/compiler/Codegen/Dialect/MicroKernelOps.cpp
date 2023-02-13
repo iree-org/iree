@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/MicroKernelOps.h"
 
 #include "iree/builtins/ukernel/exported_bits.h"
+#include "iree/compiler/Codegen/Common/EncodingInfo.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -289,19 +290,23 @@ FailureOr<func::CallOp> Mmt4DUKernelOp::lowerToFunctionCall(
         getOperation(), "cannot lower to function call operation with results");
   }
 
-  // Function name.
-  std::string fnName = "vmvx.mmt4d.";
-  if (getLhsElementType().isSignlessInteger(8) &&
-      getRhsElementType().isSignlessInteger(8) &&
-      getOutputElementType().isSignlessInteger(32)) {
-    fnName.append("i8.i8.i32");
-  } else if (getLhsElementType().isF32() && getRhsElementType().isF32() &&
-             getOutputElementType().isF32()) {
-    fnName.append("f32.f32.f32");
-  } else {
+  std::optional<MatmulType> matmulType = getMatmulType(
+      getLhsElementType(), getRhsElementType(), getOutputElementType());
+  if (!matmulType) {
     return emitOpError(
         "unhandled element types of operands for lowering to micro kernel "
         "function call");
+  }
+
+  // Function name.
+  std::string fnName = "vmvx.mmt4d.";
+  switch (matmulType.value()) {
+    case MatmulType::I8I8I32:
+      fnName.append("i8.i8.i32");
+      break;
+    case MatmulType::F32F32F32:
+      fnName.append("f32.f32.f32");
+      break;
   }
 
   // Create the function type.

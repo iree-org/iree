@@ -37,6 +37,10 @@ Optional<IREE::LinalgExt::TensorEncoding> getEncoding(
 
 Optional<MatmulType> getMatmulType(IREE::LinalgExt::TensorEncoding encoding);
 
+std::optional<MatmulType> getMatmulType(Type lhsElementType,
+                                        Type rhsElementType,
+                                        Type resultElementType);
+
 Optional<MatmulOperandRole> getMatmulOperandRole(
     IREE::LinalgExt::TensorEncoding encoding);
 

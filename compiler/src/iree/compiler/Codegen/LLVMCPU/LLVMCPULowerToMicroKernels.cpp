@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/builtins/ukernel/exported_bits.h"
+#include "iree/compiler/Codegen/Common/EncodingInfo.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/MicroKernelOps.h"
 #include "iree/compiler/Codegen/PassDetail.h"
@@ -54,12 +55,14 @@ static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
   Type lhsElemType = lhsType.getElementType();
   Type rhsElemType = rhsType.getElementType();
   Type outElemType = outType.getElementType();
-  if (!((lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
-         outElemType.isSignlessInteger(32)) ||
-        (lhsElemType.isF32() && rhsElemType.isF32() && outElemType.isF32()))) {
+
+  std::optional<MatmulType> matmulType =
+      getMatmulType(lhsElemType, rhsElemType, outElemType);
+  if (!matmulType) {
     return rewriter.notifyMatchFailure(
         op, "unsupported type for lowering to microkernels");
   }
+
   // check if the result has to be accumulated into a buffer.
   bool accumulate = !isInitializedToZero(out);
   if (!accumulate) {
@@ -90,21 +93,26 @@ static FailureOr<IREE::Codegen::MicroKernelOpInterface> matchDAGForMicroKernel(
   auto lhsType = lhs.getType().cast<ShapedType>();
   auto rhsType = rhs.getType().cast<ShapedType>();
   auto outType = out.getType().cast<ShapedType>();
-  std::string fnName = "";
   Type lhsElemType = lhsType.getElementType();
   Type rhsElemType = rhsType.getElementType();
   Type outElemType = outType.getElementType();
-  if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
-      outElemType.isSignlessInteger(32)) {
-    fnName = "vmvx.matmul.i8.i8.i32";
-  } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
-             outElemType.isF32()) {
-    fnName = "vmvx.matmul.f32.f32.f32";
-  }
-  if (fnName.empty()) {
+
+  std::optional<MatmulType> matmulType =
+      getMatmulType(lhsElemType, rhsElemType, outElemType);
+  if (!matmulType) {
     return rewriter.notifyMatchFailure(op,
                                        "unable to match micro kernel to op");
   }
+  std::string fnName = "";
+  switch (matmulType.value()) {
+    case MatmulType::I8I8I32:
+      fnName = "vmvx.matmul.i8.i8.i32";
+      break;
+    case MatmulType::F32F32F32:
+      fnName = "vmvx.matmul.f32.f32.f32";
+      break;
+  }
+
   bool accumulate = !isInitializedToZero(out);
   int flags = 0;
   if (accumulate) {
