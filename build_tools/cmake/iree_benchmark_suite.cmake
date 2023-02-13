@@ -214,8 +214,8 @@ function(iree_benchmark_suite)
     cmake_parse_arguments(
       _MODULE
       ""
-      "NAME;TAGS;SOURCE;ENTRY_FUNCTION;IMPORT_FLAGS;FUNCTION_INPUTS"
-      ""
+      "NAME;TAGS;SOURCE;ENTRY_FUNCTION;FUNCTION_INPUTS"
+      "IMPORT_FLAGS"
       ${_MODULE}
     )
     iree_validate_required_arguments(
@@ -278,7 +278,8 @@ function(iree_benchmark_suite)
       iree_import_tf_model(
         TARGET_NAME "${_MODULE_SOURCE_TARGET}"
         SOURCE "${_MODULE_SOURCE}"
-        IMPORT_FLAGS "${_MODULE_IMPORT_FLAGS}"
+        IMPORT_FLAGS
+          ${_MODULE_IMPORT_FLAGS}
         OUTPUT_MLIR_FILE "${_MODULE_SOURCE}.mlir"
       )
       set(_MODULE_SOURCE "${_MODULE_SOURCE}.mlir")
