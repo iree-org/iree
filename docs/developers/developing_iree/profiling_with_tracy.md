@@ -5,7 +5,7 @@ single view both instrumentation and system profiling (sampling, systrace). It's
 key to understand the nuance here.
 * *Instrumentation* is code built into the process being profiled, collecting
   timestamps at the start and end of "zones". Once it's enabled at build time,
-  it typically just works &emdash; it is a part of our application logic just
+  it typically just works &mdash; it is a part of our application logic just
   like anything else, so there's no reason why it would not work.
 * *Sampling* and *SysTrace* rely on specific
   system features to collect information on what is *actually* running. These
@@ -37,9 +37,9 @@ Component | Instrumentation only | Instrumentation and Sampling
 Build Tracy capture (`iree-tracy-capture`) | Base instructions below for [dependencies](#install-dependencies) and [build](#build-the-tracy-tools) | Same
 Build Tracy profiler (`iree-tracy-profiler`) | Base instructions below for [dependencies](#install-dependencies) and [build](#build-the-tracy-tools) | Same plus [`capstone-next` instructions](#do-you-need-capstone-next) for CPU disassembly to work
 Build the IREE compiler (`iree-compile`) for profiling your own modules  | [Nothing particular](#build-the-iree-compiler-iree-compile) | Same
-Build the IREE compiler (`iree-compile`) for profiling the compiler itself | [Also need](#build-the-iree-compiler-iree-compile) Cmake setting: `IREE_ENABLE_COMPILER_TRACING` | Same
+Build the IREE compiler (`iree-compile`) for profiling the compiler itself | [Also need](#build-the-iree-compiler-iree-compile) CMake setting: `IREE_ENABLE_COMPILER_TRACING` | Same
 Compile your IREE module (run `iree-compile`) | [Nothing particular](#compile-your-iree-module-run-iree-compile) | [Also need](#additional-steps-for-sampling) to pass `--iree-llvm-link-embedded=false`, and also `--iree-llvm-debug-symbols=true` but that is currently default.
-Build IREE device binaries (`iree-run-module` etc) | [Base instructions below](#build-iree-device-binaries-with-tracy-instrumentation-clients) (Cmake: set `IREE_ENABLE_RUNTIME_TRACING`) | [Also need](#additional-steps-for-sampling-1) debug information (Set `CMAKE_BUILD_TYPE` to `RelWithDebInfo`).
+Build IREE device binaries (`iree-run-module` etc) | [Base instructions below](#build-iree-device-binaries-with-tracy-instrumentation-clients) (CMake: set `IREE_ENABLE_RUNTIME_TRACING`) | [Also need](#additional-steps-for-sampling-1) debug information (Set `CMAKE_BUILD_TYPE` to `RelWithDebInfo`).
 Run IREE device binaries loading your modules | [Nothing particular](#running-the-profiled-program) (May need to set the environment variable `TRACY_NO_EXIT=1` for short-running benchmarks) | [Also need](#additional-steps-for-sampling-2) to set the environment variable `IREE_PRESERVE_DYLIB_TEMP_FILES` and adjust device security settings or run as root depending on OS.
 Run Tracy capture (`iree-tracy-capture`) to collect the trace | If device!=host (e.g. Android), [set up TCP port forwarding](#running-the-tracy-capture-cli-connecting-and-saving-profiles). | Same
 Build IREE's own tests and benchmark suites with Tracy instrumentation | [As above](#build-iree-device-binaries-with-tracy-instrumentation-clients), CMake: set `IREE_ENABLE_RUNTIME_TRACING`. | [Also need](#additional-steps-for-sampling) the CMake setting `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` so that `--iree-llvm-link-embedded=false` will be passed to `iree-compile`.
