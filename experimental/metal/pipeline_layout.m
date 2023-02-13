@@ -162,6 +162,13 @@ iree_hal_descriptor_set_layout_t* iree_hal_metal_pipeline_layout_descriptor_set_
   return NULL;
 }
 
+iree_host_size_t iree_hal_metal_pipeline_layout_push_constant_count(
+    iree_hal_pipeline_layout_t* base_pipeline_layout) {
+  iree_hal_metal_pipeline_layout_t* pipeline_layout =
+      iree_hal_metal_pipeline_layout_cast(base_pipeline_layout);
+  return pipeline_layout->push_constant_count;
+}
+
 static const iree_hal_pipeline_layout_vtable_t iree_hal_metal_pipeline_layout_vtable = {
     .destroy = iree_hal_metal_pipeline_layout_destroy,
 };

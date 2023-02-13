@@ -24,6 +24,16 @@ extern "C" {
 //   - 500,000 buffers or textures
 #define IREE_HAL_METAL_MAX_BINDING_COUNT 64
 
+// The [[buffer(N)]] index for push constants.
+//
+// This depends on the general descriptor set planning in IREE and should adjust
+// with it. Note that it also needs to be consistent with the compiler side when
+// setting up resource location attributes during cross compiling SPIR-V to MSL.
+#define IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX 3
+
+// The max number of push constants supported by the Metal HAL implementation.
+#define IREE_HAL_METAL_MAX_PUSH_CONSTANT_COUNT 64
+
 //===----------------------------------------------------------------------===//
 // iree_hal_metal_descriptor_set_layout_t
 //===----------------------------------------------------------------------===//
@@ -66,6 +76,10 @@ iree_status_t iree_hal_metal_pipeline_layout_create(
 iree_hal_descriptor_set_layout_t*
 iree_hal_metal_pipeline_layout_descriptor_set_layout(
     iree_hal_pipeline_layout_t* base_pipeline_layout, uint32_t set);
+
+// Returns the push constant count in the given |pipeline_layout|.
+iree_host_size_t iree_hal_metal_pipeline_layout_push_constant_count(
+    iree_hal_pipeline_layout_t* base_pipeline_layout);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -52,6 +52,12 @@ typedef struct iree_hal_metal_command_buffer_t {
   int current_total_binding_count;
   // The max descriptor set number we have seen thus far.
   int current_max_set_number;
+
+  // All available push constants updated each time push_constants is called. Reset only with the
+  // command buffer and otherwise will maintain its values during recording to allow for partial
+  // push_constants updates.
+  int32_t push_constants[IREE_HAL_METAL_MAX_PUSH_CONSTANT_COUNT];
+
   // The current pipeline layout used for push descriptors.
   iree_hal_pipeline_layout_t* current_pipeline_layout;
 
@@ -163,6 +169,7 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
            IREE_HAL_METAL_MAX_BINDING_COUNT * sizeof(command_buffer->current_descriptors[0]));
     command_buffer->current_total_binding_count = 0;
     command_buffer->current_max_set_number = -1;
+    memset(command_buffer->push_constants, 0, sizeof(command_buffer->push_constants));
     command_buffer->current_pipeline_layout = NULL;
     command_buffer->host_allocator = host_allocator;
     status = iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
@@ -315,7 +322,24 @@ static iree_status_t iree_hal_metal_command_buffer_collective(
 static iree_status_t iree_hal_metal_command_buffer_push_constants(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_pipeline_layout_t* pipeline_layout,
     iree_host_size_t offset, const void* values, iree_host_size_t values_length) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplemented push constants");
+  iree_hal_metal_command_buffer_t* command_buffer =
+      iree_hal_metal_command_buffer_cast(base_command_buffer);
+
+  // "Binding a pipeline with a layout that is not compatible with the push constant layout does not
+  // disturb the push constant values." So we don't need to check whether the pipeline layout
+  // compatibility and invalidate existing values.
+  // See https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPushConstants.html
+
+  if (IREE_UNLIKELY(offset + values_length >= sizeof(command_buffer->push_constants))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "push constant range [%zu, %zu) out of range", offset,
+                            offset + values_length);
+  }
+
+  memcpy((uint8_t*)&command_buffer->push_constants + offset, values, values_length);
+  command_buffer->current_pipeline_layout = pipeline_layout;
+
+  return iree_ok_status();
 }
 
 static int compare_descriptor(const void* a, const void* b) {
@@ -342,6 +366,13 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (set == IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "descriptor set #%d reserved for push constant emulation",
+                            IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX);
+  }
 
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
     if (bindings[i].buffer) continue;
@@ -415,6 +446,40 @@ static inline MTLResourceUsage iree_hal_metal_get_metal_resource_usage(
   return usage;
 }
 
+// Creates an argument encoder and its backing argument buffer for the given kernel |function|'s
+// |buffer_index|. The argument encoder will be set to encode into the newly created argument
+// buffer. Callers are expected to release both the argument encoder and buffer.
+static iree_status_t iree_hal_metal_create_argument_encoder(
+    id<MTLDevice> device, id<MTLCommandBuffer> command_buffer, id<MTLFunction> function,
+    uint32_t buffer_index, id<MTLArgumentEncoder>* out_encoder, id<MTLBuffer>* out_buffer) {
+  id<MTLArgumentEncoder> argument_encoder =
+      [function newArgumentEncoderWithBufferIndex:buffer_index];  // +1
+  if (!argument_encoder) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "invalid argument buffer index #%u",
+                            buffer_index);
+  }
+
+  __block id<MTLBuffer> argument_buffer =
+      [device newBufferWithLength:argument_encoder.encodedLength
+                          options:MTLResourceStorageModeShared];  // +1
+  if (!argument_buffer) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "failed to create argument buffer with size = %ld bytes",
+                            argument_encoder.encodedLength);
+  }
+
+  // The arugment encoder and buffer can be deleted once the command buffer completes.
+  [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cmdbuf) {
+    [argument_buffer release];   // -1
+    [argument_encoder release];  // -1
+  }];
+
+  [argument_encoder setArgumentBuffer:argument_buffer offset:0];
+  *out_encoder = argument_encoder;
+  *out_buffer = argument_buffer;
+  return iree_ok_status();
+}
+
 // Prepares kernels and argument buffers needed for kernel dispatches.
 static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
@@ -445,31 +510,12 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
     // Build argument encoder and argument buffer for the current descriptor set.
     uint32_t current_set = descriptors[i].set;
 
-    id<MTLArgumentEncoder> argument_encoder =
-        [kernel_params->function newArgumentEncoderWithBufferIndex:current_set];  // +1
-    if (!argument_encoder) {
-      status =
-          iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "invalid argument buffer index #%u", i);
-      break;
-    }
-
-    __block id<MTLBuffer> argument_buffer = [command_buffer->command_buffer.device
-        newBufferWithLength:argument_encoder.encodedLength
-                    options:MTLResourceStorageModeShared];  // +1
-    if (!argument_buffer) {
-      status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                                "failed to create argument buffer with size = %ld bytes",
-                                argument_encoder.encodedLength);
-      break;
-    }
-
-    // The arugment encoder and buffer can be deleted once the command buffer completes.
-    [command_buffer->command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cmdbuf) {
-      [argument_buffer release];   // -1
-      [argument_encoder release];  // -1
-    }];
-
-    [argument_encoder setArgumentBuffer:argument_buffer offset:0];
+    id<MTLArgumentEncoder> argument_encoder;
+    id<MTLBuffer> argument_buffer;
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_hal_metal_create_argument_encoder(
+                command_buffer->command_buffer.device, command_buffer->command_buffer,
+                kernel_params->function, current_set, &argument_encoder, &argument_buffer));
 
     iree_hal_descriptor_set_layout_t* set_layout =
         iree_hal_metal_pipeline_layout_descriptor_set_layout(
@@ -503,6 +549,12 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
     if (!iree_status_is_ok(status)) break;
 
     [compute_encoder setBuffer:argument_buffer offset:0 atIndex:current_set];
+  }
+
+  if (iree_hal_metal_pipeline_layout_push_constant_count(command_buffer->current_pipeline_layout)) {
+    [compute_encoder setBytes:(void*)command_buffer->push_constants
+                       length:sizeof(command_buffer->push_constants)
+                      atIndex:IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX];
   }
 
   if (iree_status_is_ok(status)) {

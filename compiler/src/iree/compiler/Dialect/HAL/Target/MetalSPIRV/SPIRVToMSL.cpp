@@ -6,8 +6,6 @@
 
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/SPIRVToMSL.h"
 
-#include <vector>
-
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -17,6 +15,10 @@
 #include "third_party/spirv_cross/spirv_msl.hpp"
 
 #define DEBUG_TYPE "spirv-to-msl"
+
+/// The [[buffer(N)]] index for push constants.
+/// Note that this MUST be kept consistent with the Metal HAL driver.
+#define IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX 3
 
 namespace mlir {
 namespace iree_compiler {
@@ -48,12 +50,16 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
     }
   };
 
-  // Returns all all resource buffer descriptors' set and binding number pairs
-  // in increasing order.
-  std::vector<Descriptor> getBufferSetBindingPairs() {
-    std::vector<Descriptor> descriptors;
+  // Updates `descriptors` with resource set and binding number pairs in
+  // increasing order, and `hasPushConstant` if with push constants.
+  // Returns true if no unsupported cases are encountered.
+  bool getResources(SmallVectorImpl<Descriptor>* descriptors,
+                    bool* hasPushConstant) {
+    descriptors->clear();
+    *hasPushConstant = false;
 
     // Iterate over all variables in the SPIR-V blob.
+    bool hasUnknownCase = false;
     ir.for_each_typed_id<SPIRV_CROSS_NAMESPACE::SPIRVariable>(
         [&](uint32_t id, SPIRV_CROSS_NAMESPACE::SPIRVariable& var) {
           auto storage = var.storage;
@@ -65,22 +71,24 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
               // Builtin variables. We don't care either.
             case spv::StorageClassInput:
               return;
+            case spv::StorageClassPushConstant:
+              *hasPushConstant = true;
+              return;
+            case spv::StorageClassUniform:
+            case spv::StorageClassStorageBuffer: {
+              uint32_t setNo = get_decoration(id, spv::DecorationDescriptorSet);
+              uint32_t bindingNo = get_decoration(id, spv::DecorationBinding);
+              descriptors->emplace_back(setNo, bindingNo);
+              return;
+            }
             default:
               break;
           }
-          if (storage == spv::StorageClassUniform ||
-              storage == spv::StorageClassStorageBuffer) {
-            uint32_t setNo = get_decoration(id, spv::DecorationDescriptorSet);
-            uint32_t bindingNo = get_decoration(id, spv::DecorationBinding);
-            descriptors.emplace_back(setNo, bindingNo);
-            return;
-          }
-          // TODO(antiagainst): push constant
-          assert(false && "unspported storage class in SPIRVToMSLCompiler");
+          hasUnknownCase = true;
         });
 
-    llvm::sort(descriptors);
-    return descriptors;
+    llvm::sort(*descriptors);
+    return !hasUnknownCase;
   }
 
   Options getCompilationOptions() {
@@ -107,8 +115,13 @@ std::optional<std::pair<MetalShader, std::string>> crossCompileSPIRVToMSL(
   spvCrossCompiler.set_entry_point(
       entryPoint.str(), spv::ExecutionModel::ExecutionModelGLCompute);
 
-  // Explicitly set the argument buffer index for each SPIR-V resource variable.
-  auto descriptors = spvCrossCompiler.getBufferSetBindingPairs();
+  SmallVector<SPIRVToMSLCompiler::Descriptor> descriptors;
+  bool hasPushConstant = false;
+  if (!spvCrossCompiler.getResources(&descriptors, &hasPushConstant))
+    return std::nullopt;
+
+  // Explicitly set the argument buffer [[id(N)]] location for each SPIR-V
+  // resource variable.
   for (const auto& descriptor : descriptors) {
     SPIRV_CROSS_NAMESPACE::MSLResourceBinding binding = {};
     binding.stage = spv::ExecutionModelGLCompute;
@@ -116,6 +129,17 @@ std::optional<std::pair<MetalShader, std::string>> crossCompileSPIRVToMSL(
     binding.binding = descriptor.binding;
     // We only interact with buffers in IREE.
     binding.msl_buffer = descriptor.binding;
+
+    spvCrossCompiler.add_msl_resource_binding(binding);
+  }
+  // If push constants are used, explicitly set its [[buffer(N)]] location too.
+  if (hasPushConstant) {
+    SPIRV_CROSS_NAMESPACE::MSLResourceBinding binding = {};
+    binding.stage = spv::ExecutionModelGLCompute;
+    binding.desc_set =
+        SPIRV_CROSS_NAMESPACE::ResourceBindingPushConstantDescriptorSet;
+    binding.binding = SPIRV_CROSS_NAMESPACE::ResourceBindingPushConstantBinding;
+    binding.msl_buffer = IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX;
 
     spvCrossCompiler.add_msl_resource_binding(binding);
   }

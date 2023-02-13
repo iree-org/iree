@@ -88,8 +88,8 @@ class MetalSPIRVTargetBackend : public TargetBackend {
   std::string name() const override { return "metal"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, spirv::SPIRVDialect,
-                    gpu::GPUDialect>();
+    registry.insert<gpu::GPUDialect, IREE::Codegen::IREECodegenDialect,
+                    IREE::Flow::FlowDialect, spirv::SPIRVDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
