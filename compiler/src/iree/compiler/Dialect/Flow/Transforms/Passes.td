@@ -121,6 +121,12 @@ def DispatchWithTransformDialect :
   ];
 }
 
+def EraseUnusedLinalgOperands :
+    Pass<"iree-flow-erase-unused-linalg-operands", "mlir::ModuleOp"> {
+  let summary = "Erase unused linalg operand and remove dead code.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createEraseUnusedLinalgOperands()";
+}
+
 def ExpandTensorShapes :
     Pass<"iree-flow-expand-tensor-shapes", "mlir::ModuleOp"> {
   let summary = "Expands tensor shape dimensions into SSA values across the program.";
@@ -227,6 +233,12 @@ def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {
             /*default=*/"true", "Print result types of operations">
   ];
   let constructor = "mlir::iree_compiler::IREE::Flow::createDumpDispatchGraphPass()";
+}
+
+def RaiseSpecialOps :
+    Pass<"iree-flow-raise-special-ops", ""> {
+  let summary = "raise special ops like softmax to the high level linalg.ext representation";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createRaiseSpecialOps()";
 }
 
 def SplitReduction :

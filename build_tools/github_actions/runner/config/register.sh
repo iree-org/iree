@@ -10,7 +10,7 @@
 # configuration settings and uses a proxy service to obtain runner registration
 # tokens (https://github.com/google-github-actions/github-runner-token-proxy).
 
-set -euo pipefail
+set -xeuo pipefail
 
 source /runner-root/config/functions.sh
 
@@ -98,14 +98,14 @@ RUNNER_LABELS="$(IFS="," ; echo "${RUNNER_LABELS_ARRAY[*]}")"
 INSTANCE_ID="$(get_metadata instance/id)"
 GOOGLE_CLOUD_PROJECT="$(get_metadata project/project-id)"
 
-GOOGLE_CLOUD_RUN_ID_TOKEN="$(get_metadata "instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}")"
-
+set +xe
 REGISTER_TOKEN="$(get_runner_token register ${RUNNER_SCOPE})"
 
 if [ -z "${REGISTER_TOKEN}" ]; then
   echo "failed to get registration runner token" >&2
   exit 1
 fi
+set -xe
 
 declare -a args=(
   --unattended \
@@ -129,4 +129,5 @@ declare -a args=(
 # functionality.
 (set -x; : Running configuration with additional args: "${args[@]}")
 
+set +x
 /runner-root/actions-runner/config.sh --token "${REGISTER_TOKEN}" "${args[@]}"

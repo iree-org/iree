@@ -60,6 +60,11 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+// Apply patterns to erase unused linalg operands and remove dead code
+// associated.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createEraseUnusedLinalgOperands();
+
 // Expands tensor shape dimensions into SSA values across the program.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
 
@@ -185,6 +190,10 @@ createOutlineLargeConstantsPass();
 // Deduplicates equivalent executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDeduplicateExecutablesPass();
+
+// Create a pass to raise sequence of ops to higher level linalg.ext
+// representation.
+std::unique_ptr<Pass> createRaiseSpecialOps();
 
 // Create a pass to split reduction dimension.
 std::unique_ptr<Pass> createSplitReductionPass();

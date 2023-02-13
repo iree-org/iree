@@ -120,6 +120,17 @@ else
   echo "'yamllint' not found. Skipping check"
 fi
 
+echo "***** markdownlint *****"
+# Don't fail script if condition is false
+disable_update_ret
+if exists markdownlint; then
+  enable_update_ret
+  ${scripts_dir}/run_markdownlint.sh
+else
+  enable_update_ret
+  echo "'markdownlint' not found. Skipping check"
+fi
+
 echo "***** Path Lengths *****"
 ./build_tools/scripts/check_path_lengths.py
 

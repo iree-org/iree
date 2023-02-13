@@ -336,6 +336,13 @@ if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
   endif()
 endif()
 
+if(IREE_LINK_COMPILER_SHARED_LIBRARY AND IREE_ENABLE_COMPILER_TRACING)
+  message(SEND_ERROR
+      "IREE_ENABLE_COMPILER_TRACING requires "
+      "-DIREE_LINK_COMPILER_SHARED_LIBRARY=OFF (the compiler library must not "
+      "be unloaded before Tracy finishes, static linking is one workaround)")
+endif()
+
 option(IREE_ENABLE_CCACHE
     "[DEPRECATED: Use CMAKE_<LANG>_COMPILER_LAUNCHER configure options or environment variables instead.] Use ccache if installed."
     OFF)
@@ -748,22 +755,29 @@ if(IREE_BUILD_DOCS)
   add_custom_target(iree-doc ALL)
 endif()
 
+# Samples may require additional files to be built/configured and will add
+# dependencies to this target.
+# Note: These will be automatically built with test dependencies
+# (`iree-test-deps`).
+add_custom_target(iree-sample-deps
+  COMMENT
+    "Building IREE sample data targets"
+)
+
 # Testing rules that require generation will add dependencies to this target.
 # This allows them to be EXCLUDE_FROM_ALL but still invokable.
-add_custom_target(iree-test-deps COMMENT "Building IREE test deps")
+add_custom_target(iree-test-deps
+  COMMENT
+    "Building IREE test deps"
+  DEPENDS
+    iree-sample-deps
+)
 
 # Testing rules that generate test scripts for iree-run-module-test will add
 # dependencies to this target. It is a subset of `iree-test-deps`.
 add_custom_target(iree-run-module-test-deps
   COMMENT
     "Building IREE run module test targets"
-)
-
-# Samples may require additional files to be built/configured and will add
-# dependencies to this target.
-add_custom_target(iree-sample-deps
-  COMMENT
-    "Building IREE sample data targets"
 )
 
 #-------------------------------------------------------------------------------

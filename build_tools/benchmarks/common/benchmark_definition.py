@@ -309,6 +309,7 @@ class BenchmarkInfo:
   driver_info: DriverInfo
   device_info: DeviceInfo
   compile_tags: Optional[Sequence[str]] = None
+  run_config_id: Optional[str] = None
 
   def __str__(self):
     # Get the target architecture and better driver name depending on the runner.
@@ -382,6 +383,7 @@ class BenchmarkInfo:
         # Get the "iree-*" driver name from the DriverInfo.
         "runner": IREE_PRETTY_NAME_TO_DRIVER_NAME[self.driver_info.pretty_name],
         "device_info": self.device_info.to_json_object(),
+        "run_config_id": self.run_config_id
     }
 
   @staticmethod
@@ -397,7 +399,8 @@ class BenchmarkInfo:
                          compile_tags=json_object.get("compile_tags"),
                          driver_info=driver_info,
                          device_info=DeviceInfo.from_json_object(
-                             json_object["device_info"]))
+                             json_object["device_info"]),
+                         run_config_id=json_object.get("run_config_id"))
 
 
 @dataclass
@@ -493,6 +496,7 @@ class CompilationInfo(object):
   model_source: str
   target_arch: str
   compile_tags: Tuple[str]
+  gen_config_id: Optional[str] = None
 
   def __str__(self):
     if self.model_tags:
@@ -505,13 +509,12 @@ class CompilationInfo(object):
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return CompilationInfo(
-        model_name=json_object["model_name"],
-        model_tags=tuple(json_object["model_tags"]),
-        model_source=json_object["model_source"],
-        target_arch=json_object["target_arch"],
-        compile_tags=tuple(json_object["compile_tags"]),
-    )
+    return CompilationInfo(model_name=json_object["model_name"],
+                           model_tags=tuple(json_object["model_tags"]),
+                           model_source=json_object["model_source"],
+                           target_arch=json_object["target_arch"],
+                           compile_tags=tuple(json_object["compile_tags"]),
+                           gen_config_id=json_object.get("gen_config_id"))
 
 
 @dataclass(frozen=True)

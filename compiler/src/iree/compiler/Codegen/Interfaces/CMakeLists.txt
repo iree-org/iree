@@ -24,6 +24,7 @@ iree_cc_library(
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
     MLIRAffineTransformOps
+    MLIRBufferizationTransformOps
     MLIRGPUTransformOps
     MLIRIR
     MLIRLinalgTransformOps

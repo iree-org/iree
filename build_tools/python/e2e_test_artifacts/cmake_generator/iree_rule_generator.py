@@ -72,7 +72,7 @@ class IreeRuleBuilder(object):
           cmake_builder.rules.build_iree_import_tf_model(
               target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
-              entry_function=model.entry_function,
+              import_flags=imported_model.import_flags,
               output_mlir_file=str(output_file_path))
       ]
     else:
@@ -92,7 +92,7 @@ class IreeRuleBuilder(object):
 
     compile_flags = self._generate_compile_flags(
         compile_config=compile_config,
-        mlir_dialect_type=imported_model.dialect_type.value
+        mlir_dialect_type=imported_model.dialect_type.dialect_name
     ) + compile_config.extra_flags
 
     # Module target name: iree-module-<model_id>-<compile_config_id>
@@ -136,6 +136,11 @@ class IreeRuleBuilder(object):
   def _generate_compile_target_flags(
       self, target: iree_definitions.CompileTarget) -> List[str]:
     arch_info = target.target_architecture
+    if target.target_backend == iree_definitions.TargetBackend.VULKAN_SPIRV:
+      return [
+          f"--iree-vulkan-target-triple={arch_info.architecture}-unknown-{target.target_abi.value}",
+      ]
+
     if arch_info.architecture == "x86_64":
       flags = [
           f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
@@ -154,14 +159,6 @@ class IreeRuleBuilder(object):
           "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
           "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x",
           "--riscv-v-fixed-length-vector-lmul-max=8"
-      ]
-    elif arch_info.architecture == "adreno":
-      flags = [
-          f"--iree-vulkan-target-triple=adreno-unknown-{target.target_abi.value}",
-      ]
-    elif arch_info.architecture == "mali":
-      flags = [
-          f"--iree-vulkan-target-triple=valhall-unknown-{target.target_abi.value}",
       ]
     elif arch_info.architecture == "armv8.2-a":
       flags = [

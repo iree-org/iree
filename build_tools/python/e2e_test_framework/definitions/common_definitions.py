@@ -44,7 +44,7 @@ class DeviceArchitecture(_ArchitectureInfo, Enum):
   RV32_GENERIC = (ArchitectureType.CPU, "riscv_32", "generic")
 
   # Mobile GPUs
-  MALI_VALHALL = (ArchitectureType.GPU, "mali", "valhall")
+  VALHALL_MALI = (ArchitectureType.GPU, "valhall", "mali")
   ADRENO_GENERIC = (ArchitectureType.GPU, "adreno", "generic")
 
   # CUDA GPUs

@@ -385,10 +385,11 @@ static ReductionConfig getReductionConfig(
 LogicalResult mlir::iree_compiler::gpu::matchAndSetReductionStrategy(
     func::FuncOp entryPoint, linalg::LinalgOp op, const GPUModel &gpuModel) {
   // 1. Match a reduction and surrounding ops.
-  StructuredOpMatcher reduction, fill, leading, trailing;
+  StructuredOpMatcher *reduction;
   transform_ext::MatchedReductionCaptures captures;
-  makeReductionMatcher(reduction, fill, leading, trailing, captures);
-  if (!matchPattern(op, reduction)) return failure();
+  transform_ext::MatcherContext matcherContext;
+  makeReductionMatcher(matcherContext, reduction, captures);
+  if (!matchPattern(op, *reduction)) return failure();
 
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.

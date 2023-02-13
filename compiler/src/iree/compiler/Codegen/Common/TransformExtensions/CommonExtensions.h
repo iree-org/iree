@@ -39,6 +39,7 @@ struct ApplyPatternsOpPatterns {
   bool bubbleCollapseExpand = false;
   bool canonicalization = false;
   bool eraseUnnecessaryTensorOperands = false;
+  bool expandMemrefStridedMetadata = false;
   bool foldMemrefAliases = false;
   bool foldReassociativeReshapes = false;
   bool foldTensorEmptyExtract = false;
@@ -46,9 +47,10 @@ struct ApplyPatternsOpPatterns {
   bool promoteForeachThreadCaptureToShared = false;
   bool rankReducingLinalg = false;
   bool rankReducingVector = false;
-  bool expandMemrefStridedMetadata = false;
+  bool rewritePackOps = false;
   bool swapPaddingElideConditional = false;
   bool swappingPatterns = false;
+  bool unrollVectorsGpuMma = false;
 };
 }  // namespace transform_dialect
 }  // namespace IREE

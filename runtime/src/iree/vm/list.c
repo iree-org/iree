@@ -291,6 +291,7 @@ iree_vm_list_capacity(const iree_vm_list_t* list) {
 
 IREE_API_EXPORT iree_status_t
 iree_vm_list_reserve(iree_vm_list_t* list, iree_host_size_t minimum_capacity) {
+  IREE_ASSERT_ARGUMENT(list);
   if (list->capacity >= minimum_capacity) {
     return iree_ok_status();
   }
@@ -305,11 +306,13 @@ iree_vm_list_reserve(iree_vm_list_t* list, iree_host_size_t minimum_capacity) {
 }
 
 IREE_API_EXPORT iree_host_size_t iree_vm_list_size(const iree_vm_list_t* list) {
+  IREE_ASSERT_ARGUMENT(list);
   return list->count;
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_list_resize(iree_vm_list_t* list,
                                                   iree_host_size_t new_size) {
+  IREE_ASSERT_ARGUMENT(list);
   if (new_size == list->count) {
     return iree_ok_status();
   } else if (new_size < list->count) {
@@ -331,6 +334,228 @@ IREE_API_EXPORT void iree_vm_list_clear(iree_vm_list_t* list) {
     iree_vm_list_reset_range(list, 0, list->count);
   }
   list->count = 0;
+}
+
+static void iree_memswap(void* a, void* b, iree_host_size_t size) {
+  uint8_t* a_ptr = (uint8_t*)a;
+  uint8_t* b_ptr = (uint8_t*)b;
+  for (iree_host_size_t i = 0; i < size; ++i) {
+    uint8_t t = a_ptr[i];
+    a_ptr[i] = b_ptr[i];
+    b_ptr[i] = t;
+  }
+}
+
+IREE_API_EXPORT void iree_vm_list_swap_storage(iree_vm_list_t* list_a,
+                                               iree_vm_list_t* list_b) {
+  IREE_ASSERT_ARGUMENT(list_a);
+  IREE_ASSERT_ARGUMENT(list_b);
+  if (list_a == list_b) return;
+  iree_memswap(&list_a->allocator, &list_b->allocator,
+               sizeof(list_a->allocator));
+  iree_memswap(&list_a->capacity, &list_b->capacity, sizeof(list_a->capacity));
+  iree_memswap(&list_a->count, &list_b->count, sizeof(list_a->count));
+  iree_memswap(&list_a->element_type, &list_b->element_type,
+               sizeof(list_a->element_type));
+  iree_memswap(&list_a->element_size, &list_b->element_size,
+               sizeof(list_a->element_size));
+  iree_memswap(&list_a->storage_mode, &list_b->storage_mode,
+               sizeof(list_a->storage_mode));
+  iree_memswap(&list_a->storage, &list_b->storage, sizeof(list_a->storage));
+}
+
+// Returns true if |src_type| can be converted into |dst_type|.
+static bool iree_vm_type_def_is_compatible(iree_vm_type_def_t src_type,
+                                           iree_vm_type_def_t dst_type) {
+  return memcmp(&src_type, &dst_type, sizeof(dst_type)) == 0;
+}
+
+// Copies from a |src_list| of any type (value, ref, variant) into a |dst_list|
+// in variant storage mode. This cannot fail as variant lists can store any
+// type.
+static void iree_vm_list_copy_to_variant_list(iree_vm_list_t* src_list,
+                                              iree_host_size_t src_i,
+                                              iree_vm_list_t* dst_list,
+                                              iree_host_size_t dst_i,
+                                              iree_host_size_t count) {
+  iree_vm_variant_t* dst_storage =
+      (iree_vm_variant_t*)dst_list->storage + dst_i;
+  switch (src_list->storage_mode) {
+    case IREE_VM_LIST_STORAGE_MODE_VALUE: {
+      uintptr_t src_storage =
+          (uintptr_t)src_list->storage + src_i * src_list->element_size;
+      for (iree_host_size_t i = 0; i < count; ++i) {
+        if (iree_vm_type_def_is_ref(&dst_storage[i].type)) {
+          iree_vm_ref_release(&dst_storage[i].ref);
+        }
+        dst_storage[i].type = src_list->element_type;
+        memcpy(dst_storage[i].value_storage,
+               (uint8_t*)src_storage + i * src_list->element_size,
+               src_list->element_size);
+      }
+      break;
+    }
+    case IREE_VM_LIST_STORAGE_MODE_REF: {
+      iree_vm_ref_t* src_storage = (iree_vm_ref_t*)src_list->storage + src_i;
+      for (iree_host_size_t i = 0; i < count; ++i) {
+        // NOTE: we retain first in case the lists alias and the ref is the
+        // same.
+        iree_vm_ref_t* ref = &src_storage[i];
+        iree_vm_ref_retain_inplace(ref);
+        if (iree_vm_type_def_is_ref(&dst_storage[i].type)) {
+          iree_vm_ref_release(&dst_storage[i].ref);
+        }
+        dst_storage->type = iree_vm_type_def_make_ref_type(ref->type);
+        dst_storage->ref = *ref;
+      }
+      break;
+    }
+    case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
+      iree_vm_variant_t* src_storage =
+          (iree_vm_variant_t*)src_list->storage + src_i;
+      for (iree_host_size_t i = 0; i < count; ++i) {
+        // NOTE: we retain first in case the lists alias and the ref is the
+        // same.
+        if (iree_vm_type_def_is_ref(&src_storage[i].type)) {
+          iree_vm_ref_retain_inplace(&src_storage[i].ref);
+        }
+        if (iree_vm_type_def_is_ref(&dst_storage[i].type)) {
+          iree_vm_ref_release(&dst_storage[i].ref);
+        }
+        memcpy(&dst_storage[i], &src_storage[i], sizeof(dst_storage[i]));
+      }
+      break;
+    }
+  }
+}
+
+// Copies from a |src_list| in variant storage mode to a |dst_list| of any type
+// (value, ref) while checking each element. This first needs to ensure the
+// entire source range matches the expected destination type which makes this
+// much slower than the other paths that need not check or only check once per
+// copy operation instead.
+static iree_status_t iree_vm_list_copy_from_variant_list(
+    iree_vm_list_t* src_list, iree_host_size_t src_i, iree_vm_list_t* dst_list,
+    iree_host_size_t dst_i, iree_host_size_t count) {
+  iree_vm_variant_t* src_storage =
+      (iree_vm_variant_t*)src_list->storage + src_i;
+  switch (dst_list->storage_mode) {
+    case IREE_VM_LIST_STORAGE_MODE_VALUE:
+    case IREE_VM_LIST_STORAGE_MODE_REF:
+      for (iree_host_size_t i = 0; i < count; ++i) {
+        if (!iree_vm_type_def_is_compatible(src_storage[i].type,
+                                            dst_list->element_type)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "destination list element type does not "
+                                  "match the source element %" PRIhsz,
+                                  src_i + i);
+        }
+      }
+      break;
+    default:
+      // Destination is a variant list and accepts all inputs.
+      break;
+  }
+  switch (dst_list->storage_mode) {
+    case IREE_VM_LIST_STORAGE_MODE_VALUE: {
+      uintptr_t dst_storage =
+          (uintptr_t)dst_list->storage + dst_i * dst_list->element_size;
+      for (iree_host_size_t i = 0; i < count; ++i) {
+        memcpy((uint8_t*)dst_storage + i * dst_list->element_size,
+               src_storage[i].value_storage, dst_list->element_size);
+      }
+      break;
+    }
+    case IREE_VM_LIST_STORAGE_MODE_REF: {
+      iree_vm_ref_t* dst_storage = (iree_vm_ref_t*)dst_list->storage + dst_i;
+      for (iree_host_size_t i = 0; i < count; ++i) {
+        iree_vm_ref_retain(&src_storage[i].ref, &dst_storage[i]);
+      }
+      break;
+    }
+    default:
+    case IREE_VM_LIST_STORAGE_MODE_VARIANT:
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "unhandled copy mode");
+  }
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_list_copy(iree_vm_list_t* src_list,
+                                                iree_host_size_t src_i,
+                                                iree_vm_list_t* dst_list,
+                                                iree_host_size_t dst_i,
+                                                iree_host_size_t count) {
+  IREE_ASSERT_ARGUMENT(src_list);
+  IREE_ASSERT_ARGUMENT(dst_list);
+
+  // Fast-path no-op check.
+  if (count == 0) return iree_ok_status();
+
+  // Verify ranges.
+  const iree_host_size_t src_count = iree_vm_list_size(src_list);
+  if (src_i + count > src_count) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "source range [%" PRIhsz ", %" PRIhsz ") of %" PRIhsz
+        " elements out of range of source list with size %" PRIhsz,
+        src_i, src_i + count, count, src_count);
+  }
+  const iree_host_size_t dst_count = iree_vm_list_size(dst_list);
+  if (dst_i + count > dst_count) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "destination range [%" PRIhsz ", %" PRIhsz ") of %" PRIhsz
+        " elements out of range of destination list with size %" PRIhsz,
+        dst_i, dst_i + count, count, dst_count);
+  }
+
+  // Prevent overlap when copying within the same list.
+  if (src_list == dst_list && src_i + count > dst_i && dst_i + count > src_i) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "overlapping copy of range [%" PRIhsz ", %" PRIhsz
+                            ") to [%" PRIhsz ", %" PRIhsz ") of %" PRIhsz
+                            " elements not supported",
+                            src_i, src_i + count, dst_i, dst_i + count, count);
+  }
+
+  // Copies into variant lists is a slow-path as we need to check the type of
+  // each element we copy. Note that the source of the copy can be of any type.
+  // When copying in the other direction of a variant list to a typed list we
+  // need to ensure all copied elements match the expected destination type.
+  if (dst_list->storage_mode == IREE_VM_LIST_STORAGE_MODE_VARIANT) {
+    iree_vm_list_copy_to_variant_list(src_list, src_i, dst_list, dst_i, count);
+    return iree_ok_status();
+  } else if (src_list->storage_mode == IREE_VM_LIST_STORAGE_MODE_VARIANT) {
+    return iree_vm_list_copy_from_variant_list(src_list, src_i, dst_list, dst_i,
+                                               count);
+  }
+
+  // If neither source or destination are variant lists we need to match the
+  // types exactly.
+  if (src_list->storage_mode != dst_list->storage_mode ||
+      memcmp(&src_list->element_type, &dst_list->element_type,
+             sizeof(src_list->element_type)) != 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "src/dst element type mismatch");
+  }
+
+  if (src_list->storage_mode == IREE_VM_LIST_STORAGE_MODE_VALUE) {
+    // Memcpy primitive values fast path.
+    memcpy((uint8_t*)dst_list->storage + dst_i * dst_list->element_size,
+           (uint8_t*)src_list->storage + src_i * src_list->element_size,
+           count * dst_list->element_size);
+  } else {
+    // Retain ref fast(ish) path - note that iree_vm_ref_retain will release
+    // any existing value in the dest list it overwrites.
+    iree_vm_ref_t* src_ref_storage = (iree_vm_ref_t*)src_list->storage + src_i;
+    iree_vm_ref_t* dst_ref_storage = (iree_vm_ref_t*)dst_list->storage + dst_i;
+    for (iree_host_size_t i = 0; i < count; ++i) {
+      iree_vm_ref_retain(src_ref_storage + i, dst_ref_storage + i);
+    }
+  }
+
+  return iree_ok_status();
 }
 
 static void iree_vm_list_convert_value_type(
@@ -720,7 +945,7 @@ iree_vm_list_get_variant(const iree_vm_list_t* list, iree_host_size_t i,
       iree_vm_ref_t* element_ref = (iree_vm_ref_t*)element_ptr;
       out_value->type.ref_type = element_ref->type;
       out_value->type.value_type = IREE_VM_VALUE_TYPE_NONE;
-      iree_vm_ref_retain(element_ref, &out_value->ref);
+      iree_vm_ref_assign(element_ref, &out_value->ref);
       break;
     }
     case IREE_VM_LIST_STORAGE_MODE_VARIANT: {

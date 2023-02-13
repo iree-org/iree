@@ -53,7 +53,19 @@ class BufferizationPlan {
   void insert(Value v) { mappedTensors.insert(getPointer(v)); }
 
   void unionSets(Value v1, Value v2) {
+    // If one the sets was part of the store set, the store set
+    // needs to be updated to drop the all leaders from the store set
+    // and add the new leader to it.
+    Value leader1 = getLeaderValue(v1);
+    Value leader2 = getLeaderValue(v2);
+    bool insertNewStoreLeader =
+        storeLeaders.count(leader1) || storeLeaders.count(leader2);
+    storeLeaders.erase(leader1);
+    storeLeaders.erase(leader2);
     mappedTensors.unionSets(getPointer(v1), getPointer(v2));
+    if (insertNewStoreLeader) {
+      storeLeaders.insert(getLeaderValue(v1));
+    }
   }
 
   /// Sets the equivalance class that contains `v` as the set that contains the

@@ -88,7 +88,7 @@ optimization.
 
     Convert your custom ops into standard MLIR dialects.
 
-```
+``` text
 +------------+      +--------+      +---------------+
 | Your input | -+-> |  iree  | -+-> | IREE compiler |
 +------------+  |   +--------+  |   +---------------+
@@ -121,7 +121,7 @@ describe the operation in more elemental mathematical representations and then
 add optimizations where required knowing that things will still work even if
 those optimizations never happen.
 
-#### Pros
+### Pros
 
 * No IREE compiler or runtime code changes required.
     * Can use standard IREE packaged releases and tools.
@@ -130,14 +130,14 @@ those optimizations never happen.
 * Fusion and other compiler techniques (CSE/DCE/inlining/etc) work on your code.
 * All target backends (CPU/GPU/accelerators/enclaves/etc) work.
 
-#### Cons
+### Cons
 
 * Input dialects cannot natively represent all possible programs (such as file
   IO and other syscalls).
 * Performance-sensitive host code (b-trees and other in-memory databases) will
   run through the slower VM paths if not authored as dense compute.
 
-#### When to use
+### When to use
 
 * :material-check: Targeting multiple MLIR toolchains of which IREE is just
   one (as little to no IREE-specific code is required).
@@ -145,7 +145,8 @@ those optimizations never happen.
 * :material-check: All code is known statically or symbolically at
   compile-time (instead of independently versioned libraries at runtime).
 * :material-close: Complex high-performance code not representable as linear algebra.
-* :material-close: External runtime interactions (file/network/user IO). Use custom modules.
+* :material-close: External runtime interactions (file/network/user IO). Use
+  custom modules.
 
 ### Implementation
 
@@ -210,16 +211,17 @@ cross-module calls and users must be aware that the compiler cannot optimize
 across the call boundaries.
 
 See the [synchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples/custom_module/sync/)
-and [asynchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples/custom_module/async/) samples.
+and [asynchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples/custom_module/async/)
+samples.
 
-#### Pros
+### Pros
 
 * No IREE compiler code changes required.
 * Produced artifacts are portable across IREE deployment configurations.
 * Full system access is allowed - the VM just calls external functions.
 * Runtime modules can be implemented (via shims) in other languages/runtimes.
 
-#### Cons
+### Cons
 
 * Custom modules must be registered at runtime by the user.
 * The VM custom module ABI goo must be authored by the user (such as with JNI or
@@ -230,7 +232,7 @@ and [asynchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples
 * Custom module code cannot be optimized by the IREE compiler to avoid
   host/device readbacks and unnecessary data type conversion.
 
-#### When to use
+### When to use
 
 * :material-check: Interactions with large libraries or system calls.
 * :material-check: Performance-sensitive host code that cannot easily be
@@ -293,7 +295,7 @@ Note that depending on the target there are various mechanisms for representing
 code in MLIR, up to including inline assembly snippets in IR via
 [`llvm.inline_asm`](https://mlir.llvm.org/docs/Dialects/LLVM/#llvminline_asm-mlirllvminlineasmop).
 
-#### Pros
+### Pros
 
 * Not limited to what is possible to represent in any particular MLIR dialect.
 * Rich target configuration available; multiple passes can contribute info.
@@ -303,12 +305,12 @@ code in MLIR, up to including inline assembly snippets in IR via
 * The compiler can perform deep optimizations across both the generated code and
   the provided code (hoisting/loop invariant code motion/cse/etc).
 
-#### Cons
+### Cons
 
 * Requires implementing the patterns as code in the IREE compiler or via TBD
   interfaces.
 
-#### When to use
+### When to use
 
 * :material-check: Code that must be emitted during target lowering - such as
   something optimizing for a particular CPU architecture.
@@ -363,20 +365,20 @@ solution. This does not mean this mechanism is not useful in some situations and
 only that it should be a last-resort when one of the easier to manage solutions
 is not viable - not a shortcut to avoid writing some C++ patterns.
 
-#### Pros
+### Pros
 
 * Works with hand-authored code in compatible object files from any toolchain.
 * No IREE runtime changes required.
     * All deployment modes still work, including multi-targeting.
     * No versioning concerns as custom code is included in artifacts.
 
-#### Cons
+### Cons
 
 * Users must provide per-target precompiled object files on disk.
 * IREE compiler changes are still needed for generating the external calls.
 * Though LTO _may_ be able to optimize across the calls it is not guaranteed.
 
-#### When to use
+### When to use
 
 * :material-check: Existing math libraries or architecture-specific functions
   that cannot be ported into a more MLIR-friendly form.
@@ -461,12 +463,12 @@ adjustment than anything else. Trying to bypass or workaround the constraints is
 possible - after all IREE is an open source project and any user is welcome to
 fork it - but unsupported by the core IREE team.
 
-#### Pros
+### Pros
 
 * Function resolution at runtime is orthogonal to compiler target specification.
 * Machine code can be shared between the application and IREE artifacts.
 
-#### Cons
+### Cons
 
 * IREE compiler and runtime must both be modified.
 * Deeper integration with the IREE codegen compiler infrastructure required.
@@ -479,7 +481,7 @@ fork it - but unsupported by the core IREE team.
       producing the artifact.
     * Weak imports and conditional usage can help but still leads to bloat.
 
-#### When to use
+### When to use
 
 * :material-check: Calling into opaque closed-source BLAS-like microkernel
   libraries.

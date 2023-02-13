@@ -45,7 +45,7 @@ def HAL_MemoryType_Optimal          : I32BitEnumAttrCase<"Optimal",          0x0
 def HAL_MemoryType_HostVisible      : I32BitEnumAttrCase<"HostVisible",      0x0002>;  // h
 def HAL_MemoryType_HostCoherent     : I32BitEnumAttrCase<"HostCoherent",     0x0004>;  // c
 def HAL_MemoryType_HostCached       : I32BitEnumAttrCase<"HostCached",       0x0008>;  // C
-def HAL_MemoryType_HostLocal        : I32BitEnumAttrCase<"HostLocal",        0x0006>;  // H
+def HAL_MemoryType_HostLocal        : I32BitEnumAttrCase<"HostLocal",        0x0046>;  // H
 def HAL_MemoryType_DeviceVisible    : I32BitEnumAttrCase<"DeviceVisible",    0x0010>;  // d
 def HAL_MemoryType_DeviceLocal      : I32BitEnumAttrCase<"DeviceLocal",      0x0030>;  // D
 def HAL_MemoryTypeBitfieldAttr :

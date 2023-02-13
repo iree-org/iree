@@ -41,6 +41,7 @@ iree_cc_library(
     "DetachElementwiseFromNamedOps.cpp"
     "DispatchWithTransformDialect.cpp"
     "DumpDispatchGraph.cpp"
+    "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FormDispatchRegions.cpp"
@@ -55,6 +56,7 @@ iree_cc_library(
     "OutlineDispatchRegions.cpp"
     "PassDetail.h"
     "Passes.cpp"
+    "RaiseSpecialOps.cpp"
     "RegionOpUtils.cpp"
     "SetEncoding.cpp"
     "SplitReduction.cpp"
@@ -64,6 +66,7 @@ iree_cc_library(
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
+    IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransformOps

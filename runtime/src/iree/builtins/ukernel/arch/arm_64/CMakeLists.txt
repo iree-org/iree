@@ -15,6 +15,13 @@ iree_cc_library(
     "assembly.h"
 )
 
+iree_cc_library(
+  NAME
+    common_arm_neon
+  HDRS
+    "common_arm_neon.h"
+)
+
 if(IREE_UK_BUILD_ARM_64_DOTPROD)
   iree_cc_library(
     NAME
@@ -74,15 +81,12 @@ iree_cc_library(
   SRCS
     "pack_arm_64.c"
   DEPS
+    ::common_arm_neon
     iree::base::core_headers
     iree::schemas::cpu_data
     iree::builtins::ukernel::headers
   PUBLIC
 )
-
-###############################################################################
-# query_tile_sizes entry point
-###############################################################################
 
 iree_cc_library(
   NAME
@@ -92,6 +96,21 @@ iree_cc_library(
   SRCS
     "query_tile_sizes_arm_64.c"
   DEPS
+    iree::base::core_headers
+    iree::schemas::cpu_data
+    iree::builtins::ukernel::headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    unpack_arm_64
+  HDRS
+    "unpack_arm_64.h"
+  SRCS
+    "unpack_arm_64.c"
+  DEPS
+    ::common_arm_neon
     iree::base::core_headers
     iree::schemas::cpu_data
     iree::builtins::ukernel::headers

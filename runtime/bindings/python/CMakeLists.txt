@@ -82,25 +82,25 @@ iree_py_library(
 iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-benchmark-module
-  TO_EXE_NAME iree-benchmark-module
+  TO_EXE_NAME iree/runtime/iree-benchmark-module
 )
 
 iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-benchmark-trace
-  TO_EXE_NAME iree-benchmark-trace
+  TO_EXE_NAME iree/runtime/iree-benchmark-trace
 )
 
 iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-run-trace
-  TO_EXE_NAME iree-run-trace
+  TO_EXE_NAME iree/runtime/iree-run-trace
 )
 
 iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-run-module
-  TO_EXE_NAME iree-run-module
+  TO_EXE_NAME iree/runtime/iree-run-module
 )
 
 if(_TRACY_ENABLED)

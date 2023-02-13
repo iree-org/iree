@@ -70,6 +70,8 @@ iree_cc_library(
     "query_tile_sizes.h"
     "unpack.c"
     "unpack.h"
+    "unpack_tile.c"
+    "unpack_tile.h"
   DEPS
     ::exported_bits
     ::headers

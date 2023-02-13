@@ -39,6 +39,7 @@ iree_cc_library(
     MLIRArithUtils
     MLIRAsyncDialect
     MLIRBufferizationDialect
+    MLIRBufferizationTransformOps
     MLIRBufferizationTransforms
     MLIRFuncDialect
     MLIRGPUOps
@@ -103,6 +104,7 @@ iree_cc_library(
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
+    "VectorizePackUnPackOps.cpp"
     "VectorizePad.cpp"
     "WorkgroupSpecializationPass.cpp"
   DEPS

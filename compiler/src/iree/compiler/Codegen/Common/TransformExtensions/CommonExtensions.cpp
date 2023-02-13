@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -65,11 +66,16 @@ void transform_dialect::ApplyPatternsOp::build(
 #define ADD_PATTERN(NAME, ATTR) \
   if (patterns.NAME)            \
     result.addAttribute(ApplyPatternsOp::ATTR(result.name), unitAttr);
+  ///
+  /// When touching something here, do not forget to update CommonExtensions.h.
+  ///
   ADD_PATTERN(additionalIreePatterns, getAdditionalIreePatternsAttrName)
   ADD_PATTERN(bubbleCollapseExpand, getBubbleCollapseExpandAttrName)
   ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
   ADD_PATTERN(eraseUnnecessaryTensorOperands,
               getEraseUnnecessaryTensorOperandsAttrName)
+  ADD_PATTERN(expandMemrefStridedMetadata,
+              getExpandMemrefStridedMetadataAttrName)
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
@@ -77,11 +83,11 @@ void transform_dialect::ApplyPatternsOp::build(
               getLowerTransferOpPermutationsAttrName)
   ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
   ADD_PATTERN(rankReducingVector, getRankReducingVectorAttrName)
-  ADD_PATTERN(expandMemrefStridedMetadata,
-              getExpandMemrefStridedMetadataAttrName)
+  ADD_PATTERN(rewritePackOps, getRewritePackOpsAttrName)
   ADD_PATTERN(swapPaddingElideConditional,
               getSwapPaddingElideConditionalAttrName)
   ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
+  ADD_PATTERN(unrollVectorsGpuMma, getUnrollVectorsGpuMmaAttrName)
 #undef ADD_PATTERN
   result.addTypes({pdl::OperationType::get(ctx)});
 }
@@ -125,6 +131,32 @@ struct FoldTensorEmptyExtract
     return success();
   }
 };
+
+/// Trivial 1-1 pattern to retire once IREE adopts tensor.pack.
+struct TensorPackToLinalgExt : public OpRewritePattern<tensor::PackOp> {
+  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::PackOp packOp,
+                                PatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<LinalgExt::PackOp>(
+        packOp, packOp.getSource(), packOp.getDest(), packOp.getInnerDimsPos(),
+        packOp.getMixedTiles(), packOp.getPaddingValue(),
+        packOp.getOuterDimsPerm());
+    return success();
+  }
+};
+
+/// Trivial 1-1 pattern to retire once IREE adopts tensor.unpack.
+struct TensorUnPackToLinalgExt : public OpRewritePattern<tensor::UnPackOp> {
+  using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
+                                PatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<LinalgExt::UnPackOp>(
+        unPackOp, unPackOp.getSource(), unPackOp.getDest(),
+        unPackOp.getInnerDimsPos(), unPackOp.getMixedTiles(),
+        unPackOp.getOuterDimsPerm());
+    return success();
+  }
+};
 }  // namespace
 
 static void addLowerTransferOpPermutationsPatterns(
@@ -158,6 +190,11 @@ static void addRankReducingVectorPatterns(RewritePatternSet &patterns) {
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
 }
 
+static void addRewritePackOpsPatterns(RewritePatternSet &patterns) {
+  patterns.add<TensorPackToLinalgExt, TensorUnPackToLinalgExt>(
+      patterns.getContext());
+}
+
 static void addSwappingPatterns(RewritePatternSet &patterns,
                                 bool swapPaddingElideCornerCase) {
   patterns.add<linalg::ExtractSliceOfPadTensorSwapPattern>(
@@ -165,6 +202,23 @@ static void addSwappingPatterns(RewritePatternSet &patterns,
       [&](tensor::ExtractSliceOp) -> llvm::Optional<bool> {
         return !swapPaddingElideCornerCase;
       });
+}
+
+static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeVectorSize(
+    Operation *op) {
+  return getWmmaNativeVectorSize(op);
+}
+
+static void addUnrollVectorsGpuMmaPatterns(RewritePatternSet &patterns) {
+  auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
+    auto contract = dyn_cast<vector::ContractionOp>(op);
+    if (!contract) return std::nullopt;
+    return mlir::iree_compiler::gpuMmaUnrollOrder(contract);
+  };
+  vector::populateVectorUnrollPatterns(
+      patterns, vector::UnrollVectorOptions()
+                    .setNativeShapeFn(getGPUTensorCoreNativeVectorSize)
+                    .setUnrollTraversalOrderFn(unrollOrder));
 }
 
 static void addAdditionalIreePatterns(RewritePatternSet &patterns) {
@@ -196,13 +250,14 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addLowerTransferOpPermutationsPatterns(patterns);
   if (getEraseUnnecessaryTensorOperands())
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
+  if (getExpandMemrefStridedMetadata())
+    memref::populateExpandStridedMetadataPatterns(patterns);
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
   if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
   if (getRankReducingVector()) addRankReducingVectorPatterns(patterns);
-  if (getExpandMemrefStridedMetadata())
-    memref::populateExpandStridedMetadataPatterns(patterns);
+  if (getRewritePackOps()) addRewritePackOpsPatterns(patterns);
   if (getSwappingPatterns())
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());
   if (getAdditionalIreePatterns()) addAdditionalIreePatterns(patterns);
@@ -210,6 +265,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     linalg::populateFoldReshapeOpsByExpansionPatterns(
         patterns, [](OpOperand *) { return true; });
   }
+  if (getUnrollVectorsGpuMma()) addUnrollVectorsGpuMmaPatterns(patterns);
 
   TrackingListener listener(state);
   GreedyRewriteConfig config;
@@ -734,7 +790,17 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
-  assert(targetOps.size() == 1 && "expected single target op in payload");
+  if (targetOps.empty()) {
+    transformResults.set(getForeachThreadOp().cast<OpResult>(), {});
+    transformResults.set(getTiledOp().cast<OpResult>(), {});
+    return DiagnosedSilenceableFailure::success();
+  }
+  if (targetOps.size() != 1) {
+    return mlir::emitDefiniteFailure(
+               state.getTopLevel(),
+               "expected single target op in payload, got: ")
+           << targetOps.size();
+  }
   auto funcOp = targetOps.front()->getParentOfType<func::FuncOp>();
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) {

@@ -196,7 +196,9 @@ static bool isRootOp(Operation *op) {
     }
     return !isa<linalg::FillOp>(op);
   }
-  return isa<TilingInterface>(op) ||
+  // tensor::PadOp fusion is not ready. Explicitly marking it not a root op for
+  // now.
+  return (isa<TilingInterface>(op) && !isa<tensor::PadOp>(op)) ||
          isa<LinalgExt::SetEncodingOp, LinalgExt::UnsetEncodingOp>(op);
 }
 
@@ -673,10 +675,13 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
     for (Operation &op : llvm::reverse(block)) {
       // If it is part of a fusion group or root op, ignore it.
       if (hasFusionGroupsAttribute(&op) || hasRootOpAttribute(&op)) continue;
-      // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
-      // fused with anything else into their own dispatches since it is better
-      // to convert them to splats.
-      if (!isa<linalg::LinalgOp>(op) || isa<linalg::FillOp>(op)) continue;
+      // Only look for Linalg ops here. Avoid moving `linalg.fill`,
+      // `tensor.pack`, and `tensor.unpack` that aren't fused with anything else
+      // into their own dispatches since it is better to convert them to splats.
+      if (!isa<linalg::LinalgOp, tensor::PackOp, tensor::UnPackOp>(op) ||
+          isa<linalg::FillOp>(op)) {
+        continue;
+      }
 
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);

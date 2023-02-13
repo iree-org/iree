@@ -233,7 +233,9 @@ static void specializeDistributionLoops(
   auto b = ifOp.getThenBodyBuilder();
   IRMapping bvm;
   for (unsigned i = 0, e = minSizeOps.size(); i != e; ++i) {
-    bvm.map(minSizeOps[i], constantOps[i]);
+    if (minSizeOps[i]) {
+      bvm.map(minSizeOps[i], constantOps[i]);
+    }
   }
   for (auto &blockOp : elseBlock->without_terminator()) {
     b.clone(blockOp, bvm);
