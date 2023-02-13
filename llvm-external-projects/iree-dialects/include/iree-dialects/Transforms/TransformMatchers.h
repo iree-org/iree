@@ -139,13 +139,6 @@ struct IsIdentity {};
 struct ConstantFloatMin {};
 struct ConstantFloatZero {};
 
-/// Predicate indicating that the operand is the same value as its producer's
-/// operand.
-struct SameOperandAsProducer
-    : public SingleValuePredicateParam<std::pair<int64_t, int64_t>> {
-  using Base::Base;
-};
-
 /// Indicates that the match optional. The matcher is still expected to run and
 /// capture if successful. The parameter can be set to false
 struct OptionalMatch : public SingleValuePredicateParam<bool> {
@@ -164,7 +157,14 @@ template <typename T>
 using has_get_capture_t = decltype(std::declval<T>().getCaptured());
 } // namespace detail
 
-class CapturingOpMatcher;
+/// Base class for capturing matchers that can be owned by the context.
+class CapturingMatcherBase {
+public:
+  // Virtual destructor so unique pointers are deallocated correctly.
+  // TODO: if efficiency is a problem, consider disallowing non-trivial
+  // destructors for subclasses.
+  virtual ~CapturingMatcherBase() = default;
+};
 
 /// A context object holding capturing matchers, must outlive any individual
 /// matcher. When matching complex subgraphs, the caller often doesn't care
@@ -173,9 +173,9 @@ class CapturingOpMatcher;
 /// context.
 class MatcherContext {
 public:
-  /// Create a new matcher of the specified type owned by this contxt.
+  /// Create a new matcher of the specified type owned by this context.
   template <typename T, typename... Args>
-  std::enable_if_t<std::is_base_of_v<CapturingOpMatcher, T>, T> &
+  std::enable_if_t<std::is_base_of_v<CapturingMatcherBase, T>, T> &
   allocate(Args &&...args) {
     // Need to call "new" explicitly as make_unique wouldn't have access to the
     // private constructor when this class would.
@@ -188,14 +188,51 @@ private:
   /// Owning list of matchers.
   // TODO: If this becomes inefficient, consider something like BumpPtrAllocator
   // that derived classes can use to store their members as well.
-  SmallVector<std::unique_ptr<CapturingOpMatcher>> ownedMatchers;
+  SmallVector<std::unique_ptr<CapturingMatcherBase>> ownedMatchers;
 };
 
-/// Base class for op matchers that capture the matched operation.
-class CapturingOpMatcher {
-public:
-  virtual ~CapturingOpMatcher() = default;
+/// Base class for value matchers that capture the matched value.
+class CapturingValueMatcher : public CapturingMatcherBase {
+  friend class CapturingOpMatcher;
 
+public:
+  /// Resets the captured value to null. This should be called if the same
+  /// pattern needs to be applied more than once as it may keep captured values
+  /// for optional nested predicates from the previous application.
+  void resetCapture() { captured = nullptr; }
+
+  /// Returns the matched value if the match was successful.
+  Value getCaptured() const { return captured; }
+
+protected:
+  Value captured = nullptr;
+};
+
+/// Matcher for a value, stores a list of predicates and requires all of them to
+/// match for the value to match. Once a value matched, any repeated use just
+/// verifies that equality of the value.
+class ValueMatcher : public CapturingValueMatcher {
+  using PredicateFn = std::function<bool(Value)>;
+  friend class MatcherContext;
+  ValueMatcher() = default;
+
+public:
+  /// Matches the given value, hook for `matchPattern`.
+  bool match(Value value);
+
+private:
+  /// Additional predicates to be checked on the value.
+  SmallVector<PredicateFn> predicates;
+};
+
+/// Creates a matcher of an arbitrary value.
+inline ValueMatcher &m_Value(MatcherContext &context) {
+  return context.allocate<ValueMatcher>();
+}
+
+/// Base class for op matchers that capture the matched operation.
+class CapturingOpMatcher : public CapturingMatcherBase {
+public:
   /// Resets the captured value to null. This should be called if the same
   /// pattern needs to be applied more than once as it may keep captured values
   /// for optional nested predicates from the previous application.
@@ -204,6 +241,11 @@ public:
     SmallVector<CapturingOpMatcher *> nested;
     getAllNested(nested);
     for (CapturingOpMatcher *matcher : nested) {
+      matcher->captured = nullptr;
+    }
+    SmallVector<CapturingValueMatcher *> nestedValue;
+    getAllNestedValueMatchers(nestedValue);
+    for (CapturingValueMatcher *matcher : nestedValue) {
       matcher->captured = nullptr;
     }
   }
@@ -219,15 +261,20 @@ protected:
   void recordNestedMatcher(T &nested) {
     if constexpr (std::is_base_of_v<CapturingOpMatcher, T>)
       nestedCapturingMatchers.push_back(&nested);
+    if constexpr (std::is_base_of_v<CapturingValueMatcher, T>)
+      nestedCapturingValueMatchers.push_back(&nested);
   }
 
   /// Appends all nested capturing matchers, excluding this one, to `nested`.
   void getAllNested(SmallVectorImpl<CapturingOpMatcher *> &nested);
+  void
+  getAllNestedValueMatchers(SmallVectorImpl<CapturingValueMatcher *> &nested);
 
 private:
   /// A list of (recursively) nested capturing matchers that should be reset
   /// when the current matcher is.
   SmallVector<CapturingOpMatcher *> nestedCapturingMatchers;
+  SmallVector<CapturingValueMatcher *> nestedCapturingValueMatchers;
 
 protected:
   /// Matched value.
@@ -347,9 +394,20 @@ public:
     recordNestedMatcher(operandMatcher);
     return *this;
   }
-
-  StructuredOpMatcher &input(int64_t position,
-                             SameOperandAsProducer parentPosition);
+  template <typename T>
+  std::enable_if_t<
+      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
+                        Value>::value,
+      StructuredOpMatcher &>
+  input(int64_t position, T &operandMatcher,
+        OptionalMatch optional = OptionalMatch(false)) {
+    addInputMatcher(
+        position,
+        [&operandMatcher](Value v) { return operandMatcher.match(v); },
+        optional);
+    recordNestedMatcher(operandMatcher);
+    return *this;
+  }
 
   /// Adds a predicate checking that all input operands of the structured op
   /// have a permutation indexing map.
@@ -527,6 +585,8 @@ private:
   /// outputs and results. Should not be called directly.
   void addInputMatcher(int64_t position,
                        std::function<bool(Operation *)> matcher,
+                       OptionalMatch optional);
+  void addInputMatcher(int64_t position, std::function<bool(Value)> matcher,
                        OptionalMatch optional);
   void addOutputMatcher(int64_t position,
                         std::function<bool(Operation *)> matcher,
