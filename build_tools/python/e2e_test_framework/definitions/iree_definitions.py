@@ -106,17 +106,27 @@ class MLIRDialectType(Enum):
   MHLO = "mhlo"
 
 
+# Placeholder to be replaced with entry function name when outputting the actual
+# flag list.
+IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = "$ENTRY_FUNCTION_PLACEHOLDER"
+
+
 @serialization.serializable(type_key="iree_import_configs")
 @dataclass(frozen=True)
 class ImportConfig(object):
+  """Config to import the model."""
   id: str
   dialect_type: MLIRDialectType
   import_flags: List[str] = dataclasses.field(default_factory=list)
 
+  def materialize_import_flags(self,
+                               model: common_definitions.Model) -> List[str]:
+    """Materialize flags with dependent values."""
+    return [
+        flag.replace(IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER,
+                     model.entry_function) for flag in self.import_flags
+    ]
 
-# Placeholder to be replaced with entry function name when outputting the actual
-# flag list.
-IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = "$ENTRY_FUNCTION_PLACEHOLDER"
 
 DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,

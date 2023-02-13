@@ -60,12 +60,7 @@ class IreeRuleBuilder(object):
     # Import target name: iree-imported-model-<model_id>
     target_name = f"iree-imported-model-{model.id}"
 
-    import_config = imported_model.import_config
-    import_flags = [
-        flag.replace(iree_definitions.IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER,
-                     model.entry_function)
-        for flag in import_config.import_flags
-    ]
+    import_flags = imported_model.import_config.materialize_import_flags(model)
 
     if model.source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
       cmake_rules = [
