@@ -98,6 +98,13 @@ class ModuleExecutionConfig(object):
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
+class ImportTool(Enum):
+  """Iree model import tool."""
+  NONE = "none"
+  TF_IMPORTER = "iree-import-tf"
+  TFLITE_IMPORTER = "iree-import-tflite"
+
+
 # Value should be the name of an IREE supported input type (--iree-input-type).
 class MLIRDialectType(Enum):
   """Imported MLIR dialect type."""
@@ -116,6 +123,7 @@ IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = "$ENTRY_FUNCTION_PLACEHOLDER"
 class ImportConfig(object):
   """Config to import the model."""
   id: str
+  tool: ImportTool
   dialect_type: MLIRDialectType
   import_flags: List[str] = dataclasses.field(default_factory=list)
 
@@ -130,6 +138,7 @@ class ImportConfig(object):
 
 DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
+    tool=ImportTool.TF_IMPORTER,
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
         "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v1",
@@ -138,6 +147,7 @@ DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
 
 DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
+    tool=ImportTool.TF_IMPORTER,
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
         "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v2",
@@ -146,11 +156,13 @@ DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
 
 DEFAULT_TFLITE_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TFLITE_DEFAULT,
+    tool=ImportTool.TFLITE_IMPORTER,
     dialect_type=MLIRDialectType.TOSA,
     import_flags=["--output-format=mlir-bytecode"])
 
 DEFAULT_LINALG_MLIR_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_LINALG_MLIR_DEFAULT,
+    tool=ImportTool.NONE,
     dialect_type=MLIRDialectType.NONE)
 
 MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP = {

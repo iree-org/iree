@@ -48,10 +48,11 @@ class IreeRuleBuilder(object):
       output_file_path: pathlib.PurePath) -> IreeModelImportRule:
 
     model = imported_model.model
-    if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
+    import_config = imported_model.import_config
+    if import_config.tool == iree_definitions.ImportTool.NONE:
       if source_model_rule.file_path != output_file_path:
         raise ValueError(
-            f"Separate path for Linalg model isn't supported "
+            f"Separate path for MLIR model isn't supported yet: "
             f"('{source_model_rule.file_path }' != '{output_file_path}')")
       return IreeModelImportRule(target_name=source_model_rule.target_name,
                                  output_file_path=output_file_path,
@@ -60,9 +61,8 @@ class IreeRuleBuilder(object):
     # Import target name: iree-imported-model-<model_id>
     target_name = f"iree-imported-model-{model.id}"
 
-    import_flags = imported_model.import_config.materialize_import_flags(model)
-
-    if model.source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
+    import_flags = import_config.materialize_import_flags(model)
+    if import_config.tool == iree_definitions.ImportTool.TFLITE_IMPORTER:
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tflite_model(
               target_path=self.build_target_path(target_name),
@@ -70,10 +70,7 @@ class IreeRuleBuilder(object):
               import_flags=import_flags,
               output_mlir_file=str(output_file_path))
       ]
-    elif model.source_type in [
-        common_definitions.ModelSourceType.EXPORTED_TF_V1,
-        common_definitions.ModelSourceType.EXPORTED_TF_V2
-    ]:
+    elif import_config.tool == iree_definitions.ImportTool.TF_IMPORTER:
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tf_model(
               target_path=self.build_target_path(target_name),
@@ -83,7 +80,7 @@ class IreeRuleBuilder(object):
       ]
     else:
       raise ValueError(
-          f"Unsupported source type '{model.source_type}' of the model '{model.id}'."
+          f"Unsupported import tool '{import_config.tool}' of the model '{model.id}'."
       )
 
     return IreeModelImportRule(target_name=target_name,
