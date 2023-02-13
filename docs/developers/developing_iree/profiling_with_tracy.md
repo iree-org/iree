@@ -148,7 +148,7 @@ If you want to profile `iree-compile` itself as opposed to just profiling module
 
 ## Compile your IREE module (run `iree-compile`)
 
-You you only want Instrumentation and not Sampling then you don't need anything particular here. Just run `iree-compile` as usual.
+If you only want Instrumentation and not Sampling then you don't need anything particular here. Just run `iree-compile` as usual.
 
 ### Additional steps for Sampling
 
