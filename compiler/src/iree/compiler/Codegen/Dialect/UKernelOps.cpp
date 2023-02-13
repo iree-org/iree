@@ -7,10 +7,12 @@
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 
 #include "iree/builtins/ukernel/exported_bits.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/EncodingInfo.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/DstBufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/OpImplementation.h"
@@ -327,8 +329,81 @@ FailureOr<func::CallOp> UKernelMmt4DOp::lowerToFunctionCall(
       rewriter, getOperation(), fnName, fnArgTypes.value(),
       /*callReturnTypes=*/TypeRange{}, fnCallOperands.value());
 }
-
 }  // namespace Codegen
 }  // namespace IREE
+
+//===---------------------------------------------------------------------===//
+// Register bufferization interface.
+//===---------------------------------------------------------------------===//
+
+namespace {
+template <typename OpTy>
+struct UKernelOpsBufferizationInterface
+    : public bufferization::DstBufferizableOpInterfaceExternalModel<
+          UKernelOpsBufferizationInterface<OpTy>, OpTy> {
+  LogicalResult bufferize(
+      Operation *op, RewriterBase &rewriter,
+      const bufferization::BufferizationOptions &options) const {
+    // TODO: Handle operations with regions if needed.
+    if (op->getNumRegions() != 0) {
+      op->emitOpError(
+          "unhandled bufferization of micro kernel op with regions");
+    }
+    SmallVector<Value> bufferOpOperands;
+
+    // Replace all `tensor` operands with corresponding `memref` operands.
+    for (auto [index, operand] : llvm::enumerate(op->getOperands())) {
+      // For `tensor` type operands, replace with `memref` type operand.
+      if (operand.getType().isa<RankedTensorType>()) {
+        FailureOr<Value> memrefOperand = getBuffer(rewriter, operand, options);
+        if (failed(memrefOperand)) {
+          return op->emitOpError(
+              llvm::formatv("failed to bufferize operand {0} ", index));
+        }
+        bufferOpOperands.push_back(memrefOperand.value());
+        continue;
+      }
+
+      // For all other operand types, just use the same value.
+      bufferOpOperands.push_back(operand);
+    }
+
+    // Ignore all result types that are tensor types.
+    SmallVector<Type> resultTypes;
+    for (auto resultType : op->getResultTypes()) {
+      if (resultType.isa<RankedTensorType>()) continue;
+      resultTypes.push_back(resultType);
+    }
+
+    auto bufferOp = rewriter.create<OpTy>(op->getLoc(), resultTypes,
+                                          bufferOpOperands, op->getAttrs());
+    SmallVector<Value> dpsInits =
+        cast<DestinationStyleOpInterface>(bufferOp.getOperation())
+            .getDpsInitOperands();
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, dpsInits);
+    return success();
+  }
+};
+
+template <typename... Ops>
+struct RegisterUKernelOpsBufferizationInterface {
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<UKernelOpsBufferizationInterface<Ops>>(
+         *context),
+     ...);
+  }
+};
+}  // namespace
+
+void registerUKernelBufferizationInterface(DialectRegistry &registry) {
+  registry.addExtension(
+      +[](MLIRContext *context, IREE::Codegen::IREECodegenDialect *dialect) {
+        RegisterUKernelOpsBufferizationInterface<
+#define GET_OP_LIST
+#include "iree/compiler/Codegen/Dialect/UKernelOps.cpp.inc"
+            >::registerOpInterface(context);
+      });
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
