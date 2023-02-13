@@ -60,11 +60,19 @@ class IreeRuleBuilder(object):
     # Import target name: iree-imported-model-<model_id>
     target_name = f"iree-imported-model-{model.id}"
 
+    import_config = imported_model.import_config
+    import_flags = [
+        flag.replace(iree_definitions.IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER,
+                     model.entry_function)
+        for flag in import_config.import_flags
+    ]
+
     if model.source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tflite_model(
               target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
+              import_flags=import_flags,
               output_mlir_file=str(output_file_path))
       ]
     elif model.source_type in [
@@ -75,7 +83,7 @@ class IreeRuleBuilder(object):
           cmake_builder.rules.build_iree_import_tf_model(
               target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
-              import_flags=imported_model.import_flags,
+              import_flags=import_flags,
               output_mlir_file=str(output_file_path))
       ]
     else:
@@ -95,7 +103,7 @@ class IreeRuleBuilder(object):
 
     compile_flags = self._generate_compile_flags(
         compile_config=compile_config,
-        mlir_dialect_type=imported_model.dialect_type.dialect_name
+        mlir_dialect_type=imported_model.import_config.dialect_type.value
     ) + compile_config.extra_flags
 
     # Module target name: iree-module-<model_id>-<compile_config_id>

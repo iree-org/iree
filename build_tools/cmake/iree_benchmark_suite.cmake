@@ -12,6 +12,7 @@
 # Parameters:
 #   TARGET_NAME: The target name to be created for this module.
 #   SOURCE: Source TF model direcotry
+#   IMPORT_FLAGS: Flags to include in the import command.
 #   OUTPUT_MLIR_FILE: The path to output the generated MLIR file.
 function(iree_import_tflite_model)
   cmake_parse_arguments(
@@ -19,7 +20,7 @@ function(iree_import_tflite_model)
     _RULE
     ""
     "TARGET_NAME;SOURCE;OUTPUT_MLIR_FILE"
-    ""
+    "IMPORT_FLAGS"
   )
   iree_validate_required_arguments(
     _RULE
@@ -43,6 +44,7 @@ function(iree_import_tflite_model)
         "${IREE_IMPORT_TFLITE_PATH}"
         "${_RULE_SOURCE}"
         "-o=${_RULE_OUTPUT_MLIR_FILE}"
+        ${_RULE_IMPORT_FLAGS}
       DEPENDS
         "${_RULE_SOURCE}"
       COMMENT "Importing TFLite model ${_MODEL_BASENAME}"

@@ -12,7 +12,7 @@ import hashlib
 from typing import List, Sequence
 
 from e2e_test_framework.definitions import common_definitions
-from e2e_test_framework import serialization
+from e2e_test_framework import serialization, unique_ids
 
 
 def _hash_composite_id(keys: Sequence[str]) -> str:
@@ -98,65 +98,79 @@ class ModuleExecutionConfig(object):
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
-@dataclass(frozen=True)
-class _MLIRDialectPair(object):
-  """MLIR dialect with its unique artificial id."""
-  # Unique artificial id.
-  id: int
-  # Name of an IREE supported input type (--iree-input-type).
-  dialect_name: str
-
-
-# Please use and update the next id when adding a new dialect, so we won't reuse
-# the old deprecated id.
-# Next ID: 4
-class MLIRDialectType(_MLIRDialectPair, Enum):
+# Value should be the name of an IREE supported input type (--iree-input-type).
+class MLIRDialectType(Enum):
   """Imported MLIR dialect type."""
-  NONE = (1, "none")
-  TOSA = (2, "tosa")
-  MHLO = (3, "mhlo")
+  NONE = "none"
+  TOSA = "tosa"
+  MHLO = "mhlo"
 
 
-MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
-    common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
-        MLIRDialectType.NONE,
-    common_definitions.ModelSourceType.EXPORTED_TFLITE:
-        MLIRDialectType.TOSA,
-    common_definitions.ModelSourceType.EXPORTED_TF_V1:
-        MLIRDialectType.MHLO,
-    common_definitions.ModelSourceType.EXPORTED_TF_V2:
-        MLIRDialectType.MHLO,
-}
-
-
-@serialization.serializable(type_key="iree_imported_models")
+@serialization.serializable(type_key="iree_import_configs")
 @dataclass(frozen=True)
-class ImportedModel(object):
-  """Describes an imported MLIR model."""
+class ImportConfig(object):
   id: str
-  model: common_definitions.Model
   dialect_type: MLIRDialectType
   import_flags: List[str] = dataclasses.field(default_factory=list)
 
+
+# Placeholder to be replaced with entry function name when outputting the actual
+# flag list.
+IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = "$ENTRY_FUNCTION_PLACEHOLDER"
+
+DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
+    id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
+    dialect_type=MLIRDialectType.MHLO,
+    import_flags=[
+        "--tf-import-type=savedmodel_v1",
+        f"--tf-savedmodel-exported-names={IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER}"
+    ])
+
+DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
+    id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
+    dialect_type=MLIRDialectType.MHLO,
+    import_flags=[
+        "--tf-import-type=savedmodel_v2",
+        f"--tf-savedmodel-exported-names={IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER}"
+    ])
+
+DEFAULT_TFLITE_IMPORT_CONFIG = ImportConfig(
+    id=unique_ids.IREE_MODEL_IMPORT_TFLITE_DEFAULT,
+    dialect_type=MLIRDialectType.TOSA)
+
+DEFAULT_LINALG_MLIR_IMPORT_CONFIG = ImportConfig(
+    id=unique_ids.IREE_MODEL_IMPORT_LINALG_MLIR_DEFAULT,
+    dialect_type=MLIRDialectType.NONE)
+
+MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP = {
+    common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
+        DEFAULT_LINALG_MLIR_IMPORT_CONFIG,
+    common_definitions.ModelSourceType.EXPORTED_TFLITE:
+        DEFAULT_TFLITE_IMPORT_CONFIG,
+    common_definitions.ModelSourceType.EXPORTED_TF_V1:
+        DEFAULT_TF_V1_IMPORT_CONFIG,
+    common_definitions.ModelSourceType.EXPORTED_TF_V2:
+        DEFAULT_TF_V2_IMPORT_CONFIG,
+}
+
+
+@serialization.serializable
+@dataclass(frozen=True)
+class ImportedModel(object):
+  """Describes an imported MLIR model."""
+  model: common_definitions.Model
+  import_config: ImportConfig
+
+  def composite_id(self):
+    return _hash_composite_id([self.model.id, self.import_config.id])
+
   @staticmethod
   def from_model(model: common_definitions.Model):
-    dialect_type = MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type]
-    if model.source_type == common_definitions.ModelSourceType.EXPORTED_TF_V1:
-      import_flags = [
-          "--tf-import-type=savedmodel_v1",
-          f"--tf-savedmodel-exported-names={model.entry_function}"
-      ]
-    elif model.source_type == common_definitions.ModelSourceType.EXPORTED_TF_V2:
-      import_flags = [
-          "--tf-import-type=savedmodel_v2",
-          f"--tf-savedmodel-exported-names={model.entry_function}"
-      ]
-    else:
-      import_flags = []
-    return ImportedModel(id=f"{model.id}-{dialect_type.id}",
-                         model=model,
-                         dialect_type=dialect_type,
-                         import_flags=import_flags)
+    config = MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP.get(model.source_type)
+    if config is None:
+      raise ValueError(f"Unsupported model source type: {model.source_type}.")
+
+    return ImportedModel(model=model, import_config=config)
 
 
 @serialization.serializable
@@ -167,7 +181,8 @@ class ModuleGenerationConfig(object):
   compile_config: CompileConfig
 
   def composite_id(self):
-    return _hash_composite_id([self.imported_model.id, self.compile_config.id])
+    return _hash_composite_id(
+        [self.imported_model.composite_id(), self.compile_config.id])
 
 
 @serialization.serializable
