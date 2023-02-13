@@ -133,18 +133,19 @@ def build_iree_fetch_artifact(target_name: str, source_url: str, output: str,
 
 
 def build_iree_import_tf_model(target_path: str, source: str,
-                               entry_function: str,
+                               import_flags: List[str],
                                output_mlir_file: str) -> str:
   target_name_block = _get_string_arg_block("TARGET_NAME", target_path)
   source_block = _get_string_arg_block("SOURCE", source)
-  entry_function_block = _get_string_arg_block("ENTRY_FUNCTION", entry_function)
+  import_flags_block = _get_string_arg_block("IMPORT_FLAGS",
+                                             " ".join(import_flags))
   output_mlir_file_block = _get_string_arg_block("OUTPUT_MLIR_FILE",
                                                  output_mlir_file)
   return _convert_block_to_string(
       _build_call_rule(rule_name="iree_import_tf_model",
                        parameter_blocks=[
-                           target_name_block, source_block,
-                           entry_function_block, output_mlir_file_block
+                           target_name_block, source_block, import_flags_block,
+                           output_mlir_file_block
                        ]))
 
 

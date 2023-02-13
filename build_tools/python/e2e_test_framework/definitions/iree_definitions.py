@@ -134,13 +134,19 @@ class ImportedModel(object):
   id: str
   model: common_definitions.Model
   dialect_type: MLIRDialectType
+  import_flags: List[str] = dataclasses.field(default_factory=list)
 
   @staticmethod
   def from_model(model: common_definitions.Model):
     dialect_type = MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type]
+    import_flags = []
+    if model.source_type == common_definitions.ModelSourceType.EXPORTED_TF:
+      import_flags.append(
+          f"--tf-savedmodel-exported-names={model.entry_function}")
     return ImportedModel(id=f"{model.id}-{dialect_type.id}",
                          model=model,
-                         dialect_type=dialect_type)
+                         dialect_type=dialect_type,
+                         import_flags=import_flags)
 
 
 @serialization.serializable

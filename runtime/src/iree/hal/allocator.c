@@ -13,6 +13,38 @@
 #include "iree/hal/detail.h"
 #include "iree/hal/resource.h"
 
+//===----------------------------------------------------------------------===//
+// String utils
+//===----------------------------------------------------------------------===//
+
+static const iree_bitfield_string_mapping_t
+    iree_hal_buffer_compatibility_mappings[] = {
+        {IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE, IREE_SVL("ALLOCATABLE")},
+        {IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE, IREE_SVL("IMPORTABLE")},
+        {IREE_HAL_BUFFER_COMPATIBILITY_EXPORTABLE, IREE_SVL("EXPORTABLE")},
+        {IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
+         IREE_SVL("QUEUE_TRANSFER")},
+        {IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
+         IREE_SVL("QUEUE_DISPATCH")},
+        {IREE_HAL_BUFFER_COMPATIBILITY_LOW_PERFORMANCE,
+         IREE_SVL("LOW_PERFORMANCE")},
+};
+
+IREE_API_EXPORT iree_status_t iree_hal_buffer_compatibility_parse(
+    iree_string_view_t value, iree_hal_buffer_compatibility_t* out_value) {
+  return iree_bitfield_parse(
+      value, IREE_ARRAYSIZE(iree_hal_buffer_compatibility_mappings),
+      iree_hal_buffer_compatibility_mappings, out_value);
+}
+
+IREE_API_EXPORT iree_string_view_t
+iree_hal_buffer_compatibility_format(iree_hal_buffer_compatibility_t value,
+                                     iree_bitfield_string_temp_t* out_temp) {
+  return iree_bitfield_format_inline(
+      value, IREE_ARRAYSIZE(iree_hal_buffer_compatibility_mappings),
+      iree_hal_buffer_compatibility_mappings, out_temp);
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_format(
     const iree_hal_allocator_statistics_t* statistics,
     iree_string_builder_t* builder) {
@@ -41,6 +73,10 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_format(
 #endif  // IREE_STATISTICS_ENABLE
   return iree_ok_status();
 }
+
+//===----------------------------------------------------------------------===//
+// iree_hal_allocator_t
+//===----------------------------------------------------------------------===//
 
 #define _VTABLE_DISPATCH(allocator, method_name) \
   IREE_HAL_VTABLE_DISPATCH(allocator, iree_hal_allocator, method_name)

@@ -63,7 +63,7 @@ enum iree_hal_memory_type_bits_t {
   // Memory is accessible as normal host allocated memory.
   IREE_HAL_MEMORY_TYPE_HOST_LOCAL = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
                                     IREE_HAL_MEMORY_TYPE_HOST_COHERENT |
-                                    (1u << 5),
+                                    (1u << 6),
 
   // The allocator will choose the optimal memory type based on buffer usage,
   // preferring to place the allocation in host-local memory.

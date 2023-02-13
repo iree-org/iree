@@ -31,6 +31,7 @@ iree_benchmark_suite(
     "${RESNET50_TF_FP32_MODULE}"
     "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
     "${EFFICIENTNET_V2_S_TF_FP32_MODULE}"
+    "${BERT_LARGE_TF_FP32_SEQLEN384_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"

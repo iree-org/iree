@@ -127,6 +127,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePackUnPackOpsPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
     bool flatten = false);
 
+/// Pass to lower micro_kernel operations into their defined function calls.
+std::unique_ptr<OperationPass<ModuleOp>> createLowerMicroKernelOpsToCallsPass();
+
 /// Pass to optimize vector transfer_read and transfer_write. See Passes.td for
 /// `option` details.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -272,6 +275,10 @@ createLLVMCPUCheckIRBeforeLLVMConversionPass();
 /// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass();
+
+/// Pass to lower a sequence of operations to a iree_codegen.micro_kernel
+/// operation.
+std::unique_ptr<OperationPass<>> createLLVMCPULowerToMicroKernelsPass();
 
 /// Materialize the encoding of operations. The layout to use for the encoded
 /// operations are LLVMCPU specific.
@@ -527,7 +534,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm);
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass(
-    bool enableFastMath = false);
+    bool enableFastMath = false, unsigned indexWidth = 32);
 
 /// Creates a pass to fold processor ID uses where possible.
 std::unique_ptr<OperationPass<func::FuncOp>>

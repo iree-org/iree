@@ -204,6 +204,17 @@ enum iree_hal_buffer_compatibility_bits_t {
 };
 typedef uint32_t iree_hal_buffer_compatibility_t;
 
+// Parses a buffer compatibility bitfield from a string.
+// See iree_bitfield_parse for usage.
+IREE_API_EXPORT iree_status_t iree_hal_buffer_compatibility_parse(
+    iree_string_view_t value, iree_hal_buffer_compatibility_t* out_value);
+
+// Formats a buffer compatibility bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t
+iree_hal_buffer_compatibility_format(iree_hal_buffer_compatibility_t value,
+                                     iree_bitfield_string_temp_t* out_temp);
+
 // Defines the type of an external buffer handle.
 // Each type may only be usable in a subset of implementations and platforms and
 // may even vary based on the runtime device properties or buffer instance.

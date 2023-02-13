@@ -19,6 +19,7 @@ exports_files([
     "IREECodegenAttributes.td",
     "IREECodegenDialect.td",
     "LoweringConfig.td",
+    "MicroKernelOps.td",
 ])
 
 td_library(
@@ -28,10 +29,13 @@ td_library(
             "IREECodegenAttributes.td",
             "IREECodegenDialect.td",
             "LoweringConfig.td",
+            "MicroKernelOps.td",
         ],
         include = ["*.td"],
     ),
     deps = [
+        "//compiler/src/iree/compiler/Codegen/Interfaces:td_files",
+        "@llvm-project//mlir:DestinationStyleOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
@@ -41,10 +45,12 @@ iree_compiler_cc_library(
     srcs = [
         "IREECodegenDialect.cpp",
         "LoweringConfig.cpp",
+        "MicroKernelOps.cpp",
     ],
     hdrs = [
         "IREECodegenDialect.h",
         "LoweringConfig.h",
+        "MicroKernelOps.h",
     ],
     textual_hdrs = [
         "IREECodegenDialect.cpp.inc",
@@ -53,18 +59,26 @@ iree_compiler_cc_library(
         "LoweringConfig.h.inc",
         "LoweringConfigEnums.cpp.inc",
         "LoweringConfigEnums.h.inc",
+        "MicroKernelOps.cpp.inc",
+        "MicroKernelOps.h.inc",
     ],
     deps = [
         ":IREECodegenDialectGen",
         ":LoweringConfigGen",
+        ":MicroKernelOpsGen",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:MicroKernelOpInterface",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:DestinationStyleOpInterface",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Support",
     ],
 )
 
@@ -108,4 +122,24 @@ iree_gentbl_cc_library(
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LoweringConfig.td",
     deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "MicroKernelOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "MicroKernelOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "MicroKernelOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "MicroKernelOps.td",
+    deps = [
+        ":td_files",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:td_files",
+    ],
 )

@@ -106,6 +106,12 @@ def IREEComprehensiveBufferize :
   ];
 }
 
+def LowerMicroKernelOpsToCalls :
+    Pass<"iree-codegen-lower-micro-kernel-ops-to-calls", "ModuleOp"> {
+  let summary = "Lower micro-kernel wrapper ops into function calls";
+  let constructor = "mlir::iree_compiler::createLowerMicroKernelOpsToCallsPass()";
+}
+
 def OptimizeVectorTransfer :
     Pass<"iree-codegen-optimize-vector-transfer", "func::FuncOp"> {
   let summary =
@@ -368,6 +374,14 @@ def LLVMCPULowerExecutableTarget :
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
 }
 
+def LLVMCPULowerToMicroKernels :
+    Pass<"iree-llvmcpu-lower-to-micro-kernels", ""> {
+  let summary =
+      "Separate out parts of the IR that lower to a micro-kernel";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPULowerToMicroKernelsPass()";
+}
+
 def LLVMCPUMaterializeEncoding :
     Pass<"iree-llvmcpu-materialize-encoding", "func::FuncOp"> {
   let summary = "Materialize the encoding for tensor as specified by the backend";
@@ -499,6 +513,12 @@ def LLVMGPUTensorPad :
 def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
   let summary = "Perform the final conversion to SPIR-V dialect";
   let constructor = "mlir::iree_compiler::createConvertToSPIRVPass()";
+  let options = [
+    Option<"enableFastMathOption", "enable-fast-math", "bool", /*default=*/"false",
+          "Enable fast math mode during type conversion (i.e. assume no NaN/infinity)">,
+    Option<"indexBitsOption", "index-bits", "unsigned", /*default=*/"32",
+          "Specify the bit widths for SPIR-V indices">,
+  ];
 }
 
 def SPIRVVectorToGPUSubgroupMMA :
