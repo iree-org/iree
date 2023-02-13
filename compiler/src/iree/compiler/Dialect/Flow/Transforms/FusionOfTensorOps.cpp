@@ -169,7 +169,9 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
     };
     if (!consumer ||
         !(llvm::all_of(genericOp.getIteratorTypes(), isParallelIteratorType) &&
-          llvm::all_of(consumer.getIteratorTypes(), isParallelIteratorType))) {
+          llvm::all_of(consumer.getIteratorTypes(), isParallelIteratorType) &&
+          genericOp.getIteratorTypes().size() ==
+              consumer.getIteratorTypes().size())) {
       return;
     }
 
