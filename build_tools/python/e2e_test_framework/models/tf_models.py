@@ -51,3 +51,16 @@ RESNET50_TF_FP32 = common_definitions.Model(
     "https://storage.googleapis.com/iree-model-artifacts/resnet50-tf-model.tar.gz",
     entry_function="forward",
     input_types=["1x224x224x3xf32"])
+
+# This is the model used in the MLPerf Inference Suite.
+BERT_LARGE_TF_FP32_SEQLEN384 = common_definitions.Model(
+    id=unique_ids.MODEL_BERT_LARGE_TF_FP32_SEQLEN384,
+    name="BertLargeTF",
+    tags=["fp32", "seqlen384", "tensorflow"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_TF_V1,
+    # Derived from https://github.com/mlcommons/inference/tree/master/language/bert
+    # Instructions on how to regenerate the model: https://gist.github.com/mariecwhite/e61ccebd979d98d097946ac7725bcc29
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/bert-large-seq384-tf-model.tar.gz",
+    entry_function="serving_default",
+    input_types=["1x384xi32", "1x384xi32", "1x384xi32"])
