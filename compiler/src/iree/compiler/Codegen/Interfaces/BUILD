@@ -16,6 +16,7 @@ package(
 )
 
 exports_files([
+    "MicroKernelOpInterface.td",
     "ProcessorOpInterfaces.td",
 ])
 
@@ -23,6 +24,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
+            "MicroKernelOpInterface.td",
             "PartitionableLoopsInterface.td",
             "ProcessorOpInterfaces.td",
         ],
@@ -43,6 +45,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":BufferizationInterfaces",
+        ":MicroKernelOpInterface",
         ":PartitionableLoopsInterface",
         ":ProcessorOpInterfaces",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
@@ -89,6 +92,42 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:VectorTransforms",
     ],
+)
+
+iree_compiler_cc_library(
+    name = "MicroKernelOpInterface",
+    srcs = [
+        "MicroKernelOpInterface.cpp",
+    ],
+    hdrs = [
+        "MicroKernelOpInterface.h",
+    ],
+    textual_hdrs = [
+        "MicroKernelOpInterface.cpp.inc",
+        "MicroKernelOpInterface.h.inc",
+    ],
+    deps = [
+        ":MicroKernelOpInterfaceGen",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "MicroKernelOpInterfaceGen",
+    tbl_outs = [
+        (
+            ["--gen-op-interface-decls"],
+            "MicroKernelOpInterface.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "MicroKernelOpInterface.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "MicroKernelOpInterface.td",
+    deps = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
 iree_compiler_cc_library(

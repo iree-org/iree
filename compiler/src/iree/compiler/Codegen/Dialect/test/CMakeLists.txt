@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "lowering_config_attr.mlir"
+    "micro_kernel_ops.mlir"
   TOOLS
     FileCheck
     iree-opt
