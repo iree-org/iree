@@ -55,8 +55,9 @@ jobs:
         id: check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # TODO(#11076): Temporarily matches nonexistent job to enable only in
-          # test PR until we migrate the benchmark pipeline.
+          # TODO(#11076): Temporarily matches a non-existent job so we don't
+          # post comments by default before the migration. And a test PR with
+          # the modified benchmark job name can still do end-to-end test.
           BENCHMARK_PROCESS_JOB: process_benchmark_results_disabled
         run: |
           # Assume the workflow has fewer than 100 jobs.
