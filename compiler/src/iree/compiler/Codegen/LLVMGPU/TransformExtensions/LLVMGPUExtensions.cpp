@@ -686,11 +686,11 @@ DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
 }
 
 //===----------------------------------------------------------------------===//
-// PipelineShaderMemoryCopiesOp
+// PipelineSharedMemoryCopiesOp
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform_dialect::PipelineShaderMemoryCopiesOp::applyToOne(
+transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
     scf::ForOp forOp, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   transform::TrivialPatternRewriter rewriter(getContext());

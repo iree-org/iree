@@ -385,7 +385,7 @@ def PromoteOperandsOp :
 }
 
 
-def PipelineShaderMemoryCopiesOp : Op<
+def PipelineSharedMemoryCopiesOp : Op<
     Transform_Dialect, "iree.pipeline_shared_memory_copies", [
       FunctionalStyleTransformOpTrait,
       MemoryEffectsOpInterface,
