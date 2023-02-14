@@ -10,8 +10,6 @@ jobs:
   tag_release:
     name: "Tag candidate release"
     runs-on: ubuntu-20.04
-    # Don't run the cron in everyone's forks
-    if: github.event_name != 'schedule' || github.repository == 'iree-org/iree'
     steps:
       - name: Checking out repository
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0

@@ -27,8 +27,8 @@ __all__ = [
     "benchmark_module",
 ]
 
-BenchmarkResult = namedtuple("BenchmarkResult",
-                             "entry_function process_time real_time")
+BenchmarkResult = namedtuple(
+    "BenchmarkResult", "benchmark_name time cpu_time iterations user_counters")
 
 DTYPE_TO_ABI_TYPE = {
     numpy.dtype(numpy.float32): "f32",
@@ -42,8 +42,7 @@ DTYPE_TO_ABI_TYPE = {
 
 
 def benchmark_exe():
-  return os.path.join(os.path.dirname(__file__), "..", "..",
-                      "iree-benchmark-module")
+  return os.path.join(os.path.dirname(__file__), "iree-benchmark-module")
 
 
 def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
@@ -62,7 +61,7 @@ def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
   flatbuffer = module.stashed_flatbuffer_blob
   function = module.lookup_function(entry_functiong)
   args = [iree.runtime.benchmark_exe()]
-  args.append(f"--entry_function={funcs[0]}")
+  args.append(f"--function={funcs[0]}")
 
   for k in kwargs:
     v = kwargs[k]
@@ -70,7 +69,7 @@ def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
 
   for inp in inputs:
     if isinstance(inp, str):
-      args.append(f"--function_input={inp}")
+      args.append(f"--input={inp}")
       continue
     shape = "x".join([str(d) for d in inp.shape])
     abitype = DTYPE_TO_ABI_TYPE[inp.dtype]
@@ -80,7 +79,7 @@ def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
     else:
       values = ",".join([str(v) for v in values])
 
-    args.append(f"--function_input={shape}x{abitype}={values}")
+    args.append(f"--input={shape}x{abitype}={values}")
 
   call = subprocess.Popen(args=args,
                           stdin=subprocess.PIPE,
@@ -92,10 +91,25 @@ def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
   if "INVALID_ARGUMENT;" in err:
     raise ValueError("Invalid inputs specified for benchmarking")
 
-  out = out.decode().split("\n")[4]
-  splt = out.split()
-  process_time = splt[1]
-  real_time = splt[3]
-  return BenchmarkResult(entry_function=entry_functiong,
-                         process_time=process_time,
-                         real_time=real_time)
+  # Grab individual results by line (skip header lines)
+  bench_lines = out.decode().split("\n")[3:]
+  benchmark_results = []
+  for line in bench_lines:
+    spilt = line.split()
+    if len(spilt) == 0:
+      continue
+    benchmark_name = spilt[0]
+    time = spilt[1]
+    cpu_time = spilt[2]
+    iterations = spilt[3]
+    user_counters = None
+    if len(spilt) > 4:
+      user_counters = spilt[4]
+    benchmark_results.append(
+        BenchmarkResult(benchmark_name=benchmark_name,
+                        time=time,
+                        cpu_time=cpu_time,
+                        iterations=iterations,
+                        user_counters=user_counters))
+
+  return benchmark_results

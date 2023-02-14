@@ -18,6 +18,11 @@ iree_uk_ssize_t iree_uk_test_2d_buffer_length(iree_uk_type_t type,
                                               iree_uk_ssize_t size0,
                                               iree_uk_ssize_t size1);
 
+bool iree_uk_test_2d_buffers_equal(const void* buf1, const void* buf2,
+                                   iree_uk_type_t type, iree_uk_ssize_t size0,
+                                   iree_uk_ssize_t size1,
+                                   iree_uk_ssize_t stride0);
+
 // Helpers to fill buffers with pseudorandom values. The main entry point here
 // is iree_uk_test_write_random_buffer.
 struct iree_uk_test_random_engine_t;

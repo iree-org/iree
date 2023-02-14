@@ -21,8 +21,9 @@
 // Invocation utilities for I/O
 //===----------------------------------------------------------------------===//
 
-static void iree_vm_invoke_release_io_storage(iree_string_view_t cconv_fragment,
-                                              iree_byte_span_t storage) {
+// Releases reference counted values in |storage|.
+static void iree_vm_invoke_release_io_refs(iree_string_view_t cconv_fragment,
+                                           iree_byte_span_t storage) {
   if (!storage.data_length) return;
   if (cconv_fragment.size == 0 || cconv_fragment.data[0] != '0') return;
   uint8_t* p = storage.data;
@@ -47,6 +48,26 @@ static void iree_vm_invoke_release_io_storage(iree_string_view_t cconv_fragment,
         p += sizeof(iree_vm_ref_t);
         break;
     }
+  }
+}
+
+// Releases storage for arguments.
+static void iree_vm_invoke_release_argument_storage(
+    iree_string_view_t cconv_fragment, iree_byte_span_t storage,
+    bool is_heap_alloc, iree_allocator_t host_allocator) {
+  iree_vm_invoke_release_io_refs(cconv_fragment, storage);
+  if (is_heap_alloc) {
+    iree_allocator_free(host_allocator, storage.data);
+  }
+}
+
+// Releases storage for results.
+static void iree_vm_invoke_release_result_storage(
+    iree_string_view_t cconv_fragment, iree_byte_span_t storage,
+    void* stack_storage, iree_allocator_t host_allocator) {
+  iree_vm_invoke_release_io_refs(cconv_fragment, storage);
+  if (storage.data != stack_storage) {
+    iree_allocator_free(host_allocator, storage.data);
   }
 }
 
@@ -351,6 +372,9 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
 // Asynchronous invocation
 //===----------------------------------------------------------------------===//
 
+// Argument storage larger than this will require a heap allocation.
+#define IREE_VM_STACK_MAX_ARGUMENT_ALLOCA_SIZE (iree_host_size_t)(16 * 1024)
+
 // WARNING: this function cannot have any trace markers that span the begin
 // call; the begin may yield with zones still open.
 IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
@@ -382,7 +406,19 @@ IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
       z0,
       iree_vm_function_call_compute_cconv_fragment_size(
           cconv_arguments, /*segment_size_list=*/NULL, &arguments.data_length));
-  arguments.data = iree_alloca(arguments.data_length);
+  const bool arguments_on_heap =
+      arguments.data_length > IREE_VM_STACK_MAX_ARGUMENT_ALLOCA_SIZE;
+  if (!arguments_on_heap) {
+    // Arguments fit on the native stack without too much worry about
+    // overflowing. This is the fast path (effectively just an $sp bump).
+    arguments.data = iree_alloca(arguments.data_length);
+  } else {
+    // Couldn't inline, do a heap allocation that we'll keep until this function
+    // returns.
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_allocator_malloc(host_allocator, arguments.data_length,
+                                  (void**)&arguments.data));
+  }
   memset(arguments.data, 0, arguments.data_length);
 
   // Allocate the result storage that will be populated by the invokee. This
@@ -390,26 +426,25 @@ IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
   // storage. This reduces the overall available stack space but not by much,
   // and if the stack needs to dynamically grow the inlined storage will still
   // be available.
-  iree_byte_span_t results = iree_make_byte_span(state->stack_storage, 0);
+  iree_byte_span_t results = iree_make_byte_span(NULL, 0);
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_vm_function_call_compute_cconv_fragment_size(
               cconv_results, /*segment_size_list=*/NULL, &results.data_length));
-  memset(results.data, 0, results.data_length);
-  iree_host_size_t result_storage_size =
-      iree_host_align(results.data_length, iree_max_align_t);
-  if (result_storage_size > sizeof(state->stack_storage)) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "too many results for inlined storage (%" PRIhsz
-                            ")",
-                            result_storage_size);
+  iree_host_size_t reserved_storage_size = 0;
+  if (results.data_length <= sizeof(state->stack_storage) / 4) {
+    // Results fit in the inlined storage and we can avoid a heap allocation.
+    // If we exceed the maximum we'll heap allocate below inside the stack.
+    results.data = state->stack_storage;
+    reserved_storage_size =
+        iree_host_align(results.data_length, iree_max_align_t);
+  } else {
+    // Couldn't inline, do a heap allocation we'll have to hang on to and
+    // clean up when the invocation state is released.
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_allocator_malloc(host_allocator, results.data_length,
+                                  (void**)&results.data));
   }
-
-  iree_vm_function_call_t call = {
-      .function = function,
-      .arguments = arguments,
-      .results = results,
-  };
+  memset(results.data, 0, results.data_length);
 
   // Marshal the input arguments into the VM ABI and preallocate the result
   // buffer. If marshaling fails we need to cleanup the arguments.
@@ -417,22 +452,30 @@ IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
   iree_status_t status =
       iree_vm_invoke_marshal_inputs(cconv_arguments, inputs, arguments);
   if (!iree_status_is_ok(status)) {
-    iree_vm_invoke_release_io_storage(cconv_arguments, arguments);
+    iree_vm_invoke_release_argument_storage(cconv_arguments, arguments,
+                                            arguments_on_heap, host_allocator);
+    iree_vm_invoke_release_result_storage(cconv_results, results,
+                                          state->stack_storage, host_allocator);
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
 
   // Initialize the stack with the inline storage.
-  // We sliced off the head of the storage above to use for results and perform
-  // an offset here to account for that.
+  // We (probably) sliced off the head of the storage above to use for results
+  // and perform an offset here to account for that.
   iree_vm_stack_t* stack = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_stack_initialize(
-              iree_make_byte_span(
-                  state->stack_storage + result_storage_size,
-                  sizeof(state->stack_storage) - result_storage_size),
-              flags, iree_vm_context_state_resolver(context), host_allocator,
-              &stack));
+  status = iree_vm_stack_initialize(
+      iree_make_byte_span(state->stack_storage + reserved_storage_size,
+                          sizeof(state->stack_storage) - reserved_storage_size),
+      flags, iree_vm_context_state_resolver(context), host_allocator, &stack);
+  if (!iree_status_is_ok(status)) {
+    iree_vm_invoke_release_argument_storage(cconv_arguments, arguments,
+                                            arguments_on_heap, host_allocator);
+    iree_vm_invoke_release_result_storage(cconv_results, results,
+                                          state->stack_storage, host_allocator);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
 
   // NOTE: at this point the stack must be properly deinitialized if we bail.
 
@@ -452,18 +495,24 @@ IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
   // Execute the target function until the first yield point is reached or it
   // completes. A result of OK indicates successful completion while DEFERRED
   // indicates that the invocation needs to be resumed/waited again.
+  iree_vm_function_call_t call = {
+      .function = function,
+      .arguments = arguments,
+      .results = results,
+  };
   state->status =
       function.module->begin_call(function.module->self, stack, call);
+
+  // Arguments should no longer be required - they were either consumed by the
+  // begin_call or need to be cleaned up before we return.
+  iree_vm_invoke_release_argument_storage(cconv_arguments, call.arguments,
+                                          arguments_on_heap, host_allocator);
 
   // The call may have yielded, either for cooperative scheduling purposes or
   // for a wait operation (in which case the top of the stack will have a wait
   // frame).
   if (iree_status_is_deferred(state->status)) {
     return iree_status_from_code(IREE_STATUS_DEFERRED);
-  } else if (IREE_UNLIKELY(!iree_status_is_ok(state->status))) {
-    // If the call succeeded the arguments will have been consumed - otherwise
-    // we're responsible for doing it.
-    iree_vm_invoke_release_io_storage(cconv_arguments, call.arguments);
   }
 
   // NOTE: the begin-invoke was ok, but the operation itself may have failed.
@@ -624,13 +673,18 @@ IREE_API_EXPORT void iree_vm_abort_invoke(iree_vm_invoke_state_t* state) {
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_allocator_t host_allocator = state->stack
+                                        ? iree_vm_stack_allocator(state->stack)
+                                        : iree_allocator_null();
+
   if (state->stack) {
     iree_vm_stack_deinitialize(state->stack);
     state->stack = NULL;
   }
 
   if (!iree_byte_span_is_empty(state->results)) {
-    iree_vm_invoke_release_io_storage(state->cconv_results, state->results);
+    iree_vm_invoke_release_result_storage(state->cconv_results, state->results,
+                                          state->stack_storage, host_allocator);
     state->results = iree_byte_span_empty();
   }
 

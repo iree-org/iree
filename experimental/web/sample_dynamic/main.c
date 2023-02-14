@@ -50,7 +50,7 @@ void unload_program(iree_program_state_t* program_state);
 // * |function_name| is the fully qualified function name, like 'module.abs'.
 // * |inputs| is a semicolon delimited list of VM scalars and buffers, as
 //   described in iree/tooling/vm_util and used in IREE's CLI tools.
-//   For example, the CLI `--function_input=f32=1 --function_input=f32=2`
+//   For example, the CLI `--input=f32=1 --input=f32=2`
 //   should be passed here as `f32=1;f32=2`.
 // * |iterations| is the number of times to call the function, for benchmarking
 const char* call_function(iree_program_state_t* program_state,

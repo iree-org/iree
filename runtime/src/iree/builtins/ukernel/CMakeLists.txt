@@ -60,16 +60,18 @@ iree_cc_library(
     "elementwise_impl.c.inc"
     "mmt4d.c"
     "mmt4d.h"
-    "mmt4d_generic.c"
-    "mmt4d_generic.h"
+    "mmt4d_tile.c"
+    "mmt4d_tile.h"
     "pack.c"
     "pack.h"
-    "pack_generic.c"
-    "pack_generic.h"
+    "pack_tile.c"
+    "pack_tile.h"
     "query_tile_sizes.c"
     "query_tile_sizes.h"
     "unpack.c"
     "unpack.h"
+    "unpack_tile.c"
+    "unpack_tile.h"
   DEPS
     ::exported_bits
     ::headers

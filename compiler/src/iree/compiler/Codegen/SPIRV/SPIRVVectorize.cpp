@@ -232,8 +232,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       RewritePatternSet patterns(context);
       vector::populateVectorMultiReductionLoweringPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
-      if (failed(applyOpPatternsAndFold(reductionOps, std::move(patterns),
-                                        /*strict=*/false))) {
+      if (failed(applyOpPatternsAndFold(reductionOps, std::move(patterns)))) {
         funcOp.emitOpError("vector lowering failed");
         return signalPassFailure();
       }

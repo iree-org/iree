@@ -8,12 +8,11 @@ func.func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
   %0 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%id1]
   %1 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%count1]
 
+  //  CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : index
+  //  CHECK-DAG:   %[[C4:.*]] = arith.constant 4 : i64
   //      CHECK: scf.for
-  //      CHECK:   %[[C32:.*]] = arith.constant 32 : index
   //      CHECK:   scf.for %{{.*}} = %{{.*}} to %[[C32]]
-  // CHECK-NEXT:     %[[C4:.*]] = arith.constant 4 : index
-  // CHECK-NEXT:     %[[C4I64:.*]] = arith.index_cast %[[C4:.*]]
-  // CHECK-NEXT:     memref.store %[[C4I64]], %{{.*}}[] : memref<i64>
+  // CHECK-NEXT:     memref.store %[[C4]], %{{.*}}[] : memref<i64>
   scf.for %arg0 = %0 to %c1024 step %1 {
     %2 = affine.min affine_map<(d0) -> (32, -d0 + 1024)>(%arg0)
     %3 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%id2]
@@ -31,9 +30,7 @@ func.func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
   //      CHECK: scf.for
   //      CHECK:   %[[MIN:.*]] = affine.min
   //      CHECK:   scf.for %{{.*}} = %{{.*}} to %[[MIN]]
-  // CHECK-NEXT:     %[[C4:.*]] = arith.constant 4 : index
-  // CHECK-NEXT:     %[[C4I64:.*]] = arith.index_cast %[[C4:.*]]
-  // CHECK-NEXT:     memref.store %[[C4I64]], %{{.*}}[] : memref<i64>
+  // CHECK-NEXT:     memref.store %[[C4]], %{{.*}}[] : memref<i64>
   scf.for %arg0 = %0 to %c1020 step %1 {
     %2 = affine.min affine_map<(d0) -> (32, -d0 + 1020)>(%arg0)
     %3 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%id2]
@@ -49,9 +46,7 @@ func.func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
   //      CHECK: scf.for
   //      CHECK:   %[[MIN:.*]] = affine.min
   //      CHECK:   scf.parallel {{.*}} to (%[[MIN]])
-  // CHECK-NEXT:     %[[C4:.*]] = arith.constant 4 : index
-  // CHECK-NEXT:     %[[C4I64:.*]] = arith.index_cast %[[C4:.*]]
-  // CHECK-NEXT:     memref.store %[[C4I64]], %{{.*}}[] : memref<i64>
+  // CHECK-NEXT:     memref.store %[[C4]], %{{.*}}[] : memref<i64>
   scf.for %arg0 = %0 to %c1020 step %1 {
     %2 = affine.min affine_map<(d0) -> (32, -d0 + 1020)>(%arg0)
     %3 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%id2]

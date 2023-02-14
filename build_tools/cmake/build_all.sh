@@ -47,13 +47,6 @@ declare -a CMAKE_ARGS=(
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
-  # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
-  # have enough deps to at least build CUDA support and compile CUDA binaries
-  # (but not necessarily test on real hardware).
-  "-DIREE_HAL_DRIVER_CUDA=ON"
-  "-DIREE_TARGET_BACKEND_CUDA=ON"
-
-
   "-DIREE_TARGET_BACKEND_WEBGPU=${IREE_TARGET_BACKEND_WEBGPU}"
 )
 
@@ -69,10 +62,6 @@ echo "------------------"
 echo "Building test deps"
 echo "------------------"
 "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
-
-echo "Building sample deps"
-echo "------------------"
-"$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-sample-deps -- -k 0
 
 if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats

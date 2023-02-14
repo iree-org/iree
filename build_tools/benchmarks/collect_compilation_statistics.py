@@ -124,7 +124,7 @@ def get_module_path(flag_file: TextIO) -> Optional[str]:
 
   module_path = None
   for line in flag_file:
-    match = re.match("--module_file=(.+)", line.strip())
+    match = re.match("--module=(.+)", line.strip())
     if match:
       module_name, module_ext = os.path.splitext(match.group(1))
       module_path = f"{module_name}-{COMPILATION_STATS_MODULE_SUFFIX}{module_ext}"
@@ -154,7 +154,8 @@ def get_module_map_from_generation_config(
         model_tags=tuple(model.tags),
         model_source=model.source_type.value,
         target_arch=f"[{','.join(target_archs)}]",
-        compile_tags=tuple(compile_config.tags))
+        compile_tags=tuple(compile_config.tags),
+        gen_config_id=gen_config.composite_id())
     module_dir_path = iree_artifacts.get_module_dir_path(
         module_generation_config=gen_config, root_path=e2e_test_artifacts_dir)
     module_path = module_dir_path / iree_artifacts.MODULE_FILENAME

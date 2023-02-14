@@ -92,7 +92,7 @@ LogicalResult mergeModuleInto(Operation *sourceModuleOp,
           // Private symbols can be safely folded into duplicates or renamed.
           if (OperationEquivalence::isEquivalentTo(
                   targetOp, sourceOp, OperationEquivalence::exactValueMatch,
-                  OperationEquivalence::exactValueMatch,
+                  /*markEquivalent=*/nullptr,
                   OperationEquivalence::Flags::IgnoreLocations)) {
             // Optimization: skip over duplicate private symbols.
             // We could let CSE do this later, but we may as well check here.

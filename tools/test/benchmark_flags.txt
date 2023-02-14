@@ -1,5 +1,5 @@
 // RUN: ( iree-benchmark-module --help || [[ $? == 1 ]] )  | FileCheck --check-prefix=HELP %s
-// HELP: --module_file
+// HELP: --module
 // HELP: --benchmark_list_tests
 
 // RUN: ( iree-compile --iree-hal-target-backends=vmvx %s | iree-benchmark-module --benchmark_list_tests --device=local-task --benchmark_list_tests ) | FileCheck --check-prefix=LIST-BENCHMARKS %s

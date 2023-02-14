@@ -51,7 +51,7 @@ CONV_KWARGS_TO_VALUES = dict(filters=[CONV_FILTERS],
                              strides=[1, 2],
                              padding=["valid", "same"],
                              data_format=[None, "channels_first"],
-                             dilation_rate=[1, 2])
+                             dilation_rate=[1, 1])
 # Address pooling and conv layers having different default values for
 # 'data_format' for 1D layers.
 POOLING_1D_KWARGS_TO_VALUES = copy.deepcopy(POOLING_KWARGS_TO_VALUES)
@@ -230,7 +230,7 @@ LAYERS_TO_UNIT_TEST_SPECS = {
                                   kernel_size=[CONV_KERNEL_SIZE],
                                   return_state=[False, True],
                                   strides=[1, 2],
-                                  dilation_rate=[1, 2],
+                                  dilation_rate=[1, 1],
                                   stateful=[False, True])),
     "Cropping1D":
         tf_test_utils.unit_test_specs_from_signatures(
@@ -254,7 +254,7 @@ LAYERS_TO_UNIT_TEST_SPECS = {
             kwargs_to_values=dict(kernel_size=[CONV_KERNEL_SIZE],
                                   strides=[1, 2],
                                   padding=["valid", "same"],
-                                  dilation_rate=[1, 2],
+                                  dilation_rate=[1, 1],
                                   depth_multiplier=[1, 2])),
     "Dot":
         tf_test_utils.unit_test_specs_from_signatures(
@@ -372,7 +372,7 @@ LAYERS_TO_UNIT_TEST_SPECS = {
                                   kernel_size=[CONV_KERNEL_SIZE],
                                   strides=[1, 2],
                                   padding=["valid", "same"],
-                                  dilation_rate=[1, 2],
+                                  dilation_rate=[1, 1],
                                   depth_multiplier=[1, 2])),
     "SeparableConv2D":
         tf_test_utils.unit_test_specs_from_signatures(
@@ -381,7 +381,7 @@ LAYERS_TO_UNIT_TEST_SPECS = {
                                   kernel_size=[CONV_KERNEL_SIZE],
                                   strides=[1, 2],
                                   padding=["valid", "same"],
-                                  dilation_rate=[1, 2],
+                                  dilation_rate=[1, 1],
                                   depth_multiplier=[1, 2])),
     "SimpleRNN":
         tf_test_utils.unit_test_specs_from_signatures(

@@ -4,10 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-###############################################################################
-# configuration
-###############################################################################
-
 check_cxx_compiler_flag("-march=armv8.2-a+dotprod" IREE_UK_BUILD_ARM_64_DOTPROD)
 check_cxx_compiler_flag("-march=armv8.2-a+i8mm" IREE_UK_BUILD_ARM_64_I8MM)
 configure_file(config.h.in config.h)
@@ -19,31 +15,21 @@ iree_cc_library(
     "assembly.h"
 )
 
-###############################################################################
-# mmt4d tile funcs
-###############################################################################
-
 iree_cc_library(
   NAME
-    mmt4d_tile_arm_64
+    common_arm_neon
   HDRS
-    "mmt4d_tile_arm_64.h"
-  SRCS
-    "mmt4d_tile_arm_64.S"
-  DEPS
-    ::assembly
-    iree::builtins::ukernel::exported_bits
+    "common_arm_neon.h"
 )
-list(APPEND IREE_UK_MMT4D_TILE_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_tile_arm_64")
 
 if(IREE_UK_BUILD_ARM_64_DOTPROD)
   iree_cc_library(
     NAME
-      mmt4d_tile_arm_64_dotprod
+      mmt4d_arm_64_dotprod
     HDRS
-      "mmt4d_tile_arm_64.h"
+      "mmt4d_arm_64.h"
     SRCS
-      "mmt4d_tile_arm_64_dotprod.S"
+      "mmt4d_arm_64_dotprod.S"
     COPTS
       "-march=armv8.2-a+dotprod"
     DEPS
@@ -51,29 +37,25 @@ if(IREE_UK_BUILD_ARM_64_DOTPROD)
       iree::builtins::ukernel::exported_bits
 
   )
-  list(APPEND IREE_UK_MMT4D_TILE_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_tile_arm_64_dotprod")
+  list(APPEND IREE_UK_MMT4D_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_arm_64_dotprod")
 endif()
 
 if(IREE_UK_BUILD_ARM_64_I8MM)
   iree_cc_library(
     NAME
-      mmt4d_tile_arm_64_i8mm
+      mmt4d_arm_64_i8mm
     HDRS
-      "mmt4d_tile_arm_64.h"
+      "mmt4d_arm_64.h"
     SRCS
-      "mmt4d_tile_arm_64_i8mm.S"
+      "mmt4d_arm_64_i8mm.S"
     COPTS
       "-march=armv8.2-a+i8mm"
     DEPS
       ::assembly
       iree::builtins::ukernel::exported_bits
   )
-  list(APPEND IREE_UK_MMT4D_TILE_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_tile_arm_64_i8mm")
+  list(APPEND IREE_UK_MMT4D_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_arm_64_i8mm")
 endif()
-
-###############################################################################
-# mmt4d entry point
-###############################################################################
 
 iree_cc_library(
   NAME
@@ -82,32 +64,14 @@ iree_cc_library(
     "mmt4d_arm_64.h"
   SRCS
     "mmt4d_arm_64.c"
+    "mmt4d_arm_64.S"
   DEPS
     iree::base::core_headers
     iree::schemas::cpu_data
     iree::builtins::ukernel::headers
-    ${IREE_UK_MMT4D_TILE_ARM_64_DEPS}
+    ${IREE_UK_MMT4D_ARM_64_DEPS}
   PUBLIC
 )
-
-###############################################################################
-# pack tile funcs
-###############################################################################
-
-iree_cc_library(
-  NAME
-    pack_tile_arm_64
-  HDRS
-    "pack_tile_arm_64.h"
-  SRCS
-    "pack_tile_arm_64.c"
-  DEPS
-    iree::builtins::ukernel::exported_bits
-)
-
-###############################################################################
-# pack entry point
-###############################################################################
 
 iree_cc_library(
   NAME
@@ -117,16 +81,12 @@ iree_cc_library(
   SRCS
     "pack_arm_64.c"
   DEPS
+    ::common_arm_neon
     iree::base::core_headers
     iree::schemas::cpu_data
     iree::builtins::ukernel::headers
-    ::pack_tile_arm_64
   PUBLIC
 )
-
-###############################################################################
-# query_tile_sizes entry point
-###############################################################################
 
 iree_cc_library(
   NAME
@@ -136,6 +96,21 @@ iree_cc_library(
   SRCS
     "query_tile_sizes_arm_64.c"
   DEPS
+    iree::base::core_headers
+    iree::schemas::cpu_data
+    iree::builtins::ukernel::headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    unpack_arm_64
+  HDRS
+    "unpack_arm_64.h"
+  SRCS
+    "unpack_arm_64.c"
+  DEPS
+    ::common_arm_neon
     iree::base::core_headers
     iree::schemas::cpu_data
     iree::builtins::ukernel::headers

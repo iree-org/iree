@@ -395,7 +395,7 @@ def Util_InitializerOp : Util_Op<"initializer", [
   let arguments = (ins
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
-    OptionalAttr<DictArrayAttr>:$res_attrs    
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
 
   let regions = (region AnyRegion:$body);
@@ -423,6 +423,9 @@ def Util_InitializerOp : Util_Op<"initializer", [
 
     Region *getCallableRegion() { return &getBody(); }
     ArrayRef<Type> getCallableResults() { return {}; }
+
+    /// Make symbol optional as this op has no symbol.
+    bool isOptionalSymbol() { return true; }
   }];
 
   let hasCanonicalizer = 1;

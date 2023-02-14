@@ -162,7 +162,8 @@ int main(int argc, char **argv) {
   }
 
   // Run transformations.
-  PassManager pm(&context, PassManager::Nesting::Implicit);
+  PassManager pm(&context, module.get()->getName().getStringRef(),
+                 PassManager::Nesting::Implicit);
   applyPassManagerCLOptions(pm);
   applyDefaultTimingPassManagerCLOptions(pm);
   mlir::iree_integrations::TFL::buildTFLImportPassPipeline(pm);

@@ -56,39 +56,10 @@ static llvm::cl::opt<bool> clDemoteF64ToF32(
                    "unconditionally before main flow conversions."),
     llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clEnableConvToImg2Col(
-    "iree-flow-enable-conv-img2col-transform",
-    llvm::cl::desc("Enable converting convolution ops to img2col form."),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnableConvToWinograd(
-    "iree-flow-enable-conv-winograd-transform",
-    llvm::cl::desc("Enable converting convolution ops to winograd form."),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
-    "iree-flow-enable-padding-linalg-ops",
-    llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
-                   "flow-padding-size"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
     "iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
     llvm::cl::init(false));
-
-static llvm::cl::opt<int> clLinalgOpsPaddingSize(
-    "iree-flow-linalg-ops-padding-size",
-    llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
-                   "flow-padding-size"),
-    llvm::cl::init(4));
-
-// TODO(#1159): enable by default or remove this option once it works on
-//              a broader set of programs
-static llvm::cl::opt<bool> clEnableLinalgDetensorize(
-    "iree-flow-enable-linalg-detensorize",
-    llvm::cl::desc("Enable detensorizing linalg ops to operate on primitives"),
-    llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clEnableAggressiveFusion(
     "iree-flow-enable-aggressive-fusion",
@@ -183,20 +154,6 @@ void buildGlobalOptimizationPassPipeline(
 
 }  // namespace
 
-/// Optional pre-processing passes that transform the program for specialist
-/// uses case.
-static void buildOptionalPreprocessingPassPipeline(OpPassManager &passManager) {
-  FunctionLikeNest(passManager)
-      .addPredicatedPass(clEnableConvToWinograd,
-                         IREE::LinalgExt::createConvertConv2DToWinogradPass)
-      .addPredicatedPass(clEnableConvToImg2Col,
-                         IREE::Flow::createConvertConv2DToImg2ColPass)
-      .addPredicatedPass(clEnablePaddingLinalgOps, []() {
-        return IREE::Flow::createPadLinalgOpsToIntegerMultiplePass(
-            clLinalgOpsPaddingSize);
-      });
-}
-
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
   // ML frontends have very uneven support for user-controlled types _and_ users
@@ -223,9 +180,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(IREE::Flow::createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass);
+  passManager.addPass(IREE::Flow::createEraseUnusedLinalgOperands());
 
-  // Optional pre-processing passes.
-  buildOptionalPreprocessingPassPipeline(passManager);
+  // Start of Flow pipeline, verify input legality.
   passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
@@ -244,6 +201,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
       .addPass(mlir::createLinalgFoldUnitExtentDimsPass)
+      .addPass(createRaiseSpecialOps)
       .addPass(createInterchangeGenericOpsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)
@@ -252,8 +210,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass([]() {
         return createFusionOfTensorOpsPass(clEnableAggressiveFusion);
       })
-      .addPredicatedPass(clEnableLinalgDetensorize,
-                         mlir::createLinalgDetensorizePass)
+      .addPass(mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       .addPass(createCollapseDimsPass)

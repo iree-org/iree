@@ -264,7 +264,8 @@ void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
                                   int64_t gpu_timestamp);
 
 void iree_tracing_set_plot_type_impl(const char* name_literal,
-                                     uint8_t plot_type);
+                                     uint8_t plot_type, bool step, bool fill,
+                                     uint32_t color);
 void iree_tracing_plot_value_i64_impl(const char* name_literal, int64_t value);
 void iree_tracing_plot_value_f32_impl(const char* name_literal, float value);
 void iree_tracing_plot_value_f64_impl(const char* name_literal, double value);
@@ -401,8 +402,8 @@ enum {
   IREE_RETURN_AND_EVAL_IF_ERROR(IREE_TRACE_ZONE_END(zone_id), __VA_ARGS__)
 
 // Configures the named plot with an IREE_TRACING_PLOT_TYPE_* representation.
-#define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type) \
-  iree_tracing_set_plot_type_impl(name_literal, plot_type)
+#define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type, step, fill, color) \
+  iree_tracing_set_plot_type_impl(name_literal, plot_type, step, fill, color)
 // Plots a value in the named plot group as an integer.
 #define IREE_TRACE_PLOT_VALUE_I64(name_literal, value) \
   iree_tracing_plot_value_i64_impl(name_literal, value)
@@ -476,7 +477,7 @@ enum {
 #define IREE_TRACE_ZONE_END(zone_id)
 #define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
   IREE_RETURN_IF_ERROR(__VA_ARGS__)
-#define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type)
+#define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type, step, fill, color)
 #define IREE_TRACE_PLOT_VALUE_I64(name_literal, value)
 #define IREE_TRACE_PLOT_VALUE_F32(name_literal, value)
 #define IREE_TRACE_PLOT_VALUE_F64(name_literal, value)

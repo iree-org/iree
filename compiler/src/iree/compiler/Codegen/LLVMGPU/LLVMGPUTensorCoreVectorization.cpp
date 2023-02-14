@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
@@ -43,79 +44,6 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
       f.addOpFilter<linalg::ContractionOpInterface>());
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
-}
-
-static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
-  auto contract = dyn_cast<vector::ContractionOp>(op);
-  if (!contract) return std::nullopt;
-  SmallVector<int64_t> order;
-  // Pick an unrolling order that will allow tensorcore operation to reuse LHS
-  // register. This is needed to get good performance on sm_80 target.
-  // First make reduction the outer dimensions.
-  for (auto [index, iter] : llvm::enumerate(contract.getIteratorTypes())) {
-    if (vector::isReductionIterator(iter)) {
-      order.push_back(index);
-    }
-  }
-
-  llvm::SmallDenseSet<int64_t> dims;
-  for (AffineExpr expr : contract.getIndexingMapsArray()[0].getResults()) {
-    dims.insert(expr.cast<AffineDimExpr>().getPosition());
-  }
-  // Then parallel dimensions that are part of Lhs as we want to re-use Lhs.
-  for (auto [index, iter] : llvm::enumerate(contract.getIteratorTypes())) {
-    if (vector::isParallelIterator(iter) && dims.count(index)) {
-      order.push_back(index);
-    }
-  }
-  // Then the remaining parallel loops.
-  for (auto [index, iter] : llvm::enumerate(contract.getIteratorTypes())) {
-    if (vector::isParallelIterator(iter) && !dims.count(index)) {
-      order.push_back(index);
-    }
-  }
-  return order;
-}
-
-/// Helper function to return native size for WMMA-based operations.
-static Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
-  // Currently hardcode the size of wmma operation. When more cases are
-  // supported this should be picked based on what the backend supports.
-  int64_t m = 16;
-  int64_t n = 16;
-  if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
-    int64_t k = contract.getLhsType().getElementType().isF16() ? 16 : 8;
-    SmallVector<int64_t> nativeSize(contract.getIteratorTypes().size() - 3, 1);
-    nativeSize.append({m, n, k});
-    return nativeSize;
-  }
-  if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
-    SmallVector<int64_t> nativeSize(writeOp.getVectorType().getRank() - 2, 1);
-    nativeSize.append({m, n});
-    return nativeSize;
-  }
-  if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
-    // Transfer read ops may need different shapes based on how they are being
-    // used. For simplicity just match the shape used by the extract strided op.
-    VectorType sliceType;
-    for (Operation *users : op->getUsers()) {
-      auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-      if (!extract) return std::nullopt;
-      auto vecType = extract.getResult().getType().cast<VectorType>();
-      if (sliceType && sliceType != vecType) return std::nullopt;
-      sliceType = vecType;
-    }
-    return llvm::to_vector<>(sliceType.getShape());
-  }
-  if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
-    if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
-      SmallVector<int64_t> nativeSize(vecType.getRank() - 2, 1);
-      // Map elementwise ops to the output shape.
-      nativeSize.append({m, n});
-      return nativeSize;
-    }
-  }
-  return std::nullopt;
 }
 
 /// Returns vector::ContractionOp operand's index where the result is used.
@@ -226,10 +154,37 @@ static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
 
     // Loading F32 values from Shared Memory to Registers.
     if (resultElementType.isF32()) {
-      // TODO
-      op->emitError()
-          << "TODO Implement shape for F32 loads in getMmaNativeVectorSize";
-      return std::nullopt;
+      // Set mmaShapeK for F32 datatype mma.sync.f32.tf32.m16n8k8.
+      mmaShapeK = 8;
+
+      // For matrixC.
+      if (*operandId == 2) {
+        SmallVector<int64_t> readShape;
+        readShape.append({mmaShapeM, mmaShapeN});
+        return readShape;
+      }
+      // For matrixA.
+      if (*operandId == 0) {
+        SmallVector<int64_t> readShape;
+        readShape.append({mmaShapeM, mmaShapeK});
+        return readShape;
+      }
+      // For matrixB.
+      if (*operandId == 1) {
+        // Do not use ldmatrix for matrixB.
+        // Transfer read ops may need different shapes based on how they are
+        // being used. For simplicity just match the shape used by the extract
+        // strided op.
+        VectorType sliceType;
+        for (Operation *users : op->getUsers()) {
+          auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
+          if (!extract) return std::nullopt;
+          auto vecType = extract.getResult().getType().cast<VectorType>();
+          if (sliceType && sliceType != vecType) return std::nullopt;
+          sliceType = vecType;
+        }
+        return llvm::to_vector<>(sliceType.getShape());
+      }
     }
   }
   return std::nullopt;
@@ -243,6 +198,11 @@ static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeVectorSize(
 }
 
 static void populateVectorUnrollPatterns(RewritePatternSet &patterns) {
+  auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
+    auto contract = dyn_cast<vector::ContractionOp>(op);
+    if (!contract) return std::nullopt;
+    return gpuMmaUnrollOrder(contract);
+  };
   vector::populateVectorUnrollPatterns(
       patterns, vector::UnrollVectorOptions()
                     .setNativeShapeFn(getGPUTensorCoreNativeVectorSize)

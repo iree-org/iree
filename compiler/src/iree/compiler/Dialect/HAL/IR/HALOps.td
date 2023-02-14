@@ -1855,6 +1855,9 @@ def HAL_ExecutableConstantBlockOp :
     // Placeholder attribute added to ops that look up constants by key.
     // Ordinal assignment passes use this to identify and update usage.
     static StringRef getKeyAttrName() { return "hal.executable.constant.key"; }
+
+    /// Make symbol optional as this op has no symbol.
+    bool isOptionalSymbol() { return true; }
   }];
 
   let hasCanonicalizer = 1;

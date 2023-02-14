@@ -31,11 +31,42 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "extract_slice.mlir"
+    "pack.mlir"
     "tensor_insert_slice.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
     "local-task"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_local-task
+  SRCS
+    "extract_slice.mlir"
+    "pack.mlir"
+    "tensor_insert_slice.mlir"
+    "unpack.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_ukernel_local-task
+  SRCS
+    "pack.mlir"
+    "unpack.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+    "--iree-vmvx-enable-microkernels-decompose-linalg-generic=false"
 )
 
 iree_check_single_backend_test_suite(

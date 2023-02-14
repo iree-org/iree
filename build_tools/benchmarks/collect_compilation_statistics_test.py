@@ -86,8 +86,7 @@ class CollectCompilationStatistics(unittest.TestCase):
             BytesIO(module_file_data), len(module_file_data)))
 
   def test_get_module_path(self):
-    flag_file = StringIO(
-        f"--function_inputs=1x2x3xf32\n--module_file=/abcd.vmfb")
+    flag_file = StringIO(f"--module=/abcd.vmfb\n--inputs=1x2x3xf32")
 
     moduel_path = get_module_path(flag_file)
 
@@ -102,8 +101,7 @@ class CollectCompilationStatistics(unittest.TestCase):
         source_url="https://example.com/xyz.tflite",
         entry_function="main",
         input_types=["1xf32"])
-    imported_model_a = iree_definitions.ImportedModel(
-        model=model_a, dialect_type=iree_definitions.MLIRDialectType.TOSA)
+    imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
     compile_config_a = iree_definitions.CompileConfig(
         id="config_a",
         tags=["defaults"],
@@ -146,7 +144,8 @@ class CollectCompilationStatistics(unittest.TestCase):
         model_tags=tuple(model_a.tags),
         model_source=model_a.source_type.value,
         target_arch=f"[cpu-x86_64-cascadelake-linux-gnu]",
-        compile_tags=tuple(gen_config_a.compile_config.tags))
+        compile_tags=tuple(gen_config_a.compile_config.tags),
+        gen_config_id=gen_config_a.composite_id())
     module_a_path = iree_artifacts.get_module_dir_path(
         gen_config_a, root_dir) / iree_artifacts.MODULE_FILENAME
     compile_info_b = common.benchmark_definition.CompilationInfo(
@@ -155,7 +154,8 @@ class CollectCompilationStatistics(unittest.TestCase):
         model_source=model_a.source_type.value,
         target_arch=
         f"[cpu-riscv_64-generic-linux-gnu,cpu-riscv_32-generic-linux-gnu]",
-        compile_tags=tuple(gen_config_a.compile_config.tags))
+        compile_tags=tuple(gen_config_a.compile_config.tags),
+        gen_config_id=gen_config_b.composite_id())
     module_b_path = iree_artifacts.get_module_dir_path(
         gen_config_b, root_dir) / iree_artifacts.MODULE_FILENAME
     self.assertEqual(module_map, {

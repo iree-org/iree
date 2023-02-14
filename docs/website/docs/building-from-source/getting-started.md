@@ -74,7 +74,7 @@ Configure then build all targets using CMake:
 
 Configure CMake:
 
-=== "Linux and MacOS"
+=== "Linux"
 
     ``` shell
     # Recommended for simple development using clang and lld:
@@ -87,12 +87,21 @@ Configure CMake:
 
     # Alternately, with system compiler and your choice of CMake generator:
     # cmake -B ../iree-build/ -S .
+    ```
 
-    # Additional quality of life CMake flags:
-    # Enable ccache:
-    # See https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/ccache.md
-    #   -DCMAKE_C_COMPILER_LAUNCHER=ccache
-    #   -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+=== "macOS"
+
+    ``` shell
+    # Recommended for simple development using clang and lld:
+    cmake -GNinja -B ../iree-build/ -S . \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DIREE_ENABLE_ASSERTIONS=ON \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DIREE_ENABLE_LLD=ON
+
+    # Alternately, with system compiler and your choice of CMake generator:
+    # cmake -B ../iree-build/ -S .
     ```
 
 === "Windows"
@@ -109,7 +118,7 @@ Build:
 cmake --build ../iree-build/
 ```
 
-???+ Tip
+???+ Tip "Tip - Build types"
     We recommend using the `RelWithDebInfo` build type by default for a good
     balance of debugging information and performance. The `Debug`, `Release`,
     and `MinSizeRel` build types are useful in more specific scenarios.
@@ -118,6 +127,16 @@ cmake --build ../iree-build/
     [official CMake documentation](https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html)
     for general details.
 
+???+ Tip "Tip - Faster recompilation with ccache"
+    We recommend using [`ccache`](https://ccache.dev/) together with CMake. To
+    use it, configure CMake with:
+
+    ``` shell
+    -DCMAKE_C_COMPILER_LAUNCHER=ccache
+    -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+    ```
+
+    See also our [developer documentation for ccache](https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/ccache.md).
 
 ## What's next?
 

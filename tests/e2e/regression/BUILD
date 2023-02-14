@@ -8,7 +8,6 @@
 # These should focus on support by IREE itself, not for issues with specific runner tools.
 # Place those tests in tools/test/
 
-load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
@@ -36,29 +35,14 @@ BACKEND_TESTS = [
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = enforce_glob(
-        [
-            "fill_i64.mlir",
-            "globals.mlir",
-            "libm_linking.mlir",
-            "scalar.mlir",
-            "trace_dispatch_tensors.mlir",
-            "unused_args.mlir",
-        ],
-        include =
-            ["*.mlir"],
-        # TODO(#5897): enable these for codegen linalg on tensors/etc.
-        exclude = [
-            "associative_reordering.mlir",
-            "disable_demote_f64_to_f32.mlir",
-            "globals_ml_program.mlir",
-            "large_reduction.mlir",
-            "layernorm.mlir",
-            "linalg_quantized_matmul_vs_linalg_matmul.mlir",
-            "lowering_config.mlir",
-            "softmax_large.mlir",
-        ] + BACKEND_TESTS,
-    ),
+    srcs = [
+        "fill_i64.mlir",
+        "globals.mlir",
+        "libm_linking.mlir",
+        "scalar.mlir",
+        "trace_dispatch_tensors.mlir",
+        "unused_args.mlir",
+    ],
     cfg = "//tests:lit.cfg.py",
     tags = [
         "driver=local-task",
@@ -198,4 +182,23 @@ iree_check_single_backend_test_suite(
     ],
     driver = "local-task",
     target_backend = "llvm-cpu",
+)
+
+# Compilation-only (no driver specified, the default None means compile only)
+# regression testcases for VMVX backend with microkernels. Indeed we have had
+# a couple of hard-to-diagnose issues that were purely compilation issue, no
+# particular concern about correctness once compilation succeeds, and having
+# compilation-only tests allows us to import the original unmodified testcase.
+iree_check_single_backend_test_suite(
+    name = "check_regression_compilation_only_vmvx_ukernels",
+    srcs = [
+        "dynamic_matmuls_on_same_accumulator_issue_12060.mlir",
+        "dynamic_tosa_clamp.mlir",
+        "dynamic_tosa_quantized_fully_connected_issue_10859.mlir",
+    ],
+    compiler_flags = [
+        "--iree-input-type=tosa",
+        "--iree-vmvx-enable-microkernels",
+    ],
+    target_backend = "vmvx",
 )

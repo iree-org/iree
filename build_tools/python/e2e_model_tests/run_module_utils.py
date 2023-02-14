@@ -17,12 +17,10 @@ def build_run_flags_for_model(
     model_input_data: common_definitions.ModelInputData) -> List[str]:
   """Returns the IREE run module flags for the model and its inputs."""
 
-  run_flags = [f"--entry_function={model.entry_function}"]
+  run_flags = [f"--function={model.entry_function}"]
   if model_input_data != common_definitions.ZEROS_MODEL_INPUT_DATA:
     raise ValueError("Currently only support all-zeros data.")
-  run_flags += [
-      f"--function_input={input_type}=0" for input_type in model.input_types
-  ]
+  run_flags += [f"--input={input_type}=0" for input_type in model.input_types]
   return run_flags
 
 

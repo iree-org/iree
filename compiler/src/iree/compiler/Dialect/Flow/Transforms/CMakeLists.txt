@@ -35,13 +35,13 @@ iree_cc_library(
     "CollapseDimensions.cpp"
     "CollapseReductionDims.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
-    "ConvertConv2DToImg2Col.cpp"
     "ConvertRegionToWorkgroups.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DetachElementwiseFromNamedOps.cpp"
     "DispatchWithTransformDialect.cpp"
     "DumpDispatchGraph.cpp"
+    "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FormDispatchRegions.cpp"
@@ -54,9 +54,9 @@ iree_cc_library(
     "InterchangeTransposeGenericOps.cpp"
     "OptimizeNumerics.cpp"
     "OutlineDispatchRegions.cpp"
-    "PadLinalgOps.cpp"
     "PassDetail.h"
     "Passes.cpp"
+    "RaiseSpecialOps.cpp"
     "RegionOpUtils.cpp"
     "SetEncoding.cpp"
     "SplitReduction.cpp"
@@ -66,6 +66,7 @@ iree_cc_library(
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
+    IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransformOps

@@ -43,6 +43,7 @@ def TMTensor_Dialect : Dialect {
     to.
   }];
   let hasCanonicalizer = 1;
+  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 //===----------------------------------------------------------------------===//

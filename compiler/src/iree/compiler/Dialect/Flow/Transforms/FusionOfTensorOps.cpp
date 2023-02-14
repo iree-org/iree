@@ -123,19 +123,17 @@ struct FuseElementwiseOpsWithMultipleUses
     consumerOp->removeAttr(getConsumerAttributeName());
     producerOp->removeAttr(getProducerAttributeName());
 
-    FailureOr<Operation *> fusedOperation =
+    FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
         linalg::fuseElementwiseOps(rewriter, fusedOperand);
-    if (failed(fusedOperation)) {
+    if (failed(fusionResult)) {
       return rewriter.notifyMatchFailure(consumerOp,
                                          "failed to fuse with producer");
     }
-    assert(fusedOperation.value()->getNumResults() ==
-           producerOp->getNumResults() + consumerOp->getNumResults());
-    auto fusedResults = fusedOperation.value()->getResults();
-    rewriter.replaceOp(producerOp,
-                       fusedResults.take_front(producerOp->getNumResults()));
-    rewriter.replaceOp(consumerOp,
-                       fusedResults.take_back(consumerOp->getNumResults()));
+    for (auto replacement : fusionResult->replacements) {
+      rewriter.replaceUseIf(
+          replacement.first, replacement.second,
+          [&](OpOperand &use) { return use.getOwner() != consumerOp; });
+    }
     return success();
   }
 };
@@ -190,8 +188,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
   RewritePatternSet fusionPatterns(context);
   fusionPatterns.insert<FuseElementwiseOpsWithMultipleUses>(context);
   linalg::GenericOp::getCanonicalizationPatterns(fusionPatterns, context);
-  if (failed(applyPatternsAndFoldGreedily(funcOp->getRegions(),
-                                          std::move(fusionPatterns)))) {
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns)))) {
     return funcOp->emitOpError("multi use producer -> consumer fusion failed");
   }
   return numCandidates;
@@ -285,8 +282,7 @@ struct FusionOfTensorOpsPass
 
       GreedyRewriteConfig rewriteConfig;
       rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
-      if (failed(applyPatternsAndFoldGreedily(funcOp->getRegions(),
-                                              std::move(fusionPatterns),
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns),
                                               rewriteConfig))) {
         funcOp->emitError("failed to apply fusion patterns");
         return signalPassFailure();
@@ -327,7 +323,7 @@ struct FusionOfTensorOpsPass
       memref::populateResolveRankedShapeTypeResultDimsPatterns(
           collapsingReshapePatterns);
       if (failed(applyPatternsAndFoldGreedily(
-              funcOp->getRegions(), std::move(collapsingReshapePatterns)))) {
+              funcOp, std::move(collapsingReshapePatterns)))) {
         funcOp->emitError("failed to apply collapsing reshape patterns");
         return signalPassFailure();
       }
@@ -343,7 +339,7 @@ struct FusionOfTensorOpsPass
     {
       RewritePatternSet opFoldingPatterns(&getContext());
       tensor::populateFoldTensorEmptyPatterns(opFoldingPatterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp->getRegions(),
+      if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(opFoldingPatterns)))) {
         funcOp->emitError("failed to apply op folding patterns");
         return signalPassFailure();

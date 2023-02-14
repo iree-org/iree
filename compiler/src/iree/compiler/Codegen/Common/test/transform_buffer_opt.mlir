@@ -19,7 +19,7 @@ transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
   transform.sequence %arg0 : !pdl.operation failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
-    %0 = transform.structured.match ops{["func.func"]} in %arg1
+    %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
     %1 = transform.iree.apply_buffer_optimizations %0
   }
 }

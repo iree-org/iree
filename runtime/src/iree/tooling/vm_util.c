@@ -28,7 +28,7 @@ static iree_status_t iree_allocate_and_copy_cstring_from_view(
 
 static iree_status_t iree_tooling_load_ndarrays_from_file(
     iree_string_view_t file_path, iree_hal_allocator_t* device_allocator,
-    iree_vm_list_t* variant_list) {
+    iree_vm_list_t* list) {
   char* file_path_cstring = NULL;
   IREE_RETURN_IF_ERROR(iree_allocate_and_copy_cstring_from_view(
       iree_allocator_system(), file_path, &file_path_cstring));
@@ -56,7 +56,7 @@ static iree_status_t iree_tooling_load_ndarrays_from_file(
     if (iree_status_is_ok(status)) {
       iree_vm_ref_t buffer_view_ref =
           iree_hal_buffer_view_retain_ref(buffer_view);
-      status = iree_vm_list_push_ref_move(variant_list, &buffer_view_ref);
+      status = iree_vm_list_push_ref_move(list, &buffer_view_ref);
     }
     iree_hal_buffer_view_release(buffer_view);
   }
@@ -153,24 +153,24 @@ iree_status_t iree_tooling_parse_to_variant_list(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   *out_list = NULL;
-  iree_vm_list_t* variant_list = NULL;
+  iree_vm_list_t* list = NULL;
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_list_create(
-              /*element_type=*/NULL, input_strings_count, host_allocator,
-              &variant_list));
+      z0,
+      iree_vm_list_create(
+          /*element_type=*/NULL, input_strings_count, host_allocator, &list));
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < input_strings_count; ++i) {
     if (!iree_status_is_ok(status)) break;
     iree_string_view_t input_view = iree_string_view_trim(input_strings[i]);
     if (iree_string_view_consume_prefix(&input_view, IREE_SV("@"))) {
-      status = iree_tooling_load_ndarrays_from_file(
-          input_view, device_allocator, variant_list);
+      status = iree_tooling_load_ndarrays_from_file(input_view,
+                                                    device_allocator, list);
       continue;
     } else if (iree_string_view_equal(input_view, IREE_SV("(null)")) ||
                iree_string_view_equal(input_view, IREE_SV("(ignored)"))) {
       iree_vm_ref_t null_ref = iree_vm_ref_null();
-      status = iree_vm_list_push_ref_retain(variant_list, &null_ref);
+      status = iree_vm_list_push_ref_retain(list, &null_ref);
       continue;
     }
     bool has_equal =
@@ -210,12 +210,12 @@ iree_status_t iree_tooling_parse_to_variant_list(
         iree_vm_ref_t buffer_ref = iree_hal_buffer_retain_ref(
             iree_hal_buffer_view_buffer(buffer_view));
         iree_hal_buffer_view_release(buffer_view);
-        status = iree_vm_list_push_ref_move(variant_list, &buffer_ref);
+        status = iree_vm_list_push_ref_move(list, &buffer_ref);
         if (!iree_status_is_ok(status)) break;
       } else {
         iree_vm_ref_t buffer_view_ref =
             iree_hal_buffer_view_move_ref(buffer_view);
-        status = iree_vm_list_push_ref_move(variant_list, &buffer_view_ref);
+        status = iree_vm_list_push_ref_move(list, &buffer_view_ref);
         if (!iree_status_is_ok(status)) break;
       }
     } else {
@@ -242,14 +242,14 @@ iree_status_t iree_tooling_parse_to_variant_list(
           break;
         }
       }
-      status = iree_vm_list_push_value(variant_list, &val);
+      status = iree_vm_list_push_value(list, &val);
       if (!iree_status_is_ok(status)) break;
     }
   }
   if (iree_status_is_ok(status)) {
-    *out_list = variant_list;
+    *out_list = list;
   } else {
-    iree_vm_list_release(variant_list);
+    iree_vm_list_release(list);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -309,9 +309,9 @@ iree_status_t iree_tooling_append_async_fence_inputs(
     return iree_string_builder_append_format(B, "f" #SIZE "=%g\n", (V).f##SIZE);
 
 // Prints variant description including a trailing newline.
-static iree_status_t iree_print_variant(iree_vm_variant_t variant,
-                                        size_t max_element_count,
-                                        iree_string_builder_t* builder) {
+static iree_status_t iree_variant_format(iree_vm_variant_t variant,
+                                         iree_host_size_t max_element_count,
+                                         iree_string_builder_t* builder) {
   if (iree_vm_variant_is_empty(variant)) {
     return iree_string_builder_append_string(builder, IREE_SV("(null)\n"));
   } else if (iree_vm_variant_is_value(variant)) {
@@ -347,30 +347,13 @@ static iree_status_t iree_print_variant(iree_vm_variant_t variant,
   return iree_ok_status();
 }
 
-iree_status_t iree_tooling_append_variant_list_lines(
-    iree_vm_list_t* variant_list, size_t max_element_count,
-    iree_string_builder_t* builder) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  for (iree_host_size_t i = 0; i < iree_vm_list_size(variant_list); ++i) {
-    iree_vm_variant_t variant = iree_vm_variant_empty();
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_vm_list_get_variant(variant_list, i, &variant),
-        "variant %zu not present", i);
-    iree_string_builder_append_format(builder, "result[%zu]: ", i);
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_print_variant(variant, max_element_count, builder));
-  }
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-iree_status_t iree_tooling_variant_list_fprint(iree_vm_list_t* variant_list,
-                                               size_t max_element_count,
-                                               FILE* file) {
+static iree_status_t iree_variant_fprint(iree_vm_variant_t variant,
+                                         iree_host_size_t max_element_count,
+                                         FILE* file) {
   iree_string_builder_t builder;
   iree_string_builder_initialize(iree_allocator_system(), &builder);
-  iree_status_t status = iree_tooling_append_variant_list_lines(
-      variant_list, max_element_count, &builder);
+  iree_status_t status =
+      iree_variant_format(variant, max_element_count, &builder);
   if (iree_status_is_ok(status)) {
     size_t written = fwrite(iree_string_builder_buffer(&builder), 1,
                             iree_string_builder_size(&builder), file);
@@ -380,4 +363,127 @@ iree_status_t iree_tooling_variant_list_fprint(iree_vm_list_t* variant_list,
   }
   iree_string_builder_deinitialize(&builder);
   return status;
+}
+
+iree_status_t iree_tooling_append_variant_list_lines(
+    iree_vm_list_t* list, iree_host_size_t max_element_count,
+    iree_string_builder_t* builder) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  for (iree_host_size_t i = 0; i < iree_vm_list_size(list); ++i) {
+    iree_vm_variant_t variant = iree_vm_variant_empty();
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_vm_list_get_variant(list, i, &variant),
+        "variant %zu not present", i);
+    iree_string_builder_append_format(builder, "result[%zu]: ", i);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_variant_format(variant, max_element_count, builder));
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+iree_status_t iree_tooling_variant_list_fprint(
+    iree_vm_list_t* list, iree_host_size_t max_element_count, FILE* file) {
+  iree_string_builder_t builder;
+  iree_string_builder_initialize(iree_allocator_system(), &builder);
+  iree_status_t status =
+      iree_tooling_append_variant_list_lines(list, max_element_count, &builder);
+  if (iree_status_is_ok(status)) {
+    size_t written = fwrite(iree_string_builder_buffer(&builder), 1,
+                            iree_string_builder_size(&builder), file);
+    if (written != iree_string_builder_size(&builder)) {
+      status = iree_status_from_code(IREE_STATUS_PERMISSION_DENIED);
+    }
+  }
+  iree_string_builder_deinitialize(&builder);
+  return status;
+}
+
+static iree_status_t iree_tooling_output_variant(
+    iree_vm_variant_t variant, iree_string_view_t output_str,
+    iree_host_size_t max_element_count, FILE* default_file) {
+  if (iree_string_view_is_empty(output_str)) {
+    // Send into the void.
+    return iree_ok_status();
+  } else if (iree_string_view_equal(output_str, IREE_SV("-"))) {
+    // Route to the provided file.
+    return iree_variant_fprint(variant, max_element_count, default_file);
+  }
+
+  bool has_at = iree_string_view_consume_prefix(&output_str, IREE_SV("@"));
+  bool has_plus = iree_string_view_consume_prefix(&output_str, IREE_SV("+"));
+  if (!has_at && !has_plus) {
+    // Other types of outputs are not yet supported. We could allow for shapes
+    // and either verify metadata or output binary files ala
+    // `--input=4xf32=@foo.bin`.
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "unsupported output mode specification '%.*s'",
+                            (int)output_str.size, output_str.data);
+  }
+
+  // For now we just send buffer views to npy files as primitive values (like
+  // just a normal int) can't be round-tripped. We could wrap the primitives in
+  // a single-element buffer view if needed.
+  if (!iree_vm_variant_is_ref(variant) ||
+      !iree_hal_buffer_view_isa(variant.ref)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "only buffer views can be written to npy files");
+  }
+  iree_hal_buffer_view_t* buffer_view = iree_hal_buffer_view_deref(variant.ref);
+
+  // Open file for either overwriting or appending (npy files can contain
+  // multiple arrays).
+  iree_string_view_t file_path = output_str;
+  char* file_path_cstring = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocate_and_copy_cstring_from_view(
+      iree_allocator_system(), file_path, &file_path_cstring));
+  const char* mode = has_plus ? "ab" : "wb";
+  FILE* file = fopen(file_path_cstring, mode);
+  iree_allocator_free(iree_allocator_system(), file_path_cstring);
+  if (!file) {
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to open file '%.*s'", (int)file_path.size,
+                            file_path.data);
+  }
+
+  // Append buffer view contents to the file stream.
+  iree_numpy_npy_save_options_t options = IREE_NUMPY_NPY_SAVE_OPTION_DEFAULT;
+  iree_status_t status = iree_numpy_npy_save_ndarray(file, options, buffer_view,
+                                                     iree_allocator_system());
+
+  fclose(file);
+  return status;
+}
+
+iree_status_t iree_tooling_output_variant_list(
+    iree_vm_list_t* list, const iree_string_view_t* output_strings,
+    iree_host_size_t output_strings_count, iree_host_size_t max_element_count,
+    FILE* file) {
+  IREE_ASSERT_ARGUMENT(list);
+  IREE_ASSERT_ARGUMENT(!output_strings_count || output_strings);
+
+  // We only care if there are not enough outputs to satisfy the user
+  // request. We could force users to specify all outputs to make this a bit
+  // harder to misuse but saving off outputs is a power-user feature.
+  if (iree_vm_list_size(list) != output_strings_count) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "%" PRIhsz " outputs specified but the provided list only has %" PRIhsz
+        " elements",
+        output_strings_count, iree_vm_list_size(list));
+  }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  for (iree_host_size_t i = 0; i < output_strings_count; ++i) {
+    iree_vm_variant_t variant = iree_vm_variant_empty();
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_vm_list_get_variant(list, i, &variant));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_tooling_output_variant(variant, output_strings[i],
+                                        max_element_count, file));
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
 }

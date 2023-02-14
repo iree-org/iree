@@ -5,6 +5,7 @@
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_v2_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
@@ -13,8 +14,9 @@
 /// Constant JIT'ing must be disabled because the transform-dialect debug
 /// flags leak to the JIT session, which doesn't know what to do with them.
 // RUN:     --iree-flow-enable-aggressive-fusion \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_v2_codegen_spec.mlir | \
-// RUN: iree-run-module --entry_function=softmax --device=cuda | \
+// RUN: iree-run-module --function=softmax --device=cuda | \
 // RUN: FileCheck %s
 
 !tmp_tensor_t = tensor<16x128xf32>

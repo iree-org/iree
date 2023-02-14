@@ -197,12 +197,26 @@ iree_cc_test(
     "bytecode_module_test.cc"
   DEPS
     ::bytecode_module
+    ::bytecode_module_test_module_c
     ::vm
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm::test::all_bytecode_modules_c
     iree::vm::test::async_bytecode_modules_c
+)
+
+iree_bytecode_module(
+  NAME
+    bytecode_module_test_module
+  SRC
+    "bytecode_module_test.mlir"
+  C_IDENTIFIER
+    "iree_vm_bytecode_module_test_module"
+  FLAGS
+    "--compile-mode=vm"
+  TESTONLY
+  PUBLIC
 )
 
 iree_cc_binary_benchmark(

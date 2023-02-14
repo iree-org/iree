@@ -126,8 +126,8 @@ static iree_status_t iree_pack_benchmark(
   iree_uk_test_write_random_buffer(in_buffer, in_buffer_size, in_type, engine);
   iree_uk_test_write_random_buffer(out_buffer, out_buffer_size, out_type,
                                    engine);
-  iree_uk_test_write_random_buffer(padding_value_buffer, out_type_size,
-                                   out_type, engine);
+  // Test single-byte padding pattern, most common use case as 0.0f is 0 bytes.
+  memset(padding_value_buffer, 0, out_type_size);
   iree_uk_test_random_engine_destroy(engine);
   params.in_buffer = in_buffer;
   params.out_buffer = out_buffer;

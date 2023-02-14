@@ -33,61 +33,61 @@ IREE_BENCHMARK_MODULE_PATH=iree-benchmark-module
 
 echo "Benchmarking DeepLabV3..."
 "${IREE_BENCHMARK_MODULE_PATH?}" \
-    --module_file=./deeplabv3_native.vmfb \
+    --module=./deeplabv3_native.vmfb \
     --device=local-task \
     --task_topology_group_count=1 \
-    --entry_function=main \
-    --function_input=1x257x257x3xf32 \
+    --function=main \
+    --input=1x257x257x3xf32 \
     --benchmark_min_time=3
 
 echo ""
 echo "Benchmarking MobileSSD..."
 "${IREE_BENCHMARK_MODULE_PATH?}" \
-    --module_file=./mobile_ssd_v2_float_coco_native.vmfb \
+    --module=./mobile_ssd_v2_float_coco_native.vmfb \
     --device=local-task \
     --task_topology_group_count=1 \
-    --entry_function=main \
-    --function_input=1x320x320x3xf32 \
+    --function=main \
+    --input=1x320x320x3xf32 \
     --benchmark_min_time=3
 
 echo ""
 echo "Benchmarking PoseNet..."
 "${IREE_BENCHMARK_MODULE_PATH?}" \
-    --module_file=./posenet_native.vmfb \
+    --module=./posenet_native.vmfb \
     --device=local-task \
     --task_topology_group_count=1 \
-    --entry_function=main \
-    --function_input=1x353x257x3xf32 \
+    --function=main \
+    --input=1x353x257x3xf32 \
     --benchmark_min_time=3
 
 echo ""
 echo "Benchmarking MobileBertSquad..."
 "${IREE_BENCHMARK_MODULE_PATH?}" \
-    --module_file=./mobilebertsquad_native.vmfb \
+    --module=./mobilebertsquad_native.vmfb \
     --device=local-task \
     --task_topology_group_count=1 \
-    --entry_function=main \
-    --function_input=1x384xi32 \
-    --function_input=1x384xi32 \
-    --function_input=1x384xi32 \
+    --function=main \
+    --input=1x384xi32 \
+    --input=1x384xi32 \
+    --input=1x384xi32 \
     --benchmark_min_time=10
 
 echo ""
 echo "Benchmarking MobileNetV2..."
 "${IREE_BENCHMARK_MODULE_PATH?}" \
-    --module_file=./mobilenet_v2_1.0_224_native.vmfb \
+    --module=./mobilenet_v2_1.0_224_native.vmfb \
     --device=local-task \
     --task_topology_group_count=1 \
-    --entry_function=main \
-    --function_input=1x224x224x3xf32 \
+    --function=main \
+    --input=1x224x224x3xf32 \
     --benchmark_min_time=3
 
 echo ""
 echo "Benchmarking MobileNetV3Small..."
 "${IREE_BENCHMARK_MODULE_PATH?}" \
-    --module_file=./MobileNetV3SmallStaticBatch_native.vmfb \
+    --module=./MobileNetV3SmallStaticBatch_native.vmfb \
     --device=local-task \
     --task_topology_group_count=1 \
-    --entry_function=main \
-    --function_input=1x224x224x3xf32 \
+    --function=main \
+    --input=1x224x224x3xf32 \
     --benchmark_min_time=3

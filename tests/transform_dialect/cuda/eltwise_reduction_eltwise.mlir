@@ -33,7 +33,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
     indexing_maps = [affine_map<(d0) -> (d0)>,
                      affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]}
-    ins(%6 : !out_tensor_t) outs(%7 : !out_tensor_t) {  
+    ins(%6 : !out_tensor_t) outs(%7 : !out_tensor_t) {
     ^bb0(%arg3: f32, %arg4: f32):
       %4 = math.sqrt %arg3 : f32
       linalg.yield %4 : f32
@@ -55,13 +55,13 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-flow-transformation-pipeline \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' 
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))'
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/%S_codegen_spec.mlir | \
 // RUN: FileCheck %s
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit | \
-// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="8x64xf32=1" |\
+// RUN: iree-run-module --function=reduce --device=cuda --input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 // Check that all generics ended up in the same region.

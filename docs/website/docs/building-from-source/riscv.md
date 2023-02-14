@@ -118,9 +118,9 @@ ${QEMU_BIN} \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/tools/iree-run-module \
   --device=local-task \
-  --module_file=/tmp/simple_abs_vmvx.vmfb \
-  --entry_function=abs \
-  --function_input=f32=-5
+  --module=/tmp/simple_abs_vmvx.vmfb \
+  --function=abs \
+  --input=f32=-5
 ```
 
 ## Optional configuration
@@ -150,8 +150,8 @@ tools/iree-compile \
   --iree-llvm-target-triple=riscv64 \
   --iree-llvm-target-cpu=generic-rv64 \
   --iree-llvm-target-abi=lp64d \
-  --iree-llvm-target-cpu-features="+m,+a,+f,+d,+v" \
-  --riscv-v-vector-bits-min=512 --riscv-v-fixed-length-vector-lmul-max=8 \
+  --iree-llvm-target-cpu-features="+m,+a,+f,+d,+zvl512b,+v" \
+  --riscv-v-fixed-length-vector-lmul-max=8 \
   iree_input.mlir -o mobilenet_cpu.vmfb
 ```
 
@@ -163,7 +163,7 @@ ${QEMU_BIN} \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/tools/iree-run-module \
   --device=local-task \
-  --module_file=mobilenet_cpu.vmfb \
-  --entry_function=predict \
-  --function_input="1x224x224x3xf32=0"
+  --module=mobilenet_cpu.vmfb \
+  --function=predict \
+  --input="1x224x224x3xf32=0"
 ```

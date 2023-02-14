@@ -48,6 +48,11 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
                                            int64_t threadCount,
                                            int64_t vectorSize);
 
+/// Pick an unrolling order that will allow tensorcore operation to reuse LHS
+/// register. This is needed to get good performance on sm_80 target.
+Optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
+    vector::ContractionOp contract);
+
 //===----------------------------------------------------------------------===//
 // GPU workgroup memory
 //===----------------------------------------------------------------------===//
@@ -76,6 +81,10 @@ void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp);
 Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
                             vector::CombiningKind kind, uint32_t size,
                             const int warpSize);
+
+/// Return the native size of an operation used in contraction calculation.
+// TODO: Make this take HW specific sizes.
+Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
 
 }  // namespace iree_compiler
 }  // namespace mlir

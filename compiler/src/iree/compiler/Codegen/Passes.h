@@ -100,6 +100,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
         std::nullopt,
     Optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+createHoistStaticallyBoundAllocationsPass();
+
 /// Creates a pass to remove single iteration distributed loops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRemoveSingleIterationLoopPass();
@@ -115,9 +118,17 @@ createConvertToDestinationPassingStylePass(
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 
+/// Creates a pass to vectorize tensor.pack and tensor.unpack ops. The pass does
+/// tiling, generalization, and kicking in the generic vectorizer. See
+/// implementation for more details.
+std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePackUnPackOpsPass();
+
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
     bool flatten = false);
+
+/// Pass to lower ukernel operations into their defined function calls.
+std::unique_ptr<OperationPass<ModuleOp>> createLowerUKernelOpsToCallsPass();
 
 /// Pass to optimize vector transfer_read and transfer_write. See Passes.td for
 /// `option` details.
@@ -264,6 +275,10 @@ createLLVMCPUCheckIRBeforeLLVMConversionPass();
 /// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass();
+
+/// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
+/// operation.
+std::unique_ptr<OperationPass<>> createLLVMCPULowerToUKernelsPass();
 
 /// Materialize the encoding of operations. The layout to use for the encoded
 /// operations are LLVMCPU specific.
@@ -519,7 +534,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm);
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass(
-    bool enableFastMath = false);
+    bool enableFastMath = false, unsigned indexWidth = 32);
 
 /// Creates a pass to fold processor ID uses where possible.
 std::unique_ptr<OperationPass<func::FuncOp>>

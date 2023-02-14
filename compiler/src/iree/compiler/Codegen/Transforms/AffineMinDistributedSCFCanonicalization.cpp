@@ -191,9 +191,11 @@ struct AffineMinDistributedSCFCanonicalizationPass
 
     // Explicitly walk and apply the pattern locally to avoid more general
     // folding on the rest of the IR.
-    funcOp.walk([&frozenPatterns](AffineMinOp minOp) {
-      (void)applyOpPatternsAndFold(minOp, frozenPatterns);
+    SmallVector<Operation *> minOps;
+    funcOp.walk([&minOps](AffineMinOp minOp) {
+      minOps.push_back(minOp.getOperation());
     });
+    (void)applyOpPatternsAndFold(minOps, frozenPatterns);
   }
 };
 }  // namespace

@@ -48,7 +48,8 @@ func.func @annotatePotentialValues(%arg0: i32) {
 // %arg0: not analyzable as %arg0 comes from outside the program.
 // %arg1: all values aren't known but the util.align gives us what we need.
 // %arg2: all values are known but unaligned.
-// %arg3: global initialized to 1024 and may be set to 2048.
+// %arg3: all values are known and have a derivable alignment.
+// %arg4: global initialized to 1024 and may be set to 2048.
 
 // CHECK-LABEL: @annotateOperandAlignmentEx
 stream.executable private @annotateOperandAlignmentEx {
@@ -58,8 +59,9 @@ stream.executable private @annotateOperandAlignmentEx {
     // CHECK-SAME: %arg0: index,
     // CHECK-SAME: %arg1: index {stream.alignment = 16 : index},
     // CHECK-SAME: %arg2: index {stream.values = [4096 : index, 4097 : index]},
-    // CHECK-SAME: %arg3: index {stream.alignment = 1024 : index, stream.values = [1024 : index, 2048 : index]}
-    func.func @dispatch(%arg0: index, %arg1: index, %arg2: index, %arg3: index) {
+    // CHECK-SAME: %arg3: index {stream.alignment = 16 : index, stream.values = [1200 : index, 5232 : index]}
+    // CHECK-SAME: %arg4: index {stream.alignment = 1024 : index, stream.values = [1024 : index, 2048 : index]}
+    func.func @dispatch(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {
       return
     }
   }
@@ -77,14 +79,16 @@ func.func @annotateOperandAlignment(%arg0: index, %arg1: index) {
   %c32 = arith.constant 32 : index
   %c4096 = arith.constant 4096 : index
   %c4097 = arith.constant 4097 : index
+  %c1200 = arith.constant 1200 : index
+  %c5232 = arith.constant 5232 : index
   %aligned1 = util.align %arg1, %c16 : index
   %global_value = util.global.load @global_var : index
   %alloc = stream.resource.alloc uninitialized : !stream.resource<transient>{%c1}
   %result_timepoint = stream.cmd.execute with(%alloc as %capture: !stream.resource<transient>{%c1}) {
-    stream.cmd.dispatch @annotateOperandAlignmentEx::@dispatch[%c1, %c1, %c1](%arg0, %c32, %c4097, %global_value : index, index, index, index) {
+    stream.cmd.dispatch @annotateOperandAlignmentEx::@dispatch[%c1, %c1, %c1](%arg0, %c32, %c4097, %c1200, %global_value : index, index, index, index, index) {
       rw %capture[%c0 for %c1] : !stream.resource<transient>{%c1}
     }
-    stream.cmd.dispatch @annotateOperandAlignmentEx::@dispatch[%c1, %c1, %c1](%c16, %aligned1, %c4096, %global_value: index, index, index, index) {
+    stream.cmd.dispatch @annotateOperandAlignmentEx::@dispatch[%c1, %c1, %c1](%c16, %aligned1, %c4096, %c5232, %global_value: index, index, index, index, index) {
       rw %capture[%c0 for %c1] : !stream.resource<transient>{%c1}
     }
   } => !stream.timepoint

@@ -31,6 +31,7 @@ struct IREEVMPipelineHooks {
 enum class IREEVMPipelinePhase {
   Input,
   ABI,
+  Preprocessing,
   Flow,
   Stream,
   HAL,
@@ -47,6 +48,8 @@ inline static void enumerateIREEVMPipelinePhases(
            "input dialects (linalg/etc).");
   callback(IREEVMPipelinePhase::ABI, "abi",
            "Adjusts program ABI for the specified execution environment.");
+  callback(IREEVMPipelinePhase::Preprocessing, "preprocessing",
+           "Compiles up to the `preprocessing` specified");
   callback(IREEVMPipelinePhase::Flow, "flow",
            "Compiles up to the `flow` dialect.");
   callback(IREEVMPipelinePhase::Stream, "stream",
@@ -65,6 +68,7 @@ inline static void enumerateIREEVMPipelinePhases(
 // IR after the phase completes.
 void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
+    PreprocessingOptions preprocessingOptions,
     HighLevelOptimizationOptions highLevelOptimizationOptions,
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,

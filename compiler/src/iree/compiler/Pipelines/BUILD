@@ -52,6 +52,8 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/InputConversion/TOSA",
         "//compiler/src/iree/compiler/Modules/HAL/Inline/Transforms",
         "//compiler/src/iree/compiler/Modules/HAL/Loader/Transforms",
+        "//compiler/src/iree/compiler/Preprocessing:Passes",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

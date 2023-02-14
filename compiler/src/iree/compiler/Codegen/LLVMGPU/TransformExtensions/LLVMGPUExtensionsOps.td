@@ -317,12 +317,15 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
 }
 
 def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_conversion",
-    [TransformEachOpTrait,
-     TransformOpInterface,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     This converts slices of operations containing vector.contract op into
-    mma operations, targetting warp level tensorcore operations.
+    mma operations, targetting warp level tensorcore operations. If the vector
+    operations are bigger than the native mma size it will first split up those
+    vector operations.
 
     #### Return modes
 
@@ -330,7 +333,7 @@ def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_c
   }];
 
   let arguments = (ins PDL_Operation:$target);
-  let results = (outs);
+  let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -339,6 +342,39 @@ def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_c
   let builders = [
     OpBuilder<(ins "Value":$target)>
   ];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def PromoteOperandsOp :
+  Op<Transform_Dialect, "iree.promote_operands",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
+  let description = [{
+    This op promotes the specified operands of the provided target handle.
+
+    #### Return modes
+    This op returns a handle to an allocTensorOp for each of the provided
+    valid indices.
+  }];
+
+  let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$indices);
+  let results = (outs Variadic<PDL_Operation>:$result);
+
+  let assemblyFormat = [{ $target $indices attr-dict `:` functional-type(operands, results)}];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target, "ArrayRef<int64_t>":$indices)>
+  ];
+
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,

@@ -139,10 +139,10 @@ above on IREE's VMVX driver:
 
 ```shell
 $ ../iree-build/tools/iree-run-module \
-  --module_file=/tmp/simple_abs_vmvx.vmfb \
+  --module=/tmp/simple_abs_vmvx.vmfb \
   --device=local-task \
-  --entry_function=abs \
-  --function_input=f32=-2
+  --function=abs \
+  --input=f32=-2
 ```
 
 ### iree-check-module
@@ -184,7 +184,7 @@ For example, to execute the contents of
 $ ../iree-build/tools/iree-run-mlir \
   --iree-hal-target-backends=vmvx \
   $PWD/samples/models/simple_abs.mlir \
-  --function_input=f32=-2
+  --input=f32=-2
 ```
 
 ### iree-dump-module

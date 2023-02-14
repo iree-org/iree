@@ -1,0 +1,68 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# markdownlint-cli configuration file.
+# https://github.com/igorshubovych/markdownlint-cli
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+# Enable all markdownlint rules by default
+default: true
+
+# List formatting:
+#
+# 1. Lists must have a blank line before AND after the list.
+# 2. Lists start aligned to the left (do not indent the top level list items).
+#    NOTE: markdownlint currently checks indentation for unordered lists only.
+#          Please manually verify that your ordered lists are not indented.
+#          See https://github.com/DavidAnson/markdownlint/issues/138.
+# 3. You may use one or zero blank lines between list items.
+# 4. Nested list items should be indented 4 spaces.
+# 5. In multiline list items, subsequent lines are indented to align with the
+#    first character of the first line. This is not checked automatically, so
+#    we're documenting this convention for consistency.
+#
+# Examples:
+#
+# * This is a list item that has multiple
+#   lines and each line aligns with the text from the first line.
+#     * This is a nested list, indented 4 spaces so it stands out.
+ul-indent:
+  indent: 4
+
+# Allow inconsistent unordered list style so we can use both standard ULs
+# and the non-standard task lists (`- [ ]` and `- [x]`)
+ul-style: false
+
+# Allow inconsistent code block style so we can use non-standard content tabs
+# https://squidfunk.github.io/mkdocs-material/reference/content-tabs/#grouping-code-blocks
+code-block-style: false
+
+# Limit to 80-char line length, except for tables and code blocks
+line-length:
+  line_length: 80
+  tables: false
+  code_blocks: false
+
+# Allow inline HTML
+no-inline-html: false
+
+# Allow dupe heading names only if they're not siblings
+no-duplicate-heading:
+  siblings_only: true
+
+# Allow images w/o alt-text
+no-alt-text: false
+
+# Allow bare URLs
+no-bare-urls: false
+
+# Allow first line to be something other than a heading
+# (we use this for date/author in blog posts)
+first-line-heading: false
+
+# markdownlint does not recognize link references in content tabs, so it
+# reports false positive errors for "unused" link references
+link-image-reference-definitions: false

@@ -110,7 +110,7 @@ class IreeBenchmarkCommand(BenchmarkCommand):
                      num_threads,
                      num_runs,
                      taskset=taskset)
-    self.args.append("--module_file=" + model_path)
+    self.args.append("--module=" + model_path)
     self._latency_regex = re.compile(
         r".*?BM_main/process_time/real_time_mean\s+(.*?) ms.*")
 

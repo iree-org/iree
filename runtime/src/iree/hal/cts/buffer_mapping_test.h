@@ -63,20 +63,22 @@ TEST_P(buffer_mapping_test, AllocatorSupportsBufferMapping) {
   iree_hal_buffer_params_t params = {0};
   params.type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   params.usage = IREE_HAL_BUFFER_USAGE_MAPPING;
+  iree_device_size_t allocation_size = 0;
   iree_hal_buffer_compatibility_t compatibility =
-      iree_hal_allocator_query_compatibility(device_allocator_, params,
-                                             kDefaultAllocationSize);
+      iree_hal_allocator_query_buffer_compatibility(device_allocator_, params,
+                                                    kDefaultAllocationSize,
+                                                    &params, &allocation_size);
   EXPECT_TRUE(iree_all_bits_set(compatibility,
                                 IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE));
 
   iree_hal_buffer_t* buffer = NULL;
-  AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
+  AllocateUninitializedBuffer(allocation_size, &buffer);
 
   EXPECT_TRUE(
       iree_all_bits_set(iree_hal_buffer_memory_type(buffer), params.type));
   EXPECT_TRUE(
       iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer), params.usage));
-  EXPECT_GE(iree_hal_buffer_allocation_size(buffer), kDefaultAllocationSize);
+  EXPECT_GE(iree_hal_buffer_allocation_size(buffer), allocation_size);
 
   iree_hal_buffer_release(buffer);
 }

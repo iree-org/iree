@@ -102,6 +102,14 @@
 // Include IREE_UK_STATIC_ASSERT.
 #include "iree/builtins/ukernel/static_assert.h"
 
+// Clang on Windows has __builtin_clzll; otherwise we need to use the
+// windows intrinsic functions.
+#if defined(_MSC_VER)
+#include <intrin.h>
+#pragma intrinsic(_BitScanReverse)
+#pragma intrinsic(_BitScanForward)
+#endif  // defined(_MSC_VER)
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -195,6 +203,21 @@ extern "C" {
 #define IREE_UK_ATTRIBUTE_NOINLINE
 #endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
 
+#if defined(__GNUC__) || defined(__clang__)
+#define IREE_UK_LIKELY(x) (__builtin_expect(!!(x), 1))
+#define IREE_UK_UNLIKELY(x) (__builtin_expect(!!(x), 0))
+#else
+#define IREE_UK_LIKELY(x) (x)
+#define IREE_UK_UNLIKELY(x) (x)
+#endif  // IREE_HAVE_ATTRIBUTE(likely)
+
+#if IREE_UK_HAVE_ATTRIBUTE(aligned) || \
+    (defined(__GNUC__) && !defined(__clang__))
+#define IREE_UK_ATTRIBUTE_ALIGNED(N) __attribute__((aligned(N)))
+#else
+#define IREE_UK_ATTRIBUTE_ALIGNED(N)
+#endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
+
 //===----------------------------------------------------------------------===//
 // Local replacements for stdint.h types and constants
 // Refer to the comment at the top of this file for why we can't include
@@ -261,6 +284,14 @@ static inline void iree_uk_ssize_swap(iree_uk_ssize_t* a, iree_uk_ssize_t* b) {
   iree_uk_ssize_t t = *a;
   *a = *b;
   *b = t;
+}
+
+static inline iree_uk_ssize_t iree_uk_ssize_clamp(iree_uk_ssize_t val,
+                                                  iree_uk_ssize_t min,
+                                                  iree_uk_ssize_t max) {
+  if (val < min) val = min;
+  if (val > max) val = max;
+  return val;
 }
 
 //===----------------------------------------------------------------------===//
@@ -458,8 +489,7 @@ static inline iree_uk_type_t iree_uk_untie_type(int pos,
 //===----------------------------------------------------------------------===//
 
 // The `restrict` here have the effect of enabling the compiler to rewrite this
-// as a memcpy call, shrinking code size of the (slow anyway) generic code paths
-// that would use this.
+// as a memcpy call.
 static inline void iree_uk_memcpy(void* IREE_UK_RESTRICT dst,
                                   const void* IREE_UK_RESTRICT src,
                                   iree_uk_ssize_t size) {
@@ -468,12 +498,63 @@ static inline void iree_uk_memcpy(void* IREE_UK_RESTRICT dst,
 }
 
 static inline void iree_uk_memset(void* buf, int val, iree_uk_ssize_t n) {
-  // No need for memset builtins: this naive loop is already transformed into a
-  // memset by both clang and gcc on ARM64. As __builtin_memset_inline requires
-  // a compile-time-constant size, it would require writing more complex code,
-  // which could actually prevent the optimization matching it as a single
-  // memset!
+  // This naive loop is lifted to a memset by both clang and gcc on ARM64.
   for (iree_uk_ssize_t i = 0; i < n; ++i) ((char*)buf)[i] = val;
+}
+
+//===----------------------------------------------------------------------===//
+// Count leading zeros (extracted from base/internal/math.h and adapted
+// to be able to be used standalone).
+//===----------------------------------------------------------------------===//
+
+static inline int iree_uk_count_leading_zeros_u32(const iree_uk_uint32_t n) {
+#if defined(_MSC_VER)
+  unsigned long result = 0;  // NOLINT(runtime/int)
+  if (_BitScanReverse(&result, n)) {
+    return (int)(31 - result);
+  }
+  return 32;
+#elif defined(__GNUC__) || defined(__clang__)
+#if defined(__LCZNT__)
+  // NOTE: LZCNT is a risky instruction; it is not supported on architectures
+  // before Haswell, yet it is encoded as 'rep bsr', which typically ignores
+  // invalid rep prefixes, and interprets it as the 'bsr' instruction, which
+  // returns the index of the value rather than the count, resulting in
+  // incorrect code.
+  return (int)__lzcnt32(n);
+#endif  // defined(__LCZNT__)
+
+  // Handle 0 as a special case because __builtin_clz(0) is undefined.
+  if (n == 0) return 32;
+  // Use __builtin_clz, which uses the following instructions:
+  //  x86: bsr
+  //  ARM64: clz
+  //  PPC: cntlzd
+  return (int)__builtin_clz(n);
+#else
+#error No clz for this arch.
+#endif  // MSVC / GCC / CLANG
+}
+
+//===----------------------------------------------------------------------===//
+// Power-of-two math helpers
+//===----------------------------------------------------------------------===//
+
+static inline bool iree_uk_is_po2_u32(const iree_uk_uint32_t n) {
+  return !(n & (n - 1));
+}
+
+static inline int iree_uk_floor_log2_u32(const iree_uk_uint32_t n) {
+  return 31 - iree_uk_count_leading_zeros_u32(n);
+}
+
+static inline int iree_uk_po2_log2_u32(const iree_uk_uint32_t n) {
+  IREE_UK_ASSERT(iree_uk_is_po2_u32(n));
+  return iree_uk_floor_log2_u32(n);
+}
+
+static inline int iree_uk_ceil_log2_u32(const iree_uk_uint32_t n) {
+  return n <= 1 ? 0 : (1 + iree_uk_floor_log2_u32(n - 1));
 }
 
 #ifdef __cplusplus

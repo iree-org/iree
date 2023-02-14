@@ -23,41 +23,66 @@
 #include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 
-IREE_FLAG(string, entry_function, "",
-          "Name of a function contained in the module specified by module_file "
+IREE_FLAG(string, function, "",
+          "Name of a function contained in the module specified by --module= "
           "to run.");
-
-IREE_FLAG(int32_t, print_max_element_count, 1024,
-          "Prints up to the maximum number of elements of output tensors, "
-          "eliding the remainder.");
 
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
 IREE_FLAG_LIST(
-    string, function_input,
+    string, input,
     "An input (a) value or (b) buffer of the format:\n"
     "  (a) scalar value\n"
     "     value\n"
-    "     e.g.: --function_input=\"3.14\"\n"
+    "     e.g.: --input=\"3.14\"\n"
     "  (b) buffer:\n"
     "     [shape]xtype=[value]\n"
-    "     e.g.: --function_input=\"2x2xi32=1 2 3 4\"\n"
+    "     e.g.: --input=\"2x2xi32=1 2 3 4\"\n"
     "Optionally, brackets may be used to separate the element values:\n"
     "  2x2xi32=[[1 2][3 4]]\n"
     "Raw binary files can be read to provide buffer contents:\n"
     "  2x2xi32=@some/file.bin\n"
-    "numpy npy files (from numpy.save) can be read to provide 1+ values:\n"
+    "\n"
+    "Numpy npy files from numpy.save can be read to provide 1+ values:\n"
     "  @some.npy\n"
+    "\n"
     "Each occurrence of the flag indicates an input in the order they were\n"
+    "specified on the command line.");
+
+IREE_FLAG_LIST(
+    string, output,
+    "Specifies how to handle an output from the invocation:\n"
+    "  `` (empty): ignore output\n"
+    "     e.g.: --output=\n"
+    "  `-`: print textual form to stdout\n"
+    "     e.g.: --output=-\n"
+    "  `@file.npy`: create/overwrite a numpy npy file and write buffer view\n"
+    "     e.g.: --output=@file.npy\n"
+    "  `+file.npy`: create/append a numpy npy file and write buffer view\n"
+    "     e.g.: --output=+file.npy\n"
+    "\n"
+    "Numpy npy files can be read in Python using numpy.load, for example an\n"
+    "invocation producing two outputs can be concatenated as:\n"
+    "    --output=@file.npy --output=+file.npy\n"
+    "And then loaded in Python by reading from the same file:\n"
+    "  with open('file.npy', 'rb') as f:\n"
+    "    print(numpy.load(f))\n"
+    "    print(numpy.load(f))\n"
+    "\n"
+    "Each occurrence of the flag indicates an output in the order they were\n"
     "specified on the command line.");
 
 IREE_FLAG_LIST(string, expected_output,
                "An expected function output following the same format as "
-               "--function_input. When present the results of the "
+               "--input. When present the results of the "
                "invocation will be compared against these values and the "
                "tool will return non-zero if any differ. If the value of a "
                "particular output is not of interest provide `(ignored)`.");
+
+IREE_FLAG(int32_t, output_max_element_count, 1024,
+          "Prints up to the maximum number of elements of output tensors, "
+          "eliding the remainder.");
 
 namespace iree {
 namespace {
@@ -82,11 +107,11 @@ iree_status_t Run(int* out_exit_code) {
       /*default_device_uri=*/iree_string_view_empty(), host_allocator, &context,
       &device, &device_allocator));
 
-  std::string function_name = std::string(FLAG_entry_function);
+  std::string function_name = std::string(FLAG_function);
   iree_vm_function_t function;
   if (function_name.empty()) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no --entry_function= specified");
+                            "no --function= specified");
   } else {
     IREE_RETURN_IF_ERROR(
         iree_vm_module_lookup_function_by_name(
@@ -100,8 +125,8 @@ iree_status_t Run(int* out_exit_code) {
 
   vm::ref<iree_vm_list_t> inputs;
   IREE_RETURN_IF_ERROR(iree_tooling_parse_to_variant_list(
-      device_allocator.get(), FLAG_function_input_list().values,
-      FLAG_function_input_list().count, host_allocator, &inputs));
+      device_allocator.get(), FLAG_input_list().values, FLAG_input_list().count,
+      host_allocator, &inputs));
 
   // If the function is async add fences so we can invoke it synchronously.
   vm::ref<iree_hal_fence_t> finish_fence;
@@ -129,10 +154,20 @@ iree_status_t Run(int* out_exit_code) {
   IREE_RETURN_IF_ERROR(iree_hal_end_profiling_from_flags(device.get()));
 
   if (FLAG_expected_output_list().count == 0) {
-    IREE_RETURN_IF_ERROR(
-        iree_tooling_variant_list_fprint(
-            outputs.get(), (size_t)FLAG_print_max_element_count, stdout),
-        "printing results");
+    if (FLAG_output_list().count == 0) {
+      IREE_RETURN_IF_ERROR(
+          iree_tooling_variant_list_fprint(
+              outputs.get(), (iree_host_size_t)FLAG_output_max_element_count,
+              stdout),
+          "printing results");
+    } else {
+      IREE_RETURN_IF_ERROR(
+          iree_tooling_output_variant_list(
+              outputs.get(), FLAG_output_list().values,
+              FLAG_output_list().count,
+              (iree_host_size_t)FLAG_output_max_element_count, stdout),
+          "outputting results");
+    }
   } else {
     // Parse expected list into host-local memory that we can easily access.
     // Note that we return a status here as this can fail on user inputs.

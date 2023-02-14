@@ -7,11 +7,17 @@
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
 
 #include "llvm/BinaryFormat/Dwarf.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Path.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+
+static llvm::cl::opt<bool> clVerboseDebugInfo(
+    "iree-codegen-llvm-verbose-debug-info",
+    llvm::cl::desc("Emit verbose debug information in LLVM IR."),
+    llvm::cl::init(false));
 
 namespace mlir {
 namespace iree_compiler {
@@ -582,6 +588,7 @@ static bool isLocationValidForDI(Location loc) {
 
 static Value buildArgDI(Operation *forOp, int argNum, Value value, Twine name,
                         LLVM::DITypeAttr type, OpBuilder &builder) {
+  if (!clVerboseDebugInfo) return value;
   auto loc = forOp->getLoc();
   if (!isLocationValidForDI(loc)) return value;
   auto scopeAttr = getLocalScopeAttr(forOp);
@@ -596,6 +603,7 @@ static Value buildArgDI(Operation *forOp, int argNum, Value value, Twine name,
 
 static Value buildValueDI(Operation *forOp, Value value, Twine name,
                           LLVM::DITypeAttr type, OpBuilder &builder) {
+  if (!clVerboseDebugInfo) return value;
   auto loc = forOp->getLoc();
   if (!isLocationValidForDI(loc)) return value;
   auto scopeAttr = getLocalScopeAttr(forOp);

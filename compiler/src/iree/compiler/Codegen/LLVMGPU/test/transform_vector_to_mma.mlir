@@ -34,19 +34,12 @@ func.func @matmul() {
   %7 = scf.for %arg0 = %c0 to %c32 step %c16 iter_args(%arg1 = %cst) -> (vector<16x16xf32>) {
     %10 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c0)[%5]
     %11 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c0)[%arg0]
-    %12 = vector.transfer_read %0[%10, %11], %cst_0 {in_bounds = [true, true]} : memref<32x32xf32>, vector<16x8xf32>
-    %13 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c0)[%5]
-    %14 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c8)[%arg0]
-    %15 = vector.transfer_read %0[%13, %14], %cst_0 {in_bounds = [true, true]} : memref<32x32xf32>, vector<16x8xf32>
+    %12 = vector.transfer_read %0[%10, %11], %cst_0 {in_bounds = [true, true]} : memref<32x32xf32>, vector<16x16xf32>
     %16 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c0)[%6]
     %17 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c0)[%arg0]
-    %18 = vector.transfer_read %1[%17, %16], %cst_0 {in_bounds = [true, true]} : memref<32x32xf32>, vector<8x16xf32>
-    %19 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c0)[%6]
-    %20 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c8)[%arg0]
-    %21 = vector.transfer_read %1[%20, %19], %cst_0 {in_bounds = [true, true]} : memref<32x32xf32>, vector<8x16xf32>
-    %22 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %12, %18, %arg1 : vector<16x8xf32>, vector<8x16xf32> into vector<16x16xf32>
-    %23 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %15, %21, %22 : vector<16x8xf32>, vector<8x16xf32> into vector<16x16xf32>
-    scf.yield %23 : vector<16x16xf32>
+    %18 = vector.transfer_read %1[%17, %16], %cst_0 {in_bounds = [true, true]} : memref<32x32xf32>, vector<16x16xf32>
+    %22 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %12, %18, %arg1 : vector<16x16xf32>, vector<16x16xf32> into vector<16x16xf32>
+    scf.yield %22 : vector<16x16xf32>
   }
   %8 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c0)[%5]
   %9 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c0)[%6]
@@ -56,7 +49,7 @@ func.func @matmul() {
 }
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
-  %func = transform.structured.match ops{["func.func"]} in %variant_op
+  %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   transform.iree.vector.vector_to_mma_conversion %func
 }
 }

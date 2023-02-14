@@ -28,15 +28,15 @@ struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
     for (OpOperand& opOperand : genericOp->getOpOperands()) {
       if (!linalg::areElementwiseOpsFusable(&opOperand)) continue;
 
-      FailureOr<Operation*> fusedOp =
+      FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
           linalg::fuseElementwiseOps(rewriter, &opOperand);
-      if (succeeded(fusedOp)) {
+      if (succeeded(fusionResult)) {
         // Forward lowering config.
         if (auto loweringAttr = getLoweringConfig(genericOp)) {
-          setLoweringConfig(fusedOp.value(), loweringAttr);
+          setLoweringConfig(fusionResult->fusedOp, loweringAttr);
         }
-        auto replacements =
-            fusedOp.value()->getResults().take_back(genericOp.getNumResults());
+        auto replacements = fusionResult->fusedOp->getResults().take_back(
+            genericOp.getNumResults());
         rewriter.replaceOp(genericOp, replacements);
         return success();
       }

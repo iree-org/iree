@@ -44,7 +44,7 @@ class DeviceArchitecture(_ArchitectureInfo, Enum):
   RV32_GENERIC = (ArchitectureType.CPU, "riscv_32", "generic")
 
   # Mobile GPUs
-  MALI_VALHALL = (ArchitectureType.GPU, "mali", "valhall")
+  VALHALL_MALI = (ArchitectureType.GPU, "valhall", "mali")
   ADRENO_GENERIC = (ArchitectureType.GPU, "adreno", "generic")
 
   # CUDA GPUs
@@ -88,7 +88,8 @@ class ModelSourceType(Enum):
   # Exported TFLite model file.
   EXPORTED_TFLITE = "exported_tflite"
   # Exported SavedModel from Tensorflow.
-  EXPORTED_TF = "exported_tf"
+  EXPORTED_TF_V1 = "exported_tf_v1"
+  EXPORTED_TF_V2 = "exported_tf_v2"
 
 
 class InputDataFormat(Enum):

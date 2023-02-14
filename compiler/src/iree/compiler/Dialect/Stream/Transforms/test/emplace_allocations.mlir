@@ -124,6 +124,37 @@ func.func @emplaceMultiResultDispatchSequence(
 
 // -----
 
+// Tests that multiple results from the same dispatch routing to the same target
+// get placed. This can originate from concats where all producers are fused
+// into the same dispatch.
+
+// CHECK-LABEL: @emplaceMultiResultDispatchInto
+func.func @emplaceMultiResultDispatchInto(
+    // CHECK-SAME: %[[INPUT:arg[0-9]+]]: !stream.resource<*>, %[[INPUT_SIZE:arg[0-9]+]]: index,
+    %input: !stream.resource<*>, %input_size: index,
+    // CHECK-SAME: %[[UPDATE_SIZE:arg[0-9]+]]: index, %[[TARGET_SIZE:arg[0-9]+]]: index
+    %update_size: index, %target_size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c32 = arith.constant 32 : index
+  %c64 = arith.constant 64 : index
+  // CHECK: %[[TARGET:.+]] = stream.async.alloca
+  // CHECK: %[[DISPATCH:.+]]:2 = stream.async.dispatch @ex::@dispatch0
+  // CHECK-SAME: ({{.+}}, %[[TARGET]][%c0 to %c32 for %[[UPDATE_SIZE]]], %[[TARGET]][%c32 to %c64 for %[[UPDATE_SIZE]]]) :
+  // CHECK-SAME: ({{.+}}) -> (%[[TARGET]]{%[[TARGET_SIZE]]}, %[[TARGET]]{%[[TARGET_SIZE]]})
+  %update:2 = stream.async.dispatch @ex::@dispatch0(%input[%c0 to %input_size for %input_size]) :
+      (!stream.resource<*>{%input_size}) -> (!stream.resource<*>{%update_size}, !stream.resource<*>{%update_size})
+  // CHECK-NOT: stream.async.alloca
+  %target = stream.async.alloca : !stream.resource<*>{%target_size}
+  // CHECK-NOT: stream.async.update
+  %target0 = stream.async.update %update#0, %target[%c0 to %c32] : !stream.resource<*>{%update_size} -> %target as !stream.resource<*>{%target_size}
+  // CHECK-NOT: stream.async.update
+  %target1 = stream.async.update %update#1, %target0[%c32 to %c64] : !stream.resource<*>{%update_size} -> %target0 as !stream.resource<*>{%target_size}
+  // CHECK: return %[[DISPATCH]]#1
+  return %target1 : !stream.resource<*>
+}
+
+// -----
+
 // Tests that sequences with data dependencies don't hoist beyond them.
 
 // CHECK-LABEL: @emplaceDependentDispatchSequence

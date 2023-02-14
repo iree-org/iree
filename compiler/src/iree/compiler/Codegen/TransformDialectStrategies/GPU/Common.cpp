@@ -158,7 +158,8 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
   // Locally suppress failures for this op only because it doesn't cover the
   // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.
   auto sequence = b.create<SequenceOp>(
-      TypeRange(), transform::FailurePropagationMode::Suppress, variantH);
+      TypeRange(), transform::FailurePropagationMode::Suppress, variantH,
+      /*extraBindings=*/ValueRange());
   {
     OpBuilder::InsertionGuard guard(b);
     b.createBlock(&sequence.getBody(), sequence.getBody().begin(),
@@ -384,10 +385,11 @@ static ReductionConfig getReductionConfig(
 LogicalResult mlir::iree_compiler::gpu::matchAndSetReductionStrategy(
     func::FuncOp entryPoint, linalg::LinalgOp op, const GPUModel &gpuModel) {
   // 1. Match a reduction and surrounding ops.
-  StructuredOpMatcher reduction, fill, leading, trailing;
+  StructuredOpMatcher *reduction;
   transform_ext::MatchedReductionCaptures captures;
-  makeReductionMatcher(reduction, fill, leading, trailing, captures);
-  if (!matchPattern(op, reduction)) return failure();
+  transform_ext::MatcherContext matcherContext;
+  makeReductionMatcher(matcherContext, reduction, captures);
+  if (!matchPattern(op, *reduction)) return failure();
 
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.

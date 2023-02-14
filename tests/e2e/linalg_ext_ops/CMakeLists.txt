@@ -14,6 +14,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_cuda
   SRCS
+    "attention.mlir"
     "reverse.mlir"
     "scan.mlir"
     "scatter.mlir"
@@ -70,10 +71,14 @@ iree_check_single_backend_test_suite(
     "requires-gpu-nvidia"
 )
 
+# Failing on Emscripten: https://github.com/iree-org/iree/issues/12129
+if(NOT EMSCRIPTEN)
+
 iree_check_single_backend_test_suite(
   NAME
     check_llvm-cpu_local-task
   SRCS
+    "attention.mlir"
     "pack.mlir"
     "reverse.mlir"
     "scan.mlir"
@@ -89,6 +94,8 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
 )
+
+endif()
 
 iree_check_single_backend_test_suite(
   NAME

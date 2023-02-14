@@ -81,6 +81,11 @@ iree_hal_fence_timepoint_count(const iree_hal_fence_t* fence);
 IREE_API_EXPORT iree_status_t iree_hal_fence_insert(
     iree_hal_fence_t* fence, iree_hal_semaphore_t* semaphore, uint64_t value);
 
+// Extends |into_fence| with all semaphore values in |from_fence|. This is
+// equivalent to calling |iree_hal_fence_insert| on each contained payload.
+IREE_API_EXPORT iree_status_t iree_hal_fence_extend(
+    iree_hal_fence_t* into_fence, iree_hal_fence_t* from_fence);
+
 // Queries the status of the fence.
 // Returns OK if the fence has been signaled, IREE_STATUS_DEFERRED if it has
 // not yet been signaled, or a failure if one or more timepoint semaphores have

@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "iree-benchmark-module.mlir"
     "iree-run-mlir.mlir"
     "iree-run-module-expected.mlir"
+    "iree-run-module-outputs.mlir"
     "iree-run-module.mlir"
     "multiple_args.mlir"
     "multiple_exported_functions.mlir"
@@ -33,6 +34,8 @@ iree_lit_test_suite(
     iree-run-mlir
     iree-run-module
     not
+  DATA
+    echo_npy.py
   LABELS
     "driver=local-task"
     "driver=vulkan"
@@ -76,8 +79,8 @@ if(IREE_BUILD_TESTS AND
     DRIVER
       "local-sync"
     RUNNER_ARGS
-      "--entry_function=abs"
-      "--function_input=f32=-10"
+      "--function=abs"
+      "--input=f32=-10"
     EXPECTED_OUTPUT
       "f32=10"
     DEPS

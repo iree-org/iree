@@ -188,7 +188,7 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   }
 
   auto scfIf = b.create<scf::IfOp>(
-      loc, TypeRange{}, cond,
+      loc, cond,
       [&](OpBuilder &b, Location loc) {
         if (isInclusive) {
           auto value = b.create<memref::LoadOp>(loc, input(), indices);
@@ -250,7 +250,7 @@ static LogicalResult foldMemRefCast(Operation *op) {
   return success(folded);
 }
 
-LogicalResult ScanOp::fold(ArrayRef<Attribute>,
+LogicalResult ScanOp::fold(FoldAdaptor,
                            SmallVectorImpl<OpFoldResult> &) {
   return foldMemRefCast(*this);
 }

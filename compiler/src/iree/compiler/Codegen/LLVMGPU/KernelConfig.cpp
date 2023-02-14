@@ -40,7 +40,7 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag(
     "iree-codegen-llvmgpu-transform-dialect-debug-payload-tag",
@@ -945,12 +945,8 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     }
 
     if (!rootOperation) {
-      // setTranslationInfo(
-      //    funcOp,
-      //    IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-      //    {1, 1, 1});
-      // continue;
-      return funcOp.emitOpError("unable to find root operation");
+      // No root operation found. Allow it to pass through without a config.
+      continue;
     }
 
     if (failed(setRootConfig(funcOp, rootOperation))) continue;

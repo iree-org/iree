@@ -38,6 +38,7 @@ namespace {
 struct CompilerOptions {
   BindingOptions bindingOptions;
   InputDialectOptions inputDialectOptions;
+  PreprocessingOptions preprocessingOptions;
   HighLevelOptimizationOptions highLevelOptimizationOptions;
   SchedulingOptions schedulingOptions;
   HALTargetOptions halTargetOptions;
@@ -49,6 +50,7 @@ struct CompilerOptions {
   CompilerOptions() : binder(OptionsBinder::local()) {
     bindingOptions.bindOptions(binder);
     inputDialectOptions.bindOptions(binder);
+    preprocessingOptions.bindOptions(binder);
     highLevelOptimizationOptions.bindOptions(binder);
     schedulingOptions.bindOptions(binder);
     halTargetOptions.bindOptions(binder);
@@ -116,6 +118,7 @@ void ireeCompilerBuildIREEVMPassPipeline(IreeCompilerOptions options,
       [](OpPassManager &pm) { pm.addPass(ConstEval::createJitGlobalsPass()); }};
   buildIREEVMTransformPassPipeline(
       optionsCpp->bindingOptions, optionsCpp->inputDialectOptions,
+      optionsCpp->preprocessingOptions,
       optionsCpp->highLevelOptimizationOptions, optionsCpp->schedulingOptions,
       optionsCpp->halTargetOptions, optionsCpp->vmTargetOptions, hooks,
       *passManagerCpp);

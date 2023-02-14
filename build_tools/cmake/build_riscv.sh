@@ -116,8 +116,5 @@ else
     echo "Building test deps for RISC-V"
     echo "-----------------------------"
     "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
-    echo "Building sample deps for RISC-V"
-    echo "------------------"
-    "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-sample-deps -- -k 0
   fi
 fi

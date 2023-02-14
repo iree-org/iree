@@ -218,7 +218,8 @@ class BenchmarkDriver(object):
                          bench_mode=run_tags,
                          compile_tags=compile_tags,
                          driver_info=benchmark_case.driver_info,
-                         device_info=self.device_info)
+                         device_info=self.device_info,
+                         run_config_id=benchmark_case.run_config.composite_id())
 
   def __get_available_drivers_and_loaders(
       self) -> Tuple[Sequence[str], Sequence[str]]:

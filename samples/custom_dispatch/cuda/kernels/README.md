@@ -136,8 +136,8 @@ for instructions for CMake setup and building from source.
     ```
     iree-run-module \
         --device=cuda \
-        --entry_function=mixed_invocation \
-        --function_input=8xf32=2 \
-        --function_input=8xf32=4 \
+        --function=mixed_invocation \
+        --input=8xf32=2 \
+        --input=8xf32=4 \
         /tmp/example.vmfb
     ```
