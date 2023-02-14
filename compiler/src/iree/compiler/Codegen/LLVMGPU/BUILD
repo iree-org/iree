@@ -42,6 +42,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU/Utils",
         "//compiler/src/iree/compiler/Codegen/TransformDialectStrategies/GPU:TransformDialectStrategies",
         "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Codegen/Utils",
