@@ -36,6 +36,7 @@ iree_cc_library(
     ::UKernelOpsGen
     LLVMSupport
     MLIRArithDialect
+    MLIRBufferizationDialect
     MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRIR
