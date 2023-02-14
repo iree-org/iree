@@ -331,7 +331,7 @@ def RematerializeParallelOps :
 }
 
 def LowerToUKernels :
-    Pass<"iree-lower-to-ukernels", ""> {
+    Pass<"iree-codegen-lower-to-ukernels", ""> {
   let summary =
       "Separate out parts of the IR that lower to a micro-kernel";
   let constructor =
