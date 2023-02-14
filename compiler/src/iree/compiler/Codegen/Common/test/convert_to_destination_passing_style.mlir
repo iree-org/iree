@@ -791,6 +791,52 @@ func.func @unpack() {
 
 // -----
 
+func.func @non_perfect_tiling_unpack() {
+  %c1 = arith.constant 1 : index
+  %c512 = arith.constant 512 : index
+  %c0 = arith.constant 0 : index
+  %c16 = arith.constant 16 : index
+  %0:2 = vmvx.query_tile_sizes sizes(%c16, %c16) flags(1245184) -> index, index
+  %1 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#0]
+  %2 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#1]
+  %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c512) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%1, %2, %0#0, %0#1}
+  %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x1xi32>>
+  %5:2 = vmvx.query_tile_sizes sizes(%c16, %c16) flags(1245184) -> index, index
+  %6 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%5#0]
+  %7 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%5#1]
+  %8:2 = vmvx.query_tile_sizes sizes(%c16, %c16) flags(1245184) -> index, index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %9 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_y]
+  %10 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_y]
+  scf.for %arg0 = %9 to %c1 step %10 {
+    %11 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
+    %12 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_x]
+    scf.for %arg1 = %11 to %c1 step %12 {
+      %13 = affine.apply affine_map<(d0)[s0] -> (d0 mod s0)>(%arg0)[%8#0]
+      %14 = affine.apply affine_map<(d0)[s0] -> (d0 mod s0)>(%arg1)[%8#1]
+      %15 = affine.apply affine_map<(d0)[s0] -> (d0 floordiv s0)>(%arg0)[%8#0]
+      %16 = affine.apply affine_map<(d0)[s0] -> (d0 floordiv s0)>(%arg1)[%8#1]
+      %17 = flow.dispatch.tensor.load %3, offsets = [%15, %16, 0, 0], sizes = [%c1, %c1, %8#0, %8#1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%6, %7, %5#0, %5#1} -> tensor<?x?x?x?xi32>
+      %18 = tensor.empty(%8#0, %8#1) : tensor<?x?xi32>
+      %19 = iree_linalg_ext.unpack %17 inner_dims_pos = [0, 1] inner_tiles = [%8#0, %8#1] into %18 : (tensor<?x?x?x?xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+      %extracted_slice = tensor.extract_slice %19[%13, %14] [1, 1] [1, 1] : tensor<?x?xi32> to tensor<1x1xi32>
+      %cast = tensor.cast %extracted_slice : tensor<1x1xi32> to tensor<?x?xi32>
+      flow.dispatch.tensor.store %cast, %4, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<1x1xi32>>
+    }
+  }
+  return
+}
+// CHECK-LABEL: func.func @non_perfect_tiling_unpack
+// CHECK:         %[[EMPTY:.+]] = tensor.empty
+// CHECK:         %[[UNPACK:.+]] = iree_linalg_ext.unpack
+// CHECK-SAME:      into %[[EMPTY]]
+// CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[UNPACK]]
+
+// -----
+
 func.func @multi_result_dispatches() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
