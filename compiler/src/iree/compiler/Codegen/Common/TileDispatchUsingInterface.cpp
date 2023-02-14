@@ -501,8 +501,8 @@ FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
       return rewriter.notifyMatchFailure(sliceOp,
                                          "fusion along slice op failed");
     }
-    auto tiledProducer = tiledProducerVal->getDefiningOp<TilingInterface>();
-    if (!tiledProducer) {
+    Operation *tiledProducer = tiledProducerVal->getDefiningOp();
+    if (!llvm::dyn_cast_or_null<TilingInterface>(tiledProducer)) {
       return rewriter.notifyMatchFailure(
           tiledProducer,
           "expected tiled implementation to implement TilingInterface as well");
