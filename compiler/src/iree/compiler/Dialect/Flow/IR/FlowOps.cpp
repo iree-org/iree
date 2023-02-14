@@ -1570,50 +1570,51 @@ void ChannelRankOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// flow.allgather
+// flow.collective.all_gather
 //===----------------------------------------------------------------------===//
-Value AllGatherOp::getTiedResult(unsigned resultIndex) {
+Value CollectiveAllGatherOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::llvm::Optional<unsigned> AllGatherOp::getTiedResultOperandIndex(
+::llvm::Optional<unsigned> CollectiveAllGatherOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AllGatherOp::getTiedResultOperandIndices() {
+SmallVector<int64_t, 4> CollectiveAllGatherOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
 //===----------------------------------------------------------------------===//
-// flow.allreduce
+// flow.collective.all_reduce
 //===----------------------------------------------------------------------===//
-Value AllReduceOp::getTiedResult(unsigned resultIndex) {
+Value CollectiveAllReduceOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::llvm::Optional<unsigned> AllReduceOp::getTiedResultOperandIndex(
+::llvm::Optional<unsigned> CollectiveAllReduceOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> AllReduceOp::getTiedResultOperandIndices() {
+SmallVector<int64_t, 4> CollectiveAllReduceOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
 //===----------------------------------------------------------------------===//
-// flow.reduce_scatter
+// flow.collective.reduce_scatter
 //===----------------------------------------------------------------------===//
-Value ReduceScatterOp::getTiedResult(unsigned resultIndex) {
+Value CollectiveReduceScatterOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::llvm::Optional<unsigned> ReduceScatterOp::getTiedResultOperandIndex(
+::llvm::Optional<unsigned> CollectiveReduceScatterOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // target
 }
 
-SmallVector<int64_t, 4> ReduceScatterOp::getTiedResultOperandIndices() {
+SmallVector<int64_t, 4>
+CollectiveReduceScatterOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 

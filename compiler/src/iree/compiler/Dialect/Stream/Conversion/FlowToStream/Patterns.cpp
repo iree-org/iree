@@ -486,10 +486,10 @@ struct ConvertReturnOp : public OpConversionPattern<IREE::Flow::ReturnOp> {
 // Collective Ops
 //-------------------------------------------
 struct ConvertAllGatherOp
-    : public OpConversionPattern<IREE::Flow::AllGatherOp> {
+    : public OpConversionPattern<IREE::Flow::CollectiveAllGatherOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::AllGatherOp op, OpAdaptor adaptor,
+      IREE::Flow::CollectiveAllGatherOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto shape = op.getSource().getType().cast<ShapedType>();
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
@@ -521,10 +521,10 @@ struct ConvertAllGatherOp
 };
 
 struct ConvertAllReduceOp
-    : public OpConversionPattern<IREE::Flow::AllReduceOp> {
+    : public OpConversionPattern<IREE::Flow::CollectiveAllReduceOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::AllReduceOp op, OpAdaptor adaptor,
+      IREE::Flow::CollectiveAllReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto shape = op.getType().cast<ShapedType>();
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
@@ -556,10 +556,10 @@ struct ConvertAllReduceOp
 };
 
 struct ConvertReduceScatterOp
-    : public OpConversionPattern<IREE::Flow::ReduceScatterOp> {
+    : public OpConversionPattern<IREE::Flow::CollectiveReduceScatterOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::ReduceScatterOp op, OpAdaptor adaptor,
+      IREE::Flow::CollectiveReduceScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto shape = op.getType().cast<ShapedType>();
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(

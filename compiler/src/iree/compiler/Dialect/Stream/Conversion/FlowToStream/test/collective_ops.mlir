@@ -32,7 +32,7 @@ func.func @all_reduce_sum(%arg0: !hal.buffer_view) -> !hal.buffer_view attribute
   %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<2304xf32>
   %channel_default = flow.channel.default : !flow.channel
   %1 = flow.tensor.empty : tensor<2304xf32>
-  %2 = flow.allreduce sum, f32, %1, %0, %channel_default : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> tensor<2304xf32>
+  %2 = flow.collective.all_reduce sum, f32, %1, %0, %channel_default : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> tensor<2304xf32>
   %3 = hal.tensor.export %2 : tensor<2304xf32> -> !hal.buffer_view
   return %3 : !hal.buffer_view
 }
@@ -47,7 +47,7 @@ func.func @allgather(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {ir
   %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<512xf32>
   %channel_default = flow.channel.default : !flow.channel
   %1 = flow.tensor.empty : tensor<1024xf32>
-  %2 = flow.allgather f32, %1, %0, %channel_default : (tensor<1024xf32>, tensor<512xf32>, !flow.channel) -> tensor<1024xf32>
+  %2 = flow.collective.all_gather f32, %1, %0, %channel_default : (tensor<1024xf32>, tensor<512xf32>, !flow.channel) -> tensor<1024xf32>
   %3 = hal.tensor.export %2 : tensor<1024xf32> -> !hal.buffer_view
   return %3 : !hal.buffer_view
 }
@@ -62,7 +62,7 @@ func.func @reduce_scatter(%arg0: !hal.buffer_view) -> !hal.buffer_view attribute
   %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<4x2xf32>
   %channel_default = flow.channel.default : !flow.channel
   %1 = flow.tensor.empty : tensor<2x2xf32>
-  %2 = flow.reduce_scatter sum, f32, %1, %0, %channel_default : (tensor<2x2xf32>, tensor<4x2xf32>, !flow.channel) -> tensor<2x2xf32>
+  %2 = flow.collective.reduce_scatter sum, f32, %1, %0, %channel_default : (tensor<2x2xf32>, tensor<4x2xf32>, !flow.channel) -> tensor<2x2xf32>
   %3 = hal.tensor.export %2 : tensor<2x2xf32> -> !hal.buffer_view
   return %3 : !hal.buffer_view
 }

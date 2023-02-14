@@ -192,8 +192,8 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
         loc, gatherResultShape, resultType.getElementType());
     Value gatherResult =
         rewriter
-            .create<IREE::Flow::AllGatherOp>(op.getLoc(), elementTypeAttr,
-                                             target, gatherInput, channel)
+            .create<IREE::Flow::CollectiveAllGatherOp>(
+                op.getLoc(), elementTypeAttr, target, gatherInput, channel)
             .getResult();
 
     if (allGatherDim != 0) {
@@ -276,7 +276,7 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
     // Create an empty tensor for the result
     Value target = rewriter.create<tensor::EmptyOp>(loc, inputShape,
                                                     inputType.getElementType());
-    auto allReduceOp = rewriter.create<IREE::Flow::AllReduceOp>(
+    auto allReduceOp = rewriter.create<IREE::Flow::CollectiveAllReduceOp>(
         op.getLoc(), reductionOpAttr, elementTypeAttr, target, op.getOperand(),
         channel);
     rewriter.replaceOp(op, allReduceOp.getResult());
@@ -380,7 +380,7 @@ struct ReduceScatterOpConversion
     Value target = rewriter.create<tensor::EmptyOp>(
         loc, scatterResultShape, resultType.getElementType());
     Value scatterResult = rewriter
-                              .create<IREE::Flow::ReduceScatterOp>(
+                              .create<IREE::Flow::CollectiveReduceScatterOp>(
                                   op.getLoc(), reductionOpAttr, elementTypeAttr,
                                   target, reduceInput, channel)
                               .getResult();

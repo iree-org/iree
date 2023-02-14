@@ -1369,7 +1369,7 @@ def FLOW_ChannelCountOp : FLOW_Op<"channel.count", [
   }];
 }
 
-def FLOW_AllGatherOp : FLOW_Op<"allgather", [
+def FLOW_CollectiveAllGatherOp : FLOW_Op<"collective.all_gather", [
   AllTypesMatch<["target", "result"]>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
@@ -1392,7 +1392,7 @@ def FLOW_AllGatherOp : FLOW_Op<"allgather", [
   let assemblyFormat = "$element_type `,` operands attr-dict `:` functional-type(operands, results)";
 }
 
-def FLOW_AllReduceOp : FLOW_Op<"allreduce", [
+def FLOW_CollectiveAllReduceOp : FLOW_Op<"collective.all_reduce", [
   AllTypesMatch<["source", "target", "result"]>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
@@ -1416,7 +1416,7 @@ def FLOW_AllReduceOp : FLOW_Op<"allreduce", [
   let assemblyFormat = "$reduction_op `,` $element_type `,` operands attr-dict `:` functional-type(operands, results)";
 }
 
-def FLOW_ReduceScatterOp : FLOW_Op<"reduce_scatter", [
+def FLOW_CollectiveReduceScatterOp : FLOW_Op<"collective.reduce_scatter", [
   AllTypesMatch<["target", "result"]>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",

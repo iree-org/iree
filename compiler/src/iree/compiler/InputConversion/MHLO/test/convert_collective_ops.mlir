@@ -18,7 +18,7 @@ func.func @replica_id() -> tensor<ui32> {
 func.func @all_reduce_sum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
   // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2304xf32>
-  // CHECK: [[ALLREDUCE:%.+]] = flow.allreduce sum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> tensor<2304xf32>
+  // CHECK: [[ALLREDUCE:%.+]] = flow.collective.all_reduce sum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> tensor<2304xf32>
   // CHECK: return [[ALLREDUCE]] : tensor<2304xf32>
   %out = "mhlo.all_reduce"(%input) ({
     ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
@@ -37,7 +37,7 @@ func.func @all_reduce_sum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
 func.func @all_reduce_product(%input : tensor<2304xf32>) -> tensor<2304xf32> {
   // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2304xf32>
-  // CHECK: [[OP:%.+]] = flow.allreduce product, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> tensor<2304xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_reduce product, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> tensor<2304xf32>
   // CHECK: return [[OP]] : tensor<2304xf32>
   %out = "mhlo.all_reduce"(%input) ({
     ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
@@ -56,7 +56,7 @@ func.func @all_reduce_product(%input : tensor<2304xf32>) -> tensor<2304xf32> {
 func.func @all_reduce_minimum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
   // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2304xf32>
-  // CHECK: [[OP:%.+]] = flow.allreduce minimum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> tensor<2304xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_reduce minimum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> tensor<2304xf32>
   // CHECK: return [[OP]] : tensor<2304xf32>
   %out = "mhlo.all_reduce"(%input) ({
     ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
@@ -75,7 +75,7 @@ func.func @all_reduce_minimum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
 func.func @all_reduce_maximum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
   // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2304xf32>
-  // CHECK: [[OP:%.+]] = flow.allreduce maximum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> tensor<2304xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_reduce maximum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> tensor<2304xf32>
   // CHECK: return [[OP]] : tensor<2304xf32>
   %out = "mhlo.all_reduce"(%input) ({
     ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
@@ -94,7 +94,7 @@ func.func @all_reduce_maximum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
 func.func @all_gather_dim_0(%input : tensor<512xf32>) -> tensor<1024xf32> {
   // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<1024xf32>
-  // CHECK: [[OP:%.+]] = flow.allgather f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<1024xf32>, tensor<512xf32>, !flow.channel) -> tensor<1024xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_gather f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<1024xf32>, tensor<512xf32>, !flow.channel) -> tensor<1024xf32>
   // CHECK: return [[OP]] : tensor<1024xf32>
   %out = "mhlo.all_gather"(%input) {all_gather_dim = 0 : i64,
      channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
@@ -112,7 +112,7 @@ func.func @all_gather_dim_1(%input : tensor<2x2xf32>) -> tensor<2x4xf32> {
   // CHECK: tensor.empty() : tensor<2x2xf32>
   // CHECK: [[TRANSPOSE_ARG:%.+]] = linalg.generic
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<4x2xf32>
-  // CHECK: [[OP:%.+]] = flow.allgather f32, [[EMPTY]], [[TRANSPOSE_ARG]], %channel_default  : (tensor<4x2xf32>, tensor<2x2xf32>, !flow.channel) -> tensor<4x2xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_gather f32, [[EMPTY]], [[TRANSPOSE_ARG]], %channel_default  : (tensor<4x2xf32>, tensor<2x2xf32>, !flow.channel) -> tensor<4x2xf32>
   // CHECK: tensor.empty() : tensor<2x4xf32>
   // CHECK: [[TRANSPOSE_OUT:%.+]] = linalg.generic
   // CHECK: return [[TRANSPOSE_OUT]] : tensor<2x4xf32>
@@ -130,7 +130,7 @@ func.func @all_gather_dim_1(%input : tensor<2x2xf32>) -> tensor<2x4xf32> {
 func.func @reduce_scatter_dim_0(%input : tensor<4x2xf32>) -> tensor<2x2xf32> {
   // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2x2xf32>
-  // CHECK: [[OP:%.+]] = flow.reduce_scatter sum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2x2xf32>, tensor<4x2xf32>, !flow.channel) -> tensor<2x2xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.reduce_scatter sum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2x2xf32>, tensor<4x2xf32>, !flow.channel) -> tensor<2x2xf32>
   // CHECK: return [[OP]] : tensor<2x2xf32>
   %out = "mhlo.reduce_scatter"(%input) ({
   ^bb0(%arg0: tensor<f32> , %arg1: tensor<f32>) :
@@ -152,7 +152,7 @@ func.func @reduce_scatter_dim_1(%input : tensor<2x4xf32>) -> tensor<2x2xf32> {
   // CHECK: tensor.empty() : tensor<4x2xf32>
   // CHECK: [[TRANSPOSE_ARG:%.+]] = linalg.generic
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2x2xf32>
-  // CHECK: [[OP:%.+]] = flow.reduce_scatter sum, f32, [[EMPTY]], [[TRANSPOSE_ARG]], %channel_default  : (tensor<2x2xf32>, tensor<4x2xf32>, !flow.channel) -> tensor<2x2xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.reduce_scatter sum, f32, [[EMPTY]], [[TRANSPOSE_ARG]], %channel_default  : (tensor<2x2xf32>, tensor<4x2xf32>, !flow.channel) -> tensor<2x2xf32>
   // CHECK: [[TRANSPOSE_OUT:%.+]] = linalg.generic
   // CHECK: return [[TRANSPOSE_OUT]] : tensor<2x2xf32>
   %out = "mhlo.reduce_scatter"(%input) ({
