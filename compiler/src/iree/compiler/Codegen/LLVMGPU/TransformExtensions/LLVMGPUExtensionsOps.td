@@ -392,7 +392,20 @@ def PipelineShaderMemoryCopiesOp : Op<
       TransformEachOpTrait,
       TransformOpInterface]> {
   let description = [{
-    // TODO
+    This applies software pipelining to a given scf.for loop. The pipelining
+    strategy will look for a copy to shared memory and pipeline it to overlap
+    it with the rest of the loop. 
+    It is user responsability to ensure that there are no dependency between
+    `depth` iterations of the loop by using multi-buffering.
+
+    `depth` will indicate how many stages the software pipeline should have.
+    `peel_epilogue` allows to force the epilogue to be peeled out instead of
+    potentially using predicated operations for the epilogue phase.
+
+    #### Return modes
+    This transform consumes the scf.for handle and produces a result handle
+    which points to the new scf.for loop generated. It will fail if the loop
+    cannot be pipelined or if there are no shared memory copies.
   }];
 
   let arguments = (
