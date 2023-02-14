@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines the groups of models."""
 
-from e2e_test_framework.models import tf_models, tflite_models
+from e2e_test_framework.models import tf_models, tflite_models, torch_models
 
 # Small models that require less computational resources.
 SMALL = [
@@ -29,6 +29,9 @@ LARGE = [
     tf_models.EFFICIENTNET_V2_S_FP32,
     tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
     tf_models.RESNET50_TF_FP32,
+    torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
+    # Disabled due to https://github.com/openxla/iree/issues/11447.
+    #torch_models.MODEL_UNET_2D_FP32_TORCH,
 ]
 
 ALL = SMALL + LARGE
