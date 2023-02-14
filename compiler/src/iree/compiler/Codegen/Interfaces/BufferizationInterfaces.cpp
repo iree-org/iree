@@ -379,11 +379,12 @@ static FailureOr<std::pair<Value, Value>> getSourceAndDestFromPackUnPackOp(
 
   Value dest;
   AnalysisState analysisState(options);
-  SmallVector<OpOperand *> aliasingOpOperands =
+  AliasingOpOperandList aliasingOpOperands =
       analysisState.getAliasingOpOperands(op->getOpResult(0));
-  assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
-  FailureOr<Value> resultBuffer =
-      getBuffer(rewriter, aliasingOpOperands.front()->get(), options);
+  assert(aliasingOpOperands.getNumAliases() == 1 && "expected 1 OpOperand");
+  FailureOr<Value> resultBuffer = getBuffer(
+      rewriter, aliasingOpOperands.getAliases().front().opOperand->get(),
+      options);
   if (failed(resultBuffer)) return failure();
   dest = *resultBuffer;
   return std::make_pair(source, dest);
@@ -472,7 +473,10 @@ struct PackUnPackOpInterface
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
-    if (dspOp.isDpsInit(&opOperand)) return {dspOp.getTiedOpResult(&opOperand)};
+    if (dspOp.isDpsInit(&opOperand))
+      return {AliasingOpResult(dspOp.getTiedOpResult(&opOperand),
+                               BufferRelation::Equivalent,
+                               /*isDefinite=*/false)};
     return {};
   }
 
