@@ -845,7 +845,7 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
     }
   } else if (isX86(targetAttr)) {
     if (isQuantized) {
-       //Aim to use PMADDWD (xmm).
+      // Aim to use PMADDWD (xmm).
       matmulTileSizes = {8, 2, 4};
     } else {
       matmulTileSizes = {8, 32, 16};
