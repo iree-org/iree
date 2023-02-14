@@ -163,7 +163,11 @@ iree_status_t iree_tooling_parse_to_variant_list(
   for (size_t i = 0; i < input_strings_count; ++i) {
     if (!iree_status_is_ok(status)) break;
     iree_string_view_t input_view = iree_string_view_trim(input_strings[i]);
-    if (iree_string_view_consume_prefix(&input_view, IREE_SV("@"))) {
+    if (iree_string_view_is_empty(input_view)) {
+      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "no value specified for input");
+      break;
+    } else if (iree_string_view_consume_prefix(&input_view, IREE_SV("@"))) {
       status = iree_tooling_load_ndarrays_from_file(input_view,
                                                     device_allocator, list);
       continue;
