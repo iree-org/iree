@@ -1382,12 +1382,12 @@ def FLOW_CollectiveAllGatherOp : FLOW_Op<"collective.all_gather", [
 
   let arguments = (ins
     FLOW_CollectiveElementTypeAttr:$element_type,
-    AnyTypeOf<[AnyTensor, AnyMemRef]>:$target,
-    AnyTypeOf<[AnyTensor, AnyMemRef]>:$source,
+    FLOW_Tensor:$target,
+    FLOW_Tensor:$source,
     FLOW_Channel:$channel
   );
   let results = (outs
-    AnyTypeOf<[AnyTensor, AnyMemRef]>:$result
+    FLOW_Tensor:$result
   );
   let assemblyFormat = "$element_type `,` operands attr-dict `:` functional-type(operands, results)";
 }
@@ -1406,12 +1406,12 @@ def FLOW_CollectiveAllReduceOp : FLOW_Op<"collective.all_reduce", [
   let arguments = (ins
     FLOW_CollectiveReductionOpAttr:$reduction_op,
     FLOW_CollectiveElementTypeAttr:$element_type,
-    AnyTypeOf<[AnyTensor, AnyMemRef]>:$target,
-    AnyTypeOf<[AnyTensor, AnyMemRef]>:$source,
+    FLOW_Tensor:$target,
+    FLOW_Tensor:$source,
     FLOW_Channel:$channel
   );
   let results = (outs
-    AnyTypeOf<[AnyTensor, AnyMemRef]>:$result
+    FLOW_Tensor:$result
   );
   let assemblyFormat = "$reduction_op `,` $element_type `,` operands attr-dict `:` functional-type(operands, results)";
 }
@@ -1431,12 +1431,12 @@ def FLOW_CollectiveReduceScatterOp : FLOW_Op<"collective.reduce_scatter", [
   let arguments = (ins
     FLOW_CollectiveReductionOpAttr:$reduction_op,
     FLOW_CollectiveElementTypeAttr:$element_type,
-    AnyTypeOf<[AnyTensor, AnyMemRef]>:$target,
-    AnyTypeOf<[AnyTensor, AnyMemRef]>:$source,
+    FLOW_Tensor:$target,
+    FLOW_Tensor:$source,
     FLOW_Channel:$channel
   );
   let results = (outs
-    AnyTypeOf<[AnyTensor, AnyMemRef]>:$result
+    FLOW_Tensor:$result
   );
   let assemblyFormat = "$reduction_op `,` $element_type `,` operands attr-dict `:` functional-type(operands, results)";
 }
