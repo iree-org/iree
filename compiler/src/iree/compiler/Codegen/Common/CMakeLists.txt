@@ -97,6 +97,7 @@ iree_cc_library(
     "GPUPipelining.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "IREEComprehensiveBufferizePass.cpp"
+    "LowerToUKernels.cpp"
     "LowerUKernelsToCalls.cpp"
     "MaterializeEncodingIntoPackUnPack.cpp"
     "OptimizeVectorTransferPass.cpp"

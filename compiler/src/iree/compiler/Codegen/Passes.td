@@ -330,6 +330,14 @@ def RematerializeParallelOps :
   let constructor = "mlir::iree_compiler::createRematerializeParallelOpsPass()";
 }
 
+def LowerToUKernels :
+    Pass<"iree-lower-to-ukernels", ""> {
+  let summary =
+      "Separate out parts of the IR that lower to a micro-kernel";
+  let constructor =
+      "mlir::iree_compiler::createLowerToUKernelsPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -372,14 +380,6 @@ def LLVMCPULowerExecutableTarget :
       "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
   let constructor =
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
-}
-
-def LLVMCPULowerToUKernels :
-    Pass<"iree-llvmcpu-lower-to-ukernels", ""> {
-  let summary =
-      "Separate out parts of the IR that lower to a micro-kernel";
-  let constructor =
-      "mlir::iree_compiler::createLLVMCPULowerToUKernelsPass()";
 }
 
 def LLVMCPUMaterializeEncoding :

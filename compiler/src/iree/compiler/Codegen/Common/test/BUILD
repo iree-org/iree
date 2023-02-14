@@ -35,6 +35,7 @@ iree_lit_test_suite(
             "gpu_vectorization.mlir",
             "hoist_statically_bound_allocations.mlir",
             "iree_comprehensive_bufferize.mlir",
+            "lower_to_ukernel_ops.mlir",
             "lower_ukernel_to_calls.mlir",
             "pad_dynamic_alloc.mlir",
             "rematerialize_parallel_ops.mlir",

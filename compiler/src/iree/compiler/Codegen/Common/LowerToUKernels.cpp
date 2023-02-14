@@ -19,8 +19,7 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LLVMCPULowerToUKernelsPass
-    : LLVMCPULowerToUKernelsBase<LLVMCPULowerToUKernelsPass> {
+struct LowerToUKernelsPass : LowerToUKernelsBase<LowerToUKernelsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect>();
   }
@@ -179,7 +178,7 @@ struct UKernelMmt4DPattern : OpRewritePattern<linalg::Mmt4DOp> {
 };
 }  // namespace
 
-void LLVMCPULowerToUKernelsPass::runOnOperation() {
+void LowerToUKernelsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
   patterns.insert<UKernelMatmulPattern, UKernelMmt4DPattern>(context);
@@ -189,8 +188,8 @@ void LLVMCPULowerToUKernelsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<>> createLLVMCPULowerToUKernelsPass() {
-  return std::make_unique<LLVMCPULowerToUKernelsPass>();
+std::unique_ptr<OperationPass<>> createLowerToUKernelsPass() {
+  return std::make_unique<LowerToUKernelsPass>();
 }
 
 }  // namespace iree_compiler

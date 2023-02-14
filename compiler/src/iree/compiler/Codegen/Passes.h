@@ -278,7 +278,7 @@ createLLVMCPULowerExecutableTargetPass();
 
 /// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
 /// operation.
-std::unique_ptr<OperationPass<>> createLLVMCPULowerToUKernelsPass();
+std::unique_ptr<OperationPass<>> createLowerToUKernelsPass();
 
 /// Materialize the encoding of operations. The layout to use for the encoded
 /// operations are LLVMCPU specific.
