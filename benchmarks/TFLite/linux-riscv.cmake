@@ -25,6 +25,7 @@ set(LINUX_RV64_GENERIC_CPU_COMPILATION_FLAGS
   "--riscv-v-fixed-length-vector-lmul-max=8"
 )
 
+# TODO(llvm-project/60463): Replace 'zve32f' with 'zve32x'.
 set(LINUX_RV32_GENERIC_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
   "--iree-llvm-target-triple=riscv32-pc-linux-elf"

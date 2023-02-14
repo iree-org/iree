@@ -157,6 +157,7 @@ class IreeRuleBuilder(object):
           "--riscv-v-fixed-length-vector-lmul-max=8"
       ]
     elif arch_info.architecture == "riscv_32":
+      # TODO(llvm-project/60463): Replace 'zve32f' with 'zve32x'.
       flags = [
           f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
           "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
