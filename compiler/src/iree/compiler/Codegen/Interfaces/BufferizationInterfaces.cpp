@@ -334,10 +334,10 @@ struct LinalgExtOpInterface
     auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
 
     // The i-th OpResult may alias with the i-th "out" tensor.
-    return {
-        {linalgExtOp.getOutputOperand(opResult.getResultNumber()) /*result*/,
-         BufferRelation::Equivalent,
-         /*isDefinite=*/false}};
+    return {AliasingOpOperand(
+        linalgExtOp.getOutputOperand(opResult.getResultNumber()) /*result*/,
+        BufferRelation::Equivalent,
+        /*isDefinite=*/false)};
   }
 
   bufferization::AliasingOpResultList getAliasingOpResults(
@@ -346,9 +346,9 @@ struct LinalgExtOpInterface
 
     // The i-th "out" tensor may alias with the i-th OpResult.
     if (dspOp.isDpsInit(&opOperand)) {
-      return {{dspOp.getTiedOpResult(&opOperand) /*result*/,
-               BufferRelation::Equivalent,
-               /*isDefinite=*/false}};
+      return {AliasingOpResult(dspOp.getTiedOpResult(&opOperand) /*result*/,
+                               BufferRelation::Equivalent,
+                               /*isDefinite=*/false)};
     }
     return {};
   }
