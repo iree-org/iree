@@ -25,7 +25,8 @@ namespace transform_ext {
 //===---------------------------------------------------------------------===//
 
 class StructuredOpMatcher;
-StructuredOpMatcher m_StructuredOp();
+class MatcherContext;
+StructuredOpMatcher &m_StructuredOp(MatcherContext &);
 
 /// A tag indicating the shape being static or dynamic, for use with the
 /// structured op matcher.
@@ -135,15 +136,8 @@ struct IsProjected : public SingleValuePredicateParam<int64_t> {
 struct IsIdentity {};
 
 /// Predicate tag indicating that the operand is a special float constant.
-struct ConstantFloatMin {};
+struct ConstantFloatMinOrMinusInf {};
 struct ConstantFloatZero {};
-
-/// Predicate indicating that the operand is the same value as its producer's
-/// operand.
-struct SameOperandAsProducer
-    : public SingleValuePredicateParam<std::pair<int64_t, int64_t>> {
-  using Base::Base;
-};
 
 /// Indicates that the match optional. The matcher is still expected to run and
 /// capture if successful. The parameter can be set to false
@@ -163,11 +157,82 @@ template <typename T>
 using has_get_capture_t = decltype(std::declval<T>().getCaptured());
 } // namespace detail
 
-/// Base class for op matchers that capture the matched operation.
-class CapturingOpMatcher {
+/// Base class for capturing matchers that can be owned by the context.
+class CapturingMatcherBase {
 public:
-  virtual ~CapturingOpMatcher() = default;
+  // Virtual destructor so unique pointers are deallocated correctly.
+  // TODO: if efficiency is a problem, consider disallowing non-trivial
+  // destructors for subclasses.
+  virtual ~CapturingMatcherBase() = default;
+};
 
+/// A context object holding capturing matchers, must outlive any individual
+/// matcher. When matching complex subgraphs, the caller often doesn't care
+/// about all intermediate nodes (operations) in the graph and shouldn't need to
+/// hold matcher objects for those. These matchers can be created in this
+/// context.
+class MatcherContext {
+public:
+  /// Create a new matcher of the specified type owned by this context.
+  template <typename T, typename... Args>
+  std::enable_if_t<std::is_base_of_v<CapturingMatcherBase, T>, T> &
+  allocate(Args &&...args) {
+    // Need to call "new" explicitly as make_unique wouldn't have access to the
+    // private constructor when this class would.
+    ownedMatchers.emplace_back(
+        std::unique_ptr<T>(new T(std::forward<Args>(args)...)));
+    return *static_cast<T *>(ownedMatchers.back().get());
+  }
+
+private:
+  /// Owning list of matchers.
+  // TODO: If this becomes inefficient, consider something like BumpPtrAllocator
+  // that derived classes can use to store their members as well.
+  SmallVector<std::unique_ptr<CapturingMatcherBase>> ownedMatchers;
+};
+
+/// Base class for value matchers that capture the matched value.
+class CapturingValueMatcher : public CapturingMatcherBase {
+  friend class CapturingOpMatcher;
+
+public:
+  /// Resets the captured value to null. This should be called if the same
+  /// pattern needs to be applied more than once as it may keep captured values
+  /// for optional nested predicates from the previous application.
+  void resetCapture() { captured = nullptr; }
+
+  /// Returns the matched value if the match was successful.
+  Value getCaptured() const { return captured; }
+
+protected:
+  Value captured = nullptr;
+};
+
+/// Matcher for a value, stores a list of predicates and requires all of them to
+/// match for the value to match. Once a value matched, any repeated use just
+/// verifies that equality of the value.
+class ValueMatcher : public CapturingValueMatcher {
+  using PredicateFn = std::function<bool(Value)>;
+  friend class MatcherContext;
+  ValueMatcher() = default;
+
+public:
+  /// Matches the given value, hook for `matchPattern`.
+  bool match(Value value);
+
+private:
+  /// Additional predicates to be checked on the value.
+  SmallVector<PredicateFn> predicates;
+};
+
+/// Creates a matcher of an arbitrary value.
+inline ValueMatcher &m_Value(MatcherContext &context) {
+  return context.allocate<ValueMatcher>();
+}
+
+/// Base class for op matchers that capture the matched operation.
+class CapturingOpMatcher : public CapturingMatcherBase {
+public:
   /// Resets the captured value to null. This should be called if the same
   /// pattern needs to be applied more than once as it may keep captured values
   /// for optional nested predicates from the previous application.
@@ -176,6 +241,11 @@ public:
     SmallVector<CapturingOpMatcher *> nested;
     getAllNested(nested);
     for (CapturingOpMatcher *matcher : nested) {
+      matcher->captured = nullptr;
+    }
+    SmallVector<CapturingValueMatcher *> nestedValue;
+    getAllNestedValueMatchers(nestedValue);
+    for (CapturingValueMatcher *matcher : nestedValue) {
       matcher->captured = nullptr;
     }
   }
@@ -191,15 +261,20 @@ protected:
   void recordNestedMatcher(T &nested) {
     if constexpr (std::is_base_of_v<CapturingOpMatcher, T>)
       nestedCapturingMatchers.push_back(&nested);
+    if constexpr (std::is_base_of_v<CapturingValueMatcher, T>)
+      nestedCapturingValueMatchers.push_back(&nested);
   }
 
   /// Appends all nested capturing matchers, excluding this one, to `nested`.
   void getAllNested(SmallVectorImpl<CapturingOpMatcher *> &nested);
+  void
+  getAllNestedValueMatchers(SmallVectorImpl<CapturingValueMatcher *> &nested);
 
 private:
   /// A list of (recursively) nested capturing matchers that should be reset
   /// when the current matcher is.
   SmallVector<CapturingOpMatcher *> nestedCapturingMatchers;
+  SmallVector<CapturingValueMatcher *> nestedCapturingValueMatchers;
 
 protected:
   /// Matched value.
@@ -214,10 +289,13 @@ protected:
 /// declarative format using PDL and/or Transform dialect in the future. The
 /// latter will become impossible with arbitrary C++ callbacks.
 class StructuredOpMatcher : public CapturingOpMatcher {
-  friend StructuredOpMatcher m_StructuredOp();
+  friend class MatcherContext;
+
   using PredicateFn = std::function<bool(linalg::LinalgOp)>;
   using CaptureResetFn = std::function<void()>;
   using GetCapturedFn = std::function<Operation *()>;
+
+  StructuredOpMatcher() = default;
 
   /// Matches a structured operation if the given predicate is satisfied.
   StructuredOpMatcher(PredicateFn &&firstPredicate) {
@@ -225,9 +303,6 @@ class StructuredOpMatcher : public CapturingOpMatcher {
   }
 
 public:
-  /// Matches any structured operation, i.e., operation with LinalgOp interface.
-  StructuredOpMatcher() {}
-
   /// Creates a matcher for a structured operation with one of the given types.
   template <typename... OpType>
   static StructuredOpMatcher create() {
@@ -319,9 +394,20 @@ public:
     recordNestedMatcher(operandMatcher);
     return *this;
   }
-
-  StructuredOpMatcher &input(int64_t position,
-                             SameOperandAsProducer parentPosition);
+  template <typename T>
+  std::enable_if_t<
+      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
+                        Value>::value,
+      StructuredOpMatcher &>
+  input(int64_t position, T &operandMatcher,
+        OptionalMatch optional = OptionalMatch(false)) {
+    addInputMatcher(
+        position,
+        [&operandMatcher](Value v) { return operandMatcher.match(v); },
+        optional);
+    recordNestedMatcher(operandMatcher);
+    return *this;
+  }
 
   /// Adds a predicate checking that all input operands of the structured op
   /// have a permutation indexing map.
@@ -356,7 +442,7 @@ public:
 
   /// Check if input is equal to a known constant.
   // TODO: Support matching for constant ops.
-  StructuredOpMatcher &input(int64_t position, ConstantFloatMin);
+  StructuredOpMatcher &input(int64_t position, ConstantFloatMinOrMinusInf);
   StructuredOpMatcher &input(int64_t position, ConstantFloatZero);
 
   //===-------------------------------------------------------------------===//
@@ -477,13 +563,18 @@ public:
   ///     %3 = arith.maxf %arg0, %arg1 : f32
   ///     linalg.yield %3 : f32
   ///   } -> tensor<?x?xf32>
+  /// If commutative is set binary operations can have their operands swapped.
   template <typename OpType>
-  StructuredOpMatcher &singleOpWithCanonicaleArgs() {
-    return singleOpWithCanonicaleArgs(OpType::getOperationName());
+  StructuredOpMatcher &singleOpWithCanonicaleArgs(bool commutative = false) {
+    return singleOpWithCanonicaleArgs(OpType::getOperationName(), commutative);
   }
-  StructuredOpMatcher &singleOpWithCanonicaleArgs(StringRef opname);
+  StructuredOpMatcher &singleOpWithCanonicaleArgs(StringRef opname,
+                                                  bool commutative);
   /// Check if the op is a linalg of with a single float reciprocal op.
   StructuredOpMatcher &isFloatReciprocal();
+  /// Check if the op is a linalg of with a region containing only a yield op
+  /// using block arguments in order.
+  StructuredOpMatcher &passThroughOp();
 
 private:
   /// Checks that `matchers` captured all tilable ops nested in `parent` except
@@ -499,6 +590,8 @@ private:
   /// outputs and results. Should not be called directly.
   void addInputMatcher(int64_t position,
                        std::function<bool(Operation *)> matcher,
+                       OptionalMatch optional);
+  void addInputMatcher(int64_t position, std::function<bool(Value)> matcher,
                        OptionalMatch optional);
   void addOutputMatcher(int64_t position,
                         std::function<bool(Operation *)> matcher,
@@ -516,18 +609,29 @@ private:
 };
 
 /// Creates a matcher of an arbitrary structured op.
-inline StructuredOpMatcher m_StructuredOp() { return StructuredOpMatcher(); }
+inline StructuredOpMatcher &m_StructuredOp(MatcherContext &matcherContext) {
+  return matcherContext.allocate<StructuredOpMatcher>();
+}
 
-inline StructuredOpMatcher m_StructuredOp_Or(StructuredOpMatcher &A,
-                                             StructuredOpMatcher &B) {
-  return StructuredOpMatcher(A, B);
+/// Creates a matcher that is a copy of the given matcher.
+inline StructuredOpMatcher &m_StructuredOp(MatcherContext &matcherContext,
+                                           const StructuredOpMatcher &other) {
+  return matcherContext.allocate<StructuredOpMatcher>(other);
+}
+
+/// Creates a matcher that accepts as disjunction of the two given matchers.
+inline StructuredOpMatcher &m_StructuredOp_Or(MatcherContext &matcherContext,
+                                              StructuredOpMatcher &A,
+                                              StructuredOpMatcher &B) {
+  return matcherContext.allocate<StructuredOpMatcher>(A, B);
 }
 
 /// Creates a matcher of a structured op with kinds provided as template
 /// arguments.
 template <typename... OpType>
-inline StructuredOpMatcher m_StructuredOp() {
-  return StructuredOpMatcher::create<OpType...>();
+inline StructuredOpMatcher &m_StructuredOp(MatcherContext &matcherContext) {
+  return matcherContext.allocate<StructuredOpMatcher>(
+      StructuredOpMatcher::create<OpType...>());
 }
 
 //===---------------------------------------------------------------------===//
@@ -635,10 +739,14 @@ struct MatchedReductionCaptures {
 ///
 /// where trailing and leading are elementwise operations whose presence is
 /// optional. Each matcher will capture the corresponding operation.
-void makeReductionMatcher(StructuredOpMatcher &reduction,
-                          StructuredOpMatcher &fill,
-                          StructuredOpMatcher &leading,
-                          StructuredOpMatcher &trailing,
+void makeReductionMatcher(transform_ext::MatcherContext &context,
+                          StructuredOpMatcher *&reductionCapture,
+                          StructuredOpMatcher *&fillCapture,
+                          StructuredOpMatcher *&leadingCapture,
+                          StructuredOpMatcher *&trailingCapture,
+                          MatchedReductionCaptures &captures);
+void makeReductionMatcher(transform_ext::MatcherContext &context,
+                          StructuredOpMatcher *&reductionCapture,
                           MatchedReductionCaptures &captures);
 
 /// Create a group of matchers for a different code sequence of operations
@@ -649,16 +757,10 @@ void makeReductionMatcher(StructuredOpMatcher &reduction,
 ///  %exp = exp(%sub)
 ///  %sum = reduce_sum(%exp)
 ///  %mul = div(%exp, %%sum)
-void makeSoftmaxMatcher(transform_ext::StructuredOpMatcher &fillMinusInf,
-                        transform_ext::StructuredOpMatcher &maxReduction,
-                        transform_ext::StructuredOpMatcher &sub,
-                        transform_ext::StructuredOpMatcher &expOperand,
-                        transform_ext::StructuredOpMatcher &fillZero,
-                        transform_ext::StructuredOpMatcher &sum,
-                        transform_ext::StructuredOpMatcher &rcpOperand,
-                        transform_ext::StructuredOpMatcher &mulOperand,
-                        transform_ext::StructuredOpMatcher &divOperand,
-                        transform_ext::StructuredOpMatcher &softmaxroot);
+void makeSoftmaxMatcher(
+    transform_ext::MatcherContext &context,
+    transform_ext::StructuredOpMatcher *&maxReductionCapture,
+    transform_ext::StructuredOpMatcher *&softmaxRootCapture);
 
 } // namespace transform_ext
 } // namespace mlir

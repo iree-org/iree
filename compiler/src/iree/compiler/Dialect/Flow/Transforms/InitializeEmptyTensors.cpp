@@ -39,8 +39,8 @@ struct RewriteInitTensorToSplat : public OpRewritePattern<tensor::EmptyOp> {
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
     if (llvm::all_of(emptyTensorOp->getUsers(), [](Operation *user) -> bool {
-          return isa<linalg::LinalgOp, LinalgExt::LinalgExtOp, tensor::PackOp>(
-              user);
+          return isa<linalg::LinalgOp, LinalgExt::LinalgExtOp, tensor::PackOp,
+                     tensor::UnPackOp>(user);
         })) {
       return failure();
     }
@@ -67,8 +67,8 @@ struct RewriteInitTensorToEmpty : public OpRewritePattern<tensor::EmptyOp> {
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
     if (llvm::all_of(emptyTensorOp->getUsers(), [](Operation *user) -> bool {
-          return isa<linalg::LinalgOp, LinalgExt::LinalgExtOp, tensor::PackOp>(
-              user);
+          return isa<linalg::LinalgOp, LinalgExt::LinalgExtOp, tensor::PackOp,
+                     tensor::UnPackOp>(user);
         })) {
       return failure();
     }

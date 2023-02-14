@@ -39,6 +39,7 @@ iree_cc_library(
     MLIRArithUtils
     MLIRAsyncDialect
     MLIRBufferizationDialect
+    MLIRBufferizationTransformOps
     MLIRBufferizationTransforms
     MLIRFuncDialect
     MLIRGPUOps
@@ -93,8 +94,10 @@ iree_cc_library(
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
+    "GPUPipelining.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "IREEComprehensiveBufferizePass.cpp"
+    "LowerUKernelsToCalls.cpp"
     "MaterializeEncodingIntoPackUnPack.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PolynomialApproximationPass.cpp"
@@ -142,6 +145,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTilingInterface
+    MLIRTransformDialect
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorTransforms
@@ -151,6 +155,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
+    iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
@@ -175,7 +180,6 @@ iree_cc_library(
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUMultiBuffering.cpp"
     "GPUPatterns.cpp"
-    "GPUPipelining.cpp"
     "GPUReduceBankConflicts.cpp"
     "GPUTileReduction.cpp"
     "GPUVectorization.cpp"

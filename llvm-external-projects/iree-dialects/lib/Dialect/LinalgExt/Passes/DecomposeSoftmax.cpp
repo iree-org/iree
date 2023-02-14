@@ -118,6 +118,7 @@ static Value computeSoftmax(Value numerator, Value denominator, Value output,
 ///
 LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
   IRRewriter rewriter(funcOp.getContext());
+  SmallVector<Operation *> toDelete;
   funcOp.walk([&](IREE::LinalgExt::SoftmaxOp softmaxOp) {
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(softmaxOp);
@@ -153,8 +154,13 @@ LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
     Value result = computeSoftmax(numerator, denominator, outputNd,
                                   reductionDim, loc, rewriter);
     softmaxOp.getResult()[0].replaceAllUsesWith(result);
+    // Delete the op after the walk.
+    toDelete.push_back(softmaxOp.getOperation());
     return WalkResult::advance();
   });
+  for (Operation *op : toDelete) {
+    rewriter.eraseOp(op);
+  }
   return success();
 }
 

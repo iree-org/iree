@@ -1042,11 +1042,9 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
       iree_host_size_t rhs_offset = VM_DecOperandRegI64HostSize("rhs_offset");
       iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
-      uint32_t* result_ptr = VM_DecResultRegI32("result");
-      bool result = false;
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_compare_bytes(
-          lhs_buffer, lhs_offset, rhs_buffer, rhs_offset, length, &result));
-      *result_ptr = result ? 1 : 0;
+      int32_t* result = VM_DecResultRegI32("result");
+      IREE_RETURN_IF_ERROR(vm_buffer_compare(lhs_buffer, lhs_offset, rhs_buffer,
+                                             rhs_offset, length, result));
     });
 
     // TODO(benvanik): rework dispatch so that the FillI* ops can share the same
@@ -1064,8 +1062,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       uint8_t value = (uint8_t)VM_DecOperandRegI32("value");
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
-          buffer, offset, length / sizeof(uint8_t), sizeof(uint8_t), &value));
+      IREE_RETURN_IF_ERROR(vm_buffer_fill_i8(buffer, offset, length, value));
     });
     DISPATCH_OP(CORE, BufferFillI16, {
       bool buffer_is_move;
@@ -1078,8 +1075,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       uint16_t value = (uint16_t)VM_DecOperandRegI32("value");
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
-          buffer, offset, length / sizeof(uint16_t), sizeof(uint16_t), &value));
+      IREE_RETURN_IF_ERROR(vm_buffer_fill_i16(buffer, offset, length, value));
     });
     DISPATCH_OP(CORE, BufferFillI32, {
       bool buffer_is_move;
@@ -1092,8 +1088,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       uint32_t value = VM_DecOperandRegI32("value");
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
-          buffer, offset, length / sizeof(uint32_t), sizeof(uint32_t), &value));
+      IREE_RETURN_IF_ERROR(vm_buffer_fill_i32(buffer, offset, length, value));
     });
     DISPATCH_OP(CORE, BufferFillI64, {
       bool buffer_is_move;
@@ -1106,8 +1101,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       uint64_t value = VM_DecOperandRegI64("value");
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
-          buffer, offset, length / sizeof(uint64_t), sizeof(uint64_t), &value));
+      IREE_RETURN_IF_ERROR(vm_buffer_fill_i64(buffer, offset, length, value));
     });
 
     // TODO(benvanik): rework dispatch so that the LoadI* ops can share the same
@@ -1124,11 +1118,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
                                 "source_buffer is null");
       }
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-      uint32_t* result_ptr = VM_DecResultRegI32("result");
-      uint8_t result_x8 = 0;
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
-          buffer, offset, &result_x8, 1, sizeof(result_x8)));
-      *result_ptr = vm_ext_i8i32u(result_x8);
+      uint32_t* result = VM_DecResultRegI32("result");
+      IREE_RETURN_IF_ERROR(vm_buffer_load_i8u(buffer, offset, result));
     });
     DISPATCH_OP(CORE, BufferLoadI8S, {
       bool buffer_is_move;
@@ -1140,11 +1131,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
                                 "source_buffer is null");
       }
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-      uint32_t* result_ptr = VM_DecResultRegI32("result");
-      int8_t result_x8 = 0;
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
-          buffer, offset, &result_x8, 1, sizeof(result_x8)));
-      *result_ptr = vm_ext_i8i32s(result_x8);
+      uint32_t* result = VM_DecResultRegI32("result");
+      IREE_RETURN_IF_ERROR(vm_buffer_load_i8s(buffer, offset, result));
     });
     DISPATCH_OP(CORE, BufferLoadI16U, {
       bool buffer_is_move;
@@ -1156,12 +1144,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
                                 "source_buffer is null");
       }
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-      uint32_t* result_ptr = VM_DecResultRegI32("result");
-      uint16_t result_x16 = 0;
-      IREE_RETURN_IF_ERROR(
-          iree_vm_buffer_read_elements(buffer, offset * sizeof(result_x16),
-                                       &result_x16, 1, sizeof(result_x16)));
-      *result_ptr = vm_ext_i16i32u(result_x16);
+      uint32_t* result = VM_DecResultRegI32("result");
+      IREE_RETURN_IF_ERROR(vm_buffer_load_i16u(buffer, offset, result));
     });
     DISPATCH_OP(CORE, BufferLoadI16S, {
       bool buffer_is_move;
@@ -1173,12 +1157,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
                                 "source_buffer is null");
       }
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-      uint32_t* result_ptr = VM_DecResultRegI32("result");
-      int16_t result_x16 = 0;
-      IREE_RETURN_IF_ERROR(
-          iree_vm_buffer_read_elements(buffer, offset * sizeof(result_x16),
-                                       &result_x16, 1, sizeof(result_x16)));
-      *result_ptr = vm_ext_i16i32s(result_x16);
+      uint32_t* result = VM_DecResultRegI32("result");
+      IREE_RETURN_IF_ERROR(vm_buffer_load_i16s(buffer, offset, result));
     });
     DISPATCH_OP(CORE, BufferLoadI32, {
       bool buffer_is_move;
@@ -1191,8 +1171,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
       uint32_t* result = VM_DecResultRegI32("result");
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
-          buffer, offset * sizeof(*result), result, 1, sizeof(*result)));
+      IREE_RETURN_IF_ERROR(vm_buffer_load_i32(buffer, offset, result));
     });
     DISPATCH_OP(CORE, BufferLoadI64, {
       bool buffer_is_move;
@@ -1205,8 +1184,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
       uint64_t* result = VM_DecResultRegI64("result");
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
-          buffer, offset * sizeof(*result), result, 1, sizeof(*result)));
+      IREE_RETURN_IF_ERROR(vm_buffer_load_i64(buffer, offset, result));
     });
 
     // TODO(benvanik): rework dispatch so that the StoreI* ops can share the
@@ -1223,8 +1201,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       uint8_t value = (uint8_t)VM_DecOperandRegI32("value");
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(&value, buffer, offset,
-                                                         1, sizeof(uint8_t)));
+      IREE_RETURN_IF_ERROR(vm_buffer_store_i8(buffer, offset, value));
     });
     DISPATCH_OP(CORE, BufferStoreI16, {
       bool buffer_is_move;
@@ -1237,8 +1214,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       uint16_t value = (uint16_t)VM_DecOperandRegI32("value");
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(
-          &value, buffer, offset * sizeof(value), 1, sizeof(value)));
+      IREE_RETURN_IF_ERROR(vm_buffer_store_i16(buffer, offset, value));
     });
     DISPATCH_OP(CORE, BufferStoreI32, {
       bool buffer_is_move;
@@ -1251,8 +1227,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       uint32_t value = VM_DecOperandRegI32("value");
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(
-          &value, buffer, offset * sizeof(value), 1, sizeof(value)));
+      IREE_RETURN_IF_ERROR(vm_buffer_store_i32(buffer, offset, value));
     });
     DISPATCH_OP(CORE, BufferStoreI64, {
       bool buffer_is_move;
@@ -1265,8 +1240,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       uint64_t value = (uint64_t)VM_DecOperandRegI64("value");
-      IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(
-          &value, buffer, offset * sizeof(value), 1, sizeof(value)));
+      IREE_RETURN_IF_ERROR(vm_buffer_store_i64(buffer, offset, value));
     });
 
     //===------------------------------------------------------------------===//
@@ -2110,8 +2084,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
         iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
         iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
         float value = VM_DecOperandRegF32("value");
-        IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
-            buffer, offset, length / sizeof(float), sizeof(float), &value));
+        IREE_RETURN_IF_ERROR(vm_buffer_fill_f32(buffer, offset, length, value));
       });
 
       DISPATCH_OP(EXT_F32, BufferLoadF32, {
@@ -2125,8 +2098,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
         }
         iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
         float* result = VM_DecResultRegF32("result");
-        IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
-            buffer, offset * sizeof(*result), result, 1, sizeof(*result)));
+        IREE_RETURN_IF_ERROR(vm_buffer_load_f32(buffer, offset, result));
       });
 
       DISPATCH_OP(EXT_F32, BufferStoreF32, {
@@ -2140,8 +2112,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
         }
         iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
         float value = VM_DecOperandRegF32("value");
-        IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(
-            &value, buffer, offset * sizeof(value), 1, sizeof(value)));
+        IREE_RETURN_IF_ERROR(vm_buffer_store_f32(buffer, offset, value));
       });
     }
     END_DISPATCH_PREFIX();

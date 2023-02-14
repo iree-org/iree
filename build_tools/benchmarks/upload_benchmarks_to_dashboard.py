@@ -21,13 +21,10 @@ import os
 import pathlib
 import requests
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 from common.common_arguments import expand_and_check_file_paths
-from common.benchmark_presentation import (COMPILATION_METRICS_TO_TABLE_MAPPERS,
-                                           collect_all_compilation_metrics)
-from common.benchmark_definition import (BenchmarkResults,
-                                         execute_cmd_and_get_output)
+from common import benchmark_definition, benchmark_presentation
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
 
 IREE_DASHBOARD_URL = "https://perf.iree.dev"
@@ -82,16 +79,16 @@ def get_model_description(model_name: str, model_source: str) -> Optional[str]:
 
 def get_git_commit_hash(commit: str, verbose: bool = False) -> str:
   """Gets the commit hash for the given commit."""
-  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
-                                    cwd=THIS_DIRECTORY,
-                                    verbose=verbose)
+  return benchmark_definition.execute_cmd_and_get_output(
+      ['git', 'rev-parse', commit], cwd=THIS_DIRECTORY, verbose=verbose)
 
 
 def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
-  count = execute_cmd_and_get_output(['git', 'rev-list', '--count', commit],
-                                     cwd=THIS_DIRECTORY,
-                                     verbose=verbose)
+  count = benchmark_definition.execute_cmd_and_get_output(
+      ['git', 'rev-list', '--count', commit],
+      cwd=THIS_DIRECTORY,
+      verbose=verbose)
   return int(count)
 
 
@@ -100,7 +97,9 @@ def get_git_commit_info(commit: str, verbose: bool = False) -> Dict[str, str]:
   cmd = [
       'git', 'show', '--format=%H:::%h:::%an:::%ae:::%s', '--no-patch', commit
   ]
-  info = execute_cmd_and_get_output(cmd, cwd=THIS_DIRECTORY, verbose=verbose)
+  info = benchmark_definition.execute_cmd_and_get_output(cmd,
+                                                         cwd=THIS_DIRECTORY,
+                                                         verbose=verbose)
   segments = info.split(':::')
   return {
       'hash': segments[0],
@@ -114,8 +113,9 @@ def get_git_commit_info(commit: str, verbose: bool = False) -> Dict[str, str]:
 def compose_series_payload(project_id: str,
                            series_id: str,
                            series_unit: str,
-                           series_description: bool = None,
-                           average_range: str = '5%',
+                           series_name: Optional[str] = None,
+                           series_description: Optional[str] = None,
+                           average_range: Union[int, str] = '5%',
                            average_min_count: int = 3,
                            better_criterion: str = 'smaller',
                            override: bool = False) -> Dict[str, Any]:
@@ -124,6 +124,7 @@ def compose_series_payload(project_id: str,
       'projectId': project_id,
       'serieId': series_id,
       'serieUnit': series_unit,
+      'serieName': series_name,
       'analyse': {
           'benchmark': {
               'range': average_range,
@@ -210,6 +211,7 @@ def post_to_dashboard(url: str,
 
 def add_new_iree_series(series_id: str,
                         series_unit: str,
+                        series_name: str,
                         series_description: Optional[str] = None,
                         override: bool = False,
                         dry_run: bool = False,
@@ -217,7 +219,7 @@ def add_new_iree_series(series_id: str,
   """Posts a new series to the dashboard."""
   average_range = None
   for threshold in BENCHMARK_THRESHOLDS:
-    if threshold.regex.match(series_id):
+    if threshold.regex.match(series_name):
       average_range = threshold.get_threshold_str()
       break
   if average_range is None:
@@ -226,6 +228,7 @@ def add_new_iree_series(series_id: str,
   payload = compose_series_payload(IREE_PROJECT_ID,
                                    series_id,
                                    series_unit,
+                                   series_name,
                                    series_description,
                                    average_range=average_range,
                                    override=override)
@@ -273,7 +276,7 @@ def parse_arguments():
   parser.add_argument(
       '--benchmark_files',
       metavar='<benchmark-json-files>',
-      required=True,
+      default=[],
       nargs='+',
       help=("Paths to the JSON files containing benchmark results, "
             "accepts wildcards"))
@@ -299,18 +302,24 @@ def main(args):
   benchmark_files = expand_and_check_file_paths(args.benchmark_files)
   compile_stats_files = expand_and_check_file_paths(args.compile_stats_files)
 
-  # Collect benchmark results from all files.
-  all_results = []
-  for benchmark_file in benchmark_files:
-    all_results.append(
-        BenchmarkResults.from_json_str(benchmark_file.read_text()))
-  for other_results in all_results[1:]:
-    all_results[0].merge(other_results)
-  all_results = all_results[0]
+  if len(benchmark_files) > 0:
+    committish = benchmark_definition.BenchmarkResults.from_json_str(
+        benchmark_files[0].read_text()).commit
+  elif len(compile_stats_files) > 0:
+    committish = benchmark_definition.CompilationResults.from_json_object(
+        json.loads(compile_stats_files[0].read_text())).commit
+  else:
+    raise ValueError("No benchmark/compilation results.")
 
   # Register a new build for the current commit.
-  commit_hash = get_git_commit_hash(all_results.commit, verbose=args.verbose)
+  commit_hash = get_git_commit_hash(committish, verbose=args.verbose)
   commit_count = get_git_total_commit_count(commit_hash, verbose=args.verbose)
+
+  aggregate_results = benchmark_presentation.aggregate_all_benchmarks(
+      benchmark_files=benchmark_files, expected_pr_commit=commit_hash)
+
+  all_compilation_metrics = benchmark_presentation.collect_all_compilation_metrics(
+      compile_stats_files=compile_stats_files, expected_pr_commit=commit_hash)
 
   # Allow override to support uploading data for the same build in
   # different batches.
@@ -320,31 +329,23 @@ def main(args):
                      dry_run=args.dry_run,
                      verbose=args.verbose)
 
-  # Get the mean time for all benchmarks.
-  aggregate_results = {}
-  for benchmark_index in range(len(all_results.benchmarks)):
-    benchmark_case = all_results.benchmarks[benchmark_index]
-    benchmark_info = benchmark_case.benchmark_info
-
-    # Make sure each benchmark has a unique name.
-    name = str(benchmark_info)
-    if name in aggregate_results:
-      raise ValueError(f"Duplicated benchmarks: {name}")
-
-    mean_time = all_results.get_aggregate_time(benchmark_index, "mean")
-    aggregate_results[name] = (mean_time, benchmark_info)
-
   # Upload benchmark results to the dashboard.
-  for series_id, (sample_value, benchmark_info) in aggregate_results.items():
+  for series_name, benchmark_latency in aggregate_results.items():
+    benchmark_info = benchmark_latency.benchmark_info
     description = get_model_description(benchmark_info.model_name,
                                         benchmark_info.model_source)
     if description is None:
       description = ""
     description += COMMON_DESCRIIPTION
 
+    run_config_id = benchmark_info.run_config_id
+    # TODO(#11076): Remove legacy path.
+    series_id = series_name if run_config_id is None else run_config_id
+
     # Override by default to allow updates to the series.
     add_new_iree_series(series_id=series_id,
                         series_unit="ns",
+                        series_name=series_name,
                         series_description=description,
                         override=True,
                         dry_run=args.dry_run,
@@ -352,12 +353,10 @@ def main(args):
     add_new_sample(series_id=series_id,
                    build_id=commit_count,
                    sample_unit="ns",
-                   sample_value=sample_value,
+                   sample_value=benchmark_latency.mean_time,
                    dry_run=args.dry_run,
                    verbose=args.verbose)
 
-  all_compilation_metrics = collect_all_compilation_metrics(
-      compile_stats_files=compile_stats_files, expected_pr_commit=commit_hash)
   for name, compile_metrics in all_compilation_metrics.items():
     description = get_model_description(
         compile_metrics.compilation_info.model_name,
@@ -366,14 +365,19 @@ def main(args):
       description = ""
     description += COMMON_DESCRIIPTION
 
-    for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
+    for mapper in benchmark_presentation.COMPILATION_METRICS_TO_TABLE_MAPPERS:
       sample_value, _ = mapper.get_current_and_base_value(compile_metrics)
-      series_id = mapper.get_series_name(name)
       series_unit = mapper.get_unit()
+
+      gen_config_id = compile_metrics.compilation_info.gen_config_id
+      # TODO(#11076): Remove legacy path.
+      series_id = mapper.get_series_id(
+          name if gen_config_id is None else gen_config_id)
 
       # Override by default to allow updates to the series.
       add_new_iree_series(series_id=series_id,
                           series_unit=series_unit,
+                          series_name=mapper.get_series_name(name),
                           series_description=description,
                           override=True,
                           dry_run=args.dry_run,

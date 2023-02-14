@@ -27,7 +27,7 @@ class CommonGeneratorsTest(unittest.TestCase):
         id="5678",
         name="tf_m",
         tags=[],
-        source_type=common_definitions.ModelSourceType.EXPORTED_TF,
+        source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
         source_url="https://example.com/xyz_saved_model",
         entry_function="predict",
         input_types=["2xf32"])

@@ -108,8 +108,6 @@ static void tileAndDistributeToWorkgroup(
           useWARForCooperativeMatrixCodegen));
   nestedModulePM.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createTileAndDecomposeAttentionPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createDecomposeSoftmaxPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
@@ -447,6 +445,11 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
   pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
+  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createDecomposeSoftmaxPass());
+  // Temporary solution to avoid large allocations due to softmax lowering.
+  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(

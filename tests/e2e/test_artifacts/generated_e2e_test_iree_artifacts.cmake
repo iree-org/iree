@@ -3,26 +3,32 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-c36c63b0-220a-4d78-8ade-c45ce47d89d3"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32.tflite"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32.mlir"
 )
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-0e466f69-91d6-4e50-b62b-a82b6213a231"
+    "${PACKAGE_NAME}_iree-imported-model-4a6f545e-1b4e-41a5-9236-792aa578184b"
   SOURCE
-    "${ROOT_ARTIFACTS_DIR}/model_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.tflite"
+    "${ROOT_ARTIFACTS_DIR}/model_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.tflite"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
-    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.mlir"
 )
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-5afc3014-d29d-4e88-a840-fbaf678acf2b"
+    "${PACKAGE_NAME}_iree-imported-model-73a0402e-271b-4aa8-a6a5-ac05839ca569"
   SOURCE
-    "${ROOT_ARTIFACTS_DIR}/model_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.tflite"
+    "${ROOT_ARTIFACTS_DIR}/model_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.tflite"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
-    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.mlir"
 )
 
 iree_import_tflite_model(
@@ -30,6 +36,8 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-cc69d69f-6d1f-4a1a-a31e-e021888d0d28"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32.tflite"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32.mlir"
 )
@@ -39,17 +47,10 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-e3997104-a3d2-46b4-9fbf-39069906d123"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.tflite"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.mlir"
-)
-
-iree_import_tflite_model(
-  TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-73a0402e-271b-4aa8-a6a5-ac05839ca569"
-  SOURCE
-    "${ROOT_ARTIFACTS_DIR}/model_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.tflite"
-  OUTPUT_MLIR_FILE
-    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.mlir"
 )
 
 iree_import_tflite_model(
@@ -57,6 +58,8 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-78eab9e5-9ff1-4769-9b55-933c81cc9a0f"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.0_float.tflite"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.mlir"
 )
@@ -66,6 +69,8 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-7d45f8e5-bb5e-48d0-928d-8f125104578f"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.0_224.tflite"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.mlir"
 )
@@ -75,8 +80,21 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-58855e40-eba9-4a71-b878-6b35e3460244"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32.tflite"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32.mlir"
+)
+
+iree_import_tflite_model(
+  TARGET_NAME
+    "${PACKAGE_NAME}_iree-imported-model-0e466f69-91d6-4e50-b62b-a82b6213a231"
+  SOURCE
+    "${ROOT_ARTIFACTS_DIR}/model_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.tflite"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
+  OUTPUT_MLIR_FILE
+    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.mlir"
 )
 
 iree_import_tflite_model(
@@ -84,28 +102,21 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-bc1338be-e3df-44fd-82e4-40ba9560a073"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.tflite"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.mlir"
 )
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-4a6f545e-1b4e-41a5-9236-792aa578184b"
+    "${PACKAGE_NAME}_iree-imported-model-5afc3014-d29d-4e88-a840-fbaf678acf2b"
   SOURCE
-    "${ROOT_ARTIFACTS_DIR}/model_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.tflite"
+    "${ROOT_ARTIFACTS_DIR}/model_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.tflite"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
-    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.mlir"
-)
-
-iree_import_tf_model(
-  TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493"
-  SOURCE
-    "${ROOT_ARTIFACTS_DIR}/model_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
-  ENTRY_FUNCTION
-    "predict"
-  OUTPUT_MLIR_FILE
-    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.mlir"
 )
 
 iree_import_tf_model(
@@ -113,10 +124,25 @@ iree_import_tf_model(
     "${PACKAGE_NAME}_iree-imported-model-39d157ad-f0ec-4a76-963b-d783beaed60f"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF"
-  ENTRY_FUNCTION
-    "forward"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
+    "--tf-import-type=savedmodel_v2"
+    "--tf-savedmodel-exported-names=forward"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF.mlir"
+)
+
+iree_import_tf_model(
+  TARGET_NAME
+    "${PACKAGE_NAME}_iree-imported-model-8871f602-571c-4eb8-b94d-554cc8ceec5a"
+  SOURCE
+    "${ROOT_ARTIFACTS_DIR}/model_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
+    "--tf-import-type=savedmodel_v1"
+    "--tf-savedmodel-exported-names=serving_default"
+  OUTPUT_MLIR_FILE
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF.mlir"
 )
 
 iree_import_tf_model(
@@ -124,10 +150,25 @@ iree_import_tf_model(
     "${PACKAGE_NAME}_iree-imported-model-ebe7897f-5613-435b-a330-3cb967704e5e"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF"
-  ENTRY_FUNCTION
-    "forward"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
+    "--tf-import-type=savedmodel_v2"
+    "--tf-savedmodel-exported-names=forward"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.mlir"
+)
+
+iree_import_tf_model(
+  TARGET_NAME
+    "${PACKAGE_NAME}_iree-imported-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493"
+  SOURCE
+    "${ROOT_ARTIFACTS_DIR}/model_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
+    "--tf-import-type=savedmodel_v2"
+    "--tf-savedmodel-exported-names=predict"
+  OUTPUT_MLIR_FILE
+    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
 )
 
 iree_import_tf_model(
@@ -135,8 +176,10 @@ iree_import_tf_model(
     "${PACKAGE_NAME}_iree-imported-model-c393b4fa-beb4-45d5-982a-c6328aa05d08"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_c393b4fa-beb4-45d5-982a-c6328aa05d08_Resnet50TF"
-  ENTRY_FUNCTION
-    "forward"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
+    "--tf-import-type=savedmodel_v2"
+    "--tf-savedmodel-exported-names=forward"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_c393b4fa-beb4-45d5-982a-c6328aa05d08_Resnet50TF.mlir"
 )
@@ -158,11 +201,11 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
+    "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -173,11 +216,11 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
+    "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -208,21 +251,6 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.mlir"
   MODULE_FILE_NAME
     "${ROOT_ARTIFACTS_DIR}/iree_e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -278,6 +306,21 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.mlir"
@@ -293,29 +336,14 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
+    "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
@@ -338,11 +366,41 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.mlir"
   MODULE_FILE_NAME
     "${ROOT_ARTIFACTS_DIR}/iree_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
@@ -385,11 +443,11 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6d0d5716-5525-44ad-b71d-8075ee1583a6"
+    "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -402,11 +460,11 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6d0d5716-5525-44ad-b71d-8075ee1583a6"
+    "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6d0d5716-5525-44ad-b71d-8075ee1583a6"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -441,23 +499,6 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.mlir"
   MODULE_FILE_NAME
     "${ROOT_ARTIFACTS_DIR}/iree_e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-llvmcpu-enable-pad-consumer-fusion"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6d0d5716-5525-44ad-b71d-8075ee1583a6"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -521,6 +562,23 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6d0d5716-5525-44ad-b71d-8075ee1583a6"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-6d0d5716-5525-44ad-b71d-8075ee1583a6"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.mlir"
@@ -538,31 +596,14 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6"
+    "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6d0d5716-5525-44ad-b71d-8075ee1583a6"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-llvmcpu-enable-pad-consumer-fusion"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-6d0d5716-5525-44ad-b71d-8075ee1583a6"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
@@ -577,6 +618,23 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF.mlir"
   MODULE_FILE_NAME
     "${ROOT_ARTIFACTS_DIR}/iree_39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-6d0d5716-5525-44ad-b71d-8075ee1583a6"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
@@ -606,15 +664,18 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-09cb5300-7f73-45cf-9f68-e114c77ca030"
+    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-6d0d5716-5525-44ad-b71d-8075ee1583a6"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_09cb5300-7f73-45cf-9f68-e114c77ca030/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_6d0d5716-5525-44ad-b71d-8075ee1583a6/module.vmfb"
   FLAGS
-    "--iree-hal-target-backends=cuda"
+    "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -634,11 +695,39 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-09cb5300-7f73-45cf-9f68-e114c77ca030"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF_09cb5300-7f73-45cf-9f68-e114c77ca030/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-09cb5300-7f73-45cf-9f68-e114c77ca030"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.mlir"
   MODULE_FILE_NAME
     "${ROOT_ARTIFACTS_DIR}/iree_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF_09cb5300-7f73-45cf-9f68-e114c77ca030/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-09cb5300-7f73-45cf-9f68-e114c77ca030"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_09cb5300-7f73-45cf-9f68-e114c77ca030/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
@@ -781,7 +870,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -799,7 +888,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -817,7 +906,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -1689,11 +1778,11 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
+    "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -1706,11 +1795,11 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
+    "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -1745,23 +1834,6 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.mlir"
   MODULE_FILE_NAME
     "${ROOT_ARTIFACTS_DIR}/iree_e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -1825,6 +1897,23 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvm-debug-symbols=false"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.mlir"
@@ -1842,31 +1931,14 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
+    "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
@@ -1893,11 +1965,45 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvm-debug-symbols=false"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.mlir"
   MODULE_FILE_NAME
     "${ROOT_ARTIFACTS_DIR}/iree_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvm-debug-symbols=false"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
@@ -1946,11 +2052,11 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
+    "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -1965,11 +2071,11 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
+    "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -2008,25 +2114,6 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.mlir"
   MODULE_FILE_NAME
     "${ROOT_ARTIFACTS_DIR}/iree_e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-llvmcpu-enable-pad-consumer-fusion"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -2098,6 +2185,25 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvm-debug-symbols=false"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.mlir"
@@ -2117,33 +2223,14 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
+    "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-llvmcpu-enable-pad-consumer-fusion"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
@@ -2160,6 +2247,25 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF.mlir"
   MODULE_FILE_NAME
     "${ROOT_ARTIFACTS_DIR}/iree_39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvm-debug-symbols=false"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
@@ -2193,15 +2299,18 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats"
+    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats/module.vmfb"
   FLAGS
-    "--iree-hal-target-backends=cuda"
+    "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2225,11 +2334,43 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF_09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvm-debug-symbols=false"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.mlir"
   MODULE_FILE_NAME
     "${ROOT_ARTIFACTS_DIR}/iree_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF_09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvm-debug-symbols=false"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased_09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
@@ -2388,7 +2529,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
@@ -2408,7 +2549,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
@@ -2428,7 +2569,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
     "--iree-llvm-target-cpu=generic-rv32"
     "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
@@ -3397,55 +3538,59 @@ iree_bytecode_module(
 
 add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-c36c63b0-220a-4d78-8ade-c45ce47d89d3
-  ${PACKAGE_NAME}_iree-imported-model-0e466f69-91d6-4e50-b62b-a82b6213a231
-  ${PACKAGE_NAME}_iree-imported-model-5afc3014-d29d-4e88-a840-fbaf678acf2b
+  ${PACKAGE_NAME}_iree-imported-model-4a6f545e-1b4e-41a5-9236-792aa578184b
+  ${PACKAGE_NAME}_iree-imported-model-73a0402e-271b-4aa8-a6a5-ac05839ca569
   ${PACKAGE_NAME}_iree-imported-model-cc69d69f-6d1f-4a1a-a31e-e021888d0d28
   ${PACKAGE_NAME}_iree-imported-model-e3997104-a3d2-46b4-9fbf-39069906d123
-  ${PACKAGE_NAME}_iree-imported-model-73a0402e-271b-4aa8-a6a5-ac05839ca569
   ${PACKAGE_NAME}_iree-imported-model-78eab9e5-9ff1-4769-9b55-933c81cc9a0f
   ${PACKAGE_NAME}_iree-imported-model-7d45f8e5-bb5e-48d0-928d-8f125104578f
   ${PACKAGE_NAME}_iree-imported-model-58855e40-eba9-4a71-b878-6b35e3460244
+  ${PACKAGE_NAME}_iree-imported-model-0e466f69-91d6-4e50-b62b-a82b6213a231
   ${PACKAGE_NAME}_iree-imported-model-bc1338be-e3df-44fd-82e4-40ba9560a073
-  ${PACKAGE_NAME}_iree-imported-model-4a6f545e-1b4e-41a5-9236-792aa578184b
-  ${PACKAGE_NAME}_iree-imported-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493
+  ${PACKAGE_NAME}_iree-imported-model-5afc3014-d29d-4e88-a840-fbaf678acf2b
   ${PACKAGE_NAME}_iree-imported-model-39d157ad-f0ec-4a76-963b-d783beaed60f
+  ${PACKAGE_NAME}_iree-imported-model-8871f602-571c-4eb8-b94d-554cc8ceec5a
   ${PACKAGE_NAME}_iree-imported-model-ebe7897f-5613-435b-a330-3cb967704e5e
+  ${PACKAGE_NAME}_iree-imported-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493
   ${PACKAGE_NAME}_iree-imported-model-c393b4fa-beb4-45d5-982a-c6328aa05d08
 )
 
 add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
-  ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
-  ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+  ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+  ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
   ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
-  ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
   ${PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+  ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
   ${PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
-  ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
-  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+  ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
   ${PACKAGE_NAME}_iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+  ${PACKAGE_NAME}_iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
   ${PACKAGE_NAME}_iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
   ${PACKAGE_NAME}_iree-module-c393b4fa-beb4-45d5-982a-c6328aa05d08-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-6d0d5716-5525-44ad-b71d-8075ee1583a6
-  ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6d0d5716-5525-44ad-b71d-8075ee1583a6
-  ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6d0d5716-5525-44ad-b71d-8075ee1583a6
+  ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6
+  ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6d0d5716-5525-44ad-b71d-8075ee1583a6
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-6d0d5716-5525-44ad-b71d-8075ee1583a6
   ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-6d0d5716-5525-44ad-b71d-8075ee1583a6
-  ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6d0d5716-5525-44ad-b71d-8075ee1583a6
   ${PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-6d0d5716-5525-44ad-b71d-8075ee1583a6
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-6d0d5716-5525-44ad-b71d-8075ee1583a6
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-6d0d5716-5525-44ad-b71d-8075ee1583a6
+  ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6d0d5716-5525-44ad-b71d-8075ee1583a6
   ${PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-6d0d5716-5525-44ad-b71d-8075ee1583a6
-  ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6
-  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-6d0d5716-5525-44ad-b71d-8075ee1583a6
+  ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6d0d5716-5525-44ad-b71d-8075ee1583a6
   ${PACKAGE_NAME}_iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-6d0d5716-5525-44ad-b71d-8075ee1583a6
+  ${PACKAGE_NAME}_iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-6d0d5716-5525-44ad-b71d-8075ee1583a6
   ${PACKAGE_NAME}_iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-6d0d5716-5525-44ad-b71d-8075ee1583a6
-  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-09cb5300-7f73-45cf-9f68-e114c77ca030
+  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-6d0d5716-5525-44ad-b71d-8075ee1583a6
   ${PACKAGE_NAME}_iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-09cb5300-7f73-45cf-9f68-e114c77ca030
+  ${PACKAGE_NAME}_iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-09cb5300-7f73-45cf-9f68-e114c77ca030
   ${PACKAGE_NAME}_iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-09cb5300-7f73-45cf-9f68-e114c77ca030
+  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-09cb5300-7f73-45cf-9f68-e114c77ca030
   ${PACKAGE_NAME}_iree-module-c393b4fa-beb4-45d5-982a-c6328aa05d08-09cb5300-7f73-45cf-9f68-e114c77ca030
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-cdf579a9-5446-403b-a991-802a6c702e65
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-cdf579a9-5446-403b-a991-802a6c702e65
@@ -3516,37 +3661,40 @@ add_dependencies(iree-benchmark-suites
 
 add_dependencies(iree-e2e-compile-stats-suites
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
-  ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
-  ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
+  ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
+  ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
   ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
-  ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
   ${PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
+  ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
   ${PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
-  ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
-  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
+  ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
   ${PACKAGE_NAME}_iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
+  ${PACKAGE_NAME}_iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
   ${PACKAGE_NAME}_iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
+  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
   ${PACKAGE_NAME}_iree-module-c393b4fa-beb4-45d5-982a-c6328aa05d08-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9-compile-stats
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
-  ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
-  ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
+  ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
+  ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
   ${PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
-  ${PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
   ${PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
   ${PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
   ${PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
+  ${PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
   ${PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
-  ${PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
-  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
+  ${PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
   ${PACKAGE_NAME}_iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
+  ${PACKAGE_NAME}_iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
   ${PACKAGE_NAME}_iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
-  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats
+  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-6d0d5716-5525-44ad-b71d-8075ee1583a6-compile-stats
   ${PACKAGE_NAME}_iree-module-39d157ad-f0ec-4a76-963b-d783beaed60f-09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats
+  ${PACKAGE_NAME}_iree-module-8871f602-571c-4eb8-b94d-554cc8ceec5a-09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats
   ${PACKAGE_NAME}_iree-module-ebe7897f-5613-435b-a330-3cb967704e5e-09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats
+  ${PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats
   ${PACKAGE_NAME}_iree-module-c393b4fa-beb4-45d5-982a-c6328aa05d08-09cb5300-7f73-45cf-9f68-e114c77ca030-compile-stats
   ${PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-cdf579a9-5446-403b-a991-802a6c702e65-compile-stats
   ${PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-cdf579a9-5446-403b-a991-802a6c702e65-compile-stats

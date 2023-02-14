@@ -4,7 +4,7 @@
 func.func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
   // CHECK: %[[SIZE:.+]] = vm.const.i64 1024
   %c1024 = arith.constant 1024 : index
-  // CHECK: %ref = vm.call @hal.allocator.allocate(%arg0, %c6, %c3075, %[[SIZE]]) : (!vm.ref<!hal.allocator>, i32, i32, i64) -> !vm.ref<!hal.buffer>
+  // CHECK: %ref = vm.call @hal.allocator.allocate(%arg0, %c70, %c3075, %[[SIZE]]) : (!vm.ref<!hal.allocator>, i32, i32, i64) -> !vm.ref<!hal.buffer>
   %0 = hal.allocator.allocate<%arg0 : !hal.allocator> type("HostLocal") usage("DispatchStorage|Transfer") : !hal.buffer{%c1024}
   return %0 : !hal.buffer
 }

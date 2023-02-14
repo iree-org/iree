@@ -504,7 +504,7 @@ FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
     auto tiledProducer = tiledProducerVal->getDefiningOp<TilingInterface>();
     if (!tiledProducer) {
       return rewriter.notifyMatchFailure(
-          tiledProducer,
+          tiledProducerVal->getDefiningOp(),
           "expected tiled implementation to implement TilingInterface as well");
     }
     if (tiledProducer->getNumResults() != fusableProducer->getNumResults()) {

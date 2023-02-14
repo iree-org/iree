@@ -48,10 +48,11 @@ class IreeRuleBuilder(object):
       output_file_path: pathlib.PurePath) -> IreeModelImportRule:
 
     model = imported_model.model
-    if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
+    import_config = imported_model.import_config
+    if import_config.tool == iree_definitions.ImportTool.NONE:
       if source_model_rule.file_path != output_file_path:
         raise ValueError(
-            f"Separate path for Linalg model isn't supported "
+            f"Separate path for MLIR model isn't supported yet: "
             f"('{source_model_rule.file_path }' != '{output_file_path}')")
       return IreeModelImportRule(target_name=source_model_rule.target_name,
                                  output_file_path=output_file_path,
@@ -60,24 +61,26 @@ class IreeRuleBuilder(object):
     # Import target name: iree-imported-model-<model_id>
     target_name = f"iree-imported-model-{model.id}"
 
-    if model.source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
+    import_flags = import_config.materialize_import_flags(model)
+    if import_config.tool == iree_definitions.ImportTool.TFLITE_IMPORTER:
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tflite_model(
               target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
+              import_flags=import_flags,
               output_mlir_file=str(output_file_path))
       ]
-    elif model.source_type == common_definitions.ModelSourceType.EXPORTED_TF:
+    elif import_config.tool == iree_definitions.ImportTool.TF_IMPORTER:
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tf_model(
               target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
-              entry_function=model.entry_function,
+              import_flags=import_flags,
               output_mlir_file=str(output_file_path))
       ]
     else:
       raise ValueError(
-          f"Unsupported source type '{model.source_type}' of the model '{model.id}'."
+          f"Unsupported import tool '{import_config.tool}' of the model '{model.id}'."
       )
 
     return IreeModelImportRule(target_name=target_name,
@@ -92,7 +95,7 @@ class IreeRuleBuilder(object):
 
     compile_flags = self._generate_compile_flags(
         compile_config=compile_config,
-        mlir_dialect_type=imported_model.dialect_type.dialect_name
+        mlir_dialect_type=imported_model.import_config.dialect_type.value
     ) + compile_config.extra_flags
 
     # Module target name: iree-module-<model_id>-<compile_config_id>
@@ -154,10 +157,11 @@ class IreeRuleBuilder(object):
           "--riscv-v-fixed-length-vector-lmul-max=8"
       ]
     elif arch_info.architecture == "riscv_32":
+      # TODO(llvm-project/60463): Replace 'zve32f' with 'zve32x'.
       flags = [
           f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
           "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
-          "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x",
+          "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
           "--riscv-v-fixed-length-vector-lmul-max=8"
       ]
     elif arch_info.architecture == "armv8.2-a":

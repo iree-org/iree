@@ -121,6 +121,12 @@ def DispatchWithTransformDialect :
   ];
 }
 
+def EraseUnusedLinalgOperands :
+    Pass<"iree-flow-erase-unused-linalg-operands", "mlir::ModuleOp"> {
+  let summary = "Erase unused linalg operand and remove dead code.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createEraseUnusedLinalgOperands()";
+}
+
 def ExpandTensorShapes :
     Pass<"iree-flow-expand-tensor-shapes", "mlir::ModuleOp"> {
   let summary = "Expands tensor shape dimensions into SSA values across the program.";

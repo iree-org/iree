@@ -12,7 +12,7 @@ import hashlib
 from typing import List, Sequence
 
 from e2e_test_framework.definitions import common_definitions
-from e2e_test_framework import serialization
+from e2e_test_framework import serialization, unique_ids
 
 
 def _hash_composite_id(keys: Sequence[str]) -> str:
@@ -98,49 +98,102 @@ class ModuleExecutionConfig(object):
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
-@dataclass(frozen=True)
-class _MLIRDialectPair(object):
-  """MLIR dialect with its unique artificial id."""
-  # Unique artificial id.
-  id: int
-  # Name of an IREE supported input type (--iree-input-type).
-  dialect_name: str
+class ImportTool(Enum):
+  """Iree model import tool."""
+  NONE = "none"
+  TF_IMPORTER = "iree-import-tf"
+  TFLITE_IMPORTER = "iree-import-tflite"
 
 
-# Please use and update the next id when adding a new dialect, so we won't reuse
-# the old deprecated id.
-# Next ID: 4
-class MLIRDialectType(_MLIRDialectPair, Enum):
+# Value should be the name of an IREE supported input type (--iree-input-type).
+class MLIRDialectType(Enum):
   """Imported MLIR dialect type."""
-  NONE = (1, "none")
-  TOSA = (2, "tosa")
-  MHLO = (3, "mhlo")
+  NONE = "none"
+  TOSA = "tosa"
+  MHLO = "mhlo"
 
 
-MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
+# Placeholder to be replaced with entry function name when outputting the actual
+# flag list.
+IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = "$ENTRY_FUNCTION_PLACEHOLDER"
+
+
+@serialization.serializable(type_key="iree_import_configs")
+@dataclass(frozen=True)
+class ImportConfig(object):
+  """Config to import the model."""
+  id: str
+  tool: ImportTool
+  dialect_type: MLIRDialectType
+  import_flags: List[str] = dataclasses.field(default_factory=list)
+
+  def materialize_import_flags(self,
+                               model: common_definitions.Model) -> List[str]:
+    """Materialize flags with dependent values."""
+    return [
+        flag.replace(IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER,
+                     model.entry_function) for flag in self.import_flags
+    ]
+
+
+DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
+    id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
+    tool=ImportTool.TF_IMPORTER,
+    dialect_type=MLIRDialectType.MHLO,
+    import_flags=[
+        "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v1",
+        f"--tf-savedmodel-exported-names={IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER}"
+    ])
+
+DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
+    id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
+    tool=ImportTool.TF_IMPORTER,
+    dialect_type=MLIRDialectType.MHLO,
+    import_flags=[
+        "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v2",
+        f"--tf-savedmodel-exported-names={IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER}"
+    ])
+
+DEFAULT_TFLITE_IMPORT_CONFIG = ImportConfig(
+    id=unique_ids.IREE_MODEL_IMPORT_TFLITE_DEFAULT,
+    tool=ImportTool.TFLITE_IMPORTER,
+    dialect_type=MLIRDialectType.TOSA,
+    import_flags=["--output-format=mlir-bytecode"])
+
+DEFAULT_LINALG_MLIR_IMPORT_CONFIG = ImportConfig(
+    id=unique_ids.IREE_MODEL_IMPORT_LINALG_MLIR_DEFAULT,
+    tool=ImportTool.NONE,
+    dialect_type=MLIRDialectType.NONE)
+
+MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP = {
     common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
-        MLIRDialectType.NONE,
+        DEFAULT_LINALG_MLIR_IMPORT_CONFIG,
     common_definitions.ModelSourceType.EXPORTED_TFLITE:
-        MLIRDialectType.TOSA,
-    common_definitions.ModelSourceType.EXPORTED_TF:
-        MLIRDialectType.MHLO,
+        DEFAULT_TFLITE_IMPORT_CONFIG,
+    common_definitions.ModelSourceType.EXPORTED_TF_V1:
+        DEFAULT_TF_V1_IMPORT_CONFIG,
+    common_definitions.ModelSourceType.EXPORTED_TF_V2:
+        DEFAULT_TF_V2_IMPORT_CONFIG,
 }
 
 
-@serialization.serializable(type_key="iree_imported_models")
+@serialization.serializable
 @dataclass(frozen=True)
 class ImportedModel(object):
   """Describes an imported MLIR model."""
-  id: str
   model: common_definitions.Model
-  dialect_type: MLIRDialectType
+  import_config: ImportConfig
+
+  def composite_id(self):
+    return _hash_composite_id([self.model.id, self.import_config.id])
 
   @staticmethod
   def from_model(model: common_definitions.Model):
-    dialect_type = MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type]
-    return ImportedModel(id=f"{model.id}-{dialect_type.id}",
-                         model=model,
-                         dialect_type=dialect_type)
+    config = MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP.get(model.source_type)
+    if config is None:
+      raise ValueError(f"Unsupported model source type: {model.source_type}.")
+
+    return ImportedModel(model=model, import_config=config)
 
 
 @serialization.serializable
@@ -151,7 +204,8 @@ class ModuleGenerationConfig(object):
   compile_config: CompileConfig
 
   def composite_id(self):
-    return _hash_composite_id([self.imported_model.id, self.compile_config.id])
+    return _hash_composite_id(
+        [self.imported_model.composite_id(), self.compile_config.id])
 
 
 @serialization.serializable
