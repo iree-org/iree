@@ -11,6 +11,8 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "0 17 * * *"
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
@@ -33,7 +35,7 @@ jobs:
           python-version: "3.10"  # Needs pybind >= 2.10.1 for Python >= 3.11
 
       - name: Setup Bazelisk
-        uses: bazelbuild/setup-bazelisk@v2          
+        uses: bazelbuild/setup-bazelisk@v2
 
       - name: "Sync to latest nightly"
         run: |
