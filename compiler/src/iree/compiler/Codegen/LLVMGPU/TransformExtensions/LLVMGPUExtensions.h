@@ -21,6 +21,7 @@ class FuncOp;
 namespace scf {
 class ForeachThreadOp;
 class IfOp;
+class ForOp;
 }  // namespace scf
 
 namespace vector {

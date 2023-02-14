@@ -4,13 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -172,6 +175,90 @@ static void setAsyncAnnotations(Operation* op,
   }
 }
 
+/// Check if the for operations contains a shared memory copy that can be
+/// pipelined and annotate operations with stage information if this is the
+/// case.
+static bool setPipeliningMarkers(scf::ForOp forOp, bool pipelineStoreStage) {
+  bool copyToWorkgroupMemory = false;
+  OpBuilder builder(forOp.getContext());
+  SmallVector<Operation*> barriers;
+  for (Operation& op : forOp.getBody()->getOperations()) {
+    // Pipeline the most inner for op that should be a flat region.
+    if (op.getNumRegions() > 0) return false;
+    if (isa<gpu::BarrierOp>(op)) {
+      barriers.push_back(&op);
+      if (pipelineStoreStage == 0)
+        op.setAttr(kPipeliningFirstStage, builder.getUnitAttr());
+    }
+    if (isa<nvgpu::DeviceAsyncCopyOp, nvgpu::DeviceAsyncCreateGroupOp>(op)) {
+      copyToWorkgroupMemory = true;
+      op.setAttr(kPipeliningFirstStage, builder.getUnitAttr());
+      // async copy ops need to be moved along with previous barrier.
+      for (Operation* barrier : barriers) {
+        barrier->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
+      }
+      barriers.clear();
+      continue;
+    }
+    auto ld = dyn_cast<vector::TransferReadOp>(op);
+    if (!ld) continue;
+    auto ldSrcType = ld.getSource().getType().cast<MemRefType>();
+    if (!hasDefaultOrHALAddressSpace(ldSrcType) || !ld->hasOneUse()) continue;
+    auto st = dyn_cast<vector::TransferWriteOp>(ld->use_begin()->getOwner());
+    if (!st) continue;
+    auto stSrcType = st.getSource().getType().cast<MemRefType>();
+    if (!hasSharedMemoryAddressSpace(stSrcType)) continue;
+    copyToWorkgroupMemory = true;
+    ld->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
+    if (pipelineStoreStage == 0)
+      st->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
+  }
+  if (copyToWorkgroupMemory) {
+    forOp->setAttr(kPipeliningLoopMarker, builder.getUnitAttr());
+    if (pipelineStoreStage == 0 && !barriers.empty()) {
+      barriers.front()->erase();
+    }
+  }
+  return copyToWorkgroupMemory;
+}
+
+/// Apply pipeline rewrite pattern assuming the operations were already
+/// annotated with stage information.
+// TODO: move away from using attribute annotations.
+static FailureOr<scf::ForOp> applyPipelining(scf::ForOp forOp, int64_t depth,
+                                             bool epiloguePeeling,
+                                             bool pipelineStoreStage) {
+  scf::PipeliningOption options;
+  unsigned maxDepth = depth;
+  auto getSchedule = [maxDepth](
+                         scf::ForOp forOp,
+                         std::vector<std::pair<Operation*, unsigned>>& ops) {
+    return getPipelineStages(forOp, ops, maxDepth);
+  };
+  auto setAnnotation = [maxDepth, pipelineStoreStage](
+                           Operation* op,
+                           scf::PipeliningOption::PipelinerPart part,
+                           unsigned iteration) {
+    return setAsyncAnnotations(op, part, iteration, maxDepth,
+                               pipelineStoreStage);
+  };
+  options.getScheduleFn = getSchedule;
+  options.annotateFn = setAnnotation;
+
+  // Use un-peeled epilogue (i.e. epiloguePeeling=flase) only when predication
+  // is avialable a.k.a. AsyncCopyOp.
+  if (!epiloguePeeling) {
+    options.peelEpilogue = false;
+    options.predicateFn = [](Operation* op, Value pred,
+                             PatternRewriter& rewriter) {
+      return replaceOpWithPredicatedOp(op, pred, rewriter);
+    };
+  }
+  scf::ForLoopPipeliningPattern pattern(options, forOp->getContext());
+  transform::TrivialPatternRewriter rewriter(forOp->getContext());
+  rewriter.setInsertionPoint(forOp);
+  return pattern.returningMatchAndRewrite(forOp, rewriter);
+}
 namespace {
 struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
   GPUPipeliningPass(bool epiloguePeeling, unsigned depth, unsigned storeStage)
@@ -180,89 +267,17 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
-    MLIRContext* context = &getContext();
 
     unsigned pipelineStoreStage = storeStage;
+    SmallVector<scf::ForOp> forOps;
     // Mark the loop with shared memory copy for pipelining.
-    funcOp.walk([pipelineStoreStage](scf::ForOp forOp) {
-      bool copyToWorkgroupMemory = false;
-      OpBuilder builder(forOp.getContext());
-      SmallVector<Operation*> barriers;
-      for (Operation& op : forOp.getBody()->getOperations()) {
-        // Pipeline the most inner for op that should be a flat region.
-        if (op.getNumRegions() > 0) return;
-        if (isa<gpu::BarrierOp>(op)) {
-          barriers.push_back(&op);
-          if (pipelineStoreStage == 0)
-            op.setAttr(kPipeliningFirstStage, builder.getUnitAttr());
-        }
-        if (isa<nvgpu::DeviceAsyncCopyOp, nvgpu::DeviceAsyncCreateGroupOp>(
-                op)) {
-          copyToWorkgroupMemory = true;
-          op.setAttr(kPipeliningFirstStage, builder.getUnitAttr());
-          // async copy ops need to be moved along with previous barrier.
-          for (Operation* barrier : barriers) {
-            barrier->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
-          }
-          barriers.clear();
-          continue;
-        }
-        auto ld = dyn_cast<vector::TransferReadOp>(op);
-        if (!ld) continue;
-        auto ldSrcType = ld.getSource().getType().cast<MemRefType>();
-        if (!hasDefaultOrHALAddressSpace(ldSrcType) || !ld->hasOneUse())
-          continue;
-        auto st =
-            dyn_cast<vector::TransferWriteOp>(ld->use_begin()->getOwner());
-        if (!st) continue;
-        auto stSrcType = st.getSource().getType().cast<MemRefType>();
-        if (!hasSharedMemoryAddressSpace(stSrcType)) continue;
-        copyToWorkgroupMemory = true;
-        ld->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
-        if (pipelineStoreStage == 0)
-          st->setAttr(kPipeliningFirstStage, builder.getUnitAttr());
+    funcOp.walk([&forOps](scf::ForOp forOp) { forOps.push_back(forOp); });
+    for (scf::ForOp forOp : forOps) {
+      if (setPipeliningMarkers(forOp, pipelineStoreStage)) {
+        (void)applyPipelining(forOp, depth, epiloguePeeling,
+                              pipelineStoreStage);
       }
-      if (copyToWorkgroupMemory) {
-        forOp->setAttr(kPipeliningLoopMarker, builder.getUnitAttr());
-        if (pipelineStoreStage == 0 && !barriers.empty()) {
-          barriers.front()->erase();
-        }
-      }
-    });
-    scf::PipeliningOption options;
-    unsigned maxDepth = depth;
-    auto getSchedule = [maxDepth](
-                           scf::ForOp forOp,
-                           std::vector<std::pair<Operation*, unsigned>>& ops) {
-      return getPipelineStages(forOp, ops, maxDepth);
-    };
-    auto setAnnotation = [maxDepth, pipelineStoreStage](
-                             Operation* op,
-                             scf::PipeliningOption::PipelinerPart part,
-                             unsigned iteration) {
-      return setAsyncAnnotations(op, part, iteration, maxDepth,
-                                 pipelineStoreStage);
-    };
-    options.getScheduleFn = getSchedule;
-    options.annotateFn = setAnnotation;
-
-    // Use un-peeled epilogue (i.e. epiloguePeeling=flase) only when predication
-    // is avialable a.k.a. AsyncCopyOp.
-    if (!epiloguePeeling) {
-      options.peelEpilogue = false;
-      options.predicateFn = [](Operation* op, Value pred,
-                               PatternRewriter& rewriter) {
-        return replaceOpWithPredicatedOp(op, pred, rewriter);
-      };
     }
-
-    RewritePatternSet pipeliningPatterns(context);
-    scf::populateSCFLoopPipeliningPatterns(pipeliningPatterns, options);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(pipeliningPatterns)))) {
-      return signalPassFailure();
-    }
-
     // Remove extra barriers from the prologue assuming appropriate
     // multi-buffering.
     funcOp.walk([](gpu::BarrierOp barrierOp) {
@@ -275,6 +290,17 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
   unsigned storeStage;
 };
 }  // namespace
+
+FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
+    scf::ForOp forOp, PipeliningSchedulingStrategy startegy, bool peelEpilogue,
+    int64_t depth, PatternRewriter& rewriter) {
+  bool pipelineStoreStage =
+      startegy == PipeliningSchedulingStrategy::loadStoreStage0;
+  if (setPipeliningMarkers(forOp, pipelineStoreStage)) {
+    return applyPipelining(forOp, depth, peelEpilogue, pipelineStoreStage);
+  }
+  return failure();
+}
 
 /// Pass options
 /// epiloguePeeling - try enable/disable epilogue peeling.

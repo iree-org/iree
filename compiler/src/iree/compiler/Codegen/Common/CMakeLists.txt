@@ -94,6 +94,7 @@ iree_cc_library(
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
+    "GPUPipelining.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "MaterializeEncodingIntoPackUnPack.cpp"
@@ -143,6 +144,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTilingInterface
+    MLIRTransformDialect
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorTransforms
@@ -176,7 +178,6 @@ iree_cc_library(
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUMultiBuffering.cpp"
     "GPUPatterns.cpp"
-    "GPUPipelining.cpp"
     "GPUReduceBankConflicts.cpp"
     "GPUTileReduction.cpp"
     "GPUVectorization.cpp"
