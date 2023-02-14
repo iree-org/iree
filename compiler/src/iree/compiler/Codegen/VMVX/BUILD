@@ -49,6 +49,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:Transforms",
     ],
 )

@@ -1450,7 +1450,7 @@ hal.executable private @pack  {
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x48x16x1xf32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 40], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<20x40xf32>> -> tensor<20x40xf32>
         %3 = tensor.empty() : tensor<2x48x16x1xf32>
-        %4 = iree_linalg_ext.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : (tensor<20x40xf32> tensor<2x48x16x1xf32>) -> tensor<2x48x16x1xf32>
+        %4 = tensor.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<20x40xf32> -> tensor<2x48x16x1xf32>
         flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [2, 48, 16, 1], strides = [1, 1, 1, 1] : tensor<2x48x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x48x16x1xf32>>
         return
       }
@@ -1461,7 +1461,7 @@ hal.executable private @pack  {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
 //      CHECK: hal.executable.export public @pack
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   iree_linalg_ext.pack
+//      CHECK:   tensor.pack
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----

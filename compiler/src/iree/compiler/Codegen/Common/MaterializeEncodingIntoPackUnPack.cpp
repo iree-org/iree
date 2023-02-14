@@ -56,9 +56,10 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
   auto innerTileSizes = getInnerTileSizesOfr(
       builder, loc, boundTensorType, *encodingInfo, materializeEncodingValueFn);
   if (failed(innerTileSizes)) return failure();
-  SmallVector<OpFoldResult> convertedTargetShape = PackOp::getResultShape(
-      builder, loc, targetShape, *innerTileSizes, encodingInfo->innerDimsPos,
-      encodingInfo->outerDimsPerm);
+  SmallVector<OpFoldResult> convertedTargetShape =
+      tensor::PackOp::getResultShape(builder, loc, targetShape, *innerTileSizes,
+                                     encodingInfo->innerDimsPos,
+                                     encodingInfo->outerDimsPerm);
   return convertedTargetShape;
 }
 

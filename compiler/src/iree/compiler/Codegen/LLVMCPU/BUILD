@@ -102,6 +102,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SCFToControlFlow",
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:TosaToArith",
         "@llvm-project//mlir:TransformDialect",
