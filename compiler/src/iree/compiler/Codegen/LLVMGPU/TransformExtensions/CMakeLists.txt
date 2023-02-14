@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorToGPU
     MLIRVectorTransforms
+    iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
   PUBLIC

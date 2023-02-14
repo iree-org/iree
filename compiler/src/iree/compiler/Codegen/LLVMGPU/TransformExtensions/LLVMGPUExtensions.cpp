@@ -7,6 +7,7 @@
 #include "LLVMGPUExtensions.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
@@ -18,6 +19,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -680,6 +682,24 @@ DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
       return emitDefaultDefiniteFailure(target) << "invalid index specified";
     }
   }
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// PipelineSharedMemoryCopiesOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
+    scf::ForOp forOp, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  transform::TrivialPatternRewriter rewriter(getContext());
+  int64_t depth(getDepth());
+  FailureOr<scf::ForOp> pipelinedFor = iree_compiler::pipelineSharedMemoryCopy(
+      forOp, PipeliningSchedulingStrategy::loadGlobalStage0, false, depth,
+      rewriter);
+  if (failed(pipelinedFor)) return emitDefaultSilenceableFailure(forOp);
+  results.push_back(pipelinedFor.value());
   return DiagnosedSilenceableFailure::success();
 }
 
