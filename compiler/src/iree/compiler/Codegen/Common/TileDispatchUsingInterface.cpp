@@ -501,12 +501,7 @@ FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
       return rewriter.notifyMatchFailure(sliceOp,
                                          "fusion along slice op failed");
     }
-    auto tiledProducer = tiledProducerVal->getDefiningOp<TilingInterface>();
-    if (!tiledProducer) {
-      return rewriter.notifyMatchFailure(
-          tiledProducerVal->getDefiningOp(),
-          "expected tiled implementation to implement TilingInterface as well");
-    }
+    auto tiledProducer = tiledProducerVal->getDefiningOp();
     if (tiledProducer->getNumResults() != fusableProducer->getNumResults()) {
       return rewriter.notifyMatchFailure(fusableProducer,
                                          "fused operation expected to produce "
