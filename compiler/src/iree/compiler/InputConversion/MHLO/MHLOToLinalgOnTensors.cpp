@@ -389,7 +389,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
         context);
     patterns.insert<GenericTypeConvert>(
         ml_program::GlobalStoreOp::getOperationName(), *typeConverter, context);
-    // needed to convert mhlo::ReplicaIDOp
+    // This is needed when converting mhlo::ReplicaIDOp.
     patterns.insert<GenericTypeConvert>(
         tensor::FromElementsOp::getOperationName(), *typeConverter, context);
     patterns.insert<GenericTypeConvert>(

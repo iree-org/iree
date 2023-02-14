@@ -482,9 +482,10 @@ struct ConvertReturnOp : public OpConversionPattern<IREE::Flow::ReturnOp> {
   }
 };
 
-//-------------------------------------------
+// -----------------------------------------------------------------------------
 // Collective Ops
-//-------------------------------------------
+// -----------------------------------------------------------------------------
+
 struct ConvertAllGatherOp
     : public OpConversionPattern<IREE::Flow::CollectiveAllGatherOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -494,7 +495,7 @@ struct ConvertAllGatherOp
     auto shape = op.getSource().getType().cast<ShapedType>();
     auto collectiveAttr = IREE::Stream::CollectiveAttr::get(
         op.getContext(), IREE::Stream::CollectiveKind::AllGather,
-        /*CollectiveReductionOp=*/std::nullopt,
+        /*reduction=*/std::nullopt,
         static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
 
     auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);

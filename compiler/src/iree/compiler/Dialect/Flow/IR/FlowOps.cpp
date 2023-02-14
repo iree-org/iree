@@ -1548,6 +1548,7 @@ void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
 //===----------------------------------------------------------------------===//
 // flow.channel.count
 //===----------------------------------------------------------------------===//
+
 void ChannelCountOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "channel_count");
@@ -1556,6 +1557,7 @@ void ChannelCountOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 // flow.channel.default
 //===----------------------------------------------------------------------===//
+
 void ChannelDefaultOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "channel_default");
@@ -1564,6 +1566,7 @@ void ChannelDefaultOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 // flow.channel.rank
 //===----------------------------------------------------------------------===//
+
 void ChannelRankOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "channel_rank");
@@ -1572,6 +1575,7 @@ void ChannelRankOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 // flow.collective.all_gather
 //===----------------------------------------------------------------------===//
+
 Value CollectiveAllGatherOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
@@ -1588,6 +1592,7 @@ SmallVector<int64_t, 4> CollectiveAllGatherOp::getTiedResultOperandIndices() {
 //===----------------------------------------------------------------------===//
 // flow.collective.all_reduce
 //===----------------------------------------------------------------------===//
+
 Value CollectiveAllReduceOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
@@ -1604,6 +1609,7 @@ SmallVector<int64_t, 4> CollectiveAllReduceOp::getTiedResultOperandIndices() {
 //===----------------------------------------------------------------------===//
 // flow.collective.reduce_scatter
 //===----------------------------------------------------------------------===//
+
 Value CollectiveReduceScatterOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }

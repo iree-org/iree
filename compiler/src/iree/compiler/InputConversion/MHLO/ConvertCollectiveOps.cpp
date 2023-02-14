@@ -45,40 +45,52 @@ namespace {
 
 static std::optional<IREE::Flow::CollectiveElementType>
 convertToFlowCollectiveElementType(Type type) {
-  if (type.isF32()) return IREE::Flow::CollectiveElementType::Float32;
-
-  if (type.isInteger(32)) {
-    if (type.isSignedInteger())
-      return IREE::Flow::CollectiveElementType::Sint32;
-    else
-      return IREE::Flow::CollectiveElementType::Uint32;
+  if (type.isF32()) {
+    return IREE::Flow::CollectiveElementType::Float32;
   }
 
-  if (type.isF16()) return IREE::Flow::CollectiveElementType::Float16;
+  if (type.isInteger(32)) {
+    if (type.isSignedInteger()) {
+      return IREE::Flow::CollectiveElementType::Sint32;
+    } else {
+      return IREE::Flow::CollectiveElementType::Uint32;
+    }
+  }
+
+  if (type.isF16()) {
+    return IREE::Flow::CollectiveElementType::Float16;
+  }
 
   if (type.isInteger(8)) {
-    if (type.isSignedInteger())
+    if (type.isSignedInteger()) {
       return IREE::Flow::CollectiveElementType::Sint8;
-    else
+    } else {
       return IREE::Flow::CollectiveElementType::Uint8;
+    }
   }
 
   if (type.isInteger(16)) {
-    if (type.isSignedInteger())
+    if (type.isSignedInteger()) {
       return IREE::Flow::CollectiveElementType::Sint16;
-    else
+    } else {
       return IREE::Flow::CollectiveElementType::Uint16;
+    }
   }
 
-  if (type.isBF16()) return IREE::Flow::CollectiveElementType::BFloat16;
+  if (type.isBF16()) {
+    return IREE::Flow::CollectiveElementType::BFloat16;
+  }
 
-  if (type.isF64()) return IREE::Flow::CollectiveElementType::Float64;
+  if (type.isF64()) {
+    return IREE::Flow::CollectiveElementType::Float64;
+  }
 
   if (type.isInteger(64)) {
-    if (type.isSignedInteger())
+    if (type.isSignedInteger()) {
       return IREE::Flow::CollectiveElementType::Sint64;
-    else
+    } else {
       return IREE::Flow::CollectiveElementType::Uint64;
+    }
   }
 
   return std::nullopt;
@@ -104,8 +116,8 @@ convertToFlowCollectiveReductionOp(const Operation &op) {
 }  // namespace
 
 /// Converts mhlo.replica_id to flow.channel.default + flow.channel.rank.
-/// TODO: this assumes that there is no partition so that there is a 1:1 mapping
-/// between the replica ID and the process ID.
+/// TODO(okkwon): this assumes that there is no partition so that there is a 1:1
+/// mapping between the replica ID and the process ID.
 struct ReplicaIdOpConversion : public OpConversionPattern<mhlo::ReplicaIdOp> {
   using OpConversionPattern<mhlo::ReplicaIdOp>::OpConversionPattern;
 
@@ -135,8 +147,9 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
 
-    if (!op.getUseGlobalDeviceIds())
+    if (!op.getUseGlobalDeviceIds()) {
       return rewriter.notifyMatchFailure(op, "must use global device IDs");
+    }
 
     // Check there is only one group in the replica_groups
     ShapedType replicaGroupType = op.getReplicaGroups().getType();
@@ -155,11 +168,12 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
     SmallVector<int64_t> gatherResultShape(resultType.getShape());
     auto elemType = resultType.getElementType();
 
-    // Get the element type
+    // Get the element type.
     std::optional<IREE::Flow::CollectiveElementType> collectiveElemType =
         convertToFlowCollectiveElementType(elemType);
-    if (!elemType)
+    if (!elemType) {
       return rewriter.notifyMatchFailure(op, "unsupported result type");
+    }
     auto elementTypeAttr = IREE::Flow::CollectiveElementTypeAttr::get(
         op.getContext(), *collectiveElemType);
 
@@ -178,7 +192,7 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
       permutationAttr = rewriter.getI64VectorAttr(permutation);
       std::swap(gatherInputShape[0], gatherInputShape[allGatherDim]);
       std::swap(gatherResultShape[0], gatherResultShape[allGatherDim]);
-      // transpose the input
+      // Transpose the input.
       gatherInput =
           rewriter
               .create<mhlo::TransposeOp>(
@@ -187,7 +201,7 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
               .getResult();
     }
 
-    // Create an empty tensor for the result
+    // Create an empty tensor for the result.
     Value target = rewriter.create<tensor::EmptyOp>(
         loc, gatherResultShape, resultType.getElementType());
     Value gatherResult =
@@ -216,8 +230,9 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
 
-    if (!op.getUseGlobalDeviceIds())
+    if (!op.getUseGlobalDeviceIds()) {
       return rewriter.notifyMatchFailure(op, "must use global device IDs");
+    }
 
     // Check there is only one group in the replica_groups
     ShapedType replicaGroupType = op.getReplicaGroups().getType();
@@ -231,29 +246,33 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
     Block &block = op.getComputation().front();
 
     if (block.empty() || llvm::hasSingleElement(block) ||
-        std::next(block.begin(), 2) != block.end())
+        std::next(block.begin(), 2) != block.end()) {
       return rewriter.notifyMatchFailure(op, "must have two ops in the block");
+    }
 
-    if (block.getNumArguments() != 2)
+    if (block.getNumArguments() != 2) {
       return rewriter.notifyMatchFailure(op, "must have two block args");
+    }
 
     Operation &op1 = block.front();
     Operation &op2 = *(++block.begin());
 
     if (op1.getNumResults() != 1 ||
-        !op1.hasTrait<::mlir::OpTrait::Elementwise>())
+        !op1.hasTrait<::mlir::OpTrait::Elementwise>()) {
       return rewriter.notifyMatchFailure(op, "must have elementwise trait");
+    }
 
     // Convert mhlo reduction op into flow reduction op.
     std::optional<IREE::Flow::CollectiveReductionOp> redOp =
         convertToFlowCollectiveReductionOp(op1);
-    if (!redOp)
+    if (!redOp) {
       return rewriter.notifyMatchFailure(op, "unsupported operation.");
+    }
 
-    if (!op2.mightHaveTrait<OpTrait::IsTerminator>())
+    if (!op2.mightHaveTrait<OpTrait::IsTerminator>()) {
       return rewriter.notifyMatchFailure(op,
                                          "the second op must be a terminator");
-
+    }
     // Currently only the default channel is used.
 
     // Create a default channel.
@@ -269,8 +288,9 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
     // Get the element type
     std::optional<IREE::Flow::CollectiveElementType> elemType =
         convertToFlowCollectiveElementType(inputElemType);
-    if (!elemType)
+    if (!elemType) {
       return rewriter.notifyMatchFailure(op, "unsupported input type");
+    }
     auto elementTypeAttr =
         IREE::Flow::CollectiveElementTypeAttr::get(op.getContext(), *elemType);
     // Create an empty tensor for the result
@@ -293,10 +313,11 @@ struct ReduceScatterOpConversion
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
 
-    if (!op.getUseGlobalDeviceIds())
+    if (!op.getUseGlobalDeviceIds()) {
       return rewriter.notifyMatchFailure(op, "must use global device IDs");
+    }
 
-    // Check there is only one group in the replica_groups
+    // Check if there is only one group in the replica_groups.
     ShapedType replicaGroupType = op.getReplicaGroups().getType();
     if (replicaGroupType.getRank() != 2 ||
         replicaGroupType.getDimSize(0) != 1) {
@@ -308,30 +329,35 @@ struct ReduceScatterOpConversion
     Block &block = op.getComputation().front();
 
     if (block.empty() || llvm::hasSingleElement(block) ||
-        std::next(block.begin(), 2) != block.end())
+        std::next(block.begin(), 2) != block.end()) {
       return rewriter.notifyMatchFailure(op, "must have two ops in the block");
+    }
 
-    if (block.getNumArguments() != 2)
+    if (block.getNumArguments() != 2) {
       return rewriter.notifyMatchFailure(op, "must have two block args");
+    }
 
     Operation &op1 = block.front();
     Operation &op2 = *(++block.begin());
 
     if (op1.getNumResults() != 1 ||
-        !op1.hasTrait<::mlir::OpTrait::Elementwise>())
+        !op1.hasTrait<::mlir::OpTrait::Elementwise>()) {
       return rewriter.notifyMatchFailure(op, "must have elementwise trait");
+    }
 
     // Convert mhlo reduction op into flow reduction op.
     std::optional<IREE::Flow::CollectiveReductionOp> redOp =
         convertToFlowCollectiveReductionOp(op1);
-    if (!redOp)
+    if (!redOp) {
       return rewriter.notifyMatchFailure(op, "unsupported operation.");
+    }
 
-    if (!op2.mightHaveTrait<OpTrait::IsTerminator>())
+    if (!op2.mightHaveTrait<OpTrait::IsTerminator>()) {
       return rewriter.notifyMatchFailure(op,
                                          "the second op must be a terminator");
+    }
 
-    // Convert mhlo reduction op into flow reduction op
+    // Convert mhlo reduction op into flow reduction op.
     auto reductionOpAttr =
         IREE::Flow::CollectiveReductionOpAttr::get(op.getContext(), *redOp);
 
@@ -347,8 +373,9 @@ struct ReduceScatterOpConversion
     // Get the element type
     std::optional<IREE::Flow::CollectiveElementType> collectiveElemType =
         convertToFlowCollectiveElementType(elemType);
-    if (!elemType)
+    if (!elemType) {
       return rewriter.notifyMatchFailure(op, "unsupported result type");
+    }
     auto elementTypeAttr = IREE::Flow::CollectiveElementTypeAttr::get(
         op.getContext(), *collectiveElemType);
 
@@ -376,7 +403,7 @@ struct ReduceScatterOpConversion
               .getResult();
     }
 
-    // Create an empty tensor for the result
+    // Create an empty tensor for the result.
     Value target = rewriter.create<tensor::EmptyOp>(
         loc, scatterResultShape, resultType.getElementType());
     Value scatterResult = rewriter

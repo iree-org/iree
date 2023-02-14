@@ -302,7 +302,7 @@ static iree_status_t iree_hal_cuda_device_create_channel(
   // We could multiplex channels but it'd be better to surface that to the
   // compiler so that it can emit the right rank math.
   int requested_count = iree_math_count_ones_u64(queue_affinity);
-  // FIXME: queue affinity is not set yet correctly, so we have all bits set.
+  // TODO(#12206): properly assign affinity in the compiler.
   if (requested_count != 64 && requested_count != 1) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "exactly one participant is allowed in a "

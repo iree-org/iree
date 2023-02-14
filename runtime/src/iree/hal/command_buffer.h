@@ -296,6 +296,8 @@ typedef uint8_t iree_hal_collective_kind_t;
 
 // Specifies the reduction operator of a collective reduction operation.
 enum iree_hal_collective_reduction_e {
+  // Specifies that the reduction operation is unspecified.
+  IREE_HAL_COLLECTIVE_REDUCTION_NONE = 0,
   // Specifies that the reduction operation computes a sum (addition).
   IREE_HAL_COLLECTIVE_REDUCTION_SUM = 1,
   // Specifies that the reduction operation computes a product (multiplication).

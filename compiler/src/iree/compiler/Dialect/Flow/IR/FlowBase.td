@@ -213,6 +213,9 @@ def FLOW_Channel : TypeDef<Flow_Dialect, "Channel", []> {
 // Flow collective reduction op
 //===----------------------------------------------------------------------===//
 
+// NOTE: the enum values must exactly match with the corresponding enum values
+// of the Stream reduction op.
+
 def FLOW_CollectiveReductionOp_None             : I32EnumAttrCase<"None", 0, "none">;
 def FLOW_CollectiveReductionOp_ReductionSum     : I32EnumAttrCase<"ReductionSum", 1, "sum">;
 def FLOW_CollectiveReductionOp_ReductionProduct : I32EnumAttrCase<"ReductionProduct", 2, "product">;
