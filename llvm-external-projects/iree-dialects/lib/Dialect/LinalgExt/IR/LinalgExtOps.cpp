@@ -2224,7 +2224,6 @@ SmallVector<Operation *>
 UnPackOp::getTiledImplementation(OpBuilder &builder,
                                  ArrayRef<OpFoldResult> offsets,
                                  ArrayRef<OpFoldResult> sizes) {
-  Operation *unpackOp = *this;
   // TODO(hanchung): Extend it to handle memref version.
   // Tiling on buffers needs extra buffer because tiled unpack op could produce
   // more data for incomplete tiles. Tiling on tensors satisfies IREE's needs.
