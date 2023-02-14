@@ -11,8 +11,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -24,21 +22,381 @@ using namespace mlir;
 #define DBGS() llvm::dbgs() << "[" DEBUG_TYPE "] "
 
 //===---------------------------------------------------------------------===//
-// CapturingOpMatcher
+// CapturingMatcherBase
 //===---------------------------------------------------------------------===//
 
-void transform_ext::CapturingOpMatcher::getAllNested(
+void transform_ext::CapturingMatcherBase::getAllNested(
     SmallVectorImpl<CapturingOpMatcher *> &nested) {
-  int64_t start = nested.size();
-  llvm::append_range(nested, nestedCapturingMatchers);
-  for (int64_t position = start; position < nested.size(); ++position) {
-    llvm::append_range(nested, nested[position]->nestedCapturingMatchers);
+
+  SetVector<CapturingOpMatcher *> found;
+  found.insert(nested.begin(), nested.end());
+  int64_t start = found.size();
+
+  auto appendOne = [&found](CapturingMatcherBase &one) {
+    found.insert(one.nestedCapturingMatchers.begin(),
+                 one.nestedCapturingMatchers.end());
+    for (BlockBodyMatcher *blockMatcher : one.nestedBlockMatchers) {
+      found.insert(blockMatcher->nestedCapturingMatchers.begin(),
+                   blockMatcher->nestedCapturingMatchers.end());
+    }
+    for (CapturingValueMatcher *valueMatcher :
+         one.nestedCapturingValueMatchers) {
+      found.insert(valueMatcher->nestedCapturingMatchers.begin(),
+                   valueMatcher->nestedCapturingMatchers.end());
+    }
+  };
+
+  appendOne(*this);
+  for (int64_t position = start; position < found.size(); ++position) {
+    appendOne(*found[position]);
+  }
+
+  llvm::append_range(nested, found.getArrayRef());
+}
+
+void transform_ext::CapturingMatcherBase::getAllNestedValueMatchers(
+    SmallVectorImpl<CapturingValueMatcher *> &nested) {
+
+  SetVector<CapturingValueMatcher *> found;
+  found.insert(nested.begin(), nested.end());
+  int64_t start = found.size();
+
+  auto appendOne = [&found](CapturingMatcherBase &one) {
+    found.insert(one.nestedCapturingValueMatchers.begin(),
+                 one.nestedCapturingValueMatchers.end());
+    for (BlockBodyMatcher *blockMatcher : one.nestedBlockMatchers) {
+      found.insert(blockMatcher->nestedCapturingValueMatchers.begin(),
+                   blockMatcher->nestedCapturingValueMatchers.end());
+    }
+    for (CapturingOpMatcher *opMatcher : one.nestedCapturingMatchers) {
+      found.insert(opMatcher->nestedCapturingValueMatchers.begin(),
+                   opMatcher->nestedCapturingValueMatchers.end());
+    }
+  };
+
+  appendOne(*this);
+  for (int64_t position = start; position < found.size(); ++position) {
+    appendOne(*found[position]);
+  }
+
+  llvm::append_range(nested, found.getArrayRef());
+}
+
+void transform_ext::CapturingMatcherBase::getAllNestedBlockMatchers(
+    SmallVectorImpl<BlockBodyMatcher *> &nested) {
+
+  SetVector<BlockBodyMatcher *> found;
+  found.insert(nested.begin(), nested.end());
+  int64_t start = found.size();
+
+  auto appendOne = [&found](CapturingMatcherBase &one) {
+    found.insert(one.nestedBlockMatchers.begin(),
+                 one.nestedBlockMatchers.end());
+    for (CapturingValueMatcher *valueMatcher :
+         one.nestedCapturingValueMatchers) {
+      found.insert(valueMatcher->nestedBlockMatchers.begin(),
+                   valueMatcher->nestedBlockMatchers.end());
+    }
+    for (CapturingOpMatcher *opMatcher : one.nestedCapturingMatchers) {
+      found.insert(opMatcher->nestedBlockMatchers.begin(),
+                   opMatcher->nestedBlockMatchers.end());
+    }
+  };
+
+  appendOne(*this);
+  for (int64_t position = start; position < found.size(); ++position) {
+    appendOne(*found[position]);
+  }
+
+  llvm::append_range(nested, found.getArrayRef());
+}
+
+void transform_ext::CapturingMatcherBase::resetCapture() {
+  SmallVector<CapturingOpMatcher *> nested;
+  getAllNested(nested);
+  for (CapturingOpMatcher *matcher : nested) {
+    matcher->captured = nullptr;
+  }
+  SmallVector<CapturingValueMatcher *> nestedValue;
+  getAllNestedValueMatchers(nestedValue);
+  for (CapturingValueMatcher *matcher : nestedValue) {
+    matcher->captured = nullptr;
+  }
+  SmallVector<BlockBodyMatcher *> blocks;
+  getAllNestedBlockMatchers(blocks);
+  for (BlockBodyMatcher *matcher : blocks) {
+    matcher->captured = nullptr;
   }
 }
 
-void transform_ext::CapturingOpMatcher::getAllNestedValueMatchers(
-    SmallVectorImpl<CapturingValueMatcher *> &nested) {
-  llvm::append_range(nested, nestedCapturingValueMatchers);
+//===---------------------------------------------------------------------===//
+// CapturingOpMatcher
+//===---------------------------------------------------------------------===//
+
+bool transform_ext::CapturingOpMatcher::match(Operation *op) {
+  auto debugRAII =
+      llvm::make_scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
+  LLVM_DEBUG(DBGS() << "matching: " << *op << "\n");
+
+  if (getCaptured()) {
+    LLVM_DEBUG(DBGS() << "found an already captured op: ");
+    if (getCaptured() == op) {
+      LLVM_DEBUG(llvm::dbgs() << "same\n");
+      return true;
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "different\n");
+      return false;
+    }
+  }
+
+  if (!llvm::all_of(predicates, [op](const PredicateFn &fn) {
+        bool result = fn(op);
+        LLVM_DEBUG(llvm::dbgs() << ": " << result << "\n");
+        return result;
+      })) {
+    return false;
+  }
+
+  captured = op;
+  return true;
+}
+
+void transform_ext::CapturingOpMatcher::debugOutputForCreate(
+    ArrayRef<StringRef> opNames) {
+  LLVM_DEBUG(DBGS() << "operation type is one of {";
+             llvm::interleaveComma(opNames, llvm::dbgs()); llvm::dbgs() << "}");
+}
+
+/// Apply the given matcher to the given object, produce debug messages.
+template <typename Matcher, typename Object = typename llvm::function_traits<
+                                typename Matcher::match>::template args<0>>
+static bool recursiveMatch(Matcher &matcher, Object &object,
+                           StringRef extraMessage = "") {
+  LLVM_DEBUG(llvm::dbgs() << "\n[" DEBUG_TYPE "] "
+                          << "start recursive match (" << extraMessage
+                          << ") {\n");
+  bool result = matcher.match(object);
+  LLVM_DEBUG(DBGS() << "} end recursive match");
+  return result;
+}
+
+transform_ext::CapturingOpMatcher &
+transform_ext::CapturingOpMatcher::alternatives(
+    transform_ext::CapturingOpMatcher &first,
+    transform_ext::CapturingOpMatcher &second) {
+  addPredicate([&first, &second](Operation *op) {
+    LLVM_DEBUG(DBGS() << "matching alternatives\n");
+    return recursiveMatch(first, op, "alternative 1") ||
+           recursiveMatch(second, op, "alternative 2");
+  });
+  return *this;
+}
+
+//---------------------------------------------------------------------------//
+// Predicates for operands and results.
+//---------------------------------------------------------------------------//
+
+transform_ext::CapturingOpMatcher &
+transform_ext::CapturingOpMatcher::operand(transform_ext::NumEqualsTo num) {
+  addPredicate([=](Operation *op) {
+    LLVM_DEBUG(DBGS() << "operation has exactly " << num.value << " operands");
+    return num.value == op->getNumOperands();
+  });
+  return *this;
+}
+
+/// If `pos` is negative, returns the number of the operand in op starting from
+/// the last. For example, -1 means the last operand, -2 means the
+/// second-to-last, etc. Returns nullopt if pos is out-of-bounds, both positive
+/// and negative.
+static std::optional<int64_t> remapNegativeOperandNumber(int64_t pos,
+                                                         Operation *op) {
+  int64_t updated = pos < 0 ? op->getNumOperands() + pos : pos;
+  if (updated < 0 || updated >= op->getNumOperands()) {
+    LLVM_DEBUG(DBGS() << "match operand #" << pos
+                      << "that does not exist in the operation");
+    return std::nullopt;
+  }
+  return updated;
+}
+
+transform_ext::CapturingOpMatcher &
+transform_ext::CapturingOpMatcher::operand(int64_t pos,
+                                           CapturingOpMatcher &nested) {
+  addPredicate([pos, &nested](Operation *op) {
+    std::optional<int64_t> operandNo = remapNegativeOperandNumber(pos, op);
+    if (!operandNo)
+      return false;
+    LLVM_DEBUG(DBGS() << "operand #" << pos << " is defined by an operation");
+    Operation *definingOp = op->getOperand(*operandNo).getDefiningOp();
+    if (!definingOp)
+      return false;
+    return recursiveMatch(nested, definingOp);
+  });
+  recordNestedMatcher(nested);
+  return *this;
+}
+
+transform_ext::CapturingOpMatcher &
+transform_ext::CapturingOpMatcher::operand(int64_t pos, ValueMatcher &nested) {
+  addPredicate([pos, &nested](Operation *op) {
+    std::optional<int64_t> operandNo = remapNegativeOperandNumber(pos, op);
+    if (!operandNo)
+      return false;
+    LLVM_DEBUG(DBGS() << "operand #" << pos << " is");
+    Value operand = op->getOperand(*operandNo);
+    return recursiveMatch(nested, operand);
+  });
+  recordNestedMatcher(nested);
+  return *this;
+}
+
+transform_ext::CapturingOpMatcher &transform_ext::CapturingOpMatcher::operand(
+    int64_t position, std::function<bool(llvm::APFloat)> floatValueFn) {
+  addPredicate([position,
+                floatValueFn = std::move(floatValueFn)](Operation *op) -> bool {
+    std::optional<int64_t> operandNo = remapNegativeOperandNumber(position, op);
+    if (!operandNo)
+      return false;
+
+    LLVM_DEBUG(DBGS() << "operand #" << *operandNo
+                      << " is a special floating point constant");
+    auto cstOp =
+        op->getOperand(*operandNo).getDefiningOp<arith::ConstantFloatOp>();
+    if (!cstOp)
+      return false;
+    return floatValueFn(cstOp.value());
+  });
+
+  return *this;
+}
+
+transform_ext::CapturingOpMatcher &
+transform_ext::CapturingOpMatcher::operand(int64_t position, ConstantFloatOne) {
+  return operand(position,
+                 [](llvm::APFloat value) { return value.isExactlyValue(1.0); });
+}
+
+transform_ext::CapturingOpMatcher &
+transform_ext::CapturingOpMatcher::result(transform_ext::NumEqualsTo num) {
+  addPredicate([=](Operation *op) {
+    LLVM_DEBUG(DBGS() << "operation has exactly " << num.value << " results");
+    return num.value == op->getNumResults();
+  });
+  return *this;
+}
+
+transform_ext::CapturingOpMatcher &
+transform_ext::CapturingOpMatcher::result(int64_t pos, ValueMatcher &nested) {
+  addPredicate([pos, &nested](Operation *op) {
+    int64_t updated = pos < 0 ? op->getNumResults() + pos : pos;
+    if (updated < 0 || updated >= op->getNumResults()) {
+      LLVM_DEBUG(DBGS() << "matching result #" << pos
+                        << " that does not exist in the operation");
+      return false;
+    }
+    LLVM_DEBUG(DBGS() << "result #" << pos << " is");
+    Value result = op->getResult(updated);
+    return recursiveMatch(nested, result);
+  });
+  recordNestedMatcher(nested);
+  return *this;
+}
+
+//===---------------------------------------------------------------------===//
+// BlockBodyMatcher
+//===---------------------------------------------------------------------===//
+
+transform_ext::BlockBodyMatcher::BlockBodyMatcher(
+    transform_ext::BlockBodyMatcher &first,
+    transform_ext::BlockBodyMatcher &second) {
+  addPredicate([&first, &second](Block &block) {
+    LLVM_DEBUG(DBGS() << "matching block alternatives");
+    return recursiveMatch(first, block, "first") ||
+           recursiveMatch(second, block, "second");
+  });
+}
+
+namespace {
+struct WrapBlockForPrinting {
+  Block &block;
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const WrapBlockForPrinting &wrap) {
+  wrap.block.print(os);
+  return os;
+}
+} // end namespace
+
+bool transform_ext::BlockBodyMatcher::match(Block &block) {
+  auto debugRAII =
+      llvm::make_scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
+  LLVM_DEBUG(DBGS() << "matching: " << WrapBlockForPrinting{block} << "\n");
+  if (getCaptured()) {
+    LLVM_DEBUG(DBGS() << "found an already captured block: ");
+    if (getCaptured() == &block) {
+      LLVM_DEBUG(llvm::dbgs() << "same\n");
+      return true;
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "different\n");
+      return false;
+    }
+  }
+  return llvm::all_of(predicates, [&](const PredicateFn &fn) {
+    bool result = fn(block);
+    LLVM_DEBUG(llvm::dbgs() << ": " << result << "\n");
+    return result;
+  });
+}
+
+transform_ext::BlockBodyMatcher &transform_ext::BlockBodyMatcher::argument(
+    transform_ext::NumGreaterEqualTo num) {
+  addPredicate([=](Block &block) {
+    LLVM_DEBUG(DBGS() << "block has >= " << num.value << " arguments");
+    return block.getNumArguments() >= num.value;
+  });
+  return *this;
+}
+
+transform_ext::BlockBodyMatcher &
+transform_ext::BlockBodyMatcher::argument(int64_t pos, ValueMatcher &nested) {
+  addPredicate([pos, &nested](Block &block) {
+    int64_t updatedPos = pos < 0 ? block.getNumArguments() + pos : pos;
+    if (updatedPos < 0 || updatedPos >= block.getNumArguments()) {
+      LLVM_DEBUG(DBGS() << "matching block argument #" << pos
+                        << " that does not exist");
+      return false;
+    }
+    LLVM_DEBUG(DBGS() << "block argument #" << pos << " is\n");
+    Value argument = block.getArgument(updatedPos);
+    return recursiveMatch(nested, argument);
+  });
+  recordNestedMatcher(nested);
+  return *this;
+}
+
+transform_ext::BlockBodyMatcher &
+transform_ext::BlockBodyMatcher::operations(transform_ext::NumEqualsTo num) {
+  addPredicate([=](Block &block) {
+    LLVM_DEBUG(DBGS() << "block has exactly " << num.value << " operations");
+    return num.value == std::distance(block.begin(), block.end());
+  });
+  return *this;
+}
+
+transform_ext::BlockBodyMatcher &transform_ext::BlockBodyMatcher::terminator(
+    transform_ext::CapturingOpMatcher &nested) {
+  addPredicate([&nested](Block &block) {
+    Operation *terminator = block.getTerminator();
+    LLVM_DEBUG(DBGS() << "has terminator");
+    if (!terminator) {
+      return false;
+    }
+    return recursiveMatch(nested, terminator);
+  });
+  recordNestedMatcher(nested);
+  return *this;
 }
 
 //===---------------------------------------------------------------------===//
@@ -114,44 +472,11 @@ bool transform_ext::ValueMatcher::match(Value value) {
 // StructuredOpMatcher and friends.
 //===---------------------------------------------------------------------===//
 
-void transform_ext::StructuredOpMatcher::debugOutputForCreate(
-    ArrayRef<StringRef> opNames) {
-  LLVM_DEBUG(DBGS() << "operation type is one of {";
-             llvm::interleaveComma(opNames, llvm::dbgs()); llvm::dbgs() << "}");
-}
-
-bool transform_ext::StructuredOpMatcher::match(Operation *op) {
-  auto debugRAII =
-      llvm::make_scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
-  LLVM_DEBUG(DBGS() << "matching: " << *op << "\n");
-
-  if (getCaptured()) {
-    LLVM_DEBUG(DBGS() << "found an already captured op: ");
-    if (getCaptured() == op) {
-      LLVM_DEBUG(llvm::dbgs() << "same\n");
-      return true;
-    } else {
-      LLVM_DEBUG(llvm::dbgs() << "different\n");
-      return false;
-    }
-  }
-
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) {
-    LLVM_DEBUG(DBGS() << "not a structured op\n");
-    return false;
-  }
-
-  if (!llvm::all_of(predicates, [linalgOp](const PredicateFn &fn) {
-        bool result = fn(linalgOp);
-        LLVM_DEBUG(llvm::dbgs() << ": " << result << "\n");
-        return result;
-      })) {
-    return false;
-  }
-
-  captured = linalgOp;
-  return true;
+transform_ext::StructuredOpMatcher::StructuredOpMatcher() {
+  addPredicate([](Operation *op) {
+    LLVM_DEBUG(DBGS() << "is a structured op");
+    return isa<linalg::LinalgOp>(op);
+  });
 }
 
 //===---------------------------------------------------------------------===//
@@ -160,7 +485,7 @@ bool transform_ext::StructuredOpMatcher::match(Operation *op) {
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::rank(NumGreaterEqualTo minRank) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "rank >= " << minRank.value);
     return linalgOp.getNumLoops() >= minRank.value;
   });
@@ -169,7 +494,7 @@ transform_ext::StructuredOpMatcher::rank(NumGreaterEqualTo minRank) {
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::rank(NumLowerEqualTo maxRank) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "rank <= " << maxRank.value);
     return linalgOp.getNumLoops() <= maxRank.value;
   });
@@ -189,8 +514,8 @@ StringRef stringifyShapeKind(transform_ext::ShapeKind kind) {
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(SmallVector<int64_t> &&dimensions,
                                         ShapeKind kind) {
-  predicates.push_back([dimensions = std::move(dimensions),
-                        kind](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([dimensions = std::move(dimensions),
+                kind](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "dimensions [";
                llvm::interleaveComma(dimensions, llvm::dbgs());
                llvm::dbgs() << "] are " << stringifyShapeKind(kind));
@@ -212,7 +537,7 @@ transform_ext::StructuredOpMatcher::dim(SmallVector<int64_t> &&dimensions,
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(AllDims tag, ShapeKind kind) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all dimensions are " << stringifyShapeKind(kind));
     SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
     return llvm::all_of(shape, [=](int64_t dimension) {
@@ -225,8 +550,8 @@ transform_ext::StructuredOpMatcher::dim(AllDims tag, ShapeKind kind) {
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(SmallVector<int64_t> &&dimensions,
                                         utils::IteratorType kind) {
-  predicates.push_back([dimensions = std::move(dimensions),
-                        kind](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([dimensions = std::move(dimensions),
+                kind](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "dimensions [";
                llvm::interleaveComma(dimensions, llvm::dbgs());
                llvm::dbgs() << "] are " << utils::stringifyIteratorType(kind));
@@ -254,8 +579,8 @@ transform_ext::StructuredOpMatcher::dim(AllDims tag, utils::IteratorType kind) {
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(AllDimsExcept &&dims,
                                         utils::IteratorType kind) {
-  predicates.push_back([dimensions = std::move(dims),
-                        kind](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([dimensions = std::move(dims),
+                kind](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all dimensions except [";
                llvm::interleaveComma(dimensions.getExcluded(), llvm::dbgs());
                llvm::dbgs() << "] are " << utils::stringifyIteratorType(kind));
@@ -281,7 +606,7 @@ transform_ext::StructuredOpMatcher::dim(AllDimsExcept &&dims,
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(int64_t dimension,
                                         DivisibleBy divisibleBy) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "dimension " << dimension << " is divisible by "
                       << divisibleBy.value);
     int64_t rank = linalgOp.getNumLoops();
@@ -301,7 +626,7 @@ transform_ext::StructuredOpMatcher::dim(int64_t dimension,
 //===---------------------------------------------------------------------===//
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::rank(CaptureRank capture) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "capture rank");
     capture.value = linalgOp.getNumLoops();
     return true;
@@ -311,7 +636,7 @@ transform_ext::StructuredOpMatcher::rank(CaptureRank capture) {
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(int64_t dimension, CaptureDim capture) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "capture dimension");
     int64_t rank = linalgOp.getNumLoops();
     int64_t transformedDimension =
@@ -327,7 +652,7 @@ transform_ext::StructuredOpMatcher::dim(int64_t dimension, CaptureDim capture) {
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::dim(AllDims tag, CaptureDims captures) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "capture all dimensions");
     captures.value = linalgOp.getStaticLoopRanges();
     return true;
@@ -338,7 +663,7 @@ transform_ext::StructuredOpMatcher::dim(AllDims tag, CaptureDims captures) {
 transform_ext::StructuredOpMatcher::StructuredOpMatcher(
     StructuredOpMatcher &A, StructuredOpMatcher &B) {
 
-  predicates.push_back([&A, &B](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([&A, &B](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "start recursive lhs OR match {\n");
     {
       auto debugRAII = llvm::make_scope_exit(
@@ -357,6 +682,20 @@ transform_ext::StructuredOpMatcher::StructuredOpMatcher(
   });
   recordNestedMatcher(A);
   recordNestedMatcher(B);
+}
+
+//===---------------------------------------------------------------------===//
+// Body constraints.
+//===---------------------------------------------------------------------===//
+
+transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::body(
+    transform_ext::BlockBodyMatcher &nested) {
+  addPredicate([&nested](linalg::LinalgOp linalgOp) {
+    LLVM_DEBUG(DBGS() << "body block is\n");
+    return recursiveMatch(nested, *linalgOp.getBlock());
+  });
+  recordNestedMatcher(nested);
+  return *this;
 }
 
 //===---------------------------------------------------------------------===//
@@ -379,8 +718,8 @@ void transform_ext::StructuredOpMatcher::addInputMatcher(
 void transform_ext::StructuredOpMatcher::addInputMatcher(
     int64_t position, std::function<bool(Value)> matcher,
     OptionalMatch optional) {
-  predicates.push_back([position, optional, matcher = std::move(matcher)](
-                           linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([position, optional, matcher = std::move(matcher)](
+                   linalg::LinalgOp linalgOp) -> bool {
     int64_t transformedPosition =
         position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
     if (transformedPosition >= linalgOp.getNumDpsInputs()) {
@@ -406,7 +745,7 @@ void transform_ext::StructuredOpMatcher::addInputMatcher(
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::input(AllOperands tag, IsPermutation) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all input operands have permutation maps");
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
@@ -421,7 +760,7 @@ transform_ext::StructuredOpMatcher::input(AllOperands tag, IsPermutation) {
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::input(AllOperands tag,
                                           IsProjectedPermutation) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all input operands have projected permutation maps");
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
@@ -452,7 +791,7 @@ static bool isProjectedMap(AffineMap map, int64_t projectedDim) {
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::input(SmallVector<int64_t> &&positions,
                                           IsProjected dim) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "operands ";
                llvm::interleaveComma(positions, llvm::dbgs());
                llvm::dbgs() << " have a permutation maps with " << dim.value
@@ -471,7 +810,7 @@ transform_ext::StructuredOpMatcher::input(SmallVector<int64_t> &&positions,
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::input(AllOperands tag, IsIdentity) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all input operands have identity maps");
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
@@ -486,7 +825,7 @@ transform_ext::StructuredOpMatcher::input(AllOperands tag, IsIdentity) {
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::input(SmallVector<int64_t> &&positions,
                                           IsIdentity) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "input operands ";
                llvm::interleaveComma(positions, llvm::dbgs());
                llvm::dbgs() << " have identity maps");
@@ -506,7 +845,7 @@ transform_ext::StructuredOpMatcher::input(SmallVector<int64_t> &&positions,
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::input(int64_t position,
                                           ElementTypeBitWidth width) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "input operand #" << position
                       << " has elemental type with bit width " << width.value);
     int64_t updatedPosition =
@@ -526,7 +865,7 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::input(int64_t position,
                                           CaptureElementTypeBitWidth width) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "input operand #" << position << " capture bitwidth");
     int64_t updatedPosition =
         position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
@@ -546,7 +885,7 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::input(NumEqualsTo num) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "number of input operands == " << num.value);
     return linalgOp.getNumDpsInputs() == num.value;
   });
@@ -568,8 +907,8 @@ transform_ext::StructuredOpMatcher::input(int64_t position, ConstantFloatZero) {
 
 transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::input(
     int64_t position, std::function<bool(llvm::APFloat)> floatValueFn) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    LLVM_DEBUG(DBGS() << "input operands " << position
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
+    LLVM_DEBUG(DBGS() << "input operand #" << position
                       << " is a special floating point constant");
     int64_t updatedPosition =
         position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
@@ -592,8 +931,8 @@ transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::input(
 void transform_ext::StructuredOpMatcher::addOutputMatcher(
     int64_t position, std::function<bool(Operation *)> matcher,
     OptionalMatch optional) {
-  predicates.push_back([position, optional, matcher = std::move(matcher)](
-                           linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([position, optional, matcher = std::move(matcher)](
+                   linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "output operand #" << position
                       << (optional.value ? " (optional match) " : " ")
                       << "is produced by\n");
@@ -619,7 +958,7 @@ void transform_ext::StructuredOpMatcher::addOutputMatcher(
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(AllOperands tag, IsPermutation) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have permutation maps");
     for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
       if (!linalgOp.getMatchingIndexingMap(operand).isPermutation())
@@ -633,7 +972,7 @@ transform_ext::StructuredOpMatcher::output(AllOperands tag, IsPermutation) {
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(AllOperands tag,
                                            IsProjectedPermutation) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have projected permutation maps");
     for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
       if (!linalgOp.getMatchingIndexingMap(operand).isProjectedPermutation())
@@ -646,7 +985,7 @@ transform_ext::StructuredOpMatcher::output(AllOperands tag,
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(AllOperands tag, IsProjected dim) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have a maps with projected");
     int64_t updatedDim =
         dim.value >= 0 ? dim.value : linalgOp.getNumLoops() + dim.value;
@@ -662,7 +1001,7 @@ transform_ext::StructuredOpMatcher::output(AllOperands tag, IsProjected dim) {
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(AllOperands tag, IsIdentity) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have identity permutation maps");
     for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
       if (!linalgOp.getMatchingIndexingMap(operand).isIdentity())
@@ -676,7 +1015,7 @@ transform_ext::StructuredOpMatcher::output(AllOperands tag, IsIdentity) {
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(int64_t position,
                                            ElementTypeBitWidth width) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "output operand #" << position
                       << " has elemental type with bit width " << width.value);
     int64_t updatedPosition =
@@ -696,7 +1035,7 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(int64_t position,
                                            CaptureElementTypeBitWidth width) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "output operand #" << position << " capture bitwidth");
     int64_t updatedPosition =
         position >= 0 ? position : linalgOp.getNumDpsInits() + position;
@@ -717,7 +1056,7 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(int64_t position,
                                            SingleCombinerReduction tag) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "output operand #" << position
                       << " is populated by a single-combiner reduction");
     int64_t updatedPosition =
@@ -734,7 +1073,7 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(NumEqualsTo num) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "number of output operands == " << num.value);
     return linalgOp.getNumDpsInits() == num.value;
   });
@@ -748,8 +1087,8 @@ transform_ext::StructuredOpMatcher::output(NumEqualsTo num) {
 void transform_ext::StructuredOpMatcher::addResultMatcher(
     int64_t position, HasAnyUse tag, std::function<bool(Operation *)> matcher,
     OptionalMatch optional) {
-  predicates.push_back([matcher = std::move(matcher), optional,
-                        position](linalg::LinalgOp linalgOp) -> bool {
+  addPredicate([matcher = std::move(matcher), optional,
+                position](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "result #" << position
                       << (optional.value ? " (optional match) " : " ")
                       << "has a use\n");
@@ -796,74 +1135,48 @@ bool transform_ext::StructuredOpMatcher::checkAllTilableMatched(
 // Constraints on op region.
 //===-------------------------------------------------------------------===//
 
-transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::singleOpWithCanonicaleArgs(
-    StringRef opcode, bool commutative) {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) {
-    if (linalgOp.getBlock()->getOperations().size() != 2)
-      return false;
-    Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
-    if (innerOp->getName().getStringRef() != opcode ||
-        innerOp->getNumResults() != 1)
-      return false;
-    Operation *yieldOp = linalgOp.getBlock()->getTerminator();
-    if (yieldOp->getNumOperands() != 1)
-      return false;
-    if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
-      return false;
-    if (commutative && innerOp->getNumOperands() == 2) {
-      auto arg0 = dyn_cast<BlockArgument>(innerOp->getOperand(0));
-      auto arg1 = dyn_cast<BlockArgument>(innerOp->getOperand(1));
-      if (!arg0 || !arg1)
-        return false;
-      if (arg0.getParentBlock() != linalgOp.getBlock() ||
-          arg1.getParentBlock() != linalgOp.getBlock())
-        return false;
-      if (!((arg0.getArgNumber() == 0 && arg1.getArgNumber() == 1) ||
-            (arg1.getArgNumber() == 0 && arg0.getArgNumber() == 1)))
-        return false;
-    } else {
-      for (auto [index, operand] : llvm::enumerate(innerOp->getOperands())) {
-        auto arg = dyn_cast<BlockArgument>(operand);
-        if (!arg || arg.getParentBlock() != linalgOp.getBlock() ||
-            arg.getArgNumber() != index)
-          return false;
-      }
-    }
-    return true;
-  });
-  return *this;
+/// Configures the `body` block matcher to match a block with one operation
+/// feeding exactly one value to the terminator. Returns the matcher of this
+/// operation for further chaining.
+template <typename OpTy>
+static transform_ext::CapturingOpMatcher &
+singleOpBody(transform_ext::MatcherContext &matcherContext, size_t numArguments,
+             transform_ext::BlockBodyMatcher &body) {
+  using namespace transform_ext;
+
+  auto &inner = m_Operation<OpTy>(matcherContext)
+                    .operand(NumEqualsTo(numArguments))
+                    .result(NumEqualsTo(1));
+
+  auto &terminator =
+      m_Operation(matcherContext).operand(NumEqualsTo(1)).operand(0, inner);
+
+  body = body.operations(NumEqualsTo(2))
+             .argument(NumGreaterEqualTo(numArguments))
+             .terminator(terminator);
+  return inner;
 }
 
-transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::isFloatReciprocal() {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) {
-    LLVM_DEBUG(DBGS() << "op region represents a reciprocal operation");
-    if (linalgOp.getBlock()->getOperations().size() != 2)
-      return false;
-    Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
-    if (!isa<arith::DivFOp>(innerOp) || innerOp->getNumResults() != 1)
-      return false;
-    Operation *yieldOp = linalgOp.getBlock()->getTerminator();
-    if (yieldOp->getNumOperands() != 1)
-      return false;
-    if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
-      return false;
-    auto cst = innerOp->getOperand(0).getDefiningOp<arith::ConstantFloatOp>();
-    if (!cst || cst.value().convertToDouble() != 1.0)
-      return false;
-    auto arg = dyn_cast<BlockArgument>(innerOp->getOperand(1));
-    if (!arg || arg.getParentBlock() != linalgOp.getBlock() ||
-        arg.getArgNumber() != 0)
-      return false;
-    return true;
-  });
-  return *this;
+/// Adds a predicate to `op` that matches its body to be a float reciprocal
+/// (1.0/x) computation. Returns the updated `op`.
+static transform_ext::StructuredOpMatcher &
+floatReciprocalBody(transform_ext::MatcherContext &matcherContext,
+                    transform_ext::StructuredOpMatcher &op) {
+  using namespace transform_ext;
+
+  BlockBodyMatcher &body = m_Block(matcherContext);
+  CapturingOpMatcher &inner =
+      singleOpBody<arith::DivFOp>(matcherContext, /*numArguments=*/2, body);
+
+  auto &arg = m_Value(matcherContext);
+  body = body.argument(NumGreaterEqualTo(1)).argument(0, arg);
+  inner = inner.operand(0, ConstantFloatOne()).operand(1, arg);
+  return op.body(body);
 }
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::passThroughOp() {
-  predicates.push_back([=](linalg::LinalgOp linalgOp) {
+  addPredicate([=](linalg::LinalgOp linalgOp) {
     if (linalgOp.getBlock()->getOperations().size() != 1)
       return false;
     Operation *yieldOp = linalgOp.getBlock()->getTerminator();
@@ -1020,11 +1333,57 @@ void transform_ext::makeReductionMatcher(transform_ext::MatcherContext &context,
                        captures);
 }
 
+/// Adds a predicate to `op` checking that its body has one operation of type
+/// OpTy feeding the terminator. The operation has `numArguments` operands that
+/// correspond to block arguments and is commutative if indicated so. In the
+/// latter case, the block arguments may be swapped in the operand list.
+/// Otherwise they are checked to appear in the same order as in the block
+/// argument list.
+template <typename OpTy>
+static transform_ext::StructuredOpMatcher &
+singleOpBodyWithCanonicalArgs(transform_ext::MatcherContext &matcherContext,
+                              transform_ext::StructuredOpMatcher &op,
+                              size_t numArguments, bool isCommutative) {
+  using namespace transform_ext;
+  assert((!isCommutative || numArguments == 2) &&
+         "commutative ops are expected to have 2 arguments");
+
+  BlockBodyMatcher &body = m_Block(matcherContext);
+  if (isCommutative) {
+    auto &lhs = m_Value(matcherContext);
+    auto &rhs = m_Value(matcherContext);
+
+    // It is important for the argument predicates to be listed first here:
+    // the nested value matchers will capture the values that will be later
+    // checked against in the two alternatives. Otherwise, the values will be
+    // captured by the first of the alternatives and fail for the second.
+    // TODO: consider explicit indication of when a nested matcher is allowed to
+    // capture.
+    body = body.argument(0, lhs).argument(1, rhs);
+    CapturingOpMatcher &inner =
+        singleOpBody<OpTy>(matcherContext, /*numArguments=*/numArguments, body);
+
+    inner = inner.alternatives(
+        m_Operation(matcherContext).operand(0, lhs).operand(1, rhs),
+        m_Operation(matcherContext).operand(0, rhs).operand(1, lhs));
+  } else {
+    CapturingOpMatcher &inner =
+        singleOpBody<OpTy>(matcherContext, /*numArguments=*/numArguments, body);
+    for (size_t i = 0; i < numArguments; ++i) {
+      auto &operand = m_Value(matcherContext);
+      body = body.argument(i, operand);
+      inner = inner.operand(i, operand);
+    }
+  }
+
+  return op.body(body);
+}
+
 /// Match sum(%src, broadcast(%reduction))
-static void matchSubBroadcat(transform_ext::MatcherContext &matcherContext,
-                             transform_ext::StructuredOpMatcher &maxReduction,
-                             transform_ext::ValueMatcher &softmaxSourceOperand,
-                             transform_ext::StructuredOpMatcher *&sub) {
+static void matchSubBroadcast(transform_ext::MatcherContext &matcherContext,
+                              transform_ext::StructuredOpMatcher &maxReduction,
+                              transform_ext::ValueMatcher &softmaxSourceOperand,
+                              transform_ext::StructuredOpMatcher *&sub) {
   using namespace transform_ext;
 
   auto &broadcast =
@@ -1039,7 +1398,6 @@ static void matchSubBroadcat(transform_ext::MatcherContext &matcherContext,
 
   auto &subParallel =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
-          .singleOpWithCanonicaleArgs<arith::SubFOp>()
           .dim(AllDims(), utils::IteratorType::parallel)
           .input(NumEqualsTo(2))
           .input(0, IsIdentity())
@@ -1048,10 +1406,11 @@ static void matchSubBroadcat(transform_ext::MatcherContext &matcherContext,
           .output(AllOperands(), IsIdentity());
   subParallel = subParallel.input(0, softmaxSourceOperand);
   subParallel = subParallel.input(1, broadcast);
+  subParallel = singleOpBodyWithCanonicalArgs<arith::SubFOp>(
+      matcherContext, subParallel, /*numArguments=*/2, /*isCommutative=*/false);
 
   auto &subBroadcast =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
-          .singleOpWithCanonicaleArgs<arith::SubFOp>()
           .dim(AllDims(), utils::IteratorType::parallel)
           .input(NumEqualsTo(2))
           .input(0, IsIdentity())
@@ -1060,6 +1419,9 @@ static void matchSubBroadcat(transform_ext::MatcherContext &matcherContext,
           .output(AllOperands(), IsIdentity());
   subBroadcast = subBroadcast.input(0, softmaxSourceOperand);
   subBroadcast = subBroadcast.input(1, maxReduction);
+  subBroadcast = singleOpBodyWithCanonicalArgs<arith::SubFOp>(
+      matcherContext, subBroadcast, /*numArguments=*/2,
+      /*isCommutative=*/false);
   auto &subOr = transform_ext::m_StructuredOp_Or(matcherContext, subBroadcast,
                                                  subParallel);
   sub = &subOr;
@@ -1084,7 +1446,6 @@ static void matchdivBroadcast(transform_ext::MatcherContext &matcherContext,
 
   auto &divNoBroadcast =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
-          .singleOpWithCanonicaleArgs<arith::DivFOp>()
           .dim(AllDims(), utils::IteratorType::parallel)
           .input(NumEqualsTo(2))
           .input(0, IsIdentity())
@@ -1094,10 +1455,12 @@ static void matchdivBroadcast(transform_ext::MatcherContext &matcherContext,
 
   divNoBroadcast = divNoBroadcast.input(0, expOperand);
   divNoBroadcast = divNoBroadcast.input(1, broadcast);
+  divNoBroadcast = singleOpBodyWithCanonicalArgs<arith::DivFOp>(
+      matcherContext, divNoBroadcast, /*numArguments=*/2,
+      /*isCommutative=*/false);
 
   auto &divBroadcast =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
-          .singleOpWithCanonicaleArgs<arith::DivFOp>()
           .dim(AllDims(), utils::IteratorType::parallel)
           .input(NumEqualsTo(2))
           .input(0, IsIdentity())
@@ -1107,6 +1470,9 @@ static void matchdivBroadcast(transform_ext::MatcherContext &matcherContext,
 
   divBroadcast = divBroadcast.input(0, expOperand);
   divBroadcast = divBroadcast.input(1, sum);
+  divBroadcast = singleOpBodyWithCanonicalArgs<arith::DivFOp>(
+      matcherContext, divBroadcast, /*numArguments=*/2,
+      /*isCommutative=*/false);
 
   auto &divMerge = transform_ext::m_StructuredOp_Or(
       matcherContext, divNoBroadcast, divBroadcast);
@@ -1123,7 +1489,6 @@ void transform_ext::makeSoftmaxMatcher(
                            .input(0, ConstantFloatMinOrMinusInf());
   auto &maxReduction =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
-          .singleOpWithCanonicaleArgs<arith::MaxFOp>(/*commutative=*/true)
           // Only handle most inner reduction for now.
           .dim(-1, utils::IteratorType::reduction)
           .dim(AllDimsExcept({-1}), utils::IteratorType::parallel)
@@ -1133,48 +1498,51 @@ void transform_ext::makeSoftmaxMatcher(
           .output(AllOperands(), IsProjected(-1));
   maxReduction = maxReduction.input(0, softmaxSourceOperand);
   maxReduction = maxReduction.output(0, fillMinusInf);
+  maxReduction = singleOpBodyWithCanonicalArgs<arith::MaxFOp>(
+      matcherContext, maxReduction, /*numArguments=*/2, /*isCommutative=*/true);
   maxReductionCapture = &maxReduction;
 
   transform_ext::StructuredOpMatcher *subOperand;
-  matchSubBroadcat(matcherContext, maxReduction, softmaxSourceOperand,
-                   subOperand);
+  matchSubBroadcast(matcherContext, maxReduction, softmaxSourceOperand,
+                    subOperand);
 
   auto &expOperand = m_StructuredOp<linalg::GenericOp>(matcherContext)
-                         .singleOpWithCanonicaleArgs<math::ExpOp>()
                          .dim(AllDims(), utils::IteratorType::parallel)
                          .input(NumEqualsTo(1))
                          .input(AllOperands(), IsIdentity())
                          .output(AllOperands(), IsIdentity())
                          .output(NumEqualsTo(1));
   expOperand = expOperand.input(0, *subOperand);
+  expOperand = singleOpBodyWithCanonicalArgs<math::ExpOp>(
+      matcherContext, expOperand, /*numArguments=*/1, /*isCommutative=*/false);
 
   auto &fillZero = m_StructuredOp<linalg::FillOp>(matcherContext)
                        .input(0, ConstantFloatZero());
-  auto &sum =
-      m_StructuredOp<linalg::GenericOp>(matcherContext)
-          .singleOpWithCanonicaleArgs<arith::AddFOp>(/*commutative=*/true)
-          // Only handle most inner reduction for now.
-          .dim(-1, utils::IteratorType::reduction)
-          .dim(AllDimsExcept({-1}), utils::IteratorType::parallel)
-          .input(NumEqualsTo(1))
-          .input(AllOperands(), IsIdentity())
-          .output(AllOperands(), IsProjected(-1))
-          .output(NumEqualsTo(1));
+  auto &sum = m_StructuredOp<linalg::GenericOp>(matcherContext)
+                  // Only handle most inner reduction for now.
+                  .dim(-1, utils::IteratorType::reduction)
+                  .dim(AllDimsExcept({-1}), utils::IteratorType::parallel)
+                  .input(NumEqualsTo(1))
+                  .input(AllOperands(), IsIdentity())
+                  .output(AllOperands(), IsProjected(-1))
+                  .output(NumEqualsTo(1));
   sum = sum.input(0, expOperand);
   sum = sum.output(0, fillZero);
+  sum = singleOpBodyWithCanonicalArgs<arith::AddFOp>(
+      matcherContext, sum, /*numArguments=*/2, /*isCommutative=*/true);
 
   auto &rcpOperand = m_StructuredOp<linalg::GenericOp>(matcherContext)
-                         .isFloatReciprocal()
+                         //  .isFloatReciprocal()
                          .dim(AllDims(), utils::IteratorType::parallel)
                          .input(NumEqualsTo(1))
                          .input(AllOperands(), IsIdentity())
                          .output(AllOperands(), IsIdentity())
                          .output(NumEqualsTo(1));
   rcpOperand = rcpOperand.input(0, sum);
+  rcpOperand = floatReciprocalBody(matcherContext, rcpOperand);
 
   auto &mulOperand =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
-          .singleOpWithCanonicaleArgs<arith::MulFOp>(/*commutative=*/true)
           .dim(AllDims(), utils::IteratorType::parallel)
           .input(NumEqualsTo(2))
           .input(0, IsIdentity())
@@ -1184,6 +1552,8 @@ void transform_ext::makeSoftmaxMatcher(
 
   mulOperand = mulOperand.input(0, expOperand);
   mulOperand = mulOperand.input(1, rcpOperand);
+  mulOperand = singleOpBodyWithCanonicalArgs<arith::MulFOp>(
+      matcherContext, mulOperand, /*numArguments=*/2, /*isCommutative=*/true);
 
   transform_ext::StructuredOpMatcher *divOperand;
   matchdivBroadcast(matcherContext, expOperand, sum, divOperand);
