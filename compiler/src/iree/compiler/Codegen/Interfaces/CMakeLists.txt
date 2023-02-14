@@ -19,9 +19,9 @@ iree_cc_library(
     "Interfaces.cpp"
   DEPS
     ::BufferizationInterfaces
-    ::MicroKernelOpInterface
     ::PartitionableLoopsInterface
     ::ProcessorOpInterfaces
+    ::UKernelOpInterface
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
     MLIRAffineTransformOps
@@ -68,16 +68,16 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    MicroKernelOpInterface
+    UKernelOpInterface
   HDRS
-    "MicroKernelOpInterface.h"
+    "UKernelOpInterface.h"
   TEXTUAL_HDRS
-    "MicroKernelOpInterface.cpp.inc"
-    "MicroKernelOpInterface.h.inc"
+    "UKernelOpInterface.cpp.inc"
+    "UKernelOpInterface.h.inc"
   SRCS
-    "MicroKernelOpInterface.cpp"
+    "UKernelOpInterface.cpp"
   DEPS
-    ::MicroKernelOpInterfaceGen
+    ::UKernelOpInterfaceGen
     MLIRFuncDialect
     MLIRIR
   PUBLIC
@@ -85,12 +85,12 @@ iree_cc_library(
 
 iree_tablegen_library(
   NAME
-    MicroKernelOpInterfaceGen
+    UKernelOpInterfaceGen
   TD_FILE
-    "MicroKernelOpInterface.td"
+    "UKernelOpInterface.td"
   OUTS
-    --gen-op-interface-decls MicroKernelOpInterface.h.inc
-    --gen-op-interface-defs MicroKernelOpInterface.cpp.inc
+    --gen-op-interface-decls UKernelOpInterface.h.inc
+    --gen-op-interface-defs UKernelOpInterface.cpp.inc
 )
 
 iree_cc_library(

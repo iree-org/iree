@@ -16,17 +16,17 @@ package(
 )
 
 exports_files([
-    "MicroKernelOpInterface.td",
     "ProcessorOpInterfaces.td",
+    "UKernelOpInterface.td",
 ])
 
 td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "MicroKernelOpInterface.td",
             "PartitionableLoopsInterface.td",
             "ProcessorOpInterfaces.td",
+            "UKernelOpInterface.td",
         ],
         include = ["*.td"],
     ),
@@ -45,9 +45,9 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":BufferizationInterfaces",
-        ":MicroKernelOpInterface",
         ":PartitionableLoopsInterface",
         ":ProcessorOpInterfaces",
+        ":UKernelOpInterface",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//mlir:IR",
@@ -96,38 +96,38 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
-    name = "MicroKernelOpInterface",
+    name = "UKernelOpInterface",
     srcs = [
-        "MicroKernelOpInterface.cpp",
+        "UKernelOpInterface.cpp",
     ],
     hdrs = [
-        "MicroKernelOpInterface.h",
+        "UKernelOpInterface.h",
     ],
     textual_hdrs = [
-        "MicroKernelOpInterface.cpp.inc",
-        "MicroKernelOpInterface.h.inc",
+        "UKernelOpInterface.cpp.inc",
+        "UKernelOpInterface.h.inc",
     ],
     deps = [
-        ":MicroKernelOpInterfaceGen",
+        ":UKernelOpInterfaceGen",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
     ],
 )
 
 iree_gentbl_cc_library(
-    name = "MicroKernelOpInterfaceGen",
+    name = "UKernelOpInterfaceGen",
     tbl_outs = [
         (
             ["--gen-op-interface-decls"],
-            "MicroKernelOpInterface.h.inc",
+            "UKernelOpInterface.h.inc",
         ),
         (
             ["--gen-op-interface-defs"],
-            "MicroKernelOpInterface.cpp.inc",
+            "UKernelOpInterface.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "MicroKernelOpInterface.td",
+    td_file = "UKernelOpInterface.td",
     deps = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 

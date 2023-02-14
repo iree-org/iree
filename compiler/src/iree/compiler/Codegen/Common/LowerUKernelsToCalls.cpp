@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Interfaces/MicroKernelOpInterface.h"
+#include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -15,8 +15,8 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LowerMicroKernelOpsToCallsPass
-    : LowerMicroKernelOpsToCallsBase<LowerMicroKernelOpsToCallsPass> {
+struct LowerUKernelOpsToCallsPass
+    : LowerUKernelOpsToCallsBase<LowerUKernelOpsToCallsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<memref::MemRefDialect, func::FuncDialect>();
   }
@@ -24,14 +24,14 @@ struct LowerMicroKernelOpsToCallsPass
 };
 }  // namespace
 
-void LowerMicroKernelOpsToCallsPass::runOnOperation() {
+void LowerUKernelOpsToCallsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
   SmallVector<Operation *> toDelete;
   Operation *errorOp = nullptr;
   IRRewriter rewriter(context);
   WalkResult result = getOperation().walk(
-      [&](IREE::Codegen::MicroKernelOpInterface microKernelOp) -> WalkResult {
+      [&](IREE::Codegen::UKernelOpInterface microKernelOp) -> WalkResult {
         OpBuilder::InsertionGuard g(rewriter);
         rewriter.setInsertionPoint(microKernelOp);
         FailureOr<func::CallOp> callOp =
@@ -53,9 +53,8 @@ void LowerMicroKernelOpsToCallsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createLowerMicroKernelOpsToCallsPass() {
-  return std::make_unique<LowerMicroKernelOpsToCallsPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createLowerUKernelOpsToCallsPass() {
+  return std::make_unique<LowerUKernelOpsToCallsPass>();
 }
 
 }  // namespace iree_compiler
