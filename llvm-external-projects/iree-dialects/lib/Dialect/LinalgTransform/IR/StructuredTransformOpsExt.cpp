@@ -614,8 +614,8 @@ forgetUnnecessaryHandles(transform::TransformState &state,
         return !handlesUsedAfterTransform[handle];
       });
       if (allHandlesUnused) {
-        // Store for mapping removal, but not remove immediately because it could
-        // invalidate other handles.
+        // Store for mapping removal, but not remove immediately because it
+        // could invalidate other handles.
         seen.insert(payload);
       }
     }
