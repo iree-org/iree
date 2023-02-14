@@ -354,7 +354,7 @@ struct UKernelOpsBufferizationInterface
     // Replace all `tensor` operands with corresponding `memref` operands.
     for (auto [index, operand] : llvm::enumerate(op->getOperands())) {
       // For `tensor` type operands, replace with `memref` type operand.
-      if (operand.getType().isa<RankedTensorType>()) {
+      if (operand.getType().template isa<RankedTensorType>()) {
         FailureOr<Value> memrefOperand = getBuffer(rewriter, operand, options);
         if (failed(memrefOperand)) {
           return op->emitOpError(
