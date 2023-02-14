@@ -192,6 +192,7 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-flow-enable-aggressive-fusion"
+    "--iree-vulkan-target-triple=ampere-unknown-unknown"
   LABELS
     "noasan"
     "nomsan"

@@ -149,10 +149,11 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "--iree-flow-enable-aggressive-fusion",
+        # Use a target triple that allows subgroup shuffle ops.
+        "--iree-vulkan-target-triple=ampere-unknown-unknown"
     ],
     driver = "vulkan",
     tags = [
-        # CUDA cuInit fails with sanitizer on.
         "noasan",
         "nomsan",
         "notsan",
