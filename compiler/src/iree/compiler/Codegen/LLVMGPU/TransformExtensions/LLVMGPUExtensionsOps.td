@@ -384,7 +384,6 @@ def PromoteOperandsOp :
   }];
 }
 
-
 def PipelineSharedMemoryCopiesOp : Op<
     Transform_Dialect, "iree.pipeline_shared_memory_copies", [
       FunctionalStyleTransformOpTrait,
@@ -421,6 +420,44 @@ def PipelineSharedMemoryCopiesOp : Op<
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::scf::ForOp forOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def CreateAsyncGroupsOp :
+  Op<Transform_Dialect, "iree.create_async_groups",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
+  let description = [{
+    Convert copies to shared memory to async copies. This creates groups
+    of consecutive copies and emit wait operation right after.
+    The input operation is a `func.func`.
+
+    `use_mma_sync` specifies whether or not `bypassL1` attributes should be
+    added to the async copies.
+
+    #### Return modes
+    This op returns a handle to the transformed function, even if nothing
+    changed.
+  }];
+
+  let arguments = (ins PDL_Operation:$target,
+                   BoolAttr:$use_mma_sync);
+  let results = (outs Variadic<PDL_Operation>:$result);
+
+  let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target, "bool":$use_mma_sync)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::func::FuncOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];

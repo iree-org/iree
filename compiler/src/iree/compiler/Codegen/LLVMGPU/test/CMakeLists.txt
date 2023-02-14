@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "convert_to_nvvm.mlir"
     "convert_to_nvvm_error.mlir"
     "convert_to_rocdl.mlir"
+    "create_async_groups.mlir"
     "distribute_foreach.mlir"
     "distribute_to_thread.mlir"
     "gpu_set_num_workgroups.mlir"
