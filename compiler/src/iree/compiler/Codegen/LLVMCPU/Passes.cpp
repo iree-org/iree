@@ -455,27 +455,35 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager,
                              /*useFuseTensorPadWithConsumerPass=*/false);
 
-  // Tensor-level micro-kernel optimizations.
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+
+  // Tensor-level micro-kernel lowerings and optimizations.
   // Note that this must be done post-tiling because it changes the structure
   // of the dispatch region such that tiling is not always possible.
-  if (enableMicrokernels && clEnableMicrokernelsDecomposeLinalgGeneric) {
-    passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
-        createDecomposeLinalgGenericPass());
+  if (enableMicrokernels) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPULowerToUKernelsPass());
+    if (clEnableMicrokernelsDecomposeLinalgGeneric) {
+      nestedModulePM.addNestedPass<func::FuncOp>(
+          createDecomposeLinalgGenericPass());
+    }
   }
 
   // Lower to buffers.
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addBufferizePasses(nestedModulePM);
 
   // Cleanup the IR that may now have unused loops.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
-  // Convert buffer-level microkernels.
+  // Legacy buffer-level microkernel lowerings.
   if (enableMicrokernels) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createVMVXLowerLinalgMicrokernelsPass());
   }
+
+  // Lower micro-kernels (non-legacy, post-bufferization) to function calls
+  passManager.addNestedPass<ModuleOp>(createLowerUKernelOpsToCallsPass());
 }
 
 void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
