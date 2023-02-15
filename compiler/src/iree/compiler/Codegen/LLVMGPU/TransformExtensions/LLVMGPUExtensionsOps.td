@@ -361,8 +361,11 @@ def PromoteOperandsOp :
     This op promotes the specified operands of the provided target handle.
 
     #### Return modes
-    This op returns a handle to an allocTensorOp for each of the provided
-    valid indices.
+    This op consume its target handle and returns a new handle to its target handle
+    as well as an allocTensorOp for each of the provided valid indices.
+
+    If the promotion of any specified operand fails to occur, the op definitely
+    fails.
   }];
 
   let arguments = (ins PDL_Operation:$target,
