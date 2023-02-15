@@ -414,7 +414,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       func.setDSOLocal(true);
       func.setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
     }
-    for (auto &global : llvmModule->getGlobalList()) {
+    for (auto &global : llvmModule->globals()) {
       global.setDSOLocal(true);
       global.setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
     }
