@@ -471,17 +471,13 @@ static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
 /// of tensor.unpack op for more details.
 static LogicalResult replaceUnpackEmptyWithAllocTensor(OpBuilder &b,
                                                        func::FuncOp funcOp) {
-  funcOp.walk<WalkOrder::PreOrder>([&](tensor::EmptyOp emptyOp) {
-    bool isUsedByNonPerfectUnpack = false;
-    for (const auto &use : emptyOp->getUses()) {
-      if (auto unpack = dyn_cast<IREE::LinalgExt::UnPackOp>(use.getOwner())) {
-        if (unpack->hasOneUse() &&
-            isa<tensor::ExtractSliceOp>(*(unpack->user_begin()))) {
-          isUsedByNonPerfectUnpack = true;
-        }
-      }
+  funcOp.walk([&](IREE::LinalgExt::UnPackOp unpackOp) {
+    if (!unpackOp->hasOneUse() ||
+        !isa<tensor::ExtractSliceOp>(*(unpackOp->user_begin()))) {
+      return;
     }
-    if (!isUsedByNonPerfectUnpack) return;
+    auto emptyOp = unpackOp.getOutput().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp) return;
 
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPointAfter(emptyOp);
