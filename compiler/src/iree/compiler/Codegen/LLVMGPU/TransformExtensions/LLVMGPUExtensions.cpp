@@ -658,7 +658,8 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
     target->emitOpError("vector to mma patterns failed to apply");
     return emitDefaultDefiniteFailure(target);
   }
-  convertVectorToMMAOps(target);
+  IRRewriter rewriter(getContext());
+  (void)convertVectorToMMAOps(rewriter, target);
 
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();

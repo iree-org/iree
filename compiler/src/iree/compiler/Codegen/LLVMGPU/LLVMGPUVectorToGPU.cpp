@@ -68,8 +68,9 @@ struct LLVMGPUVectorToGPUPass
       return signalPassFailure();
     }
 
+    IRRewriter rewriter(&getContext());
     if (llvmgpuUseMMASync) {
-      if (failed(convertVectorToNVVMCompatibleMMASync(funcOp))) {
+      if (failed(convertVectorToNVVMCompatibleMMASync(rewriter, funcOp))) {
         return signalPassFailure();
       }
       // Using TF32 for Float.
@@ -81,7 +82,7 @@ struct LLVMGPUVectorToGPUPass
         return signalPassFailure();
       }
     } else {
-      convertVectorToMMAOps(funcOp);
+      (void)convertVectorToMMAOps(rewriter, funcOp);
     }
     createAsyncGroups(funcOp, llvmgpuUseMMASync);
 

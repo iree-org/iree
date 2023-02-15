@@ -40,7 +40,8 @@ struct SPIRVVectorToGPUSubgroupMMAPass final
       return signalPassFailure();
     }
 
-    convertVectorToMMAOps(funcOp);
+    IRRewriter rewriter(&getContext());
+    (void)convertVectorToMMAOps(rewriter, funcOp);
 
     // Make sure we actually generate GPU subgroup mma ops.
     WalkResult result = funcOp.walk([](Operation* op) {
