@@ -541,8 +541,9 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
 
   auto lhsType = lhs->get().getType().cast<ShapedType>();
   auto rhsType = rhs->get().getType().cast<ShapedType>();
-  auto elementBits = lhsType.getElementType().getIntOrFloatBitWidth();
-  if (elementBits != 16 && elementBits != 32) return success();
+  auto elementBits =
+      static_cast<int>(lhsType.getElementType().getIntOrFloatBitWidth());
+  if (!llvm::is_contained({8, 16, 32}, elementBits)) return success();
 
   ArrayRef<int64_t> lhsShape = lhsType.getShape();
   ArrayRef<int64_t> rhsShape = rhsType.getShape();
