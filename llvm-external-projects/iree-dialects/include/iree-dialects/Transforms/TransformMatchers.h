@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Support/TypeID.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 
@@ -154,46 +155,76 @@ struct SingleCombinerReduction {};
 class CapturingOpMatcher;
 class ValueMatcher;
 class CapturingValueMatcher;
+class CapturingValuePackMatcher;
 class BlockBodyMatcher;
 
-/// Base class for capturing matchers that can be owned by the context.
+template <typename Derived>
+class CapturingMatcher;
+
+/// Base class for capturing matchers that can be owned by the context. Should
+/// not be used directly. Derived classes must derive CapturingMatcher CRTP
+/// instead to enable LLVM-style casting functionality.
 class CapturingMatcherBase {
 public:
-  // Virtual destructor so unique pointers are deallocated correctly.
-  // TODO: if efficiency is a problem, consider disallowing non-trivial
-  // destructors for subclasses.
+  /// Virtual destructor so unique pointers are deallocated correctly.
+  // TODO: if efficiency is a problem, consider disallowing derived classes with
+  // extra storage and/or providing a manual MLIR-style virtual table
+  // implementation.
   virtual ~CapturingMatcherBase() = default;
 
 protected:
+  /// Creates a matcher with the TypeID of the given derived class.
+  explicit CapturingMatcherBase(TypeID typeID) : typeID(typeID) {}
+
   /// Informs the matcher that it has another, nested matcher. Derived classes
   /// must call this to keep track of nested matchers for capture resetting
   /// purposes.
   template <typename T>
   void recordNestedMatcher(T &nested) {
-    if constexpr (std::is_base_of_v<CapturingOpMatcher, T>)
-      nestedCapturingMatchers.push_back(&nested);
-    if constexpr (std::is_base_of_v<CapturingValueMatcher, T>)
-      nestedCapturingValueMatchers.push_back(&nested);
-    if constexpr (std::is_base_of_v<BlockBodyMatcher, T>)
-      nestedBlockMatchers.push_back(&nested);
+    // if constexpr (std::is_base_of_v<CapturingMatcherBase, T>)
+    this->nested.push_back(&nested);
   }
 
   /// Appends all nested capturing matchers of a certain kind, excluding this
   /// one, to `nested`.
-  void getAllNested(SmallVectorImpl<CapturingOpMatcher *> &nested);
-  void
-  getAllNestedValueMatchers(SmallVectorImpl<CapturingValueMatcher *> &nested);
-  void getAllNestedBlockMatchers(SmallVectorImpl<BlockBodyMatcher *> &nested);
+  void getAllNested(SmallVectorImpl<CapturingMatcherBase *> &nested);
 
-  /// Resets nested capturing matchers but does NOT reset the current one.
+  /// Hook for derived classes to reset their captured objects.
+  virtual void resetThisCapture() = 0;
+
+public:
+  /// Resets this and all nested capturing matchers. This should be called if
+  /// the same pattern needs to be applied more than once as it may keep
+  /// captured values for optional nested predicates from the previous
+  /// application.
   void resetCapture();
 
+  /// Returns the type ID of the current matcher.
+  TypeID getTypeID() const { return typeID; }
+
 private:
-  /// A list of (recursively) nested capturing matchers that should be reset
-  /// when the current matcher is.
-  SmallVector<CapturingOpMatcher *, 2> nestedCapturingMatchers;
-  SmallVector<CapturingValueMatcher *, 2> nestedCapturingValueMatchers;
-  SmallVector<BlockBodyMatcher *, 2> nestedBlockMatchers;
+  /// Type ID of the current matcher, used for LLVM-style casting.
+  TypeID typeID;
+
+  /// A list of nested capturing matchers that should be reset when the current
+  /// matcher is.
+  SmallVector<CapturingMatcherBase *> nested;
+};
+
+/// CRTP base class for capturing matchers. Currently supports only one level of
+/// type hierarchy for casting. That is, only the top-level matcher can be found
+/// by `isa`/`dyn_cast`, any derived classes are only there for API wrapping.
+template <typename Derived>
+class CapturingMatcher : public CapturingMatcherBase {
+protected:
+  /// Constructs the base class with the appropriate type ID.
+  CapturingMatcher() : CapturingMatcherBase(TypeID::get<Derived>()) {}
+
+public:
+  /// Hook for LLVM-style casting.
+  static bool classof(const CapturingMatcherBase *obj) {
+    return obj->getTypeID() == TypeID::get<Derived>();
+  }
 };
 
 /// A context object holding capturing matchers, must outlive any individual
@@ -229,7 +260,7 @@ private:
 ///
 /// will match the block terminator and look at the operation defining its
 /// operands.
-class BlockBodyMatcher : public CapturingMatcherBase {
+class BlockBodyMatcher : public CapturingMatcher<BlockBodyMatcher> {
   friend class CapturingMatcherBase;
   friend class MatcherContext;
   friend BlockBodyMatcher &m_Block(MatcherContext &);
@@ -254,13 +285,8 @@ public:
   /// Returns the block that matched.
   Block *getCaptured() const { return captured; }
 
-  /// Resets the captured block to null. This should be called if the same
-  /// pattern needs to be applied more than once as it may keep captured values
-  /// for optional nested predicates from the previous application.
-  void resetCapture() {
-    captured = nullptr;
-    CapturingMatcherBase::resetCapture();
-  }
+  /// Resets the captured block to null.
+  void resetThisCapture() override { captured = nullptr; }
 
   /// Adds a predicate checking that the block has at lest the given number of
   /// arguments.
@@ -308,17 +334,14 @@ inline BlockBodyMatcher &m_Block_Or(MatcherContext &matcherContext,
 }
 
 /// Base class for value matchers that capture the matched value.
-class CapturingValueMatcher : public CapturingMatcherBase {
+class CapturingValueMatcher : public CapturingMatcher<CapturingValueMatcher> {
   friend class CapturingMatcherBase;
 
 public:
   /// Resets the captured value to null. This should be called if the same
   /// pattern needs to be applied more than once as it may keep captured values
   /// for optional nested predicates from the previous application.
-  void resetCapture() {
-    captured = nullptr;
-    CapturingMatcherBase::resetCapture();
-  }
+  void resetThisCapture() override { captured = nullptr; }
 
   /// Returns the matched value if the match was successful.
   Value getCaptured() const { return captured; }
@@ -326,6 +349,32 @@ public:
 protected:
   Value captured = nullptr;
 };
+
+/// Matcher for a pack of values that are treated as a group.
+class CapturingValuePackMatcher
+    : public CapturingMatcher<CapturingValuePackMatcher> {
+public:
+  /// Clears the captured pack of values.
+  void resetThisCapture() override { capturedValuesSet = false; }
+
+  /// Returns the captured pack of values, if any. Note that the captured pack
+  /// may be empty, which is different from no pack being captured.
+  std::optional<ValueRange> getCaptured() const;
+
+  /// Returns `true` if the given pack of value satisfies the matching criteria.
+  bool match(ValueRange values);
+
+private:
+  /// Storage for the captured pack of values. The boolean indicates whether
+  /// something was captured, including an empty pack of values.
+  SmallVector<Value> capturedValues;
+  bool capturedValuesSet;
+};
+
+/// Creates a matcher for a pack of values in the given context.
+inline CapturingValuePackMatcher &m_ValuePack(MatcherContext &context) {
+  return context.allocate<CapturingValuePackMatcher>();
+}
 
 /// Matcher for a value, stores a list of predicates and requires all of them to
 /// match for the value to match. Once a value matched, any repeated use just
@@ -356,7 +405,7 @@ inline ValueMatcher &m_Value(MatcherContext &context) {
 /// increases readability, it also allows us to port the matcher to a
 /// declarative format using PDL and/or Transform dialect in the future. The
 /// latter will become impossible with arbitrary C++ callbacks.
-class CapturingOpMatcher : public CapturingMatcherBase {
+class CapturingOpMatcher : public CapturingMatcher<CapturingOpMatcher> {
   friend class CapturingMatcherBase;
   friend class MatcherContext;
 
@@ -369,13 +418,8 @@ public:
   /// Matches the given operation, hook for `matchPattern`.
   bool match(Operation *op);
 
-  /// Resets the captured value to null. This should be called if the same
-  /// pattern needs to be applied more than once as it may keep captured values
-  /// for optional nested predicates from the previous application.
-  void resetCapture() {
-    captured = nullptr;
-    CapturingMatcherBase::resetCapture();
-  }
+  /// Resets the captured value to null.
+  void resetThisCapture() override { captured = nullptr; }
 
   /// Returns the matched operation if the match was successful.
   Operation *getCaptured() const { return captured; }
@@ -408,6 +452,11 @@ public:
   /// defined by `arith.constant` with the value 1.0.
   // TODO: better matching for attributes.
   CapturingOpMatcher &operand(int64_t pos, ConstantFloatOne);
+
+  /// Adds a predicate checking that the pack of values consisting of all
+  /// operands satisfies the given value pack matcher.
+  CapturingOpMatcher &operand(AllOperands tag,
+                              CapturingValuePackMatcher &nested);
 
   /// Adds a predicate checking that the operation has exactly the given number
   /// of results.
@@ -542,7 +591,14 @@ public:
   //===-------------------------------------------------------------------===//
   // Body constraints.
   //===-------------------------------------------------------------------===//
+
+  /// Adds a predicate checking that the body of the structured operation
+  /// satisfies the given block matcher.
   StructuredOpMatcher &body(BlockBodyMatcher &body);
+
+  /// Adds a predicate checking that the arguments of the body block that
+  /// correspond to input operands satisfy the given value pack matcher.
+  StructuredOpMatcher &bodyInputArguments(CapturingValuePackMatcher &nested);
 
   //===-------------------------------------------------------------------===//
   // Constraints on input operands.
@@ -633,7 +689,7 @@ public:
   /// be added *after* all the other predicates that capture.
   template <typename OpTy>
   StructuredOpMatcher &allTilableOpsCaptured() {
-    SmallVector<CapturingOpMatcher *> copy;
+    SmallVector<CapturingMatcherBase *> copy;
     copy.push_back(this);
     getAllNested(copy);
     addPredicate([copy = std::move(copy)](linalg::LinalgOp linalgOp) {
@@ -726,14 +782,6 @@ public:
     return *this;
   }
 
-  //===-------------------------------------------------------------------===//
-  // Constraints on op region.
-  //===-------------------------------------------------------------------===//
-
-  /// Check if the op is a linalg of with a region containing only a yield op
-  /// using block arguments in order.
-  StructuredOpMatcher &passThroughOp();
-
 private:
   /// Adds a predicate for the matched operation to satisfy.
   void addPredicate(std::function<bool(linalg::LinalgOp)> predicate) {
@@ -750,7 +798,7 @@ private:
   /// for `linalgOp`. This is an implementation detail of allTilableOpsCaptured.
   static bool checkAllTilableMatched(Operation *parent,
                                      linalg::LinalgOp linalgOp,
-                                     ArrayRef<CapturingOpMatcher *> matchers);
+                                     ArrayRef<CapturingMatcherBase *> matchers);
 
   /// Non-template implementations of nested predicate builders for inputs,
   /// outputs and results. Should not be called directly.
@@ -927,5 +975,9 @@ void makeSoftmaxMatcher(
 
 } // namespace transform_ext
 } // namespace mlir
+
+MLIR_DECLARE_EXPLICIT_TYPE_ID(::mlir::transform_ext::BlockBodyMatcher);
+MLIR_DECLARE_EXPLICIT_TYPE_ID(::mlir::transform_ext::CapturingOpMatcher);
+MLIR_DECLARE_EXPLICIT_TYPE_ID(::mlir::transform_ext::CapturingValueMatcher);
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_TRANSFORMMATCHERS_H_

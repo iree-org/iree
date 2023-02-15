@@ -14,6 +14,7 @@ add_mlir_library(IREEDialectsTransforms
   MLIRLinalgDialect
   MLIRLinalgTransforms
   MLIRMathDialect
+  MLIRSupport
 
   DEPENDS
   mlir-headers

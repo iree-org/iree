@@ -26,107 +26,22 @@ using namespace mlir;
 //===---------------------------------------------------------------------===//
 
 void transform_ext::CapturingMatcherBase::getAllNested(
-    SmallVectorImpl<CapturingOpMatcher *> &nested) {
-
-  SetVector<CapturingOpMatcher *> found;
+    SmallVectorImpl<CapturingMatcherBase *> &nested) {
+  SetVector<CapturingMatcherBase *> found;
   found.insert(nested.begin(), nested.end());
-  int64_t start = found.size();
-
-  auto appendOne = [&found](CapturingMatcherBase &one) {
-    found.insert(one.nestedCapturingMatchers.begin(),
-                 one.nestedCapturingMatchers.end());
-    for (BlockBodyMatcher *blockMatcher : one.nestedBlockMatchers) {
-      found.insert(blockMatcher->nestedCapturingMatchers.begin(),
-                   blockMatcher->nestedCapturingMatchers.end());
-    }
-    for (CapturingValueMatcher *valueMatcher :
-         one.nestedCapturingValueMatchers) {
-      found.insert(valueMatcher->nestedCapturingMatchers.begin(),
-                   valueMatcher->nestedCapturingMatchers.end());
-    }
-  };
-
-  appendOne(*this);
-  for (int64_t position = start; position < found.size(); ++position) {
-    appendOne(*found[position]);
+  for (int64_t position = 0; position < found.size(); ++position) {
+    found.insert(found[position]->nested.begin(),
+                 found[position]->nested.end());
   }
 
-  llvm::append_range(nested, found.getArrayRef());
-}
-
-void transform_ext::CapturingMatcherBase::getAllNestedValueMatchers(
-    SmallVectorImpl<CapturingValueMatcher *> &nested) {
-
-  SetVector<CapturingValueMatcher *> found;
-  found.insert(nested.begin(), nested.end());
-  int64_t start = found.size();
-
-  auto appendOne = [&found](CapturingMatcherBase &one) {
-    found.insert(one.nestedCapturingValueMatchers.begin(),
-                 one.nestedCapturingValueMatchers.end());
-    for (BlockBodyMatcher *blockMatcher : one.nestedBlockMatchers) {
-      found.insert(blockMatcher->nestedCapturingValueMatchers.begin(),
-                   blockMatcher->nestedCapturingValueMatchers.end());
-    }
-    for (CapturingOpMatcher *opMatcher : one.nestedCapturingMatchers) {
-      found.insert(opMatcher->nestedCapturingValueMatchers.begin(),
-                   opMatcher->nestedCapturingValueMatchers.end());
-    }
-  };
-
-  appendOne(*this);
-  for (int64_t position = start; position < found.size(); ++position) {
-    appendOne(*found[position]);
-  }
-
-  llvm::append_range(nested, found.getArrayRef());
-}
-
-void transform_ext::CapturingMatcherBase::getAllNestedBlockMatchers(
-    SmallVectorImpl<BlockBodyMatcher *> &nested) {
-
-  SetVector<BlockBodyMatcher *> found;
-  found.insert(nested.begin(), nested.end());
-  int64_t start = found.size();
-
-  auto appendOne = [&found](CapturingMatcherBase &one) {
-    found.insert(one.nestedBlockMatchers.begin(),
-                 one.nestedBlockMatchers.end());
-    for (CapturingValueMatcher *valueMatcher :
-         one.nestedCapturingValueMatchers) {
-      found.insert(valueMatcher->nestedBlockMatchers.begin(),
-                   valueMatcher->nestedBlockMatchers.end());
-    }
-    for (CapturingOpMatcher *opMatcher : one.nestedCapturingMatchers) {
-      found.insert(opMatcher->nestedBlockMatchers.begin(),
-                   opMatcher->nestedBlockMatchers.end());
-    }
-  };
-
-  appendOne(*this);
-  for (int64_t position = start; position < found.size(); ++position) {
-    appendOne(*found[position]);
-  }
-
-  llvm::append_range(nested, found.getArrayRef());
+  llvm::append_range(nested, found.takeVector());
 }
 
 void transform_ext::CapturingMatcherBase::resetCapture() {
-  SmallVector<CapturingOpMatcher *> nested;
+  SmallVector<CapturingMatcherBase *> nested;
   getAllNested(nested);
-  for (CapturingOpMatcher *matcher : nested) {
-    matcher->captured = nullptr;
-  }
-  SmallVector<CapturingValueMatcher *> nestedValue;
-  getAllNestedValueMatchers(nestedValue);
-  for (CapturingValueMatcher *matcher : nestedValue) {
-    matcher->captured = nullptr;
-  }
-  SmallVector<BlockBodyMatcher *> blocks;
-  getAllNestedBlockMatchers(blocks);
-  for (BlockBodyMatcher *matcher : blocks) {
-    matcher->captured = nullptr;
-  }
+  for (CapturingMatcherBase *n : nested)
+    n->resetThisCapture();
 }
 
 //===---------------------------------------------------------------------===//
@@ -275,6 +190,18 @@ transform_ext::CapturingOpMatcher &
 transform_ext::CapturingOpMatcher::operand(int64_t position, ConstantFloatOne) {
   return operand(position,
                  [](llvm::APFloat value) { return value.isExactlyValue(1.0); });
+}
+
+transform_ext::CapturingOpMatcher &transform_ext::CapturingOpMatcher::operand(
+    transform_ext::AllOperands tag,
+    transform_ext::CapturingValuePackMatcher &nested) {
+  addPredicate([&nested](Operation *op) {
+    LLVM_DEBUG(DBGS() << "all operands are");
+    ValueRange operands = op->getOperands();
+    return recursiveMatch(nested, operands);
+  });
+  recordNestedMatcher(nested);
+  return *this;
 }
 
 transform_ext::CapturingOpMatcher &
@@ -465,6 +392,28 @@ bool transform_ext::ValueMatcher::match(Value value) {
   }
 
   captured = value;
+  return true;
+}
+
+//===---------------------------------------------------------------------===//
+// ValueMatcher
+//===---------------------------------------------------------------------===//
+
+std::optional<ValueRange>
+transform_ext::CapturingValuePackMatcher::getCaptured() const {
+  if (!capturedValuesSet)
+    return std::nullopt;
+
+  return capturedValues;
+}
+
+bool transform_ext::CapturingValuePackMatcher::match(ValueRange values) {
+  if (capturedValuesSet) {
+    return llvm::equal(values, capturedValues);
+  }
+
+  capturedValuesSet = true;
+  capturedValues = llvm::to_vector(values);
   return true;
 }
 
@@ -691,8 +640,24 @@ transform_ext::StructuredOpMatcher::StructuredOpMatcher(
 transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::body(
     transform_ext::BlockBodyMatcher &nested) {
   addPredicate([&nested](linalg::LinalgOp linalgOp) {
-    LLVM_DEBUG(DBGS() << "body block is\n");
+    LLVM_DEBUG(DBGS() << "body block is");
     return recursiveMatch(nested, *linalgOp.getBlock());
+  });
+  recordNestedMatcher(nested);
+  return *this;
+}
+
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::bodyInputArguments(
+    transform_ext::CapturingValuePackMatcher &nested) {
+  addPredicate([&nested](linalg::LinalgOp linalgOp) {
+    SmallVector<Value> arguments = llvm::to_vector(
+        llvm::map_range(linalgOp.getDpsInputOperands(),
+                        [&linalgOp](OpOperand *operand) -> Value {
+                          return linalgOp.getMatchingBlockArgument(operand);
+                        }));
+    LLVM_DEBUG(DBGS() << "body block input arguments are");
+    return recursiveMatch(nested, arguments);
   });
   recordNestedMatcher(nested);
   return *this;
@@ -1112,7 +1077,7 @@ void transform_ext::StructuredOpMatcher::addResultMatcher(
 
 bool transform_ext::StructuredOpMatcher::checkAllTilableMatched(
     Operation *parent, linalg::LinalgOp linalgOp,
-    ArrayRef<transform_ext::CapturingOpMatcher *> matchers) {
+    ArrayRef<transform_ext::CapturingMatcherBase *> matchers) {
   LLVM_DEBUG(DBGS() << "all tilable ops captured");
   int64_t numTilableOps = 0;
   if (!parent)
@@ -1120,8 +1085,11 @@ bool transform_ext::StructuredOpMatcher::checkAllTilableMatched(
   parent->walk([&](TilingInterface Op) { ++numTilableOps; });
 
   llvm::SmallPtrSet<Operation *, 6> matched;
-  for (CapturingOpMatcher *nested : matchers) {
-    if (Operation *captured = nested->getCaptured()) {
+  for (CapturingMatcherBase *nested : matchers) {
+    auto *opMatcher = dyn_cast<CapturingOpMatcher>(nested);
+    if (!opMatcher)
+      continue;
+    if (Operation *captured = opMatcher->getCaptured()) {
       matched.insert(captured);
     }
   }
@@ -1174,21 +1142,18 @@ floatReciprocalBody(transform_ext::MatcherContext &matcherContext,
   return op.body(body);
 }
 
-transform_ext::StructuredOpMatcher &
-transform_ext::StructuredOpMatcher::passThroughOp() {
-  addPredicate([=](linalg::LinalgOp linalgOp) {
-    if (linalgOp.getBlock()->getOperations().size() != 1)
-      return false;
-    Operation *yieldOp = linalgOp.getBlock()->getTerminator();
-    for (auto [index, operand] : llvm::enumerate(yieldOp->getOperands())) {
-      auto arg = dyn_cast<BlockArgument>(operand);
-      if (!arg || arg.getParentBlock() != linalgOp.getBlock() ||
-          arg.getArgNumber() != index)
-        return false;
-    }
-    return true;
-  });
-  return *this;
+/// Adds a predicate to `op` that matches its body to just yield its arguments
+/// that correspond to structured op inputs.
+static transform_ext::StructuredOpMatcher &
+passThroughBody(transform_ext::MatcherContext &matcherContext,
+                transform_ext::StructuredOpMatcher &op) {
+  using namespace transform_ext;
+
+  CapturingValuePackMatcher &args = m_ValuePack(matcherContext);
+  CapturingOpMatcher &terminator =
+      m_Operation<linalg::YieldOp>(matcherContext).operand(AllOperands(), args);
+  return op.bodyInputArguments(args).body(
+      m_Block(matcherContext).terminator(terminator));
 }
 
 //===---------------------------------------------------------------------===//
@@ -1388,13 +1353,13 @@ static void matchSubBroadcast(transform_ext::MatcherContext &matcherContext,
 
   auto &broadcast =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
-          .passThroughOp()
           .dim(AllDims(), utils::IteratorType::parallel)
           .input(NumEqualsTo(1))
           .input(0, IsProjected(-1))
           .output(NumEqualsTo(1))
           .output(AllOperands(), IsIdentity());
   broadcast = broadcast.input(0, maxReduction);
+  broadcast = passThroughBody(matcherContext, broadcast);
 
   auto &subParallel =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
@@ -1436,13 +1401,13 @@ static void matchdivBroadcast(transform_ext::MatcherContext &matcherContext,
 
   auto &broadcast =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
-          .passThroughOp()
           .dim(AllDims(), utils::IteratorType::parallel)
           .input(NumEqualsTo(1))
           .input(0, IsProjected(-1))
           .output(NumEqualsTo(1))
           .output(AllOperands(), IsIdentity());
   broadcast = broadcast.input(0, sum);
+  broadcast = passThroughBody(matcherContext, broadcast);
 
   auto &divNoBroadcast =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
@@ -1562,3 +1527,7 @@ void transform_ext::makeSoftmaxMatcher(
       transform_ext::m_StructuredOp_Or(matcherContext, mulOperand, *divOperand);
   softmaxRootCapture = &softmaxRoot;
 }
+
+MLIR_DEFINE_EXPLICIT_TYPE_ID(::mlir::transform_ext::BlockBodyMatcher);
+MLIR_DEFINE_EXPLICIT_TYPE_ID(::mlir::transform_ext::CapturingOpMatcher);
+MLIR_DEFINE_EXPLICIT_TYPE_ID(::mlir::transform_ext::CapturingValueMatcher);
