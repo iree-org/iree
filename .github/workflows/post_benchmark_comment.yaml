@@ -55,7 +55,10 @@ jobs:
         id: check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BENCHMARK_PROCESS_JOB: process_benchmark_results
+          # TODO(#11076): Temporarily matches a non-existent job so we don't
+          # post comments by default before the migration. And a test PR with
+          # the modified benchmark job name can still do end-to-end test.
+          BENCHMARK_PROCESS_JOB: process_benchmark_results_disabled
         run: |
           # Assume the workflow has fewer than 100 jobs.
           export CONCLUSION=$(gh api \
@@ -76,8 +79,7 @@ jobs:
             "${PR_CI_GCS_URL}/${BENCHMARK_COMMENT_ARTIFACT}"
           echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
       - name: Posting comments
-        # TODO(#11076): Temporarily disabled until we migrate the database.
-        if: false && steps.check.outputs.job-conclusion == 'success'
+        if: steps.check.outputs.job-conclusion == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIST_BOT_TOKEN: ${{ secrets.GIST_BOT_TOKEN }}

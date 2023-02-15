@@ -92,6 +92,7 @@ iree_compiler_cc_library(
         "@llvm-project//lld:MachO",
         "@llvm-project//lld:Wasm",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
     ],
 )
 

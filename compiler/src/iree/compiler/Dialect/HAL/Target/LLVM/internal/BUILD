@@ -26,6 +26,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVM:LinkerTool_hdrs",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:Support",
     ],
 )

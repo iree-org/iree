@@ -16,7 +16,7 @@ iree_cc_library(
   HDRS
     "IREECodegenDialect.h"
     "LoweringConfig.h"
-    "MicroKernelOps.h"
+    "UKernelOps.h"
   TEXTUAL_HDRS
     "IREECodegenDialect.cpp.inc"
     "IREECodegenDialect.h.inc"
@@ -24,18 +24,19 @@ iree_cc_library(
     "LoweringConfig.h.inc"
     "LoweringConfigEnums.cpp.inc"
     "LoweringConfigEnums.h.inc"
-    "MicroKernelOps.cpp.inc"
-    "MicroKernelOps.h.inc"
+    "UKernelOps.cpp.inc"
+    "UKernelOps.h.inc"
   SRCS
     "IREECodegenDialect.cpp"
     "LoweringConfig.cpp"
-    "MicroKernelOps.cpp"
+    "UKernelOps.cpp"
   DEPS
     ::IREECodegenDialectGen
     ::LoweringConfigGen
-    ::MicroKernelOpsGen
+    ::UKernelOpsGen
     LLVMSupport
     MLIRArithDialect
+    MLIRBufferizationDialect
     MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRIR
@@ -43,7 +44,7 @@ iree_cc_library(
     MLIRParser
     MLIRSupport
     iree::builtins::ukernel::exported_bits
-    iree::compiler::Codegen::Interfaces::MicroKernelOpInterface
+    iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
   PUBLIC
@@ -73,12 +74,12 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    MicroKernelOpsGen
+    UKernelOpsGen
   TD_FILE
-    "MicroKernelOps.td"
+    "UKernelOps.td"
   OUTS
-    --gen-op-decls MicroKernelOps.h.inc
-    --gen-op-defs MicroKernelOps.cpp.inc
+    --gen-op-decls UKernelOps.h.inc
+    --gen-op-defs UKernelOps.cpp.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

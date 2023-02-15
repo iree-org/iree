@@ -17,12 +17,14 @@ package(
 iree_compiler_cc_library(
     name = "Utils",
     srcs = [
+        "EncodingInfo.cpp",
         "GPUUtils.cpp",
         "LinkingUtils.cpp",
         "MarkerUtils.cpp",
         "Utils.cpp",
     ],
     hdrs = [
+        "EncodingInfo.h",
         "GPUUtils.h",
         "LinkingUtils.h",
         "MarkerUtils.h",
@@ -36,6 +38,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",

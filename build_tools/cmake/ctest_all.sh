@@ -84,6 +84,7 @@ if [[ "$OSTYPE" =~ ^msys ]]; then
     "iree/tests/e2e/regression/check_regression_llvm-cpu_lowering_config.mlir"
     # TODO: Fix equality mismatch
     "iree/tests/e2e/linalg_ext_ops/check_vmvx_ukernel_local-task_unpack.mlir"
+    "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_unpack.mlir"
     # TODO(#11070): Fix argument/result signature mismatch
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
     # TODO(#11080): Fix arrays not matching in test_variant_list_buffers

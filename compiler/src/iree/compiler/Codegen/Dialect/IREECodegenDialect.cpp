@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.cpp.inc"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/Dialect/MicroKernelOps.h"
+#include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
 namespace mlir {
@@ -39,7 +39,7 @@ void IREECodegenDialect::initialize() {
 
   addOperations<
 #define GET_OP_LIST
-#include "iree/compiler/Codegen/Dialect/MicroKernelOps.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/UKernelOps.cpp.inc"
       >();
 }
 

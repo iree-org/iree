@@ -83,6 +83,7 @@ iree_cc_library(
     "LLDToolEntryPoint.cpp"
   DEPS
     LLVMSupport
+    LLVMTargetParser
     iree::compiler::API2::Headers
     lldCOFF
     lldCommon

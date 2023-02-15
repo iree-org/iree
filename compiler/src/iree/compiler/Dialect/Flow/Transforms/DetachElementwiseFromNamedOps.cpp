@@ -120,7 +120,7 @@ struct DetachElementwisePattern
 };
 
 /// Replace uses of splat constants as `outs` operands of `LinalgExt`
-/// operations. More canonical representation is to use a `init_tensor -> fill
+/// operations. More canonical representation is to use a `empty -> fill
 /// -> outs` operand sequence. Splat constants pulled in this way causes issues
 /// with allocations. Using `fill` will allow for fusing with the op just like
 /// fill -> linalg ops are fused. If not as a fallback they would be converted

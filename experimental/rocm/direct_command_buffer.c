@@ -196,7 +196,8 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_fill_buffer(
   hipDeviceptr_t target_device_buffer = iree_hal_rocm_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
-  hipDeviceptr_t dst = target_device_buffer + target_offset;
+  hipDeviceptr_t dst =
+      (hipDeviceptr_t)((uintptr_t)target_device_buffer + target_offset);
   size_t num_elements = length / pattern_length;
   // TODO(raikonenfnu): Currently using NULL stream, need to figure out way to
   // access proper stream from command buffer
@@ -251,8 +252,10 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_copy_buffer(
   hipDeviceptr_t source_device_buffer = iree_hal_rocm_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(source_buffer));
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
-  hipDeviceptr_t dst = target_device_buffer + target_offset;
-  hipDeviceptr_t src = source_device_buffer + source_offset;
+  hipDeviceptr_t dst =
+      (hipDeviceptr_t)((uintptr_t)target_device_buffer + target_offset);
+  hipDeviceptr_t src =
+      (hipDeviceptr_t)((uintptr_t)source_device_buffer + source_offset);
   // TODO(raikonenfnu): Currently using NULL stream, need to figure out way to
   // access proper stream from command buffer
   ROCM_RETURN_IF_ERROR(
@@ -327,9 +330,11 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_push_descriptor_set(
     iree_hal_descriptor_set_binding_t binding = bindings[binding_used[i].index];
     hipDeviceptr_t device_ptr =
         binding.buffer
-            ? (iree_hal_rocm_buffer_device_pointer(
-                   iree_hal_buffer_allocated_buffer(binding.buffer)) +
-               iree_hal_buffer_byte_offset(binding.buffer) + binding.offset)
+            ? (hipDeviceptr_t)((uintptr_t)iree_hal_rocm_buffer_device_pointer(
+                                   iree_hal_buffer_allocated_buffer(
+                                       binding.buffer)) +
+                               iree_hal_buffer_byte_offset(binding.buffer) +
+                               binding.offset)
             : 0;
     *((hipDeviceptr_t*)command_buffer->current_descriptor[i + base_binding]) =
         device_ptr;

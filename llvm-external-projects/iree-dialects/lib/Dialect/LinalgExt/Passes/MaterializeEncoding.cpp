@@ -147,11 +147,11 @@ static FailureOr<PackOp> lowerSetEncodingOpToPackOp(
       PackOp::getResultShape(rewriter, loc, sourceDims, *innerTileSizesOfr,
                              materializeEncodingInfo->innerDimsPos,
                              materializeEncodingInfo->outerDimsPerm);
-  auto initTensor = rewriter.create<tensor::EmptyOp>(
-      loc, resultDims, resultType.getElementType());
+  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
+                                                  resultType.getElementType());
   Optional<Value> paddingValue = getPaddingValue(source);
   auto packOp = rewriter.create<PackOp>(
-      loc, source, initTensor, materializeEncodingInfo->innerDimsPos,
+      loc, source, emptyOp, materializeEncodingInfo->innerDimsPos,
       *innerTileSizesOfr, paddingValue, materializeEncodingInfo->outerDimsPerm);
   // As we rewrite the SetEncoding and its old result tensor, which used to hold
   // the TensorEncodingAttr, into a pack op with a new result tensor which does
@@ -183,8 +183,8 @@ static FailureOr<UnPackOp> lowerUnsetEncodingToUnpackOp(
   Location loc = encodingOp.getLoc();
   SmallVector<OpFoldResult> resultDims =
       getDims(rewriter, loc, encodingOp.getSource());
-  auto initTensor = rewriter.create<tensor::EmptyOp>(
-      loc, resultDims, sourceType.getElementType());
+  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
+                                                  sourceType.getElementType());
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr =
       getInnerTileSizesOfr(rewriter, loc, sourceType, *materializeEncodingInfo,
                            materializeEncodingValueFn);
@@ -193,7 +193,7 @@ static FailureOr<UnPackOp> lowerUnsetEncodingToUnpackOp(
         encodingOp, "failed to generate runtime tile size query");
   }
   return rewriter.create<UnPackOp>(
-      loc, packedValue, initTensor, materializeEncodingInfo->innerDimsPos,
+      loc, packedValue, emptyOp, materializeEncodingInfo->innerDimsPos,
       *innerTileSizesOfr, materializeEncodingInfo->outerDimsPerm);
 }
 

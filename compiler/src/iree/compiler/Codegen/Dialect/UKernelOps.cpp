@@ -4,12 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/MicroKernelOps.h"
+#include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 
 #include "iree/builtins/ukernel/exported_bits.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Utils/EncodingInfo.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/DstBufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/OpImplementation.h"
@@ -17,7 +20,7 @@
 
 // clang-format off
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/Dialect/MicroKernelOps.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Codegen/Dialect/UKernelOps.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {
@@ -75,10 +78,10 @@ static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
 }
 
 //===---------------------------------------------------------------------===//
-// GenericUKernelOp
+// UKernelGenericOp
 //===---------------------------------------------------------------------===//
 
-std::pair<int64_t, int64_t> GenericUKernelOp::getDpsInitsPositionRange() {
+std::pair<int64_t, int64_t> UKernelGenericOp::getDpsInitsPositionRange() {
   auto [pos, size] = getODSOperandIndexAndLength(1);
   return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
 }
@@ -144,7 +147,7 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
       .Default([](Type) { return failure(); });
 }
 
-FailureOr<func::CallOp> GenericUKernelOp::lowerToFunctionCall(
+FailureOr<func::CallOp> UKernelGenericOp::lowerToFunctionCall(
     RewriterBase &rewriter) {
   // Create the function type based on the operands and results.
   SmallVector<Type> callArgumentTypes;
@@ -180,21 +183,21 @@ FailureOr<func::CallOp> GenericUKernelOp::lowerToFunctionCall(
           getOperation(), "failed to lower operands to function call operands");
     }
   }
-  return createFunctionCall(rewriter, getOperation(), getMicroKernelFnName(),
+  return createFunctionCall(rewriter, getOperation(), getUKernelFnName(),
                             callArgumentTypes, callResultTypes, callOperands);
 }
 
 //===---------------------------------------------------------------------===//
-// MMT4DMicroKernelOp
+// UKernelMmt4DOp
 //===---------------------------------------------------------------------===//
 
-std::pair<int64_t, int64_t> Mmt4DUKernelOp::getDpsInitsPositionRange() {
+std::pair<int64_t, int64_t> UKernelMmt4DOp::getDpsInitsPositionRange() {
   auto [pos, size] = getODSOperandIndexAndLength(2);
   return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
 }
 
-static FailureOr<SmallVector<Type>> getFunctionArgTypesForMMT4DMicroKernel(
-    MLIRContext *context, Mmt4DUKernelOp mmt4dUKernelOp) {
+static FailureOr<SmallVector<Type>> getFunctionArgTypesForUKernelMmt4D(
+    MLIRContext *context, UKernelMmt4DOp mmt4dUKernelOp) {
   SmallVector<Type> callArgumentTypes;
   auto indexType = IndexType::get(context);
 
@@ -231,8 +234,8 @@ static FailureOr<SmallVector<Type>> getFunctionArgTypesForMMT4DMicroKernel(
   return callArgumentTypes;
 }
 
-static FailureOr<SmallVector<Value>> getFunctionArgValuesForMMT4DMicroKernel(
-    RewriterBase &rewriter, Location loc, Mmt4DUKernelOp mmt4dUKernelOp) {
+static FailureOr<SmallVector<Value>> getFunctionArgValuesForUKernelMmt4D(
+    RewriterBase &rewriter, Location loc, UKernelMmt4DOp mmt4dUKernelOp) {
   SmallVector<Value> callOperands;
   auto processMemrefTypeOperand = [&](Value memRefValue) {
     auto extractStridedMetadataOp =
@@ -281,7 +284,7 @@ static FailureOr<SmallVector<Value>> getFunctionArgValuesForMMT4DMicroKernel(
   return callOperands;
 }
 
-FailureOr<func::CallOp> Mmt4DUKernelOp::lowerToFunctionCall(
+FailureOr<func::CallOp> UKernelMmt4DOp::lowerToFunctionCall(
     RewriterBase &rewriter) {
   // TODO: handle op with return values if they are scalar.
   if (getNumResults() != 0) {
@@ -289,31 +292,35 @@ FailureOr<func::CallOp> Mmt4DUKernelOp::lowerToFunctionCall(
         getOperation(), "cannot lower to function call operation with results");
   }
 
-  // Function name.
-  std::string fnName = "vmvx.mmt4d.";
-  if (getLhsElementType().isSignlessInteger(8) &&
-      getRhsElementType().isSignlessInteger(8) &&
-      getOutputElementType().isSignlessInteger(32)) {
-    fnName.append("i8.i8.i32");
-  } else if (getLhsElementType().isF32() && getRhsElementType().isF32() &&
-             getOutputElementType().isF32()) {
-    fnName.append("f32.f32.f32");
-  } else {
+  std::optional<MatmulType> matmulType = getMatmulType(
+      getLhsElementType(), getRhsElementType(), getOutputElementType());
+  if (!matmulType) {
     return emitOpError(
         "unhandled element types of operands for lowering to micro kernel "
         "function call");
   }
 
+  // Function name.
+  std::string fnName = "vmvx.mmt4d.";
+  switch (matmulType.value()) {
+    case MatmulType::I8I8I32:
+      fnName.append("i8.i8.i32");
+      break;
+    case MatmulType::F32F32F32:
+      fnName.append("f32.f32.f32");
+      break;
+  }
+
   // Create the function type.
   FailureOr<SmallVector<Type>> fnArgTypes =
-      getFunctionArgTypesForMMT4DMicroKernel(rewriter.getContext(), *this);
+      getFunctionArgTypesForUKernelMmt4D(rewriter.getContext(), *this);
   if (failed(fnArgTypes)) {
     return emitOpError(
         "unable to get function type to lower micro kernel op to");
   }
   // Create the function call operands.
   FailureOr<SmallVector<Value>> fnCallOperands =
-      getFunctionArgValuesForMMT4DMicroKernel(rewriter, getLoc(), *this);
+      getFunctionArgValuesForUKernelMmt4D(rewriter, getLoc(), *this);
   if (failed(fnCallOperands)) {
     return emitOpError(
         "unable to get the function call operands to lower micro kernel op");
@@ -322,8 +329,81 @@ FailureOr<func::CallOp> Mmt4DUKernelOp::lowerToFunctionCall(
       rewriter, getOperation(), fnName, fnArgTypes.value(),
       /*callReturnTypes=*/TypeRange{}, fnCallOperands.value());
 }
-
 }  // namespace Codegen
 }  // namespace IREE
+
+//===---------------------------------------------------------------------===//
+// Register bufferization interface.
+//===---------------------------------------------------------------------===//
+
+namespace {
+template <typename OpTy>
+struct UKernelOpsBufferizationInterface
+    : public bufferization::DstBufferizableOpInterfaceExternalModel<
+          UKernelOpsBufferizationInterface<OpTy>, OpTy> {
+  LogicalResult bufferize(
+      Operation *op, RewriterBase &rewriter,
+      const bufferization::BufferizationOptions &options) const {
+    // TODO: Handle operations with regions if needed.
+    if (op->getNumRegions() != 0) {
+      op->emitOpError(
+          "unhandled bufferization of micro kernel op with regions");
+    }
+    SmallVector<Value> bufferOpOperands;
+
+    // Replace all `tensor` operands with corresponding `memref` operands.
+    for (auto [index, operand] : llvm::enumerate(op->getOperands())) {
+      // For `tensor` type operands, replace with `memref` type operand.
+      if (operand.getType().template isa<RankedTensorType>()) {
+        FailureOr<Value> memrefOperand = getBuffer(rewriter, operand, options);
+        if (failed(memrefOperand)) {
+          return op->emitOpError(
+              llvm::formatv("failed to bufferize operand {0} ", index));
+        }
+        bufferOpOperands.push_back(memrefOperand.value());
+        continue;
+      }
+
+      // For all other operand types, just use the same value.
+      bufferOpOperands.push_back(operand);
+    }
+
+    // Ignore all result types that are tensor types.
+    SmallVector<Type> resultTypes;
+    for (auto resultType : op->getResultTypes()) {
+      if (resultType.isa<RankedTensorType>()) continue;
+      resultTypes.push_back(resultType);
+    }
+
+    auto bufferOp = rewriter.create<OpTy>(op->getLoc(), resultTypes,
+                                          bufferOpOperands, op->getAttrs());
+    SmallVector<Value> dpsInits =
+        cast<DestinationStyleOpInterface>(bufferOp.getOperation())
+            .getDpsInitOperands();
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, dpsInits);
+    return success();
+  }
+};
+
+template <typename... Ops>
+struct RegisterUKernelOpsBufferizationInterface {
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<UKernelOpsBufferizationInterface<Ops>>(
+         *context),
+     ...);
+  }
+};
+}  // namespace
+
+void registerUKernelBufferizationInterface(DialectRegistry &registry) {
+  registry.addExtension(
+      +[](MLIRContext *context, IREE::Codegen::IREECodegenDialect *dialect) {
+        RegisterUKernelOpsBufferizationInterface<
+#define GET_OP_LIST
+#include "iree/compiler/Codegen/Dialect/UKernelOps.cpp.inc"
+            >::registerOpInterface(context);
+      });
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -5,7 +5,7 @@
 // By proxy checks that destination passing style kicked in correctly
 // and no CSE was run between first level tile + fuse + distribute
 // and the conversion to destination passing style. Running CSE
-// before hoists the fill and the init_tensor out of the loop causing
+// before hoists the fill and the empty out of the loop causing
 // issues with the conversion.
 #map3 = affine_map<(d0) -> (d0)>
 #map4 = affine_map<(d0, d1) -> (d0)>

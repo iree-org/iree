@@ -127,8 +127,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePackUnPackOpsPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
     bool flatten = false);
 
-/// Pass to lower micro_kernel operations into their defined function calls.
-std::unique_ptr<OperationPass<ModuleOp>> createLowerMicroKernelOpsToCallsPass();
+/// Pass to lower ukernel operations into their defined function calls.
+std::unique_ptr<OperationPass<ModuleOp>> createLowerUKernelOpsToCallsPass();
 
 /// Pass to optimize vector transfer_read and transfer_write. See Passes.td for
 /// `option` details.
@@ -276,9 +276,9 @@ createLLVMCPUCheckIRBeforeLLVMConversionPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass();
 
-/// Pass to lower a sequence of operations to a iree_codegen.micro_kernel
+/// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
 /// operation.
-std::unique_ptr<OperationPass<>> createLLVMCPULowerToMicroKernelsPass();
+std::unique_ptr<OperationPass<>> createLLVMCPULowerToUKernelsPass();
 
 /// Materialize the encoding of operations. The layout to use for the encoded
 /// operations are LLVMCPU specific.

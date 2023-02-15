@@ -14,11 +14,13 @@ iree_cc_library(
   NAME
     Utils
   HDRS
+    "EncodingInfo.h"
     "GPUUtils.h"
     "LinkingUtils.h"
     "MarkerUtils.h"
     "Utils.h"
   SRCS
+    "EncodingInfo.cpp"
     "GPUUtils.cpp"
     "LinkingUtils.cpp"
     "MarkerUtils.cpp"
@@ -27,6 +29,7 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
+    LLVMTargetParser
     MLIRAffineDialect
     MLIRArithDialect
     MLIRArithUtils

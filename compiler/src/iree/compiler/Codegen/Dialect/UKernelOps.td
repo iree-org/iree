@@ -4,21 +4,21 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_CODEGEN_DIALECT_MICRO_KERNEL_OPS
-#define IREE_CODEGEN_DIALECT_MICRO_KERNEL_OPS
+#ifndef IREE_CODEGEN_DIALECT_UKERNEL_OPS
+#define IREE_CODEGEN_DIALECT_UKERNEL_OPS
 
 include "iree/compiler/Codegen/Dialect/IREECodegenDialect.td"
-include "iree/compiler/Codegen/Interfaces/MicroKernelOpInterface.td"
+include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 
-class IREECodegen_MicroKernelOp<string mnemonic, list<Trait> traits = []> : 
+class IREECodegen_UKernelOp<string mnemonic, list<Trait> traits = []> : 
   Op<IREECodegen_Dialect, mnemonic, !listconcat(traits,
-    [DeclareOpInterfaceMethods<MicroKernelOpInterface,
+    [DeclareOpInterfaceMethods<UKernelOpInterface,
         ["lowerToFunctionCall"]>,
      DeclareOpInterfaceMethods<DestinationStyleOpInterface>])> {}
   
-def IREECodegen_GenericUKernelOp :
-    IREECodegen_MicroKernelOp<"ukernel.generic", [
+def IREECodegen_UKernelGenericOp :
+    IREECodegen_UKernelOp<"ukernel.generic", [
       AttrSizedOperandSegments]> {
   let summary = "Generic Microkernel operator";
 
@@ -52,21 +52,21 @@ def IREECodegen_GenericUKernelOp :
   }];
 
   let arguments = (ins
-    StrAttr:$micro_kernel_fn_name,
+    StrAttr:$u_kernel_fn_name,
     Variadic<AnyType>:$inputs,
     Variadic<AnyRankedTensorOrMemRefType>:$outputs,
     Variadic<AnyType>:$other_operands);
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
-    attr-dict $micro_kernel_fn_name
+    attr-dict $u_kernel_fn_name
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     (`outs` `(` $outputs^  `:` type($outputs) `)`)?
     (`(` $other_operands^ `:` type($other_operands) `)`)? (`->` type($results)^)?
   }];
 }
 
-def IREECodegen_Mmt4DUKernelOp :
-    IREECodegen_MicroKernelOp<"ukernel.mmt4d", []>  {
+def IREECodegen_UKernelMmt4DOp :
+    IREECodegen_UKernelOp<"ukernel.mmt4d", []>  {
   let summary = "Mmt4D Microkernel operator";
 
   let description = [{
@@ -105,4 +105,4 @@ def IREECodegen_Mmt4DUKernelOp :
   }];
 }
 
-#endif // IREE_CODEGEN_DIALECT_MICRO_KERNEL_OPS
+#endif // IREE_CODEGEN_DIALECT_UKERNEL_OPS

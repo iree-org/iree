@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-lower-to-micro-kernels %s | FileCheck %s
+// RUN: iree-opt --iree-llvmcpu-lower-to-ukernels %s | FileCheck %s
 
 func.func @matmul(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
     %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {

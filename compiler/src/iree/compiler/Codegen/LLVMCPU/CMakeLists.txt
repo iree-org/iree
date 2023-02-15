@@ -27,7 +27,7 @@ iree_cc_library(
     "LLVMCPUEmitVectorizationRemarks.cpp"
     "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
-    "LLVMCPULowerToMicroKernels.cpp"
+    "LLVMCPULowerToUKernels.cpp"
     "LLVMCPUMaterializeEncodingPass.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
@@ -43,6 +43,7 @@ iree_cc_library(
     IREELinalgTransformDialectPasses
     LLVMBinaryFormat
     LLVMSupport
+    LLVMTargetParser
     MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAnalysis

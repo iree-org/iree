@@ -19,7 +19,7 @@ exports_files([
     "IREECodegenAttributes.td",
     "IREECodegenDialect.td",
     "LoweringConfig.td",
-    "MicroKernelOps.td",
+    "UKernelOps.td",
 ])
 
 td_library(
@@ -29,7 +29,7 @@ td_library(
             "IREECodegenAttributes.td",
             "IREECodegenDialect.td",
             "LoweringConfig.td",
-            "MicroKernelOps.td",
+            "UKernelOps.td",
         ],
         include = ["*.td"],
     ),
@@ -45,12 +45,12 @@ iree_compiler_cc_library(
     srcs = [
         "IREECodegenDialect.cpp",
         "LoweringConfig.cpp",
-        "MicroKernelOps.cpp",
+        "UKernelOps.cpp",
     ],
     hdrs = [
         "IREECodegenDialect.h",
         "LoweringConfig.h",
-        "MicroKernelOps.h",
+        "UKernelOps.h",
     ],
     textual_hdrs = [
         "IREECodegenDialect.cpp.inc",
@@ -59,19 +59,20 @@ iree_compiler_cc_library(
         "LoweringConfig.h.inc",
         "LoweringConfigEnums.cpp.inc",
         "LoweringConfigEnums.h.inc",
-        "MicroKernelOps.cpp.inc",
-        "MicroKernelOps.h.inc",
+        "UKernelOps.cpp.inc",
+        "UKernelOps.h.inc",
     ],
     deps = [
         ":IREECodegenDialectGen",
         ":LoweringConfigGen",
-        ":MicroKernelOpsGen",
-        "//compiler/src/iree/compiler/Codegen/Interfaces:MicroKernelOpInterface",
+        ":UKernelOpsGen",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:DestinationStyleOpInterface",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
@@ -125,19 +126,19 @@ iree_gentbl_cc_library(
 )
 
 iree_gentbl_cc_library(
-    name = "MicroKernelOpsGen",
+    name = "UKernelOpsGen",
     tbl_outs = [
         (
             ["--gen-op-decls"],
-            "MicroKernelOps.h.inc",
+            "UKernelOps.h.inc",
         ),
         (
             ["--gen-op-defs"],
-            "MicroKernelOps.cpp.inc",
+            "UKernelOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "MicroKernelOps.td",
+    td_file = "UKernelOps.td",
     deps = [
         ":td_files",
         "//compiler/src/iree/compiler/Codegen/Interfaces:td_files",

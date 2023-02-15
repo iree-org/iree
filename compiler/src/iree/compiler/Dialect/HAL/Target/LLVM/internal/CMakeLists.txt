@@ -23,6 +23,7 @@ iree_cc_library(
   DEPS
     LLVMCore
     LLVMSupport
+    LLVMTargetParser
     MLIRSupport
     iree::compiler::Dialect::HAL::Target::LLVM::LinkerTool_hdrs
   PUBLIC

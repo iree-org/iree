@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-lower-micro-kernel-ops-to-calls -split-input-file --verify-diagnostics --cse %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-lower-ukernel-ops-to-calls -split-input-file --verify-diagnostics --cse %s | FileCheck %s
 
 func.func @scalar_types(%arg0: i32, %arg1 : f64, %arg2 : index, %arg3 : memref<f32>) {
   iree_codegen.ukernel.generic "scalar_fn" ins(%arg0, %arg1, %arg2 : i32, f64, index) outs(%arg3 : memref<f32>)
