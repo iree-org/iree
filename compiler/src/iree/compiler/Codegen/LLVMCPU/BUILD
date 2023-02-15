@@ -63,6 +63,7 @@ iree_compiler_cc_library(
         "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:BinaryFormat",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:Analysis",

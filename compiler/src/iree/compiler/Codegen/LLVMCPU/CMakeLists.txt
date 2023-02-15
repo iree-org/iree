@@ -43,6 +43,7 @@ iree_cc_library(
     IREELinalgTransformDialectPasses
     LLVMBinaryFormat
     LLVMSupport
+    LLVMTargetParser
     MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAnalysis
