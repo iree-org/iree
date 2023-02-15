@@ -36,10 +36,10 @@
   data-md-level="0"
 >
 
-  <!-- Site title -->
+  <!-- Community site logo / home page link -->
   <label class="md-nav__title" for="__drawer">
     <a
-      href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}"
+      href="{{ config.extra.community_homepage | d(nav.homepage.url, true) | url }}"
       title="{{ config.site_name | e }}"
       class="md-nav__button md-logo"
       aria-label="{{ config.site_name }}"
@@ -47,6 +47,7 @@
     >
       {% include "partials/logo.html" %}
     </a>
+    <!-- Site title (nav item below links to site home) -->
     {{ config.site_name }}
   </label>
 

@@ -1,61 +1,63 @@
 site_name: IREE
 site_url: https://iree-org.github.io/iree/
+repo_url: https://github.com/iree-org/iree
+repo_name: iree-org/iree
 
 theme:
   name: material
+  logo: assets/images/openxla-logo-lockup-white.svg
+  logo_alt: IREE
   icon:
     repo: fontawesome/brands/github
-    logo: iree/ghost
-  favicon: ghost.svg
+  font:
+    text: Noto
+    code: Noto Sans Mono
+  favicon: assets/images/favicon.png
 
   # Note: this includes symlinks to forked files in third_party/mkdocs-material/
   custom_dir: overrides
 
   features:
-    - navigation.instant # Faster loading
+    - content.code.annotate # Allow inline annotations
+    - content.code.copy     # Enable copy button
+    - content.tabs.link     # Link content tabs across site (e.g. Windows/Linux)
 
-    # TODO(scotttodd): join mkdocs-material insiders for this
+    - navigation.instant  # Ajax-style dynamic loading (faster)
     - navigation.tracking # Update URL in address bar with the active anchor
+    - navigation.sections # Group sections without collapsible buttons
+    - navigation.top      # "Back to top" button
+    - navigation.indexes  # section names can link to index.md pages
 
     # TODO(scotttodd): decide if we want this
     #     these move sections from the left nav to tabs below the header
     # - navigation.tabs
     # - navigation.tabs.sticky  # insiders only
 
-    # TODO(scotttodd): remove this if the number of pages grows too much
-    - navigation.sections # Group sections without collapsible buttons
-
-    - navigation.top # Back to top button
-
-    - navigation.indexes # section names can link to index.md pages
-
-    - content.code.annotate # Allow inline annotations
-    - content.code.copy # Enable copy button
-    - content.tabs.link # Link content tabs across site (e.g. Windows/Linux)
+    - toc.follow # Scroll the TOC panel to follow the reader
 
   palette:
-    # Light mode
+    # Light mode (scheme overrides in openxla.css)
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: indigo
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    # Dark mode
+    # Dark mode (scheme overrides in openxla.css)
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: blue
-      accent: blue
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
 
-repo_url: https://github.com/iree-org/iree
-repo_name: iree-org/iree
-edit_uri: "" # Omit edit button (linking to GitHub) from each document
-
 extra:
+  # TODO(scotttodd): https://openxla.github.io/community (when hosted)
+  community_homepage: https://github.com/openxla/community
+  community_site_name: OpenXLA
+
+  # TODO(scotttodd): join mkdocs-material insiders and remove notice?
+  #   (we *can* remove the notice without joining)
+  # generator: false
+
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/iree-org/iree
@@ -66,10 +68,10 @@ extra:
     - icon: fontawesome/solid/users
       link: https://groups.google.com/forum/#!forum/iree-discuss
       name: IREE Discuss Google Group
-  generator: false # TODO(scotttodd): join mkdocs-material insiders for this
 
 extra_css:
   - assets/stylesheets/extra.css
+  - assets/stylesheets/openxla.css
 
 copyright: Copyright &copy; 2023 The IREE Authors
 
@@ -92,8 +94,8 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - tables
-  - toc:
-      permalink: true # TODO(scotttodd): icon: https://fonts.google.com/icons?selected=Material+Icons+Outlined:link
+  - toc:  # Table of Contents
+      permalink: 'link'  # Use Material font's "link" icon; see openxla.css
 
 # Navigation with explicit ordering and nesting.
 # https://www.mkdocs.org/user-guide/configuration/#nav
