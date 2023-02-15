@@ -1166,35 +1166,6 @@ struct LinalgExtUnpackConversion
   }
 };
 
-bool isMmt4d(ArrayAttr indexingMaps) {
-  if (indexingMaps.size() != 3) return false;
-
-  auto map0 = indexingMaps[0].cast<AffineMapAttr>().getValue();
-  auto map1 = indexingMaps[1].cast<AffineMapAttr>().getValue();
-  auto map2 = indexingMaps[2].cast<AffineMapAttr>().getValue();
-
-  if (map0.getNumResults() != 4 || map1.getNumResults() != 4 ||
-      map2.getNumResults() != 4 || map0.getNumInputs() != 6 ||
-      map1.getNumInputs() != 6 || map2.getNumInputs() != 6) {
-    return false;
-  }
-
-  // Extract dimensions for MxK * KxN -> MxN
-  AffineExpr m = map2.getResult(0);
-  AffineExpr n = map2.getResult(1);
-  AffineExpr k = map0.getResult(1);
-  AffineExpr m0 = map2.getResult(2);
-  AffineExpr n0 = map2.getResult(3);
-  AffineExpr k0 = map0.getResult(3);
-
-  auto *context = indexingMaps.getContext();
-  auto mapA = AffineMapAttr::get(AffineMap::get(6, 0, {m, k, m0, k0}, context));
-  auto mapB = AffineMapAttr::get(AffineMap::get(6, 0, {n, k, n0, k0}, context));
-  auto mapC = AffineMapAttr::get(AffineMap::get(6, 0, {m, n, m0, n0}, context));
-  auto maps = ArrayAttr::get(context, {mapA, mapB, mapC});
-  return indexingMaps == maps;
-}
-
 int getNumberOfUses(Value v) {
   auto uses = v.getUses();
   return std::distance(uses.begin(), uses.end());
@@ -1237,7 +1208,7 @@ linalg::FillOp findFillOpSolelyZeroingOutputOf(linalg::LinalgOp op) {
   return nullptr;
 }
 
-/// Convert supported linalg contraction ops like matmul and mmt4d.
+/// Convert supported linalg contraction ops like matmul.
 struct LinalgContractionConversion
     : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
@@ -1311,10 +1282,6 @@ struct LinalgContractionConversion
       if (succeeded(handleConformingMatmul2D(info, rewriter))) {
         return success();
       }
-    } else if (isMmt4d(info.op.getIndexingMaps())) {
-      if (succeeded(handleConformingMmt4d(info, rewriter))) {
-        return success();
-      }
     }
 
     // Match failure.
@@ -1353,49 +1320,6 @@ struct LinalgContractionConversion
         outBuffer, outDesc.offset, outDesc.strides[0],
         // m,n,k
         m, n, k,
-        // flags
-        lhsDesc.getElementTypeAttr(), rhsDesc.getElementTypeAttr(),
-        outDesc.getElementTypeAttr(), rewriter.getI32IntegerAttr(flags));
-    return success();
-  }
-
-  LogicalResult handleConformingMmt4d(OpInfo &info,
-                                      PatternRewriter &rewriter) const {
-    int flags = 0;
-    if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
-      rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
-    } else {
-      flags |= IREE_UK_FLAG_ACCUMULATE;  // accumulate into existing.
-    }
-
-    auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
-    auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
-    auto &outDesc = info.outAnal.getDesc(rewriter);
-
-    Value m = lhsDesc.sizes[0];
-    Value n = rhsDesc.sizes[0];
-    Value k = rhsDesc.sizes[1];
-    Value m0 = lhsDesc.sizes[2];
-    Value n0 = rhsDesc.sizes[2];
-    Value k0 = rhsDesc.sizes[3];
-
-    auto loc = info.op.getLoc();
-    auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
-    auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
-    auto outBuffer = outDesc.castToLinear(loc, rewriter);
-
-    rewriter.replaceOpWithNewOp<IREE::VMVX::Mmt4dOp>(
-        info.op,
-        // LHS
-        lhsBuffer, lhsDesc.offset, lhsDesc.strides[0],
-        // RHS
-        rhsBuffer, rhsDesc.offset, rhsDesc.strides[0],
-        // Out
-        outBuffer, outDesc.offset, outDesc.strides[0],
-        // m,n,k
-        m, n, k,
-        // m0,n0,k0
-        m0, n0, k0,
         // flags
         lhsDesc.getElementTypeAttr(), rhsDesc.getElementTypeAttr(),
         outDesc.getElementTypeAttr(), rewriter.getI32IntegerAttr(flags));
