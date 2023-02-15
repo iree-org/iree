@@ -386,7 +386,8 @@ static bool tileMatmulK(const int64_t dimK, const int64_t residualTilingFactor,
                         int64_t &tileSize) {
   // Deduce the configuration for the K dimension. We need some power of two
   // here so that we can do vector load.
-  for (int64_t t = llvm::PowerOf2Floor(residualTilingFactor); t >= 2; t >>= 1) {
+  for (int64_t t = llvm::bit_floor<uint64_t>(residualTilingFactor); t >= 2;
+       t >>= 1) {
     if (dimK % t == 0) {
       tileSize = t;
       return true;
