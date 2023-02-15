@@ -42,7 +42,7 @@ class RunModuleTuilsTest(unittest.TestCase):
 
     self.assertEqual(
         flags,
-        ["--task=10", "--device_allocator=caching", "--device=local-task"])
+        ["--device_allocator=caching", "--task=10", "--device=local-task"])
 
   def test_build_run_flags_for_execution_config_with_cuda(self):
     execution_config = iree_definitions.ModuleExecutionConfig(
