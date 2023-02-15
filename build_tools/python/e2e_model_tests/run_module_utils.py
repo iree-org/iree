@@ -17,9 +17,7 @@ def build_run_flags_for_model(
     model_input_data: common_definitions.ModelInputData) -> List[str]:
   """Returns the IREE run module flags for the model and its inputs."""
 
-  run_flags = [
-      f"--function={model.entry_function}", "--device_allocator=caching"
-  ]
+  run_flags = [f"--function={model.entry_function}"]
   if model_input_data != common_definitions.ZEROS_MODEL_INPUT_DATA:
     raise ValueError("Currently only support all-zeros data.")
   run_flags += [f"--input={input_type}=0" for input_type in model.input_types]
@@ -32,6 +30,7 @@ def build_run_flags_for_execution_config(
   """Returns the IREE run module flags of the execution config."""
 
   run_flags = list(module_execution_config.extra_flags)
+  run_flags.append("--device_allocator=caching")
   driver = module_execution_config.driver
   if driver == RuntimeDriver.CUDA:
     run_flags.append(f"--device=cuda://{gpu_id}")
