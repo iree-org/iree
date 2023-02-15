@@ -951,10 +951,15 @@ jobs:
         env:
           COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
           COMPILE_STATS_RESULTS: ${{ steps.collect.outputs.compile-stats-results }}
+          COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.collect.outputs.compile-stats-results }}
         run: |
-          gcloud storage cp "${COMPILATION_CONFIG}" "${COMPILE_STATS_RESULTS}" \
-            "${GCS_DIR}"
-          echo "compile-stats-results-gcs-artifact=${GCS_DIR}/${COMPILE_STATS_RESULTS}" >> "${GITHUB_OUTPUT}"
+          # Upload files with two commands since they go into different GCS
+          # directories.
+          gcloud storage cp "${COMPILATION_CONFIG}" "${GCS_DIR}"
+          gcloud storage cp \
+            "${COMPILE_STATS_RESULTS}" \
+            "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
+          echo "compile-stats-results-gcs-artifact=${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
   execution_benchmarks:
     needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
