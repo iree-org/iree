@@ -616,12 +616,12 @@ struct SwapExtractSliceWithDispatchTensorLoad
 };
 
 //===----------------------------------------------------------------------===//
-// SwapExtractSliceWithInitTensor
+// SwapExtractSliceWithTensorEmpty
 //===----------------------------------------------------------------------===//
 
-/// Pattern to swap `init_tensor` -> `tensor.extract_slice` with
-/// `init_tensor` of the slice.
-struct SwapExtractSliceWithInitTensor
+/// Pattern to swap `empty` -> `tensor.extract_slice` with
+/// `empty` of the slice.
+struct SwapExtractSliceWithTensorEmpty
     : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
 
@@ -653,7 +653,7 @@ void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options) {
   MLIRContext *context = patterns.getContext();
   patterns.insert<SwapExtractSliceWithDispatchTensorLoad,
-                  SwapExtractSliceWithInitTensor,
+                  SwapExtractSliceWithTensorEmpty,
                   SwapExtractSliceWithTiledProducer>(context);
 }
 

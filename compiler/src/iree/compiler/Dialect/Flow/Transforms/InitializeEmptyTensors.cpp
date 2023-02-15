@@ -34,7 +34,7 @@ static FailureOr<Attribute> getZero(OpBuilder &builder, Location loc,
 namespace {
 
 /// Converts an tensor.empty() op to `flow.tensor.splat` op.
-struct RewriteInitTensorToSplat : public OpRewritePattern<tensor::EmptyOp> {
+struct RewriteTensorEmptyToSplat : public OpRewritePattern<tensor::EmptyOp> {
   using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
@@ -62,7 +62,7 @@ struct RewriteInitTensorToSplat : public OpRewritePattern<tensor::EmptyOp> {
 };
 
 /// Converts an tensor.empty() op to `flow.tensor.empty` op.
-struct RewriteInitTensorToEmpty : public OpRewritePattern<tensor::EmptyOp> {
+struct RewriteTensorEmptyToEmpty : public OpRewritePattern<tensor::EmptyOp> {
   using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
@@ -94,9 +94,9 @@ struct InitializeEmptyTensorsPass
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     if (zeroFill) {
-      patterns.insert<RewriteInitTensorToSplat>(context);
+      patterns.insert<RewriteTensorEmptyToSplat>(context);
     } else {
-      patterns.insert<RewriteInitTensorToEmpty>(context);
+      patterns.insert<RewriteTensorEmptyToEmpty>(context);
     }
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
