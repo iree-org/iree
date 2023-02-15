@@ -830,9 +830,9 @@ func.func @non_perfect_tiling_unpack() {
   return
 }
 // CHECK-LABEL: func.func @non_perfect_tiling_unpack
-// CHECK:         %[[EMPTY:.+]] = tensor.empty
+// CHECK:         %[[ALLOC:.+]] = bufferization.alloc_tensor
 // CHECK:         %[[UNPACK:.+]] = iree_linalg_ext.unpack
-// CHECK-SAME:      into %[[EMPTY]]
+// CHECK-SAME:      into %[[ALLOC]]
 // CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[UNPACK]]
 
 // -----
