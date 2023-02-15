@@ -31,6 +31,7 @@ iree_benchmark_suite_module_test(
     "mobilenet_v1_fp32_expected_output.txt"
   RUNNER_ARGS
     "--function=main"
+    "--device_allocator=caching"
     "--input=1x224x224x3xf32=0"
   UNSUPPORTED_PLATFORMS
     "riscv32-Linux"
@@ -48,6 +49,7 @@ iree_benchmark_suite_module_test(
     "efficientnet_int8_expected_output.txt"
   RUNNER_ARGS
     "--function=main"
+    "--device_allocator=caching"
     "--input=1x224x224x3xui8=0"
   UNSUPPORTED_PLATFORMS
     "android-arm64-v8a"
@@ -64,6 +66,7 @@ iree_benchmark_suite_module_test(
     "deeplab_v3_fp32_input_0_expected_output.npy"
   RUNNER_ARGS
     "--function=main"
+    "--device_allocator=caching"
     "--input=1x257x257x3xf32=0"
     "--expected_f32_threshold=0.001"
   UNSUPPORTED_PLATFORMS
@@ -81,6 +84,7 @@ iree_benchmark_suite_module_test(
     "1x2xi8=[72 -72]"
   RUNNER_ARGS
     "--function=main"
+    "--device_allocator=caching"
     "--input=1x96x96x1xi8=0"
   UNSUPPORTED_PLATFORMS
     "android-arm64-v8a"
