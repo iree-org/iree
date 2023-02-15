@@ -317,7 +317,6 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    arith.addf
 //         CHECK:    arith.addf
 //         CHECK:    vector.broadcast
-//         CHECK:    vector.broadcast
 //         CHECK:    arith.divf
 //         CHECK:    scf.for
 //         CHECK:      vector.transfer_read
