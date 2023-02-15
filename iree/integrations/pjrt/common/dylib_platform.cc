@@ -55,7 +55,7 @@ iree_status_t DylibPlatform::SubclassInitialize() {
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
         "the compiler library could not be found. It can be configured via the "
-        "'COMPILER_LIBRARY_PATH' config var ('IREE_PJRT_COMPILER_LIBRARY_PATH' "
+        "'COMPILER_LIB_PATH' config var ('IREE_PJRT_COMPILER_LIB_PATH' "
         "env var)");
   }
 
