@@ -25,6 +25,8 @@ include(CMakeParseArguments)
 # STATIC_LIB_PATH: When added, the module is compiled into a LLVM static
 #     library with the specified library path.
 # FRIENDLY_NAME: Optional. Name to use to display build progress info.
+# FLAGFILE_NAME: Optional. When specified, dumps the compilation flag into the
+#    file ${FLAGFILE_NAME}.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 #     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
 #     will be in ${PACKAGE}/internal.
@@ -41,7 +43,7 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME;STATIC_LIB_PATH"
+    "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME;STATIC_LIB_PATH;FLAGFILE_NAME"
     "FLAGS;DEPENDS;DEPS"
     ${ARGN}
   )
@@ -122,6 +124,20 @@ function(iree_bytecode_module)
     get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
+  if(_RULE_FLAGFILE_NAME)
+    # Generate the flagfile with python command. We can't use "file" because
+    # it can't be part of a target's dependency and generated lazily. And
+    # "cmake -E echo" doesn't work with newlines.
+    add_custom_command(
+      OUTPUT "${_RULE_FLAGFILE_NAME}"
+      COMMAND
+        "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_compilation_flagfile.py"
+          --output "${_RULE_FLAGFILE_NAME}"
+          -- ${_ARGS}
+      COMMENT "Generating flagfile ${_RULE_FLAGFILE_NAME}"
+    )
+  endif()
+
   add_custom_command(
     OUTPUT
       ${_OUTPUT_FILES}
@@ -133,6 +149,7 @@ function(iree_bytecode_module)
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
       ${_RULE_DEPENDS}
+      ${_RULE_FLAGFILE_NAME}
     COMMENT
       "Generating ${_MODULE_FILE_NAME} from ${_FRIENDLY_NAME}"
     VERBATIM
