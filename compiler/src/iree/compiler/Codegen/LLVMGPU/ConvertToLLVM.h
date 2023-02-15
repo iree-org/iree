@@ -29,7 +29,7 @@ void populateScalarizeMathOps(RewritePatternSet &patterns);
 void populateLowerHALInterfaceOp(RewritePatternSet &patterns);
 
 /// Add patterns to convert AllocOp of shared memory to a global variable.
-void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns);
+void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns, unsigned addrSpace);
 
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp);
 

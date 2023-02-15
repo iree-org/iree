@@ -86,6 +86,11 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
 // TODO: Make this take HW specific sizes.
 Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
 
+LogicalResult lowerAddressSpaceEnum(MLIRContext *ctx, ModuleOp &op,
+                                    unsigned globalAddrSpace,
+                                    unsigned workgroupAddrSpace,
+                                    unsigned privateAddrSpace);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -68,6 +69,18 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       return;
     }
 
+    // MemRef conversion for GPU to NVVM lowering.
+    // NVVM uses alloca in the default address space to represent private
+    // memory allocations, so drop private annotations. NVVM uses address
+    // space 3 for shared memory. NVVM uses the default address space to
+    // represent global memory.
+    if (failed(lowerAddressSpaceEnum(
+            &getContext(), m,
+            /* global= */ NVVM::NVVMMemorySpace::kGlobalMemorySpace,
+            /* workgroup= */ NVVM::NVVMMemorySpace::kSharedMemorySpace,
+            /* private= */ 0)))
+      return signalPassFailure();
+
     /// Customize the bitwidth used for the device side index computations.
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
     options.overrideIndexBitwidth(64);
@@ -88,7 +101,8 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       RewritePatternSet patterns(&getContext());
       patterns.insert<DropSharedMemoryDeallocOp>(&getContext());
       populateScalarizeMathOps(patterns);
-      populateConvertSharedMemoryAllocOps(patterns);
+      populateConvertSharedMemoryAllocOps(
+          patterns, NVVM::NVVMMemorySpace::kSharedMemorySpace);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(

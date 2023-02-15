@@ -152,9 +152,12 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
 struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
   using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
 
+  ConvertSharedMemAllocOp(MLIRContext *ctx, unsigned addrSpace)
+      : OpRewritePattern(ctx), addrSpace(addrSpace) {}
+
   LogicalResult matchAndRewrite(memref::AllocOp allocOp,
                                 PatternRewriter &rewriter) const override {
-    if (allocOp.getType().getMemorySpaceAsInt() != 3) return failure();
+    if (allocOp.getType().getMemorySpaceAsInt() != addrSpace) return failure();
     ArrayRef<int64_t> shape = allocOp.getType().getShape();
     if (llvm::any_of(shape,
                      [](int64_t dim) { return dim == ShapedType::kDynamic; })) {
@@ -193,6 +196,9 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
                                                      global.getName());
     return success();
   }
+
+ private:
+  unsigned addrSpace;
 };
 
 /// Pass to test in dialect transformation used to legalize the IR before
@@ -205,7 +211,7 @@ class TestLLVMGPULegalizeOpPass
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateScalarizeMathOps(patterns);
-    populateConvertSharedMemoryAllocOps(patterns);
+    populateConvertSharedMemoryAllocOps(patterns, (unsigned)gpu::AddressSpace::Workgroup);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
@@ -503,8 +509,8 @@ void populateScalarizeMathOps(RewritePatternSet &patterns) {
       patterns.getContext());
 }
 
-void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns) {
-  patterns.add<ConvertSharedMemAllocOp>(patterns.getContext());
+void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns, unsigned addrSpace) {
+  patterns.add<ConvertSharedMemAllocOp>(patterns.getContext(), addrSpace);
 }
 
 void populateLowerHALInterfaceOp(RewritePatternSet &patterns) {

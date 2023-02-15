@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -32,6 +33,10 @@ namespace iree_compiler {
 
 namespace {
 
+const unsigned kGlobalAddrSpace = 1;
+const unsigned kWorkgroupAddrSpace = 3;
+const unsigned kPrivateAddrSpace = 5;
+
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding ROCDL equivalent.
 ///
@@ -44,6 +49,17 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
+    // MemRef conversion for GPU to NVVM lowering.
+    // NVVM uses alloca in the default address space to represent private
+    // memory allocations, so drop private annotations. NVVM uses address
+    // space 3 for shared memory. NVVM uses the default address space to
+    // represent global memory.
+    if (failed(lowerAddressSpaceEnum(&getContext(), m,
+                                     /* global= */ kGlobalAddrSpace,
+                                     /* workgroup= */ kWorkgroupAddrSpace,
+                                     /* private= */ kPrivateAddrSpace)))
+      return signalPassFailure();
+
     /// Customize the bitwidth used for the device side index computations.
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
     options.overrideIndexBitwidth(64);
@@ -55,7 +71,7 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
     {
       RewritePatternSet patterns(&getContext());
       populateScalarizeMathOps(patterns);
-      populateConvertSharedMemoryAllocOps(patterns);
+      populateConvertSharedMemoryAllocOps(patterns, kWorkgroupAddrSpace);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(

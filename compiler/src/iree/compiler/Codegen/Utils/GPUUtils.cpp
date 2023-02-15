@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -594,6 +595,36 @@ Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     }
   }
   return std::nullopt;
+}
+
+LogicalResult lowerAddressSpaceEnum(MLIRContext *ctx, ModuleOp &op,
+                                    unsigned globalAddrSpace,
+                                    unsigned workgroupAddrSpace,
+                                    unsigned privateAddrSpace) {
+  RewritePatternSet patterns(ctx);
+  TypeConverter typeConverter;
+  typeConverter.addConversion([](Type t) { return t; });
+  // NVVM uses alloca in the default address space to represent private
+  // memory allocations, so drop private annotations. NVVM uses address
+  // space 3 for shared memory. NVVM uses the default address space to
+  // represent global memory.
+  gpu::populateMemorySpaceAttributeTypeConversions(
+      typeConverter, [&](gpu::AddressSpace space) -> unsigned {
+        switch (space) {
+          case gpu::AddressSpace::Global:
+            return globalAddrSpace;
+          case gpu::AddressSpace::Workgroup:
+            return workgroupAddrSpace;
+          case gpu::AddressSpace::Private:
+            return privateAddrSpace;
+        }
+        llvm_unreachable("unknown address space enum value");
+        return 0;
+      });
+  gpu::populateMemorySpaceLoweringPatterns(typeConverter, patterns);
+  ConversionTarget target(*ctx);
+  gpu::populateLowerMemorySpaceOpLegality(target);
+  return applyFullConversion(op, target, std::move(patterns));
 }
 
 }  // namespace iree_compiler
