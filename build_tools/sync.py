@@ -53,6 +53,7 @@ def sync_nightly():
   sync_iree_runtime_submodules(iree_path)
   jax_path = checkout_repo("jax", "https://github.com/google/jax.git")
   tf_commit = probe_jax_tensorflow_commit(jax_path)
+  tf_commit = "HEAD" # TODO Disable once JAX syncs to a newer TF version
   log(f"Jax is synced to tensorflow commit {tf_commit}")
   tf_path = checkout_repo("tensorflow",
                           "https://github.com/tensorflow/tensorflow.git",

@@ -1210,6 +1210,18 @@ void ExecutableImage::BindApi(PJRT_Api* api) {
     args->num_outputs = exec->result_count;
     return nullptr;
   };
+  api->PJRT_Executable_NumPartitions =
+      +[](PJRT_Executable_NumPartitions_Args* args) -> PJRT_Error* {
+    // This should be updated once iree supports partitioning.
+    args->num_partitions = 1;
+    return nullptr;
+  };
+  api->PJRT_Executable_NumReplicas =
+      +[](PJRT_Executable_NumReplicas_Args* args) -> PJRT_Error* {
+    // This should be updated once iree supports replicas.
+    args->num_replicas = 1;
+    return nullptr;
+  };
   api->PJRT_Executable_Serialize =
       +[](PJRT_Executable_Serialize_Args* args) -> PJRT_Error* {
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
