@@ -37,6 +37,7 @@ iree_cc_library(
     LLVMCore
     LLVMLinker
     LLVMSupport
+    LLVMTargetParser
     MLIRArmNeonDialect
     MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
@@ -118,6 +119,7 @@ iree_cc_library(
     ::LLVMTargetOptions
     LLVMCore
     LLVMSupport
+    LLVMTargetParser
     MLIRSupport
   PUBLIC
 )

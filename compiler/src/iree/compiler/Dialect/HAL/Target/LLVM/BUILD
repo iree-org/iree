@@ -57,6 +57,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:RISCVAsmParser",
         "@llvm-project//llvm:RISCVCodeGen",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
         "@llvm-project//llvm:WebAssemblyAsmParser",
         "@llvm-project//llvm:WebAssemblyCodeGen",
         "@llvm-project//llvm:X86AsmParser",
@@ -131,6 +132,7 @@ iree_compiler_cc_library(
         ":LLVMTargetOptions",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:Support",
     ],
 )

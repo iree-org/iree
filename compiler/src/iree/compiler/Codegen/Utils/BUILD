@@ -38,6 +38,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",
