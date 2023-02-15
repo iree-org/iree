@@ -7,7 +7,7 @@
 //
 // Transformations that are performed before calling upstream Comprehensive
 // Bufferization pass. These change the dispatch region to use destination
-// passing style, mostly to get rid of `init_tensor` ops that result in an
+// passing style, mostly to get rid of `empty` ops that result in an
 // allocation.
 //
 //===----------------------------------------------------------------------===//
@@ -168,8 +168,8 @@ static LogicalResult replaceDestinationBuffer(OpResult resultValue,
         op.setDpsInitOperand(resultValue.getResultNumber(), destinationValue);
         return success();
       })
-      .Case<tensor::EmptyOp>([&](auto emptyTensorOp) {
-        emptyTensorOp.replaceAllUsesWith(destinationValue);
+      .Case<tensor::EmptyOp>([&](auto emptyOp) {
+        emptyOp.replaceAllUsesWith(destinationValue);
         return success();
       })
       .Default([](auto defaultOp) {
@@ -250,8 +250,8 @@ static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
 
   llvm::DenseSet<Value> processed;
   auto walkResult = funcOp.walk<WalkOrder::PreOrder>(
-      [&](tensor::EmptyOp emptyTensorOp) -> WalkResult {
-        for (auto result : emptyTensorOp->getResults()) {
+      [&](tensor::EmptyOp emptyOp) -> WalkResult {
+        for (auto result : emptyOp->getResults()) {
           if (!result.getType().isa<RankedTensorType>()) continue;
           if (plan.isInStoreSet(result) && !processed.count(result)) {
             return modifyResultToUseStoreBuffer(b, result, plan, processed);
@@ -264,17 +264,17 @@ static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
 
 /// Multiple uses of `tensor.empty()` results in a copy since upstream
 /// treats `tensor.empty()` as an allocation and sees uses as a data-hazard
-/// creating copies/allocations. Since the `init_tensor` op is a proxy for
+/// creating copies/allocations. Since the `empty` op is a proxy for
 /// undef, these could just be duplicated to have a single use. This removes
 /// unnecessary data-hazards.
-static LogicalResult duplicateInitTensorOps(OpBuilder &b,
-                                            tensor::EmptyOp emptyTensorOp) {
+static LogicalResult duplicateTensorEmptyOps(OpBuilder &b,
+                                             tensor::EmptyOp emptyOp) {
   OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(emptyTensorOp);
-  SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(
-      emptyTensorOp->getUses(), [](OpOperand &use) { return &use; }));
+  b.setInsertionPoint(emptyOp);
+  SmallVector<OpOperand *> uses = llvm::to_vector(
+      llvm::map_range(emptyOp->getUses(), [](OpOperand &use) { return &use; }));
   for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
-    auto newOp = cast<tensor::EmptyOp>(b.clone(*emptyTensorOp.getOperation()));
+    auto newOp = cast<tensor::EmptyOp>(b.clone(*emptyOp.getOperation()));
     Operation *user = use->getOwner();
     user->setOperand(use->getOperandNumber(), newOp);
   }
@@ -504,12 +504,10 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   MLIRContext *context = &getContext();
 
   OpBuilder b(context);
-  SmallVector<tensor::EmptyOp> emptyTensorOps;
-  funcOp.walk([&](tensor::EmptyOp emptyTensorOp) {
-    emptyTensorOps.push_back(emptyTensorOp);
-  });
-  if (llvm::any_of(emptyTensorOps, [&](tensor::EmptyOp emptyTensorOp) {
-        return failed(duplicateInitTensorOps(b, emptyTensorOp));
+  SmallVector<tensor::EmptyOp> emptyOps;
+  funcOp.walk([&](tensor::EmptyOp emptyOp) { emptyOps.push_back(emptyOp); });
+  if (llvm::any_of(emptyOps, [&](tensor::EmptyOp emptyOp) {
+        return failed(duplicateTensorEmptyOps(b, emptyOp));
       })) {
     return signalPassFailure();
   }

@@ -99,20 +99,20 @@ struct NarrowParams {
   Optional<std::pair<int64_t, int64_t>> range;
 };
 
-// Eliminates a cast produced by an init_tensor by just initializing to that
+// Eliminates a cast produced by an empty by just initializing to that
 // type directly.
-struct LinalgInitTensorCast
+struct TensorEmptyCast
     : OpInterfaceRewritePattern<IREE::Util::NumericCastOpInterface> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Util::NumericCastOpInterface castOp,
                                 PatternRewriter &rewriter) const override {
-    auto emptyTensorOp = castOp.getInput().getDefiningOp<tensor::EmptyOp>();
-    if (!emptyTensorOp) return failure();
+    auto emptyOp = castOp.getInput().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp) return failure();
     Type resultType = castOp.getCasted().getType();
 
-    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
-        castOp, resultType, emptyTensorOp.getDynamicSizes());
+    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(castOp, resultType,
+                                                 emptyOp.getDynamicSizes());
     return success();
   }
 };
@@ -263,7 +263,7 @@ class OptimizeNumericsPass : public OptimizeNumericsBase<OptimizeNumericsPass> {
     patterns.insert<LinalgFpMatmulToLowP>(context);
 
     // Cast propagation.
-    patterns.insert<LinalgInitTensorCast>(context);
+    patterns.insert<TensorEmptyCast>(context);
     patterns.insert<LinalgFillCast>(context);
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
