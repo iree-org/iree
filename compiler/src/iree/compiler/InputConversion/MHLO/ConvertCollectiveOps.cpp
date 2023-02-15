@@ -4,6 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <iree/compiler/Dialect/Flow/IR/FlowTypes.h>
+
+#include <optional>
+
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
@@ -12,6 +16,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -113,6 +118,17 @@ convertToFlowCollectiveReductionOp(const Operation &op) {
   }
 }
 
+static IREE::Flow::CollectiveElementTypeAttr getCollectiveElementTypeAttr(
+    MLIRContext *context, RankedTensorType type) {
+  std::optional<IREE::Flow::CollectiveElementType> collectiveElemType =
+      convertToFlowCollectiveElementType(type.getElementType());
+  if (!collectiveElemType) {
+    return IREE::Flow::CollectiveElementTypeAttr();
+  }
+  return IREE::Flow::CollectiveElementTypeAttr::get(context,
+                                                    *collectiveElemType);
+}
+
 }  // namespace
 
 /// Converts mhlo.replica_id to flow.channel.default + flow.channel.rank.
@@ -164,18 +180,14 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
     // Create a default channel.
     auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
 
+    // Get the collective element type attribute.
     auto resultType = op.getResult().getType().cast<RankedTensorType>();
-    SmallVector<int64_t> gatherResultShape(resultType.getShape());
-    auto elemType = resultType.getElementType();
-
-    // Get the element type.
-    std::optional<IREE::Flow::CollectiveElementType> collectiveElemType =
-        convertToFlowCollectiveElementType(elemType);
-    if (!elemType) {
-      return rewriter.notifyMatchFailure(op, "unsupported result type");
+    IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
+        getCollectiveElementTypeAttr(op.getContext(), resultType);
+    if (!elementTypeAttr) {
+      return rewriter.notifyMatchFailure(
+          op, "unsupported element type for collective op");
     }
-    auto elementTypeAttr = IREE::Flow::CollectiveElementTypeAttr::get(
-        op.getContext(), *collectiveElemType);
 
     // When all_gather_dim != 0, we need to transpose between 0 and
     // all_gather_dim before and after the flow allgather op.
@@ -184,6 +196,7 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
     SmallVector<int64_t> gatherInputShape(inputType.getShape());
     Value gatherInput = op.getOperand();
     DenseIntElementsAttr permutationAttr;
+    SmallVector<int64_t> gatherResultShape(resultType.getShape());
 
     if (allGatherDim != 0) {
       SmallVector<int64_t> permutation =
@@ -193,12 +206,13 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
       std::swap(gatherInputShape[0], gatherInputShape[allGatherDim]);
       std::swap(gatherResultShape[0], gatherResultShape[allGatherDim]);
       // Transpose the input.
-      gatherInput =
-          rewriter
-              .create<mhlo::TransposeOp>(
-                  loc, RankedTensorType::get(gatherInputShape, elemType),
-                  gatherInput, permutationAttr)
-              .getResult();
+      gatherInput = rewriter
+                        .create<mhlo::TransposeOp>(
+                            loc,
+                            RankedTensorType::get(gatherInputShape,
+                                                  resultType.getElementType()),
+                            gatherInput, permutationAttr)
+                        .getResult();
     }
 
     // Create an empty tensor for the result.
@@ -234,7 +248,7 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
       return rewriter.notifyMatchFailure(op, "must use global device IDs");
     }
 
-    // Check there is only one group in the replica_groups
+    // Check there is only one group in the replica_groups.
     ShapedType replicaGroupType = op.getReplicaGroups().getType();
     if (replicaGroupType.getRank() != 2 ||
         replicaGroupType.getDimSize(0) != 1) {
@@ -278,22 +292,21 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
     // Create a default channel.
     auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
 
-    // Convert mhlo reduction op into flow reduction op
+    // Convert mhlo reduction op into flow reduction op.
     auto reductionOpAttr =
         IREE::Flow::CollectiveReductionOpAttr::get(op.getContext(), *redOp);
 
     auto inputType = op.getOperand().getType().cast<RankedTensorType>();
-    ArrayRef<int64_t> inputShape = inputType.getShape();
-    auto inputElemType = inputType.getElementType();
-    // Get the element type
-    std::optional<IREE::Flow::CollectiveElementType> elemType =
-        convertToFlowCollectiveElementType(inputElemType);
-    if (!elemType) {
+
+    // Get the collective element type attribute.
+    IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
+        getCollectiveElementTypeAttr(op.getContext(), inputType);
+    if (!elementTypeAttr) {
       return rewriter.notifyMatchFailure(op, "unsupported input type");
     }
-    auto elementTypeAttr =
-        IREE::Flow::CollectiveElementTypeAttr::get(op.getContext(), *elemType);
-    // Create an empty tensor for the result
+
+    // Create an empty tensor for the result.
+    ArrayRef<int64_t> inputShape = inputType.getShape();
     Value target = rewriter.create<tensor::EmptyOp>(loc, inputShape,
                                                     inputType.getElementType());
     auto allReduceOp = rewriter.create<IREE::Flow::CollectiveAllReduceOp>(
@@ -366,18 +379,13 @@ struct ReduceScatterOpConversion
     // Create a default channel.
     auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
 
+    // Get the collective element type attribute.
     auto resultType = op.getResult().getType().cast<RankedTensorType>();
-    SmallVector<int64_t> scatterResultShape(resultType.getShape());
-    auto elemType = resultType.getElementType();
-
-    // Get the element type
-    std::optional<IREE::Flow::CollectiveElementType> collectiveElemType =
-        convertToFlowCollectiveElementType(elemType);
-    if (!elemType) {
-      return rewriter.notifyMatchFailure(op, "unsupported result type");
+    IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
+        getCollectiveElementTypeAttr(op.getContext(), resultType);
+    if (!elementTypeAttr) {
+      return rewriter.notifyMatchFailure(op, "unsupported input type");
     }
-    auto elementTypeAttr = IREE::Flow::CollectiveElementTypeAttr::get(
-        op.getContext(), *collectiveElemType);
 
     // When scatter_dimension != 0, we need to transpose between 0 and
     // scatter_dimension before and after the flow reduce_scatter op.
@@ -387,6 +395,9 @@ struct ReduceScatterOpConversion
     Value reduceInput = op.getOperand();
     DenseIntElementsAttr permutationAttr;
 
+    SmallVector<int64_t> scatterResultShape(resultType.getShape());
+    auto elemType = resultType.getElementType();
+
     if (scatterDim != 0) {
       SmallVector<int64_t> permutation =
           llvm::to_vector(llvm::seq<int64_t>(0, scatterResultShape.size()));
@@ -394,7 +405,7 @@ struct ReduceScatterOpConversion
       permutationAttr = rewriter.getI64VectorAttr(permutation);
       std::swap(reduceInputShape[0], reduceInputShape[scatterDim]);
       std::swap(scatterResultShape[0], scatterResultShape[scatterDim]);
-      // transpose the input
+      // Transpose the input.
       reduceInput =
           rewriter
               .create<mhlo::TransposeOp>(
