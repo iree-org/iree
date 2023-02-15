@@ -56,7 +56,11 @@ class Android_Mali_Benchmarks(object):
       tflite_models.MOBILENET_V3SMALL,
   ]
   FP16_MODELS = [tflite_models.MOBILEBERT_FP16]
-  QUANT_MODELS = [tflite_models.MOBILEBERT_INT8]
+  QUANT_MODELS = [
+      tflite_models.MOBILEBERT_INT8,
+      tflite_models.EFFICIENTNET_INT8,
+      tflite_models.PERSON_DETECT_INT8,
+  ]
 
   def generate(
       self
