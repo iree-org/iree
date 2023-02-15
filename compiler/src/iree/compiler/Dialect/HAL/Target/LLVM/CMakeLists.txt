@@ -104,6 +104,7 @@ iree_cc_library(
     ::LLVMTargetOptions
     LLVMCore
     LLVMSupport
+    LLVMTargetParser
     MLIRSupport
     iree::compiler::Dialect::HAL::Target::LLVM::internal::LinkerTools_internal
     iree::compiler::Utils
