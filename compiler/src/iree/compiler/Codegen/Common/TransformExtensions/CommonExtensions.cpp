@@ -1054,12 +1054,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = getTestAnalysisOnly();
   options.printConflicts = getPrintConflicts();
-  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
-    if (failed(runIREEOneShotBufferize(moduleOp, options)))
-      return WalkResult::interrupt();
-    return WalkResult::advance();
-  });
-  if (res.wasInterrupted())
+  if (failed(runIREEOneShotBufferize(state.getTopLevel(), options)))
     return DiagnosedSilenceableFailure::definiteFailure();
 
   // Early exit if test_analysis_only is set.
@@ -1071,7 +1066,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   //   3. Post-bufferization passes are fine.
   PassManager pm(getContext());
   addIREEPostBufferizationPasses(pm);
-  res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
+  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
     if (failed(pm.run(moduleOp))) {
       getOperation()->emitError()
           << "failed to post-bufferization passes on module:\n"

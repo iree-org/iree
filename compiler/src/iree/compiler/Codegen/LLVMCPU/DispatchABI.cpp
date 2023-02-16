@@ -767,9 +767,7 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
   // Cast to the desired memref element type.
   auto elementType = typeConverter->convertType(memRefType.getElementType());
   Value typedPtrValue = builder.create<LLVM::BitcastOp>(
-      loc,
-      LLVM::LLVMPointerType::get(elementType, memRefType.getMemorySpaceAsInt()),
-      basePtrValue);
+      loc, LLVM::LLVMPointerType::get(elementType), basePtrValue);
 
   // Construct the MemRefDescriptor type based on the information we have.
   // NOTE: we could use the binding length to clamp this/check that the

@@ -981,16 +981,16 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
   pm.addPass(createLowerAffinePass());
   pm.addPass(createConvertSCFToCFPass());
   pm.addPass(createConvertLinalgToLLVMPass());
-  pm.addPass(createConvertVectorToLLVMPass(
-      // clang-format off
-      LowerVectorToLLVMOptions()
-        .enableReassociateFPReductions(getReassociateFpReductions())
-        .enableIndexOptimizations(getEnableIndexOptimizations())
-        .enableArmNeon(getEnableArmNeon())
-        .enableArmSVE(getEnableArmSve())
-        .enableAMX(getEnableAmx())
-        .enableX86Vector(getEnableX86vector())));
-  // clang-format on
+  {
+    auto options = ConvertVectorToLLVMPassOptions();
+    options.reassociateFPReductions = getReassociateFpReductions();
+    options.force32BitVectorIndices = getEnableIndexOptimizations();
+    options.armNeon = getEnableArmNeon();
+    options.armSVE = getEnableArmSve();
+    options.amx = getEnableAmx();
+    options.x86Vector = getEnableX86vector();
+    pm.addPass(createConvertVectorToLLVMPass(options));
+  }
   pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
   pm.addPass(createFinalizeMemRefToLLVMConversionPass());
   if (getEnableAsync())

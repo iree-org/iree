@@ -655,10 +655,14 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
   populatePrepareVectorToMMAPatterns(patterns, /*llvmgpuUseMMASync=*/false);
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {
+    target->emitOpError("vector to mma preparation patterns failed to apply");
+    return emitDefaultDefiniteFailure(target);
+  }
+  IRRewriter rewriter(getContext());
+  if (failed(convertVectorToMMAOps(rewriter, target))) {
     target->emitOpError("vector to mma patterns failed to apply");
     return emitDefaultDefiniteFailure(target);
   }
-  convertVectorToMMAOps(target);
 
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
