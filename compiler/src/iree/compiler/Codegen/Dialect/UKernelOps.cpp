@@ -28,22 +28,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Codegen {
 
-/// Returns true if the dimensions of ShapedType are compatible.
-static bool isShapedTypeDimCompatible(int64_t lhs, int64_t rhs) {
-  return lhs == ShapedType::kDynamic || rhs == ShapedType::kDynamic ||
-         lhs == rhs;
-}
-
-/// Returns true if the dimensions of ShapedType are compatible.
-static bool areShapesCompatible(ArrayRef<int64_t> lhs, ArrayRef<int64_t> rhs) {
-  if (lhs.size() != rhs.size()) {
-    return false;
-  }
-  return llvm::all_of(llvm::zip(lhs, rhs), [](std::tuple<int64_t, int64_t> it) {
-    return isShapedTypeDimCompatible(std::get<0>(it), std::get<1>(it));
-  });
-}
-
 /// Helper method to generate a function declaration at a module scope,
 /// and a call to that function
 static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
