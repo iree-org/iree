@@ -40,6 +40,18 @@ def GeneralizeConvolutions :
   let constructor = "mlir::iree_compiler::IREE::createGeneralizeConvolutionsPass()";
 }
 
+def ConvertConvToChannelsLast :
+    Pass<"iree-preprocessing-convert-conv-to-channels-last", ""> {
+  let summary = "Convert linalg convolutions to channels last.";
+  let constructor =
+      "mlir::iree_compiler::IREE::createConvertConvToChannelsLastPass()";
+  let options = [
+    Option<"tileSize", "tile-size", "int",
+           /*default=*/"0",
+           "Specify the tiling factor">,
+  ];
+}
+
 def PadLinalgOps :
     Pass<"iree-preprocessing-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
