@@ -80,12 +80,6 @@ class ModuleExecutionConfig(object):
   loader: RuntimeLoader
   driver: RuntimeDriver
   extra_flags: List[str] = dataclasses.field(default_factory=list)
-  # Special flags that we want to enable for all benchmarks. We would like to
-  # keep these flags in the config so the exported config contains all
-  # information for reproducing. Add/remove flags with caution.
-  # TODO(#11588): Replace with tuple once the serializer support tuple.
-  global_flags: List[str] = dataclasses.field(
-      default_factory=lambda: ["--device_allocator=caching"], init=False)
 
 
 class ImportTool(Enum):
