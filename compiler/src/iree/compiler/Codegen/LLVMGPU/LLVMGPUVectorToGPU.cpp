@@ -82,7 +82,9 @@ struct LLVMGPUVectorToGPUPass
         return signalPassFailure();
       }
     } else {
-      (void)convertVectorToMMAOps(rewriter, funcOp);
+      if (failed(convertVectorToMMAOps(rewriter, funcOp))) {
+        return signalPassFailure();
+      }
     }
     createAsyncGroups(funcOp, llvmgpuUseMMASync);
 
