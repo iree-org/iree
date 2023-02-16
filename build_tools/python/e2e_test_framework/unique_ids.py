@@ -36,7 +36,7 @@ def hash_composite_id(keys: Sequence[str]) -> str:
   unchanged for the existing composite object if they use TRANSPARENT_ID on the
   new keyed field.
 
-  The composite id is compuated in the follow steps:
+  The composite id is computed in the following steps:
   1. Index each key with its position in the list from 0.
   2. Remove any key == TRANSPARENT_ID
   3. Get the SHA256 hex digest of "0-key_0:1-key_1:..."
