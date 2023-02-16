@@ -39,7 +39,7 @@ if [[ "${DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
         --verbose
 elif [[ "${DEVICE_NAME}" == "c2-standard-16" ]]; then
   ${DOCKER_WRAPPER} \
-    gcr.io/iree-oss/base-bleeding-edge@sha256:479eefb76447c865cf58c5be7ca9fe33f48584b474a1da3dfaa125aad2510463 \
+    gcr.io/iree-oss/base-bleeding-edge@sha256:273559bafe04270a8ad5b21d31c6c056d2d966b5d06c41353da5063cc8a16616 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \

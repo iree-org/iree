@@ -1,4 +1,4 @@
-# Copyright 2020 The IREE Authors
+# Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -17,7 +17,7 @@ ARG NVIDIA_COMMON_DEB="libnvidia-common-515-server_515.86.01-0ubuntu0.22.04.1_al
 ARG NVIDIA_EGL_WAYLAND_DEB="libnvidia-egl-wayland1_1.1.9-1.1_amd64.deb"
 
 
-FROM gcr.io/iree-oss/base-bleeding-edge@sha256:10a94f7edf0df2f3894038e0e434a93ea353460ed72240c226548025690a79e5 AS fetch-nvidia
+FROM gcr.io/iree-oss/base-bleeding-edge@sha256:273559bafe04270a8ad5b21d31c6c056d2d966b5d06c41353da5063cc8a16616 AS fetch-nvidia
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
@@ -37,9 +37,8 @@ RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_EGL_WAYLA
 #     it's.. for CUDA.
 # - nvidia/vulkan (https://hub.docker.com/r/nvidia/vulkan):
 #      does not support Ubuntu 22.04.
-# This allows to share configuration with base CMake, but it also means we need
-# to MATCH the driver version between the host machine and the docker image.
-FROM gcr.io/iree-oss/base-bleeding-edge@sha256:10a94f7edf0df2f3894038e0e434a93ea353460ed72240c226548025690a79e5 AS final
+# This allows to share configuration with base CMake.
+FROM gcr.io/iree-oss/base-bleeding-edge@sha256:273559bafe04270a8ad5b21d31c6c056d2d966b5d06c41353da5063cc8a16616 AS final
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
