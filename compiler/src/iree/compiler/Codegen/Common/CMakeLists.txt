@@ -231,6 +231,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTilingInterface
+    MLIRTransformDialect
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToSCF
