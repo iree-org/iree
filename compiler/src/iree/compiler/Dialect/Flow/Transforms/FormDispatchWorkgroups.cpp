@@ -93,6 +93,9 @@ static SmallVector<Operation *> getCloneableOps(
     }
     result.push_back(definingOp);
     worklist.append(definingOp->operand_begin(), definingOp->operand_end());
+    llvm::SetVector<Value> nestedValues;
+    mlir::getUsedValuesDefinedAbove(definingOp->getRegions(), nestedValues);
+    worklist.append(nestedValues.begin(), nestedValues.end());
   }
 
   return result;

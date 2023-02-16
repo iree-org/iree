@@ -48,8 +48,8 @@
 // compiler implementation details.
 static llvm::cl::opt<int> clInlineConstantByteLength(
     "iree-flow-inline-constants-max-byte-length",
-    llvm::cl::desc("Maximum byte-length of constant that can be inlined into a "
-                   "dispatch region"),
+    llvm::cl::desc("Maximum byte-length of tensor constant that can be inlined "
+                   "into a dispatch region or 0 to disable inlining."),
     llvm::cl::init(256));
 
 static const char kRootOpAttr[] = "__root_op__";
@@ -214,6 +214,7 @@ bool isClonableIntoDispatchOp(Operation *op) {
     return true;
   }
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
+    if (clInlineConstantByteLength == 0) return false;
     auto constantValueAttr = constantOp.getValue();
     auto constantType = constantOp.getType();
     if (constantValueAttr.isa<SplatElementsAttr>()) {

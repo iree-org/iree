@@ -196,8 +196,12 @@ struct ReplaceDispatchResultIfZeroElements
 
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
+  // Disable constant inlining as we have done it during dispatch region
+  // formation.
+  IREE::Util::ClosureOptimizationOptions closureOptions;
+  closureOptions.maxInlinedConstantBytes = 0;
   results.insert<IREE::Util::ClosureOptimizationPattern<DispatchWorkgroupsOp>>(
-      context);
+      context, closureOptions);
   results.insert<ReplaceDispatchResultIfZeroElements>(context);
 }
 
