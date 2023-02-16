@@ -31,6 +31,7 @@ iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "ConvertConv2DToImg2Col.cpp",
+        "ConvertConvToChannelsLast.cpp",
         "InterpreterPass.cpp",
         "MakeSingleDispatchForFunction.cpp",
         "PadLinalgOps.cpp",
