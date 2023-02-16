@@ -1589,6 +1589,16 @@ SmallVector<int64_t, 4> CollectiveAllGatherOp::getTiedResultOperandIndices() {
   return {0};  // target
 }
 
+void CollectiveAllGatherOp::build(OpBuilder &builder, OperationState &state,
+                                  CollectiveElementTypeAttr elementType,
+                                  Value target, Value source, Value channel) {
+  auto targetDims =
+      IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
+
+  build(builder, state, elementType, target, targetDims, source, channel,
+        builder.getIndexArrayAttr({0}));
+}
+
 //===----------------------------------------------------------------------===//
 // flow.collective.all_reduce
 //===----------------------------------------------------------------------===//
@@ -1604,6 +1614,17 @@ Value CollectiveAllReduceOp::getTiedResult(unsigned resultIndex) {
 
 SmallVector<int64_t, 4> CollectiveAllReduceOp::getTiedResultOperandIndices() {
   return {0};  // target
+}
+
+void CollectiveAllReduceOp::build(OpBuilder &builder, OperationState &state,
+                                  CollectiveReductionOpAttr reductionOp,
+                                  CollectiveElementTypeAttr elementType,
+                                  Value target, Value source, Value channel) {
+  auto targetDims =
+      IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
+
+  build(builder, state, reductionOp, elementType, target, targetDims, source,
+        channel, builder.getIndexArrayAttr({0}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1622,6 +1643,18 @@ Value CollectiveReduceScatterOp::getTiedResult(unsigned resultIndex) {
 SmallVector<int64_t, 4>
 CollectiveReduceScatterOp::getTiedResultOperandIndices() {
   return {0};  // target
+}
+
+void CollectiveReduceScatterOp::build(OpBuilder &builder, OperationState &state,
+                                      CollectiveReductionOpAttr reductionOp,
+                                      CollectiveElementTypeAttr elementType,
+                                      Value target, Value source,
+                                      Value channel) {
+  auto targetDims =
+      IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
+
+  build(builder, state, reductionOp, elementType, target, targetDims, source,
+        channel, builder.getIndexArrayAttr({0}));
 }
 
 }  // namespace Flow

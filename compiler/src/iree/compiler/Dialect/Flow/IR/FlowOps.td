@@ -1383,13 +1383,27 @@ def FLOW_CollectiveAllGatherOp : FLOW_Op<"collective.all_gather", [
   let arguments = (ins
     FLOW_CollectiveElementTypeAttr:$element_type,
     FLOW_Tensor:$target,
+    FLOW_ShapeDynamicDims:$target_dims,
     FLOW_Tensor:$source,
-    FLOW_Channel:$channel
+    FLOW_Channel:$channel,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     FLOW_Tensor:$result
   );
-  let assemblyFormat = "$element_type `,` operands attr-dict `:` functional-type(operands, results)";
+  let assemblyFormat = [{
+    $element_type `,` $target `,` $source `,` $channel `:`
+    `(` type($target) `,` type($source) `,` type($channel) `)` `->`
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
+    attr-dict-with-keyword
+  }];
+  let builders = [
+    OpBuilder<(ins
+      "CollectiveElementTypeAttr":$element_type,
+      "Value":$target,
+      "Value":$source,
+      "Value":$channel)>,
+  ];
 }
 
 def FLOW_CollectiveAllReduceOp : FLOW_Op<"collective.all_reduce", [
@@ -1407,13 +1421,28 @@ def FLOW_CollectiveAllReduceOp : FLOW_Op<"collective.all_reduce", [
     FLOW_CollectiveReductionOpAttr:$reduction_op,
     FLOW_CollectiveElementTypeAttr:$element_type,
     FLOW_Tensor:$target,
+    FLOW_ShapeDynamicDims:$target_dims,
     FLOW_Tensor:$source,
-    FLOW_Channel:$channel
+    FLOW_Channel:$channel,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     FLOW_Tensor:$result
   );
-  let assemblyFormat = "$reduction_op `,` $element_type `,` operands attr-dict `:` functional-type(operands, results)";
+  let assemblyFormat = [{
+    $reduction_op `,` $element_type `,` $target `,` $source `,` $channel `:`
+    `(` type($target) `,` type($source) `,` type($channel) `)` `->`
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
+    attr-dict-with-keyword
+  }];
+  let builders = [
+    OpBuilder<(ins
+      "CollectiveReductionOpAttr":$reduction_op,
+      "CollectiveElementTypeAttr":$element_type,
+      "Value":$target,
+      "Value":$source,
+      "Value":$channel)>,
+  ];
 }
 
 def FLOW_CollectiveReduceScatterOp : FLOW_Op<"collective.reduce_scatter", [
@@ -1432,13 +1461,28 @@ def FLOW_CollectiveReduceScatterOp : FLOW_Op<"collective.reduce_scatter", [
     FLOW_CollectiveReductionOpAttr:$reduction_op,
     FLOW_CollectiveElementTypeAttr:$element_type,
     FLOW_Tensor:$target,
+    FLOW_ShapeDynamicDims:$target_dims,
     FLOW_Tensor:$source,
-    FLOW_Channel:$channel
+    FLOW_Channel:$channel,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     FLOW_Tensor:$result
   );
-  let assemblyFormat = "$reduction_op `,` $element_type `,` operands attr-dict `:` functional-type(operands, results)";
+  let assemblyFormat = [{
+    $reduction_op `,` $element_type `,` $target `,` $source `,` $channel `:`
+    `(` type($target) `,` type($source) `,` type($channel) `)` `->`
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
+    attr-dict-with-keyword
+  }];
+  let builders = [
+    OpBuilder<(ins
+      "CollectiveReductionOpAttr":$reduction_op,
+      "CollectiveElementTypeAttr":$element_type,
+      "Value":$target,
+      "Value":$source,
+      "Value":$channel)>,
+  ];
 }
 
 #endif  // IREE_DIALECT_FLOW_OPS
