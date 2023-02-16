@@ -585,13 +585,6 @@ else()
   # Stash cmake build type in case LLVM messes with it.
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 
-  # Add default external projects.
-  iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
-  iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
-  if(IREE_INPUT_TORCH)
-    iree_add_llvm_external_project(torch-mlir-dialects TORCH_MLIR_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
-  endif()
-
   add_subdirectory("third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting.
@@ -639,6 +632,13 @@ else()
     target_include_directories(IREELLVMIncludeSetup INTERFACE ${_COMMON_INCLUDE_DIRS})
   endfunction()
   _hack_llvm_include_paths()
+
+  # Add default external projects.
+  iree_add_llvm_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
+  iree_add_llvm_external_project(mlir-hlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
+  if(IREE_INPUT_TORCH)
+    iree_add_llvm_external_project(torch-mlir-dialects ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
+  endif()
 endif()
 
 #-------------------------------------------------------------------------------
