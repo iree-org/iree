@@ -20,7 +20,7 @@ from typing import Sequence
 # this id and populate that config to the fields of the existing objects. The
 # composite id computing function will ignore this id and keep the output
 # unchanged.
-TRANSPARENT_ID = "75f74d68-9556-4c03-91ef-68c5b7f4bcbd"
+TRANSPARENT_ID = "00000000-0000-0000-0000-000000000000"
 
 
 def hash_composite_id(keys: Sequence[str]) -> str:
