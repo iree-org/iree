@@ -28,8 +28,6 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "pack.mlir",
-            "unpack.mlir",
             "winograd_input.mlir",
             "winograd_output.mlir",
         ],
@@ -96,14 +94,12 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "attention.mlir",
-            "pack.mlir",
             "reverse.mlir",
             "scan.mlir",
             "scatter.mlir",
             "softmax.mlir",
             "sort.mlir",
             "top-k.mlir",
-            "unpack.mlir",
             "winograd_input.mlir",
             "winograd_output.mlir",
         ],
@@ -121,37 +117,15 @@ endif()
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_vmvx_ukernel_local-task",
-    srcs = [
-        "pack.mlir",
-        "unpack.mlir",
-    ],
-    compiler_flags = [
-        "--iree-vmvx-enable-microkernels",
-        # Some testcases have linalg.generic ops with multiple ops in the body.
-        # If we don't opt out from it, DecomposeLinalgGenericPass splits those
-        # into smaller linalg.generic ops with only one op in the body. This
-        # results in the creation of temporary buffers between these split
-        # linalg.generic ops, causing:
-        # > error: failed to legalize operation 'memref.alloca' that was explicitly marked illegal
-        "--iree-vmvx-enable-microkernels-decompose-linalg-generic=false",
-    ],
-    driver = "local-task",
-    target_backend = "vmvx",
-)
-
-iree_check_single_backend_test_suite(
     name = "check_vmvx_local-task",
     srcs = enforce_glob(
         # keep sorted
         [
-            "pack.mlir",
             "reverse.mlir",
             "scan.mlir",
             "scatter.mlir",
             "sort.mlir",
             "top-k.mlir",
-            "unpack.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
@@ -180,8 +154,6 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "pack.mlir",
-            "unpack.mlir",
             # TODO(antiagainst): scan fails on Adreno GPUs due to driver bug.
             # Re-enable this once we have new devices with up-to-date drivers.
             "top-k.mlir",

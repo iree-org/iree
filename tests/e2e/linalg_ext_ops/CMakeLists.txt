@@ -79,14 +79,12 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "attention.mlir"
-    "pack.mlir"
     "reverse.mlir"
     "scan.mlir"
     "scatter.mlir"
     "softmax.mlir"
     "sort.mlir"
     "top-k.mlir"
-    "unpack.mlir"
     "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND
@@ -99,30 +97,13 @@ endif()
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vmvx_ukernel_local-task
-  SRCS
-    "pack.mlir"
-    "unpack.mlir"
-  TARGET_BACKEND
-    "vmvx"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-vmvx-enable-microkernels"
-    "--iree-vmvx-enable-microkernels-decompose-linalg-generic=false"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_vmvx_local-task
   SRCS
-    "pack.mlir"
     "reverse.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
-    "unpack.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER

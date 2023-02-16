@@ -97,9 +97,7 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
           tilableOp.emitOpError("failed to get tiled implementation"));
     }
     assert(
-        (tiledOps.size() == 1 ||
-         (tiledOps.size() == 2 &&
-          isa<IREE::LinalgExt::UnPackOp>(tilableOp.getOperation()))) &&
+        (tiledOps.size() == 1) &&
         "expected only a single operation returned from tiling implementation");
     ret.op.assign(tiledOps);
     for (auto result : llvm::enumerate(ret.op.back()->getResults())) {
@@ -409,33 +407,6 @@ void TilingInterfaceTilingPass::runOnOperation() {
 
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
-  }
-
-  // TODO(hanchung): Deprecate IREE specific logic. We should move to use
-  // upstream scf::tileUsingSCFForOp method. For now only uses it for packing
-  // and unpacking ops.
-  {
-    transform::TrivialPatternRewriter rewriter(context);
-    auto filter = IREE::LinalgExt::LinalgTransformationFilter(
-        StringAttr::get(context, "tiling_pack_input"),
-        StringAttr::get(context, "tiling_pack_output"));
-    auto options = scf::SCFTilingOptions().setTileSizes({2, 4});
-    auto funcOp = getOperation();
-    funcOp->walk([&](Operation *tilableOp) {
-      if (failed(filter.checkAndNotify(rewriter, tilableOp))) {
-        return;
-      }
-
-      FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-          rewriter, cast<TilingInterface>(tilableOp), options);
-      if (failed(tilingResult))
-        return signalPassFailure();
-      rewriter.replaceOp(tilableOp, tilingResult->replacements);
-
-      for (auto op : tilingResult.value().tiledOps) {
-        filter.replaceLinalgTransformationFilter(rewriter, op);
-      }
-    });
   }
 }
 
