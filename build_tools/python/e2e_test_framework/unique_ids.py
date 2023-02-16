@@ -3,10 +3,62 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""List of unique random IDs in the benchmark suites.
+"""List of unique random IDs in the framework and id utilities.
 
 Each ID should be generated from uuid.uuid4().
 """
+
+import hashlib
+from typing import Sequence
+
+# Special id which will be ignored when calculating the composite id.
+#
+# It should only be used when adding a new field to a composite object while
+# we want to maintain the same id on the existing composite objects.
+#
+# In such case, you need to create a "default config" for the new field with
+# this id and populate that config to the fields of the existing objects. The
+# composite id computing function will ignore this id and keep the output
+# unchanged.
+TRANSPARENT_ID = "00000000-0000-0000-0000-000000000000"
+
+
+def hash_composite_id(keys: Sequence[str]) -> str:
+  """Computes the composite hash id from string keys.
+
+  String keys are the component ids that compose this composite object. We hash
+  the composite id since the id isn't designed to be inspected and insufficient
+  to reconstruct the original composite object.
+
+  Note that the output is sensitive to the order of the keys, and any key ==
+  TRANSPARENT_ID will be skipped. When adding a new key to the keys, the new key
+  should be always appended to the end. In this way, the composite id can be
+  unchanged for the existing composite object if they use TRANSPARENT_ID on the
+  new keyed field.
+
+  The composite id is computed in the following steps:
+  1. Index each key with its position in the list from 0.
+  2. Remove any key == TRANSPARENT_ID
+  3. Get the SHA256 hex digest of "0-key_0:1-key_1:..."
+
+  Step 1 is needed to avoid the ambiguity between:
+  ["key_abc", TRANSPARENT_ID] and [TRANSPARENT_ID, "key_abc"]
+  since after removing TRANSPARENT_ID, they both become ["key_abc"] without the
+  position index.
+
+  Args:
+    keys: list of string keys.
+
+  Returns:
+    Unique composite id.
+  """
+  trimmed_indexed_key = [
+      f"{index}-{key}" for index, key in enumerate(keys)
+      if key != TRANSPARENT_ID
+  ]
+  return hashlib.sha256(
+      ":".join(trimmed_indexed_key).encode("utf-8")).hexdigest()
+
 
 # Models
 MODEL_DEEPLABV3_FP32 = "c36c63b0-220a-4d78-8ade-c45ce47d89d3"
