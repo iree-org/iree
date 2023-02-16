@@ -501,12 +501,7 @@ FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
       return rewriter.notifyMatchFailure(sliceOp,
                                          "fusion along slice op failed");
     }
-    auto tiledProducer = tiledProducerVal->getDefiningOp<TilingInterface>();
-    if (!tiledProducer) {
-      return rewriter.notifyMatchFailure(
-          tiledProducerVal->getDefiningOp(),
-          "expected tiled implementation to implement TilingInterface as well");
-    }
+    auto tiledProducer = tiledProducerVal->getDefiningOp();
     if (tiledProducer->getNumResults() != fusableProducer->getNumResults()) {
       return rewriter.notifyMatchFailure(fusableProducer,
                                          "fused operation expected to produce "
@@ -555,35 +550,6 @@ FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
 }
 
 namespace {
-
-//===----------------------------------------------------------------------===//
-// SwapExtractSliceWithTiledProducer
-//===----------------------------------------------------------------------===//
-
-/// Pattern to swap a `tilinginterface op` -> `tensor.extract_slice` with
-/// `tensor.extract_slice` of operands of the op -> tiled `tilinginterface
-/// op`.
-struct SwapExtractSliceWithTiledProducer
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
-                                PatternRewriter &rewriter) const override {
-    OpResult producer = sliceOp.getSource().dyn_cast<OpResult>();
-    if (!producer) {
-      return rewriter.notifyMatchFailure(sliceOp, "source uses bb arg");
-    }
-    FailureOr<Value> tiledProducer =
-        tensor::replaceExtractSliceWithTiledProducer(rewriter, sliceOp,
-                                                     producer);
-    if (failed(tiledProducer)) {
-      return failure();
-    }
-    // Replace all uses of the producer within the
-    rewriter.replaceOp(sliceOp, tiledProducer.value());
-    return success();
-  }
-};
 
 //===----------------------------------------------------------------------===//
 // SwapExtractSliceWithDispatchTensorLoad
@@ -653,8 +619,7 @@ void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options) {
   MLIRContext *context = patterns.getContext();
   patterns.insert<SwapExtractSliceWithDispatchTensorLoad,
-                  SwapExtractSliceWithTensorEmpty,
-                  SwapExtractSliceWithTiledProducer>(context);
+                  SwapExtractSliceWithTensorEmpty>(context);
 }
 
 }  // namespace iree_compiler

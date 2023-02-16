@@ -780,6 +780,30 @@ add_custom_target(iree-run-module-test-deps
     "Building IREE run module test targets"
 )
 
+# Convenience target for running IREE tests.
+add_custom_target(iree-run-tests
+  COMMENT
+    "Run IREE unit tests"
+  WORKING_DIRECTORY
+    "${CMAKE_CURRENT_BINARY_DIR}"
+  USES_TERMINAL
+  COMMAND
+    "${CMAKE_COMMAND}" -E echo
+    "The 'iree-run-tests' target is a helper for running ctest. For advanced"
+    "options, build dependencies and invoke ctest independently as in:"
+  COMMAND
+    "${CMAKE_COMMAND}" -E echo
+    "  \\(cd ${CMAKE_CURRENT_BINARY_DIR} \\&\\& cmake --build . --target iree-test-deps \\&\\& ctest --output-on-failure\\)"
+  COMMAND
+    "${CMAKE_COMMAND}" -E echo
+    "Run tests in parallel by setting a variable like CTEST_PARALLEL_LEVEL=25."
+  COMMAND
+    "${CMAKE_CTEST_COMMAND}"
+    --output-on-failure
+)
+add_dependencies(iree-run-tests iree-test-deps)
+
+
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
 #-------------------------------------------------------------------------------

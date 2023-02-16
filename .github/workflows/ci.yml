@@ -949,9 +949,13 @@ jobs:
       - name: "Uploading benchmark results"
         id: upload
         env:
+          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
           COMPILE_STATS_RESULTS: ${{ steps.collect.outputs.compile-stats-results }}
           COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.collect.outputs.compile-stats-results }}
         run: |
+          # Upload files with two commands since they go into different GCS
+          # directories.
+          gcloud storage cp "${COMPILATION_CONFIG}" "${GCS_DIR}"
           gcloud storage cp \
             "${COMPILE_STATS_RESULTS}" \
             "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"

@@ -668,6 +668,10 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
+//===----------------------------------------------------------------------===//
+// PromoteOperandsOp
+//===----------------------------------------------------------------------===//
+
 DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
@@ -676,6 +680,8 @@ DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
   rewriter.setInsertionPoint(target);
   SmallVector<int64_t> indices = llvm::to_vector(getIndices());
   int64_t numOperands = target->getNumOperands();
+
+  results.push_back(target);
   bufferization::BufferizationOptions options;
   for (int64_t index : indices) {
     if ((index >= 0) && (index < numOperands)) {
