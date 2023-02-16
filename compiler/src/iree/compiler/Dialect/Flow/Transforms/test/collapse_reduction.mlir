@@ -18,3 +18,20 @@ func.func @multi_reduce_dim(%arg0: !hal.buffer_view) -> !hal.buffer_view attribu
 // Check that we collapse dimensions.
 // CHECK: @multi_reduce_dim
 // CHECK: linalg.generic {{.*}} iterator_types = ["parallel", "parallel", "reduction"]
+
+// -----
+
+func.func @input_broadcast(%arg0: tensor<4x8xf32>, %arg1: tensor<4xf32>) -> tensor<f32> {
+  %empty = tensor.empty() : tensor<f32>
+  %reduce = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> ()>], iterator_types = ["reduction", "reduction"]} ins(%arg0, %arg1 : tensor<4x8xf32>, tensor<4xf32>) outs(%empty : tensor<f32>) {
+  ^bb0(%arg2: f32, %arg3: f32, %out: f32):
+    %div = arith.divf %arg2, %arg3 : f32
+    %add = arith.addf %out, %div : f32
+    linalg.yield %add : f32
+  } -> tensor<f32>
+  return %reduce : tensor<f32>
+}
+
+// Check that we don't collapse dimensions here
+// CHECK: @input_broadcast
+// CHECK: linalg.generic {{.*}} iterator_types = ["reduction", "reduction"]

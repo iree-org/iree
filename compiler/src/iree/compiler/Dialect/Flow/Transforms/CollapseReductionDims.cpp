@@ -31,7 +31,8 @@ static bool hasContiguousDims(AffineMap map, ArrayRef<unsigned> dims) {
     }
     // Check that the following dimensions are match the order of `dims`
     for (unsigned j = 1, numDims = dims.size(); j < numDims; j++) {
-      if (map.getDimPosition(i + j) != dims[j]) {
+      if ((map.getNumResults() <= (i + j)) ||
+          map.getDimPosition(i + j) != dims[j]) {
         return false;
       }
     }
