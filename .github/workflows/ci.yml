@@ -1056,10 +1056,12 @@ jobs:
           EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
           IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
         run: |
-          ./build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
-            --verbose \
-            --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
-            --compile_stats_files="${COMPILE_STATS_RESULTS}"
+          build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
+            ./build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
+              --verbose \
+              --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
+              --compile_stats_files="${COMPILE_STATS_RESULTS}"
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
