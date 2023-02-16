@@ -30,6 +30,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -62,7 +63,8 @@ class ConvertToDestinationPassingStylePass
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
+    registry
+        .insert<linalg::LinalgDialect, bufferization::BufferizationDialect>();
   }
   void runOnOperation() override;
 };
@@ -463,6 +465,29 @@ static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
   return success();
 }
 
+/// Replaces a tensor.empty op with bufferization.alloc_tensor op which is
+/// created by tiling tensor.unpack op. It is intended because tiling unpack ops
+/// with non-perfect sizes needs extra elements. See the tiling implementation
+/// of tensor.unpack op for more details.
+static LogicalResult replaceUnpackEmptyWithAllocTensor(OpBuilder &b,
+                                                       func::FuncOp funcOp) {
+  funcOp.walk([&](IREE::LinalgExt::UnPackOp unpackOp) {
+    if (!unpackOp->hasOneUse() ||
+        !isa<tensor::ExtractSliceOp>(*(unpackOp->user_begin()))) {
+      return;
+    }
+    auto emptyOp = unpackOp.getOutput().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp) return;
+
+    OpBuilder::InsertionGuard g(b);
+    b.setInsertionPointAfter(emptyOp);
+    auto allocTensor = b.create<bufferization::AllocTensorOp>(
+        emptyOp.getLoc(), emptyOp.getType(), emptyOp.getDynamicSizes());
+    emptyOp.replaceAllUsesWith(allocTensor.getResult());
+  });
+  return success();
+}
+
 namespace {
 struct RemoveCstOutsDependency
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
@@ -523,6 +548,10 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
+  }
+
+  if (failed(replaceUnpackEmptyWithAllocTensor(b, funcOp))) {
+    return signalPassFailure();
   }
 
   if (failed(convertToDestinationPassingStyle(b, funcOp))) {
