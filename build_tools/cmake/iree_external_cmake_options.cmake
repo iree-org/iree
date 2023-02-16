@@ -103,15 +103,20 @@ macro(iree_set_llvm_cmake_options)
   message(VERBOSE "Building LLVM Projects: ${LLVM_ENABLE_PROJECTS}")
 endmacro()
 
-macro(iree_add_llvm_external_project name identifier location)
-  message(STATUS "Adding LLVM external project ${name} (${identifier}) -> ${location}")
+# Adds a project as if by appending to the LLVM_EXTERNAL_PROJECTS CMake
+# variable. This is done by setting the same top-level variables that the LLVM
+# machinery is expected to export and including the sub directory explicitly.
+# The project binary dir will be llvm-external-projects/${name}
+# Call this after appropriate LLVM/MLIR packages have been loaded.
+function(iree_add_llvm_external_project name location)
+  message(STATUS "Adding LLVM external project ${name} -> ${location}")
   if(NOT EXISTS "${location}/CMakeLists.txt")
     message(FATAL_ERROR "External project location ${location} is not valid")
   endif()
-  list(APPEND LLVM_EXTERNAL_PROJECTS ${name})
-  list(REMOVE_DUPLICATES LLVM_EXTERNAL_PROJECTS)
-  set(LLVM_EXTERNAL_${identifier}_SOURCE_DIR ${location})
-endmacro()
+  set(LLVM_MAIN_SRC_DIR "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm")
+  set(LLVM_BINARY_DIR "${IREE_BINARY_DIR}/third_party/llvm-project/llvm")
+  add_subdirectory(${location} "llvm-external-projects/${name}" EXCLUDE_FROM_ALL)
+endfunction()
 
 macro(iree_set_spirv_headers_cmake_options)
   set(SPIRV_HEADERS_SKIP_EXAMPLES ON CACHE BOOL "" FORCE)
