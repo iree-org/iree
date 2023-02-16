@@ -1272,13 +1272,14 @@ use it, configure CMake with:</p>
 <!-- TODO(scotttodd): "at this point you can..." -->
 
 <h3 id="running-tests">Running tests<a class="headerlink" href="#running-tests" title="Permanent link">&para;</a></h3>
-<p>Build test dependencies:</p>
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build<span class="w"> </span>--target<span class="w"> </span>iree-test-deps
+<p>Build test dependencies and run tests:</p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build<span class="w"> </span>--target<span class="w"> </span>iree-run-tests
 </code></pre></div>
-<p>Run all built tests through
-<a href="https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest">CTest</a>:</p>
-<div class="highlight"><pre><span></span><code>ctest<span class="w"> </span>--test-dir<span class="w"> </span>../iree-build/<span class="w"> </span>--output-on-failure
-</code></pre></div>
+<p>Internally, this builds dependencies via the <code>iree-test-deps</code> target and
+invokes <a href="https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest">CTest</a>.</p>
+<p>The parallel testing level can be set via the environment variable
+<code>CTEST_PARALLEL_LEVEL</code> when invoking ctest in this fashion. Instructions
+are printed to test with a custom command line.</p>
 <h3 id="take-a-look-around">Take a look around<a class="headerlink" href="#take-a-look-around" title="Permanent link">&para;</a></h3>
 <p>Check out the contents of the 'tools' build directory:</p>
 <div class="highlight"><pre><span></span><code>ls<span class="w"> </span>../iree-build/tools/
