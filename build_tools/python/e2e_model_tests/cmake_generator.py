@@ -26,10 +26,10 @@ def generate_rules() -> List[str]:
     runner_args = run_module_utils.build_run_flags_for_model(
         model=model,
         model_input_data=test_config.input_data) + test_config.extra_test_flags
-    # TODO(#11136): We should pick up the execution args from
-    # `build_run_flags_for_execution_config`. But currently the DRIVER needs to
-    # be populated separately in the CMake rule.
-    runner_args.append("--device_allocator=caching")
+    # TODO(#11136): Currently the DRIVER is a separate field in the CMake rule (
+    # and has effect on test labels). Generates the flags without the driver.
+    runner_args += run_module_utils.build_run_flags_for_execution_config(
+        test_config.execution_config, without_driver=True)
     cmake_rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
         target_name=test_config.name,
         model=f"{model.id}_{model.name}",

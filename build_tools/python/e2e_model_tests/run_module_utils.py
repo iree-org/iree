@@ -26,15 +26,26 @@ def build_run_flags_for_model(
 
 def build_run_flags_for_execution_config(
     module_execution_config: ModuleExecutionConfig,
-    gpu_id: str = "0") -> List[str]:
-  """Returns the IREE run module flags of the execution config."""
+    gpu_id: str = "0",
+    without_driver: bool = False) -> List[str]:
+  """Returns the IREE run module flags of the execution config.
+
+  Args:
+    module_execution_config: execution config.
+    gpu_id: target gpu id, if runs on GPUs.
+    without_driver: don't populate the driver flags if true. Useful for
+      generating flags for some CMake rules with a separate DRIVER arg.
+  Returns:
+    List of flags.
+  """
 
   run_flags = list(module_execution_config.extra_flags)
-  driver = module_execution_config.driver
-  if driver == RuntimeDriver.CUDA:
-    run_flags.append(f"--device=cuda://{gpu_id}")
-  else:
-    run_flags.append(f"--device={driver.value}")
+  if not without_driver:
+    driver = module_execution_config.driver
+    if driver == RuntimeDriver.CUDA:
+      run_flags.append(f"--device=cuda://{gpu_id}")
+    else:
+      run_flags.append(f"--device={driver.value}")
   return run_flags
 
 
