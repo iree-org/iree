@@ -95,16 +95,16 @@ def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
   bench_lines = out.decode().split("\n")[3:]
   benchmark_results = []
   for line in bench_lines:
-    spilt = line.split()
-    if len(spilt) == 0:
+    split = line.split()
+    if len(split) == 0:
       continue
-    benchmark_name = spilt[0]
-    time = spilt[1]
-    cpu_time = spilt[2]
-    iterations = spilt[3]
+    benchmark_name = split[0]
+    time = " ".join(split[1:3])
+    cpu_time = " ".join(split[3:5])
+    iterations = split[5]
     user_counters = None
-    if len(spilt) > 4:
-      user_counters = spilt[4]
+    if len(split) > 5:
+      user_counters = split[6]
     benchmark_results.append(
         BenchmarkResult(benchmark_name=benchmark_name,
                         time=time,
