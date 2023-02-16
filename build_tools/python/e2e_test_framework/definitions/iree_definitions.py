@@ -15,22 +15,6 @@ from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework import serialization, unique_ids
 
 
-def _hash_composite_id(keys: Sequence[str]) -> str:
-  """Computes the composite hash id from string keys.
-
-  String keys are the component ids that compose this composite object. We hash
-  the composite id since the id isn't designed to be inspected and insufficient
-  to reconstruct the original composite object.
-
-  Args:
-    keys: list of string keys.
-
-  Returns:
-    Unique hash id.
-  """
-  return hashlib.sha256(":".join(keys).encode("utf-8")).hexdigest()
-
-
 class TargetBackend(Enum):
   """IREE target backend."""
   LLVM_CPU = "llvm-cpu"
@@ -185,7 +169,7 @@ class ImportedModel(object):
   import_config: ImportConfig
 
   def composite_id(self):
-    return _hash_composite_id([self.model.id, self.import_config.id])
+    return unique_ids.hash_composite_id([self.model.id, self.import_config.id])
 
   @staticmethod
   def from_model(model: common_definitions.Model):
@@ -204,7 +188,7 @@ class ModuleGenerationConfig(object):
   compile_config: CompileConfig
 
   def composite_id(self):
-    return _hash_composite_id(
+    return unique_ids.hash_composite_id(
         [self.imported_model.composite_id(), self.compile_config.id])
 
 
@@ -218,7 +202,7 @@ class E2EModelRunConfig(object):
   input_data: common_definitions.ModelInputData
 
   def composite_id(self):
-    return _hash_composite_id([
+    return unique_ids.hash_composite_id([
         self.module_generation_config.composite_id(),
         self.module_execution_config.id, self.target_device_spec.id,
         self.input_data.id
