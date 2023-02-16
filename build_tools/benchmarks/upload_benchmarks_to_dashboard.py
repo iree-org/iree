@@ -330,7 +330,7 @@ def main(args):
                      verbose=args.verbose)
 
   # Upload benchmark results to the dashboard.
-  for series_name, benchmark_latency in aggregate_results.items():
+  for series_id, benchmark_latency in aggregate_results.items():
     benchmark_info = benchmark_latency.benchmark_info
     description = get_model_description(benchmark_info.model_name,
                                         benchmark_info.model_source)
@@ -338,14 +338,10 @@ def main(args):
       description = ""
     description += COMMON_DESCRIIPTION
 
-    run_config_id = benchmark_info.run_config_id
-    # TODO(#11076): Remove legacy path.
-    series_id = series_name if run_config_id is None else run_config_id
-
     # Override by default to allow updates to the series.
     add_new_iree_series(series_id=series_id,
                         series_unit="ns",
-                        series_name=series_name,
+                        series_name=benchmark_latency.name,
                         series_description=description,
                         override=True,
                         dry_run=args.dry_run,
@@ -357,7 +353,7 @@ def main(args):
                    dry_run=args.dry_run,
                    verbose=args.verbose)
 
-  for name, compile_metrics in all_compilation_metrics.items():
+  for target_id, compile_metrics in all_compilation_metrics.items():
     description = get_model_description(
         compile_metrics.compilation_info.model_name,
         compile_metrics.compilation_info.model_source)
@@ -368,16 +364,13 @@ def main(args):
     for mapper in benchmark_presentation.COMPILATION_METRICS_TO_TABLE_MAPPERS:
       sample_value, _ = mapper.get_current_and_base_value(compile_metrics)
       series_unit = mapper.get_unit()
-
-      gen_config_id = compile_metrics.compilation_info.gen_config_id
-      # TODO(#11076): Remove legacy path.
-      series_id = mapper.get_series_id(
-          name if gen_config_id is None else gen_config_id)
+      series_id = mapper.get_series_id(target_id)
 
       # Override by default to allow updates to the series.
       add_new_iree_series(series_id=series_id,
                           series_unit=series_unit,
-                          series_name=mapper.get_series_name(name),
+                          series_name=mapper.get_series_name(
+                              compile_metrics.name),
                           series_description=description,
                           override=True,
                           dry_run=args.dry_run,
