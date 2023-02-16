@@ -7,6 +7,8 @@ theme:
     repo: fontawesome/brands/github
     logo: iree/ghost
   favicon: ghost.svg
+
+  # Note: this includes symlinks to forked files in third_party/mkdocs-material/
   custom_dir: overrides
 
   features:

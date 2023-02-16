@@ -38,6 +38,7 @@ BENCHMARK_PRESET_KEY = "benchmarks"
 # worth the dependency.
 SKIP_PATH_PATTERNS = [
     "docs/*",
+    "third_party/mkdocs-material/*",
     "experimental/*",
     "build_tools/buildkite/*",
     # These configure the runners themselves and don't affect presubmit.
