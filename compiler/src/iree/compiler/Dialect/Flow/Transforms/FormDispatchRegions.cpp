@@ -43,15 +43,6 @@
 
 #define DEBUG_TYPE "iree-flow-form-dispatch-regions"
 
-// NOTE: These flags are added for experimental purposes only
-// for developer control. These should be treated as internal
-// compiler implementation details.
-static llvm::cl::opt<int> clInlineConstantByteLength(
-    "iree-flow-inline-constants-max-byte-length",
-    llvm::cl::desc("Maximum byte-length of constant that can be inlined into a "
-                   "dispatch region"),
-    llvm::cl::init(256));
-
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
@@ -212,23 +203,6 @@ bool isClonableIntoDispatchOp(Operation *op) {
           tensor::CastOp, tensor::ExtractOp, tensor::ExtractSliceOp,
           tensor::PadOp>(op)) {
     return true;
-  }
-  if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    auto constantValueAttr = constantOp.getValue();
-    auto constantType = constantOp.getType();
-    if (constantValueAttr.isa<SplatElementsAttr>()) {
-      return true;
-    } else if (auto denseAttr =
-                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      auto shapedType = constantOp.getType().cast<ShapedType>();
-      uint64_t estimatedByteLength =
-          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
-          8;
-      return denseAttr.isSplat() ||
-             estimatedByteLength <= clInlineConstantByteLength;
-    } else if (constantType.isIntOrIndexOrFloat()) {
-      return true;
-    }
   }
   if (llvm::all_of(op->getOperands(),
                    [&](Value v) { return v.getType().isIntOrFloat(); }) &&

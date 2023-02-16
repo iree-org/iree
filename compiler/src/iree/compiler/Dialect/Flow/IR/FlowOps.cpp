@@ -960,20 +960,13 @@ Operation::result_range DispatchWorkgroupsOp::getClosureResults() {
   return getResults();
 }
 
-// Inline operations that the dispatch region can handle natively.
-static bool canDispatchRegionContainOp(Operation *op) {
-  // Inline constant operations that are splat or small constants.
-  if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    auto constantType = constantOp.getType();
-    if (constantType.isIntOrIndexOrFloat()) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
-  return canDispatchRegionContainOp(op);
+  // For now we only allow constants; we could bring other ops across the
+  // boundary though if we want (particularly metadata ops).
+  // Note that the closure optimization may still filter out the constant op if
+  // it's not configured to inline constants of certain types/sizes.
+  if (isa<arith::ConstantOp>(op)) return true;
+  return false;
 }
 
 // Refines the tensor access from what is declared on |type| based on actual
@@ -985,15 +978,20 @@ static TensorAccess refineTensorAccess(Value value, DispatchTensorType type) {
     // If the argument is a result with `readwrite` access, return false if the
     // value is only written to. Check this by looking at the uses of the
     // argument being only the `target` of `flow.dispatch.tensor.store` ops.
-    bool onlyWrites = true;
+    bool hasReads = false;
+    bool hasWrites = false;
     for (OpOperand &uses : value.getUses()) {
-      auto storeOp = dyn_cast<DispatchTensorStoreOp>(uses.getOwner());
-      if (!(storeOp && storeOp.getTarget() == uses.get())) {
-        onlyWrites = false;
-        break;
-      }
+      TypeSwitch<Operation *>(uses.getOwner())
+          .Case<DispatchTensorLoadOp>([&](auto loadOp) { hasReads = true; })
+          .Case<DispatchTensorStoreOp>([&](auto storeOp) { hasWrites = true; })
+          .Default([&](auto op) {
+            // Treat unknown ops conservatively as read/write.
+            hasReads = true;
+            hasWrites = true;
+          });
     }
-    if (onlyWrites) tensorAccess = TensorAccess::WriteOnly;
+    if (hasReads && !hasWrites) tensorAccess = TensorAccess::ReadOnly;
+    if (!hasReads && hasWrites) tensorAccess = TensorAccess::WriteOnly;
   }
   return tensorAccess;
 }

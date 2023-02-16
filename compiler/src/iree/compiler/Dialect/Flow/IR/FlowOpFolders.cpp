@@ -17,6 +17,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -31,6 +32,15 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
+
+// NOTE: These flags are added for experimental purposes only
+// for developer control. These should be treated as internal
+// compiler implementation details.
+static llvm::cl::opt<int> clInlineConstantByteLength(
+    "iree-flow-inline-constants-max-byte-length",
+    llvm::cl::desc("Maximum byte-length of constant that can be inlined into a "
+                   "dispatch region"),
+    llvm::cl::init(256));
 
 namespace mlir {
 namespace iree_compiler {
@@ -196,8 +206,10 @@ struct ReplaceDispatchResultIfZeroElements
 
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
+  IREE::Util::ClosureOptimizationOptions closureOptions;
+  closureOptions.maxInlinedConstantBytes = clInlineConstantByteLength;
   results.insert<IREE::Util::ClosureOptimizationPattern<DispatchWorkgroupsOp>>(
-      context);
+      context, closureOptions);
   results.insert<ReplaceDispatchResultIfZeroElements>(context);
 }
 

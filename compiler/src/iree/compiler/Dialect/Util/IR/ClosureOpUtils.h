@@ -43,11 +43,19 @@ void excludeClosureOperandsAndResults(SmallVector<Value, 4> &operandValues,
 void eraseRegionResults(Region &region,
                         ArrayRef<unsigned> excludedResultIndices);
 
+struct ClosureOptimizationOptions {
+  // Maximum size in bytes of constant values to inline into the closure.
+  // When 0 no constants will be inlined; when None all constants will be
+  // inlined.
+  Optional<int64_t> maxInlinedConstantBytes = {256};
+};
+
 // Optimizes closure |closureOp| to remove duplicate operands and unused
 // results. The op may be mutated, destroyed, or replaced with a new one. If an
 // optional |rewriter| is provided then it will be notified of the operations
 // performed on the op. Returns true if the op was optimized.
-LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
+LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
+                                    ClosureOpInterface closureOp,
                                     PatternRewriter &rewriter);
 
 // A pattern that optimizes the given region-containing op T (CSE, DCE, etc).
@@ -56,14 +64,21 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
 //
 // T must implement the IREE::Util::ClosureOpInterface.
 template <typename T>
-struct ClosureOptimizationPattern : public OpRewritePattern<T> {
-  using OpRewritePattern<T>::OpRewritePattern;
+class ClosureOptimizationPattern : public OpRewritePattern<T> {
+ public:
+  ClosureOptimizationPattern(MLIRContext *context,
+                             ClosureOptimizationOptions options = {},
+                             PatternBenefit benefit = 1)
+      : OpRewritePattern<T>(context, benefit), options(options) {}
 
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     auto closureOp = cast<ClosureOpInterface>(op.getOperation());
-    return optimizeClosureLikeOp(closureOp, rewriter);
+    return optimizeClosureLikeOp(options, closureOp, rewriter);
   }
+
+ private:
+  const ClosureOptimizationOptions options;
 };
 
 }  // namespace Util
