@@ -64,7 +64,7 @@ class RunModuleTuilsTest(unittest.TestCase):
         extra_flags=["--task=10"])
 
     flags = run_module_utils.build_run_flags_for_execution_config(
-        execution_config, without_driver=True)
+        execution_config, with_driver=False)
 
     self.assertEqual(flags, ["--task=10"])
 

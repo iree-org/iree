@@ -29,7 +29,7 @@ def generate_rules() -> List[str]:
     # TODO(#11136): Currently the DRIVER is a separate field in the CMake rule (
     # and has effect on test labels). Generates the flags without the driver.
     runner_args += run_module_utils.build_run_flags_for_execution_config(
-        test_config.execution_config, without_driver=True)
+        test_config.execution_config, with_driver=False)
     cmake_rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
         target_name=test_config.name,
         model=f"{model.id}_{model.name}",
