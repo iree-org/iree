@@ -361,10 +361,11 @@ struct RewriteExternCallOpToDynamicImportCallOp
   LLVMTypeConverter &typeConverter;
 };
 
-// The 32-bit RISC-V backend is very sensitive to how extended multiplication is
-// lowered. This pattern lowers `arith.mulsi_extended` before going to the LLVM
-// dialect, in a way compatible with that backend, so that we break down any
-// 64-bit constants that would otherwise prevent the code from being vectorized.
+/// The 32-bit RISC-V backend is very sensitive to how extended multiplication
+/// is lowered. This pattern lowers `arith.mulsi_extended` before going to the
+/// LLVM dialect, in a way compatible with that backend, so that we break down
+/// any 64-bit constants that would otherwise prevent the code from being
+/// vectorized.
 class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
  public:
   using OpRewritePattern<arith::MulSIExtendedOp>::OpRewritePattern;
@@ -372,10 +373,11 @@ class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
   LogicalResult matchAndRewrite(arith::MulSIExtendedOp op,
                                 PatternRewriter &rewriter) const override {
     Type resultType = op.getLhs().getType();
-    if (getElementTypeOrSelf(resultType).getIntOrFloatBitWidth() != 32)
+    if (getElementTypeOrSelf(resultType).getIntOrFloatBitWidth() != 32) {
       return failure();
+    }
 
-    Location loc = op->getLoc();
+    Location loc = op.getLoc();
 
     Type wideType = rewriter.getIntegerType(64);
     // Shift amount necessary to extract the high bits from widened result.
@@ -393,7 +395,7 @@ class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
     Value low = rewriter.create<arith::MulIOp>(loc, resultType, op.getLhs(),
                                                op.getRhs());
 
-    // Split the 2*N-bit wide result into two N-bit values.
+    // Produce two 32-bit results.
     Value highExt = rewriter.create<arith::ShRUIOp>(loc, mulExt, shiftVal);
     Value high = rewriter.create<arith::TruncIOp>(loc, resultType, highExt);
 
@@ -511,8 +513,9 @@ void ConvertToLLVMPass::runOnOperation() {
 
   // Make sure we expand any `arith.mulsi_extended` before going to the LLVM
   // dialect.
-  if (use32BitImpl)
+  if (use32BitImpl) {
     patterns.add<ExpandMulSIExtended>(patterns.getContext(), /*benefit=*/1024);
+  }
 
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);

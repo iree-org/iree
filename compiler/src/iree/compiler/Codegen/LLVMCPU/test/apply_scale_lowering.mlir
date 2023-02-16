@@ -180,8 +180,7 @@ hal.executable private @apply_scale_zve32x {
 
 // 32-bit lowering is used with '+zve32x'. Note that the 32-bit lowering
 // generates 64-bit mul operations that are decomposed into 32-bit operations by
-// the LLVM backend. The backend expects both the low and high halves to be
-// `llvm.mul` ops.
+// the LLVM backend. The backend expects both the low half to be an `llvm.mul` op.
 // CHECK-LABEL: llvm.func @apply_scale_zve32x
 //   CHECK-DAG:   %[[RHS:.+]]    = llvm.mlir.constant(dense<19689> : vector<2xi32>) : vector<2xi32>
 //   CHECK-DAG:   %[[RHSEXT:.+]] = llvm.mlir.constant(dense<19689> : vector<2xi64>) : vector<2xi64>
