@@ -10,6 +10,9 @@
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 
 namespace mlir {
+namespace gpu {
+enum class AddressSpace : uint32_t;
+}
 namespace iree_compiler {
 
 /// Verifies compatibility of the module for application of the LLVM
@@ -32,6 +35,11 @@ void populateLowerHALInterfaceOp(RewritePatternSet &patterns);
 void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns);
 
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp);
+
+using MemorySpaceMapping =
+    std::function<unsigned(gpu::AddressSpace gpuAddressSpace)>;
+void populateGpuMemorySpaceAttributeConversions(
+    TypeConverter &typeConverter, const MemorySpaceMapping &mapping);
 
 }  // namespace iree_compiler
 }  // namespace mlir
