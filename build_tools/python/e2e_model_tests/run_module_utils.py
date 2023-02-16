@@ -33,7 +33,7 @@ def build_run_flags_for_execution_config(
   Args:
     module_execution_config: execution config.
     gpu_id: target gpu id, if runs on GPUs.
-    without_driver: don't populate the driver flags if true. Useful for
+    with_driver: populate the driver flags if true. False can be used for
       generating flags for some CMake rules with a separate DRIVER arg.
   Returns:
     List of flags.
