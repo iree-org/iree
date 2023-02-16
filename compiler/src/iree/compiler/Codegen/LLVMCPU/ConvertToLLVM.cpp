@@ -48,6 +48,9 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -358,6 +361,49 @@ struct RewriteExternCallOpToDynamicImportCallOp
   LLVMTypeConverter &typeConverter;
 };
 
+/// The 32-bit RISC-V backend is very sensitive to how extended multiplication
+/// is lowered. This pattern lowers `arith.mulsi_extended` before going to the
+/// LLVM dialect, in a way compatible with that backend, so that we break down
+/// any 64-bit constants that would otherwise prevent the code from being
+/// vectorized.
+class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
+ public:
+  using OpRewritePattern<arith::MulSIExtendedOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::MulSIExtendedOp op,
+                                PatternRewriter &rewriter) const override {
+    Type resultType = op.getLhs().getType();
+    if (getElementTypeOrSelf(resultType).getIntOrFloatBitWidth() != 32) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+
+    Type wideType = rewriter.getIntegerType(64);
+    // Shift amount necessary to extract the high bits from widened result.
+    Attribute shiftValAttr = rewriter.getI64IntegerAttr(32);
+    if (auto vecTy = resultType.dyn_cast<VectorType>()) {
+      wideType = VectorType::get(vecTy.getShape(), wideType);
+      shiftValAttr = SplatElementsAttr::get(wideType, shiftValAttr);
+    }
+    Value shiftVal = rewriter.create<arith::ConstantOp>(loc, shiftValAttr);
+
+    Value lhsExt = rewriter.create<arith::ExtSIOp>(loc, wideType, op.getLhs());
+    Value rhsExt = rewriter.create<arith::ExtSIOp>(loc, wideType, op.getRhs());
+    Value mulExt =
+        rewriter.create<arith::MulIOp>(loc, wideType, lhsExt, rhsExt);
+    Value low = rewriter.create<arith::MulIOp>(loc, resultType, op.getLhs(),
+                                               op.getRhs());
+
+    // Produce two 32-bit results.
+    Value highExt = rewriter.create<arith::ShRUIOp>(loc, mulExt, shiftVal);
+    Value high = rewriter.create<arith::TruncIOp>(loc, resultType, highExt);
+
+    rewriter.replaceOp(op, {low, high});
+    return success();
+  }
+};
+
 class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
  public:
   ConvertToLLVMPass(bool reassociateFpReductions) {
@@ -464,6 +510,12 @@ void ConvertToLLVMPass::runOnOperation() {
                    !hasZve64xFeature(targetAttr);
   }
   tosa::populateTosaRescaleToArithConversionPatterns(&patterns, use32BitImpl);
+
+  // Make sure we expand any `arith.mulsi_extended` before going to the LLVM
+  // dialect.
+  if (use32BitImpl) {
+    patterns.add<ExpandMulSIExtended>(patterns.getContext(), /*benefit=*/1024);
+  }
 
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
