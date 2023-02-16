@@ -18,14 +18,13 @@ def _with_caching_allocator(
     driver: iree_definitions.RuntimeDriver,
     extra_flags: Optional[Sequence[str]] = None
 ) -> iree_definitions.ModuleExecutionConfig:
-  flags = ["--device_allocator=caching"]
-  if extra_flags is not None:
-    flags.extend(extra_flags)
-  return iree_definitions.ModuleExecutionConfig(id=id,
-                                                tags=tags,
-                                                loader=loader,
-                                                driver=driver,
-                                                extra_flags=flags)
+  extra_flags = [] if extra_flags is None else list(extra_flags)
+  return iree_definitions.ModuleExecutionConfig(
+      id=id,
+      tags=tags,
+      loader=loader,
+      driver=driver,
+      extra_flags=["--device_allocator=caching"] + extra_flags)
 
 
 ELF_LOCAL_SYNC_CONFIG = _with_caching_allocator(
