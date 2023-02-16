@@ -43,6 +43,7 @@ iree_cc_library(
     MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRNVGPUDialect
+    MLIRNVGPUTransforms
     MLIRPDLDialect
     MLIRPass
     MLIRSCFDialect

@@ -19,6 +19,7 @@
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/NVGPU/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Transform/IR/TransformUtils.h"
@@ -635,35 +636,55 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
         "patterns greedily");
     return emitDefaultDefiniteFailure(target);
   }
-  MLIRContext *ctx = target->getContext();
 
-  // Step 1. Unroll vectors to native size.
-  RewritePatternSet unrollPatterns(ctx);
-  vector::populateVectorUnrollPatterns(
-      unrollPatterns,
-      vector::UnrollVectorOptions().setNativeShapeFn(getWmmaNativeVectorSize));
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(unrollPatterns)))) {
-    target->emitOpError(
-        "failed to break up vector operations into mma native size");
+  auto funcOp = dyn_cast<func::FuncOp>(target);
+  if (!funcOp) {
+    target->emitOpError("Must apply to a func op");
     return emitDefaultDefiniteFailure(target);
   }
 
-  // TODO: Step 2. add pattern to propagate the extract through the scf.for ops.
+  if (!(getUseMmaSync() ^ getUseWmma())) {
+    target->emitOpError(
+        "Exactly one of use_mma_sync or use_wmma must be specified");
+    return emitDefaultDefiniteFailure(target);
+  }
 
-  // Step 3. Convert slice of contract operations to wmma ops.
+  MLIRContext *ctx = target->getContext();
+
+  // Unrolling to native vector size must have previously occurred.
+  // TODO: Add pattern to propagate the extract through the scf.for ops.
+  // Convert slice of contract operations to mma_sync/wmma ops.
   RewritePatternSet patterns(ctx);
   mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  populatePrepareVectorToMMAPatterns(patterns, /*llvmgpuUseMMASync=*/false);
+  populatePrepareVectorToMMAPatterns(patterns, getUseMmaSync());
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {
     target->emitOpError("vector to mma preparation patterns failed to apply");
     return emitDefaultDefiniteFailure(target);
   }
+
   IRRewriter rewriter(getContext());
-  if (failed(convertVectorToMMAOps(rewriter, target))) {
+  if (getUseWmma()) {
+    if (failed(convertVectorToMMAOps(rewriter, target))) {
+      target->emitOpError("vector to wmma patterns failed to apply");
+      return emitDefaultDefiniteFailure(target);
+    }
+    results.push_back(target);
+    return DiagnosedSilenceableFailure::success();
+  }
+
+  if (failed(convertVectorToNVVMCompatibleMMASync(rewriter, funcOp))) {
     target->emitOpError("vector to mma patterns failed to apply");
     return emitDefaultDefiniteFailure(target);
   }
-
+  // Using TF32 for Float.
+  RewritePatternSet f32ToTF32patterns(funcOp.getContext());
+  nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
+                                          nvgpu::MmaSyncF32Lowering::TF32);
+  if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                          std::move(f32ToTF32patterns)))) {
+    target->emitOpError("vector to mma F32ToTF32 patterns failed to apply");
+    return emitDefaultDefiniteFailure(target);
+  }
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }

@@ -68,8 +68,11 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       tensor.extract_slice swapping pattern. This injects static information
       that guarantees padding is smaller than the window size which guarantees
       we never see a tile comprised of padding-only.
-      - unroll_vectors_gpu_mma: adds patterns that unroll vectors to a native tile
+      - unroll_vectors_gpu_mma_sync: adds patterns that unroll vectors to a native tile
       size for GPUs with mma operations. The size is currently hardcoded but 
+      should be refactored upstream and made pluggable.
+      - unroll_vectors_gpu_wmma: adds patterns that unroll vectors to a native tile
+      size for GPUs with wmma operations. The size is currently hardcoded but 
       should be refactored upstream and made pluggable.
 
 
@@ -101,7 +104,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$rewrite_pack_ops,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns,
-                       UnitAttr:$unroll_vectors_gpu_mma);
+                       UnitAttr:$unroll_vectors_gpu_mma_sync,
+                       UnitAttr:$unroll_vectors_gpu_wmma);
   let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "$target attr-dict";

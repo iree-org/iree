@@ -75,6 +75,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgUtils",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:NVGPUDialect",
+        "@llvm-project//mlir:NVGPUTransforms",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",

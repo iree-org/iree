@@ -87,7 +87,8 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(swapPaddingElideConditional,
               getSwapPaddingElideConditionalAttrName)
   ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
-  ADD_PATTERN(unrollVectorsGpuMma, getUnrollVectorsGpuMmaAttrName)
+  ADD_PATTERN(unrollVectorsGpuMmaSync, getUnrollVectorsGpuMmaSyncAttrName)
+  ADD_PATTERN(unrollVectorsGpuWmma, getUnrollVectorsGpuWmmaAttrName)
 #undef ADD_PATTERN
   result.addTypes({pdl::OperationType::get(ctx)});
 }
@@ -204,12 +205,12 @@ static void addSwappingPatterns(RewritePatternSet &patterns,
       });
 }
 
-static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeVectorSize(
+static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeMmaSyncVectorSize(
     Operation *op) {
-  return getWmmaNativeVectorSize(op);
+  return getMmaNativeVectorSize(op);
 }
 
-static void addUnrollVectorsGpuMmaPatterns(RewritePatternSet &patterns) {
+static void addUnrollVectorsGpuMmaSyncPatterns(RewritePatternSet &patterns) {
   auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
     if (!contract) return std::nullopt;
@@ -217,7 +218,24 @@ static void addUnrollVectorsGpuMmaPatterns(RewritePatternSet &patterns) {
   };
   vector::populateVectorUnrollPatterns(
       patterns, vector::UnrollVectorOptions()
-                    .setNativeShapeFn(getGPUTensorCoreNativeVectorSize)
+                    .setNativeShapeFn(getGPUTensorCoreNativeMmaSyncVectorSize)
+                    .setUnrollTraversalOrderFn(unrollOrder));
+}
+
+static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeWmmaVectorSize(
+    Operation *op) {
+  return getWmmaNativeVectorSize(op);
+}
+
+static void addUnrollVectorsGpuWmmaPatterns(RewritePatternSet &patterns) {
+  auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
+    auto contract = dyn_cast<vector::ContractionOp>(op);
+    if (!contract) return std::nullopt;
+    return mlir::iree_compiler::gpuMmaUnrollOrder(contract);
+  };
+  vector::populateVectorUnrollPatterns(
+      patterns, vector::UnrollVectorOptions()
+                    .setNativeShapeFn(getGPUTensorCoreNativeWmmaVectorSize)
                     .setUnrollTraversalOrderFn(unrollOrder));
 }
 
@@ -265,7 +283,9 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     linalg::populateFoldReshapeOpsByExpansionPatterns(
         patterns, [](OpOperand *) { return true; });
   }
-  if (getUnrollVectorsGpuMma()) addUnrollVectorsGpuMmaPatterns(patterns);
+  if (getUnrollVectorsGpuMmaSync())
+    addUnrollVectorsGpuMmaSyncPatterns(patterns);
+  if (getUnrollVectorsGpuWmma()) addUnrollVectorsGpuWmmaPatterns(patterns);
 
   TrackingListener listener(state);
   GreedyRewriteConfig config;
