@@ -31,6 +31,7 @@ iree_cc_library(
     "ConvertLinalgMatmulToMmt.cpp"
     "GeneralizeAndFuse.cpp"
     "GeneralizeConvolutions.cpp"
+    "ConvertConvToChannelsLast.cpp"
     "PadLinalgOps.cpp"
     "PassDetail.h"
     "Passes.cpp"
