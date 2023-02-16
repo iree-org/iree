@@ -39,7 +39,7 @@ def build_run_flags_for_execution_config(
     List of flags.
   """
 
-  run_flags = list(module_execution_config.extra_flags)
+  run_flags = module_execution_config.extra_flags.copy()
   if with_driver:
     driver = module_execution_config.driver
     if driver == RuntimeDriver.CUDA:
