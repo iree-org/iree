@@ -53,7 +53,7 @@ namespace {
 /// This needs to be its own pass because the registration mechanism and ops
 /// available are different than for other interpreters.
 class TransformDialectInterpreterPass
-    : public transform::TransformInterpreterPassBase<
+    : public transform::iree_dialects::TransformInterpreterPassBase<
           TransformDialectInterpreterPass,
           iree_compiler::TransformDialectInterpreterBase> {
  public:
