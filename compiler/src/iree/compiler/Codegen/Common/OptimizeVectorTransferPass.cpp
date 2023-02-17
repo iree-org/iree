@@ -67,11 +67,12 @@ class TransposeUnitDimToShapeCast
 
   LogicalResult matchAndRewrite(vector::TransposeOp op,
                                 PatternRewriter& rewriter) const override {
-    unsigned numNonUnitSrcDim = llvm::count_if(
-        op.getVectorType().getShape(), [](int64_t dim) { return dim != 1; });
+    unsigned numNonUnitSrcDim =
+        llvm::count_if(op.getSourceVectorType().getShape(),
+                       [](int64_t dim) { return dim != 1; });
     if (numNonUnitSrcDim > 1) return failure();
-    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(op, op.getResultType(),
-                                                     op.getVector());
+    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
+        op, op.getResultVectorType(), op.getVector());
     return success();
   }
 };
