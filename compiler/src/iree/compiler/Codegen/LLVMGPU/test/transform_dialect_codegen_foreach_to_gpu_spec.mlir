@@ -16,5 +16,5 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Get the function to which to apply to.
   %2 = transform.structured.match ops{["linalg.matmul"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   %func = transform.get_closest_isolated_parent %2 : (!pdl.operation) -> !pdl.operation
-  transform.iree.map_nested_foreach_thread_to_gpu_threads %func { workgroup_size = [10, 11]}
+  transform.iree.map_nested_forall_to_gpu_threads %func { workgroup_size = [10, 11]}
 }

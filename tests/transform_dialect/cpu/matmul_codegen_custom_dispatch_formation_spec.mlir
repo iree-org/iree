@@ -14,5 +14,5 @@ transform.structured.canonicalized_sequence failures(propagate) {
   transform.iree.erase_hal_descriptor_type_from_memref %memref_func
 
   %func = transform.structured.match ops{["func.func"]} in %1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.foreach_thread_to_workgroup %func
+  transform.iree.forall_to_workgroup %func
 }

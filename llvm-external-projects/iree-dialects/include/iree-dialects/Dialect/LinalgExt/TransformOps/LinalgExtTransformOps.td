@@ -30,7 +30,7 @@ def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
 }
 
 def RewriteForallToAsyncOp :
-  Op<Transform_Dialect, "foreach_thread_to_async",
+  Op<Transform_Dialect, "forall_to_async",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
@@ -66,7 +66,7 @@ def RewriteForallToAsyncOp :
 }
 
 def RewriteForallToScfForOp :
-  Op<Transform_Dialect, "foreach_thread_to_scf_for",
+  Op<Transform_Dialect, "forall_to_scf_for",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,

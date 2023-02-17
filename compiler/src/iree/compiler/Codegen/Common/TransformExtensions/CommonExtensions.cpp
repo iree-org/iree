@@ -333,7 +333,7 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
         2) {
       /*return mlir::emitSilenceableFailure(
           forallOp,
-          "operand to share must have exactly 2 uses, the foreach_thread op "
+          "operand to share must have exactly 2 uses, the forall op "
           "and an extract_slice op.");*/
       continue;
     }

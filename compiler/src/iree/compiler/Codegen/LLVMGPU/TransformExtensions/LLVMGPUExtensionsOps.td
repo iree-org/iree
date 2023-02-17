@@ -15,7 +15,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
 def MapNestedForallToGpuThreadsOp :
-  Op<Transform_Dialect, "iree.map_nested_foreach_thread_to_gpu_threads",
+  Op<Transform_Dialect, "iree.map_nested_forall_to_gpu_threads",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,

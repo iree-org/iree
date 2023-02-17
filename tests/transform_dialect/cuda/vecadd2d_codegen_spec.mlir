@@ -18,5 +18,5 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 3. Map to GPU thread blocks.
   // ===========================================================================
   %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  transform.iree.foreach_thread_to_workgroup %func_2
+  transform.iree.forall_to_workgroup %func_2
 }

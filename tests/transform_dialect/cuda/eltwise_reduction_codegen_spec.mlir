@@ -72,8 +72,8 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 6. Post-bufferization mapping to blocks and threads.
   // ===========================================================================
   %func_4 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  %func_5 = transform.iree.foreach_thread_to_workgroup %func_4
-  %func_6 = transform.iree.map_nested_foreach_thread_to_gpu_threads %func_5
+  %func_5 = transform.iree.forall_to_workgroup %func_4
+  %func_6 = transform.iree.map_nested_forall_to_gpu_threads %func_5
       { workgroup_size = [32, 2, 1] }
 
   // Step 7. Post-bufferization vector distribution with rank-reduction.

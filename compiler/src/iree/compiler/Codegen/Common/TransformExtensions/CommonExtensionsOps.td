@@ -229,7 +229,7 @@ def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
 }
 
 def ForallToWorkgroupOp : Op<Transform_Dialect,
-    "iree.foreach_thread_to_workgroup",
+    "iree.forall_to_workgroup",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformOpInterface,
