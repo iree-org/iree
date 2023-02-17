@@ -32,7 +32,7 @@ declare -a PACKAGES=(
 # check when we drop the support of Ubuntu 18.04.
 if [[ "${LINUX_VERSION}" = "Ubuntu 18.04*" ]]; then
   PACKAGES+=(
-    # Tracy dependencies
+    # Tracy build and run dependencies
     pkg-config
     libcapstone-dev
     libtbb-dev
