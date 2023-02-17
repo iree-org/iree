@@ -788,6 +788,12 @@ def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
   let hasCustomAssemblyFormat = 1;
 
   let extraClassDeclaration = [{
+    // Returns a list of all objects with a path matching one of the provided
+    // file extensions.
+    static void filterObjects(
+        ArrayAttr objectAttrs, ArrayRef<StringRef> extensions,
+        SmallVectorImpl<ExecutableObjectAttr> &filteredAttrs);
+
     // Returns the absolute path of the referenced object file if it exists.
     FailureOr<std::string> getAbsolutePath();
 

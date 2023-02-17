@@ -26,6 +26,7 @@ iree_cc_library(
   DEPS
     LLVMAnalysis
     LLVMBitReader
+    LLVMBitWriter
     LLVMCore
     LLVMLinker
     LLVMMC
@@ -49,6 +50,7 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Target::LLVMLinkerUtils
     iree::compiler::Utils
     iree::schemas::cuda_executable_def_c_fbs
     iree_cuda::libdevice_embedded

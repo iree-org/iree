@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/StaticLibraryGenerator.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -44,6 +45,38 @@ namespace HAL {
 
 static constexpr char kQueryFunctionName[] =
     "iree_hal_executable_library_query";
+
+static void dumpBitcodeToPath(StringRef path, StringRef baseName,
+                              StringRef suffix, StringRef extension,
+                              llvm::Module &module) {
+  llvm::SmallVector<char, 0> data;
+  llvm::raw_svector_ostream ostream(data);
+  llvm::WriteBitcodeToFile(module, ostream);
+  dumpDataToPath(path, baseName, suffix, extension,
+                 StringRef(data.data(), data.size()));
+}
+
+static void fixupVisibility(llvm::Module &module,
+                            const SetVector<llvm::Function *> &preserveFuncs) {
+  for (auto &func : module) {
+    if (preserveFuncs.contains(&func) || func.getName() == "iree_dll_main") {
+      // Leave our library query function as public/external so that it is
+      // exported from shared objects and available for linking in static
+      // objects.
+      continue;
+    } else if (func.isDeclaration()) {
+      // Declarations must have their original visibility/linkage; they most
+      // often come from declared llvm builtin ops (llvm.memcpy/etc).
+      continue;
+    }
+    func.setDSOLocal(true);
+    func.setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
+  }
+  for (auto &global : module.globals()) {
+    global.setDSOLocal(true);
+    global.setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
+  }
+}
 
 // Appends the |debugDatabase| to the end of |baseFile| and writes the footer
 // so the runtime can find it.
@@ -80,36 +113,6 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
               debugFile.size());
   std::memcpy(baseFile.data() + baseFileSize + debugFileSize, &footer,
               sizeof(footer));
-  return success();
-}
-
-// Verifies builtin bitcode is loaded correctly and appends it to |linker|.
-//
-// Example:
-//  if (failed(linkBuiltinLibrary(loc, linker, linkerFlag, targetMachine,
-//  "libfoo", loadLibFoo(...))))
-static LogicalResult linkBuiltinLibrary(
-    Location loc, llvm::Linker &linker, llvm::Linker::Flags linkerFlag,
-    llvm::TargetMachine *targetMachine, StringRef name,
-    llvm::Expected<std::unique_ptr<llvm::Module>> bitcodeModuleValue) {
-  // Ensure the bitcode loaded correctly. It may fail if the LLVM version is
-  // incompatible.
-  if (!bitcodeModuleValue) {
-    return mlir::emitError(loc)
-           << "failed to parse " << name
-           << " bitcode: " << llvm::toString(bitcodeModuleValue.takeError())
-           << " (possible LLVM bitcode incompatibility?)";
-  }
-  auto bitcodeModule = std::move(bitcodeModuleValue.get());
-  bitcodeModule->setDataLayout(targetMachine->createDataLayout());
-  bitcodeModule->setTargetTriple(targetMachine->getTargetTriple().str());
-
-  // Link the bitcode into the base module. This will merge in any required
-  // symbols and override declarations that may exist.
-  if (linker.linkInModule(std::move(bitcodeModule), linkerFlag)) {
-    return mlir::emitError(loc) << "failed to link " << name << " bitcode";
-  }
-
   return success();
 }
 
@@ -360,24 +363,46 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     llvmModule->setDataLayout(targetMachine->createDataLayout());
     llvmModule->setTargetTriple(targetMachine->getTargetTriple().str());
 
-    // Statically link libraries into our module.
-    // Note that if producing a static library then the symbols we add must be
-    // weak such that we don't trigger ODR issues.
+    // Dump just the codegen bitcode before linking and optimization.
+    if (!options.dumpIntermediatesPath.empty()) {
+      dumpBitcodeToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                        variantOp.getName(), ".codegen.bc", *llvmModule);
+    }
+
+    // Statically link libraries into our module prior to LLVM optimizations.
+    // This approximates LTO.
     llvm::Linker moduleLinker(*llvmModule);
 
-    llvm::Linker::Flags linkerFlag = llvm::Linker::OverrideFromSrc;
-    if (options_.linkStatic) linkerFlag = llvm::Linker::LinkOnlyNeeded;
+    // Link any user bitcode objects and specialize them for the current config.
+    if (failed(linkBitcodeObjects(variantOp.getLoc(), moduleLinker,
+                                  llvm::Linker::LinkOnlyNeeded, *targetMachine,
+                                  variantOp.getObjectsAttr(), context))) {
+      return failure();
+    }
 
-    if (failed(linkBuiltinLibrary(
-            variantOp.getLoc(), moduleLinker, linkerFlag, targetMachine.get(),
-            "libdevice", loadDeviceBitcode(targetMachine.get(), context)))) {
+    // Link our libdevice after all codegen and user objects as they may
+    // reference it. Some of the functions in here are only known used after we
+    // perform LLVM ISel and need to be pulled in whether they are used or not.
+    if (failed(linkBitcodeModule(
+            variantOp.getLoc(), moduleLinker, llvm::Linker::OverrideFromSrc,
+            *targetMachine, "libdevice",
+            loadDeviceBitcode(targetMachine.get(), context),
+            [&](llvm::Module &module) {
+              specializeDeviceModule(variantOp, module, *targetMachine);
+            }))) {
       return mlir::emitError(variantOp.getLoc())
              << "failed linking in builtin library for target triple '"
              << targetTriple.str() << "'";
     }
-    if (failed(linkBuiltinLibrary(
-            variantOp.getLoc(), moduleLinker, linkerFlag, targetMachine.get(),
-            "libmusl", loadMuslBitcode(targetMachine.get(), context)))) {
+
+    // Link musl last and pull in all of it - this is sad but LLVM will take IR
+    // intrinsics and generate calls out to libc during code generation and we
+    // have no control over that - if we don't provide the symbols here then
+    // linking with ld will fail.
+    if (failed(linkBitcodeModule(
+            variantOp.getLoc(), moduleLinker, llvm::Linker::OverrideFromSrc,
+            *targetMachine, "libmusl",
+            loadMuslBitcode(targetMachine.get(), context)))) {
       return mlir::emitError(variantOp.getLoc())
              << "failed linking in builtin library for target triple '"
              << targetTriple.str() << "'";
@@ -387,6 +412,12 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     // tag the module.
     auto *llvmIdent = llvmModule->getNamedMetadata("llvm.ident");
     if (llvmIdent) llvmIdent->clearOperands();
+
+    // Dump all linked bitcode prior to optimization.
+    if (!options.dumpIntermediatesPath.empty()) {
+      dumpBitcodeToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                        variantOp.getName(), ".linked.bc", *llvmModule);
+    }
 
     // LLVM opt passes that perform code generation optimizations/transformation
     // similar to what a frontend would do.
@@ -400,23 +431,14 @@ class LLVMCPUTargetBackend final : public TargetBackend {
 
     // Fixup visibility from any symbols we may link in - we want to hide all
     // but the query entry point.
-    for (auto &func : *llvmModule) {
-      if (&func == queryLibraryFunc || func.getName() == "iree_dll_main") {
-        // Leave our library query function as public/external so that it is
-        // exported from shared objects and available for linking in static
-        // objects.
-        continue;
-      } else if (func.isDeclaration()) {
-        // Declarations must have their original visibility/linkage; they most
-        // often come from declared llvm builtin ops (llvm.memcpy/etc).
-        continue;
-      }
-      func.setDSOLocal(true);
-      func.setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
-    }
-    for (auto &global : llvmModule->globals()) {
-      global.setDSOLocal(true);
-      global.setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
+    SetVector<llvm::Function *> preservedFuncs;
+    preservedFuncs.insert(queryLibraryFunc);
+    fixupVisibility(*llvmModule, preservedFuncs);
+
+    // Dump bitcode post-linking and optimization.
+    if (!options.dumpIntermediatesPath.empty()) {
+      dumpBitcodeToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                        variantOp.getName(), ".optimized.bc", *llvmModule);
     }
 
     SmallVector<Artifact> objectFiles;
@@ -474,25 +496,27 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     // If custom object files were specified then add those to our artifact set.
     // These will either be combined into the resulting static library or linked
     // statically into the resulting dynamic library.
-    if (auto objectAttrs = variantOp.getObjects()) {
-      for (auto [index, attr] : llvm::enumerate(objectAttrs.value())) {
-        auto objectAttr = attr.cast<IREE::HAL::ExecutableObjectAttr>();
-        if (auto dataAttr = objectAttr.getData()) {
-          objectFiles.push_back(Artifact::createTemporary(
-              objectFiles.front().path + "_object_" + std::to_string(index),
-              ".o"));
-        } else {
-          auto absolutePath = objectAttr.getAbsolutePath();
-          if (failed(absolutePath)) {
-            llvm::errs()
-                << "ERROR: referenced object file not found on any path; use "
-                   "--iree-hal-executable-object-search-path= to add search "
-                   "paths: "
-                << objectAttr << "\n";
-            return failure();
-          }
-          objectFiles.push_back(Artifact::fromFile(*absolutePath));
+    SmallVector<IREE::HAL::ExecutableObjectAttr> linkerObjectAttrs;
+    IREE::HAL::ExecutableObjectAttr::filterObjects(variantOp.getObjectsAttr(),
+                                                   {".o", ".obj", ".a", ".lib"},
+                                                   linkerObjectAttrs);
+    for (auto [index, attr] : llvm::enumerate(linkerObjectAttrs)) {
+      auto objectAttr = attr.cast<IREE::HAL::ExecutableObjectAttr>();
+      if (auto dataAttr = objectAttr.getData()) {
+        objectFiles.push_back(Artifact::createTemporary(
+            objectFiles.front().path + "_object_" + std::to_string(index),
+            llvm::sys::path::extension(objectAttr.getPath())));
+      } else {
+        auto absolutePath = objectAttr.getAbsolutePath();
+        if (failed(absolutePath)) {
+          llvm::errs()
+              << "ERROR: referenced object file not found on any path; use "
+                 "--iree-hal-executable-object-search-path= to add search "
+                 "paths: "
+              << objectAttr << "\n";
+          return failure();
         }
+        objectFiles.push_back(Artifact::fromFile(*absolutePath));
       }
     }
 

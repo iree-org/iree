@@ -27,6 +27,7 @@ iree_cc_library(
     MLIRSupport
     iree::builtins::device::libdevice_bitcode
     iree::builtins::musl::bin::libmusl
+    iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
 

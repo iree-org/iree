@@ -23,6 +23,7 @@ iree_compiler_cc_library(
         "Musl.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//runtime/src/iree/builtins/device:libdevice_bitcode",
         "//runtime/src/iree/builtins/musl/bin:libmusl",
         "@llvm-project//llvm:BitReader",
