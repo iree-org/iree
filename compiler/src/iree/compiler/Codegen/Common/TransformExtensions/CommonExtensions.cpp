@@ -810,7 +810,7 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
     transform::TransformState &state) {
   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
   if (targetOps.empty()) {
-    transformResults.set(getForeachThreadOp().cast<OpResult>(), {});
+    transformResults.set(getForallOp().cast<OpResult>(), {});
     transformResults.set(getTiledOp().cast<OpResult>(), {});
     return DiagnosedSilenceableFailure::success();
   }
@@ -849,14 +849,14 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
       tiledOps);
 
   if (!diag.succeeded()) {
-    transformResults.set(getForeachThreadOp().cast<OpResult>(),
+    transformResults.set(getForallOp().cast<OpResult>(),
                          SmallVector<mlir::Operation *>{});
     transformResults.set(getTiledOp().cast<OpResult>(),
                          SmallVector<mlir::Operation *>{});
     return diag;
   }
 
-  transformResults.set(getForeachThreadOp().cast<OpResult>(), tileOps);
+  transformResults.set(getForallOp().cast<OpResult>(), tileOps);
   transformResults.set(getTiledOp().cast<OpResult>(), tiledOps);
   return DiagnosedSilenceableFailure::success();
 }

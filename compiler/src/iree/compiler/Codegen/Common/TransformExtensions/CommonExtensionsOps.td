@@ -380,7 +380,7 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
                    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_num_threads,
                    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_tile_sizes,
                    OptionalAttr<DeviceMappingArrayAttr>:$mapping);
-  let results = (outs PDL_Operation:$foreach_thread_op,
+  let results = (outs PDL_Operation:$forall_op,
                       PDL_Operation:$tiled_op);
   let assemblyFormat = [{
     $target oilist(
