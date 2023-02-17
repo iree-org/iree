@@ -977,13 +977,9 @@ jobs:
 
   process_benchmark_results:
     needs: [setup, compilation_benchmarks, execution_benchmarks]
-    # execution_benchmarks is the optional dependency and skipped in presubmit
-    # if no benchmark is specified to run.
     if: |
-      always() &&
       needs.setup.outputs.should-run == 'true' &&
-      needs.compilation_benchmarks.result == 'success' &&
-      contains(fromJSON('["success", "skipped"]'), needs.execution_benchmarks.result)
+      needs.setup.outputs.benchmark-presets != ''
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -1045,7 +1041,7 @@ jobs:
         # Due to security reasons, instead of posting the comment to PR, we only
         # upload the comment data in presubmit workflow and trigger the posting
         # workflow on the main branch. See post_benchmark_comment.yaml
-        if: needs.setup.outputs.ci-stage == 'presubmit' && needs.setup.outputs.benchmark-presets != ''
+        if: needs.setup.outputs.ci-stage == 'presubmit'
         env:
           BENCHMARK_COMMENT_ARTIFACT: ${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
           BENCHMARK_COMMENT_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
