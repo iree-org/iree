@@ -989,7 +989,9 @@ jobs:
     env:
       COMPILE_STATS_RESULTS: ${{ needs.compilation_benchmarks.outputs.compile-stats-results }}
       COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
+      # Empty if no execution benchmark runs.
       EXECUTION_BENCHMARK_RESULTS_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-dir }}
+      # Empty if no execution benchmark runs.
       EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
     steps:
       - name: "Checking out repository"

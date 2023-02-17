@@ -33,10 +33,14 @@ on:
         type: string
     outputs:
       benchmark-results-dir:
-        description: "Local path that stores all benchmark results."
+        description: |
+          Local path that stores all benchmark results.
+          Empty if no benchmark runs.
         value: ${{ jobs.run_benchmarks.outputs.benchmark-results-dir }}
       benchmark-results-gcs-artifact-dir:
-        description: "GCS path that stores all benchmark results."
+        description: |
+          GCS path that stores all benchmark results.
+          Empty if no benchmark runs.
         value: ${{ jobs.run_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
 
 env:
