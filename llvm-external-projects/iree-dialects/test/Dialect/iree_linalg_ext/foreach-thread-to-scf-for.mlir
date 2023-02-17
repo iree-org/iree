@@ -23,7 +23,7 @@ func.func @static_tile_buffers(%arg0: index, %arg1: memref<?xf32>, %arg2: memref
   // CHECK: %[[C1:.*]] = arith.constant 1 : index
   // CHECK: %[[M:.*]] = memref.dim %{{.*}}, %{{.*}} : memref<?xf32>
   // CHECK: scf.for %[[IV:.*]] = {{.*}} step %[[C1]] {
-  scf.foreach_thread (%arg3) in (%1) shared_outs() -> () {
+  scf.forall (%arg3) in (%1) shared_outs() -> () {
       %3 = affine.apply #map1(%arg3)[%arg0]
       %4 = affine.apply #map2(%0, %3)
       %5 = affine.min #map3(%4, %arg0)
@@ -46,6 +46,6 @@ func.func @static_tile_buffers(%arg0: index, %arg1: memref<?xf32>, %arg2: memref
 
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%module_op: !pdl.operation):
-  %0 = transform.structured.match ops{["scf.foreach_thread"]} in %module_op : (!pdl.operation) -> !pdl.operation
-  %1 = foreach_thread_to_scf_for %0
+  %0 = transform.structured.match ops{["scf.forall"]} in %module_op : (!pdl.operation) -> !pdl.operation
+  %1 = forall_to_scf_for %0
 }

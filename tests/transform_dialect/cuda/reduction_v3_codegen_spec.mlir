@@ -7,26 +7,26 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ===========================================================================
-  %foreach_thread_grid, %grid_reduction =
-    transform.iree.tile_to_foreach_thread_and_workgroup_count_region %reduction tile_sizes [1]
+  %forall_grid, %grid_reduction =
+    transform.iree.tile_to_forall_and_workgroup_count_region %reduction tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
-  transform.structured.fuse_into_containing_op %fill into %foreach_thread_grid
+  transform.structured.fuse_into_containing_op %fill into %forall_grid
 
   // Step 2. Split the reduction to get meatier parallelism.
   // This also parallelizes to threads.
   // ===========================================================================
-  %foreach_thread, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
-     transform.structured.tile_reduction_using_foreach_thread %grid_reduction 
+  %forall, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
+     transform.structured.tile_reduction_using_forall %grid_reduction 
         by num_threads = [0, 1024], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
 
   // Fuse the fill and pointwise to privatize them.
   transform.structured.fuse_into_containing_op %block_more_parallel_fill_op_2
-    into %foreach_thread
+    into %forall
 
   // block_combiner_op_2 op is [parallel, reduction] of 1x384 that cannot fuse.
   // map the 1-dim to threadIdx.y to trigger mapping of the reduction to 
   // threadIdx.x via predication via `if (x==0)`.
-  transform.structured.tile_to_foreach_thread_op %block_combiner_op_2 num_threads [1] 
+  transform.structured.tile_to_forall_op %block_combiner_op_2 num_threads [1] 
     ( mapping = [#gpu.thread<y>] )
 
   // Step 3. Rank-reduce and vectorize.
@@ -50,8 +50,8 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 5. Post-bufferization mapping to blocks and threads.
   // ===========================================================================
   %func_7 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  %func_8 = transform.iree.foreach_thread_to_workgroup %func_7
-  %func_9 = transform.iree.map_nested_foreach_thread_to_gpu_threads %func_8
+  %func_8 = transform.iree.forall_to_workgroup %func_7
+  %func_9 = transform.iree.map_nested_forall_to_gpu_threads %func_8
       { workgroup_size = [1024, 1, 1] }
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.

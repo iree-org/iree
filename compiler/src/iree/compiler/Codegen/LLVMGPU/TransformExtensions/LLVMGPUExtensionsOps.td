@@ -14,36 +14,36 @@ include "mlir/Dialect/Transform/IR/TransformTypes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def MapNestedForeachThreadToGpuThreadsOp :
-  Op<Transform_Dialect, "iree.map_nested_foreach_thread_to_gpu_threads",
+def MapNestedForallToGpuThreadsOp :
+  Op<Transform_Dialect, "iree.map_nested_forall_to_gpu_threads",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
-    Target the whole hal.executable_variant op and rewrite all scf.foreach_thread
+    Target the whole hal.executable_variant op and rewrite all scf.forall
     to distributed gpu.thread_id and translation_info attribute.
 
     The mapping of threads to gpu.thread_id is currently one-to-one and in order.
-    Only **bufferized** scf.foreach_thread are currently supported.
-    Only scf.foreach_thread distributed to **at most 3 dimensions** are currently
+    Only **bufferized** scf.forall are currently supported.
+    Only scf.forall distributed to **at most 3 dimensions** are currently
     supported.
 
-    Multiple scf.foreach_thread are supported per function in which case, the
+    Multiple scf.forall are supported per function in which case, the
     max of all the threads is computed and taken for the global gpu.thread_id.
-    If necessary, scf.foreach_thread that do not use the whole thread range
+    If necessary, scf.forall that do not use the whole thread range
     result in predicated computations.
 
-    Barriers are inserted after each scf.foreach_thread op for now.
+    Barriers are inserted after each scf.forall op for now.
 
     Return modes:
     =============
     This operation ignores non-Func ops and drops them in the return.
 
-    If any scf.foreach_thread with tensors is found, the transform definitely
+    If any scf.forall with tensors is found, the transform definitely
     fails.
 
-    If all the scf.foreach_thread operations contained within the FuncOp
+    If all the scf.forall operations contained within the FuncOp
     referred to by the `target` PDLOperation lower to GPU properly, the
     transform succeeds. Otherwise the transform definitely fails.
 
@@ -59,10 +59,10 @@ def MapNestedForeachThreadToGpuThreadsOp :
       hal.executable.variant {
         hal.executable.export {
           func @foo() {
-            scf.foreach_thread (%i, %j) in (7, 9) {
+            scf.forall (%i, %j) in (7, 9) {
               ... // body 1
             }
-            scf.foreach_thread (%i) in (12) {
+            scf.forall (%i) in (12) {
               ... // body 2
             }
           }

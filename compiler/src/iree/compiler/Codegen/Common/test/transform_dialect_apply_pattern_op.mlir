@@ -32,11 +32,11 @@ func.func @promote() -> (tensor<16x128xf32>) {
   %empty = tensor.empty() : tensor<16x128xf32>
   %filled = linalg.fill ins(%f0 : f32) outs(%empty : tensor<16x128xf32>) -> tensor<16x128xf32>
 
-  // CHECK: foreach_thread{{.*}}shared_outs(%[[ARG:.*]] =
+  // CHECK: forall{{.*}}shared_outs(%[[ARG:.*]] =
   // CHECK:   %[[A:.*]] = tensor.extract_slice %[[ARG]]
   // CHECK:   %[[B:.*]] = tensor.extract_slice %[[ARG]]
   // CHECK:   %[[C:.*]] = linalg.generic{{.*}}ins(%[[A]]{{.*}}outs(%[[B]]
-  %10 = scf.foreach_thread (%arg0, %arg1) in (%c16, %c32) shared_outs(%arg2 = %filled) -> (tensor<16x128xf32>) {
+  %10 = scf.forall (%arg0, %arg1) in (%c16, %c32) shared_outs(%arg2 = %filled) -> (tensor<16x128xf32>) {
     %11 = affine.apply #map2(%arg1)
     %extracted_slice = tensor.extract_slice %filled[%arg0, %11] [1, 4] [1, 1] : tensor<16x128xf32> to tensor<1x4xf32>
     %extracted_slice_2 = tensor.extract_slice %arg2[%arg0, %11] [1, 4] [1, 1] : tensor<16x128xf32> to tensor<1x4xf32>
@@ -45,7 +45,7 @@ func.func @promote() -> (tensor<16x128xf32>) {
       %res = arith.addf %in, %in: f32
       linalg.yield %res : f32
     } -> tensor<1x4xf32>
-    scf.foreach_thread.perform_concurrently {
+    scf.forall.in_parallel {
       tensor.parallel_insert_slice %13 into %arg2[%arg0, %11] [1, 4] [1, 1] : tensor<1x4xf32> into tensor<16x128xf32>
     }
   }
@@ -54,9 +54,9 @@ func.func @promote() -> (tensor<16x128xf32>) {
 
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !pdl.operation):
-  %0 = transform.structured.match ops{["scf.foreach_thread"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  %1 = transform.cast %0 : !pdl.operation to !transform.op<"scf.foreach_thread">
-  transform.iree.share_foreach_thread_operands %1 share_operands = [0] : (!transform.op<"scf.foreach_thread">) -> !transform.op<"scf.foreach_thread">
+  %0 = transform.structured.match ops{["scf.forall"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+  %1 = transform.cast %0 : !pdl.operation to !transform.op<"scf.forall">
+  transform.iree.share_forall_operands %1 share_operands = [0] : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
 }
 
 // -----

@@ -19,7 +19,7 @@ class FuncOp;
 }
 
 namespace scf {
-class ForeachThreadOp;
+class ForallOp;
 class IfOp;
 class ForOp;
 }  // namespace scf
@@ -46,11 +46,10 @@ class LLVMGPUExtensions
 }  // namespace transform_dialect
 }  // namespace IREE
 
-/// Transformation to convert scf.foreach_thread to gpu distribution.
-FailureOr<SmallVector<OpFoldResult>> rewriteForeachThreadToGpu(
-    scf::ForeachThreadOp foreachThreadOp,
-    const SmallVector<int64_t> &globalWorkgroupSizes, RewriterBase &rewriter,
-    bool syncAfterDistribute = true);
+/// Transformation to convert scf.forall to gpu distribution.
+FailureOr<SmallVector<OpFoldResult>> rewriteForallToGpu(
+    scf::ForallOp forallOp, const SmallVector<int64_t> &globalWorkgroupSizes,
+    RewriterBase &rewriter, bool syncAfterDistribute = true);
 
 }  // namespace iree_compiler
 }  // namespace mlir

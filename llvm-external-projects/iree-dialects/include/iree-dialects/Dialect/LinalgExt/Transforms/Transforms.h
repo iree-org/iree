@@ -16,7 +16,7 @@
 namespace mlir {
 namespace scf {
 class ForOp;
-class ForeachThreadOp;
+class ForallOp;
 } // namespace scf
 namespace linalg {
 class LinalgOp;
@@ -40,33 +40,31 @@ struct SwapTilingInterfaceOp : public OpRewritePattern<tensor::ExtractSliceOp> {
   }
 };
 
-/// Pattern to rewrite a scf::ForEachThreadOp to the async dialect.
-struct ForeachThreadOpToAsyncRewriter
-    : public OpRewritePattern<scf::ForeachThreadOp> {
+/// Pattern to rewrite a scf::ForallOp to the async dialect.
+struct ForallOpToAsyncRewriter : public OpRewritePattern<scf::ForallOp> {
   using OpRewritePattern::OpRewritePattern;
 
   FailureOr<Operation *>
-  returningMatchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
+  returningMatchAndRewrite(scf::ForallOp forallOp,
                            PatternRewriter &rewriter) const;
 
-  LogicalResult matchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
+  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
                                 PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(foreachThreadOp, rewriter);
+    return returningMatchAndRewrite(forallOp, rewriter);
   }
 };
 
-/// Pattern to rewrite a ForeachThreadOp to an scf::ForOp.
-struct ForeachThreadOpToScfForRewriter
-    : public OpRewritePattern<scf::ForeachThreadOp> {
+/// Pattern to rewrite a ForallOp to an scf::ForOp.
+struct ForallOpToScfForRewriter : public OpRewritePattern<scf::ForallOp> {
   using OpRewritePattern::OpRewritePattern;
 
   FailureOr<scf::ForOp>
-  returningMatchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
+  returningMatchAndRewrite(scf::ForallOp forallOp,
                            PatternRewriter &rewriter) const;
 
-  LogicalResult matchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
+  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
                                 PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(foreachThreadOp, rewriter);
+    return returningMatchAndRewrite(forallOp, rewriter);
   }
 };
 

@@ -31,7 +31,7 @@ using namespace mlir;
 using iree_compiler::cpu::CPUModel;
 using iree_compiler::cpu::ReductionConfig;
 using iree_compiler::cpu::ReductionStrategy;
-using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
+using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using transform::LowerVectorsOp;
 using transform::MatchOp;
 using transform::SplitHandlesOp;
@@ -62,7 +62,7 @@ std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
+  funcH = b.create<ForallToWorkgroupOp>(funcH);
   auto pdlOperation = pdl::OperationType::get(b.getContext());
 
   // Step N. Lower vectors.

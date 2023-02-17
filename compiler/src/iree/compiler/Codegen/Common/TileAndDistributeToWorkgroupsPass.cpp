@@ -59,7 +59,7 @@ namespace iree_compiler {
 // workgroups to a static value. Ideally this should not be done and the static
 // and dyamic cases are handled the same way. When the tile+distribute moves
 // away from using `scf.for` to using a construct that better captures
-// distribution (like `scf.foreach_thread`) this information can be dropped.
+// distribution (like `scf.forall`) this information can be dropped.
 static LogicalResult getTileAndDistributeConfig(
     ArrayRef<Operation *> computeOps, Operation *&dispatchRootOp,
     SmallVectorImpl<int64_t> &tileSizes,

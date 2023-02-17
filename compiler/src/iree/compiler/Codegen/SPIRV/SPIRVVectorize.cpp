@@ -98,7 +98,7 @@ Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
     return nativeSize;
   } else if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
     // Unroll all reduction dimensions by size 1 for vector.multi_reduction.
-    auto srcVectorType = reductionOp.getSourceVectorType();
+    VectorType srcVectorType = reductionOp.getSourceVectorType();
     auto nativeSize = llvm::to_vector<>(srcVectorType.getShape());
     auto dims = reductionOp.getReductionDims().getAsValueRange<IntegerAttr>();
     for (const auto &dimAttr : dims) {
@@ -106,12 +106,12 @@ Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
     }
     return nativeSize;
   } else if (auto reductionOp = dyn_cast<vector::ReductionOp>(op)) {
-    auto srcVectorType = reductionOp.getVectorType();
+    VectorType srcVectorType = reductionOp.getSourceVectorType();
     assert(srcVectorType.getRank() == 1);  // Guaranteed by semantics
     int64_t vectorSize = getComputeVectorSize(srcVectorType.getDimSize(0));
     return SmallVector<int64_t>{vectorSize};
   } else if (auto transposeOp = dyn_cast<vector::TransposeOp>(op)) {
-    auto vectorType = transposeOp.getResultType();
+    VectorType vectorType = transposeOp.getResultVectorType();
     SmallVector<int64_t> nativeSize(vectorType.getRank(), 1);
     nativeSize.back() = getComputeVectorSize(vectorType.getShape().back());
     return nativeSize;

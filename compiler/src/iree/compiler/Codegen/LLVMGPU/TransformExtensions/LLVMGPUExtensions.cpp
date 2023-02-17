@@ -52,13 +52,12 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // IREE-specific LLVMGPU transformations.
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::MapNestedForeachThreadToGpuThreadsOp::build(
+void transform_dialect::MapNestedForallToGpuThreadsOp::build(
     OpBuilder &builder, OperationState &result, Value target,
     ArrayRef<int64_t> workgroupSize) {
   result.addOperands(target);
   result.addAttribute(
-      MapNestedForeachThreadToGpuThreadsOp::getWorkgroupSizeAttrName(
-          result.name),
+      MapNestedForallToGpuThreadsOp::getWorkgroupSizeAttrName(result.name),
       builder.getI64ArrayAttr(workgroupSize));
   MLIRContext *ctx = builder.getContext();
   result.addTypes({pdl::OperationType::get(ctx)});
@@ -68,7 +67,7 @@ void transform_dialect::MapNestedForeachThreadToGpuThreadsOp::build(
 // reuse most of the code and not require a static number of threads.
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
-transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
+transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
@@ -101,9 +100,19 @@ transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
       gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimY),
       gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimZ)};
 
+  auto threadIdGenerator = [](RewriterBase &rewriter, scf::ForallOp forallOp,
+                              SmallVectorImpl<Value> &threadIds) {
+    Location loc = forallOp.getLoc();
+    IndexType indexType = rewriter.getIndexType();
+    threadIds.assign(
+        {rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x),
+         rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y),
+         rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::z)});
+  };
+
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForeachToThreadsImpl(
-          rewriter, target, workgroupSize, true, transformOp,
+          rewriter, target, workgroupSize, threadIdGenerator, true, transformOp,
           threadMappingAttributes);
 
   if (diag.succeeded()) {

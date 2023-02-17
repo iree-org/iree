@@ -228,40 +228,40 @@ def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
   let builders = [OpBuilder<(ins "Value":$target)>];
 }
 
-def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
-    "iree.foreach_thread_to_workgroup",
+def ForallToWorkgroupOp : Op<Transform_Dialect,
+    "iree.forall_to_workgroup",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformOpInterface,
      TransformEachOpTrait]> {
   let description = [{
     Target the whole hal.executable_variant op and rewrite the unique topLevel
-    scf.foreach_thread to distributed workgroup_id and workgroup_count.
+    scf.forall to distributed workgroup_id and workgroup_count.
 
     The mapping of threads to workgroup_id is currently one-to-one and in order.
-    Only **bufferized** scf.foreach_thread are currently supported.
-    Only scf.foreach_thread distributed to **at most 3 dimensions** are currently
+    Only **bufferized** scf.forall are currently supported.
+    Only scf.forall distributed to **at most 3 dimensions** are currently
     supported.
 
     Return modes:
     =============
     This operation ignores non-Func ops and drops them in the return.
 
-    If no unique scf.foreach_thread topLevel operation is found, then the
+    If no unique scf.forall topLevel operation is found, then the
     transform definitely fails.
-    If the unique topLevel scf.foreach_thread has results (i.e. tensors), then
+    If the unique topLevel scf.forall has results (i.e. tensors), then
     the transform definitely fails.
 
-    If the unique topLevel scf.foreach_thread maps to a dynamic number of
+    If the unique topLevel scf.forall maps to a dynamic number of
     threads, then the transform definitely fails. This is a temporary
-    limitation until the backward slice computing scf.foreach_thread.num_threads
+    limitation until the backward slice computing scf.forall.num_threads
     can be extracted into the hal::executable_export workgroup_count region.
     This region may require arbitrary computations and cannot magically match
     what the `stream.cmd.dispatch` has already imposed on us at a distance.
     For now we must specify the number of values properly when applying the
-    topLevel tile_to_foreach_thread_op.
+    topLevel tile_to_forall_op.
 
-    If the unique topLevel scf.foreach_thread operation contained within the
+    If the unique topLevel scf.forall operation contained within the
     FuncOp referred to by the `target` PDLOperation lowers to workgroup properly,
     the transform succeeds. Otherwise the transform definitely fails.
 
@@ -288,14 +288,14 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
   }];
 }
 
-def ShareForeachThreadOperandsOp : Op<
-    Transform_Dialect, "iree.share_foreach_thread_operands", [
+def ShareForallOperandsOp : Op<
+    Transform_Dialect, "iree.share_forall_operands", [
       FunctionalStyleTransformOpTrait,
       MemoryEffectsOpInterface,
       TransformEachOpTrait,
       TransformOpInterface]> {
   let description = [{
-    Target a single scf.foreach_thread op and shares all uses of the specified 
+    Target a single scf.forall op and shares all uses of the specified 
     `share_operands` operand indices.
 
     Sharing can be thought of as the inverse of traditional privatization.
@@ -303,7 +303,7 @@ def ShareForeachThreadOperandsOp : Op<
     by a single thread to and subsequently slicing out that part into a 
     thread_private storage that has smaller footprint, better locality and better
     alignment properties.
-    In the case of scf.foreach_thread on tensors, tensor values are immutable 
+    In the case of scf.forall on tensors, tensor values are immutable 
     and the same tensor value may be passed as `shared_outs` and also captured
     for internal uses.
     Due to the immutability property, the whole tensor values are private by 
@@ -320,7 +320,7 @@ def ShareForeachThreadOperandsOp : Op<
     However this can still be unsafe wrt parallelism so use carefully!
 
     Sharing consists in rewriting all uses of the operands passed as 
-    `shared_outs` that are also captured wihtin the `scf.foreach_thread` region
+    `shared_outs` that are also captured wihtin the `scf.forall` region
     into the matching `shared_outs` bbarg.
 
     Only those operands whose indices are specified in `share_operands` are
@@ -335,42 +335,42 @@ def ShareForeachThreadOperandsOp : Op<
     In the future, we should emit a notification.
 
     This transform consumes the target handle and produces a result handle to
-    the modified `scf.foreach_thread` op.
+    the modified `scf.forall` op.
   }];
 
   let arguments = (
-      ins Transform_ConcreteOpType<"scf.foreach_thread">:$foreach_thread_op,
+      ins Transform_ConcreteOpType<"scf.forall">:$forall_op,
           DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$share_operands
   );
-  let results = (outs Transform_ConcreteOpType<"scf.foreach_thread">:$result);
+  let results = (outs Transform_ConcreteOpType<"scf.forall">:$result);
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let assemblyFormat = [{
-    $foreach_thread_op (`share_operands` `=` $share_operands^ )? attr-dict
+    $forall_op (`share_operands` `=` $share_operands^ )? attr-dict
       `:` functional-type(operands, results)
   }];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::scf::ForeachThreadOp foreachThreadOp,
+        ::mlir::scf::ForallOp forallOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
 }
 
-def TileToForeachThreadAndWorkgroupCountRegionOp :
-    Op<Transform_Dialect, "iree.tile_to_foreach_thread_and_workgroup_count_region",
+def TileToForallAndWorkgroupCountRegionOp :
+    Op<Transform_Dialect, "iree.tile_to_forall_and_workgroup_count_region",
       [AttrSizedOperandSegments,
        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
        TransformOpInterface]> {
   let description = [{
-    Wrapper around `structured.tile_to_foreach_thread_op` for use within IREE.
+    Wrapper around `structured.tile_to_forall_op` for use within IREE.
 
-    In addition to tile and distribute using `scf.foreach_thread`, lowers the
+    In addition to tile and distribute using `scf.forall`, lowers the
     the `workgroup_count` region of the export op corresponding to the parent
     `func.func` of the target to return the number of workgroups.
-    Please see the doc of `structured.tile_to_foreach_thread_op` for full
+    Please see the doc of `structured.tile_to_forall_op` for full
     description of op semantics.
   }];
 
@@ -380,7 +380,7 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
                    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_num_threads,
                    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_tile_sizes,
                    OptionalAttr<DeviceMappingArrayAttr>:$mapping);
-  let results = (outs PDL_Operation:$foreach_thread_op,
+  let results = (outs PDL_Operation:$forall_op,
                       PDL_Operation:$tiled_op);
   let assemblyFormat = [{
     $target oilist(
