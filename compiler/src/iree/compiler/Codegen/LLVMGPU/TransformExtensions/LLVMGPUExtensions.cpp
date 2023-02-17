@@ -101,9 +101,19 @@ transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
       gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimY),
       gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimZ)};
 
+  auto threadIdGenerator = [](RewriterBase &rewriter, scf::ForallOp forallOp,
+                              SmallVectorImpl<Value> &threadIds) {
+    Location loc = forallOp.getLoc();
+    IndexType indexType = rewriter.getIndexType();
+    threadIds.assign(
+        {rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x),
+         rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y),
+         rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::z)});
+  };
+
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForeachToThreadsImpl(
-          rewriter, target, workgroupSize, true, transformOp,
+          rewriter, target, workgroupSize, threadIdGenerator, true, transformOp,
           threadMappingAttributes);
 
   if (diag.succeeded()) {
