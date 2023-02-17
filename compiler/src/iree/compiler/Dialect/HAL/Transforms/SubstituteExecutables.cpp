@@ -167,10 +167,11 @@ static LogicalResult externalizeExecutableOp(
   // there may have been microkernel libraries or something referenced by the
   // existing module.
   auto dataObjectAttr = builder.getAttr<IREE::HAL::ExecutableObjectAttr>(
-      nullptr, DenseIntElementsAttr::get(
-                   VectorType::get({static_cast<int64_t>(fileContents->size())},
-                                   builder.getI8Type()),
-                   ArrayRef(fileContents->data(), fileContents->size())));
+      builder.getStringAttr(llvm::sys::path::filename(filePath)),
+      DenseIntElementsAttr::get(
+          VectorType::get({static_cast<int64_t>(fileContents->size())},
+                          builder.getI8Type()),
+          ArrayRef(fileContents->data(), fileContents->size())));
   variantOp.setObjectsAttr(builder.getArrayAttr({dataObjectAttr}));
 
   // Drop the inner module if present (may already be external).

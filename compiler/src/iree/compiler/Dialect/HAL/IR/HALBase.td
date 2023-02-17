@@ -752,9 +752,12 @@ def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
   let mnemonic = "executable.object";
   let summary = [{object file reference}];
   let description = [{
-    WIP; defines an object file that can be linked into executables.
+    Defines an object file that can be linked into executables.
     Today this is only supported for external file references with paths the
     compiler can successfully resolve from its current working directory.
+    Inlined data can optionally be provided to avoid the need for file system
+    access and ensure the data source is attached to the IR as it makes its way
+    through multiple compiler stages or reproducers.
 
     Future revisions may change this to an interface that allows both internal
     and external resources to define the object contents. Linking needs to be
@@ -770,12 +773,15 @@ def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
     Example:
     ```mlir
     #hal.executable.object<{path = "some/file.obj"}>
-    #hal.executable.object<{data = dense<[...]> : vector<2048xi8>}>
+    #hal.executable.object<{
+      path = "some/embedded/file.obj",
+      data = dense<[...]> : vector<2048xi8>
+    }>
     ```
   }];
 
   let parameters = (ins
-    OptionalParameter<"StringAttr", "">:$path,
+    AttrParameter<"StringAttr", "">:$path,
     OptionalParameter<"DenseIntElementsAttr", "">:$data
   );
 

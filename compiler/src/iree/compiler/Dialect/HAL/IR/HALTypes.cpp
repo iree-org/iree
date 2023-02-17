@@ -464,8 +464,9 @@ void ExecutableObjectAttr::print(AsmPrinter &p) const {
   if (auto pathAttr = getPath()) {
     os << "path = ";
     p.printAttribute(getPath());
-  } else if (auto dataAttr = getData()) {
-    os << "data = ";
+  }
+  if (auto dataAttr = getData()) {
+    os << ", data = ";
     p.printAttribute(getData());
   }
   os << "}>";
