@@ -32,7 +32,7 @@ func.func @promote() -> (tensor<16x128xf32>) {
   %empty = tensor.empty() : tensor<16x128xf32>
   %filled = linalg.fill ins(%f0 : f32) outs(%empty : tensor<16x128xf32>) -> tensor<16x128xf32>
 
-  // CHECK: foreach_thread{{.*}}shared_outs(%[[ARG:.*]] =
+  // CHECK: forall{{.*}}shared_outs(%[[ARG:.*]] =
   // CHECK:   %[[A:.*]] = tensor.extract_slice %[[ARG]]
   // CHECK:   %[[B:.*]] = tensor.extract_slice %[[ARG]]
   // CHECK:   %[[C:.*]] = linalg.generic{{.*}}ins(%[[A]]{{.*}}outs(%[[B]]
