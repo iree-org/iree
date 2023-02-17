@@ -40,7 +40,7 @@ using transform::PrintOp;
 using transform::SequenceOp;
 using transform::SplitHandlesOp;
 using transform::SplitReductionOp;
-using transform::TileToForeachThreadOp;
+using transform::TileToForallOp;
 using transform::VectorizeOp;
 using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::TakeFirstOp;
@@ -176,7 +176,7 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b, Value rootH,
   iree_compiler::TileToForeachThreadAndFuseAndDistributeResult result;
   auto tileToForeachOp = b.create<TilingTransformOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
-  result.foreachThreadH = tileToForeachOp.getForeachThreadOp();
+  result.foreachThreadH = tileToForeachOp.getForallOp();
   result.tiledOpH = tileToForeachOp.getTiledOp();
 
   // Batch fusion if requested.
@@ -208,7 +208,7 @@ iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
 mlir::iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
-  return buildTileFuseDistWithTileSizes<TileToForeachThreadOp>(
+  return buildTileFuseDistWithTileSizes<TileToForallOp>(
       b, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
 iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
@@ -238,7 +238,7 @@ iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
 mlir::iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping) {
-  return buildTileFuseDistWithNumThreads<TileToForeachThreadOp>(
+  return buildTileFuseDistWithNumThreads<TileToForallOp>(
       b, rootH, opsHToFuse, tileSizes, threadDimMapping);
 }
 iree_compiler::TileToForeachThreadAndFuseAndDistributeResult
@@ -345,18 +345,18 @@ mlir::iree_compiler::buildTileReductionUsingScfForeach(
   numThreads.push_back(tileSize);
   SmallVector<int64_t> tileSizes = leadingParallelDims;
   tileSizes.push_back(reductionVectorSize);
-  auto tileReduction = b.create<transform::TileReductionUsingForeachThreadOp>(
+  auto tileReduction = b.create<transform::TileReductionUsingForallOp>(
       /*target=*/reductionH,
       /*numThreads=*/numThreads,
       /*tileSizes=*/tileSizes,
       /*threadDimMapping=*/b.getArrayAttr(mappingAttr));
-  Value blockParallelForeachThreadOp = tileReduction.getForeachThreadOp();
+  Value blockParallelForallOp = tileReduction.getForallOp();
   Value blockParallelFillH = tileReduction.getFillOp();
   Value blockCombinerOpH = tileReduction.getCombiningLinalgOp();
   // Fuse the fill and elementwise to privatize them.
-  blockParallelFillH = b.create<FuseIntoContainingOp>(
-      blockParallelFillH, blockParallelForeachThreadOp);
-  return std::make_tuple(blockParallelForeachThreadOp, blockParallelFillH,
+  blockParallelFillH =
+      b.create<FuseIntoContainingOp>(blockParallelFillH, blockParallelForallOp);
+  return std::make_tuple(blockParallelForallOp, blockParallelFillH,
                          blockCombinerOpH);
 }
 

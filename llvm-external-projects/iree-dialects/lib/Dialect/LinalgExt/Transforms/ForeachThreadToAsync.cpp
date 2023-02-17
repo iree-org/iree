@@ -26,30 +26,30 @@ using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
 FailureOr<Operation *>
-mlir::iree_compiler::IREE::LinalgExt::ForeachThreadOpToAsyncRewriter::
-    returningMatchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
+mlir::iree_compiler::IREE::LinalgExt::ForallOpToAsyncRewriter::
+    returningMatchAndRewrite(scf::ForallOp forallOp,
                              PatternRewriter &rewriter) const {
-  if (foreachThreadOp.getNumResults() > 0)
-    return foreachThreadOp->emitError(
+  if (forallOp.getNumResults() > 0)
+    return forallOp->emitError(
         "only bufferized scf.foreach_thread lowers to async");
 
-  if (foreachThreadOp.getNumThreads().size() > 1)
-    return foreachThreadOp->emitError(
+  if (forallOp.getRank() > 1)
+    return forallOp->emitError(
         "only single-dimension scf.foreach_thread lowers to async");
 
-  // Only consider the top level ForeachThreadOp op and skip if it already
+  // Only consider the top level ForallOp op and skip if it already
   // contains an ExecuteOp.
-  if (foreachThreadOp->getParentOfType<scf::ForeachThreadOp>() ||
-      llvm::any_of(foreachThreadOp.getBody()->getOperations(),
+  if (forallOp->getParentOfType<scf::ForallOp>() ||
+      llvm::any_of(forallOp.getBody()->getOperations(),
                    [](Operation &op) { return isa<async::ExecuteOp>(&op); }))
     return failure();
 
-  auto *ctx = foreachThreadOp.getContext();
-  Location loc = foreachThreadOp.getLoc();
+  auto *ctx = forallOp.getContext();
+  Location loc = forallOp.getLoc();
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
   // TODO: allow multi-dim.
-  Value numThreads = foreachThreadOp.getNumThreads().front();
+  Value numThreads = forallOp.getUpperBound(rewriter).front();
 
   // Wrap the scf.foreach_thread into an async::ExecuteOp.
   // 1. Create the async::GroupType object on which we synchronize.
@@ -71,12 +71,12 @@ mlir::iree_compiler::IREE::LinalgExt::ForeachThreadOpToAsyncRewriter::
   // 3. Steal the ops nested under scf::ForeachThread, except the terminator,
   // into the body of the async::ExecuteOp, just before the terminator.
   SmallVector<Value> bbArgsTranslated{forOp.getInductionVar()};
-  rewriter.mergeBlocks(&foreachThreadOp.getRegion().front(),
-                       executeOp.getBody(), bbArgsTranslated);
-  // 3.b. Erase the terminator stolen from foreachThreadOp.
+  rewriter.mergeBlocks(&forallOp.getRegion().front(), executeOp.getBody(),
+                       bbArgsTranslated);
+  // 3.b. Erase the terminator stolen from forallOp.
   rewriter.eraseOp(&executeOp.getBody()->back());
-  // 3.c. Erase foreachThreadOp.
-  rewriter.eraseOp(foreachThreadOp);
+  // 3.c. Erase forallOp.
+  rewriter.eraseOp(forallOp);
   // 3.d. Add ExecuteOp terminator.
   rewriter.setInsertionPointToEnd(executeOp.getBody());
   rewriter.create<async::YieldOp>(loc, ValueRange{});

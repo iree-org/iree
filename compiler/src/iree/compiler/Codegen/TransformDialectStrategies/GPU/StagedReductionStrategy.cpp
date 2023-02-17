@@ -28,7 +28,7 @@ using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::
     MapNestedForeachThreadToGpuThreadsOp;
-using iree_compiler::IREE::transform_dialect::ShareForeachThreadOperandsOp;
+using iree_compiler::IREE::transform_dialect::ShareForallOperandsOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
 using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
 using transform::FuseIntoContainingOp;
@@ -117,11 +117,11 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
 static Value shareForeachArgument(ImplicitLocOpBuilder &b, Value foreachThread,
                                   ArrayRef<int64_t> indices) {
   auto foreachType = transform::OperationType::get(
-      b.getContext(), scf::ForeachThreadOp::getOperationName());
+      b.getContext(), scf::ForallOp::getOperationName());
   foreachThread = b.create<transform::CastOp>(foreachType, foreachThread);
-  return b.create<
-      iree_compiler::IREE::transform_dialect::ShareForeachThreadOperandsOp>(
-      foreachType, foreachThread, indices);
+  return b
+      .create<iree_compiler::IREE::transform_dialect::ShareForallOperandsOp>(
+          foreachType, foreachThread, indices);
 }
 
 static void buildStagedReductionStrategyThreadLevel(
@@ -148,7 +148,7 @@ static void buildStagedReductionStrategyThreadLevel(
   }
 
   // Staged reduction step 1: break gridReductionH apart.
-  auto [blockParallelForeachThreadOp, blockParallelFillH, blockCombinerOpH] =
+  auto [blockParallelForallOp, blockParallelFillH, blockCombinerOpH] =
       buildTileReductionUsingScfForeach(
           /*b=*/b,
           /*reductionH=*/gridReductionH,

@@ -124,9 +124,9 @@ void LinalgExt::FuseProducersOp::print(OpAsmPrinter &p) {
 
 DiagnosedSilenceableFailure
 LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
-    scf::ForeachThreadOp target, transform::ApplyToEachResultList &results,
+    scf::ForallOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  LinalgExt::ForeachThreadOpToAsyncRewriter pattern(this->getContext());
+  LinalgExt::ForallOpToAsyncRewriter pattern(this->getContext());
   SimplePatternRewriter rewriter(target);
   FailureOr<Operation *> result =
       pattern.returningMatchAndRewrite(target, rewriter);
@@ -138,9 +138,9 @@ LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
 
 DiagnosedSilenceableFailure
 LinalgExt::RewriteForeachThreadToScfForOp::applyToOne(
-    scf::ForeachThreadOp target, transform::ApplyToEachResultList &results,
+    scf::ForallOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  LinalgExt::ForeachThreadOpToScfForRewriter pattern(this->getContext());
+  LinalgExt::ForallOpToScfForRewriter pattern(this->getContext());
   SimplePatternRewriter rewriter(target);
   FailureOr<Operation *> result =
       pattern.returningMatchAndRewrite(target, rewriter);

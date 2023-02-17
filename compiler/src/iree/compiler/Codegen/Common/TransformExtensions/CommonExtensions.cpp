@@ -311,29 +311,28 @@ void transform_dialect::ApplyPatternsOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
-// ShareForeachThreadOperandsOp
+// ShareForallOperandsOp
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform_dialect::ShareForeachThreadOperandsOp::applyToOne(
-    scf::ForeachThreadOp foreachThreadOp,
-    transform::ApplyToEachResultList &results,
+transform_dialect::ShareForallOperandsOp::applyToOne(
+    scf::ForallOp forallOp, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   IRRewriter rewriter(getContext());
   SmallVector<int64_t> shareOperands(getShareOperands());
   // Empty case: consider all operands need to be shared.
   if (shareOperands.empty()) {
-    shareOperands = llvm::to_vector(
-        llvm::seq<int64_t>(0, foreachThreadOp.getOutputs().size()));
+    shareOperands =
+        llvm::to_vector(llvm::seq<int64_t>(0, forallOp.getOutputs().size()));
   }
   for (int64_t outputIdx : getShareOperands()) {
-    if (outputIdx < 0 || outputIdx >= foreachThreadOp.getOutputs().size())
-      return mlir::emitDefiniteFailure(foreachThreadOp, "operand idx overflow");
-    Value toShare = foreachThreadOp.getOutputs()[outputIdx];
+    if (outputIdx < 0 || outputIdx >= forallOp.getOutputs().size())
+      return mlir::emitDefiniteFailure(forallOp, "operand idx overflow");
+    Value toShare = forallOp.getOutputs()[outputIdx];
     if (std::distance(toShare.getUses().begin(), toShare.getUses().end()) !=
         2) {
       /*return mlir::emitSilenceableFailure(
-          foreachThreadOp,
+          forallOp,
           "operand to share must have exactly 2 uses, the foreach_thread op "
           "and an extract_slice op.");*/
       continue;
@@ -345,12 +344,12 @@ transform_dialect::ShareForeachThreadOperandsOp::applyToOne(
     }
     if (!extractSliceOp) {
       /*return mlir::emitSilenceableFailure(
-        foreachThreadOp,
+        forallOp,
         "shared operands use must be extractSliceOp.");*/
       continue;
     }
     // Get the corresponding bbArg.
-    BlockArgument bbArg = foreachThreadOp.getOutputBlockArguments()[outputIdx];
+    BlockArgument bbArg = forallOp.getOutputBlockArguments()[outputIdx];
 
     // Check if the extract_slice has a matching parallel_insert_slice
     // (i.e., same source/target, offsets, sizes and strides).
@@ -365,7 +364,7 @@ transform_dialect::ShareForeachThreadOperandsOp::applyToOne(
              llvm::equal(insertSlice.getMixedStrides(),
                          extractSliceOp.getMixedStrides());
     };
-    if (llvm::none_of(foreachThreadOp.getTerminator().getYieldingOps(),
+    if (llvm::none_of(forallOp.getTerminator().getYieldingOps(),
                       isMatchingParallelInsertSlice)) {
       continue;
     }
@@ -376,7 +375,7 @@ transform_dialect::ShareForeachThreadOperandsOp::applyToOne(
     });
   }
 
-  results.push_back(foreachThreadOp);
+  results.push_back(forallOp);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -396,9 +395,9 @@ void transform_dialect::ForeachThreadToWorkgroupOp::build(
 /// operands. Assumes the HAL::ExecutableExportOp is built with an empty
 /// region.
 static LogicalResult populateWorkgroupCountComputingRegion(
-    PatternRewriter &rewriter, scf::ForeachThreadOp foreachThreadOp,
+    PatternRewriter &rewriter, scf::ForallOp forallOp,
     HAL::ExecutableExportOp exportOp) {
-  Location loc = foreachThreadOp.getLoc();
+  Location loc = forallOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   Region &r = exportOp.getWorkgroupCount();
   assert(r.empty() && "expected block-less workgroup_count region");
@@ -410,7 +409,7 @@ static LogicalResult populateWorkgroupCountComputingRegion(
   SmallVector<Value> results;
   // For now, this assumes that we only pull in constants.
   // TODO: Iteratively pull required operations.
-  for (Value v : foreachThreadOp.getNumThreads()) {
+  for (Value v : forallOp.getUpperBound(rewriter)) {
     auto op = dyn_cast_or_null<arith::ConstantIndexOp>(v.getDefiningOp());
     if (!op) return failure();
     results.push_back(
@@ -430,37 +429,37 @@ static LogicalResult populateWorkgroupCountComputingRegion(
 //===---------------------------------------------------------------------===//
 
 LogicalResult rewriteForeachThreadToWorkgroup(
-    scf::ForeachThreadOp foreachThreadOp,
-    IREE::HAL::ExecutableExportOp exportOp, PatternRewriter &rewriter) {
+    scf::ForallOp forallOp, IREE::HAL::ExecutableExportOp exportOp,
+    PatternRewriter &rewriter) {
   // Step 0. Target-specific verifications. There is no good place to anchor
-  // those right now: the ForeachThreadOp is target-independent and the
-  // transform op does not apply to individual ForeachThreadOp.
-  MLIRContext *ctx = foreachThreadOp->getContext();
-  Location loc = foreachThreadOp->getLoc();
+  // those right now: the ForallOp is target-independent and the
+  // transform op does not apply to individual ForallOp.
+  MLIRContext *ctx = forallOp->getContext();
+  Location loc = forallOp->getLoc();
   // TODO iree should have own device mapping like #hal.workgroup<x/y/z>
   Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimX);
   Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimY);
   Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimZ);
-  if (foreachThreadOp.getNumResults() > 0)
-    return foreachThreadOp->emitError(
+  if (forallOp.getNumResults() > 0)
+    return forallOp->emitError(
         "only bufferized scf.foreach_thread lowers to workgroup");
-  if (foreachThreadOp.getNumThreads().size() > 3)
-    return foreachThreadOp->emitError(
+  if (forallOp.getRank() > 3)
+    return forallOp->emitError(
         "scf.foreach_thread with rank > 3 does not lower to workgroup");
 
-  if (!foreachThreadOp.getMapping().has_value())
-    return foreachThreadOp->emitError("mapping must be present");
+  if (!forallOp.getMapping().has_value())
+    return forallOp->emitError("mapping must be present");
   SmallVector<Attribute> blockMapping =
-      llvm::to_vector(foreachThreadOp.getMapping()->getValue());
+      llvm::to_vector(forallOp.getMapping()->getValue());
   if (llvm::any_of(blockMapping, [](DeviceMappingAttrInterface map) {
         return !map.isa<gpu::GPUBlockMappingAttr>();
       })) {
-    return foreachThreadOp->emitError("mapping must be #gpu.block<x/y/z/>");
+    return forallOp->emitError("mapping must be #gpu.block<x/y/z/>");
   }
 
   // Step 1. Complete the blockMapping to a full mapping (with 1s) if necessary.
   SmallVector<Value> numBlocks =
-      llvm::to_vector(foreachThreadOp.getNumThreads());
+      llvm::to_vector(forallOp.getUpperBound(rewriter));
   // Ensure we have 3 block sizes, one for each id.
   Value one;
   for (auto attr : {bX, bY, bZ}) {
@@ -476,8 +475,8 @@ LogicalResult rewriteForeachThreadToWorkgroup(
     return static_cast<int64_t>(a.cast<gpu::GPUBlockMappingAttr>().getBlock()) <
            static_cast<int64_t>(b.cast<gpu::GPUBlockMappingAttr>().getBlock());
   };
-  SmallVector<Value> gridDimValues = scf::ForeachThreadOp::getValuesSortedByKey(
-      blockMapping, numBlocks, comparator);
+  SmallVector<Value> gridDimValues =
+      scf::ForallOp::getValuesSortedByKey(blockMapping, numBlocks, comparator);
 
   // Step 3. Outline the compute workload region and set up the workload
   // operands, if this has not been done already.
@@ -492,10 +491,10 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   // the flow level and explicitly match the ops we want to fuse.
   // Once fusion is customizable enough in perpetuity, we can retire this.
   if (exportOp.getWorkgroupCount().empty()) {
-    if (llvm::any_of(foreachThreadOp.getNumThreads(), [](Value v) {
+    if (llvm::any_of(forallOp.getUpperBound(rewriter), [](Value v) {
           return !v.getDefiningOp<arith::ConstantIndexOp>();
         })) {
-      return foreachThreadOp->emitError(
+      return forallOp->emitError(
           "unsupported dynamic workgroup_count atm --- need to slice out "
           "workgroup_count computation into ExecutableExport::workgroup_count."
           "\nThis region may require arbitrary computations and cannot "
@@ -504,9 +503,9 @@ LogicalResult rewriteForeachThreadToWorkgroup(
           "\nFor now we must specify the number of values properly when "
           "applying the topLevel tile_to_foreach_thread_op");
     }
-    if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
+    if (failed(populateWorkgroupCountComputingRegion(rewriter, forallOp,
                                                      exportOp))) {
-      return foreachThreadOp->emitOpError(
+      return forallOp->emitOpError(
                  "failed to populate workload region for dispatchOp: ")
              << exportOp;
     }
@@ -523,24 +522,24 @@ LogicalResult rewriteForeachThreadToWorkgroup(
     workgroupCountOps.push_back(
         rewriter.create<HAL::InterfaceWorkgroupCountOp>(loc, idx));
   }
-  bvm.map(foreachThreadOp.getThreadIndices(), workgroupIdOps);
-  bvm.map(foreachThreadOp.getNumThreads(), workgroupCountOps);
+  bvm.map(forallOp.getInductionVars(), workgroupIdOps);
+  bvm.map(forallOp.getUpperBound(rewriter), workgroupCountOps);
 
-  // Step 5. Predicate omitted given unique topLevel scf::ForeachThreadOp.
+  // Step 5. Predicate omitted given unique topLevel scf::ForallOp.
 
-  // Step 6. Move the body of foreachThreadOp.
+  // Step 6. Move the body of forallOp.
   // Erase the terminator first, it will not be used since we are on buffers.
-  rewriter.eraseOp(foreachThreadOp.getTerminator());
+  rewriter.eraseOp(forallOp.getTerminator());
   Block *targetBlock;
   Block::iterator insertionPoint;
-  targetBlock = foreachThreadOp->getBlock();
-  insertionPoint = Block::iterator(foreachThreadOp);
-  Block &sourceBlock = foreachThreadOp.getRegion().front();
+  targetBlock = forallOp->getBlock();
+  insertionPoint = Block::iterator(forallOp);
+  Block &sourceBlock = forallOp.getRegion().front();
   targetBlock->getOperations().splice(insertionPoint,
                                       sourceBlock.getOperations());
 
   // Step 7. RAUW thread indices to thread ops.
-  for (Value blockIdx : foreachThreadOp.getThreadIndices()) {
+  for (Value blockIdx : forallOp.getInductionVars()) {
     for (Operation *user : llvm::make_early_inc_range(blockIdx.getUsers())) {
       rewriter.updateRootInPlace(user, [&]() {
         user->replaceUsesOfWith(blockIdx, bvm.lookup(blockIdx));
@@ -548,10 +547,10 @@ LogicalResult rewriteForeachThreadToWorkgroup(
     }
   }
 
-  // Step 5. Barriers omitted given unique topLevel scf::ForeachThreadOp.
+  // Step 5. Barriers omitted given unique topLevel scf::ForallOp.
 
   // Step 6. Erase old op.
-  rewriter.eraseOp(foreachThreadOp);
+  rewriter.eraseOp(forallOp);
 
   return success();
 }
@@ -582,12 +581,12 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
         target, "no IREE::HAL::ExecutableExportOp found");
   }
 
-  scf::ForeachThreadOp topLevelForeachThreadOp;
-  auto walkResult = target->walk([&](scf::ForeachThreadOp foreachThreadOp) {
-    if (foreachThreadOp->getParentOfType<scf::ForeachThreadOp>())
+  scf::ForallOp topLevelForallOp;
+  auto walkResult = target->walk([&](scf::ForallOp forallOp) {
+    if (forallOp->getParentOfType<scf::ForallOp>())
       return WalkResult::advance();
-    if (topLevelForeachThreadOp) return WalkResult::interrupt();
-    topLevelForeachThreadOp = foreachThreadOp;
+    if (topLevelForallOp) return WalkResult::interrupt();
+    topLevelForallOp = forallOp;
     return WalkResult::advance();
   });
 
@@ -597,8 +596,8 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
         target, "could not find a unique topLevel scf.foreach_thread");
   }
 
-  SimplePatternRewriter rewriter(topLevelForeachThreadOp);
-  if (failed(rewriteForeachThreadToWorkgroup(topLevelForeachThreadOp, exportOp,
+  SimplePatternRewriter rewriter(topLevelForallOp);
+  if (failed(rewriteForeachThreadToWorkgroup(topLevelForallOp, exportOp,
                                              rewriter))) {
     return mlir::emitDefiniteFailure(target,
                                      "rewriteForeachThreadToWorkgroup failed");
@@ -844,7 +843,7 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
   SmallVector<Operation *> tileOps;
   SmallVector<Operation *> tiledOps;
 
-  DiagnosedSilenceableFailure diag = transform::tileToForeachThreadOpImpl(
+  DiagnosedSilenceableFailure diag = transform::tileToForallOpImpl(
       rewriter, state, cast<transform::TransformOpInterface>(getOperation()),
       targets, getMixedNumThreads(), getMixedTileSizes(), getMapping(), tileOps,
       tiledOps);

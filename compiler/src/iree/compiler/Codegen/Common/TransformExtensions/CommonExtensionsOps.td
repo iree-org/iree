@@ -288,7 +288,7 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
   }];
 }
 
-def ShareForeachThreadOperandsOp : Op<
+def ShareForallOperandsOp : Op<
     Transform_Dialect, "iree.share_foreach_thread_operands", [
       FunctionalStyleTransformOpTrait,
       MemoryEffectsOpInterface,
@@ -353,7 +353,7 @@ def ShareForeachThreadOperandsOp : Op<
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::scf::ForeachThreadOp foreachThreadOp,
+        ::mlir::scf::ForallOp forallOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];

@@ -15,7 +15,7 @@ namespace mlir {
 class DialectRegistry;
 
 namespace scf {
-class ForeachThreadOp;
+class ForallOp;
 }  // namespace scf
 
 namespace iree_compiler {
