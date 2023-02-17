@@ -22,6 +22,7 @@ iree_cc_library(
   SRCS
     "VMVXTarget.cpp"
   DEPS
+    IREELinalgExtDialect
     LLVMSupport
     MLIRIR
     MLIRPass
