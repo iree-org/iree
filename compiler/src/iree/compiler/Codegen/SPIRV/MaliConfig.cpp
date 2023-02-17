@@ -16,7 +16,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -27,9 +26,15 @@ static LogicalResult setMaliMatmulConfig(linalg::LinalgOp op,
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
-  if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+  Type elementType = op.getDpsInputOperand(0)
+                         ->get()
+                         .getType()
+                         .cast<ShapedType>()
+                         .getElementType();
+  if (elementType.getIntOrFloatBitWidth() == 16) {
     threadMNK = {2, 8, 8};
+  } else if (elementType.isInteger(8)) {
+    threadMNK = {2, 4, 4};
   } else {
     threadMNK = {6, 4, 4};
   }
