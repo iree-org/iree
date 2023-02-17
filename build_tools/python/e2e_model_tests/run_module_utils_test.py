@@ -55,6 +55,19 @@ class RunModuleTuilsTest(unittest.TestCase):
 
     self.assertEqual(flags, ["--device=cuda://3"])
 
+  def test_build_run_flags_for_execution_config_without_driver(self):
+    execution_config = iree_definitions.ModuleExecutionConfig(
+        id="123",
+        tags=["test"],
+        loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
+        driver=iree_definitions.RuntimeDriver.LOCAL_TASK,
+        extra_flags=["--task=10"])
+
+    flags = run_module_utils.build_run_flags_for_execution_config(
+        execution_config, with_driver=False)
+
+    self.assertEqual(flags, ["--task=10"])
+
   def test_build_linux_wrapper_cmds_for_device_spec(self):
     device_spec = common_definitions.DeviceSpec(
         id="abc",
