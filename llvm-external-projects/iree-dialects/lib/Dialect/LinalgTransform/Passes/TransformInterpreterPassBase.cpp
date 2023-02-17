@@ -201,8 +201,9 @@ printIreeOptReproCall(llvm::raw_ostream &os, StringRef rootOpName,
 
 /// Prints the module rooted at `root` to `os` and appends
 /// `transformContainer` if it is not nested in `root`.
-llvm::raw_ostream &printModuleForRepro(llvm::raw_ostream &os, Operation *root,
-                                       Operation *transformContainer) {
+static llvm::raw_ostream &printModuleForRepro(llvm::raw_ostream &os,
+                                              Operation *root,
+                                              Operation *transformContainer) {
   root->print(os);
   if (!root->isAncestor(transformContainer)) {
     transformContainer->print(os);
@@ -212,10 +213,11 @@ llvm::raw_ostream &printModuleForRepro(llvm::raw_ostream &os, Operation *root,
 
 /// Saves the payload and the transform IR into a temporary file and reports
 /// the file name to `os`.
-void saveReproToTempFile(
-    llvm::raw_ostream &os, Operation *target, Operation *transformContainer,
-    StringRef passName, const Pass::Option<std::string> &debugPayloadRootTag,
-    const Pass::Option<std::string> &debugTransformRootTag) {
+static void
+saveReproToTempFile(llvm::raw_ostream &os, Operation *target,
+                    Operation *transformContainer, StringRef passName,
+                    const Pass::Option<std::string> &debugPayloadRootTag,
+                    const Pass::Option<std::string> &debugTransformRootTag) {
   using llvm::sys::fs::TempFile;
   Operation *root = getRootOperation(target);
 
@@ -366,7 +368,8 @@ static void performOptionalDebugActions(
   });
 }
 
-LogicalResult transform::detail::interpreterBaseRunOnOperationImpl(
+LogicalResult
+transform::iree_dialects::detail::interpreterBaseRunOnOperationImpl(
     Operation *target, StringRef passName,
     const std::shared_ptr<OwningOpRef<ModuleOp>> &sharedTransformModule,
     const Pass::Option<std::string> &transformFileName,
@@ -468,7 +471,7 @@ LogicalResult transform::detail::interpreterBaseRunOnOperationImpl(
   return success();
 }
 
-LogicalResult transform::detail::interpreterBaseInitializeImpl(
+LogicalResult transform::iree_dialects::detail::interpreterBaseInitializeImpl(
     MLIRContext *context, StringRef transformFileName,
     std::shared_ptr<OwningOpRef<ModuleOp>> &module) {
   OwningOpRef<ModuleOp> parsed;

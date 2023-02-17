@@ -115,6 +115,7 @@ function(iree_add_llvm_external_project name location)
   endif()
   set(LLVM_MAIN_SRC_DIR "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm")
   set(LLVM_BINARY_DIR "${IREE_BINARY_DIR}/third_party/llvm-project/llvm")
+  set(LLVM_EXTERNAL_LIT "${IREE_BINARY_DIR}/third_party/llvm-project/llvm/bin/llvm-lit")
   add_subdirectory(${location} "llvm-external-projects/${name}" EXCLUDE_FROM_ALL)
 endfunction()
 

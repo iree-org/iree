@@ -65,6 +65,12 @@ llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 tool_dirs = [config.llvm_tools_dir]
 tools = [
     ToolSubst('%PYTHON', config.python_executable, unresolved='ignore'),
+    # Since we build iree-dialects out of tree, we don't have a common tools
+    # directory, so substitute binaries needed to an explicit path.
+    ToolSubst(
+        'iree-dialects-opt',
+        os.path.join(config.iree_dialects_obj_root,
+                     'tools/iree-dialects-opt/iree-dialects-opt'))
 ]
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)

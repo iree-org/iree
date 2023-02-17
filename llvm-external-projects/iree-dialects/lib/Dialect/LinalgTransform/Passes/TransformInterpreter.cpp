@@ -43,7 +43,7 @@ class PassWrapperStub : public PassWrapper<T, Pass> {};
 /// This needs to be its own pass because the registration mechanism and ops
 /// available are different than for other interpreters.
 class TransformDialectInterpreter
-    : public transform::TransformInterpreterPassBase<
+    : public transform::iree_dialects::TransformInterpreterPassBase<
           TransformDialectInterpreter, PassWrapperStub> {
 public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TransformDialectInterpreter)
