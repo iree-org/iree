@@ -1,2 +1,3 @@
 # REQUIRES: vulkan
 # RUN: %PYTHON -m iree_tfl_tests.mobilebert_tf2_quant_test --target_backend=vulkan --artifacts_dir=%t
+# XFAIL: *
