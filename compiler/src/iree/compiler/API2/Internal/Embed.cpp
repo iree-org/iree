@@ -692,7 +692,7 @@ void ireeCompilerInvocationSetCrashHandler(
   };
 
   unwrap(inv)->passManager.enableCrashReproducerGeneration(
-      [&](std::string &errorMessage)
+      [=](std::string &errorMessage)
           -> std::unique_ptr<mlir::PassManager::ReproducerStream> {
         iree_compiler_output_t *output = nullptr;
         auto error = onCrashCallback(&output, userData);
