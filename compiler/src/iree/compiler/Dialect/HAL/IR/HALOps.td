@@ -2197,21 +2197,6 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     OptionalAttr<IndexAttr>:$alignment,
     OptionalAttr<HAL_DescriptorFlagsAttr>:$descriptor_flags
   );
-
-let builders = [
-    OpBuilder<(ins
-      "Type":$resultType,
-      "APInt":$set,
-      "APInt":$binding,
-      "IREE::HAL::DescriptorType":$descriptor_type,
-      "Value":$byte_offset,
-      "ValueRange":$dynamic_dims,
-      "IntegerAttr":$alignment,
-      CArg<"mlir::Optional<DescriptorFlags>", "llvm::None">:$flags
-    )>,
-  ];
-
-
   let results = (outs
     Res<AnyType, "", [MemAlloc]>:$result
   );
@@ -2225,6 +2210,19 @@ let builders = [
     (`flags` `(` $descriptor_flags^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Type":$resultType,
+      "APInt":$set,
+      "APInt":$binding,
+      "IREE::HAL::DescriptorType":$descriptor_type,
+      "Value":$byte_offset,
+      "ValueRange":$dynamic_dims,
+      "IntegerAttr":$alignment,
+      CArg<"mlir::Optional<DescriptorFlags>", "llvm::None">:$flags
+    )>,
+  ];
 
   let hasVerifier = 1;
 

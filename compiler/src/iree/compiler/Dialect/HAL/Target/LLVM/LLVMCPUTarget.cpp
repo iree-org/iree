@@ -477,7 +477,11 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     if (auto objectAttrs = variantOp.getObjects()) {
       for (auto [index, attr] : llvm::enumerate(objectAttrs.value())) {
         auto objectAttr = attr.cast<IREE::HAL::ExecutableObjectAttr>();
-        if (objectAttr.getPath()) {
+        if (auto dataAttr = objectAttr.getData()) {
+          objectFiles.push_back(Artifact::createTemporary(
+              objectFiles.front().path + "_object_" + std::to_string(index),
+              ".o"));
+        } else {
           auto absolutePath = objectAttr.getAbsolutePath();
           if (failed(absolutePath)) {
             llvm::errs()
@@ -488,10 +492,6 @@ class LLVMCPUTargetBackend final : public TargetBackend {
             return failure();
           }
           objectFiles.push_back(Artifact::fromFile(*absolutePath));
-        } else if (auto dataAttr = objectAttr.getData()) {
-          objectFiles.push_back(Artifact::createTemporary(
-              objectFiles.front().path + "_object_" + std::to_string(index),
-              ".o"));
         }
       }
     }

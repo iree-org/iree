@@ -31,6 +31,7 @@ iree_cc_library(
     "Passes.cpp"
     "ResolveExportOrdinals.cpp"
     "SerializeExecutables.cpp"
+    "SubstituteExecutables.cpp"
     "TranslateExecutables.cpp"
     "VerifyTargetEnvironment.cpp"
   DEPS
@@ -41,6 +42,7 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
+    MLIRParser
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow

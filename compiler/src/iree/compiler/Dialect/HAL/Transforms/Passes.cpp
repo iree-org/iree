@@ -40,13 +40,55 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::init(true)};
 };
 
-static llvm::cl::opt<unsigned> benchmarkDispatchRepeatCount{
+static llvm::cl::opt<unsigned> clBenchmarkDispatchRepeatCount{
     "iree-hal-benchmark-dispatch-repeat-count",
     llvm::cl::desc(
         "The number of times to repeat each hal.command_buffer.dispatch op. "
         "This simply duplicates the dispatch op and inserts barriers. It's "
         "meant for command buffers having linear dispatch structures."),
     llvm::cl::init(1)};
+
+static llvm::cl::list<std::string> clSubstituteExecutableSource{
+    "iree-hal-substitute-executable-source",
+    llvm::cl::desc(
+        "A `executable_name=object_file.xxx` pair specifying a "
+        "hal.executable symbol name that will be substituted with the source "
+        "object file at the given path. Source object paths are relative to "
+        "those specified on `--iree-hal-executable-object-search-path=`. If a "
+        "`.mlir` or `.mlirbc` file is specified the entire executable will be "
+        "replaced with an equivalently named hal.executable in the referenced "
+        "file and otherwise the executable will be externalized and link the "
+        "referenced file (`.ptx`/`.spv`/etc)."),
+};
+
+static llvm::cl::opt<std::string> clSubstituteExecutableSourcesFrom{
+    "iree-hal-substitute-executable-sources-from",
+    llvm::cl::desc(
+        "Substitutes any hal.executable with a file in the given path with "
+        "the same name ala `--iree-hal-substitute-executable-source=`."),
+    llvm::cl::init(""),
+};
+
+static llvm::cl::list<std::string> clSubstituteExecutableObject{
+    "iree-hal-substitute-executable-object",
+    llvm::cl::desc(
+        "A `executable_name=object_file.xxx` pair specifying a "
+        "hal.executable symbol name that will be substituted with the object "
+        "file at the given path. Object paths are relative to those "
+        "specified on `--iree-hal-executable-object-search-path=`. If a "
+        "`.mlir` or `.mlirbc` file is specified the entire executable will be "
+        "replaced with an equivalently named hal.executable in the referenced "
+        "file and otherwise the executable will be externalized and link the "
+        "referenced file (`.ptx`/`.spv`/etc)."),
+};
+
+static llvm::cl::opt<std::string> clSubstituteExecutableObjectsFrom{
+    "iree-hal-substitute-executable-objects-from",
+    llvm::cl::desc(
+        "Substitutes any hal.executable with a file in the given path with "
+        "the same name ala `--iree-hal-substitute-executable-object=`."),
+    llvm::cl::init(""),
+};
 
 }  // namespace
 
@@ -107,6 +149,21 @@ void buildHALConfigurationPassPipeline(OpPassManager &passManager,
         createDumpExecutableSourcesPass(targetOptions.sourceListingPath));
   }
 
+  // Substitute hal.executables we've generated from earlier phases of
+  // compilation with those specified on the command line. This developer
+  // feature allows for splicing in hand-authored or hand-modified executables
+  // in various forms without modifying the end-to-end compiler. Note that we do
+  // this prior to dumping benchmarks in order to allow generating new
+  // benchmarks using the substituted executables.
+  if (!clSubstituteExecutableSourcesFrom.empty()) {
+    passManager.addPass(createSubstituteExecutablesPass(
+        clSubstituteExecutableSourcesFrom.getValue()));
+  }
+  if (!clSubstituteExecutableSource.empty()) {
+    passManager.addPass(
+        createSubstituteExecutablesPass(clSubstituteExecutableSource));
+  }
+
   // Dump standalone hal.executable benchmark modules.
   // Today this only works for executables that have static dispatch parameters
   // and is only useful for basic microbenchmarking.
@@ -141,6 +198,22 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // their interfaces.
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
       createTranslateExecutablesPass());
+
+  // Substitute hal.executables we've translated with those specified on the
+  // command line. This developer feature allows for splicing in hand-authored
+  // or hand-modified executables in various forms without modifying the
+  // end-to-end compiler. We support substituting prior to translation as well
+  // but sometimes translation is required to produce the host code required for
+  // specialization and workgroup counts and we need to perform the substitution
+  // later.
+  if (!clSubstituteExecutableObjectsFrom.empty()) {
+    passManager.addPass(createSubstituteExecutablesPass(
+        clSubstituteExecutableObjectsFrom.getValue()));
+  }
+  if (!clSubstituteExecutableObject.empty()) {
+    passManager.addPass(
+        createSubstituteExecutablesPass(clSubstituteExecutableObject));
+  }
 
   //----------------------------------------------------------------------------
   // Host program conversion
@@ -194,9 +267,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   addCleanupPatterns(passManager);
 
   // HACK: repeat dispatch ops for benchmarks.
-  if (benchmarkDispatchRepeatCount != 1) {
+  if (clBenchmarkDispatchRepeatCount != 1) {
     passManager.addNestedPass<mlir::func::FuncOp>(
-        createBenchmarkBatchDispatchesPass(benchmarkDispatchRepeatCount));
+        createBenchmarkBatchDispatchesPass(clBenchmarkDispatchRepeatCount));
   }
 
   // Elide redundant command buffer state ops created during conversion.

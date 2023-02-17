@@ -26,10 +26,14 @@ iree_lit_test_suite(
     "materialize_resource_caches.mlir"
     "memoize_device_queries.mlir"
     "resolve_export_ordinals.mlir"
+    "substitute_executables.mlir"
     "verify_target_environment.mlir"
   TOOLS
     FileCheck
     iree-opt
+  DATA
+    substitute_executables_replacement.mlir
+    substitute_executables_replacement.obj
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
