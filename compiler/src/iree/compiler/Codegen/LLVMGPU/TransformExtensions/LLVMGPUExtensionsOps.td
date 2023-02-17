@@ -328,12 +328,16 @@ def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_c
     operations are bigger than the native mma size it will first split up those
     vector operations.
 
+    Exactly one of use_wmma or use_mma_sync must be specified.
+
     #### Return modes
 
     This transform consumes the target handle and produces a result handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins PDL_Operation:$target,
+                       UnitAttr:$use_mma_sync,
+                       UnitAttr:$use_wmma);
   let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "$target attr-dict";

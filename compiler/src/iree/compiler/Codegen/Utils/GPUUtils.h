@@ -86,6 +86,9 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
 // TODO: Make this take HW specific sizes.
 Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
 
+/// Helper function to return native size for MMA.SYNC-based operations.
+Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
