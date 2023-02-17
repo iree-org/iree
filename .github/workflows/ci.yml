@@ -889,7 +889,7 @@ jobs:
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
-    if: needs.setup.outputs.should-run == 'true'
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -977,9 +977,7 @@ jobs:
 
   process_benchmark_results:
     needs: [setup, compilation_benchmarks, execution_benchmarks]
-    if: |
-      needs.setup.outputs.should-run == 'true' &&
-      needs.setup.outputs.benchmark-presets != ''
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
