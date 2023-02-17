@@ -35,33 +35,33 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %expanded_eltwise, %more_parallel_2, %combiner_2, %trailing_eltwise_2 =
     transform.split_handles %generics in [4]
     : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
-  %foreach_thread_grid_2 = transform.structured.match ops{["scf.forall"]} in %variant_op
+  %forall_grid_2 = transform.structured.match ops{["scf.forall"]} in %variant_op
   %not_trailing = transform.merge_handles %fill_2, %more_parallel_fill_2,
     %more_parallel_2, %expanded_eltwise, %combiner_2 : !pdl.operation
-  transform.structured.fuse_into_containing_op %not_trailing into %foreach_thread_grid_2
+  transform.structured.fuse_into_containing_op %not_trailing into %forall_grid_2
 
   // Step 3. Second level of tiling + fusion parallelizes to threads. Also
   // fuse in the leading and trailing elementwise.
   // ===========================================================================
   %fill_1d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1xf32> in %variant_op : (!pdl.operation) -> !pdl.operation
-  %foreach_thread_trailing_eltwise_op, %block_trailing_eltwise_op =
+  %forall_trailing_eltwise_op, %block_trailing_eltwise_op =
     transform.structured.tile_to_forall_op %trailing_eltwise_2 tile_sizes [1] 
     ( mapping = [#gpu.thread<z>] )
   %block_combiner_op = transform.structured.match ops{["linalg.generic"]}
     attributes {iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %fill_and_reduction = transform.merge_handles %fill_1d, %block_combiner_op : !pdl.operation
-  transform.structured.fuse_into_containing_op %fill_and_reduction into %foreach_thread_trailing_eltwise_op
+  transform.structured.fuse_into_containing_op %fill_and_reduction into %forall_trailing_eltwise_op
 
   %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op : (!pdl.operation) -> !pdl.operation
   %grid_more_parallel_op = transform.structured.match ops{["linalg.generic"]}
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %grid_eltwise_op = transform.structured.match ops{["linalg.generic"]}
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %foreach_thread_block_more_parallel_op, %block_more_parallel_op =
+  %forall_block_more_parallel_op, %block_more_parallel_op =
     transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1] 
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
-  transform.structured.fuse_into_containing_op %fill_2d into %foreach_thread_block_more_parallel_op
-  transform.structured.fuse_into_containing_op %grid_eltwise_op into %foreach_thread_block_more_parallel_op
+  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op
+  transform.structured.fuse_into_containing_op %grid_eltwise_op into %forall_block_more_parallel_op
 
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================

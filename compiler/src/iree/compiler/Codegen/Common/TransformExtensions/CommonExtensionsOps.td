@@ -289,7 +289,7 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
 }
 
 def ShareForallOperandsOp : Op<
-    Transform_Dialect, "iree.share_foreach_thread_operands", [
+    Transform_Dialect, "iree.share_forall_operands", [
       FunctionalStyleTransformOpTrait,
       MemoryEffectsOpInterface,
       TransformEachOpTrait,
@@ -339,7 +339,7 @@ def ShareForallOperandsOp : Op<
   }];
 
   let arguments = (
-      ins Transform_ConcreteOpType<"scf.forall">:$foreach_thread_op,
+      ins Transform_ConcreteOpType<"scf.forall">:$forall_op,
           DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$share_operands
   );
   let results = (outs Transform_ConcreteOpType<"scf.forall">:$result);
@@ -347,7 +347,7 @@ def ShareForallOperandsOp : Op<
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let assemblyFormat = [{
-    $foreach_thread_op (`share_operands` `=` $share_operands^ )? attr-dict
+    $forall_op (`share_operands` `=` $share_operands^ )? attr-dict
       `:` functional-type(operands, results)
   }];
 

@@ -39,7 +39,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   transform.structured.fuse_into_containing_op
 //         CHECK:   transform.structured.tile_to_forall_op %{{.*}} tile_sizes [1](mapping = [#gpu.thread<y>])
 //         CHECK:   cast %{{.*}} : !pdl.operation to !transform.op<"scf.forall">
-//         CHECK:   transform.iree.share_foreach_thread_operands %{{.*}} share_operands = [0] : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
+//         CHECK:   transform.iree.share_forall_operands %{{.*}} share_operands = [0] : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
 //         CHECK:   transform.structured.match ops{["func.func"]} in %arg0
 //         CHECK:   transform.structured.vectorize
 //         CHECK:   transform.iree.bufferize {target_gpu}

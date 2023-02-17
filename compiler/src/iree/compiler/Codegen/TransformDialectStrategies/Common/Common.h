@@ -166,8 +166,8 @@ Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH,
 /// Then tile the parallel part and map it to `tileSize` threads, each reducing
 /// on `vectorSize` elements.
 /// Lastly, fuse the newly created fill and elementwise operations into the
-/// resulting containing foreach_thread op.
-/// Return a triple of handles to (foreach_thread, fill, combiner)
+/// resulting containing forall op.
+/// Return a triple of handles to (forall, fill, combiner)
 std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
     ImplicitLocOpBuilder &b, Value reductionH, int64_t reductionRank,
     int64_t tileSize, int64_t reductionVectorSize, Attribute mappingAttr);

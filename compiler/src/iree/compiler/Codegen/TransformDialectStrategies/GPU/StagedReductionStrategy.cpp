@@ -225,7 +225,7 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
                                           maybeLeadingHBlock,
                                           maybeTiledTrailingHBlock, strategy);
 
-  // Step 3. Make sure we don't create allocation by sharing foreach_thread
+  // Step 3. Make sure we don't create allocation by sharing forall
   // output. This amounts to injecting user-defined static information that each
   // thread accesses only a private slice. This needs to be added late, once we
   // don't need handles anymore, because contained handles are currently always

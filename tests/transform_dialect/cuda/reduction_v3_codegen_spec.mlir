@@ -7,21 +7,21 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ===========================================================================
-  %foreach_thread_grid, %grid_reduction =
+  %forall_grid, %grid_reduction =
     transform.iree.tile_to_forall_and_workgroup_count_region %reduction tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
-  transform.structured.fuse_into_containing_op %fill into %foreach_thread_grid
+  transform.structured.fuse_into_containing_op %fill into %forall_grid
 
   // Step 2. Split the reduction to get meatier parallelism.
   // This also parallelizes to threads.
   // ===========================================================================
-  %foreach_thread, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
+  %forall, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
      transform.structured.tile_reduction_using_forall %grid_reduction 
         by num_threads = [0, 1024], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
 
   // Fuse the fill and pointwise to privatize them.
   transform.structured.fuse_into_containing_op %block_more_parallel_fill_op_2
-    into %foreach_thread
+    into %forall
 
   // block_combiner_op_2 op is [parallel, reduction] of 1x384 that cannot fuse.
   // map the 1-dim to threadIdx.y to trigger mapping of the reduction to 

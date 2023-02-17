@@ -15,20 +15,20 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ==============================================================
-  %foreach_thread, %_ =
+  %forall, %_ =
   transform.iree.tile_to_forall_and_workgroup_count_region %div tile_sizes [1, 4]  
     ( mapping = [#gpu.block<x>, #gpu.block<y>] )
   // TODO: Merging and fusing merged handles does not work properly atm.
-  transform.structured.fuse_into_containing_op %exp_and_exps_sum into %foreach_thread
-  transform.structured.fuse_into_containing_op %exps_sum_fill into %foreach_thread
-  transform.structured.fuse_into_containing_op %input_max into %foreach_thread
-  transform.structured.fuse_into_containing_op %input_max_fill into %foreach_thread
+  transform.structured.fuse_into_containing_op %exp_and_exps_sum into %forall
+  transform.structured.fuse_into_containing_op %exps_sum_fill into %forall
+  transform.structured.fuse_into_containing_op %input_max into %forall
+  transform.structured.fuse_into_containing_op %input_max_fill into %forall
   // By default, fusion into scf.forall does not promote captured values
   // to shared as this involves a cross-thread dependence analysis.
   // Instead, we activate it explicitly post-hoc to promote all the extract_slice
   // ops that we find and match the prerequisites
-  %foreach_thread_with_type = transform.cast %foreach_thread : !pdl.operation to !transform.op<"scf.forall">
-  transform.iree.share_foreach_thread_operands %foreach_thread_with_type
+  %forall_with_type = transform.cast %forall : !pdl.operation to !transform.op<"scf.forall">
+  transform.iree.share_forall_operands %forall_with_type
     : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
