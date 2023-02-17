@@ -60,6 +60,7 @@ option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
+option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
 
 option(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
 
@@ -564,6 +565,37 @@ endif()
 
 if(NOT IREE_BUILD_COMPILER)
   message(STATUS "Not adding LLVM/MLIR because the configuration does not require it")
+elseif(NOT IREE_BUILD_BUNDLED_LLVM)
+  message(STATUS "Using installed LLVM components")
+  find_package(LLVM REQUIRED)
+  find_package(MLIR REQUIRED)
+  find_package(LLD REQUIRED)
+  list(APPEND CMAKE_MODULE_PATH "${LLVM_DIR}")
+  list(APPEND CMAKE_MODULE_PATH "${MLIR_DIR}")
+  list(APPEND CMAKE_MODULE_PATH "${LLD_DIR}")
+  include(TableGen)  # TODO: Eliminate.
+  message(STATUS "Installed LLVM packages found")
+  message(STATUS "LLVM_INCLUDE_DIRS=${LLVM_INCLUDE_DIRS}")
+  #message(STATUS "LLVM_LIBRARY_DIR=${LLVM_LIBRARY_DIR}")
+  message(STATUS "MLIR_INCLUDE_DIRS=${MLIR_INCLUDE_DIRS}")
+  message(STATUS "LLD_INCLUDE_DIRS=${LLD_INCLUDE_DIRS}")
+  #message(STATUS "MLIR_LIBRARY_DIR=${MLIR_LIBRARY_DIR}")
+
+  include_directories(${LLVM_INCLUDE_DIRS})
+  include_directories(${MLIR_INCLUDE_DIRS})
+  include_directories(${LLD_INCLUDE_DIRS})
+
+  # Also add a library that can be depended on to get LLVM includes setup
+  # properly. bazel_to_cmake targets this for some header only pseudo deps.
+  add_library(IREELLVMIncludeSetup INTERFACE)
+  target_include_directories(IREELLVMIncludeSetup INTERFACE ${LLVM_INCLUDE_DIRS})
+
+  # Add default external projects.
+  iree_add_llvm_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
+  iree_add_llvm_external_project(mlir-hlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
+  if(IREE_INPUT_TORCH)
+    iree_add_llvm_external_project(torch-mlir-dialects ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
+  endif()
 elseif(TARGET LLVMSupport)
   message(STATUS "Not adding IREE bundled LLVM because it has already been included")
   if(NOT TARGET MLIRIR)

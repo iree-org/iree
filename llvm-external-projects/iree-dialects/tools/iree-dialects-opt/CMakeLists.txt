@@ -31,7 +31,7 @@ set(LIBS
   MLIRVectorTransformOps
 )
 
-add_llvm_tool(iree-dialects-opt
+add_llvm_executable(iree-dialects-opt
   iree-dialects-opt.cpp
 
   DEPENDS
