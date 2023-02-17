@@ -21,6 +21,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -307,12 +308,6 @@ TilingInterfaceTilingPattern::matchAndRewrite(TilingInterface tilableOp,
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// A simple pattern rewriter that implements no special logic.
-class SimpleRewriter : public PatternRewriter {
-public:
-  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
-};
-
 struct TilingInterfaceTilingPass
     : public TilingInterfaceTilingBase<TilingInterfaceTilingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -420,7 +415,7 @@ void TilingInterfaceTilingPass::runOnOperation() {
   // upstream scf::tileUsingSCFForOp method. For now only uses it for packing
   // and unpacking ops.
   {
-    SimpleRewriter rewriter(context);
+    transform::TrivialPatternRewriter rewriter(context);
     auto filter = IREE::LinalgExt::LinalgTransformationFilter(
         StringAttr::get(context, "tiling_pack_input"),
         StringAttr::get(context, "tiling_pack_output"));

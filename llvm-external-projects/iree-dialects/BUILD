@@ -430,6 +430,7 @@ cc_library(
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:TilingInterface",
+        "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",

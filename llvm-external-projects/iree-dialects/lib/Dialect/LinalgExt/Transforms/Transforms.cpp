@@ -20,6 +20,7 @@
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
@@ -837,12 +838,6 @@ createLinalgStrategyRemoveMarkersPass() {
 
 namespace {
 
-/// A simple pattern rewriter that implements no special logic.
-class SimpleRewriter : public PatternRewriter {
-public:
-  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
-};
-
 /// Returns a tensor.pad op if padding value is set. Otherwise, returns the
 /// input directly. The method assumes that the `packOp` has static shapes.
 Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
@@ -1037,7 +1032,7 @@ struct LinalgExtVectorizationPass
     MLIRContext *ctx = &getContext();
     // Apply tiling to make outer dims be all 1s.
     {
-      SimpleRewriter rewriter(ctx);
+      transform::TrivialPatternRewriter rewriter(ctx);
       auto packOptions = scf::SCFTileAndFuseOptions().setTilingOptions(
           scf::SCFTilingOptions().setTileSizeComputationFunction(
               [](OpBuilder &builder, Operation *op) -> SmallVector<Value> {
