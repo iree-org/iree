@@ -112,7 +112,18 @@ struct RemoveDeadMemAllocs : RewritePattern {
     if (!memEffect || !memEffect.hasEffect<MemoryEffects::Allocate>()) {
       return failure();
     }
-    if (!op->use_empty()) return failure();
+    SmallVector<Operation *> deadUsers;
+    for (OpOperand &use : op->getUses()) {
+      if (auto user = dyn_cast<memref::AssumeAlignmentOp>(use.getOwner())) {
+        deadUsers.push_back(user);
+        continue;
+      }
+      // For any other use, return failure;
+      return failure();
+    }
+    for (auto user : deadUsers) {
+      rewriter.eraseOp(user);
+    }
     rewriter.eraseOp(op);
     return success();
   }
