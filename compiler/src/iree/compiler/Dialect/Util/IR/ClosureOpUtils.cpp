@@ -107,7 +107,8 @@ void eraseRegionResults(Region &region,
   }
 }
 
-// Returns true if |constantOp| represents a (logically) small constant value.
+// Returns true if |constantOp| represents a (logically) small constant value
+// that can be inlined into a closure.
 //
 // "Small" is relative and there's a risk that we'll bloat the closures by
 // duplicating a bunch of constants however what we are able to save by not
@@ -119,13 +120,14 @@ void eraseRegionResults(Region &region,
 // This is also still at a fairly high level (flow dialect): once the closures
 // are expanded out in lower dialects things like CSE have a chance to once
 // again get at the constants and dedupe them if they survive.
-static bool isConstantSmall(arith::ConstantOp constantOp) {
-  // We could tune this/take it as a configuration setting.
-  // The current value is chosen based on what is known to be reasonable to
-  // inline into command buffers way down in the HAL, which is not great but at
-  // least better than either allocating independent buffers for 4 byte
-  // constants or inlining megabytes.
-  static constexpr int kMaxInlinedConstantBytes = 256;
+static bool isConstantInlinable(const ClosureOptimizationOptions &options,
+                                arith::ConstantOp constantOp) {
+  int64_t maxInlinedConstantBytes =
+      options.maxInlinedConstantBytes.value_or(INT64_MAX);
+  if (maxInlinedConstantBytes == 0) {
+    // Inlining of constants disabled.
+    return false;
+  }
 
   auto constantValueAttr = constantOp.getValue();
   auto constantType = constantOp.getType();
@@ -141,7 +143,7 @@ static bool isConstantSmall(arith::ConstantOp constantOp) {
         shapedType.getNumElements() *
         getRoundedElementByteWidth(shapedType.getElementType());
     return denseAttr.isSplat() ||
-           estimatedByteLength <= kMaxInlinedConstantBytes;
+           estimatedByteLength <= maxInlinedConstantBytes;
   } else if (constantType.isIntOrIndexOrFloat()) {
     // Primitives can always go in.
     return true;
@@ -155,11 +157,12 @@ static bool isConstantSmall(arith::ConstantOp constantOp) {
 // trees is hard and it'd be better to model that differently such as by having
 // a wrapper region for immutable blobs that can be inlined that this then
 // returns true for.
-static bool shouldInlineIntoClosure(Value value) {
+static bool shouldInlineIntoClosure(const ClosureOptimizationOptions &options,
+                                    Value value) {
   auto definingOp = value.getDefiningOp();
   if (auto constantOp = dyn_cast<arith::ConstantOp>(definingOp)) {
     // Constants are perfect!
-    return isConstantSmall(constantOp);
+    return isConstantInlinable(options, constantOp);
   }
   return false;
 }
@@ -171,7 +174,8 @@ static bool shouldInlineIntoClosure(Value value) {
 // Note that if multiple operands reference the same value it will get cloned
 // multiple times. That's fine, as anything we can inline here is something we
 // should also be able to CSE and that happens later on anyway.
-static void inlineClosureOperands(ClosureOpInterface &closureOp,
+static void inlineClosureOperands(const ClosureOptimizationOptions &options,
+                                  ClosureOpInterface &closureOp,
                                   Block &entryBlock,
                                   PatternRewriter &rewriter) {
   OpBuilder::InsertionGuard g(rewriter);
@@ -188,7 +192,7 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
     if (!closureOp.getOperandAccess(opArg.index()).isReadOnly()) continue;
 
     if (closureOp.canClosureContainOp(sourceOp) &&
-        shouldInlineIntoClosure(outerValue)) {
+        shouldInlineIntoClosure(options, outerValue)) {
       // Clone the op (with regions).
       auto *clonedOp = rewriter.clone(*sourceOp);
 
@@ -208,7 +212,8 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
   }
 }
 
-LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
+LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
+                                    ClosureOpInterface closureOp,
                                     PatternRewriter &rewriter) {
   // NOTE: the block is transferred to the new op; we can update it in place.
   Block &entryBlock = closureOp.getClosureBodyRegion().front();
@@ -218,7 +223,7 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   // then elide below. When we do inline things the operands will be changed
   // such that the following work is guaranteed to happen and thus our op will
   // be rebuilt.
-  inlineClosureOperands(closureOp, entryBlock, rewriter);
+  inlineClosureOperands(options, closureOp, entryBlock, rewriter);
 
   // Build data structure for unused operand elision.
   SmallVector<unsigned, 4> elidedOperands;
