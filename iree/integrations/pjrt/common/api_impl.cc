@@ -470,13 +470,39 @@ iree_status_t BufferInstance::AsyncDeallocate() {
 
 iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
                                          EventInstance** out_done_event) {
-  // Set up an event for external triggering. While a little wonky, we
-  // trigger it in the host buffer release callback, which happens once the
-  // transfer is done. I don't love this option but it seems to match what
-  // I'm looking for.
-  EventInstance* capture_done_event =
-      new EventInstance(EventInstance::Type::EXTERNAL);
-  *out_done_event = capture_done_event;
+  // Use a data structure to handle intermediary buffer when necessary. This
+  // needs to include the destination and aligned buffer, along with the size
+  // so the destination can be mem-copied if necessary.
+  struct CopyToHostData {
+    // Set up an event for external triggering. While a little wonky, we
+    // trigger it in the host buffer release callback, which happens once the
+    // transfer is done. I don't love this option but it seems to match what
+    // I'm looking for.
+    EventInstance* event;
+    void* alloc;
+    void* aligned;
+    void* dst;
+    size_t size;
+  };
+
+  //  Configure a default structure that writes directly to dst.
+  const size_t alignment = 64;
+  struct CopyToHostData* copy_to_host_data = new CopyToHostData;
+  copy_to_host_data->event = new EventInstance(EventInstance::Type::EXTERNAL);
+  copy_to_host_data->alloc = nullptr;
+  copy_to_host_data->aligned = dst;
+  copy_to_host_data->dst = dst;
+  copy_to_host_data->size = dst_size;
+  *out_done_event = copy_to_host_data->event;
+
+  // If the destination is unaligned we need to write to an intermediary buffer.
+  if (((uintptr_t)dst) & (alignment - 1)) {
+    const size_t alignment_size = alignment + dst_size + sizeof(uintptr_t);
+    char* alloc = new char[alignment_size];
+    copy_to_host_data->alloc = alloc;
+    copy_to_host_data->aligned =
+        (void*)((((uintptr_t)alloc + alignment) & ~(uintptr_t)(alignment - 1)));
+  }
 
   // Import the destination (host) buffer as an iree_hal_buffer_t so that we
   // can issue copy commands.
@@ -496,16 +522,21 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
   dst_external_buffer.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
   dst_external_buffer.flags = IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE;
   dst_external_buffer.size = dst_size;
-  dst_external_buffer.handle.host_allocation.ptr = dst;
+  dst_external_buffer.handle.host_allocation.ptr = copy_to_host_data->aligned;
   auto release_callback = +[](void* user_data, iree_hal_buffer_t* buffer) {
     IREE_TRACE_SCOPE0("PJRT_CopyToHost_ReleaseCallback");
-    auto* local_done_event = static_cast<EventInstance*>(user_data);
-    local_done_event->ExternalSignalReady(iree_ok_status());
+    auto* copy_data = static_cast<CopyToHostData*>(user_data);
+    // If there is an allocated buffer we need to copy to the destinaton.
+    if (copy_data->alloc) {
+      std::memcpy(copy_data->dst, copy_data->aligned, copy_data->size);
+      delete static_cast<char*>(copy_data->alloc);
+    }
+    copy_data->event->ExternalSignalReady(iree_ok_status());
+    delete copy_data;
   };
   IREE_RETURN_IF_ERROR(iree_hal_allocator_import_buffer(
       device_.device_allocator(), dst_buffer_params, &dst_external_buffer,
-      /*release_callback=*/{release_callback, capture_done_event},
-      &dst_buffer));
+      /*release_callback=*/{release_callback, copy_to_host_data}, &dst_buffer));
 
   // Create the transfer command buffer.
   iree::vm::ref<iree_hal_command_buffer_t> transfer_cb;
