@@ -176,26 +176,6 @@ static SmallVector<int64_t> getVectorSizes(
     return {};
   }
 
-  // TODO: Support masking for vector.contract or disable the lowering to
-  // vector.contact.
-  auto anyReductionIterator = llvm::any_of(
-      linalgOp.getIteratorTypesArray(), [](utils::IteratorType iter) {
-        return linalg::isReductionIterator(iter);
-      });
-  auto isSupportedMaskedReduction =
-      llvm::all_of(linalgOp.getIndexingMapsArray(), [&](AffineMap indexMap) {
-        // Vector.contract ops that need decomposition are not supported yet.
-        if (indexMap.getNumResults() > 2) {
-          return false;
-        }
-
-        return true;
-      });
-
-  if (anyReductionIterator && !isSupportedMaskedReduction) {
-    return {};
-  }
-
   if (canonicalVectorShape.empty()) {
     return {};
   }
