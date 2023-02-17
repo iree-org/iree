@@ -1057,6 +1057,7 @@ jobs:
           IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
         run: |
           build_tools/github_actions/docker_run.sh \
+            --env "IREE_DASHBOARD_API_TOKEN=${IREE_DASHBOARD_API_TOKEN}" \
             gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
             ./build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
               --verbose \
