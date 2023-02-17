@@ -253,7 +253,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
-            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:36a2129630fe10d86168730b4a4a54b18720ef1e517d48c2e60f34fac5cabfd9 \
+            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:9a43a8ef05b6193d6e907bcebcea255977a7cea8a0f19a936dc0e46a69e69bc5 \
             ./build_tools/bazel/build_core.sh
 
   test_all:
@@ -629,7 +629,7 @@ jobs:
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=swiftshader-bleeding-edge@sha256:c22afc61198e14a98e06e5261149de74c629acd2bc61b82e57ec90e5461b69be" \
-            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:36a2129630fe10d86168730b4a4a54b18720ef1e517d48c2e60f34fac5cabfd9 \
+            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:9a43a8ef05b6193d6e907bcebcea255977a7cea8a0f19a936dc0e46a69e69bc5 \
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:

@@ -8,7 +8,6 @@
 set -euo pipefail
 
 LLVM_VERSION="$1"
-LINUX_VERSION="$(lsb_release -ds)"
 
 declare -a PACKAGES=(
     "clang-${LLVM_VERSION}"
@@ -26,19 +25,12 @@ declare -a PACKAGES=(
     # Optional for tools like llvm-symbolizer, which we could build from
     # source but would rather just have available ahead of time
     llvm-dev
-)
-
-# The current lowest supported version Ubuntu 18.04 can't build Tracy. Drop this
-# check when we drop the support of Ubuntu 18.04.
-if [[ "${LINUX_VERSION}" = "Ubuntu 18.04*" ]]; then
-  PACKAGES+=(
     # Tracy build and run dependencies
     pkg-config
     libcapstone-dev
     libtbb-dev
     libzstd-dev
-  )
-fi
+)
 
 apt-get update
 apt-get install -y "${PACKAGES[@]}"
