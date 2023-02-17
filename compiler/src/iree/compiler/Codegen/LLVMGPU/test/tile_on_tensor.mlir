@@ -53,7 +53,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:       %{{.*}} = arith.addf %{{.*}}, %{{.*}} : f32
 //         CHECK:       linalg.yield %{{.*}} : f32
 //         CHECK:     } -> tensor<1x4xf32>
-//         CHECK:     scf.forall.perform_concurrently {
+//         CHECK:     scf.forall.in_parallel {
 //         CHECK:       tensor.parallel_insert_slice %[[L]] into %[[O]][0, %[[OFF]]] [1, 4] [1, 1] : tensor<1x4xf32> into tensor<1x256xf32>
 //         CHECK:     }
 //         CHECK:   } {mapping = [#gpu.thread<x>]}
@@ -114,7 +114,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:       } -> tensor<1xf32>
 //         CHECK:       scf.yield %[[L]] : tensor<1xf32>
 //         CHECK:     }
-//         CHECK:     scf.forall.perform_concurrently {
+//         CHECK:     scf.forall.in_parallel {
 //         CHECK:       tensor.parallel_insert_slice %[[R]] into %[[O]][%[[ARG]]] [1] [1] : tensor<1xf32> into tensor<64xf32>
 //         CHECK:     }
 //         CHECK:   } {mapping = [#gpu.thread<x>]}

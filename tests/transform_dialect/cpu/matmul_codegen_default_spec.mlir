@@ -7,7 +7,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 1. Tile to foreach_thread with tile_sizes [2].
   // ===================================================
   %foreach_thread, %tiled_generic =
-    transform.iree.tile_to_foreach_thread_and_workgroup_count_region %matmul tile_sizes [2]
+    transform.iree.tile_to_forall_and_workgroup_count_region %matmul tile_sizes [2]
       // TODO: IREE needs own workgroup mapping attribute.
       ( mapping = [#gpu.block<x>] )
 

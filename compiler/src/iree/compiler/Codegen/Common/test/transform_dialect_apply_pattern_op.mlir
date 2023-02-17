@@ -45,7 +45,7 @@ func.func @promote() -> (tensor<16x128xf32>) {
       %res = arith.addf %in, %in: f32
       linalg.yield %res : f32
     } -> tensor<1x4xf32>
-    scf.forall.perform_concurrently {
+    scf.forall.in_parallel {
       tensor.parallel_insert_slice %13 into %arg2[%arg0, %11] [1, 4] [1, 1] : tensor<1x4xf32> into tensor<16x128xf32>
     }
   }

@@ -480,7 +480,7 @@ LogicalResult rewriteForeachThreadToWorkgroup(
 
   // Step 3. Outline the compute workload region and set up the workload
   // operands, if this has not been done already.
-  // Using `transform.iree.tile_to_foreach_thread_and_workgroup_count_region` is
+  // Using `transform.iree.tile_to_forall_and_workgroup_count_region` is
   // the preferred way to set up tiling and workgroup_count region **at the same
   // time**.
   //
@@ -501,7 +501,7 @@ LogicalResult rewriteForeachThreadToWorkgroup(
           "magically match what the `stream.cmd.dispatch` has already imposed "
           "on us at a distance."
           "\nFor now we must specify the number of values properly when "
-          "applying the topLevel tile_to_foreach_thread_op");
+          "applying the topLevel tile_to_forall_op");
     }
     if (failed(populateWorkgroupCountComputingRegion(rewriter, forallOp,
                                                      exportOp))) {

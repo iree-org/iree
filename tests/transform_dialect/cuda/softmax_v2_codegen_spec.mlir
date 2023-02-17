@@ -16,7 +16,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ==============================================================
   %foreach_thread, %_ =
-  transform.iree.tile_to_foreach_thread_and_workgroup_count_region %div tile_sizes [1, 4]  
+  transform.iree.tile_to_forall_and_workgroup_count_region %div tile_sizes [1, 4]  
     ( mapping = [#gpu.block<x>, #gpu.block<y>] )
   // TODO: Merging and fusing merged handles does not work properly atm.
   transform.structured.fuse_into_containing_op %exp_and_exps_sum into %foreach_thread
@@ -49,14 +49,14 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %reduction_linalg_ops = transform.merge_handles %tiled_input_max,
                                                   %tiled_exp_and_exps_sum
     : !pdl.operation
-  transform.structured.tile_to_foreach_thread_op %reduction_linalg_ops tile_sizes [1, 1]
+  transform.structured.tile_to_forall_op %reduction_linalg_ops tile_sizes [1, 1]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
   // Fully parallel ops are tiled and mapped.
   %parallel_linalg_ops = transform.merge_handles %tiled_input_max_fill,
                                                  %tiled_exps_sum_fill,
                                                  %tiled_div
     : !pdl.operation
-  transform.structured.tile_to_foreach_thread_op %parallel_linalg_ops num_threads [1, 4, 32]
+  transform.structured.tile_to_forall_op %parallel_linalg_ops num_threads [1, 4, 32]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>] )
 
   // Step 3. Rank-reduce and vectorize.

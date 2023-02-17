@@ -15,7 +15,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 2. First level of tiling + fusion parallelizes to blocks.
   // ===========================================================================
   %foreach_thread_grid, %grid_combiner_op =
-    transform.structured.tile_to_foreach_thread_op %combiner_op tile_sizes [1]
+    transform.structured.tile_to_forall_op %combiner_op tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
 
   // Step 2.1: Cannot fuse across the "expand_shape" produced by reduction
@@ -41,7 +41,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // ===========================================================================
   %fill_1d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1xf32> in %variant_op : (!pdl.operation) -> !pdl.operation
   %foreach_thread_block_combiner_op, %block_combiner_op =
-    transform.structured.tile_to_foreach_thread_op %combiner_2 tile_sizes [1] 
+    transform.structured.tile_to_forall_op %combiner_2 tile_sizes [1] 
     ( mapping = [#gpu.thread<z>] )
   transform.structured.fuse_into_containing_op %fill_1d into %foreach_thread_block_combiner_op
 
@@ -51,7 +51,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %grid_eltwise_op = transform.structured.match ops{["linalg.generic"]} : (!pdl.operation) -> !pdl.operation
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %foreach_thread_block_more_parallel_op, %block_more_parallel_op =
-    transform.structured.tile_to_foreach_thread_op %grid_more_parallel_op tile_sizes [1, 1] 
+    transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1] 
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
   transform.structured.fuse_into_containing_op %fill_2d into %foreach_thread_block_more_parallel_op
   transform.structured.fuse_into_containing_op %grid_eltwise_op into %foreach_thread_block_more_parallel_op

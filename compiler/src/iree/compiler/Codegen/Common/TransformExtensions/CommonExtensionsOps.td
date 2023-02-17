@@ -259,7 +259,7 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
     This region may require arbitrary computations and cannot magically match
     what the `stream.cmd.dispatch` has already imposed on us at a distance.
     For now we must specify the number of values properly when applying the
-    topLevel tile_to_foreach_thread_op.
+    topLevel tile_to_forall_op.
 
     If the unique topLevel scf.forall operation contained within the
     FuncOp referred to by the `target` PDLOperation lowers to workgroup properly,
@@ -360,17 +360,17 @@ def ShareForallOperandsOp : Op<
 }
 
 def TileToForeachThreadAndWorkgroupCountRegionOp :
-    Op<Transform_Dialect, "iree.tile_to_foreach_thread_and_workgroup_count_region",
+    Op<Transform_Dialect, "iree.tile_to_forall_and_workgroup_count_region",
       [AttrSizedOperandSegments,
        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
        TransformOpInterface]> {
   let description = [{
-    Wrapper around `structured.tile_to_foreach_thread_op` for use within IREE.
+    Wrapper around `structured.tile_to_forall_op` for use within IREE.
 
     In addition to tile and distribute using `scf.forall`, lowers the
     the `workgroup_count` region of the export op corresponding to the parent
     `func.func` of the target to return the number of workgroups.
-    Please see the doc of `structured.tile_to_foreach_thread_op` for full
+    Please see the doc of `structured.tile_to_forall_op` for full
     description of op semantics.
   }];
 

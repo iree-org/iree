@@ -17,7 +17,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // trailing elementwise the same way we want to tile the reduction.
   // ===========================================================================
   %grid_loop, %trailing_eltwise_grid_op =
-    transform.structured.tile_to_foreach_thread_op %trailing_eltwise tile_sizes [1]
+    transform.structured.tile_to_forall_op %trailing_eltwise tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
 
   // Step 2.1: Cannot fuse across the "expand_shape" produced by reduction
@@ -45,7 +45,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // ===========================================================================
   %fill_1d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1xf32> in %variant_op : (!pdl.operation) -> !pdl.operation
   %foreach_thread_trailing_eltwise_op, %block_trailing_eltwise_op =
-    transform.structured.tile_to_foreach_thread_op %trailing_eltwise_2 tile_sizes [1] 
+    transform.structured.tile_to_forall_op %trailing_eltwise_2 tile_sizes [1] 
     ( mapping = [#gpu.thread<z>] )
   %block_combiner_op = transform.structured.match ops{["linalg.generic"]}
     attributes {iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!pdl.operation) -> !pdl.operation
@@ -58,7 +58,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %grid_eltwise_op = transform.structured.match ops{["linalg.generic"]}
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %foreach_thread_block_more_parallel_op, %block_more_parallel_op =
-    transform.structured.tile_to_foreach_thread_op %grid_more_parallel_op tile_sizes [1, 1] 
+    transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1] 
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
   transform.structured.fuse_into_containing_op %fill_2d into %foreach_thread_block_more_parallel_op
   transform.structured.fuse_into_containing_op %grid_eltwise_op into %foreach_thread_block_more_parallel_op
