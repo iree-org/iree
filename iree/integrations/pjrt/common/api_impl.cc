@@ -134,7 +134,7 @@ iree_status_t MapElementTypeToXlaElementType(
       *xla_primitive = xla::PrimitiveType::F16;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      *xla_primitive = xla::PrimitiveType::U32;
+      *xla_primitive = xla::PrimitiveType::F32;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       *xla_primitive = xla::PrimitiveType::F64;
