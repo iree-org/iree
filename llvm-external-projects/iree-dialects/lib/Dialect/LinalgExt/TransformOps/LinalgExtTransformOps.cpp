@@ -122,8 +122,7 @@ void LinalgExt::FuseProducersOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
 }
 
-DiagnosedSilenceableFailure
-LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
+DiagnosedSilenceableFailure LinalgExt::RewriteForallToAsyncOp::applyToOne(
     scf::ForallOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   LinalgExt::ForallOpToAsyncRewriter pattern(this->getContext());
@@ -136,8 +135,7 @@ LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
-DiagnosedSilenceableFailure
-LinalgExt::RewriteForeachThreadToScfForOp::applyToOne(
+DiagnosedSilenceableFailure LinalgExt::RewriteForallToScfForOp::applyToOne(
     scf::ForallOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   LinalgExt::ForallOpToScfForRewriter pattern(this->getContext());

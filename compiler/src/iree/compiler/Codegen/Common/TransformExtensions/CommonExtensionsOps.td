@@ -228,7 +228,7 @@ def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
   let builders = [OpBuilder<(ins "Value":$target)>];
 }
 
-def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
+def ForallToWorkgroupOp : Op<Transform_Dialect,
     "iree.foreach_thread_to_workgroup",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
@@ -359,7 +359,7 @@ def ShareForallOperandsOp : Op<
   }];
 }
 
-def TileToForeachThreadAndWorkgroupCountRegionOp :
+def TileToForallAndWorkgroupCountRegionOp :
     Op<Transform_Dialect, "iree.tile_to_forall_and_workgroup_count_region",
       [AttrSizedOperandSegments,
        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,

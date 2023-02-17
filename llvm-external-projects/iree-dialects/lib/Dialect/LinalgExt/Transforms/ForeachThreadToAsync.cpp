@@ -67,7 +67,7 @@ mlir::iree_compiler::IREE::LinalgExt::ForallOpToAsyncRewriter::
                                         /*dependencies=*/ValueRange(),
                                         /*operands=*/ValueRange(), noopExec);
 
-  // 3. Steal the ops nested under scf::ForeachThread, except the terminator,
+  // 3. Steal the ops nested under scf::Forall, except the terminator,
   // into the body of the async::ExecuteOp, just before the terminator.
   SmallVector<Value> bbArgsTranslated{forOp.getInductionVar()};
   rewriter.mergeBlocks(&forallOp.getRegion().front(), executeOp.getBody(),
@@ -84,7 +84,7 @@ mlir::iree_compiler::IREE::LinalgExt::ForallOpToAsyncRewriter::
   rewriter.create<async::AddToGroupOp>(loc, rewriter.getIndexType(),
                                        executeOp.getToken(), asyncGroup);
 
-  // 4. After the iree_compiler::IREE::LinalgExt::ForeachThread, await all async
+  // 4. After the iree_compiler::IREE::LinalgExt::Forall, await all async
   // tasks in `asyncGroup`.
   rewriter.setInsertionPointAfter(forOp);
   return rewriter.create<async::AwaitAllOp>(loc, asyncGroup).getOperation();

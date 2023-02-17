@@ -29,7 +29,7 @@ def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 }
 
-def RewriteForeachThreadToAsyncOp :
+def RewriteForallToAsyncOp :
   Op<Transform_Dialect, "foreach_thread_to_async",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
@@ -65,7 +65,7 @@ def RewriteForeachThreadToAsyncOp :
   }];
 }
 
-def RewriteForeachThreadToScfForOp :
+def RewriteForallToScfForOp :
   Op<Transform_Dialect, "foreach_thread_to_scf_for",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,

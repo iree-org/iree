@@ -44,7 +44,7 @@ struct ApplyPatternsOpPatterns {
   bool foldReassociativeReshapes = false;
   bool foldTensorEmptyExtract = false;
   bool lowerTransferOpPermutations = false;
-  bool promoteForeachThreadCaptureToShared = false;
+  bool promoteForallCaptureToShared = false;
   bool rankReducingLinalg = false;
   bool rankReducingVector = false;
   bool rewritePackOps = false;

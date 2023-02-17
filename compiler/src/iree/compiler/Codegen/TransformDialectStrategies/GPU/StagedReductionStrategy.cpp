@@ -25,9 +25,8 @@ using namespace mlir;
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
-using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
-using iree_compiler::IREE::transform_dialect::
-    MapNestedForeachThreadToGpuThreadsOp;
+using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
+using iree_compiler::IREE::transform_dialect::MapNestedForallToGpuThreadsOp;
 using iree_compiler::IREE::transform_dialect::ShareForallOperandsOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
 using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
@@ -114,14 +113,14 @@ void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
   }
 }
 
-static Value shareForeachArgument(ImplicitLocOpBuilder &b, Value foreachThread,
+static Value shareForeachArgument(ImplicitLocOpBuilder &b, Value Forall,
                                   ArrayRef<int64_t> indices) {
   auto foreachType = transform::OperationType::get(
       b.getContext(), scf::ForallOp::getOperationName());
-  foreachThread = b.create<transform::CastOp>(foreachType, foreachThread);
+  Forall = b.create<transform::CastOp>(foreachType, Forall);
   return b
       .create<iree_compiler::IREE::transform_dialect::ShareForallOperandsOp>(
-          foreachType, foreachThread, indices);
+          foreachType, Forall, indices);
 }
 
 static void buildStagedReductionStrategyThreadLevel(
@@ -182,7 +181,7 @@ static void buildStagedReductionStrategyThreadLevel(
     root = maybeTiledTrailingH;
     opsToFuse.push_back(blockCombinerOpH);
   }
-  iree_compiler::buildTileFuseDistToForeachThreadWithTileSizes(
+  iree_compiler::buildTileFuseDistToForallWithTileSizes(
       /*b=*/b,
       /*rootH=*/root,
       /*opsToFuse=*/opsToFuse,
@@ -217,7 +216,7 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
   // Step 1. Match and tile to introduce the top-level scf.forall for
   // the block/workgroup level. Keep everything fused.
   auto [maybeLeadingHBlock, gridFillH, gridReductionH, maybeTiledTrailingHBlock,
-        commonEnclosingForeachThreadH] =
+        commonEnclosingForallH] =
       buildReductionStrategyBlockDistribution(b, variantH, strategy);
 
   // Step 2. Split the reduction and tile the pieces to ensure vector
@@ -233,8 +232,7 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
   // invalidated, even when modified inplace.
   // TODO: Relax nested invalidation for transforms that only move or modify
   // contained ops inplace.
-  shareForeachArgument(b, commonEnclosingForeachThreadH,
-                       ArrayRef<int64_t>({0}));
+  shareForeachArgument(b, commonEnclosingForallH, ArrayRef<int64_t>({0}));
 
   // Step 4-5. Common trailing steps.
   auto [variantH2, funcH] = buildCommonTrailingStrategy(b, variantH, strategy);

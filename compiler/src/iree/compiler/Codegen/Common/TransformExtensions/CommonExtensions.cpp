@@ -380,11 +380,12 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
 }
 
 //===---------------------------------------------------------------------===//
-// ForeachThreadToWorkgroupOp
+// ForallToWorkgroupOp
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::ForeachThreadToWorkgroupOp::build(
-    OpBuilder &builder, OperationState &result, Value target) {
+void transform_dialect::ForallToWorkgroupOp::build(OpBuilder &builder,
+                                                   OperationState &result,
+                                                   Value target) {
   result.addOperands(target);
   MLIRContext *ctx = builder.getContext();
   result.addTypes({pdl::OperationType::get(ctx)});
@@ -425,12 +426,12 @@ static LogicalResult populateWorkgroupCountComputingRegion(
 }
 
 //===---------------------------------------------------------------------===//
-// Patterns for ForeachThreadToWorkgroup rewrite.
+// Patterns for ForallToWorkgroup rewrite.
 //===---------------------------------------------------------------------===//
 
-LogicalResult rewriteForeachThreadToWorkgroup(
-    scf::ForallOp forallOp, IREE::HAL::ExecutableExportOp exportOp,
-    PatternRewriter &rewriter) {
+LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
+                                       IREE::HAL::ExecutableExportOp exportOp,
+                                       PatternRewriter &rewriter) {
   // Step 0. Target-specific verifications. There is no good place to anchor
   // those right now: the ForallOp is target-independent and the
   // transform op does not apply to individual ForallOp.
@@ -559,8 +560,7 @@ LogicalResult rewriteForeachThreadToWorkgroup(
 // IREE-specific transformations defined outside of iree_linalg_transform.
 //===---------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
+DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
     func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
@@ -597,10 +597,8 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
   }
 
   SimplePatternRewriter rewriter(topLevelForallOp);
-  if (failed(rewriteForeachThreadToWorkgroup(topLevelForallOp, exportOp,
-                                             rewriter))) {
-    return mlir::emitDefiniteFailure(target,
-                                     "rewriteForeachThreadToWorkgroup failed");
+  if (failed(rewriteForallToWorkgroup(topLevelForallOp, exportOp, rewriter))) {
+    return mlir::emitDefiniteFailure(target, "rewriteForallToWorkgroup failed");
   }
 
   results.push_back(target);
@@ -608,10 +606,10 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
 }
 
 //===---------------------------------------------------------------------===//
-// TileToForeachThreadAndWorkgroupCountRegionOp
+// TileToForallAndWorkgroupCountRegionOp
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
     OpBuilder &builder, OperationState &result, Value target,
     ArrayRef<int64_t> staticTileSizes, transform::TileSizesSpec,
     ArrayAttr mappingAttr) {
@@ -621,7 +619,7 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
                /*_=*/transform::TileSizesSpec(), /*mapping=*/mappingAttr);
 }
 
-void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
     OpBuilder &builder, OperationState &result, Value target,
     ArrayRef<OpFoldResult> mixedTileSizes, transform::TileSizesSpec,
     ArrayAttr mappingAttr) {
@@ -645,7 +643,7 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
         /*mapping=*/mappingAttr);
 }
 
-void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
     OpBuilder &builder, OperationState &result, Value target,
     ArrayRef<int64_t> staticNumThreads, transform::NumThreadsSpec,
     ArrayAttr mappingAttr) {
@@ -657,7 +655,7 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
                /*mapping=*/mappingAttr);
 }
 
-void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
     OpBuilder &builder, OperationState &result, Value target,
     ArrayRef<OpFoldResult> mixedNumThreads, transform::NumThreadsSpec,
     ArrayAttr mappingAttr) {
@@ -776,27 +774,27 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
   return success();
 }
 
-SmallVector<OpFoldResult> transform_dialect::
-    TileToForeachThreadAndWorkgroupCountRegionOp::getMixedNumThreads() {
+SmallVector<OpFoldResult>
+transform_dialect::TileToForallAndWorkgroupCountRegionOp::getMixedNumThreads() {
   Builder b(getContext());
   return getMixedValues(getStaticNumThreads(), getNumThreads(), b);
 }
 
-SmallVector<OpFoldResult> transform_dialect::
-    TileToForeachThreadAndWorkgroupCountRegionOp::getMixedTileSizes() {
+SmallVector<OpFoldResult>
+transform_dialect::TileToForallAndWorkgroupCountRegionOp::getMixedTileSizes() {
   Builder b(getContext());
   return getMixedValues(getStaticTileSizes(), getTileSizes(), b);
 }
 
 LogicalResult
-transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::verify() {
+transform_dialect::TileToForallAndWorkgroupCountRegionOp::verify() {
   if (getMixedNumThreads().empty() == getMixedTileSizes().empty())
     return emitOpError("either num_threads or tile_sizes must be specified");
   return success();
 }
 
-void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::
-    getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+void transform_dialect::TileToForallAndWorkgroupCountRegionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::consumesHandle(getTarget(), effects);
   transform::onlyReadsHandle(getTileSizes(), effects);
   transform::onlyReadsHandle(getNumThreads(), effects);
@@ -805,7 +803,7 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::
 }
 
 DiagnosedSilenceableFailure
-transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
+transform_dialect::TileToForallAndWorkgroupCountRegionOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
