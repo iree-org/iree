@@ -20,7 +20,7 @@ class FuncOp;
 }  // namespace func
 
 namespace scf {
-class ForeachThreadOp;
+class ForallOp;
 }  // namespace scf
 
 namespace transform {
@@ -44,13 +44,14 @@ struct ApplyPatternsOpPatterns {
   bool foldReassociativeReshapes = false;
   bool foldTensorEmptyExtract = false;
   bool lowerTransferOpPermutations = false;
-  bool promoteForeachThreadCaptureToShared = false;
+  bool promoteForallCaptureToShared = false;
   bool rankReducingLinalg = false;
   bool rankReducingVector = false;
   bool rewritePackOps = false;
   bool swapPaddingElideConditional = false;
   bool swappingPatterns = false;
-  bool unrollVectorsGpuMma = false;
+  bool unrollVectorsGpuMmaSync = false;
+  bool unrollVectorsGpuWmma = false;
 };
 }  // namespace transform_dialect
 }  // namespace IREE

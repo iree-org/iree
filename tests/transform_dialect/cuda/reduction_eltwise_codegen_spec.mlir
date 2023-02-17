@@ -15,7 +15,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 2. First level of tiling + fusion parallelizes to blocks. Tile the
   // trailing elementwise the same way we want to tile the reduction.
   // ===========================================================================
-  %grid_loop, %eltwise_grid_op = transform.iree.tile_to_foreach_thread_and_workgroup_count_region %eltwise 
+  %grid_loop, %eltwise_grid_op = transform.iree.tile_to_forall_and_workgroup_count_region %eltwise 
     tile_sizes [1] (mapping = [#gpu.block<x>])
   %not_eltwise = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op, %combiner_op : !pdl.operation
   transform.structured.fuse_into_containing_op %not_eltwise into %grid_loop
@@ -24,7 +24,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // ===========================================================================
   %fill_1d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1xf32> in %variant_op : (!pdl.operation) -> !pdl.operation
   %eltwise_block_loop, %eltwise_block_op =
-    transform.structured.tile_to_foreach_thread_op %eltwise_grid_op tile_sizes [1]
+    transform.structured.tile_to_forall_op %eltwise_grid_op tile_sizes [1]
     ( mapping = [#gpu.thread<z>] )
   %block_combiner_op = transform.structured.match ops{["linalg.generic"]}
     attributes {iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!pdl.operation) -> !pdl.operation
@@ -34,10 +34,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op : (!pdl.operation) -> !pdl.operation
   %grid_more_parallel_op = transform.structured.match ops{["linalg.generic"]}
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %foreach_thread_block_more_parallel_op, %block_more_parallel_op =
-    transform.structured.tile_to_foreach_thread_op %grid_more_parallel_op tile_sizes [1, 1] 
+  %forall_block_more_parallel_op, %block_more_parallel_op =
+    transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1] 
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
-  transform.structured.fuse_into_containing_op %fill_2d into %foreach_thread_block_more_parallel_op
+  transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op
 
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================
@@ -56,8 +56,8 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 6. Post-bufferization mapping to blocks and threads.
   // ===========================================================================
   %func_5 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  %func_6 = transform.iree.foreach_thread_to_workgroup %func_5
-  %func_7 = transform.iree.map_nested_foreach_thread_to_gpu_threads %func_6
+  %func_6 = transform.iree.forall_to_workgroup %func_5
+  %func_7 = transform.iree.map_nested_forall_to_gpu_threads %func_6
       { workgroup_size = [32, 2, 1] }
 
   // Step 7. Post-bufferization vector distribution with rank-reduction.

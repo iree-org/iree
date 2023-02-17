@@ -156,8 +156,8 @@ struct CombineTransferReadOpBroadcast final
         transferReadOp.hasOutOfBoundsDim()) {
       return failure();
     }
-    int64_t rankDiff =
-        op.getVectorType().getRank() - transferReadOp.getVectorType().getRank();
+    int64_t rankDiff = op.getResultVectorType().getRank() -
+                       transferReadOp.getVectorType().getRank();
     SmallVector<AffineExpr> exprs(rankDiff, rewriter.getAffineConstantExpr(0));
     ArrayRef<AffineExpr> originalExpr =
         transferReadOp.getPermutationMap().getResults();
@@ -167,7 +167,7 @@ struct CombineTransferReadOpBroadcast final
                        transferReadOp.getPermutationMap().getNumSymbols(),
                        exprs, op.getContext());
     ArrayAttr inBounds = rewriter.getBoolArrayAttr(
-        SmallVector<bool>(op.getVectorType().getRank(), true));
+        SmallVector<bool>(op.getResultVectorType().getRank(), true));
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
         op, op.getType(), transferReadOp.getSource(),
         transferReadOp.getIndices(), newMap, transferReadOp.getPadding(),

@@ -138,7 +138,6 @@ def get_iree_benchmark_module_arguments(
     repetitions = 10
 
   cmd = [
-      "--device_allocator=caching",
       "--time_unit=ns",
       "--benchmark_format=json",
       "--benchmark_out_format=json",

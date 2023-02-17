@@ -59,6 +59,8 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":LLVMGPUExtensionsOpGen",
+        "//compiler/src/iree/compiler/Codegen/Common:CommonPasses",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU/Utils",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
@@ -72,6 +74,8 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:LinalgUtils",
         "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:NVGPUDialect",
+        "@llvm-project//mlir:NVGPUTransforms",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",

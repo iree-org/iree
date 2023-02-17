@@ -45,16 +45,16 @@ static SmallVector<int64_t> getIndicesOfDynamicDims(ShapedType t) {
 }
 
 //===---------------------------------------------------------------------===//
-// Patterns for ForeachThreadOpToFlow rewrite.
+// Patterns for ForallOpToFlow rewrite.
 //===---------------------------------------------------------------------===//
 
 /// Populate the workgroup_count region of `dispatchOp`.
 /// For now, this only supports constant index ops and empty workload operands.
 /// Assumes the Flow::DispatchWorkgroupsOp is built with an empty region.
 static LogicalResult populateWorkgroupCountComputingRegion(
-    PatternRewriter &rewriter, scf::ForeachThreadOp foreachThreadOp,
+    PatternRewriter &rewriter, scf::ForallOp forallOp,
     Flow::DispatchWorkgroupsOp dispatchOp) {
-  Location loc = foreachThreadOp.getLoc();
+  Location loc = forallOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   Region &r = dispatchOp.getWorkgroupCount();
   assert(r.empty() && "expected block-less workgroup_count region");
@@ -64,7 +64,7 @@ static LogicalResult populateWorkgroupCountComputingRegion(
   SmallVector<Value> results;
   // For now, this assumes that we only pull in constants.
   // TODO: Iteratively pull operations that are only consuming IndexType.
-  for (Value v : foreachThreadOp.getNumThreads()) {
+  for (Value v : forallOp.getUpperBound(rewriter)) {
     auto op = dyn_cast_or_null<arith::ConstantIndexOp>(v.getDefiningOp());
     if (!op) return failure();
     results.push_back(
@@ -79,27 +79,29 @@ static LogicalResult populateWorkgroupCountComputingRegion(
   return success();
 }
 
-/// Rewrite ParallelInsertSlice ops in `performConcurrentlyOp` as Flow
+/// Rewrite ParallelInsertSlice ops in `InParallelOp` as Flow
 /// DispatchTensorStoreOps.
 /// Ops are inserted just before the `block` terminator.
-static void rewriteParallelInsertSlices(
-    PatternRewriter &rewriter, scf::ForeachThreadOp foreachThreadOp,
-    scf::PerformConcurrentlyOp performConcurrentlyOp, Block &block,
-    ValueRange resultTensorOperands, ValueRange resultTensorsDynamicDims,
-    IRMapping tensorToFlowBvm) {
-  Location loc = performConcurrentlyOp.getLoc();
+static void rewriteParallelInsertSlices(PatternRewriter &rewriter,
+                                        scf::ForallOp forallOp,
+                                        scf::InParallelOp InParallelOp,
+                                        Block &block,
+                                        ValueRange resultTensorOperands,
+                                        ValueRange resultTensorsDynamicDims,
+                                        IRMapping tensorToFlowBvm) {
+  Location loc = InParallelOp.getLoc();
   int64_t resultIndex = 0;
   for (const Operation &yieldingOp :
-       llvm::make_early_inc_range(performConcurrentlyOp.getYieldingOps())) {
+       llvm::make_early_inc_range(InParallelOp.getYieldingOps())) {
     auto parallelInsertOp = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(block.getTerminator());
     auto dynamicDims = Util::findVariadicDynamicDims(
         resultIndex, resultTensorOperands, resultTensorsDynamicDims);
     BlockArgument destBbArg = parallelInsertOp.getDest().cast<BlockArgument>();
-    assert(destBbArg.getOwner()->getParentOp() == foreachThreadOp &&
+    assert(destBbArg.getOwner()->getParentOp() == forallOp &&
            "expected that dest is an output bbArg");
-    Value dest = foreachThreadOp.getTiedOpOperand(destBbArg)->get();
+    Value dest = forallOp.getTiedOpOperand(destBbArg)->get();
     // clang-format off
     rewriter.create<Flow::DispatchTensorStoreOp>(
         loc,
@@ -120,7 +122,7 @@ static void rewriteParallelInsertSlices(
 /// dispatchOp as well as a IRMapping from tensor operands to the
 /// corresponding Flow dispatch tensor bbArgs.
 static void rewriteExtractSlices(PatternRewriter &rewriter,
-                                 scf::ForeachThreadOp foreachThreadOp,
+                                 scf::ForallOp forallOp,
                                  Flow::DispatchWorkgroupsOp dispatchOp,
                                  ValueRange tensorOperands,
                                  ValueRange tensorDynamicDims,
@@ -128,9 +130,8 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
   dispatchOp->walk([&](tensor::ExtractSliceOp extractSliceOp) {
     Value source = extractSliceOp.getSource();
     if (auto sourceBbArg = source.dyn_cast<BlockArgument>())
-      if (sourceBbArg.getOwner()->getParentOp() ==
-          foreachThreadOp.getOperation())
-        source = foreachThreadOp.getTiedOpOperand(sourceBbArg)->get();
+      if (sourceBbArg.getOwner()->getParentOp() == forallOp.getOperation())
+        source = forallOp.getTiedOpOperand(sourceBbArg)->get();
 
     auto it = llvm::find(tensorOperands, source);
     if (it == tensorOperands.end()) return;
@@ -156,13 +157,12 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
   });
 }
 
-static void cloneOpsIntoForeachThreadOp(RewriterBase &rewriter,
-                                        scf::ForeachThreadOp foreachThreadOp) {
-  // 1. Find all ops that should be cloned into the ForeachThreadOp.
+static void cloneOpsIntoForallOp(RewriterBase &rewriter,
+                                 scf::ForallOp forallOp) {
+  // 1. Find all ops that should be cloned into the ForallOp.
   llvm::SetVector<Value> valuesDefinedAbove;
-  mlir::getUsedValuesDefinedAbove(foreachThreadOp.getRegion(),
-                                  valuesDefinedAbove);
-  // Add all ops who's results are used inside the ForeachThreadOp to the
+  mlir::getUsedValuesDefinedAbove(forallOp.getRegion(), valuesDefinedAbove);
+  // Add all ops who's results are used inside the ForallOp to the
   // worklist.
   llvm::SetVector<Operation *> worklist;
   for (Value v : valuesDefinedAbove)
@@ -182,7 +182,7 @@ static void cloneOpsIntoForeachThreadOp(RewriterBase &rewriter,
 
     // Do not clone ParallelInsertSliceOp destinations.
     bool isDestination =
-        any_of(foreachThreadOp.getTerminator().getYieldingOps(),
+        any_of(forallOp.getTerminator().getYieldingOps(),
                [&](Operation &insertOp) {
                  return cast<tensor::ParallelInsertSliceOp>(&insertOp)
                             .getDest()
@@ -200,16 +200,14 @@ static void cloneOpsIntoForeachThreadOp(RewriterBase &rewriter,
     }
   }
 
-  // 2. Clone ops and replace their uses inside the ForeachThreadOp.
+  // 2. Clone ops and replace their uses inside the ForallOp.
   OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPointToStart(
-      &foreachThreadOp.getRegion().getBlocks().front());
+  rewriter.setInsertionPointToStart(&forallOp.getRegion().getBlocks().front());
   for (Operation *op : llvm::reverse(opsToClone)) {
     Operation *cloned = rewriter.clone(*op);
     SmallVector<OpOperand *> uses;
     for (OpOperand &use : op->getUses())
-      if (foreachThreadOp->isProperAncestor(use.getOwner()))
-        uses.push_back(&use);
+      if (forallOp->isProperAncestor(use.getOwner())) uses.push_back(&use);
     for (OpOperand *use : uses) {
       unsigned resultNum = use->get().cast<OpResult>().getResultNumber();
       rewriter.updateRootInPlace(
@@ -218,13 +216,13 @@ static void cloneOpsIntoForeachThreadOp(RewriterBase &rewriter,
   }
 }
 
-/// Rewrite a ForeachThreadOp into a Flow::DispatchWorkGroupsOp.
+/// Rewrite a ForallOp into a Flow::DispatchWorkGroupsOp.
 /// This rewrite proceeds in a few steps:
-///   - Step 0: Clone certain ops into the ForeachThreadOp (as per IREE
+///   - Step 0: Clone certain ops into the ForallOp (as per IREE
 ///     heuristic), so that they are part of the dispatch region.
 ///   - Step 1: Compute the result types and their result dynamic dim operands.
 ///     This first step takes advantage of the ops contained in the
-///     ForeachThreadOp terminator and that are tied to the results.
+///     ForallOp terminator and that are tied to the results.
 ///   - Step 2: Get values defined above and separate them between non-tensors,
 ///     tensors and introduce appropriate tensor dims.
 ///   - Step 3: Create ordered vectors of operands to pass to the builder and
@@ -232,7 +230,7 @@ static void cloneOpsIntoForeachThreadOp(RewriterBase &rewriter,
 ///   - Step 4: Populate the workgroupCount region of the dispatchOp and set
 ///     the workload operands to the values defined above.
 ///   - Step 5: Fixup dispatchOp bbArgs and terminator.
-///   - Step 6: Move the body of foreachThreadOp to the dispatchOp.
+///   - Step 6: Move the body of forallOp to the dispatchOp.
 ///   - Step 7: Set up bvm for RAUWIf. In particular, tensor operands become
 ///     flow dispatch tensor bbArgs and need to be
 ///     flow.dispatch.tensor.load'ed.
@@ -240,31 +238,30 @@ static void cloneOpsIntoForeachThreadOp(RewriterBase &rewriter,
 ///   - Step 9. Rewrite tensor::ExtractSlice and ParallelInsert ops to the
 ///     relevant Flow DispatchTensorLoad/Store version.
 ///   - Step 10: Perform RAUWIf.
-///   - Step 11: Drop the terminator and replace foreachThreadOp.
-// TODO: n-D ForeachThreadOp
+///   - Step 11: Drop the terminator and replace forallOp.
+// TODO: n-D ForallOp
 FailureOr<Flow::DispatchWorkgroupsOp>
-rewriteForeachThreadToFlowDispatchWorkgroups(
-    scf::ForeachThreadOp foreachThreadOp, PatternRewriter &rewriter) {
-  // Step 0: Clone ops into the ForeachThreadOp.
-  cloneOpsIntoForeachThreadOp(rewriter, foreachThreadOp);
+rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
+                                             PatternRewriter &rewriter) {
+  // Step 0: Clone ops into the ForallOp.
+  cloneOpsIntoForallOp(rewriter, forallOp);
 
   OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(foreachThreadOp);
+  rewriter.setInsertionPoint(forallOp);
 
-  // Entry point start just before the foreachThreadOp.
-  Location loc = foreachThreadOp.getLoc();
-  scf::PerformConcurrentlyOp performConcurrentlyOp =
-      foreachThreadOp.getTerminator();
+  // Entry point start just before the forallOp.
+  Location loc = forallOp.getLoc();
+  scf::InParallelOp InParallelOp = forallOp.getTerminator();
 
   // Step 1: Compute all dynamic result dims.
   // The `dest` of the ParallelInsertSliceOp are tied to the results and carry
   // over to the Flow::DispatchWorkgroupsOp.
   // Use a SetVector to ensure tensor operand uniqueness.
   llvm::SetVector<Value> resultTensorOperands, resultTensorsDynamicDims;
-  for (const Operation &yieldingOp : performConcurrentlyOp.getYieldingOps()) {
+  for (const Operation &yieldingOp : InParallelOp.getYieldingOps()) {
     auto parallelInsertOp = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
     BlockArgument destBbArg = parallelInsertOp.getDest().cast<BlockArgument>();
-    Value dest = foreachThreadOp.getTiedOpOperand(destBbArg)->get();
+    Value dest = forallOp.getTiedOpOperand(destBbArg)->get();
     bool inserted = resultTensorOperands.insert(dest);
     if (!inserted) continue;
     auto dynamicDims =
@@ -273,16 +270,15 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
       resultTensorsDynamicDims.insert(
           rewriter.create<tensor::DimOp>(loc, dest, dim));
   }
-  assert(resultTensorOperands.size() == foreachThreadOp.getNumResults() &&
-         "Expected as many resultTensorOperands as results of foreachThreadOp");
+  assert(resultTensorOperands.size() == forallOp.getNumResults() &&
+         "Expected as many resultTensorOperands as results of forallOp");
 
   // Step 2. Get values defined above and separate them between non-tensors,
   // tensors and introduce appropriate tensor dims.
   // Tensors that have already been recorded as resultTensorOperands are
   // omitted to avoid duplications.
   llvm::SetVector<Value> valuesDefinedAbove;
-  mlir::getUsedValuesDefinedAbove(foreachThreadOp.getRegion(),
-                                  valuesDefinedAbove);
+  mlir::getUsedValuesDefinedAbove(forallOp.getRegion(), valuesDefinedAbove);
 
   SmallVector<Value> nonTensorOperands, tensorOperands, tensorDynamicDims;
   for (Value v : valuesDefinedAbove) {
@@ -298,7 +294,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   }
   // Also add shared outputs. (These are usually already added as result
   // tensor operands.)
-  for (Value v : foreachThreadOp.getOutputs()) {
+  for (Value v : forallOp.getOutputs()) {
     auto tensorType = v.getType().cast<RankedTensorType>();
     if (resultTensorOperands.contains(v)) continue;
     tensorOperands.push_back(v);
@@ -313,7 +309,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   llvm::append_range(nonDimOperands, nonTensorOperands);
   llvm::append_range(nonDimOperands, tensorOperands);
   llvm::append_range(nonDimOperands, resultTensorOperands);
-  // scf::ForeachThreadOp tensors inserted into are tied to results and
+  // scf::ForallOp tensors inserted into are tied to results and
   // translate to the tied operands of the dispatch.
   int64_t sizeNonTensors = nonTensorOperands.size();
   int64_t sizeNonResultTensors = tensorOperands.size();
@@ -330,7 +326,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   auto dispatchOp = rewriter.create<Flow::DispatchWorkgroupsOp>(
       loc,
       /*workload=*/ValueRange{},
-      /*resultTypes=*/foreachThreadOp.getResultTypes(),
+      /*resultTypes=*/forallOp.getResultTypes(),
       /*resultDims=*/resultTensorsDynamicDims.getArrayRef(),
       /*operands=*/nonDimOperands,
       /*operandDims=*/allTensorDynamicDims,
@@ -339,9 +335,9 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
 
   // Step 4. Outline the compute workload region and set up the workload
   // operands.
-  if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
+  if (failed(populateWorkgroupCountComputingRegion(rewriter, forallOp,
                                                    dispatchOp)))
-    return foreachThreadOp->emitOpError(
+    return forallOp->emitOpError(
                "failed to populate workload region for dispatchOp: ")
            << dispatchOp;
 
@@ -382,9 +378,9 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   assert(block->getNumArguments() == allOperands.size() &&
          "Expected as many bbArgs as operands");
 
-  // Step 6. Move the body of foreachThreadOp to the dispatchOp.
-  block->getOperations().splice(
-      block->begin(), foreachThreadOp.getRegion().front().getOperations());
+  // Step 6. Move the body of forallOp to the dispatchOp.
+  block->getOperations().splice(block->begin(),
+                                forallOp.getRegion().front().getOperations());
 
   // Step 7. Set up bvm for RAUWIf.
   // Generally, allOperands map to their corresponding bbArg but there is a
@@ -420,22 +416,22 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   rewriter.setInsertionPointToStart(block);
   SmallVector<Value, 8> workgroupIds, workgroupCounts;
   for (int64_t rank :
-       llvm::seq<int64_t>(0, foreachThreadOp.getThreadIndices().size())) {
+       llvm::seq<int64_t>(0, forallOp.getInductionVars().size())) {
     workgroupIds.push_back(
         rewriter.create<Flow::DispatchWorkgroupIDOp>(loc, rank));
     workgroupCounts.push_back(
         rewriter.create<Flow::DispatchWorkgroupCountOp>(loc, rank));
   }
-  bvm.map(foreachThreadOp.getThreadIndices(), workgroupIds);
-  bvm.map(foreachThreadOp.getNumThreads(), workgroupCounts);
+  bvm.map(forallOp.getInductionVars(), workgroupIds);
+  bvm.map(forallOp.getUpperBound(rewriter), workgroupCounts);
 
   // Step 9. Rewrite tensor::ExtractSlice and ParallelInsert ops to the
   // relevant Flow DispatchTensorLoad/Store version.
-  rewriteParallelInsertSlices(rewriter, foreachThreadOp, performConcurrentlyOp,
-                              *block, resultTensorOperands.getArrayRef(),
+  rewriteParallelInsertSlices(rewriter, forallOp, InParallelOp, *block,
+                              resultTensorOperands.getArrayRef(),
                               resultTensorsDynamicDims.getArrayRef(),
                               tensorToFlowBvm);
-  rewriteExtractSlices(rewriter, foreachThreadOp, dispatchOp, allTensorOperands,
+  rewriteExtractSlices(rewriter, forallOp, dispatchOp, allTensorOperands,
                        allTensorDynamicDims, tensorToFlowBvm);
 
   // Step 10. Perform RAUWIf.
@@ -447,9 +443,9 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
     });
   }
 
-  // Step 11. Drop the terminator and replace foreachThreadOp.
-  rewriter.eraseOp(performConcurrentlyOp);
-  rewriter.replaceOp(foreachThreadOp, dispatchOp.getResults());
+  // Step 11. Drop the terminator and replace forallOp.
+  rewriter.eraseOp(InParallelOp);
+  rewriter.replaceOp(forallOp, dispatchOp.getResults());
 
   return dispatchOp;
 }
@@ -460,7 +456,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
 
 DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
-    scf::ForeachThreadOp target, transform::ApplyToEachResultList &results,
+    scf::ForallOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &) {
   SimplePatternRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =

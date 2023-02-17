@@ -57,6 +57,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:RISCVAsmParser",
         "@llvm-project//llvm:RISCVCodeGen",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
         "@llvm-project//llvm:WebAssemblyAsmParser",
         "@llvm-project//llvm:WebAssemblyCodeGen",
         "@llvm-project//llvm:X86AsmParser",
@@ -90,6 +91,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
+        "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:Support",
     ],
 )
@@ -117,8 +119,9 @@ iree_compiler_cc_library(
     hdrs = ["LinkerTool.h"],
     deps = platform_trampoline_deps("LinkerTools", "compiler/src/iree/compiler/Dialect/HAL/Target/LLVM") + [
         "//compiler/src/iree/compiler/Utils",
-        "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:Support",
         ":LLVMTargetOptions",
     ],
@@ -131,6 +134,7 @@ iree_compiler_cc_library(
         ":LLVMTargetOptions",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:Support",
     ],
 )

@@ -28,11 +28,17 @@ iree_lit_test_suite(
             "materialize_resource_caches.mlir",
             "memoize_device_queries.mlir",
             "resolve_export_ordinals.mlir",
+            "substitute_executables.mlir",
             "verify_target_environment.mlir",
         ],
         include = ["*.mlir"],
+        exclude = ["substitute_executables_replacement.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
+    data = [
+        "substitute_executables_replacement.mlir",
+        "substitute_executables_replacement.obj",
+    ],
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",

@@ -161,32 +161,35 @@ def _get_benchmark_result_markdown(
   # Compose the full benchmark tables.
   full_table = [md.header("Full Benchmark Summary", 2)]
   full_table.append(md.unordered_list([commit_info_md, pr_info, build_info]))
-  full_table.append(
-      benchmark_presentation.categorize_benchmarks_into_tables(
-          execution_benchmarks))
-
-  # Compose the full compilation metrics tables.
-  full_table.append(
-      benchmark_presentation.categorize_compilation_metrics_into_tables(
-          compilation_metrics))
 
   # Compose the abbreviated benchmark tables.
   abbr_table = [md.header(comment_def.title, 2)]
   abbr_table.append(commit_info_md)
 
-  abbr_benchmarks_tables = benchmark_presentation.categorize_benchmarks_into_tables(
-      execution_benchmarks, TABLE_SIZE_CUT)
-  if len(abbr_benchmarks_tables) == 0:
-    abbr_table.append("No improved or regressed benchmarks 🏖️")
-  else:
-    abbr_table.append(abbr_benchmarks_tables)
+  if len(execution_benchmarks) > 0:
+    full_table.append(
+        benchmark_presentation.categorize_benchmarks_into_tables(
+            execution_benchmarks))
 
-  abbr_compilation_metrics_tables = benchmark_presentation.categorize_compilation_metrics_into_tables(
-      compilation_metrics, TABLE_SIZE_CUT)
-  if len(abbr_compilation_metrics_tables) == 0:
-    abbr_table.append("No improved or regressed compilation metrics 🏖️")
-  else:
-    abbr_table.append(abbr_compilation_metrics_tables)
+    abbr_benchmarks_tables = benchmark_presentation.categorize_benchmarks_into_tables(
+        execution_benchmarks, TABLE_SIZE_CUT)
+    if len(abbr_benchmarks_tables) == 0:
+      abbr_table.append("No improved or regressed benchmarks 🏖️")
+    else:
+      abbr_table.append(abbr_benchmarks_tables)
+
+  # Compose the full compilation metrics tables.
+  if len(compilation_metrics) > 0:
+    full_table.append(
+        benchmark_presentation.categorize_compilation_metrics_into_tables(
+            compilation_metrics))
+
+    abbr_compilation_metrics_tables = benchmark_presentation.categorize_compilation_metrics_into_tables(
+        compilation_metrics, TABLE_SIZE_CUT)
+    if len(abbr_compilation_metrics_tables) == 0:
+      abbr_table.append("No improved or regressed compilation metrics 🏖️")
+    else:
+      abbr_table.append(abbr_compilation_metrics_tables)
 
   abbr_table.append("For more information:")
   # We don't know until a Gist is really created. Use a placeholder for now and

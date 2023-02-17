@@ -24,7 +24,7 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 
 namespace {
 
-SmallVector<Value> getValuesToYield(scf::PerformConcurrentlyOp op) {
+SmallVector<Value> getValuesToYield(scf::InParallelOp op) {
   return llvm::to_vector(
       llvm::map_range(op.getYieldingOps(), [](Operation &op) -> Value {
         return cast<tensor::ParallelInsertSliceOp>(&op).getDest();
@@ -33,30 +33,28 @@ SmallVector<Value> getValuesToYield(scf::PerformConcurrentlyOp op) {
 
 } // namespace
 
-FailureOr<scf::ForOp> ForeachThreadOpToScfForRewriter::returningMatchAndRewrite(
-    scf::ForeachThreadOp foreachThreadOp, PatternRewriter &rewriter) const {
-  if (foreachThreadOp.getNumResults() > 0)
-    return foreachThreadOp->emitError(
-        "only bufferized scf.foreach_thread lowers to scf.for");
+FailureOr<scf::ForOp> ForallOpToScfForRewriter::returningMatchAndRewrite(
+    scf::ForallOp forallOp, PatternRewriter &rewriter) const {
+  if (forallOp.getNumResults() > 0)
+    return forallOp->emitError("only bufferized scf.forall lowers to scf.for");
 
-  if (foreachThreadOp.getNumThreads().size() > 1)
-    return foreachThreadOp->emitError(
-        "only single-dimension scf.foreach_thread lowers to scf.for");
+  if (forallOp.getRank() > 1)
+    return forallOp->emitError(
+        "only single-dimension scf.forall lowers to scf.for");
 
   // Construct the loop bounds based on the canonical arithmetic progression.
-  Location loc = foreachThreadOp.getLoc();
+  Location loc = forallOp.getLoc();
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
   // TODO: allow multi-dim.
-  Value numThreads = foreachThreadOp.getNumThreads().front();
+  Value numThreads = forallOp.getUpperBound(rewriter).front();
 
   // Construct the op without a body builder: we need to clone the ops in the
   // body explicitly after having access to the new bbArgs.
   // As a consequence, `ensureTerminator` is not called and the `forOp` body
   // has no terminator.
-  scf::PerformConcurrentlyOp performConcurrentlyOp =
-      foreachThreadOp.getTerminator();
-  SmallVector<Value> valuesToYield = getValuesToYield(performConcurrentlyOp);
+  scf::InParallelOp InParallelOp = forallOp.getTerminator();
+  SmallVector<Value> valuesToYield = getValuesToYield(InParallelOp);
   scf::ForOp forOp =
       rewriter.create<scf::ForOp>(loc, zero, numThreads, one, valuesToYield);
 
@@ -66,11 +64,10 @@ FailureOr<scf::ForOp> ForeachThreadOpToScfForRewriter::returningMatchAndRewrite(
   bool hasTerminator =
       !body->empty() && body->back().hasTrait<OpTrait::IsTerminator>();
   if (hasTerminator) {
-    rewriter.mergeBlockBefore(&foreachThreadOp.getRegion().front(),
+    rewriter.mergeBlockBefore(&forallOp.getRegion().front(),
                               body->getTerminator(), bbArgsTranslated);
   } else {
-    rewriter.mergeBlocks(&foreachThreadOp.getRegion().front(), body,
-                         bbArgsTranslated);
+    rewriter.mergeBlocks(&forallOp.getRegion().front(), body, bbArgsTranslated);
   }
 
   rewriter.setInsertionPointToStart(body);
@@ -79,8 +76,8 @@ FailureOr<scf::ForOp> ForeachThreadOpToScfForRewriter::returningMatchAndRewrite(
 
   // Create sequential insertSlice ops.
   SmallVector<Value> toYield;
-  rewriter.setInsertionPoint(performConcurrentlyOp);
-  for (Operation &operation : performConcurrentlyOp.getYieldingOps()) {
+  rewriter.setInsertionPoint(InParallelOp);
+  for (Operation &operation : InParallelOp.getYieldingOps()) {
     tensor::ParallelInsertSliceOp op =
         cast<tensor::ParallelInsertSliceOp>(&operation);
     toYield.push_back(rewriter.createOrFold<tensor::InsertSliceOp>(
@@ -88,7 +85,7 @@ FailureOr<scf::ForOp> ForeachThreadOpToScfForRewriter::returningMatchAndRewrite(
         op.getMixedSizes(), op.getMixedStrides()));
   }
 
-  // performConcurrentlyOp.yieldedValues come from above, not from bbArgs.
+  // InParallelOp.yieldedValues come from above, not from bbArgs.
   // There is no rewriter method to make mergeBlocks update non-bbArgs.
   // Need to manually clone + bvm all uses that are now nested under forOp.
   // Warning: this replacement is currently optimistic and may change the
@@ -116,8 +113,8 @@ FailureOr<scf::ForOp> ForeachThreadOpToScfForRewriter::returningMatchAndRewrite(
   }
 
   // Cleanup and replace.
-  rewriter.eraseOp(performConcurrentlyOp);
-  rewriter.replaceOp(foreachThreadOp, forOp.getResults());
+  rewriter.eraseOp(InParallelOp);
+  rewriter.replaceOp(forallOp, forOp.getResults());
 
   return forOp;
 }

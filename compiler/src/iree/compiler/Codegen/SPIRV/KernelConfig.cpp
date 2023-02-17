@@ -386,7 +386,8 @@ static bool tileMatmulK(const int64_t dimK, const int64_t residualTilingFactor,
                         int64_t &tileSize) {
   // Deduce the configuration for the K dimension. We need some power of two
   // here so that we can do vector load.
-  for (int64_t t = llvm::PowerOf2Floor(residualTilingFactor); t >= 2; t >>= 1) {
+  for (int64_t t = llvm::bit_floor<uint64_t>(residualTilingFactor); t >= 2;
+       t >>= 1) {
     if (dimK % t == 0) {
       tileSize = t;
       return true;
@@ -540,8 +541,9 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
 
   auto lhsType = lhs->get().getType().cast<ShapedType>();
   auto rhsType = rhs->get().getType().cast<ShapedType>();
-  auto elementBits = lhsType.getElementType().getIntOrFloatBitWidth();
-  if (elementBits != 16 && elementBits != 32) return success();
+  auto elementBits =
+      static_cast<int>(lhsType.getElementType().getIntOrFloatBitWidth());
+  if (!llvm::is_contained({8, 16, 32}, elementBits)) return success();
 
   ArrayRef<int64_t> lhsShape = lhsType.getShape();
   ArrayRef<int64_t> rhsShape = rhsType.getShape();

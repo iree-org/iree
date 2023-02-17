@@ -29,20 +29,20 @@ def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 }
 
-def RewriteForeachThreadToAsyncOp :
-  Op<Transform_Dialect, "foreach_thread_to_async",
+def RewriteForallToAsyncOp :
+  Op<Transform_Dialect, "forall_to_async",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
      TransformOpInterface]> {
 
   let description = [{
-    Rewrite a bufferized scf.foreach_thread op to the async dialect.
+    Rewrite a bufferized scf.forall op to the async dialect.
 
     Return modes:
     =============
     This operation ignores non-Linalg ops and drops them in the return.
-    This transform is currently only implemented for 1-D scf.foreach_thread that
+    This transform is currently only implemented for 1-D scf.forall that
     have been bufferized and definitely fail for the rest.
 
     If all the operations referred to by the `target` PDLOperation lower
@@ -59,26 +59,26 @@ def RewriteForeachThreadToAsyncOp :
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::scf::ForeachThreadOp target,
+        ::mlir::scf::ForallOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
 }
 
-def RewriteForeachThreadToScfForOp :
-  Op<Transform_Dialect, "foreach_thread_to_scf_for",
+def RewriteForallToScfForOp :
+  Op<Transform_Dialect, "forall_to_scf_for",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
      TransformOpInterface]> {
 
   let description = [{
-    Rewrite a bufferized scf.foreach_thread to a sequential scf.for.
+    Rewrite a bufferized scf.forall to a sequential scf.for.
 
     Return modes:
     =============
     This operation ignores non-Linalg ops and drops them in the return.
-    This transform is currently only implemented for 1-D scf.foreach_thread that
+    This transform is currently only implemented for 1-D scf.forall that
     have been bufferized and definitely fail for the rest.
 
     If all the operations referred to by the `target` PDLOperation lower
@@ -95,7 +95,7 @@ def RewriteForeachThreadToScfForOp :
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::scf::ForeachThreadOp target,
+        ::mlir::scf::ForallOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];

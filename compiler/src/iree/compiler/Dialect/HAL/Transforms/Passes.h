@@ -97,6 +97,16 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createDumpExecutableSourcesPass(
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDumpExecutableBenchmarksPass(StringRef path);
 
+// Substitutes hal.executable ops by parsing |substitutions| in
+// `executable_name=file.xxx` strings. File paths may be absolute or relative to
+// the paths specified on `--iree-hal-executable-object-search-path=`.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
+    ArrayRef<std::string> substitutions = {});
+// Substitutes hal.executable ops with files in the given |searchPath| matching
+// the symbol name.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
+    std::string searchPath);
+
 // Translates hal.executable.variant ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createTranslateExecutablesPass();
@@ -172,6 +182,7 @@ inline void registerHALPasses() {
   createResolveExportOrdinalsPass();
   createSerializeExecutablesPass();
   createSerializeTargetExecutablesPass("");
+  createSubstituteExecutablesPass();
   createTranslateExecutablesPass();
   createTranslateTargetExecutableVariantsPass("");
   createVerifyTargetEnvironmentPass();

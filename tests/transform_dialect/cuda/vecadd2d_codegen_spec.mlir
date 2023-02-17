@@ -3,7 +3,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 1. Find three linalg.generics and tile to GPU thread blocks.
   // ===========================================================================
   %generics = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  transform.iree.tile_to_foreach_thread_and_workgroup_count_region %generics 
+  transform.iree.tile_to_forall_and_workgroup_count_region %generics 
                   tile_sizes [5, 3] ( mapping = [#gpu.block<z>, #gpu.block<x>])
 
   // Step 2. Rank reduce and bufferize and drop HAL decriptor from memref ops.
@@ -18,5 +18,5 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 3. Map to GPU thread blocks.
   // ===========================================================================
   %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  transform.iree.foreach_thread_to_workgroup %func_2
+  transform.iree.forall_to_workgroup %func_2
 }

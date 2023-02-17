@@ -76,12 +76,11 @@ jobs:
             "${PR_CI_GCS_URL}/${BENCHMARK_COMMENT_ARTIFACT}"
           echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
       - name: Posting comments
-        # TODO(#11076): Temporarily disabled until we migrate the database.
-        if: false && steps.check.outputs.job-conclusion == 'success'
+        if: steps.check.outputs.job-conclusion == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIST_BOT_TOKEN: ${{ secrets.GIST_BOT_TOKEN }}
-          COMMENT_BOT_USER: iree-github-actions-bot
+          COMMENT_BOT_USER: github-actions[bot]
           # Get PR number from the event instead of the untrusted comment
           # artifact, to make sure we won't incorrectly update other PRs.
           BENCHMARK_COMMENT_ARTIFACT: ${{ steps.download.outputs.benchmark-comment-artifact }}

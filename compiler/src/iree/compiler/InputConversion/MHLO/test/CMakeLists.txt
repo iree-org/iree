@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "broadcasting.mlir"
+    "convert_collective_ops.mlir"
     "convert_complex_to_real.mlir"
     "convert_mhlo_to_linalg_ext.mlir"
     "convert_structural_types.mlir"

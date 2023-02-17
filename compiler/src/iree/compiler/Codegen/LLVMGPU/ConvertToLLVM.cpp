@@ -154,7 +154,12 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
 
   LogicalResult matchAndRewrite(memref::AllocOp allocOp,
                                 PatternRewriter &rewriter) const override {
-    if (allocOp.getType().getMemorySpaceAsInt() != 3) return failure();
+    auto addressSpace = allocOp.getType()
+                            .getMemorySpace()
+                            .dyn_cast_or_null<gpu::AddressSpaceAttr>();
+    if (!addressSpace ||
+        addressSpace.getValue() != gpu::GPUDialect::getWorkgroupAddressSpace())
+      return failure();
     ArrayRef<int64_t> shape = allocOp.getType().getShape();
     if (llvm::any_of(shape,
                      [](int64_t dim) { return dim == ShapedType::kDynamic; })) {
@@ -266,8 +271,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
     funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
       auto memrefType = subspanOp.getType().cast<MemRefType>();
       Type elType = memrefType.getElementType();
-      auto llvmType =
-          LLVM::LLVMPointerType::get(elType, memrefType.getMemorySpaceAsInt());
+      auto llvmType = LLVM::LLVMPointerType::get(elType);
       llvmInputTypes[argMapping[SetBinding(subspanOp.getSet(),
                                            subspanOp.getBinding())]] = llvmType;
     });
@@ -388,8 +392,7 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
           loc, llvmBufferBasei8Ptr.getType(), llvmBufferBasei8Ptr,
           adaptor.getByteOffset());
     }
-    auto llvmPtrType = LLVM::LLVMPointerType::get(
-        memrefType.getElementType(), memrefType.getMemorySpaceAsInt());
+    auto llvmPtrType = LLVM::LLVMPointerType::get(memrefType.getElementType());
     Value llvmBufferBasePtr =
         rewriter.create<LLVM::BitcastOp>(loc, llvmPtrType, llvmBufferBasei8Ptr);
     if (memrefType.hasStaticShape()) {
@@ -517,6 +520,21 @@ void populateLowerHALInterfaceOp(RewritePatternSet &patterns) {
 
 std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass() {
   return std::make_unique<TestLLVMGPULegalizeOpPass>();
+}
+
+static IntegerAttr wrapNumericMemorySpace(MLIRContext *ctx, unsigned space) {
+  return IntegerAttr::get(IntegerType::get(ctx, 64), space);
+}
+
+void populateGpuMemorySpaceAttributeConversions(
+    TypeConverter &typeConverter, const MemorySpaceMapping &mapping) {
+  typeConverter.addTypeAttributeConversion(
+      [mapping](BaseMemRefType type, gpu::AddressSpaceAttr memorySpaceAttr) {
+        gpu::AddressSpace memorySpace = memorySpaceAttr.getValue();
+        unsigned addressSpace = mapping(memorySpace);
+        return wrapNumericMemorySpace(memorySpaceAttr.getContext(),
+                                      addressSpace);
+      });
 }
 
 }  // namespace iree_compiler

@@ -4,10 +4,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!pdl.operation) -> !pdl.operation
 
-  // Step 1. Tile to foreach_thread with tile_sizes [2].
+  // Step 1. Tile to forall with tile_sizes [2].
   // ===================================================
-  %foreach_thread, %tiled_generic =
-    transform.iree.tile_to_foreach_thread_and_workgroup_count_region %matmul tile_sizes [2]
+  %forall, %tiled_generic =
+    transform.iree.tile_to_forall_and_workgroup_count_region %matmul tile_sizes [2]
       // TODO: IREE needs own workgroup mapping attribute.
       ( mapping = [#gpu.block<x>] )
 
@@ -21,5 +21,5 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 3. Post-bufferization mapping workgroup.
   // =========================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  transform.iree.foreach_thread_to_workgroup %func
+  transform.iree.forall_to_workgroup %func
 }

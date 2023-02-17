@@ -50,6 +50,7 @@ func.func @matmul() {
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  transform.iree.vector.vector_to_mma_conversion %func
+  %func_2 = transform.iree.apply_patterns %func { unroll_vectors_gpu_wmma }
+  transform.iree.vector.vector_to_mma_conversion %func_2 { use_wmma }
 }
 }

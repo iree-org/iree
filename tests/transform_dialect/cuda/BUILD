@@ -26,6 +26,7 @@ endif()
 iree_lit_test_suite(
     name = "lit",
     srcs = [
+        "mma.mlir",
         "reduction.mlir",
         "reduction_eltwise.mlir",
         "reduction_v2.mlir",

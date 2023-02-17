@@ -28,8 +28,8 @@ module {
     } -> tensor<64xf32>
 
     %2 = affine.apply #map0()[%arg0]
-    // CHECK: scf.foreach_thread
-    %3 = scf.foreach_thread (%arg3) in (%2) shared_outs(%O = %arg2) -> (tensor<64xf32>) {
+    // CHECK: scf.forall
+    %3 = scf.forall (%arg3) in (%2) shared_outs(%O = %arg2) -> (tensor<64xf32>) {
       // CHECK:    %[[OFFSET:.*]] = affine.apply
       // CHECK:    %[[SIZE:.*]] = affine.min
       %4 = affine.apply #map1(%arg3)[%arg0]
@@ -44,7 +44,7 @@ module {
 
       // CHECK:    %[[T4:.*]] = linalg.elemwise_unary ins(%[[T1]] {{.*}} outs(%[[T3]]
       %8 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%7 : tensor<?xf32>) -> tensor<?xf32>
-      scf.foreach_thread.perform_concurrently {
+      scf.forall.in_parallel {
         tensor.parallel_insert_slice %8 into %O[%4] [%5] [1] : tensor<?xf32> into tensor<64xf32>
       }
     }
@@ -62,7 +62,7 @@ module {
     pdl.pattern @match_in_parallel : benefit(1) {
       %0 = operands
       %1 = types
-      %2 = operation "scf.foreach_thread"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      %2 = operation "scf.forall"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
       rewrite %2 with "transform.dialect"
     }
     transform.structured.canonicalized_sequence %arg0 failures(propagate) {
@@ -96,8 +96,8 @@ module {
     // TODO: Choosing %arg2 here complicates the size computation.
     %d0 = tensor.dim %arg1, %c0 : tensor<?xf32>
     %1 = affine.apply #map0()[%d0, %arg0]
-    // CHECK: scf.foreach_thread
-    %2 = scf.foreach_thread (%arg3) in (%1) shared_outs(%O = %arg2) -> (tensor<?xf32>) {
+    // CHECK: scf.forall
+    %2 = scf.forall (%arg3) in (%1) shared_outs(%O = %arg2) -> (tensor<?xf32>) {
       // CHECK:    %[[OFFSET:.*]] = affine.apply
       // CHECK:    %[[SIZE:.*]] = affine.min
       %3 = affine.apply #map1(%arg3)[%arg0]
@@ -110,7 +110,7 @@ module {
 
       // CHECK:    %[[T2:.*]] = linalg.elemwise_unary ins(%[[T1]]
       %7 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%5 : tensor<?xf32>) -> tensor<?xf32>
-      scf.foreach_thread.perform_concurrently {
+      scf.forall.in_parallel {
         tensor.parallel_insert_slice %7 into %O[%3] [%4] [1] : tensor<?xf32> into tensor<?xf32>
       }
     }
@@ -128,7 +128,7 @@ module {
     pdl.pattern @match_in_parallel : benefit(1) {
       %0 = operands
       %1 = types
-      %2 = operation "scf.foreach_thread"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      %2 = operation "scf.forall"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
       rewrite %2 with "transform.dialect"
     }
     transform.structured.canonicalized_sequence %arg0 failures(propagate) {

@@ -61,7 +61,7 @@ SKIP_PATH_PATTERNS = [
 RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
-BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64"]
+BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64", "comp-stats"]
 
 
 def skip_path(path: str) -> bool:
@@ -83,12 +83,13 @@ def get_trailers() -> Mapping[str, str]:
 
   print("Parsing PR description:", description, sep="\n")
 
-  trailer_lines = subprocess.run(["git", "interpret-trailers", "--parse"],
-                                 input=description,
-                                 stdout=subprocess.PIPE,
-                                 check=True,
-                                 text=True,
-                                 timeout=60).stdout.splitlines()
+  trailer_lines = subprocess.run(
+      ["git", "interpret-trailers", "--parse", "--no-divider"],
+      input=description,
+      stdout=subprocess.PIPE,
+      check=True,
+      text=True,
+      timeout=60).stdout.splitlines()
   return {
       k.lower().strip(): v.strip()
       for k, v in (line.split(":", maxsplit=1) for line in trailer_lines)

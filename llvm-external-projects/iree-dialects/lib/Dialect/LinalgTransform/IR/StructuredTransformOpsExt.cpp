@@ -599,7 +599,8 @@ forgetUnnecessaryHandles(transform::TransformState &state,
   for (Value operand : transform->getOperands()) {
     if (transform::isHandleConsumed(operand, transform))
       continue;
-
+    if (!operand.getType().isa<transform::TransformHandleTypeInterface>())
+      continue;
     for (Operation *payload : state.getPayloadOps(operand)) {
       if (!payload || seen.contains(payload))
         continue;
@@ -613,7 +614,8 @@ forgetUnnecessaryHandles(transform::TransformState &state,
         return !handlesUsedAfterTransform[handle];
       });
       if (allHandlesUnused) {
-        listener->removeMappings(payload);
+        // Store for mapping removal, but not remove immediately because it
+        // could invalidate other handles.
         seen.insert(payload);
       }
     }
@@ -623,13 +625,20 @@ forgetUnnecessaryHandles(transform::TransformState &state,
   for (Value result : transform->getResults()) {
     if (!result.getUses().empty())
       continue;
+    if (!result.getType().isa<transform::TransformHandleTypeInterface>())
+      continue;
     for (Operation *payload : state.getPayloadOps(result)) {
       if (!payload || seen.contains(payload))
         continue;
-      listener->removeMappings(payload);
+      // Store for mapping removal, but not remove immediately because it could
+      // invalidate other handles.
       seen.insert(payload);
     }
   }
+
+  // Remove everything in one bunch.
+  for (Operation *payload : seen)
+    listener->removeMappings(payload);
 }
 
 DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
@@ -972,16 +981,16 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
   pm.addPass(createLowerAffinePass());
   pm.addPass(createConvertSCFToCFPass());
   pm.addPass(createConvertLinalgToLLVMPass());
-  pm.addPass(createConvertVectorToLLVMPass(
-      // clang-format off
-      LowerVectorToLLVMOptions()
-        .enableReassociateFPReductions(getReassociateFpReductions())
-        .enableIndexOptimizations(getEnableIndexOptimizations())
-        .enableArmNeon(getEnableArmNeon())
-        .enableArmSVE(getEnableArmSve())
-        .enableAMX(getEnableAmx())
-        .enableX86Vector(getEnableX86vector())));
-  // clang-format on
+  {
+    auto options = ConvertVectorToLLVMPassOptions();
+    options.reassociateFPReductions = getReassociateFpReductions();
+    options.force32BitVectorIndices = getEnableIndexOptimizations();
+    options.armNeon = getEnableArmNeon();
+    options.armSVE = getEnableArmSve();
+    options.amx = getEnableAmx();
+    options.x86Vector = getEnableX86vector();
+    pm.addPass(createConvertVectorToLLVMPass(options));
+  }
   pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
   pm.addPass(createFinalizeMemRefToLLVMConversionPass());
   if (getEnableAsync())

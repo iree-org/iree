@@ -18,7 +18,7 @@
 namespace mlir {
 namespace scf {
 class ForOp;
-class ForeachThreadOp;
+class ForallOp;
 } // namespace scf
 } // namespace mlir
 

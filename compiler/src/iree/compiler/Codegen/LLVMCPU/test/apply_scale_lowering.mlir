@@ -180,8 +180,13 @@ hal.executable private @apply_scale_zve32x {
 
 // 32-bit lowering is used with '+zve32x'. Note that the 32-bit lowering
 // generates 64-bit mul operations that are decomposed into 32-bit operations by
-// the LLVM backend.
+// the LLVM backend. The backend expects both the low half to be an `llvm.mul` op.
 // CHECK-LABEL: llvm.func @apply_scale_zve32x
-//       CHECK:   %[[MUL:.*]] = llvm.mul %{{.*}}, %{{.*}} : vector<2xi64>
-//       CHECK:   %[[SHR:.*]] = llvm.lshr %{{.*}}, %{{.*}} : vector<2xi64>
+//   CHECK-DAG:   %[[RHS:.+]]    = llvm.mlir.constant(dense<19689> : vector<2xi32>) : vector<2xi32>
+//   CHECK-DAG:   %[[RHSEXT:.+]] = llvm.mlir.constant(dense<19689> : vector<2xi64>) : vector<2xi64>
+//       CHECK:   %[[LHS:.+]]    = llvm.load %{{.+}} {alignment = 4 : i64} : !llvm.ptr<vector<2xi32>>
+//       CHECK:   %[[LHSEXT:.+]] = llvm.sext %[[LHS]] : vector<2xi32> to vector<2xi64>
+//       CHECK:   %[[MULEXT:.*]] = llvm.mul %[[LHSEXT]], %[[RHSEXT]] : vector<2xi64>
+//       CHECK:   %[[MULLOW:.*]] = llvm.mul %[[LHS]], %[[RHS]] : vector<2xi32>
+//       CHECK:   %[[SHR:.*]]    = llvm.lshr %[[MULEXT]], %{{.*}} : vector<2xi64>
 //  CHECK-NEXT:   llvm.trunc %[[SHR]] : vector<2xi64> to vector<2xi32>

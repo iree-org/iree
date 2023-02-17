@@ -144,18 +144,18 @@ cmake --build ../iree-build/
 
 ### Running tests
 
-Build test dependencies:
+Build test dependencies and run tests:
 
 ``` shell
-cmake --build ../iree-build --target iree-test-deps
+cmake --build ../iree-build --target iree-run-tests
 ```
 
-Run all built tests through
-[CTest](https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest):
+Internally, this builds dependencies via the `iree-test-deps` target and
+invokes [CTest](https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest).
 
-``` shell
-ctest --test-dir ../iree-build/ --output-on-failure
-```
+The parallel testing level can be set via the environment variable
+`CTEST_PARALLEL_LEVEL` when invoking ctest in this fashion. Instructions
+are printed to test with a custom command line.
 
 ### Take a look around
 

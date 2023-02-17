@@ -41,6 +41,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "BroadcastingToLinalgPatterns.cpp"
+    "ConvertCollectiveOps.cpp"
     "ConvertComplexToReal.cpp"
     "ConvertMHLOToFlow.cpp"
     "ConvertMHLOToFlow.h"

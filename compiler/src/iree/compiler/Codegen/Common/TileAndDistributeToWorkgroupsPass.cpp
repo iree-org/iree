@@ -36,6 +36,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -58,7 +59,7 @@ namespace iree_compiler {
 // workgroups to a static value. Ideally this should not be done and the static
 // and dyamic cases are handled the same way. When the tile+distribute moves
 // away from using `scf.for` to using a construct that better captures
-// distribution (like `scf.foreach_thread`) this information can be dropped.
+// distribution (like `scf.forall`) this information can be dropped.
 static LogicalResult getTileAndDistributeConfig(
     ArrayRef<Operation *> computeOps, Operation *&dispatchRootOp,
     SmallVectorImpl<int64_t> &tileSizes,
@@ -137,11 +138,6 @@ getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
 //===---------------------------------------------------------------------===//
 
 namespace {
-
-class SimpleRewriter : public PatternRewriter {
- public:
-  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
-};
 
 /// The `flow.dispatch.workgroup_count_from_dag_root` op is lowered to
 /// a sequence of `affine.apply affine_map<()[s0, s1] -> ceildDiv(s0,
@@ -414,7 +410,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
             .setLoopType(linalg::LinalgTilingLoopType::Loops)
             .setTileSizeComputationFunction(tileSizeFn);
 
-    SimpleRewriter rewriter(context);
+    transform::TrivialPatternRewriter rewriter(context);
     if (failed(tileAndFuseDispatchUsingSCFForOp(
             cast<TilingInterface>(computeOps.back()), linalgTilingOptions,
             rewriter))) {

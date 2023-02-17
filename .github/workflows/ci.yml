@@ -889,7 +889,7 @@ jobs:
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
-    if: needs.setup.outputs.should-run == 'true'
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -949,9 +949,13 @@ jobs:
       - name: "Uploading benchmark results"
         id: upload
         env:
+          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
           COMPILE_STATS_RESULTS: ${{ steps.collect.outputs.compile-stats-results }}
           COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.collect.outputs.compile-stats-results }}
         run: |
+          # Upload files with two commands since they go into different GCS
+          # directories.
+          gcloud storage cp "${COMPILATION_CONFIG}" "${GCS_DIR}"
           gcloud storage cp \
             "${COMPILE_STATS_RESULTS}" \
             "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
@@ -973,13 +977,7 @@ jobs:
 
   process_benchmark_results:
     needs: [setup, compilation_benchmarks, execution_benchmarks]
-    # execution_benchmarks is the optional dependency and skipped in presubmit
-    # if no benchmark is specified to run.
-    if: |
-      always() &&
-      needs.setup.outputs.should-run == 'true' &&
-      needs.compilation_benchmarks.result == 'success' &&
-      contains(fromJSON('["success", "skipped"]'), needs.execution_benchmarks.result)
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -989,7 +987,9 @@ jobs:
     env:
       COMPILE_STATS_RESULTS: ${{ needs.compilation_benchmarks.outputs.compile-stats-results }}
       COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
+      # Empty if no execution benchmark runs.
       EXECUTION_BENCHMARK_RESULTS_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-dir }}
+      # Empty if no execution benchmark runs.
       EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
     steps:
       - name: "Checking out repository"
@@ -1004,7 +1004,10 @@ jobs:
             "${COMPILE_STATS_RESULTS}"
       - name: Downloading execution benchmark results
         id: download-execution-results
-        if: needs.execution_benchmarks.result == 'success'
+        # Skip the download if there is no execution benchmark results (e.g. no
+        # benchmark matches the preset/filter). In such case, no benchmark job
+        # is run in benchmark_execution.yml and the output variables are empty.
+        if: env.EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR != ''
         run: |
           gcloud storage cp -r \
             "${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/benchmark-results-*.json" \
@@ -1047,16 +1050,18 @@ jobs:
             "${BENCHMARK_COMMENT_ARTIFACT}" \
             "${BENCHMARK_COMMENT_GCS_ARTIFACT}"
       - name: Uploading results to dashboard
-        # TODO(#11076): Temporarily disabled until we migrate the database.
-        if: false && needs.setup.outputs.ci-stage == 'postsubmit'
+        if: needs.setup.outputs.ci-stage == 'postsubmit'
         env:
           EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
           IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
         run: |
-          ./build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
-            --verbose \
-            --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
-            --compile_stats_files="${COMPILE_STATS_RESULTS}"
+          build_tools/github_actions/docker_run.sh \
+            --env "IREE_DASHBOARD_API_TOKEN=${IREE_DASHBOARD_API_TOKEN}" \
+            gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
+            ./build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
+              --verbose \
+              --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
+              --compile_stats_files="${COMPILE_STATS_RESULTS}"
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms

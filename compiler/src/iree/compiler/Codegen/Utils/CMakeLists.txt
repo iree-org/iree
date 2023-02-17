@@ -29,6 +29,7 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
+    LLVMTargetParser
     MLIRAffineDialect
     MLIRArithDialect
     MLIRArithUtils

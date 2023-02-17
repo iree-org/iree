@@ -33,9 +33,8 @@ using namespace mlir;
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
-using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
-using iree_compiler::IREE::transform_dialect::
-    MapNestedForeachThreadToGpuThreadsOp;
+using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
+using iree_compiler::IREE::transform_dialect::MapNestedForallToGpuThreadsOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
 using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
 using transform::FuseIntoContainingOp;
@@ -139,8 +138,8 @@ static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
 /// func.func.
 Value mlir::iree_compiler::gpu::buildMapToBlockAndThreads(
     ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize) {
-  funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
-  return b.create<MapNestedForeachThreadToGpuThreadsOp>(funcH, blockSize);
+  funcH = b.create<ForallToWorkgroupOp>(funcH);
+  return b.create<MapNestedForallToGpuThreadsOp>(funcH, blockSize);
 }
 
 /// Post-bufferization vector distribution with rank-reduction.
@@ -222,7 +221,7 @@ void mlir::iree_compiler::gpu::
     }
     if (numThreads > 1) {
       assert(mappingAttr && "must specify a mapping attribute");
-      iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
+      iree_compiler::buildTileFuseDistToForallWithNumThreads(
           /*b=*/b,
           /*rootH=*/opH,
           /*opsHToFuse=*/{},
@@ -243,7 +242,7 @@ void mlir::iree_compiler::gpu::
   }
   if (numThreads > 1) {
     assert(mappingAttr && "must specify a mapping attribute");
-    iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
+    iree_compiler::buildTileFuseDistToForallWithNumThreads(
         /*b=*/b,
         /*rootH=*/opH,
         /*opsHToFuse=*/{},

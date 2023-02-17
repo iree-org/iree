@@ -32,7 +32,7 @@ func.func @static_tile(%arg0: index, %arg1: memref<?xf32>, %arg2: memref<?xf32>)
   // CHECK:   async.add_to_group %[[token]], %[[group]] : !async.token
   // CHECK: }
   // CHECK: async.await_all %[[group]]
-  scf.foreach_thread (%arg3) in (%1) shared_outs() -> () {
+  scf.forall (%arg3) in (%1) shared_outs() -> () {
       %3 = affine.apply #map1(%arg3)[%arg0]
       %4 = affine.apply #map2(%0, %3)
       %5 = affine.min #map3(%4, %arg0)
@@ -52,6 +52,6 @@ func.func @static_tile(%arg0: index, %arg1: memref<?xf32>, %arg2: memref<?xf32>)
 
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%module_op: !pdl.operation):
-  %0 = transform.structured.match ops{["scf.foreach_thread"]} in %module_op : (!pdl.operation) -> !pdl.operation
-  %1 = foreach_thread_to_async %0
+  %0 = transform.structured.match ops{["scf.forall"]} in %module_op : (!pdl.operation) -> !pdl.operation
+  %1 = forall_to_async %0
 }

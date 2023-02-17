@@ -2093,3 +2093,64 @@ hal.executable private @unpack_elem {
 // CHECK:           scf.for
 // CHECK:             iree_linalg_ext.unpack
 // CHECK:             linalg.generic
+
+// -----
+
+hal.executable private @dynamic_unpack_fusion {
+  hal.executable.variant public @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb", {ukernels = true}> {
+    hal.executable.export public @dynamic_unpack_fusion ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) attributes {translation_info = #iree_codegen.translation_info<VMVXDefault>} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @dynamic_unpack_fusion() {
+        %c200960 = arith.constant 200960 : index
+        %c1003776 = arith.constant 1003776 : index
+        %c1053952 = arith.constant 1053952 : index
+        %c0 = arith.constant 0 : index
+        %c-30_i32 = arith.constant -30 : i32
+        %c-128_i32 = arith.constant -128 : i32
+        %c30720_i32 = arith.constant 30720 : i32
+        %cst = arith.constant dense<[-918, -4433, 87, -234, -21393, 7738, 529, -8835, -16817, -375, -199, 572, 5082, 15569, -186, 4955]> : tensor<16xi32>
+        %c12544 = arith.constant 12544 : index
+        %c16 = arith.constant 16 : index
+        %0:2 = vmvx.query_tile_sizes sizes(%c12544, %c16) flags(1245184) -> index, index
+        %1 = affine.apply affine_map<()[s0] -> (12544 ceildiv s0)>()[%0#0]
+        %2 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#1]
+        %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c200960) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%1, %2, %0#0, %0#1}
+        %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c1003776) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<12544xi32>>
+        %5 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c1053952) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<16xi32>>
+        %6 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<12544x16xi32>>
+        %7:2 = vmvx.query_tile_sizes sizes(%c12544, %c16) flags(1245184) -> index, index
+        %8 = affine.apply affine_map<()[s0] -> (12544 ceildiv s0)>()[%7#0]
+        %9 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%7#1]
+        %10 = flow.dispatch.tensor.load %3, offsets = [0, 0, 0, 0], sizes = [%8, %9, %7#0, %7#1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%8, %9, %7#0, %7#1} -> tensor<?x?x?x?xi32>
+        %11 = flow.dispatch.tensor.load %4, offsets = [0], sizes = [12544], strides = [1] : !flow.dispatch.tensor<readonly:tensor<12544xi32>> -> tensor<12544xi32>
+        %12 = flow.dispatch.tensor.load %5, offsets = [0], sizes = [16], strides = [1] : !flow.dispatch.tensor<readonly:tensor<16xi32>> -> tensor<16xi32>
+        %13 = tensor.empty() : tensor<12544x16xi32>
+        %14 = tensor.empty() : tensor<12544x16xi32>
+        %15:2 = vmvx.query_tile_sizes sizes(%c12544, %c16) flags(1245184) -> index, index
+        %16 = iree_linalg_ext.unpack {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[16, 16]]>} %10 inner_dims_pos = [0, 1] inner_tiles = [%15#0, %15#1] into %14 : (tensor<?x?x?x?xi32> tensor<12544x16xi32>) -> tensor<12544x16xi32>
+        %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%cst, %16, %11, %12 : tensor<16xi32>, tensor<12544x16xi32>, tensor<12544xi32>, tensor<16xi32>) outs(%13 : tensor<12544x16xi32>) {
+        ^bb0(%in: i32, %in_0: i32, %in_1: i32, %in_2: i32, %out: i32):
+          %18 = arith.muli %in_1, %c-30_i32 : i32
+          %19 = arith.subi %in_0, %18 : i32
+          %20 = arith.muli %in_2, %c-128_i32 : i32
+          %21 = arith.subi %19, %20 : i32
+          %22 = arith.addi %21, %c30720_i32 : i32
+          %23 = arith.addi %in, %22 : i32
+          linalg.yield %23 : i32
+        } -> tensor<12544x16xi32>
+        flow.dispatch.tensor.store %17, %6, offsets = [0, 0], sizes = [12544, 16], strides = [1, 1] : tensor<12544x16xi32> -> !flow.dispatch.tensor<writeonly:tensor<12544x16xi32>>
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: func.func @dynamic_unpack_fusion
+// CHECK:         scf.for
+// CHECK:           scf.for
+// CHECK:             iree_linalg_ext.unpack
+// CHECK:             tensor.extract_slice
+// CHECK:             linalg.generic

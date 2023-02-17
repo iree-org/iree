@@ -42,13 +42,16 @@ struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
 
   LogicalResult matchAndRewrite(memref::DeallocOp op,
                                 PatternRewriter &rewriter) const override {
-    unsigned addressSpace =
-        op.getMemref().getType().cast<MemRefType>().getMemorySpaceAsInt();
-    if (addressSpace == NVVM::NVVMMemorySpace::kSharedMemorySpace) {
-      rewriter.eraseOp(op);
-      return success();
-    }
-    return failure();
+    auto addressSpace = op.getMemref()
+                            .getType()
+                            .cast<MemRefType>()
+                            .getMemorySpace()
+                            .dyn_cast_or_null<gpu::AddressSpaceAttr>();
+    if (!addressSpace ||
+        addressSpace.getValue() != gpu::GPUDialect::getWorkgroupAddressSpace())
+      return failure();
+    rewriter.eraseOp(op);
+    return success();
   }
 };
 
@@ -72,6 +75,21 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
     options.overrideIndexBitwidth(64);
     LLVMTypeConverter converter(m.getContext(), options);
+    populateGpuMemorySpaceAttributeConversions(
+        converter, [](gpu::AddressSpace space) -> unsigned {
+          switch (space) {
+            case gpu::AddressSpace::Global:
+              return static_cast<unsigned>(
+                  NVVM::NVVMMemorySpace::kGlobalMemorySpace);
+            case gpu::AddressSpace::Workgroup:
+              return static_cast<unsigned>(
+                  NVVM::NVVMMemorySpace::kSharedMemorySpace);
+            case gpu::AddressSpace::Private:
+              return 0;
+          }
+          llvm_unreachable("unknown address space enum value");
+          return 0;
+        });
     // Lowering for MMAMatrixType.
     converter.addConversion([&](gpu::MMAMatrixType type) -> Type {
       return convertMMAToLLVMType(type);
