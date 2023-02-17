@@ -59,6 +59,9 @@ iree_lit_test_suite(
   SRCS
     "example_hal.mlir"
     "example_stream.mlir"
+  DATA
+    functions_aarch64.o
+    functions_x86_64.o
   TOOLS
     FileCheck
     iree-compile
