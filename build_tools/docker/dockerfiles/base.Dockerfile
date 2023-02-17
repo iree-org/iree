@@ -28,7 +28,7 @@ RUN apt-get update \
     wget \
     curl \
     gnupg2 \
-    lsb_release
+    lsb-release
 
 # Install the oldest supported compiler tools
 ARG LLVM_VERSION=9

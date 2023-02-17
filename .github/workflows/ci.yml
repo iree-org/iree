@@ -122,8 +122,8 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e" \
-            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6" \
+            gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
       # The archive step below doesn't include these files. Remove them first to
@@ -282,7 +282,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_CUDA_DISABLE=1 \
-            gcr.io/iree-oss/swiftshader@sha256:126f96acd2071d364ff09d1e726a543ded8689619dfd80ca63ce716b31a5c1d4 \
+            gcr.io/iree-oss/swiftshader@sha256:ad9d07a63982d4a2c9ada8b5f455b889fed823f0c9c4b28f2548a6ba8cc3d86d \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
@@ -320,7 +320,7 @@ jobs:
             --env CTEST_PARALLEL_LEVEL=2 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
-            gcr.io/iree-oss/nvidia@sha256:1294591d06d2b5eb03a7214fac040a1ccab890ea62e466843553f7fb7aacdc1d \
+            gcr.io/iree-oss/nvidia@sha256:ad5d69c09710a1529a549b1c69ca72121f5e58197b793f367d2cb126bb119fc5 \
             bash -euo pipefail -c \
               "./build_tools/scripts/check_cuda.sh
               ./build_tools/scripts/check_vulkan.sh
@@ -346,14 +346,14 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "BUILD_PRESET=test" \
-            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6 \
             ./build_tools/cmake/build_runtime.sh \
             "${BUILD_DIR}"
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VULKAN_DISABLE=1 \
-            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
@@ -413,7 +413,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
             --env "IREE_TF_BINARIES_OUTPUT_DIR=${IREE_TF_BINARIES_OUTPUT_DIR}" \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:414071144e8b742ec61eccf69a657e13424513b7574153820367de355e494e0a \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:03282a03a42e383cb9fe39ca2e2b39e66eea1b301fa91ea4d34c000b7f825ab7 \
             build_tools/cmake/build_tf_binaries.sh
           echo "binaries-dir=${IREE_TF_BINARIES_OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
       - name: "Creating archive of binaries"
@@ -468,7 +468,7 @@ jobs:
       - name: "Running TF integrations tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:414071144e8b742ec61eccf69a657e13424513b7574153820367de355e494e0a \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:03282a03a42e383cb9fe39ca2e2b39e66eea1b301fa91ea4d34c000b7f825ab7 \
             build_tools/cmake/run_tf_tests.sh \
             "${BUILD_DIR}"
 
@@ -510,7 +510,7 @@ jobs:
             --env IREE_LLVM_CPU_DISABLE=1 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
-            gcr.io/iree-oss/frontends-nvidia@sha256:130572b670f8d7e29ca934cb8775ac81346d532dde7dfd51c402b52f23ea73fc \
+            gcr.io/iree-oss/frontends-nvidia@sha256:7dec21e3a1a5135572b7cd6201c1b64f16ed7a45c03b5fa3427d08d3ded7d5ed \
             bash -euo pipefail -c \
               "./build_tools/scripts/check_cuda.sh
               ./build_tools/scripts/check_vulkan.sh
@@ -557,7 +557,7 @@ jobs:
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
             --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
             --env "IREE_BUILD_BENCHMARKS_DIR=${BUILD_BENCHMARKS_DIR}" \
-            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6 \
             build_tools/cmake/build_benchmarks.sh
 
   ############################### Configurations ###############################
@@ -653,8 +653,8 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e" \
-            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6" \
+            gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6 \
             ./build_tools/cmake/build_and_test_tsan.sh
 
   small_runtime:
@@ -673,14 +673,14 @@ jobs:
         # and GitHub runners don't have write access to GCS
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6 \
             ./build_tools/cmake/build_runtime_small.sh \
             "${BUILD_DIR}"
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VULKAN_DISABLE=1 \
-            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
@@ -710,8 +710,8 @@ jobs:
             --env "IREE_TARGET_BACKEND_WEBGPU=OFF" \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e" \
-            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6" \
+            gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
 
@@ -739,8 +739,8 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e" \
-            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6" \
+            gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6 \
             ./build_tools/cmake/build_tracing.sh \
             "${BUILD_DIR}"
 
@@ -768,8 +768,8 @@ jobs:
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CMAKE_BUILD_TYPE=Debug" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e" \
-            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6" \
+            gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
 
@@ -799,12 +799,12 @@ jobs:
         target:
           - platform: "linux"
             arch: "x86_64"
-            docker_image: "gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e"
+            docker_image: "gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6"
             # Builds tools on the host and assumes the builder is Linux x86_64.
             build_script: "./build_tools/cmake/build_runtime.sh"
           - platform: "linux"
             arch: "riscv_64"
-            docker_image: "gcr.io/iree-oss/riscv@sha256:a7e7b03236324f92e7c96925add02cf0b37eca5b68af54f64049fc689f770915"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:5ce8217f9e6c9cc1211ed43b51a7c0cb12f90894e6a99b1d89a3413142c0e49f"
             build_script: "./build_tools/cmake/build_riscv.sh"
     env:
       PLATFORM: ${{ matrix.target.platform }}
@@ -902,7 +902,7 @@ jobs:
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
-            gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e \
+            gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6 \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
@@ -1123,31 +1123,31 @@ jobs:
           - platform: android
             arch: armv8.2-a
             abi: arm64-v8a
-            docker_image: "gcr.io/iree-oss/android@sha256:b0b607d95af8da6a6ce430f22d9d7c621702df13ce2b5d264b79d0ac7e60d670"
+            docker_image: "gcr.io/iree-oss/android@sha256:4540757ccf67e4cc594a16bdace31e23d193b04b9b54ecfcea07c3f50c6aeb6d"
             build_script: "./build_tools/cmake/build_android.sh"
             # No test_script
           - platform: linux
             arch: riscv_64
             abi: lp64d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:a7e7b03236324f92e7c96925add02cf0b37eca5b68af54f64049fc689f770915"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:5ce8217f9e6c9cc1211ed43b51a7c0cb12f90894e6a99b1d89a3413142c0e49f"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: riscv_32
             abi: ilp32d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:a7e7b03236324f92e7c96925add02cf0b37eca5b68af54f64049fc689f770915"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:5ce8217f9e6c9cc1211ed43b51a7c0cb12f90894e6a99b1d89a3413142c0e49f"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: generic
             arch: riscv_32
             abi: ilp32
-            docker_image: "gcr.io/iree-oss/riscv@sha256:a7e7b03236324f92e7c96925add02cf0b37eca5b68af54f64049fc689f770915"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:5ce8217f9e6c9cc1211ed43b51a7c0cb12f90894e6a99b1d89a3413142c0e49f"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./tests/riscv32/smoke.sh"
           - platform: emscripten
             arch: wasm32
             abi: wasm32
-            docker_image: "gcr.io/iree-oss/emscripten@sha256:fdb2bf6b0701a6de80f4f708ea86b001279c8acd904c34ef4d05ee3802711e45"
+            docker_image: "gcr.io/iree-oss/emscripten@sha256:2c9ff3db40aba6da66b3ea88b18943045080fc8589868cbf49bfa95321825f8c"
             build_script: "./build_tools/cmake/build_runtime_emscripten.sh"
             # No test script
 
@@ -1211,15 +1211,15 @@ jobs:
         target:
           - platform: linux
             arch: riscv_64
-            docker_image: "gcr.io/iree-oss/riscv@sha256:a7e7b03236324f92e7c96925add02cf0b37eca5b68af54f64049fc689f770915"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:5ce8217f9e6c9cc1211ed43b51a7c0cb12f90894e6a99b1d89a3413142c0e49f"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: riscv_32
-            docker_image: "gcr.io/iree-oss/riscv@sha256:a7e7b03236324f92e7c96925add02cf0b37eca5b68af54f64049fc689f770915"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:5ce8217f9e6c9cc1211ed43b51a7c0cb12f90894e6a99b1d89a3413142c0e49f"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: x86_64
-            docker_image: "gcr.io/iree-oss/base@sha256:f26a5aa5f8d3705c6b80c71d04fafb360861f1907bdd1b1f5f19480b6192664e"
+            docker_image: "gcr.io/iree-oss/base@sha256:af286f169cfccd2d25c89dfc00633114d36829e4710c6f8317b9ef3beb1845d6"
             run_scripts: "./build_tools/cmake/test_benchmark_suites_on_linux.sh"
     env:
       PLATFORM: ${{ matrix.target.platform }}

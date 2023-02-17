@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 env:
-  DOCKER_IMAGE: "gcr.io/iree-oss/frontends@sha256:41e82bb62a3850c01d0252aa67aebd7816e47da0132af677cd70fc76731c4b5d"
+  DOCKER_IMAGE: "gcr.io/iree-oss/frontends@sha256:fa8d9a8ff996cc2f98b6bf7103840f20e76763db44b0ac633660f1e063e02693"
   IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
 
 steps:
