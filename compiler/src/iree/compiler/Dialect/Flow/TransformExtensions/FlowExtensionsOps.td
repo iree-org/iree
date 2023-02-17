@@ -19,7 +19,7 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreac
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
-    Rewrite an scf.foreach_thread to Flow::DispatchWorkgroups.
+    Rewrite an scf.forall to Flow::DispatchWorkgroups.
 
     #### Return modes
 

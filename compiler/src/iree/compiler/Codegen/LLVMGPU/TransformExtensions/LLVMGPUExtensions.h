@@ -46,7 +46,7 @@ class LLVMGPUExtensions
 }  // namespace transform_dialect
 }  // namespace IREE
 
-/// Transformation to convert scf.foreach_thread to gpu distribution.
+/// Transformation to convert scf.forall to gpu distribution.
 FailureOr<SmallVector<OpFoldResult>> rewriteForeachThreadToGpu(
     scf::ForallOp forallOp, const SmallVector<int64_t> &globalWorkgroupSizes,
     RewriterBase &rewriter, bool syncAfterDistribute = true);

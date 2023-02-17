@@ -160,7 +160,7 @@ static void buildStagedReductionStrategyThreadLevel(
   // Staged reduction step 2: multi-warp shuffle reduce.
   // Map the combiner reduction to one thread along y. Mapping this part along
   // y only will trigger the insertion of an `scf.if (threadIdx.x == 0)`
-  // predicate after `scf.foreach_thread` is lowered.
+  // predicate after `scf.forall` is lowered.
   // This predicate allows further vector distribution to kick in.
   Value root = blockCombinerOpH;
   SmallVector<Value> opsToFuse = {gridFillH};
@@ -214,7 +214,7 @@ static void buildStagedReductionStrategyThreadLevel(
 void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const StagedReductionStrategy &strategy) {
-  // Step 1. Match and tile to introduce the top-level scf.foreach_thread for
+  // Step 1. Match and tile to introduce the top-level scf.forall for
   // the block/workgroup level. Keep everything fused.
   auto [maybeLeadingHBlock, gridFillH, gridReductionH, maybeTiledTrailingHBlock,
         commonEnclosingForeachThreadH] =

@@ -23,13 +23,13 @@ transform.structured.canonicalized_sequence failures(propagate) {
   transform.structured.fuse_into_containing_op %exps_sum_fill into %foreach_thread
   transform.structured.fuse_into_containing_op %input_max into %foreach_thread
   transform.structured.fuse_into_containing_op %input_max_fill into %foreach_thread
-  // By default, fusion into scf.foreach_thread does not promote captured values
+  // By default, fusion into scf.forall does not promote captured values
   // to shared as this involves a cross-thread dependence analysis.
   // Instead, we activate it explicitly post-hoc to promote all the extract_slice
   // ops that we find and match the prerequisites
-  %foreach_thread_with_type = transform.cast %foreach_thread : !pdl.operation to !transform.op<"scf.foreach_thread">
+  %foreach_thread_with_type = transform.cast %foreach_thread : !pdl.operation to !transform.op<"scf.forall">
   transform.iree.share_foreach_thread_operands %foreach_thread_with_type
-    : (!transform.op<"scf.foreach_thread">) -> !transform.op<"scf.foreach_thread">
+    : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   // ================================================================

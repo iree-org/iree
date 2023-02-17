@@ -92,7 +92,7 @@ TileToScfForAndFuseResult buildTileFuseToScfFor(
 /// Result of the combined transform performing tiling, fusion and
 /// distribution to parallel constructs.
 struct TileToForeachThreadAndFuseAndDistributeResult {
-  /// Outer `scf.foreach_thread` loop containing the tiled and fused
+  /// Outer `scf.forall` loop containing the tiled and fused
   /// operations.
   Value foreachThreadH;
   /// Handles to fused operations other than the final consumer operation. May
@@ -105,9 +105,9 @@ struct TileToForeachThreadAndFuseAndDistributeResult {
 };
 
 /// Build transform IR to perform the following transformations:
-///   1. Tiles `rootH` to scf.foreach_thread to with `tileSizesOrNumThreads`
+///   1. Tiles `rootH` to scf.forall to with `tileSizesOrNumThreads`
 ///      according to whether spec is a TileSizesSpec or a NumThreadsSpec.
-///   2. Maps the resulting scf.foreach_thread to threads according to
+///   2. Maps the resulting scf.forall to threads according to
 ///      `threadDimMapping`.
 ///   3. Iterates over `opsHToFuse` in order and fuses into the containing op.
 ///
@@ -183,13 +183,13 @@ std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
 
 /// Build transform IR to match exactly an N-D reduction operation (with
 /// optional leading and trailing elementwise) and create a top-level
-/// `scf.foreach_thread` tiled by `strategy.workgroupTileSizes`.
+/// `scf.forall` tiled by `strategy.workgroupTileSizes`.
 /// The matched `maybeLeadingH`, `fillH`, `reductionH` and `maybeTrailingH` are
-/// fused into the top-level `scf.foreach_thread` and handles are returned to
+/// fused into the top-level `scf.forall` and handles are returned to
 /// the fused versions of these ops, in order, that are all tiled and
-/// distributed accordingly. The scf.foreach_thread is returned as the last
+/// distributed accordingly. The scf.forall is returned as the last
 /// value.
-/// The mapping of the `scf.foreach_thread` dimensions is tied the first
+/// The mapping of the `scf.forall` dimensions is tied the first
 /// dimensions of `strategy.allBlockAttrs`.
 ///
 /// Note: `buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes` is

@@ -36,12 +36,11 @@ SmallVector<Value> getValuesToYield(scf::InParallelOp op) {
 FailureOr<scf::ForOp> ForallOpToScfForRewriter::returningMatchAndRewrite(
     scf::ForallOp forallOp, PatternRewriter &rewriter) const {
   if (forallOp.getNumResults() > 0)
-    return forallOp->emitError(
-        "only bufferized scf.foreach_thread lowers to scf.for");
+    return forallOp->emitError("only bufferized scf.forall lowers to scf.for");
 
   if (forallOp.getRank() > 1)
     return forallOp->emitError(
-        "only single-dimension scf.foreach_thread lowers to scf.for");
+        "only single-dimension scf.forall lowers to scf.for");
 
   // Construct the loop bounds based on the canonical arithmetic progression.
   Location loc = forallOp.getLoc();

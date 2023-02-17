@@ -30,12 +30,11 @@ mlir::iree_compiler::IREE::LinalgExt::ForallOpToAsyncRewriter::
     returningMatchAndRewrite(scf::ForallOp forallOp,
                              PatternRewriter &rewriter) const {
   if (forallOp.getNumResults() > 0)
-    return forallOp->emitError(
-        "only bufferized scf.foreach_thread lowers to async");
+    return forallOp->emitError("only bufferized scf.forall lowers to async");
 
   if (forallOp.getRank() > 1)
     return forallOp->emitError(
-        "only single-dimension scf.foreach_thread lowers to async");
+        "only single-dimension scf.forall lowers to async");
 
   // Only consider the top level ForallOp op and skip if it already
   // contains an ExecuteOp.
@@ -51,7 +50,7 @@ mlir::iree_compiler::IREE::LinalgExt::ForallOpToAsyncRewriter::
   // TODO: allow multi-dim.
   Value numThreads = forallOp.getUpperBound(rewriter).front();
 
-  // Wrap the scf.foreach_thread into an async::ExecuteOp.
+  // Wrap the scf.forall into an async::ExecuteOp.
   // 1. Create the async::GroupType object on which we synchronize.
   Value asyncGroup = rewriter.create<async::CreateGroupOp>(
       loc, async::GroupType::get(ctx), numThreads);

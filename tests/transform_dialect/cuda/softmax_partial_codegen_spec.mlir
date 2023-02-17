@@ -28,7 +28,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
     transform.structured.tile_to_foreach_thread_op %reduction_linalg tile_sizes [1, 1]
       ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
   // TODO: this fusion currently does not happen properly, this is related to the clone
-  // behavior when fusing into scf.foreach_thread.
+  // behavior when fusing into scf.forall.
   // Once fixed we'll be able to fuse.
   // Fusion will save us one roundtrip to memory.
   // transform.structured.fuse_into_containing_op %fill_linalg into %foreach_thread_reduction
@@ -36,9 +36,9 @@ transform.structured.canonicalized_sequence failures(propagate) {
       ( mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>] )
 
 
-  // Inability to tile reductions to scf.foreach_thread has 2 implications:
-  //   1. since no scf.foreach_thread is present, no gpu.barrier is added.
-  //      This should be fixed independently: ops that are not nested in an scf.foreach_thread
+  // Inability to tile reductions to scf.forall has 2 implications:
+  //   1. since no scf.forall is present, no gpu.barrier is added.
+  //      This should be fixed independently: ops that are not nested in an scf.forall
   //      should have a gpu.barrier. Later needs to be complemented by a barrier
   //      removal pass.
   //   2. Similarly, needs to be predicated under an if threadIx == 0 to avoid

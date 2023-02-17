@@ -35,7 +35,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %expanded_eltwise, %more_parallel_2, %combiner_2, %trailing_eltwise_2 =
     transform.split_handles %generics in [4]
     : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
-  %foreach_thread_grid_2 = transform.structured.match ops{["scf.foreach_thread"]} in %variant_op
+  %foreach_thread_grid_2 = transform.structured.match ops{["scf.forall"]} in %variant_op
   %not_trailing = transform.merge_handles %fill_2, %more_parallel_fill_2,
     %more_parallel_2, %expanded_eltwise, %combiner_2 : !pdl.operation
   transform.structured.fuse_into_containing_op %not_trailing into %foreach_thread_grid_2

@@ -32,7 +32,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %generics = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %expanded_eltwise, %more_parallel_2, %combiner_2 =
     transform.split_handles %generics in [3] : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation)
-  %foreach_thread_grid_2 = transform.structured.match ops{["scf.foreach_thread"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+  %foreach_thread_grid_2 = transform.structured.match ops{["scf.forall"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %not_combiner = transform.merge_handles %fill_2, %more_parallel_fill_2, %more_parallel_2, %expanded_eltwise : !pdl.operation
   transform.structured.fuse_into_containing_op %not_combiner into %foreach_thread_grid_2
 

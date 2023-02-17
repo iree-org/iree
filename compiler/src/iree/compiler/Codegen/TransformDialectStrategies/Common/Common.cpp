@@ -148,12 +148,12 @@ mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b, Value rootH,
 }
 
 /// Performs the following transformations:
-///   1. Tiles `rootH` to scf.foreach_thread to with `tileSizesOrNumThreads`
+///   1. Tiles `rootH` to scf.forall to with `tileSizesOrNumThreads`
 ///      according to whether spec is a TileSizesSpec or a NumThreadsSpec.
-///   2. Maps the resulting scf.foreach_thread to threads according to
+///   2. Maps the resulting scf.forall to threads according to
 ///      `threadDimMapping`.
 ///   3. Iterates over `opsHToFuse` in order and fuses into the containing op.
-/// Returns a handle to the resulting scf.foreach_thread.
+/// Returns a handle to the resulting scf.forall.
 ///
 /// Fusion operates in batch mode: a single fusion command is issued and a
 /// topological sort is automatically computed by the fusion.

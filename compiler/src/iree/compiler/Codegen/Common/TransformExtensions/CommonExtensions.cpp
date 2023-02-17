@@ -442,10 +442,10 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimZ);
   if (forallOp.getNumResults() > 0)
     return forallOp->emitError(
-        "only bufferized scf.foreach_thread lowers to workgroup");
+        "only bufferized scf.forall lowers to workgroup");
   if (forallOp.getRank() > 3)
     return forallOp->emitError(
-        "scf.foreach_thread with rank > 3 does not lower to workgroup");
+        "scf.forall with rank > 3 does not lower to workgroup");
 
   if (!forallOp.getMapping().has_value())
     return forallOp->emitError("mapping must be present");
@@ -593,7 +593,7 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
   if (walkResult.wasInterrupted()) {
     results.assign(1, nullptr);
     return mlir::emitSilenceableFailure(
-        target, "could not find a unique topLevel scf.foreach_thread");
+        target, "could not find a unique topLevel scf.forall");
   }
 
   SimplePatternRewriter rewriter(topLevelForallOp);
