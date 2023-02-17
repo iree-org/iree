@@ -1008,8 +1008,9 @@ jobs:
             "${COMPILE_STATS_RESULTS}"
       - name: Downloading execution benchmark results
         id: download-execution-results
-        # Skip the download if there is no execution benchmark to run.
-        if: ${{ env.EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR }} != ''
+        # Skip the download if there is no execution benchmark results (e.g. no
+        # benchmark matches the preset/filter).
+        if: env.EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR != ''
         run: |
           gcloud storage cp -r \
             "${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/benchmark-results-*.json" \
