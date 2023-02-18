@@ -60,9 +60,11 @@ config.test_exec_root = os.path.join(config.iree_dialects_obj_root, 'test')
 config.standalone_tools_dir = os.path.join(config.iree_dialects_obj_root, 'bin')
 
 # Tweak the PATH to include the tools dir.
-llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
+llvm_config.with_environment('PATH',
+                             config.llvm_tools_binary_dir,
+                             append_path=True)
 
-tool_dirs = [config.llvm_tools_dir]
+tool_dirs = [config.llvm_tools_binary_dir]
 tools = [
     ToolSubst('%PYTHON', config.python_executable, unresolved='ignore'),
     # Since we build iree-dialects out of tree, we don't have a common tools
