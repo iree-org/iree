@@ -9,7 +9,7 @@
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
   cpu_features = "+m,+a,+f,+d,+c",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
-  native_vector_size = 256 : index,
+  native_vector_size = 512 : index,
   target_triple = "riscv64-unknown-unknown-eabi-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
@@ -55,9 +55,9 @@ hal.executable private @apply_scale_no_vector_feature {
   ]>
 ]>
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
-  cpu_features = "+m,+a,+f,+d,+c,+v",
+  cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+v",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
-  native_vector_size = 256 : index,
+  native_vector_size = 512 : index,
   target_triple = "riscv64-unknown-unknown-eabi-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
@@ -101,9 +101,9 @@ hal.executable private @apply_scale_v {
   ]>
 ]>
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
-  cpu_features = "+m,+a,+f,+d,+c,+zve64x",
+  cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+zve64x",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
-  native_vector_size = 256 : index,
+  native_vector_size = 512 : index,
   target_triple = "riscv64-unknown-unknown-eabi-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
@@ -147,9 +147,9 @@ hal.executable private @apply_scale_zve64x {
   ]>
 ]>
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
-  cpu_features = "+m,+a,+f,+d,+c,+zve32x",
+  cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+zve32x",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
-  native_vector_size = 256 : index,
+  native_vector_size = 512 : index,
   target_triple = "riscv64-unknown-unknown-eabi-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
@@ -200,9 +200,9 @@ hal.executable private @apply_scale_zve32x {
   ]>
 ]>
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
-  cpu_features = "+m,+a,+f,+d,+c,+zve32f",
+  cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+zve32f",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
-  native_vector_size = 256 : index,
+  native_vector_size = 512 : index,
   target_triple = "riscv64-unknown-unknown-eabi-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
