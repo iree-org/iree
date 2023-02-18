@@ -17,18 +17,5 @@ iree_hal_cts_test_suite(
     "\"MTLE\""
   DEPS
     iree::experimental::metal::registration
-  INCLUDED_TESTS
-    "allocator"
-    "buffer_mapping"
-    "command_buffer"
-    "command_buffer_dispatch"
-    "command_buffer_push_constants"
-    "event"
-    "executable_cache"
-    "descriptor_set_layout"
-    "driver"
-    "pipeline_layout"
-    "semaphore"
-    "semaphore_submission"
 )
 
