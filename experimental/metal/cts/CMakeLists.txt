@@ -22,6 +22,7 @@ iree_hal_cts_test_suite(
     "buffer_mapping"
     "command_buffer_dispatch"
     "command_buffer_push_constants"
+    "event"
     "executable_cache"
     "descriptor_set_layout"
     "driver"

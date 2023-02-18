@@ -10,6 +10,7 @@
 
 #include "experimental/metal/metal_buffer.h"
 #include "experimental/metal/metal_device.h"
+#include "experimental/metal/metal_fence.h"
 #include "experimental/metal/metal_kernel_library.h"
 #include "experimental/metal/pipeline_layout.h"
 #include "iree/base/api.h"
@@ -268,13 +269,30 @@ static iree_status_t iree_hal_metal_command_buffer_execution_barrier(
 static iree_status_t iree_hal_metal_command_buffer_signal_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "event not yet supported");
+  iree_hal_metal_command_buffer_t* command_buffer =
+      iree_hal_metal_command_buffer_cast(base_command_buffer);
+  id<MTLFence> fence = iree_hal_metal_fence_handle(event);
+
+  // In Metal compute pipelines, fences are more course grained than Vulkan--we only have one
+  // execution stage instead of multiple stages in Vulkan.
+  if (command_buffer->blit_encoder != nil) {
+    [command_buffer->blit_encoder updateFence:fence];
+  } else {
+    id<MTLComputeCommandEncoder> compute_encoder =
+        iree_hal_metal_get_or_begin_compute_encoder(command_buffer);
+    [compute_encoder updateFence:fence];
+  }
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_metal_command_buffer_reset_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "event not yet supported");
+  // In Metal, MTLFence does not support reset. We just create a new fence every time IREE event
+  // reset API is called. This assumes IREE fences are not waited anymore when reset is called,
+  // which should be true for proper IREE event usage.
+  return iree_hal_metal_fence_recreate(event);
 }
 
 static iree_status_t iree_hal_metal_command_buffer_wait_events(
@@ -283,7 +301,27 @@ static iree_status_t iree_hal_metal_command_buffer_wait_events(
     iree_hal_execution_stage_t target_stage_mask, iree_host_size_t memory_barrier_count,
     const iree_hal_memory_barrier_t* memory_barriers, iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "event not yet supported");
+  iree_hal_metal_command_buffer_t* command_buffer =
+      iree_hal_metal_command_buffer_cast(base_command_buffer);
+
+  // In Metal compute pipelines, fences are more course grained than Vulkan--we only have one
+  // execution stage instead of multiple stages in Vulkan, and we don't have separate memory
+  // barriers to control.
+  if (command_buffer->blit_encoder != nil) {
+    for (iree_host_size_t i = 0; i < event_count; ++i) {
+      id<MTLFence> fence = iree_hal_metal_fence_handle(events[i]);
+      [command_buffer->blit_encoder waitForFence:fence];
+    }
+  } else {
+    id<MTLComputeCommandEncoder> compute_encoder =
+        iree_hal_metal_get_or_begin_compute_encoder(command_buffer);
+    for (iree_host_size_t i = 0; i < event_count; ++i) {
+      id<MTLFence> fence = iree_hal_metal_fence_handle(events[i]);
+      [compute_encoder waitForFence:fence];
+    }
+  }
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_metal_command_buffer_discard_buffer(

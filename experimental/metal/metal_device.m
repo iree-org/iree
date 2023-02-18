@@ -9,6 +9,7 @@
 #include "experimental/metal/api.h"
 #include "experimental/metal/direct_allocator.h"
 #include "experimental/metal/direct_command_buffer.h"
+#include "experimental/metal/metal_fence.h"
 #include "experimental/metal/metal_shared_event.h"
 #include "experimental/metal/nop_executable_cache.h"
 #include "experimental/metal/pipeline_layout.h"
@@ -200,7 +201,8 @@ static iree_status_t iree_hal_metal_device_create_descriptor_set_layout(
 
 static iree_status_t iree_hal_metal_device_create_event(iree_hal_device_t* base_device,
                                                         iree_hal_event_t** out_event) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplmented event create");
+  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  return iree_hal_metal_fence_create(device->device, device->host_allocator, out_event);
 }
 
 static iree_status_t iree_hal_metal_device_create_executable_cache(
