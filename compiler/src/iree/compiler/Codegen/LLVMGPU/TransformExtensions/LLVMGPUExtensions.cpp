@@ -120,6 +120,40 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
     exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
   }
+
+  // Map warpIds.
+  if (diag.succeeded()) {
+    SmallVector<DeviceMappingAttrInterface> warpMappingAttributes = {
+        gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimX),
+        gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimY),
+        gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimZ)};
+
+    auto warpIdGenerator = [&workgroupSize](RewriterBase &rewriter,
+                                            scf::ForallOp forallOp,
+                                            SmallVectorImpl<Value> &warpIds) {
+      Location loc = forallOp.getLoc();
+      IndexType indexType = rewriter.getIndexType();
+      assert(workgroupSize[0] % 32 == 0 &&
+             "warp distribution assumes workgroup_size.x is divisible by warp "
+             "size.");
+      Value threadIdX =
+          rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x);
+      Value cstWarpSize =
+          rewriter.create<arith::ConstantIndexOp>(loc, kWarpSize);
+      Value warpIdX =
+          rewriter.create<arith::DivUIOp>(loc, threadIdX, cstWarpSize);
+      warpIds.assign(
+          {warpIdX,
+           rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y),
+           rewriter.create<gpu::ThreadIdOp>(loc, indexType,
+                                            gpu::Dimension::z)});
+    };
+    SmallVector<int64_t> numWarps = {workgroupSize[0] / kWarpSize,
+                                     workgroupSize[1], workgroupSize[2]};
+    diag = mlir::transform::gpu::mapNestedForeachToThreadsImpl(
+        rewriter, target, workgroupSize, warpIdGenerator, true, transformOp,
+        warpMappingAttributes);
+  }
   results.push_back(target);
   return diag;
 }
