@@ -30,7 +30,7 @@ if [[ "${DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
   ${DOCKER_WRAPPER} \
     --gpus all \
     --env NVIDIA_DRIVER_CAPABILITIES=all \
-    gcr.io/iree-oss/nvidia@sha256:ad5d69c09710a1529a549b1c69ca72121f5e58197b793f367d2cb126bb119fc5 \
+    gcr.io/iree-oss/nvidia@sha256:7aea2f9e3f71fc68e0130cd972613e46fccd880a7b9ba1e6d8e7df1c7576c779 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
