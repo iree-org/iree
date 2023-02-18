@@ -39,24 +39,24 @@ macro(iree_llvm_configure_bundled)
   # world. Source of truth for these is in an installed LLVMConfig.cmake,
   # MLIRConfig.cmake, LLDConfig.cmake (etc) and in the various standalone
   # build segments of each project's top-level CMakeLists.
-  set(LLVM_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/llvm-project/lib/cmake/llvm")
+  set(LLVM_CMAKE_DIR "${IREE_BINARY_DIR}/llvm-project/lib/cmake/llvm")
   list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
   # TODO: Fix MLIR upstream so it doesn't spew into the containing project
   # binary dir.
-  set(MLIR_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")
+  set(MLIR_CMAKE_DIR "${IREE_BINARY_DIR}/lib/cmake/mlir")
   list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 
   set(LLVM_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-    ${CMAKE_CURRENT_BINARY_DIR}/llvm-project/include
+    ${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/include
+    ${IREE_BINARY_DIR}/llvm-project/include
   )
   set(MLIR_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-    ${CMAKE_CURRENT_BINARY_DIR}/llvm-project/tools/mlir/include
+    ${IREE_SOURCE_DIR}/third_party/llvm-project/mlir/include
+    ${IREE_BINARY_DIR}/llvm-project/tools/mlir/include
   )
   set(LLD_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/lld/include
-    ${CMAKE_CURRENT_BINARY_DIR}/llvm-project/tools/lld/include
+    ${IREE_SOURCE_DIR}/third_party/llvm-project/lld/include
+    ${IREE_BINARY_DIR}/llvm-project/tools/lld/include
   )
 
   set(LLVM_BINARY_DIR "${IREE_BINARY_DIR}/llvm-project")
@@ -78,7 +78,12 @@ macro(iree_llvm_configure_installed)
   list(APPEND CMAKE_MODULE_PATH "${LLD_CMAKE_DIR}")
   include_directories(${LLD_INCLUDE_DIRS})
 
-  include(TableGen)  # TODO: Eliminate.
+  # Lit never gets installed with LLVM. So we have to reach into our copy
+  # of the monorepo to get it. I'm sorry. If this doesn't work for you,
+  # feel free to -DLLVM_EXTERNAL_LIT to provide your own.
+  if(NOT LLVM_EXTERNAL_LIT)
+    set(LLVM_EXTERNAL_LIT "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py")
+  endif()
 endmacro()
 
 # iree_llvm_set_bundled_cmake_options()
