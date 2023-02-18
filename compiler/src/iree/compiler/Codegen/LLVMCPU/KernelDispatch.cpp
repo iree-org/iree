@@ -215,10 +215,17 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
     }
   }
 
-  //// Default RISC-V specific strategies.
-  // if (isRISCV(targetAttr) && enableVectorPeeling) {
-  //   return VectorPreProcStrategy::Peeling;
-  // }
+  // Default RISC-V specific strategies.
+   if (isRISCV(targetAttr)) {
+    // No pre-processing strategy for generic ops. Masking will catch
+    // unaligned cases.
+    if (isa<linalg::GenericOp>(linalgOp.getOperation()))
+      return VectorPreProcStrategy::None;
+
+    if (enableVectorPeeling) {
+      return VectorPreProcStrategy::Peeling;
+    }
+   }
 
   return VectorPreProcStrategy::None;
 }
