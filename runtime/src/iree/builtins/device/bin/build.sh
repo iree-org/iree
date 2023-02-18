@@ -17,7 +17,7 @@ CLANG="${CLANG:-clang}"
 CLANG_INCLUDE="${CLANG_INCLUDE:-/usr/lib/llvm-13/lib/clang/13.0.0/include/}"
 IREE_SRC_DIR="$(git rev-parse --show-toplevel)"
 IREE_BUILD_DIR="${IREE_BUILD_DIR:-${IREE_SRC_DIR?}/../build}"
-LLVM_AS="${LLVM_AS:-${IREE_BUILD_DIR}/third_party/llvm-project/llvm/bin/llvm-as}"
+LLVM_AS="${LLVM_AS:-${IREE_BUILD_DIR}/llvm-project/bin/llvm-as}"
 
 SCRIPT_DIR="$(realpath `dirname $0`)"
 OUT="${SCRIPT_DIR?}/"

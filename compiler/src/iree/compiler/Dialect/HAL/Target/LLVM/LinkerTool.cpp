@@ -205,9 +205,8 @@ std::string LinkerTool::findToolFromExecutableDir(
   }
 
   // Next search around in the CMake build tree.
-  toolPath = findToolAtPath(
-      normalizedToolNames,
-      mainExecutableDir + "/../third_party/llvm-project/llvm/bin/");
+  toolPath = findToolAtPath(normalizedToolNames,
+                            mainExecutableDir + "/../llvm-project/bin/");
   if (!toolPath.empty()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Found tool in build tree at path " << toolPath << "\n");
