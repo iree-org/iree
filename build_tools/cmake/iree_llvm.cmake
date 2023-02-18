@@ -81,6 +81,8 @@ macro(iree_llvm_configure_installed)
   # Lit never gets installed with LLVM. So we have to reach into our copy
   # of the monorepo to get it. I'm sorry. If this doesn't work for you,
   # feel free to -DLLVM_EXTERNAL_LIT to provide your own.
+  # Note that LLVM style lit test helpers use LLVM_EXTERNAL_LIT, if provided,
+  # so this is consistent between the projects.
   if(NOT LLVM_EXTERNAL_LIT)
     set(LLVM_EXTERNAL_LIT "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py")
   endif()
