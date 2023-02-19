@@ -60,6 +60,7 @@ option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
+option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
 
 option(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
 
@@ -431,6 +432,7 @@ include(iree_bytecode_module)
 include(iree_c_module)
 include(iree_python)
 include(iree_lit_test)
+include(iree_llvm)
 include(iree_add_all_subdirs)
 include(iree_check_test)
 include(iree_trace_runner_test)
@@ -564,81 +566,36 @@ endif()
 
 if(NOT IREE_BUILD_COMPILER)
   message(STATUS "Not adding LLVM/MLIR because the configuration does not require it")
-elseif(TARGET LLVMSupport)
-  message(STATUS "Not adding IREE bundled LLVM because it has already been included")
-  if(NOT TARGET MLIRIR)
-    message(FATAL_ERROR "Detected externally provided LLVM project but could not find MLIR projects (is it enabled/installed?)")
-  endif()
 else()
-  message(STATUS "Adding bundled LLVM source dependency")
-  iree_set_llvm_cmake_options()
-
-  # Enable MLIR Python bindings if IREE Python bindings enabled.
-  if(IREE_BUILD_PYTHON_BINDINGS)
-    set(MLIR_ENABLE_BINDINGS_PYTHON ON)
-    set(MHLO_ENABLE_BINDINGS_PYTHON ON)
+  # Get the main LLVM deps.
+  if(IREE_BUILD_BUNDLED_LLVM)
+    iree_llvm_configure_bundled()
+  else()
+    iree_llvm_configure_installed()
   endif()
 
-  # Disable LLVM's warnings.
-  set(LLVM_ENABLE_WARNINGS OFF)
+  # Also add a library that can be depended on to get LLVM includes setup
+  # properly. bazel_to_cmake targets this for some header only pseudo deps.
+  add_library(IREELLVMIncludeSetup INTERFACE)
+  target_include_directories(IREELLVMIncludeSetup INTERFACE
+    ${LLVM_INCLUDE_DIRS}
+    ${MLIR_INCLUDE_DIRS}
+    ${LLD_INCLUDE_DIRS}
+  )
 
-  # Stash cmake build type in case LLVM messes with it.
-  set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+  # Splice the includes setup into base LLVM libraries so that using them
+  # gets everything nice and tidy. It would be super if some day, LLVM
+  # libraries set their right usage requirements for includes. In the meantime
+  # we add usage requirements to libraries at the root of all things LLVM.
+  iree_llvm_add_usage_requirements(LLVMSupport IREELLVMIncludeSetup)
+  iree_llvm_add_usage_requirements(MLIRSupport IREELLVMIncludeSetup)
 
   # Add default external projects.
-  iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
-  iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
+  iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
+  iree_llvm_add_external_project(mlir-hlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
   if(IREE_INPUT_TORCH)
-    iree_add_llvm_external_project(torch-mlir-dialects TORCH_MLIR_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
+    iree_llvm_add_external_project(torch-mlir-dialects ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
   endif()
-
-  add_subdirectory("third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
-
-  # Reset CMAKE_BUILD_TYPE to its previous setting.
-  set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" )
-
-  # Extend module path to allow submodules to use LLVM and MLIR CMake modules.
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
-
-  # Add the bundled include directories for cmake files looking for them.
-  list(APPEND LLVM_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
-  )
-  list(APPEND MLIR_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
-  )
-
-  # TODO: It should be possible to fix upstream targets so as to not require
-  # any of these. Remove as they become unnecessary.
-  function(_hack_llvm_include_paths)
-    set(_COMMON_INCLUDE_DIRS
-      # LLVM
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
-
-      # MLIR
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>
-
-      # LLD
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/lld/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/lld/include>
-
-    )
-    # Avoid globally modifying paths by instead adding the include paths to the
-    # rules that really should have them in the first place.
-    target_include_directories(LLVMSupport PUBLIC ${_COMMON_INCLUDE_DIRS})
-    target_include_directories(MLIRSupport PUBLIC ${_COMMON_INCLUDE_DIRS})
-
-    # Also add a library that can be depended on to get LLVM includes setup
-    # properly. bazel_to_cmake targets this for some header only pseudo deps.
-    add_library(IREELLVMIncludeSetup INTERFACE)
-    target_include_directories(IREELLVMIncludeSetup INTERFACE ${_COMMON_INCLUDE_DIRS})
-  endfunction()
-  _hack_llvm_include_paths()
 endif()
 
 #-------------------------------------------------------------------------------

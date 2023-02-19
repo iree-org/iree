@@ -31,7 +31,7 @@ namespace Flow {
 /// formation. This needs to be its own pass because the registration mechanism
 /// and ops available are different than for other interpreters.
 struct DispatchWithTransformDialect
-    : public transform::TransformInterpreterPassBase<
+    : public transform::iree_dialects::TransformInterpreterPassBase<
           DispatchWithTransformDialect, DispatchWithTransformDialectBase> {
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off

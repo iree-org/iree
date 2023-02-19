@@ -279,19 +279,6 @@ if(IREE_BUILD_COMPILER)
   # below, which we use for cross-platform testing.
   set_target_properties(FileCheck PROPERTIES EXCLUDE_FROM_ALL OFF)
   set_target_properties(not PROPERTIES EXCLUDE_FROM_ALL OFF)
-
-  # Bundle the FileCheck and associated binaries from LLVM into our tests/bin
-  # directory so installed FileCheck tests are hermetic.
-  install(
-    TARGETS FileCheck
-    DESTINATION "tests/bin"
-    COMPONENT Tests
-  )
-  install(
-    TARGETS not
-    DESTINATION "tests/bin"
-    COMPONENT Tests
-  )
 elseif(NOT IREE_HOST_BIN_DIR)
   message(STATUS
       "*Not* building or importing IREE's compiler tools.\n   "
