@@ -86,6 +86,9 @@ bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// Returns true if the 'targetAttr' contains '+zve32x' in its cpu features.
 bool hasZve32xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
+/// Returns true if the 'targetAttr' contains '+zve32f' in its cpu features.
+bool hasZve32fFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 /// Returns true if the 'targetAttr' contains '+zve64x' in its cpu features.
 bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
