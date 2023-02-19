@@ -1,9 +1,29 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# This script illustrates how IREE can be built with various forms of LLVM
+# installations with the option -DIREE_BUILD_BUNDLED_LLVM=OFF set, disabling
+# a source dependency on the bundled LLVM submodule.
+#
+# Usage:
+#   byo_llvm.sh build_llvm && \
+#   byo_llvm.sh build_mlir && \
+#   byo_llvm.sh build_iree
+#
+# This script has minimal configurability, which can be extended as needed. The
+# defaults should suffice for testing on CI. Different configurations are
+# possible (i.e. building MLIR bundled with LLVM vs standalone), and this
+# is just normal CMake package management options.
+#
+# Fully separating LLVM+LLD+CLANG from MLIR and from IREE enables maximum
+# flexibility for the cases where multiple teams are responsible for
+# different parts. Note that IREE often has a tight dependency on specific
+# MLIR commits, and the bundled submodule often carries patches and fixes
+# required for full functionality of all backends.
 
 TD="$(cd $(dirname $0) && pwd)"
 REPO_ROOT="$(cd $TD/../.. && pwd)"
