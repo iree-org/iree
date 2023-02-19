@@ -272,11 +272,11 @@ if(IREE_BUILD_COMPILER)
     HOSTONLY
   )
 
-  # # Ensure FileCheck and associated binaries get built. Tests don't have
-  # # dependencies in CMake because they aren't targets. So until we fix that, we
-  # # just force this to get built.
-  # # Limiting this to when IREE_BUILD_TESTS is set prevents the installation
-  # # below, which we use for cross-platform testing.
+  # Ensure FileCheck and associated binaries get built. Tests don't have
+  # dependencies in CMake because they aren't targets. So until we fix that, we
+  # just force this to get built.
+  # Limiting this to when IREE_BUILD_TESTS is set prevents the installation
+  # below, which we use for cross-platform testing.
   set_target_properties(FileCheck PROPERTIES EXCLUDE_FROM_ALL OFF)
   set_target_properties(not PROPERTIES EXCLUDE_FROM_ALL OFF)
 elseif(NOT IREE_HOST_BIN_DIR)
