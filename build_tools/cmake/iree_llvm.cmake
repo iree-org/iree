@@ -61,7 +61,7 @@ macro(iree_llvm_configure_bundled)
 
   set(LLVM_BINARY_DIR "${IREE_BINARY_DIR}/llvm-project")
   set(LLVM_TOOLS_BINARY_DIR "${LLVM_BINARY_DIR}/bin")
-  set(LLVM_EXTERNAL_LIT "${LLVM_TOOLS_BINARY_DIR}/llvm-lit")
+  set(LLVM_EXTERNAL_LIT "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py")
 endmacro()
 
 macro(iree_llvm_configure_installed)
