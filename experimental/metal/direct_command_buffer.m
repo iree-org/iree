@@ -8,6 +8,7 @@
 
 #import <Metal/Metal.h>
 
+#include "experimental/metal/builtin_executables.h"
 #include "experimental/metal/metal_buffer.h"
 #include "experimental/metal/metal_device.h"
 #include "experimental/metal/metal_fence.h"
@@ -32,6 +33,9 @@ typedef struct iree_hal_metal_command_buffer_t {
 
   // The Metal command queue owning this command buffer.
   id<MTLCommandQueue> queue;
+
+  // For polyfilling fill/copy/update buffers that are not directly supported by Metal APIs.
+  iree_hal_metal_builtin_executable_t* builtin_executable;
 
   id<MTLCommandBuffer> command_buffer;
 
@@ -132,6 +136,7 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories, iree_host_size_t binding_capacity,
     id<MTLCommandQueue> queue, iree_allocator_t host_allocator, iree_arena_block_pool_t* block_pool,
+    iree_hal_metal_builtin_executable_t* builtin_executable,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
@@ -154,6 +159,7 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
         device, mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY, binding_capacity,
         &iree_hal_metal_command_buffer_vtable, &command_buffer->base);
     command_buffer->queue = [queue retain];  // +1
+    command_buffer->builtin_executable = builtin_executable;
     @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
       // We track resource lifetime by ourselves in IREE; so just do unretained references to
       // resources in Metal command buffer, which avoids overhead and gives better performance.
@@ -330,15 +336,14 @@ static iree_status_t iree_hal_metal_command_buffer_discard_buffer(
   return iree_ok_status();
 }
 
-// Fills |value| with the duplicated single byte value if the given |pattern| has duplicated values
-// for each of its |pattern_length| bytes.
-static iree_status_t iree_hal_metal_get_duplicated_single_byte_value(const void* pattern,
-                                                                     size_t pattern_length,
-                                                                     uint8_t* value) {
+// Fills |value| with the duplicated single byte value and return true if the given |pattern| has
+// duplicated values for each of its |pattern_length| bytes.
+static bool iree_hal_metal_get_duplicated_single_byte_value(const void* pattern,
+                                                            size_t pattern_length, uint8_t* value) {
   switch (pattern_length) {
     case 1: {
       *value = *(uint8_t*)pattern;
-      return iree_ok_status();
+      return true;
     }
     case 2: {
       uint16_t two_bytes = *(uint16_t*)pattern;
@@ -346,11 +351,9 @@ static iree_status_t iree_hal_metal_get_duplicated_single_byte_value(const void*
       uint16_t byte1 = two_bytes >> 8u;
       if (byte0 == byte1) {
         *value = (int8_t)byte0;
-        return iree_ok_status();
+        return true;
       }
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "unimplemented non-duplicated 2-byte-pattern fill: 0x%04x",
-                              two_bytes);
+      break;
     }
     case 4: {
       uint32_t four_bytes = *(uint32_t*)pattern;
@@ -360,16 +363,43 @@ static iree_status_t iree_hal_metal_get_duplicated_single_byte_value(const void*
       uint32_t byte3 = four_bytes >> 24u;
       if (byte0 == byte1 && byte0 == byte2 && byte0 == byte3) {
         *value = (int8_t)byte0;
-        return iree_ok_status();
+        return true;
       }
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "unimplemented non-duplicated 4-byte-pattern fill: 0x%08x",
-                              four_bytes);
+      break;
     }
     default:
       break;
   }
-  return iree_make_status(IREE_STATUS_INTERNAL, "fill pattern should contain 1/2/4 bytes");
+  return false;
+}
+
+// Fills |value| by duplicating the given |pattern| into 4-bytes.
+static iree_status_t iree_hal_metal_duplicate_to_four_byte_value(const void* pattern,
+                                                                 size_t pattern_length,
+                                                                 uint32_t* value) {
+  switch (pattern_length) {
+    case 1: {
+      uint8_t single_byte = *(uint8_t*)pattern;
+      *value = (uint32_t)single_byte;
+      *value |= (*value << 8u);
+      *value |= (*value << 16u);
+      return iree_ok_status();
+    }
+    case 2: {
+      uint16_t two_bytes = *(uint16_t*)pattern;
+      *value = (uint32_t)two_bytes;
+      *value |= (*value << 16u);
+      return iree_ok_status();
+    }
+    case 4: {
+      *value = *(uint32_t*)pattern;
+      return iree_ok_status();
+    }
+
+    default:
+      break;
+  }
+  return iree_make_status(IREE_STATUS_INTERNAL, "fill pattern should have 1/2/4 bytes");
 }
 
 static iree_status_t iree_hal_metal_command_buffer_fill_buffer(
@@ -380,34 +410,46 @@ static iree_status_t iree_hal_metal_command_buffer_fill_buffer(
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  id<MTLBuffer> target_device_buffer =
+      iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
 
   // Per the spec for fillBuffer:range:value: "The alignment and length of the range must both be a
   // multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS."
 #if defined(IREE_PLATFORM_MACOS)
-  if (target_offset % 4 != 0 || length % 4 != 0) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "unimplemented fill buffer with non-4-multiple offset/length");
-  }
+  bool can_use_metal_api = target_offset % 4 == 0 && length % 4 == 0;
+#else
+  bool can_use_metal_api = true;
 #endif
-
-  IREE_RETURN_IF_ERROR(
-      iree_hal_resource_set_insert(command_buffer->resource_set, 1, &target_buffer));
 
   // Note that fillBuffer:range:value: only accepts a single byte as the pattern but FillBuffer
   // can accept 1/2/4 bytes. If the pattern itself contains repeated bytes, we can call into
   // fillBuffer:range:value:. Otherwise we need to emulate the support.
   uint8_t single_byte_value = 0u;
-  iree_status_t status =
-      iree_hal_metal_get_duplicated_single_byte_value(pattern, pattern_length, &single_byte_value);
-  if (iree_status_is_ok(status)) {
+  if (can_use_metal_api) {
+    can_use_metal_api &= iree_hal_metal_get_duplicated_single_byte_value(pattern, pattern_length,
+                                                                         &single_byte_value);
+  }
+
+  IREE_RETURN_IF_ERROR(
+      iree_hal_resource_set_insert(command_buffer->resource_set, 1, &target_buffer));
+
+  iree_status_t status = iree_ok_status();
+  if (can_use_metal_api) {
     id<MTLBlitCommandEncoder> encoder = iree_hal_metal_get_or_begin_blit_encoder(command_buffer);
-    id<MTLBuffer> target_device_buffer =
-        iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(target_buffer));
     [encoder fillBuffer:target_device_buffer
                   range:NSMakeRange(target_offset, length)
                   value:single_byte_value];
+  } else {
+    id<MTLComputeCommandEncoder> compute_encoder =
+        iree_hal_metal_get_or_begin_compute_encoder(command_buffer);
+    uint32_t pattern_4byte = 0;
+    status = iree_hal_metal_duplicate_to_four_byte_value(pattern, pattern_length, &pattern_4byte);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_metal_builtin_executable_fill_buffer(command_buffer->builtin_executable,
+                                                             compute_encoder, target_device_buffer,
+                                                             target_offset, length, pattern_4byte);
+    }
   }
 
   IREE_TRACE_ZONE_END(z0);

@@ -118,12 +118,10 @@ static iree_status_t iree_hal_metal_kernel_library_flatbuffer_verify(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_metal_compile_msl(flatbuffers_string_t source_code,
-                                                flatbuffers_string_t entry_point,
-                                                id<MTLDevice> device,
-                                                MTLCompileOptions* compile_options,
-                                                id<MTLLibrary>* library, id<MTLFunction>* function,
-                                                id<MTLComputePipelineState>* pso) {
+iree_status_t iree_hal_metal_compile_msl(const char* source_code, const char* entry_point,
+                                         id<MTLDevice> device, MTLCompileOptions* compile_options,
+                                         id<MTLLibrary>* out_library, id<MTLFunction>* out_function,
+                                         id<MTLComputePipelineState>* out_pso) {
   @autoreleasepool {
     NSError* error = nil;
 

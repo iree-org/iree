@@ -20,6 +20,7 @@ iree_hal_cts_test_suite(
   INCLUDED_TESTS
     "allocator"
     "buffer_mapping"
+    "command_buffer"
     "command_buffer_dispatch"
     "command_buffer_push_constants"
     "event"
