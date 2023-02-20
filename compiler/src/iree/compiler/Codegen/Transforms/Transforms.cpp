@@ -12,8 +12,11 @@
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 
+#include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+
+#define DEBUG_TYPE "iree-codegen-transforms"
 
 namespace mlir {
 namespace iree_compiler {
@@ -84,7 +87,7 @@ SliceAndDynamicDims cloneOffsetsSizesAndStrides(
       loadOp.getMixedSizes(), loadOp.getMixedStrides(), loadOp.getSourceDims());
 }
 
-std::optional<Value> hoistStaticallyBoundAllocations(
+std::optional<Value> hoistOneStaticallyBoundAllocation(
     func::FuncOp funcOp, OpBuilder &builder, Location loc,
     MemRefType allocaType, ValueRange dynamicSizes,
     std::optional<uint64_t> alignment) {
@@ -142,13 +145,62 @@ std::optional<Value> hoistStaticallyBoundAllocations(
                                                       subviewSizes, strides);
   return subviewOp;
 }
-std::optional<Value> hoistStaticallyBoundAllocations(
+std::optional<Value> hoistOneStaticallyBoundAllocation(
     func::FuncOp funcOp, OpBuilder &builder, memref::AllocaOp allocaOp) {
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPoint(allocaOp);
-  return hoistStaticallyBoundAllocations(
+  return hoistOneStaticallyBoundAllocation(
       funcOp, builder, allocaOp.getLoc(), allocaOp.getType(),
       allocaOp.getDynamicSizes(), allocaOp.getAlignment());
+}
+
+/// Some uses of a `memref.alloca` can be replaced with a `memref.subview`
+/// easily. Other uses (like a use in a `scf.yield` or `func.return`) are
+/// non-trivial because of compatibility between types of different SSA values.
+static bool isUseReplacableWithSubview(OpOperand &use) {
+  Operation *user = use.getOwner();
+  return isa<linalg::LinalgOp, memref::StoreOp, memref::SubViewOp>(user);
+}
+
+void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
+                                           func::FuncOp funcOp) {
+  SmallVector<memref::AllocaOp> allocaOps;
+
+  // Collect all allocas that are hoistable.
+  funcOp.walk([&](memref::AllocaOp allocaOp) {
+    allocaOp.dump();
+    if (allocaOp->getBlock() == &funcOp.getBody().front()) return;
+    if (allocaOp.getDynamicSizes().empty()) {
+      allocaOps.push_back(allocaOp);
+      return;
+    }
+    if (llvm::all_of(allocaOp->getUses(), [](OpOperand &use) {
+          return isUseReplacableWithSubview(use);
+        })) {
+      allocaOps.push_back(allocaOp);
+      return;
+    }
+  });
+
+  // Hoist the allocas and replace all uses.
+  for (auto allocaOp : allocaOps) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "Alloca Op : ";
+      allocaOp->dump();
+      int numUses = std::distance(allocaOp.getResult().use_begin(),
+                                  allocaOp.getResult().use_end());
+      llvm::dbgs() << " num Uses : " << numUses;
+    });
+    std::optional<Value> replacement =
+        hoistOneStaticallyBoundAllocation(funcOp, rewriter, allocaOp);
+    if (!replacement) continue;
+    LLVM_DEBUG({
+      llvm::dbgs() << "Replacement : ";
+      replacement->dump();
+    });
+    Value replacementVal = replacement.value();
+    rewriter.replaceOp(allocaOp, replacementVal);
+  }
 }
 
 }  // namespace iree_compiler

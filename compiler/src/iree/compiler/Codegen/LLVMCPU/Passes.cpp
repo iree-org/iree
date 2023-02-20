@@ -98,7 +98,7 @@ static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
                                         unsigned alignment) {
   auto funcOp = builder.getInsertionPoint()->getParentOfType<func::FuncOp>();
   if (funcOp) {
-    std::optional<Value> hoistedAllocation = hoistStaticallyBoundAllocations(
+    std::optional<Value> hoistedAllocation = hoistOneStaticallyBoundAllocation(
         funcOp, builder, loc, memRefType, dynamicSizes, alignment);
     if (hoistedAllocation) {
       return hoistedAllocation.value();
