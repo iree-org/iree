@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
@@ -28,7 +29,7 @@ struct HoistStaticallyBoundAllocationsPass
 void HoistStaticallyBoundAllocationsPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
-  hoistStaticallyBoundAllocationsInFunc(rewriter, funcOp);
+  hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(rewriter, funcOp);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

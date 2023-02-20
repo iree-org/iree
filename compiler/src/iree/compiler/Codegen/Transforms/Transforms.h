@@ -44,6 +44,7 @@ SliceAndDynamicDims cloneOffsetsSizesAndStrides(
 /// allocations creates an allocation, and inserts a subview to match the
 /// dynamic shape of the allocation. Returns std::nullopt if the method
 /// couldnt creat an allocation in the entry block.
+template <typename AllocLikeOpType>
 std::optional<Value> hoistOneStaticallyBoundAllocation(
     func::FuncOp funcOp, OpBuilder &builder, Location loc,
     MemRefType allocaType, ValueRange dynamicSizes,
@@ -55,9 +56,13 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 /// allocations creates an allocation, and inserts a subview to match the
 /// dynamic shape of the allocation. The method returns a value, but
 /// does not replace the uses of the `allocaOp`.
+template <typename AllocLikeOpType>
 std::optional<Value> hoistOneStaticallyBoundAllocation(
-    func::FuncOp funcOp, OpBuilder &builder, memref::AllocaOp allocaOp);
+    func::FuncOp funcOp, OpBuilder &builder, AllocLikeOpType allocaOp);
 
+/// Traverse funcOp and try to hoist every AllocaOp to the entry block of the
+/// function if the size is statically bounded.
+template <typename AllocLikeOpType>
 void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
                                            func::FuncOp funcOp);
 
