@@ -16,6 +16,7 @@ hal.executable private @distribute {
 // CHECK-LABEL: func.func @distribute
       func.func @distribute() {
         %cst_0 = arith.constant dense<0.000000e+00> : vector<1xf16>
+        %c250 = arith.constant 250 : index
         %c256 = arith.constant 256 : index
         %c0 = arith.constant 0 : index
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xf16>
@@ -24,8 +25,10 @@ hal.executable private @distribute {
         %subview = memref.subview %1[%workgroup_id_x] [1] [1] : memref<2xf16> to memref<1xf16, strided<[1], offset: ?>>
 // CHECK: %[[C32:.+]] = arith.constant 32 : index
 // CHECK: %[[TX:.+]] = gpu.thread_id  x
-// CHECK: vector.transfer_write %{{.*}}, %{{.*}}[%[[TX]]] {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
-        scf.forall (%arg0) in (%c256) {
+// CHECK: %[[COND:.*]] = arith.cmpi ult
+// CHECK: scf.if %[[COND]] {
+// CHECK:   vector.transfer_write %{{.*}}, %{{.*}}[%[[TX]]] {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
+        scf.forall (%arg0) in (%c250) {
           vector.transfer_write %cst_0, %subview[%arg0]
           {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
         } {mapping = [#gpu.thread<x>]}
