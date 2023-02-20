@@ -409,8 +409,9 @@ function(iree_benchmark_suite)
       # Create the command and target for the flagfile spec used to execute
       # the generated artifacts.
       set(_FLAG_FILE "${_RUN_SPEC_DIR}/flagfile")
-      set(_BENCHMARK_FLAGS "--device_allocator=caching")
-      set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_RULE_RUNTIME_FLAGS}\" \"${_BENCHMARK_FLAGS}\"")
+      set(_ADDITIONAL_ARGS "${_RULE_RUNTIME_FLAGS}")
+      list(APPEND _ADDITIONAL_ARGS "--device_allocator=caching")
+      set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_ADDITIONAL_ARGS}\"")
       file(RELATIVE_PATH _MODULE_FILE_FLAG "${_RUN_SPEC_DIR}" "${_VMFB_FILE}")
       add_custom_command(
         OUTPUT "${_FLAG_FILE}"
