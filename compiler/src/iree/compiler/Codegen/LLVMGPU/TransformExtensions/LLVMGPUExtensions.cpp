@@ -27,6 +27,7 @@
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/Region.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
@@ -120,6 +121,57 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
     exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
   }
+
+  // Map warpIds, only if threadIdx.x is a multiple of the warp size.
+  // TODO: more advanced mechanism to linearize/delinearize the threadIds to
+  // warps.
+  SmallVector<DeviceMappingAttrInterface> warpMappingAttributes = {
+      gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimX),
+      gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimY),
+      gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimZ)};
+  if (diag.succeeded() && (workgroupSize[0] % kWarpSize == 0)) {
+    auto warpIdGenerator = [](RewriterBase &rewriter, scf::ForallOp forallOp,
+                              SmallVectorImpl<Value> &warpIds) {
+      Location loc = forallOp.getLoc();
+      IndexType indexType = rewriter.getIndexType();
+      Value threadIdX =
+          rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x);
+      Value cstWarpSize =
+          rewriter.create<arith::ConstantIndexOp>(loc, kWarpSize);
+      Value warpIdX =
+          rewriter.create<arith::DivUIOp>(loc, threadIdX, cstWarpSize);
+      warpIds.assign(
+          {warpIdX,
+           rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y),
+           rewriter.create<gpu::ThreadIdOp>(loc, indexType,
+                                            gpu::Dimension::z)});
+    };
+    SmallVector<int64_t> numWarps = {workgroupSize[0] / kWarpSize,
+                                     workgroupSize[1], workgroupSize[2]};
+    diag = mlir::transform::gpu::mapNestedForeachToThreadsImpl(
+        rewriter, target, workgroupSize, warpIdGenerator, true, transformOp,
+        warpMappingAttributes);
+  }
+
+  auto walkResult = target->walk([&warpMappingAttributes](
+                                     scf::ForallOp forallOp) -> WalkResult {
+    auto maybeMapping = forallOp.getMapping();
+    if (!maybeMapping) return WalkResult::advance();
+    for (Attribute attr : *maybeMapping) {
+      for (const auto &warpAttr : warpMappingAttributes) {
+        if (attr == warpAttr) {
+          forallOp->emitOpError(
+              "Mapping failed: is threadIdx.x a multiple of the warp size?");
+          return WalkResult::interrupt();
+        }
+      }
+    }
+    return WalkResult::advance();
+  });
+  if (walkResult.wasInterrupted()) {
+    return emitDefaultDefiniteFailure(target);
+  }
+
   results.push_back(target);
   return diag;
 }
