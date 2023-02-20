@@ -251,6 +251,10 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
   if (auto setEncodingOp = dyn_cast<IREE::LinalgExt::SetEncodingOp>(op)) {
     return llvm::SmallBitVector(setEncodingOp.getResultType().getRank(), true);
   }
+  if (auto unsetEncodingOp = dyn_cast<IREE::LinalgExt::UnsetEncodingOp>(op)) {
+    return llvm::SmallBitVector(unsetEncodingOp.getResultType().getRank(),
+                                true);
+  }
 
   auto interfaceOp = dyn_cast<TilingInterface>(op);
   if (!interfaceOp) {
