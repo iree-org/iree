@@ -161,6 +161,32 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   }];
 }
 
+def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
+    [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
+     TransformOpInterface, TransformEachOpTrait]> {
+  let summary = "Hoist static allocations";
+  let description = [{
+    Find static allocations and hoist them to the top level.
+
+    #### Return modes
+    This operation applies static alloc hoisting the whole region of the operand.
+    It always return success.
+  }];
+
+  let arguments = (ins Transform_ConcreteOpType<"func.func">:$target);
+  let results = (outs Transform_ConcreteOpType<"func.func">:$result);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::func::FuncOp funcOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
