@@ -87,7 +87,7 @@ jobs:
           # https://github.com/nektos/act where there will be more.
           git log --oneline --graph --max-count=3
 
-          ./build_tools/github_actions/configure_ci.py
+          ./build_tools/github_actions/configure_ci.py | tee -a "${GITHUB_STEP_SUMMARY}"
 
 
   ################################### Basic ####################################
@@ -886,6 +886,7 @@ jobs:
               "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
           echo "e2e-test-artifacts-build-log-gcs-artifact=${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+          echo "E2E Test Artifacts GCS link: [${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}](${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR})" >> "${GITHUB_STEP_SUMMARY}"
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
