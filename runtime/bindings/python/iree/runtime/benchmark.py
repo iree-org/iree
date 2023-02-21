@@ -41,6 +41,14 @@ DTYPE_TO_ABI_TYPE = {
 }
 
 
+class BenchmarkToolError(Exception):
+  """Benchmark exception that preserves the command line and error output."""
+
+  def __init__(self, message):
+    self.message = message
+    super().__init__(self.message)
+
+
 def benchmark_exe():
   return os.path.join(os.path.dirname(__file__), "iree-benchmark-module")
 
@@ -90,6 +98,11 @@ def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
   err = err.decode()
   if "INVALID_ARGUMENT;" in err:
     raise ValueError("Invalid inputs specified for benchmarking")
+
+  # In the event benchmarking runs but encounteres an internal error,
+  # return the internal error instead of benchmark results.
+  if "INTERNAL; CUDA driver error" in str(out):
+    raise BenchmarkToolError(str(out))
 
   # Grab individual results by line (skip header lines)
   bench_lines = out.decode().split("\n")[3:]
