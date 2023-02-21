@@ -338,6 +338,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
     options.peel = true;
     options.vectorize = true;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -429,6 +430,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
     options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -520,6 +522,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     LinalgSingleTilingExpertPassOptions options;
     options.peel = enablePeeling;
     options.vectorize = true;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -587,6 +590,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
     options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -646,6 +650,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
   }

@@ -58,6 +58,7 @@ struct LinalgSingleTilingExpertPassOptions {
   bool peel = false;
   bool vectorize = false;
   bool vectorizePadding = false;
+  bool vectorizeGatherAccesses = false;
   int64_t tilingLevel = -1;
 };
 

@@ -361,6 +361,7 @@ struct LinalgSingleTilingExpertPass
     this->peel = options.peel;
     this->vectorize = options.vectorize;
     this->vectorizePadding = options.vectorizePadding;
+    this->vectorizeGatherAccesses = options.vectorizeGatherAccesses;
     this->tilingLevel = options.tilingLevel;
   }
   LinalgSingleTilingExpertPass(const LinalgSingleTilingExpertPass &pass) {}

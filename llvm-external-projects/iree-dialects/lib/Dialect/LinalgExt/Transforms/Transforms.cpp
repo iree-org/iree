@@ -339,7 +339,8 @@ LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
   if (options.vectorSizeComputationFunction)
     vectorSizes.append(options.vectorSizeComputationFunction(
         linalgOp, options.canonicalVectorSizes));
-  return vectorize(rewriter, linalgOp, vectorSizes);
+  return vectorize(rewriter, linalgOp, vectorSizes,
+                   options.vectorizeGatherAccesses);
 }
 
 namespace {
