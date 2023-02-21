@@ -91,6 +91,12 @@ cc_binary(
     ],
 )
 
+py_binary(
+    name = "iree-import-tf-py",
+    srcs = ["iree-import-tf-main.py"],
+    main = "iree-import-tf-main.py",
+)
+
 cc_binary(
     name = "iree-import-tflite",
     srcs = ["iree-import-tflite-main.cpp"],

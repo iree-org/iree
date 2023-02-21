@@ -13,6 +13,8 @@ import logging
 import tempfile
 from typing import List, Optional, Sequence, Set, Union
 
+from tensorflow.python import pywrap_mlir
+
 from .core import (
     CompilerOptions,
     DEFAULT_TESTING_BACKENDS,
@@ -180,6 +182,21 @@ def build_import_command_line(input_path: str, tfs: TempFileSaver,
   return cl
 
 
+def _get_mlir(saved_model_dir, exported_names=None):
+  if exported_names is None:
+    exported_names = []
+  result = pywrap_mlir.experimental_convert_saved_model_to_mlir(
+      saved_model_dir,
+      exported_names=",".join(exported_names),
+      show_debug_info=False)
+
+  pipeline = ["tf-lower-to-mlprogram-and-hlo"]
+  result = pywrap_mlir.experimental_run_pass_pipeline(result,
+                                                      ",".join(pipeline),
+                                                      show_debug_info=False)
+  return result
+
+
 def compile_saved_model(saved_model_dir: str, **kwargs):
   """Compiles an on-disk saved model to an IREE binary.
 
@@ -199,6 +216,13 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
       if options.output_file:
         return None
       return result
+
+  with tempfile.NamedTemporaryFile(mode="w") as temp_file:
+    # Generate MLIR
+    mlir = _get_mlir(saved_model_dir, exported_names=options.exported_names)
+    temp_file.write(mlir)
+    temp_file.flush()
+    import_cl = ["cat", temp_file.name]
 
     # Full compilation pipeline.
     compile_cl = build_compile_command_line("-", tfs, options)
