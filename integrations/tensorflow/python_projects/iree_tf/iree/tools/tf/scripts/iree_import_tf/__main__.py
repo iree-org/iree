@@ -13,6 +13,7 @@ import iree.tools.tf
 def main(args=None):
   if args is None:
     args = sys.argv[1:]
+  # BEFORE SUBMIT: Add optional arg to use old tool
   exe = iree.tools.tf.get_tool("iree-import-tf")
   return subprocess.call(args=[exe] + args)
 
