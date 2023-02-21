@@ -241,6 +241,7 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
+    "complex.mlir"
     "concatenate.mlir"
     "constant.mlir"
     "convert.mlir"
@@ -308,6 +309,7 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
+    "complex.mlir"
     "concatenate.mlir"
     "constant.mlir"
     "convert.mlir"
@@ -374,6 +376,7 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
+    "complex.mlir"
     "concatenate.mlir"
     "constant.mlir"
     "convert.mlir"
@@ -448,6 +451,7 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     # "clamp.mlir"  # TODO(#10906): fix (i8/i16?)
     # "compare.mlir"  # TODO(#10906): fix (i8/i16?)
+    "complex.mlir"
     "concatenate.mlir"
     "constant.mlir"
     # "convert.mlir"  # TODO(#10906): fix (i8/i16?)
