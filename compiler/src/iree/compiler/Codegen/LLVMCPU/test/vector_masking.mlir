@@ -55,7 +55,7 @@ hal.executable private @preset_config_generic_add  {
   }
 }
 
-// Masking is applied to the main vector loop when the peeling is not used.
+// Masking is applied to the main vector loop when peeling is not used.
 
 // CHECK-LABEL: func.func @mask_dynamic_generic_add
 // Main loop

@@ -1271,6 +1271,8 @@ static LogicalResult setDefaultGenericOpRootConfig(
                        << "\n");
 
   auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+  LLVM_DEBUG(KD_DBGS() << "Vectorization pre-processing strategy "
+                       << vecPreProcStrategy << "\n");
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
@@ -1284,12 +1286,6 @@ static LogicalResult setDefaultGenericOpRootConfig(
                        << parallelTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (reduction): "
                        << reductionTileSizes << "\n");
-
-  // setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
-  //                                parallelTileSizes, reductionTileSizes);
-
-  LLVM_DEBUG(KD_DBGS() << "Vectorization pre-processing strategy "
-                       << vecPreProcStrategy << "\n");
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
@@ -1380,6 +1376,8 @@ static LogicalResult setTransposeLikeOpRootConfig(
       genericOp, minTileSizes, maxTileSizes);
 
   auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+  LLVM_DEBUG(KD_DBGS() << "Vectorization pre-processing strategy "
+                       << vecPreProcStrategy << "\n");
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
