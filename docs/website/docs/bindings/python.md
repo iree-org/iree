@@ -108,7 +108,7 @@ Stable release packages are published to
     run `pip install` with this extra option:
 
     ```
-    --find-links https://iree-org.github.io/iree/pip-release-links.html
+    --find-links https://openxla.github.io/iree/pip-release-links.html
     ```
 
 ### Building from source

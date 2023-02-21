@@ -150,7 +150,7 @@ def main(argv):
   print(
       "The bazel integrations build and tests are deprecated. This script "
       "may be reworked in the future. For the time being refer to "
-      "https://iree-org.github.io/iree/building-from-source/python-bindings-and-importers/ "
+      "https://openxla.github.io/iree/building-from-source/python-bindings-and-importers/ "
       "and https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/e2e_benchmarking.md "
       "for information on how to run TensorFlow benchmarks.")
   exit(1)

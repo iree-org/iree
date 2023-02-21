@@ -68,7 +68,7 @@ them.
     generates
 
 2. Build the `iree-compile` tool (see
-    [here](https://iree-org.github.io/iree/building-from-source/getting-started/)
+    [here](https://openxla.github.io/iree/building-from-source/getting-started/)
     for general instructions on building using CMake)
 
     ```
@@ -77,7 +77,7 @@ them.
     ```
 
 3. Compile the `dynamic_shapes.mlir` file using `iree-compile`. The
-    [CPU configuration](https://iree-org.github.io/iree/deployment-configurations/cpu/)
+    [CPU configuration](https://openxla.github.io/iree/deployment-configurations/cpu/)
     has the best support for dynamic shapes:
 
     ```

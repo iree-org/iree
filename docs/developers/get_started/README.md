@@ -3,7 +3,7 @@
 ---
 
 The primary guides are located at
-https://iree-org.github.io/iree/building-from-source/ (source in
+https://openxla.github.io/iree/building-from-source/ (source in
 [the website/ folder](../../website/docs/building-from-source/) )
 
 ---

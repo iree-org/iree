@@ -9,7 +9,7 @@
 #include "llvm/Support/CommandLine.h"
 
 static void versionPrinter(llvm::raw_ostream &os) {
-  os << "IREE (https://iree-org.github.io/):\n  ";
+  os << "IREE (https://openxla.github.io/):\n  ";
   std::string version = mlir::iree_compiler::getIreeRevision();
   if (version.empty()) {
     version = "(unknown)";

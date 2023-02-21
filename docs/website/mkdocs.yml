@@ -1,7 +1,7 @@
 site_name: IREE
-site_url: https://iree-org.github.io/iree/
 repo_url: https://github.com/iree-org/iree
 repo_name: iree-org/iree
+site_url: https://openxla.github.io/iree/
 
 theme:
   name: material
