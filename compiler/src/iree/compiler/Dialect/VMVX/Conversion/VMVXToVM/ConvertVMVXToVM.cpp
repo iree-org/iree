@@ -160,20 +160,6 @@ class Fill2DOpConversion : public VMVXImportOpConversion<IREE::VMVX::Fill2DOp> {
   }
 };
 
-// Converts the vmvx.matmul op to an appropriate typed import.
-class MatmulOpConversion : public VMVXImportOpConversion<IREE::VMVX::MatmulOp> {
- public:
-  using VMVXImportOpConversion::VMVXImportOpConversion;
-
-  std::string getImportFqName(IREE::VMVX::MatmulOp op) const override {
-    std::string name("vmvx.matmul.");
-    name.append(getTypedTypeStr(op.getLhsType()));
-    name.append(getTypedTypeStr(op.getRhsType()));
-    name.append(getTypedTypeStr(op.getOutType()));
-    return name;
-  }
-};
-
 // Converts the vmvx.mmt4d op to an appropriate typed import.
 class Mmt4dOpConversion : public VMVXImportOpConversion<IREE::VMVX::Mmt4dOp> {
  public:
@@ -248,11 +234,10 @@ void populateVMVXToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
                               SymbolTable &importSymbols,
                               RewritePatternSet &patterns) {
-  patterns
-      .insert<BinaryOpConversion, CopyOpConversion, Fill2DOpConversion,
-              MatmulOpConversion, Mmt4dOpConversion, UnaryOpConversion,
-              PackOpConversion, UnpackOpConversion, QueryTileSizesOpConversion>(
-          context, importSymbols, typeConverter);
+  patterns.insert<BinaryOpConversion, CopyOpConversion, Fill2DOpConversion,
+                  Mmt4dOpConversion, UnaryOpConversion, PackOpConversion,
+                  UnpackOpConversion, QueryTileSizesOpConversion>(
+      context, importSymbols, typeConverter);
 }
 
 }  // namespace iree_compiler

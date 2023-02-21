@@ -1234,7 +1234,7 @@ linalg::FillOp findFillOpSolelyZeroingOutputOf(linalg::LinalgOp op) {
   return nullptr;
 }
 
-/// Convert supported linalg contraction ops like matmul and mmt4d.
+/// Convert supported linalg contraction ops like mmt4d.
 struct LinalgContractionConversion
     : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
@@ -1304,11 +1304,7 @@ struct LinalgContractionConversion
     }
 
     // Switch on contraction type.
-    if (info.contract.isRowMajorMatmul()) {
-      if (succeeded(handleConformingMatmul2D(info, rewriter))) {
-        return success();
-      }
-    } else if (isMmt4d(info.op.getIndexingMaps())) {
+    if (isMmt4d(info.op.getIndexingMaps())) {
       if (succeeded(handleConformingMmt4d(info, rewriter))) {
         return success();
       }
@@ -1316,44 +1312,6 @@ struct LinalgContractionConversion
 
     // Match failure.
     return rewriter.notifyMatchFailure(op, "unsupported contraction variant");
-  }
-
-  LogicalResult handleConformingMatmul2D(OpInfo &info,
-                                         PatternRewriter &rewriter) const {
-    int flags = 0;
-    if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
-      rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
-    } else {
-      flags |= IREE_UK_FLAG_ACCUMULATE;  // accumulate into existing.
-    }
-
-    auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
-    auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
-    auto &outDesc = info.outAnal.getDesc(rewriter);
-
-    Value m = lhsDesc.sizes[0];
-    Value k = rhsDesc.sizes[0];
-    Value n = rhsDesc.sizes[1];
-
-    auto loc = info.op.getLoc();
-    auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
-    auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
-    auto outBuffer = outDesc.castToLinear(loc, rewriter);
-
-    rewriter.replaceOpWithNewOp<IREE::VMVX::MatmulOp>(
-        info.op,
-        // LHS
-        lhsBuffer, lhsDesc.offset, lhsDesc.strides[0],
-        // RHS
-        rhsBuffer, rhsDesc.offset, rhsDesc.strides[0],
-        // Out
-        outBuffer, outDesc.offset, outDesc.strides[0],
-        // m,n,k
-        m, n, k,
-        // flags
-        lhsDesc.getElementTypeAttr(), rhsDesc.getElementTypeAttr(),
-        outDesc.getElementTypeAttr(), rewriter.getI32IntegerAttr(flags));
-    return success();
   }
 
   LogicalResult handleConformingMmt4d(OpInfo &info,
