@@ -54,6 +54,7 @@ iree_cc_library(
     MLIRArmNeonDialect
     MLIRBufferizationDialect
     MLIRComplexToLLVM
+    MLIRComplexToStandard
     MLIRControlFlowToLLVM
     MLIRFuncDialect
     MLIRFuncToLLVM
