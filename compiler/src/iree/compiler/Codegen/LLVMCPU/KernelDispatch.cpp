@@ -203,11 +203,6 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
   bool isLinalgGeneric = isa<linalg::GenericOp>(linalgOp.getOperation());
 
-  if (!isLinalgGeneric && isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
-    // Peeling is enabled on non-linalg-generic fully dynamic shape ops for now.
-    return VectorPreProcStrategy::Peeling;
-  }
-
   // Default X86 specific strategy.
   if (isX86(targetAttr)) {
     // Enable masking for generic ops.
@@ -224,12 +219,19 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
 
   // Default RISC-V specific strategies.
   if (isRISCV(targetAttr)) {
-    // Enable maskign for generic ops.
+    // Enable masking for generic ops.
     if (isLinalgGeneric) {
       return VectorPreProcStrategy::Masking;
     }
 
     if (enableVectorPeeling) {
+      return VectorPreProcStrategy::Peeling;
+    }
+  }
+
+  // Default AArch64 specific strategies.
+  if (isAArch64(targetAttr)) {
+    if (isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
@@ -618,6 +620,13 @@ static void setVectorSizesForDynamicShapes(
                                          parallelSizes.end());
   SmallVector<int64_t> origReductionSizes(reductionSizes.begin(),
                                           reductionSizes.end());
+  // Masking doesn't need any dim set to 1.
+  if (vecPreProcStrategy == VectorPreProcStrategy::Masking) {
+    return;
+  }
+
+  setAlwaysVectorizeSizes(op, parallelSizes, reductionSizes);
+
   // If peeling is enabled and the 'op' is fully dynamic, we only vectorize the
   // lowest order parallel dimension for now to avoid peeling higher level
   // dimensions. If no parallel dimension is found to be vectorized, we try to
@@ -627,8 +636,6 @@ static void setVectorSizesForDynamicShapes(
       vecPreProcStrategy != VectorPreProcStrategy::Peeling) {
     return;
   }
-
-  setAlwaysVectorizeSizes(op, parallelSizes, reductionSizes);
 
   bool isParallelDimVectorized = false;
   for (int i = origParallelSizes.size() - 1; i >= 0; --i) {
