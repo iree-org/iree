@@ -56,12 +56,12 @@ hal.executable private @check_no_cse {
     }
   }
 }
-//      CHECK: func.func @check_no_cse()
-//  CHECK-NOT:    memref.alloc
-//      CHECK:    %[[FOR:.+]] = scf.for
-//      CHECK:    %[[DIVF:.+]] = arith.divf %[[FOR]]
-//      CHECK:    %[[RES:.+]] = vector.extract %[[DIVF]]
-//      CHECK:    memref.store %[[RES]]
+// CHECK-LABEL: func.func @check_no_cse()
+//   CHECK-NOT:    memref.alloc
+//       CHECK:    %[[FOR:.+]] = scf.for
+//       CHECK:    %[[DIVF:.+]] = arith.divf %[[FOR]]
+//       CHECK:    %[[RES:.+]] = vector.extract %[[DIVF]]
+//       CHECK:    memref.store %[[RES]]
 
 // -----
 
@@ -106,9 +106,10 @@ hal.executable private @preset_config_matmul  {
     }
   }
 }
-// CHECK: func.func @preset_config_matmul
-// CHECK:   vector.outerproduct
-// HOIST-PAD:         func.func @preset_config_matmul
+// CHECK-LABEL: func.func @preset_config_matmul
+//       CHECK:   vector.outerproduct
+
+// HOIST-PAD-LABEL:   func.func @preset_config_matmul
 // HOIST-PAD-DAG:       %[[BUF1:.+]] = memref.alloca() {{.+}} : memref<3x4x16x32xf32>
 // HOIST-PAD-DAG:       %[[BUF2:.+]] = memref.alloca() {{.+}} : memref<4x8x16xf32>
 // HOIST-PAD-16-DAG:      vector.store {{.+}}, %[[BUF1]]
@@ -167,8 +168,8 @@ hal.executable private @batch_matmul_dynamic {
     }
   }
 }
-// CHECK: func.func @batch_matmul_dynamic
-// CHECK:   vector.outerproduct
+// CHECK-LABEL: func.func @batch_matmul_dynamic
+//       CHECK:   vector.outerproduct
 
 // -----
 
@@ -208,10 +209,10 @@ hal.executable private @check_buffer_ops_vectorization {
     }
   }
 }
-// CHECK:      #{{.+}} = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize
-// CHECK:      func.func @check_buffer_ops_vectorization
-// CHECK:        vector.load
-// CHECK-NEXT:   vector.store
+// CHECK-LABEL:  #{{.+}} = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize
+//       CHECK:      func.func @check_buffer_ops_vectorization
+//       CHECK:        vector.load
+//  CHECK-NEXT:        vector.store
 
 // -----
 
@@ -276,12 +277,12 @@ hal.executable private @vectorize_fill_conv2d_generic {
   }
 }
 
-// CHECK:      func.func @vectorize_fill_conv2d_generic
-// CHECK-NOT:    memref.alloca
-// CHECK-NOT:    linalg.fill
-// CHECK:        vector.outerproduct %{{.+}}, %{{.+}}, %{{.+}} {kind = #vector.kind<add>}
-// CHECK-NOT:    linalg.generic
-// CHECK:        arith.cmpf olt, %{{.+}}, %{{.+}} : vector<4x8xf32>
+// CHECK-LABEL:  func.func @vectorize_fill_conv2d_generic
+//   CHECK-NOT:    memref.alloca
+//   CHECK-NOT:    linalg.fill
+//       CHECK:    vector.outerproduct %{{.+}}, %{{.+}}, %{{.+}} {kind = #vector.kind<add>}
+//   CHECK-NOT:    linalg.generic
+//       CHECK:    arith.cmpf olt, %{{.+}}, %{{.+}} : vector<4x8xf32>
 
 // -----
 

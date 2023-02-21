@@ -55,19 +55,16 @@ hal.executable private @preset_config_generic_add  {
   }
 }
 
-// Masking is not applied to the main vector loop when the peeling is used.
+// Masking is applied to the main vector loop when the peeling is not used.
 
 // CHECK-LABEL: func.func @mask_dynamic_generic_add
 // Main loop
-// CHECK:       scf.for
-// CHECK:         vector.load
-// CHECK:         vector.load
-// CHECK:         vector.store
-// Peel loop
-// CHECK:       scf.for
-// CHECK:         vector.maskedload
-// CHECK:         vector.maskedload
-// CHECK:         vector.maskedstore
+//     CHECK:     scf.for
+//     CHECK:       vector.maskedload
+//     CHECK:       vector.maskedload
+//     CHECK:       vector.maskedstore
+// No epilogue
+// CHECK-NOT:     scf.for
 
 // -----
 
@@ -119,4 +116,15 @@ hal.executable private @preset_config_reduction  {
   }
 }
 
+// CHECK-LABEL: func.func @mask_dynamic_reduction
+//       CHECK:   vector.maskedload
+//       CHECK:   vector.maskedload
+//       CHECK:   vector.maskedload
+//       CHECK:   vector.maskedload
+//       CHECK:   vector.maskedload
+//       CHECK:   vector.mask %{{.*}} { vector.reduction <add>
+//       CHECK:   vector.mask %{{.*}} { vector.reduction <add>
+//       CHECK:   vector.mask %{{.*}} { vector.reduction <add>
+//       CHECK:   vector.mask %{{.*}} { vector.reduction <add>
+//       CHECK:   vector.maskedstore
 
