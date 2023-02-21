@@ -802,10 +802,12 @@ static LogicalResult setMatmulNoPadRootConfig(
   for (auto [index, tileSize] : llvm::enumerate(workgroupTileSizes)) {
     int64_t sz = tileSize;
     if (sz != 0) {
-      sz = getMaxTileSize(/*lb=*/0, /*ub=*/shape[index],
-                          /*maxTileSize=*/sz, vectorSize,
-                          /*allowIncompleteTile=*/vecPreProcStrategy ==
-                              VectorPreProcStrategy::Peeling);
+      sz = getMaxTileSize(
+          /*lb=*/0, /*ub=*/shape[index],
+          /*maxTileSize=*/sz, vectorSize,
+          /*allowIncompleteTile=*/vecPreProcStrategy ==
+                  VectorPreProcStrategy::Peeling ||
+              vecPreProcStrategy == VectorPreProcStrategy::Masking);
     }
     parallelTileSizes.push_back(sz);
   }
