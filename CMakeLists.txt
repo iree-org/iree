@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# DO NOT SUBMIT: trigger CI
+
 cmake_minimum_required(VERSION 3.21...3.24)
 
 # LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
