@@ -17,6 +17,42 @@ include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
+def ApplyBufferOptimizationsOp :
+  Op<Transform_Dialect, "iree.apply_buffer_optimizations",
+    [TransformEachOpTrait,
+     TransformOpInterface,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let description = [{
+    This applies memory optimization on memref. In particular it does store to
+    load forwarding, dead store elimination and dead alloc elimination.
+
+    #### Return modes
+
+    This operation applies a set of memory optimization on the whole region of
+    the operand.
+
+    If the transformation is successful it returns the handle to the
+    same payload as its operand to allow for simpler composition.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$result);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
@@ -120,6 +156,32 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
+    [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
+     TransformOpInterface, TransformEachOpTrait]> {
+  let summary = "Hoist static allocations";
+  let description = [{
+    Find static allocations and hoist them to the top level.
+
+    #### Return modes
+    This operation applies static alloc hoisting the whole region of the operand.
+    It always return success.
+  }];
+
+  let arguments = (ins Transform_ConcreteOpType<"func.func">:$target);
+  let results = (outs Transform_ConcreteOpType<"func.func">:$result);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::func::FuncOp funcOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -449,42 +511,6 @@ def ConfigExtractPart :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
         ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
-def ApplyBufferOptimizationsOp :
-  Op<Transform_Dialect, "iree.apply_buffer_optimizations",
-    [TransformEachOpTrait,
-     TransformOpInterface,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
-  let description = [{
-    This applies memory optimization on memref. In particular it does store to
-    load forwarding, dead store elimination and dead alloc elimination.
-
-    #### Return modes
-
-    This operation applies a set of memory optimization on the whole region of
-    the operand.
-
-    If the transformation is successful it returns the handle to the
-    same payload as its operand to allow for simpler composition.
-  }];
-
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$result);
-
-  let assemblyFormat = "$target attr-dict";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::Operation *target,
-        ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
 }

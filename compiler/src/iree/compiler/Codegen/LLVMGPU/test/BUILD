@@ -39,6 +39,7 @@ iree_lit_test_suite(
             "tensor_pad.mlir",
             "tensorcore_vectorization.mlir",
             "tile_on_tensor.mlir",
+            "transform_dialect_hoist_allocs.mlir",
             "transform_dialect_vector_distribution.mlir",
             "transform_dialect_bufferize.mlir",
             "transform_dialect_promote_operands.mlir",

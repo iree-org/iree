@@ -10,6 +10,9 @@ cmake_minimum_required(VERSION 3.21...3.24)
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
 # New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
 set(CMAKE_POLICY_DEFAULT_CMP0116 OLD)
+if(POLICY CMP0116)
+  cmake_policy(SET CMP0116 OLD)
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

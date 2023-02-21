@@ -26,7 +26,7 @@ python -m pip install \
   iree-tools-tf
 ```
 
-!!! warning
+!!! Caution
     The TensorFlow package is currently only available on Linux and macOS. It
     is not available on Windows yet (see
     [this issue](https://github.com/iree-org/iree/issues/6417)).

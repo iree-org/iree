@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
@@ -98,8 +99,9 @@ static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
                                         unsigned alignment) {
   auto funcOp = builder.getInsertionPoint()->getParentOfType<func::FuncOp>();
   if (funcOp) {
-    std::optional<Value> hoistedAllocation = hoistStaticallyBoundAllocations(
-        funcOp, builder, loc, memRefType, dynamicSizes, alignment);
+    std::optional<Value> hoistedAllocation =
+        hoistOneStaticallyBoundAllocation<memref::AllocaOp>(
+            funcOp, builder, loc, memRefType, dynamicSizes, alignment);
     if (hoistedAllocation) {
       return hoistedAllocation.value();
     }
@@ -720,6 +722,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // Handled tensor-type constants.
   passManager.addPass(arith::createConstantBufferizePass());
   passManager.addPass(createFoldTensorExtractOpPass());
+
+  // Handle complex operation conversion.
+  passManager.addPass(createConvertComplexToStandardPass());
 
   // math dialect elementry functions -> polynomial form.
   passManager.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());

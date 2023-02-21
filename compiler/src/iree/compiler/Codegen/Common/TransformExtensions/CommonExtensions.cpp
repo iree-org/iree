@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -52,6 +53,68 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
     DialectRegistry &registry) {
   registry.addExtensions<
       mlir::iree_compiler::IREE::transform_dialect::CommonExtensions>();
+}
+
+// Return true if all the uses of op are either Store/transfer_write.
+// There can be SubviewOp users as long as all its users are also
+// StoreOp/transfer_write. If return true it also fills out the uses, if it
+// returns false uses is unchanged.
+static bool allUsesAreStores(Operation *op, std::vector<Operation *> &uses) {
+  std::vector<Operation *> opUses;
+  for (OpOperand &use : op->getUses()) {
+    Operation *useOp = use.getOwner();
+    if (isa<memref::DeallocOp, vector::TransferWriteOp, memref::StoreOp>(
+            useOp) ||
+        (isa<memref::SubViewOp>(useOp) && allUsesAreStores(useOp, opUses))) {
+      opUses.push_back(useOp);
+      continue;
+    }
+    return false;
+  }
+  uses.insert(uses.end(), opUses.begin(), opUses.end());
+  return true;
+}
+
+// Track temporary allocations that are never read from. If this is the case
+// it means both the allocations and associated stores can be removed.
+static void eraseDeadAllocAndStores(Operation *parentOp) {
+  std::vector<Operation *> opToErase;
+  parentOp->walk([&](memref::AllocOp op) {
+    if (allUsesAreStores(op, opToErase)) {
+      opToErase.push_back(op.getOperation());
+    }
+  });
+  for (Operation *op : opToErase) {
+    op->erase();
+  }
+}
+
+//===---------------------------------------------------------------------===//
+// ApplyBufferOptimizationsOp
+//===---------------------------------------------------------------------===//
+DiagnosedSilenceableFailure
+transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
+    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  // Apply store to load forwarding and dead store elimination.
+  vector::transferOpflowOpt(target);
+  eraseDeadAllocAndStores(target);
+
+  results.push_back(target);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
+}
+
+void transform_dialect::ApplyBufferOptimizationsOp::build(
+    OpBuilder &builder, OperationState &result, Value target) {
+  result.addOperands(target);
+  result.addTypes({pdl::OperationType::get(target.getContext())});
 }
 
 //===---------------------------------------------------------------------===//
@@ -311,6 +374,20 @@ void transform_dialect::ApplyPatternsOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
+// HoistStaticAllocOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
+    func::FuncOp funcOp, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(funcOp->getContext());
+  mlir::iree_compiler::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
+      rewriter, funcOp);
+  results.push_back(funcOp);
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
 // ShareForallOperandsOp
 //===----------------------------------------------------------------------===//
 
@@ -482,14 +559,14 @@ LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
   // Step 3. Outline the compute workload region and set up the workload
   // operands, if this has not been done already.
   // Using `transform.iree.tile_to_forall_and_workgroup_count_region` is
-  // the preferred way to set up tiling and workgroup_count region **at the same
-  // time**.
+  // the preferred way to set up tiling and workgroup_count region **at the
+  // same time**.
   //
-  // The block of code below will be retired once there is enough confidence we
-  // can do everything without it. This includes in particular providing custom
-  // fusion heuristics at the flow level: at this time, the only way to fully
-  // control fusion of more advanced cases is to use the transform dialect at
-  // the flow level and explicitly match the ops we want to fuse.
+  // The block of code below will be retired once there is enough confidence
+  // we can do everything without it. This includes in particular providing
+  // custom fusion heuristics at the flow level: at this time, the only way to
+  // fully control fusion of more advanced cases is to use the transform
+  // dialect at the flow level and explicitly match the ops we want to fuse.
   // Once fusion is customizable enough in perpetuity, we can retire this.
   if (exportOp.getWorkgroupCount().empty()) {
     if (llvm::any_of(forallOp.getUpperBound(rewriter), [](Value v) {
@@ -497,9 +574,11 @@ LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
         })) {
       return forallOp->emitError(
           "unsupported dynamic workgroup_count atm --- need to slice out "
-          "workgroup_count computation into ExecutableExport::workgroup_count."
+          "workgroup_count computation into "
+          "ExecutableExport::workgroup_count."
           "\nThis region may require arbitrary computations and cannot "
-          "magically match what the `stream.cmd.dispatch` has already imposed "
+          "magically match what the `stream.cmd.dispatch` has already "
+          "imposed "
           "on us at a distance."
           "\nFor now we must specify the number of values properly when "
           "applying the topLevel tile_to_forall_op");
@@ -628,8 +707,8 @@ void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
   SmallVector<Value> dynamicTileSizes;
   dispatchIndexOpFoldResults(mixedTileSizes, dynamicTileSizes, staticTileSizes);
   // Call the default builder which sets up the proper operands segment sizes
-  // attributes for multiple variadic operands. In the absence of this, horrible
-  // bugs ensue.
+  // attributes for multiple variadic operands. In the absence of this,
+  // horrible bugs ensue.
   MLIRContext *ctx = builder.getContext();
   auto operationType = pdl::OperationType::get(ctx);
 
@@ -665,8 +744,8 @@ void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
   dispatchIndexOpFoldResults(mixedNumThreads, dynamicNumThreads,
                              staticNumThreads);
   // Call the default builder which sets up the proper operands segment sizes
-  // attributes for multiple variadic operands. In the absence of this, horrible
-  // bugs ensue.
+  // attributes for multiple variadic operands. In the absence of this,
+  // horrible bugs ensue.
   MLIRContext *ctx = builder.getContext();
   auto operationType = pdl::OperationType::get(ctx);
   build(builder, result,
@@ -1224,65 +1303,6 @@ transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::apply(
 
   transformResults.set(getOperation()->getOpResult(0), targetOps.front());
   return DiagnosedSilenceableFailure::success();
-}
-
-// Return true if all the uses of op are either Store/transfer_write.
-// There can be SubviewOp users as long as all its users are also
-// StoreOp/transfer_write. If return true it also fills out the uses, if it
-// returns false uses is unchanged.
-static bool allUsesAreStores(Operation *op, std::vector<Operation *> &uses) {
-  std::vector<Operation *> opUses;
-  for (OpOperand &use : op->getUses()) {
-    Operation *useOp = use.getOwner();
-    if (isa<memref::DeallocOp, vector::TransferWriteOp, memref::StoreOp>(
-            useOp) ||
-        (isa<memref::SubViewOp>(useOp) && allUsesAreStores(useOp, opUses))) {
-      opUses.push_back(useOp);
-      continue;
-    }
-    return false;
-  }
-  uses.insert(uses.end(), opUses.begin(), opUses.end());
-  return true;
-}
-
-// Track temporary allocations that are never read from. If this is the case
-// it means both the allocations and associated stores can be removed.
-static void eraseDeadAllocAndStores(Operation *parentOp) {
-  std::vector<Operation *> opToErase;
-  parentOp->walk([&](memref::AllocOp op) {
-    if (allUsesAreStores(op, opToErase)) {
-      opToErase.push_back(op.getOperation());
-    }
-  });
-  for (Operation *op : opToErase) {
-    op->erase();
-  }
-}
-
-DiagnosedSilenceableFailure
-transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
-    Operation *target, transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  // Apply store to load forwarding and dead store elimination.
-  vector::transferOpflowOpt(target);
-  eraseDeadAllocAndStores(target);
-
-  results.push_back(target);
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
-  transform::modifiesPayload(effects);
-}
-
-void transform_dialect::ApplyBufferOptimizationsOp::build(
-    OpBuilder &builder, OperationState &result, Value target) {
-  result.addOperands(target);
-  result.addTypes({pdl::OperationType::get(target.getContext())});
 }
 
 #define GET_OP_CLASSES
