@@ -22,7 +22,7 @@ components:
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
 
-!!! warning
+!!! Caution
     The TensorFlow, TensorFlow Lite, and XLA packages are currently only
     available on Linux and macOS. They are not available on Windows yet (see
     [this issue](https://github.com/iree-org/iree/issues/6417)).
