@@ -76,6 +76,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       will need to be sliced out better in the future.
       - bubble_collapse_expand: bubble `expand_shape` up and `collapse_shape`
       down across Linalg ops.
+      - bubble_pack_un_pack: bubble `pack` up and `unpack` down across Linalg
+      ops.
       - canonicalization: adds all the canonicalization patterns of all
       registered dialects and ops.
       - cse: additionally apply common subexpression elimination. This must
@@ -138,6 +140,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   let arguments = (ins PDL_Operation:$target,
                        UnitAttr:$additional_iree_patterns,
                        UnitAttr:$bubble_collapse_expand,
+                       UnitAttr:$bubble_pack_un_pack,
                        UnitAttr:$canonicalization,
                        UnitAttr:$cse,
                        UnitAttr:$erase_unnecessary_tensor_operands,

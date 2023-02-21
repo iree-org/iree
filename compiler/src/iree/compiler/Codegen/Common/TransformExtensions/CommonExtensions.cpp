@@ -140,6 +140,7 @@ void transform_dialect::ApplyPatternsOp::build(
   ///
   ADD_PATTERN(additionalIreePatterns, getAdditionalIreePatternsAttrName)
   ADD_PATTERN(bubbleCollapseExpand, getBubbleCollapseExpandAttrName)
+  ADD_PATTERN(bubblePackUnPack, getBubblePackUnPackAttrName)
   ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
   ADD_PATTERN(cse, getCseAttrName)
   ADD_PATTERN(eraseUnnecessaryTensorOperands,
@@ -321,6 +322,8 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     linalg::populateFoldReshapeOpsByExpansionPatterns(
         patterns, [](OpOperand *) { return true; });
   }
+  if (getBubblePackUnPack())
+    linalg::populateDataLayoutPropagationPatterns(patterns);
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
   if (getEraseUnnecessaryTensorOperands())
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
@@ -578,7 +581,8 @@ LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
     return forallOp->emitError("mapping must be #gpu.block<x/y/z/>");
   }
 
-  // Step 1. Complete the blockMapping to a full mapping (with 1s) if necessary.
+  // Step 1. Complete the blockMapping to a full mapping (with 1s) if
+  // necessary.
   SmallVector<Value> numBlocks =
       llvm::to_vector(forallOp.getUpperBound(rewriter));
   // Ensure we have 3 block sizes, one for each id.

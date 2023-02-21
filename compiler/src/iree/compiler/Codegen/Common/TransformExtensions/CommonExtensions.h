@@ -37,6 +37,7 @@ namespace transform_dialect {
 struct ApplyPatternsOpPatterns {
   bool additionalIreePatterns = false;
   bool bubbleCollapseExpand = false;
+  bool bubblePackUnPack = false;
   bool canonicalization = false;
   bool cse = false;
   bool eraseUnnecessaryTensorOperands = false;
