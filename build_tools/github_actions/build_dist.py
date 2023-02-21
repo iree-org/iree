@@ -159,7 +159,6 @@ def build_main_dist():
   dist_entries = [
       "bin",
       "lib",
-      "tests",
   ]
   dist_archive = os.path.join(
       BINDIST_DIR, f"iree-dist{version_info['package-suffix']}"
