@@ -169,9 +169,10 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 /// Some uses of a AllocLike can be replaced with a `memref.subview`
 /// easily. Other uses (like a use in a `scf.yield` or `func.return`) are
 /// non-trivial because of compatibility between types of different SSA values.
-static bool isUseReplacableWithSubview(OpOperand &use) {
+static bool isUseReplaceableWithSubview(OpOperand &use) {
   Operation *user = use.getOwner();
-  return isa<linalg::LinalgOp, memref::StoreOp, memref::SubViewOp>(user);
+  return isa<linalg::LinalgOp, memref::DeallocOp, memref::StoreOp,
+             memref::SubViewOp>(user);
 }
 
 /// Explicit instantiations for `hoistStaticallyBoundAllocationsInFunc`.
@@ -195,7 +196,7 @@ void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
       return;
     }
     if (llvm::all_of(allocLikeOp->getUses(), [](OpOperand &use) {
-          return isUseReplacableWithSubview(use);
+          return isUseReplaceableWithSubview(use);
         })) {
       allocLikeOps.push_back(allocLikeOp);
       return;
