@@ -13,7 +13,7 @@ Steps 1-3 are performed in Python via the
 [`variables_and_state.ipynb`](./variables_and_state.ipynb)
 [Colab](https://research.google.com/colaboratory/) notebook:
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/variables_and_state/variables_and_state.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/variables_and_state/variables_and_state.ipynb)
 
 Steps 4-5 are in [`main.c`](./main.c)
 

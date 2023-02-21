@@ -28,7 +28,7 @@ from common import benchmark_definition, benchmark_presentation
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
 
 IREE_DASHBOARD_URL = "https://perf.iree.dev"
-IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/iree-org/iree/commit'
+IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/openxla/iree/commit'
 IREE_PROJECT_ID = 'IREE'
 THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
 
@@ -37,8 +37,8 @@ COMMON_DESCRIIPTION = """
 For the graph, the x axis is the Git commit index, and the y axis is the
 measured metrics. The unit for the numbers is shown in the "Unit" dropdown.
 <br>
-See <a href="https://github.com/iree-org/iree/tree/main/benchmarks/dashboard.md">
-https://github.com/iree-org/iree/tree/main/benchmarks/dashboard.md
+See <a href="https://github.com/openxla/iree/tree/main/benchmarks/dashboard.md">
+https://github.com/openxla/iree/tree/main/benchmarks/dashboard.md
 </a> for benchmark philosophy, specification, and definitions.
 """
 

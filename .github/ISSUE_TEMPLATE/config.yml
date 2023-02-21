@@ -1,13 +1,13 @@
 blank_issues_enabled: true
 contact_links:
   - name: 📄 Blank Issue
-    url: https://github.com/iree-org/iree/issues/new
+    url: https://github.com/openxla/iree/issues/new
     about: If you know what you're doing (especially collaborators)
   - name: 📧 Send an email to our mailing list
     url: https://groups.google.com/forum/#!forum/iree-discuss
     about: For announcements and asynchronous discussion
   - name: 🗣 Start a discussion on GitHub
-    url: https://github.com/iree-org/iree/discussions
+    url: https://github.com/openxla/iree/discussions
     about: An alternative platform for asynchronous discussion
   - name: 💬 Join us on Discord
     url: https://discord.gg/26P4xW4

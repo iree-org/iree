@@ -59,7 +59,7 @@ passed to the IREE compiler when building modules used in tests, benchmarks,
 etc. (anything that internally uses the CMake `iree_bytecode_module` macro).
 
 The CMake option `IREE_BUILD_SAMPLES=OFF` is needed because samples [currently
-assume](https://github.com/iree-org/iree/pull/8893) that the embedded linker is
+assume](https://github.com/openxla/iree/pull/8893) that the embedded linker is
 used, so they are incompatible with
 `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON`.
 
@@ -70,7 +70,7 @@ That ensures that all tests succeed: no test is expected to fail with TSan.
 If you know what you're doing (i.e. if you are not building targets that
 internally involve a LLVM/CPU `iree_bytecode_module`), feel free to locally comment out
 the CMake error and only set `IREE_ENABLE_TSAN`. Also see a
-[past attempt]((https://github.com/iree-org/iree/pull/8966) to relax that CMake
+[past attempt]((https://github.com/openxla/iree/pull/8966) to relax that CMake
 validation.
 
 ### MSan (MemorySanitizer)

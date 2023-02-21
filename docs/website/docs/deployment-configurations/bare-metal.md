@@ -45,10 +45,10 @@ In which
 * `iree-hal-target-backends=llvm-cpu`: Compile using the LLVM CPU target
 * `iree-llvm-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple
     so the artifact has a fixed ABI to be rendered by the
-    [elf_module library](https://github.com/iree-org/iree/tree/main/iree/hal/local/elf)
+    [elf_module library](https://github.com/openxla/iree/tree/main/iree/hal/local/elf)
 * `iree-llvm-debug-symbols=false`: To reduce the artifact size
 
-See [generate.sh](https://github.com/iree-org/iree/blob/main/iree/hal/local/elf/testdata/generate.sh)
+See [generate.sh](https://github.com/openxla/iree/blob/main/iree/hal/local/elf/testdata/generate.sh)
 for example command-line instructions of some common architectures
 
 You can replace the MLIR file with the other MLIR model files, following the
@@ -56,7 +56,7 @@ You can replace the MLIR file with the other MLIR model files, following the
 
 ### Compiling the bare-metal model for static-library support
 
-See the [static_library](https://github.com/iree-org/iree/tree/main/samples/static_library)
+See the [static_library](https://github.com/openxla/iree/tree/main/samples/static_library)
 demo sample for an example and instructions on running a model with IREE's
 `static_library_loader`.
 
@@ -89,11 +89,11 @@ model execution is in a single-thread synchronous fashion.
 * `set(IREE_BUILD_TESTS OFF)`: Disable tests until IREE supports running them
   on bare-metal platforms
 * `set(IREE_BUILD_SAMPLES ON)`: Build
-  [simple_embedding](https://github.com/iree-org/iree/tree/main/samples/simple_embedding)
+  [simple_embedding](https://github.com/openxla/iree/tree/main/samples/simple_embedding)
   example
 
 !!! todo
-    Clean the list up after [#6353](https://github.com/iree-org/iree/issues/6353)
+    Clean the list up after [#6353](https://github.com/openxla/iree/issues/6353)
     is fixed.
 
 Also, set the toolchain-specific cmake file to match the tool path, target
@@ -115,13 +115,13 @@ architecture, target abi, linker script, system library path, etc.
 
 Examples of how to setup the CMakeLists.txt and .cmake file:
 
-* [IREE RISC-V toolchain cmake](https://github.com/iree-org/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
+* [IREE RISC-V toolchain cmake](https://github.com/openxla/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
 * [IREE Bare-Metal Arm Sample](https://github.com/iml130/iree-bare-metal-arm)
 * [IREE Bare-Metal RV32 Sample](https://github.com/AmbiML/iree-rv32-springbok)
 
 ## Bare-metal execution example
 
 See
-[simple_embedding for generic platform](https://github.com/iree-org/iree/blob/main/samples/simple_embedding/README.md#generic-platform-support)
+[simple_embedding for generic platform](https://github.com/openxla/iree/blob/main/samples/simple_embedding/README.md#generic-platform-support)
 to see how to use the IREE runtime library to build/run the IREE model for the
 bare-metal target.

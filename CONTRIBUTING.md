@@ -68,7 +68,7 @@ write access).
 ## Peculiarities
 
 Our documentation on
-[repository management](https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/repository_management.md)
+[repository management](https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/repository_management.md)
 has more information on some of the oddities in our repository setup and
 workflows. For the most part, these should be transparent to normal developer
 workflows.

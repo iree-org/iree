@@ -391,6 +391,6 @@ source view pointing to the `.mlir` file.
 ## Configuring Tracy instrumentation
 
 Set IREE's `IREE_TRACING_MODE` value (defined in
-[iree/base/tracing.h](https://github.com/iree-org/iree/blob/main/iree/base/tracing.h))
+[iree/base/tracing.h](https://github.com/openxla/iree/blob/main/iree/base/tracing.h))
 to adjust which tracing features, such as allocation tracking and callstacks,
 are enabled.

@@ -24,7 +24,7 @@ iree_cc_test(
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # Move to bin/ directory and systematically name more appropriately.
-# See: https://github.com/iree-org/iree/issues/11297
+# See: https://github.com/openxla/iree/issues/11297
 if(TARGET iree_compiler_API2_test_api-test-binary)
   set_target_properties(iree_compiler_API2_test_api-test-binary
     PROPERTIES

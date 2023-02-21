@@ -13,7 +13,7 @@ using it.
 We tend to use the "triangular" or "forking" workflow. Develop primarily on a
 clone of the repository on your development machine. Any local branches named
 the same as persistent branches from the
-[main repository](https://github.com/iree-org/iree) (currently `main`, `google`,
+[main repository](https://github.com/openxla/iree) (currently `main`, `google`,
 and `stable`) are pristine (though potentially stale) copies. You only
 fastforward these to match upstream and otherwise do development on other
 branches. When sending PRs, you push to a different branch on your public fork
@@ -42,7 +42,7 @@ and create the PR from there.
     # From whatever directory under which you want to nest your repo
     $ git clone git@github.com:<github_username>/iree.git
     $ cd iree
-    $ git remote add upstream git@github.com:iree-org/iree.git
+    $ git remote add upstream git@github.com:openxla/iree.git
     ```
 
     This is especially important for maintainers who have write access (so can
@@ -55,7 +55,7 @@ and create the PR from there.
     URL explicitly before pushing.
 
 3.  Use a script like
-    [git_update.sh](https://github.com/iree-org/iree/blob/main/scripts/git/git_update.sh)
+    [git_update.sh](https://github.com/openxla/iree/blob/main/scripts/git/git_update.sh)
     to easily synchronize `main` with `upstream`. Submodules make this is a
     little trickier than it should be. You can also add this as a git alias.
 

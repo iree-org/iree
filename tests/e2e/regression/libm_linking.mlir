@@ -13,7 +13,7 @@
 // This test checks that the LLVM lowerings for certain operations are
 // correctly covered by our linker configurations.
 //
-// See https://github.com/iree-org/iree/issues/4717 for more details.
+// See https://github.com/openxla/iree/issues/4717 for more details.
 
 // CHECK: vm.func private @tanh
 func.func @tanh(%input : tensor<f32>) -> (tensor<f32>) {

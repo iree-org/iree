@@ -30,7 +30,7 @@ Importing from other frameworks is planned - stay tuned!
 ## Samples
 
 Check out the samples in IREE's
-[samples/colab/ directory](https://github.com/iree-org/iree/tree/main/colab),
+[samples/colab/ directory](https://github.com/openxla/iree/tree/main/colab),
 as well as the [iree-samples repository](https://github.com/iree-org/iree-samples),
 which contains workflow comparisons across frameworks.
 

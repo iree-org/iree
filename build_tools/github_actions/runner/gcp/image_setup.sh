@@ -268,8 +268,8 @@ EOF
     nice_curl \
       --remote-name-all \
       --output-dir "${script_dir}" \
-      https://raw.githubusercontent.com/iree-org/iree/main/build_tools/scripts/check_vulkan.sh \
-      https://raw.githubusercontent.com/iree-org/iree/main/build_tools/scripts/check_cuda.sh
+      https://raw.githubusercontent.com/openxla/iree/main/build_tools/scripts/check_vulkan.sh \
+      https://raw.githubusercontent.com/openxla/iree/main/build_tools/scripts/check_cuda.sh
 
     chmod +x "${script_dir}/check_vulkan.sh" "${script_dir}/check_cuda.sh"
 

@@ -166,7 +166,7 @@ function(iree_py_library)
   foreach(_SRC_FILE ${_RULE_SRCS})
     # _SRC_FILE could have other path components in it, so we need to make a
     # directory for it. Ninja does this automatically, but make doesn't. See
-    # https://github.com/iree-org/iree/issues/6801
+    # https://github.com/openxla/iree/issues/6801
     set(_SRC_BIN_PATH "${CMAKE_CURRENT_BINARY_DIR}/${_SRC_FILE}")
     get_filename_component(_SRC_BIN_DIR "${_SRC_BIN_PATH}" DIRECTORY)
     add_custom_command(

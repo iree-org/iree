@@ -26,7 +26,7 @@ class VM_TrivialOp<string mnemonic, list<Trait> traits = []> :
 // Pure ops do not have any memory effects, do not invoke Undefined Behavior,
 // and are always safe to speculate/hoist.
 //
-// TODO(https://github.com/iree-org/iree/issues/11179): More VM ops should be
+// TODO(https://github.com/openxla/iree/issues/11179): More VM ops should be
 // made pure.
 class VM_PureOp<string mnemonic, list<Trait> traits = []> :
       VM_TrivialOp<mnemonic, !listconcat(traits, [AlwaysSpeculatable])>;

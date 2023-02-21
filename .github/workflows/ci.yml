@@ -1020,7 +1020,7 @@ jobs:
           # Wildcard pattern to match all execution benchmark results. Empty if
           # execution_benchmarks is skipped, which results in no match.
           EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
-          IREE_BUILD_URL: https://github.com/iree-org/iree/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+          IREE_BUILD_URL: https://github.com/openxla/iree/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BENCHMARK_COMMENT_ARTIFACT: benchmark-comment.json
         run: |

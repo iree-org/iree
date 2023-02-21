@@ -210,8 +210,8 @@ within should perform a large amount of work to hide overheads involved in the
 cross-module calls and users must be aware that the compiler cannot optimize
 across the call boundaries.
 
-See the [synchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples/custom_module/sync/)
-and [asynchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples/custom_module/async/)
+See the [synchronous tensor I/O](https://github.com/openxla/iree/tree/main/samples/custom_module/sync/)
+and [asynchronous tensor I/O](https://github.com/openxla/iree/tree/main/samples/custom_module/async/)
 samples.
 
 ### Pros
@@ -243,18 +243,18 @@ samples.
 
 The runtime portion requires that the code be exported to the VM system by way
 of an `iree_vm_module_t` interface. A low-level native interface exists with
-minimal overhead and is used for example [by the IREE HAL itself](https://github.com/iree-org/iree/tree/main/iree/modules/hal).
+minimal overhead and is used for example [by the IREE HAL itself](https://github.com/openxla/iree/tree/main/iree/modules/hal).
 There is also a C++ wrapper that is significantly easier to work with however it
 needs some performance improvements.
 
-Full end-to-end examples can be found under [`samples/custom_modules/`](https://github.com/iree-org/iree/tree/main/samples/custom_modules):
+Full end-to-end examples can be found under [`samples/custom_modules/`](https://github.com/openxla/iree/tree/main/samples/custom_modules):
 
-* The [basic](https://github.com/iree-org/iree/tree/main/samples/custom_module/basic/)
+* The [basic](https://github.com/openxla/iree/tree/main/samples/custom_module/basic/)
 sample shows how to add VM modules with custom types and take advantage of ABI
 features like fallback functions and optional imports.
-* The [synchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples/custom_module/sync/)
+* The [synchronous tensor I/O](https://github.com/openxla/iree/tree/main/samples/custom_module/sync/)
 sample shows a call taking and returning a tensor and performing blocking work.
-* The [asynchronous tensor I/O](https://github.com/iree-org/iree/tree/main/samples/custom_module/async/)
+* The [asynchronous tensor I/O](https://github.com/openxla/iree/tree/main/samples/custom_module/async/)
 sample shows the same thing but with fences for asynchronous scheduling.
 
 ## 3. Extend target-specific device conversion patterns
@@ -498,6 +498,6 @@ provider to resolve named symbols in the import table to C functions that
 marshal arguments and results.
 
 The compiler-side needs some additional work but an example is included here:
-[Issue 7504](https://github.com/iree-org/iree/issues/7504).
+[Issue 7504](https://github.com/openxla/iree/issues/7504).
 The runtime-side is complete and resolution is performed by a user-supplied
 `iree_hal_executable_import_provider_t`.

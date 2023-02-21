@@ -245,7 +245,7 @@ ${AAPT_PACK?} --non-constant-id -m \
 
 # Compile the R.java and create classes.dex out of it for Android.
 echo "Using javac: '${JAVAC_BIN?}'"
-${JAVAC?} "${IREE_RESOURCE_GEN_DIR?}"/com/iree-org/iree/run_module/*.java
+${JAVAC?} "${IREE_RESOURCE_GEN_DIR?}"/com/openxla/iree/run_module/*.java
 ${DX?} --output="${IREE_APK_PARTS_DIR?}/classes.dex" "${IREE_APK_PARTS_DIR?}"
 
 echo ">>> Packaging apk file <<<"
