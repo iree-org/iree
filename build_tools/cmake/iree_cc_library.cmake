@@ -113,7 +113,7 @@ function(iree_cc_library)
 
   if(NOT _RULE_IS_INTERFACE)
     add_library(${_OBJECTS_NAME} OBJECT)
-    if(_RULE_SHARED)
+    if(_RULE_SHARED OR BUILD_SHARED_LIBS)
       add_library(${_NAME} SHARED "$<TARGET_OBJECTS:${_OBJECTS_NAME}>")
       if(_RULE_WINDOWS_DEF_FILE AND WIN32)
         target_sources(${_NAME} PRIVATE "${_RULE_WINDOWS_DEF_FILE}")
@@ -196,6 +196,15 @@ function(iree_cc_library)
       PUBLIC
         ${_RULE_DEFINES}
     )
+
+    # If in BUILD_SHARED_LIBS mode, then we need to make sure that visibility
+    # is not hidden. We default to hidden visibility in the main copts so
+    # need to undo it here.
+    if(BUILD_SHARED_LIBS AND IREE_SUPPORTS_VISIBILITY_DEFAULT)
+      target_compile_options(${_OBJECTS_NAME} PRIVATE
+        "-fvisibility=default"
+      )
+    endif()
 
     # Add all IREE targets to a folder in the IDE for organization.
     if(_RULE_PUBLIC)
