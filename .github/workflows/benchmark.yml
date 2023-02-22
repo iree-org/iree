@@ -28,5 +28,7 @@ jobs:
           submodules: false
 
       - name: "Waiting"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "test"
+          build_tools/github_actions/wait_ci.py
