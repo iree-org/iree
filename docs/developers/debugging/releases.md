@@ -92,25 +92,13 @@ can test any changes to the release process on your own fork.  Some setup is
 required before these github actions will work on your fork and development
 branch.
 
-To run
-[`schedule_snapshot_release.yml`](https://github.com/openxla/iree/blob/main/.github/workflows/schedule_snapshot_release.yml),
-comment out
-[this line](https://github.com/openxla/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/schedule_snapshot_release.yml#L14):
-```yaml
-# Don't run this in everyone's forks.
-if: github.repository == 'iree-org/iree'
-```
-
-And change the branch from 'main' to the branch you are developing on
-[here](https://github.com/openxla/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/schedule_snapshot_release.yml#L37):
-```yaml
-- name: Pushing changes
-  uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6  # v0.6.0
-  with:
-    github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-    branch: main
-    tags: true
-```
+You can run
+[`schedule_candidate_release.yml`](https://github.com/openxla/iree/blob/main/.github/workflows/schedule_candidate_release.yml)
+with a workflow dispatch from the actions tab. If you want to test using a
+commit other than the latest green on your `main` branch, modify the section
+that
+[identifies the latest green commit](https://github.com/openxla/iree/blob/c7b29123f8bd80c1346d2a9e6c5227b372b75616/.github/workflows/schedule_candidate_release.yml#L25)
+to search from another commit or just hardcode one.
 
 To speed up
 [`build_package.yml`](https://github.com/openxla/iree/blob/main/.github/workflows/build_package.yml),

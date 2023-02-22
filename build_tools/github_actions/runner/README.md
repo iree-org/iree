@@ -57,7 +57,7 @@ repository you are registering it in. This access is too broad to grant to the
 runners themselves. Therefore, we mediate the token acquisition through a proxy
 hosted on [Google Cloud Run](https://cloud.google.com/run). The proxy has the
 app token for a GitHub App with permission to manage self-hosted runners for the
-"iree-org" GitHub organization. It receives requests from the runners when they
+"openxla" GitHub organization. It receives requests from the runners when they
 are trying to register or deregister and returns them the much more narrowly
 scoped [de]registration token. We use
 https://github.com/google-github-actions/github-runner-token-proxy for the
@@ -107,8 +107,8 @@ code authorship and review.
 
 ## Examining Runners
 
-The runners for iree-org can be viewed in the
-[GitHub UI](https://github.com/organizations/iree-org/settings/actions/runners).
+The runners for openxla can be viewed in the
+[GitHub UI](https://github.com/organizations/openxla/settings/actions/runners).
 Unfortunately, only organization admins have access to this page. Organization
 admin gives very broad privileges, so this set is necessarily kept very small by
 Google security policy.
