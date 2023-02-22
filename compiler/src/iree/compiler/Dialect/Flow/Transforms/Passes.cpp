@@ -249,10 +249,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
-      .addPass(createCSEPass);
+      .addPass(createCSEPass)
 
-  // Initialize any empty tensors to zero.
-  passManager.addPass(createInitializeEmptyTensorsPass(clZeroFillEmptyTensors));
+      // Initialize any empty tensors to zero.
+      .addPass([&]() {
+        return createInitializeEmptyTensorsPass(clZeroFillEmptyTensors);
+      });
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.
