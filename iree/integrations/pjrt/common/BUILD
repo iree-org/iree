@@ -26,6 +26,7 @@ iree_pjrt_cc_library(
     deps = [
         ":compiler",
         ":debugging",
+        "@iree_core//runtime/src/iree/base",
         "@iree_core//runtime/src/iree/base:tracing",
         "@iree_core//runtime/src/iree/hal",
         "@iree_core//runtime/src/iree/modules/hal",
