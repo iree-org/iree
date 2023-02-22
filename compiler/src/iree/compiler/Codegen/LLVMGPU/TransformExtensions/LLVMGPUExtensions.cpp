@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -26,6 +27,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Region.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -122,32 +124,44 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
   }
 
-  // Map warpIds, only if threadIdx.x is a multiple of the warp size.
-  // TODO: more advanced mechanism to linearize/delinearize the threadIds to
-  // warps.
   SmallVector<DeviceMappingAttrInterface> warpMappingAttributes = {
       gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimX),
       gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimY),
       gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimZ)};
-  if (diag.succeeded() && (workgroupSize[0] % kWarpSize == 0)) {
-    auto warpIdGenerator = [](RewriterBase &rewriter, scf::ForallOp forallOp,
-                              SmallVectorImpl<Value> &warpIds) {
+  // Map warpIds, only if the total number of threads is a multiple of the warp
+  // size.
+  int64_t totalNumThreads =
+      workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+  if (diag.succeeded() && (totalNumThreads % kWarpSize == 0)) {
+    auto warpIdGenerator = [&workgroupSize](RewriterBase &rewriter,
+                                            scf::ForallOp forallOp,
+                                            SmallVectorImpl<Value> &warpIds) {
       Location loc = forallOp.getLoc();
       IndexType indexType = rewriter.getIndexType();
       Value threadIdX =
           rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x);
-      Value cstWarpSize =
-          rewriter.create<arith::ConstantIndexOp>(loc, kWarpSize);
-      Value warpIdX =
-          rewriter.create<arith::DivUIOp>(loc, threadIdX, cstWarpSize);
-      warpIds.assign(
-          {warpIdX,
-           rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y),
-           rewriter.create<gpu::ThreadIdOp>(loc, indexType,
-                                            gpu::Dimension::z)});
+      Value threadIdY =
+          rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y);
+      Value threadIdZ =
+          rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::z);
+
+      AffineExpr tx, ty, tz, BDX, BDY;
+      bindDims(rewriter.getContext(), tx, ty, tz);
+      // These can become symbolic when needed.
+      BDX = getAffineConstantExpr(workgroupSize[0], rewriter.getContext());
+      BDY = getAffineConstantExpr(workgroupSize[1], rewriter.getContext());
+      Value linearThreadId =
+          makeComposedAffineApply(rewriter, loc, tx + ty * BDX + tz * BDX * BDY,
+                                  {threadIdX, threadIdY, threadIdZ});
+      AffineExpr ltid, warpSize;
+      bindDims(rewriter.getContext(), ltid);
+      warpSize = getAffineConstantExpr(kWarpSize, rewriter.getContext());
+      Value warpIdX = makeComposedAffineApply(rewriter, loc, ltid % warpSize,
+                                              {linearThreadId});
+      Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+      warpIds.assign({warpIdX, one, one});
     };
-    SmallVector<int64_t> numWarps = {workgroupSize[0] / kWarpSize,
-                                     workgroupSize[1], workgroupSize[2]};
+    SmallVector<int64_t> numWarps = {totalNumThreads / kWarpSize, 1, 1};
     diag = mlir::transform::gpu::mapNestedForeachToThreadsImpl(
         rewriter, target, numWarps, warpIdGenerator, true, transformOp,
         warpMappingAttributes);
@@ -161,7 +175,8 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
       for (const auto &warpAttr : warpMappingAttributes) {
         if (attr == warpAttr) {
           forallOp->emitOpError(
-              "Mapping failed: is threadIdx.x a multiple of the warp size?");
+              "Mapping failed: is the total number of threads a multiple of "
+              "the warp size?");
           return WalkResult::interrupt();
         }
       }
