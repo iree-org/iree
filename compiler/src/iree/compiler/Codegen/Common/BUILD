@@ -128,6 +128,7 @@ iree_compiler_cc_library(
         "PolynomialApproximationPass.cpp",
         "RematerializeParallelOps.cpp",
         "SplitFullPartialTransferPass.cpp",
+        "TestExecutablePreprocessing.cpp",
         "TestPartitionableLoopsInterface.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TypePropagationPass.cpp",

@@ -90,6 +90,18 @@ static llvm::cl::opt<std::string> clSubstituteExecutableObjectsFrom{
     llvm::cl::init(""),
 };
 
+static llvm::cl::list<std::string> clPreprocessExecutablesWith{
+    "iree-hal-preprocess-executables-with",
+    llvm::cl::desc(
+        "Passes each hal.executable to the given command. Multiple "
+        "commands may be specified and they will be "
+        "executed in order. A command may either be a pass pipeline available "
+        "within the IREE compiler specified as `builtin.module(...)` or a "
+        "shell tool that consumes a hal.executable MLIR file on stdin and "
+        "produces a modified hal.executable on stdout. Non-zero exit codes "
+        "will fail compilation."),
+};
+
 }  // namespace
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
@@ -185,6 +197,13 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   //----------------------------------------------------------------------------
   // Executable translation
   //----------------------------------------------------------------------------
+
+  // Preprocess executables using an external tool. The tool may mutate one or
+  // more variants and even insert or remove variants.
+  for (auto command : clPreprocessExecutablesWith) {
+    passManager.addNestedPass<IREE::HAL::ExecutableOp>(
+        createPreprocessExecutablesPass(command));
+  }
 
   // TODO(benvanik): move translation after conversion; today translation
   // inserts the workgroup count logic we need to convert but we could instead

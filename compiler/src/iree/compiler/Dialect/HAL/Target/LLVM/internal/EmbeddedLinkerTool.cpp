@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
+#include "iree/compiler/Utils/ToolUtils.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/FileSystem.h"
@@ -53,17 +54,11 @@ class EmbeddedLinkerTool : public LinkerTool {
     char *envVarPath = std::getenv("IREE_LLVM_EMBEDDED_LINKER_PATH");
     if (envVarPath && envVarPath[0] != '\0') return std::string(envVarPath);
 
-    // No explicit linker specified, search the install or build dir.
+    // No explicit linker specified, search the install/build dir or env.
     const SmallVector<std::string> &toolNames{"iree-lld", "lld", "ld.lld",
                                               "lld-link"};
-    std::string executableDirPath = findToolFromExecutableDir(toolNames);
-    if (!executableDirPath.empty()) return executableDirPath;
-
-    // Currently fall back on searching the environment. This shouldn't be
-    // needed as we are building lld in the LLVM submodule of IREE, but it
-    // currently required on a few of our CI bots.
-    std::string environmentPath = findToolInEnvironment(toolNames);
-    if (!environmentPath.empty()) return environmentPath;
+    std::string toolPath = findTool(toolNames);
+    if (!toolPath.empty()) return toolPath;
 
     llvm::errs()
         << "error: required embedded linker tool (typically `lld`) not found "

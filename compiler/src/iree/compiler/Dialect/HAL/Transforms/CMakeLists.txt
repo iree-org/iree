@@ -29,6 +29,7 @@ iree_cc_library(
     "MaterializeResourceCaches.cpp"
     "MemoizeDeviceQueries.cpp"
     "Passes.cpp"
+    "PreprocessExecutables.cpp"
     "ResolveExportOrdinals.cpp"
     "SerializeExecutables.cpp"
     "SubstituteExecutables.cpp"
