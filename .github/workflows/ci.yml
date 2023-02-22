@@ -157,6 +157,14 @@ jobs:
         run: |
           gcloud storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
           echo "build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+      - name: "Writing job outputs"
+        env:
+          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_GCS_ARTIFACT: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+        run: |
+          echo "::notice title=JOB_OUTPUT_VARIABLE::build-dir=${BUILD_DIR}"
+          echo "::notice title=JOB_OUTPUT_VARIABLE::build-dir-archive=${BUILD_DIR_ARCHIVE}"
+          echo "::notice title=JOB_OUTPUT_VARIABLE::build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}"
 
   build_test_all_windows:
     needs: setup
@@ -886,6 +894,7 @@ jobs:
               "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
           echo "e2e-test-artifacts-build-log-gcs-artifact=${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+          echo "::notice title=JOB_OUTPUT_VARIABLE::e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
