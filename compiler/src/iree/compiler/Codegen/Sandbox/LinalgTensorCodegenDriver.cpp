@@ -769,6 +769,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
 
   LinalgVectorizationOptions vectorizationOptions;
   vectorizationOptions.setVectorizePadding(vectorizePadding);
+  vectorizationOptions.setVectorizeGatherAccesses(vectorizeGatherAccesses);
   vectorizationOptions.setCanonicalVectorSizes(getCanonicalVectorShape(funcOp));
   vectorizationOptions.setVectorSizeComputationFunction(getVectorSizes);
 
