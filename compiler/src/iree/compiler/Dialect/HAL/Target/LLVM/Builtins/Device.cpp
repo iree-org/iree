@@ -52,19 +52,6 @@ static const iree_file_toc_t *lookupDeviceFile(
   }
 }
 
-// TODO(benvanik): move to a common file so we can reuse it.
-static void overridePlatformGlobal(llvm::Module &module, StringRef globalName,
-                                   uint32_t newValue) {
-  // NOTE: the global will not be defined if it is not used in the module.
-  auto *globalValue = module.getNamedGlobal(globalName);
-  if (!globalValue) return;
-  globalValue->setLinkage(llvm::GlobalValue::PrivateLinkage);
-  globalValue->setDSOLocal(true);
-  globalValue->setConstant(true);
-  globalValue->setInitializer(
-      llvm::ConstantInt::get(globalValue->getValueType(), APInt(32, newValue)));
-}
-
 llvm::Expected<std::unique_ptr<llvm::Module>> loadDeviceBitcode(
     llvm::TargetMachine *targetMachine, llvm::LLVMContext &context) {
   // Find a bitcode file for the current architecture.
@@ -89,10 +76,25 @@ llvm::Expected<std::unique_ptr<llvm::Module>> loadDeviceBitcode(
     func.removeFnAttr("target-features");
   }
 
-  // Inject target-specific flags.
-  overridePlatformGlobal(*bitcodeModule, "libdevice_platform_example_flag", 0u);
-
   return std::move(bitcodeModule);
+}
+
+static void overridePlatformGlobal(llvm::Module &module, StringRef globalName,
+                                   uint32_t newValue) {
+  // NOTE: the global will not be defined if it is not used in the module.
+  auto *globalValue = module.getNamedGlobal(globalName);
+  if (!globalValue) return;
+  globalValue->setLinkage(llvm::GlobalValue::PrivateLinkage);
+  globalValue->setDSOLocal(true);
+  globalValue->setConstant(true);
+  globalValue->setInitializer(
+      llvm::ConstantInt::get(globalValue->getValueType(), APInt(32, newValue)));
+}
+
+void specializeDeviceModule(IREE::HAL::ExecutableVariantOp variantOp,
+                            llvm::Module &module,
+                            llvm::TargetMachine &targetMachine) {
+  overridePlatformGlobal(module, "libdevice_platform_example_flag", 0u);
 }
 
 }  // namespace HAL
