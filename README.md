@@ -6,10 +6,10 @@ compiler and runtime that lowers Machine Learning (ML) models to a unified IR
 that scales up to meet the needs of the datacenter and down to satisfy the
 constraints and special considerations of mobile and edge deployments.
 
-See [our website](https://iree-org.github.io/iree/) for project details, user
+See [our website](https://openxla.github.io/iree/) for project details, user
 guides, and instructions on building from source.
 
-[![CI Status](https://github.com/iree-org/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
+[![CI Status](https://github.com/openxla/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/openxla/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 
 #### Project Status
 
@@ -21,7 +21,7 @@ of feedback on any [communication channels](#communication-channels)!
 
 ## Communication Channels
 
-*   [GitHub issues](https://github.com/iree-org/iree/issues): Feature requests,
+*   [GitHub issues](https://github.com/openxla/iree/issues): Feature requests,
     bugs, and other work tracking
 *   [IREE Discord server](https://discord.gg/26P4xW4): Daily development
     discussions with the core team and collaborators
@@ -41,7 +41,7 @@ of feedback on any [communication channels](#communication-channels)!
 ![IREE Architecture](docs/website/docs/assets/images/iree_architecture_dark.svg#gh-dark-mode-only)
 ![IREE Architecture](docs/website/docs/assets/images/iree_architecture.svg#gh-light-mode-only)
 
-See [our website](https://iree-org.github.io/iree/) for more information.
+See [our website](https://openxla.github.io/iree/) for more information.
 
 ## Presentations and Talks
 

@@ -1,7 +1,7 @@
 # IREE TFLite C API Compatibility Shim
 
 **EXPERIMENTAL**: we are working towards making this a stable API but it has a
-ways to go still. Progress is being tracked in https://github.com/iree-org/iree/projects/17.
+ways to go still. Progress is being tracked in https://github.com/openxla/iree/projects/17.
 
 Provides a (mostly) tflite-compatible API that allows loading compiled IREE
 modules, managing tensors, and invoking functions with the same conventions as
@@ -174,7 +174,7 @@ avoiding it for now. ([1](https://www.google.com/search?q=%22TfLiteInterpreterOp
 
 Custom ops in tflite map to functions imported into compiled IREE modules.
 The IREE tflite API shim could provide a wrapper implemented as an
-[iree_vm_module_t](https://github.com/iree-org/iree/blob/main/iree/vm/module.h)
+[iree_vm_module_t](https://github.com/openxla/iree/blob/main/iree/vm/module.h)
 that resolves and executes the functions as they are called by the VM. Having
 real IREE modules, though, provides significant benefits in representation
 such as the ability to have asynchronous custom behavior that interacts well

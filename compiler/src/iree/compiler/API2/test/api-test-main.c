@@ -10,7 +10,7 @@
 //
 // Originally contributed due to the work of edubart who figured out how to
 // be the first user of the combined MLIR+IREE CAPI:
-// https://github.com/iree-org/iree/pull/8582
+// https://github.com/openxla/iree/pull/8582
 
 #include <stdio.h>
 

@@ -37,7 +37,7 @@ class MobileBertTest(test_util.TFLiteModelTest):
                                                 details)
     # We have confirmed in large scale accuracy tests that differences as large
     # as 5.0 is acceptable. We later further relaxed from 5.0 to 7.0 in
-    # https://github.com/iree-org/iree/pull/9337 when quantized Softmax got
+    # https://github.com/openxla/iree/pull/9337 when quantized Softmax got
     # de-quantized, which should be numerically correct albeit not bit-exact.
     # The actual observed max error was ~ 6.36. The value 7.0 is that rounded up
     # to the next integer.

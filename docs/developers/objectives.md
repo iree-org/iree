@@ -87,14 +87,14 @@
 
 +   P1 KR: Able to perform IREE profiling using Tracy
 
-    + See [https://github.com/iree-org/iree/issues/1886](https://github.com/iree-org/iree/issues/1886), [https://github.com/wolfpld/tracy](https://github.com/wolfpld/tracy)
+    + See [https://github.com/openxla/iree/issues/1886](https://github.com/openxla/iree/issues/1886), [https://github.com/wolfpld/tracy](https://github.com/wolfpld/tracy)
 
 +   P1 KR: Able to map time spent in execution to back to source using Tracy
-    +   See https://github.com/iree-org/iree/issues/1199
+    +   See https://github.com/openxla/iree/issues/1199
     +   Source layer (source python, HLO, HAL, etc) is configurable at compile time.
 
 +   P1 KR: Able to track compile-time performance-related statistics
-    + See [https://github.com/iree-org/iree/issues/1409](https://github.com/iree-org/iree/issues/1409)
+    + See [https://github.com/openxla/iree/issues/1409](https://github.com/openxla/iree/issues/1409)
     + Initial stats to track: number of executables, the serialized size of constant data, the serialized size of the executables, the number of host readbacks (flow.tensor.load), backend specific stats like the number of split dispatches in the SPIR-V backend, dynamic shape info like the number of tensors with dynamic shapes that survive after shape propagation
 
 +   P1 KR: Internal and external contributors able to confidently assess performance impact of a change.

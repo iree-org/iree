@@ -75,7 +75,7 @@ runners are "basic" trust, so they run as
 
 Using GitHub's [artifact actions](https://github.com/actions/upload-artifact)
 with runners on GCE turns out to be prohibitively slow (see discussion in
-https://github.com/iree-org/iree/issues/9881). Instead we use our own
+https://github.com/openxla/iree/issues/9881). Instead we use our own
 [Google Cloud Storage](https://cloud.google.com/storage) (GCS) buckets to save
 artifacts from jobs and fetch them in subsequent jobs:
 `iree-github-actions-presubmit-artifacts` and

@@ -17,7 +17,7 @@ BUILD_DIR="${1:-${IREE_TRACING_BUILD_DIR:-build-tracing}}"
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
 
-# Note: https://github.com/iree-org/iree/issues/6404 prevents us from building
+# Note: https://github.com/openxla/iree/issues/6404 prevents us from building
 # tests with these other settings. Many tests invoke the compiler tools with
 # MLIR threading enabled, which crashes with compiler tracing enabled.
 "${CMAKE_BIN?}" -B "${BUILD_DIR}" \

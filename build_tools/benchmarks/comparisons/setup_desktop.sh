@@ -46,7 +46,7 @@ rm -rf "${SOURCE_DIR}"
 mkdir "${SOURCE_DIR}"
 cd "${SOURCE_DIR}"
 
-git clone https://github.com/iree-org/iree.git
+git clone https://github.com/openxla/iree.git
 
 cd iree
 git submodule update --init

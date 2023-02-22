@@ -47,7 +47,7 @@ class CompilerTest(unittest.TestCase):
 
   # Compiling the string form means that the compiler does not have a valid
   # source file name, which can cause issues. Verify specifically.
-  # See: https://github.com/iree-org/iree/issues/4439
+  # See: https://github.com/openxla/iree/issues/4439
   def testCompileStrLLVMCPU(self):
     binary = iree.compiler.tools.compile_str(SIMPLE_MUL_ASM,
                                              target_backends=["llvm-cpu"])
@@ -56,7 +56,7 @@ class CompilerTest(unittest.TestCase):
 
   # Verifies that multiple target_backends are accepted. Which two are not
   # load bearing.
-  # See: https://github.com/iree-org/iree/issues/4436
+  # See: https://github.com/openxla/iree/issues/4436
   def testCompileMultipleBackends(self):
     binary = iree.compiler.tools.compile_str(
         SIMPLE_MUL_ASM, target_backends=["llvm-cpu", "vulkan-spirv"])

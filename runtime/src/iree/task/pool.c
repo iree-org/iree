@@ -93,7 +93,7 @@ static iree_status_t iree_task_pool_grow(iree_task_pool_t* pool,
 
   // Work around a loop vectorizer bug that causes memory corruption in this
   // loop. Only Android NDK r25 is known to be affected. See
-  // https://github.com/iree-org/iree/issues/9953 for details.
+  // https://github.com/openxla/iree/issues/9953 for details.
 #if defined(__NDK_MAJOR__) && __NDK_MAJOR__ == 25
 #pragma clang loop unroll(disable) vectorize(disable)
 #endif

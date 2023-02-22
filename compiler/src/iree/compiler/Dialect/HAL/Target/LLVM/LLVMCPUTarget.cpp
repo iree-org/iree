@@ -233,7 +233,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       // Tracy. In principle this could also be achieved by enabling unwind
       // tables, but we tried that and that didn't work in Tracy (which uses
       // libbacktrace), while enabling frame pointers worked.
-      // https://github.com/iree-org/iree/issues/3957
+      // https://github.com/openxla/iree/issues/3957
       func.addFnAttr("frame-pointer", "all");
 
       // -ffreestanding-like behavior.

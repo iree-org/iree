@@ -68,7 +68,7 @@ cmake --build ../iree-build/ --target install
 
 The following instruction shows how to build for a RISC-V 64-bit Linux machine.
 For other RISC-V targets, please refer to
-[riscv.toolchain.cmake](https://github.com/iree-org/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
+[riscv.toolchain.cmake](https://github.com/openxla/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
 as a reference of how to set up the cmake configuration.
 
 #### RISC-V 64-bit Linux target
@@ -90,7 +90,7 @@ cmake --build ../iree-build-riscv/
 !!! note
     The following instructions are meant for the RISC-V 64-bit Linux
     target. For the bare-metal target, please refer to
-    [simple_embedding](https://github.com/iree-org/iree/blob/main/samples/simple_embedding)
+    [simple_embedding](https://github.com/openxla/iree/blob/main/samples/simple_embedding)
     to see how to build a ML workload for a bare-metal machine.
 
 Set the path to qemu-riscv64 Linux emulator binary in the `QEMU_BIN` environment

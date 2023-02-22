@@ -3,7 +3,7 @@
 Tests of MobileBert and streamable Keyword Spotting models.
 
 IREE has three main backend
-[targets](https://github.com/iree-org/iree/tree/main/iree/compiler/Dialect/HAL/Target):
+[targets](https://github.com/openxla/iree/tree/main/iree/compiler/Dialect/HAL/Target):
 `vmvx` , `llvm` and `vulkan-spirv`. We also test TFLite in our infrastructure
 for benchmarking purposes.
 

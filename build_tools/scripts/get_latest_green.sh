@@ -39,7 +39,7 @@ function get_latest_green() {
     for workflow in "${REQUIRED_WORKFLOWS[@]}"; do
       local successful_run_count="$(\
         gh api --jq '.total_count' \
-        "/repos/iree-org/iree/actions/workflows/${workflow}/runs?${query_string}" \
+        "/repos/openxla/iree/actions/workflows/${workflow}/runs?${query_string}" \
       )"
       # Any successful run of the workflow (including reruns) is OK.
       if (( successful_run_count==0 )); then

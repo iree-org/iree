@@ -67,7 +67,7 @@ fi
 # Disable actually running GPU tests. This tends to yield TSan reports that are
 # specific to one's particular GPU driver and therefore hard to reproduce across
 # machines and often un-actionable anyway.
-# See e.g. https://github.com/iree-org/iree/issues/9393
+# See e.g. https://github.com/openxla/iree/issues/9393
 export IREE_VULKAN_DISABLE=1
 export IREE_CUDA_DISABLE=1
 

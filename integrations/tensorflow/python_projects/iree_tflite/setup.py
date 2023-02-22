@@ -89,7 +89,7 @@ setup(
     description="IREE TFLite Compiler Tools",
     long_description=README,
     long_description_content_type="text/markdown",
-    url="https://github.com/iree-org/iree",
+    url="https://github.com/openxla/iree",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: Apache Software License",

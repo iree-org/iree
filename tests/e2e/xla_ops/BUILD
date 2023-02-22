@@ -8,7 +8,7 @@
 # Each test file should have a name matching the corresponding XLA HLO op and test only the
 # functionality of that op (though may make use of other ops where necessary). Tests should be
 # written using the IREE Check framework and should always pass on the reference VMVX backend.
-# See https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
+# See https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")

@@ -138,7 +138,7 @@ IREE offers a low level C API, as well as several specialized sets of
 ## Communication channels
 
 * :fontawesome-brands-github:
-  [GitHub issues](https://github.com/iree-org/iree/issues): Feature requests,
+  [GitHub issues](https://github.com/openxla/iree/issues): Feature requests,
   bugs, and other work tracking
 * :fontawesome-brands-discord:
   [IREE Discord server](https://discord.gg/26P4xW4): Daily development
@@ -150,8 +150,8 @@ IREE offers a low level C API, as well as several specialized sets of
 
 IREE is in the early stages of development and is not yet ready for broad
 adoption. We use both
-[GitHub Projects](https://github.com/iree-org/iree/projects) and
-[GitHub Milestones](https://github.com/iree-org/iree/milestones) to track
+[GitHub Projects](https://github.com/openxla/iree/projects) and
+[GitHub Milestones](https://github.com/openxla/iree/milestones) to track
 progress.
 
 [^1]:

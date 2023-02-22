@@ -37,7 +37,7 @@ When compiling programs, a list of target backends must be specified via
 | `cuda`         | NVIDIA GPU support via PTX for CUDA | `cuda` |
 | `rocm`         | **Experimental** <br> AMD GPU support via HSACO for ROCm | `rocm` |
 | `webgpu-wgsl`  | **Experimental** <br> GPU support on the Web via WGSL for WebGPU | `webgpu` |
-| `metal-spirv`  | **Stale - see [Issue#4370](https://github.com/iree-org/iree/issues/4370)** <br> GPU support on Apple platforms via MSL for Metal | `metal` |
+| `metal-spirv`  | **Stale - see [Issue#4370](https://github.com/openxla/iree/issues/4370)** <br> GPU support on Apple platforms via MSL for Metal | `metal` |
 
 !!! tip
     The list of available compiler target backends can be queried with
@@ -59,7 +59,7 @@ focus and the build configuration.
 | `cuda`       | NVIDIA GPU execution using CUDA |
 | `rocm`       | **Experimental** <br> AMD GPU execution using ROCm |
 | `webgpu`     | **Experimental** <br> GPU execution on the web using WebGPU |
-| `metal`      | **Stale - see [Issue#4370](https://github.com/iree-org/iree/issues/4370)** <br> GPU execution on Apple platforms using Metal |
+| `metal`      | **Stale - see [Issue#4370](https://github.com/openxla/iree/issues/4370)** <br> GPU execution on Apple platforms using Metal |
 
 !!! tip
     The list of available runtime HAL devices can be queried with

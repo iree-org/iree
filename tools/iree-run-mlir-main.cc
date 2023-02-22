@@ -596,7 +596,7 @@ extern "C" int main(int argc_llvm, char** argv_llvm) {
   // On Windows InitLLVM re-queries the command line from Windows directly and
   // totally messes up the array.
   llvm::setBugReportMsg(
-      "Please report issues to https://github.com/iree-org/iree/issues and "
+      "Please report issues to https://github.com/openxla/iree/issues and "
       "include the crash backtrace.\n");
   llvm::InitLLVM init_llvm(argc_llvm, argv_llvm);
   llvm::cl::ParseCommandLineOptions(argc_llvm, argv_llvm);

@@ -6,7 +6,7 @@
 
 # Run commands below on the workstation that the phone is attached to.
 # Prerequisites:
-#   Manual installations of the Android NDK and ADB are needed. See https://iree-org.github.io/iree/building-from-source/android/#install-android-ndk-and-adb for instructions.
+#   Manual installations of the Android NDK and ADB are needed. See https://openxla.github.io/iree/building-from-source/android/#install-android-ndk-and-adb for instructions.
 #   Manual installations of the Termux App and python are needed on the Android device. See README.md for instructions.
 
 #!/bin/bash
@@ -54,7 +54,7 @@ rm -rf "${SOURCE_DIR}"
 mkdir "${SOURCE_DIR}"
 cd "${SOURCE_DIR}"
 
-git clone https://github.com/iree-org/iree.git
+git clone https://github.com/openxla/iree.git
 
 cd iree
 cp "${SOURCE_DIR}/iree/build_tools/benchmarks/set_adreno_gpu_scaling_policy.sh" "${ROOT_DIR}/setup/"

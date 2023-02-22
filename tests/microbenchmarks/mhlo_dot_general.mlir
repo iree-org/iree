@@ -1,5 +1,5 @@
 // The following ops are sampled from mobile_bert
-// https://github.com/iree-org/iree/blob/main/integrations/tensorflow/e2e/mobile_bert_squad_test.py
+// https://github.com/openxla/iree/blob/main/integrations/tensorflow/e2e/mobile_bert_squad_test.py
 
 func.func @dot_general_4x384x32x384() -> tensor<4x384x384xf32> {
     %lhs = util.unfoldable_constant dense<1.0> : tensor<4x384x32xf32>
