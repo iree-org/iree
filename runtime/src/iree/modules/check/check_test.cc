@@ -266,7 +266,8 @@ TEST_F(CheckTest, ExpectAllTrueFailure) {
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   EXPECT_NONFATAL_FAILURE(
-      IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})), "0");
+      IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})),
+      "element #0 doesn't match");
 }
 
 TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
@@ -277,7 +278,7 @@ TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})),
-      "1, 2, 3, 0, 4");
+      "element #3 doesn't match");
 }
 
 TEST_F(CheckTest, ExpectAllTrue3DSingleElementFailure) {
@@ -288,7 +289,7 @@ TEST_F(CheckTest, ExpectAllTrue3DSingleElementFailure) {
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})),
-      "1, 2, 3, 4, 5, 6, 0, 8");
+      "element #6 doesn't match");
 }
 
 TEST_F(CheckTest, ExpectEqSameBufferSuccess) {
