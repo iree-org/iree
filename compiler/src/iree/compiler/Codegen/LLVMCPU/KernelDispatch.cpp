@@ -205,9 +205,12 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
 
   // Default X86 specific strategy.
   if (isX86(targetAttr)) {
-    // Enable masking for generic ops.
     if (isLinalgGeneric) {
       return VectorPreProcStrategy::Masking;
+    }
+
+    if (isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
+      return VectorPreProcStrategy::Peeling;
     }
 
     if (enableVectorPadding) {
@@ -219,7 +222,6 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
 
   // Default RISC-V specific strategies.
   if (isRISCV(targetAttr)) {
-    // Enable masking for generic ops.
     if (isLinalgGeneric) {
       return VectorPreProcStrategy::Masking;
     }
@@ -236,8 +238,7 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
     }
   }
 
-  // Enable masking by default. Better than not vectorizing.
-  return VectorPreProcStrategy::Masking;
+  return VectorPreProcStrategy::None;
 }
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.target
