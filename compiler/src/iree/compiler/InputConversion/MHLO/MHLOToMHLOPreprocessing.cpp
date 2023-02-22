@@ -455,10 +455,11 @@ struct ScatterInt64Indices : public OpRewritePattern<mhlo::ScatterOp> {
       return rewriter.notifyMatchFailure(op, "cannot validate legal size");
 
     uint64_t maxSize = std::numeric_limits<int32_t>::max();
-    if (indicesETy.getIntOrFloatBitWidth() > 32)
-      for (int i = 0, s = indicesTy.getRank(); i < s; ++i)
-        if (indicesTy.getDimSize(i) > maxSize)
+    if (indicesETy.getIntOrFloatBitWidth() > 32) {
+      for (int i = 0, s = indicesTy.getRank(); i < s; ++i) {
+        if (indicesTy.getDimSize(i) > maxSize) {
           return rewriter.notifyMatchFailure(op, "index may exceed i32 max");
+        }}}
 
     indices = rewriter.create<mhlo::ConvertOp>(
         op.getLoc(), indicesTy.clone(rewriter.getI32Type()), indices);
