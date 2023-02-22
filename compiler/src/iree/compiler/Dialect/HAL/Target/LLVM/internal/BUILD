@@ -24,6 +24,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVM:LinkerTool_hdrs",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TargetParser",
