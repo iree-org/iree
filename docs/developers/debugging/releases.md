@@ -98,7 +98,7 @@ comment out
 [this line](https://github.com/openxla/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/schedule_snapshot_release.yml#L14):
 ```yaml
 # Don't run this in everyone's forks.
-if: github.repository == 'openxla/iree'
+if: github.repository == 'iree-org/iree'
 ```
 
 And change the branch from 'main' to the branch you are developing on
