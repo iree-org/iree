@@ -1,0 +1,32 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Benchmark CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [synchronize, opened, reopened, labeled, unlabeled]
+
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit).
+  group: benchmark-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  wait_ci:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        with:
+          submodules: false
+
+      - name: "Waiting"
+        run: |
+          echo "test"
