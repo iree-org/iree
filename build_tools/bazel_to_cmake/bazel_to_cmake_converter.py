@@ -443,6 +443,39 @@ class BuildFileFunctions(object):
                             f"{flatten_block}"
                             f"  PUBLIC\n)\n\n")
 
+  def iree_bitcode_library(self,
+                           name,
+                           srcs,
+                           hdrs=None,
+                           copts=None,
+                           defines=None,
+                           data=None,
+                           clang_tool=None,
+                           builtin_headers=None,
+                           testonly=None):
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
+    srcs_block = _convert_srcs_block(srcs)
+    hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
+    data_block = _convert_target_list_block("DATA", data)
+    clang_tool_block = _convert_target_block("CLANG_TOOL", clang_tool)
+    builtin_headers_block = _convert_target_list_block("BUILTIN_HEADERS",
+                                                       builtin_headers)
+    testonly_block = _convert_option_block("TESTONLY", testonly)
+
+    self.converter.body += (f"iree_bitcode_library(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{hdrs_block}"
+                            f"{copts_block}"
+                            f"{defines_block}"
+                            f"{data_block}"
+                            f"{clang_tool_block}"
+                            f"{builtin_headers_block}"
+                            f"{testonly_block}"
+                            f"  PUBLIC\n)\n\n")
+
   def iree_bytecode_module(self,
                            name,
                            src,

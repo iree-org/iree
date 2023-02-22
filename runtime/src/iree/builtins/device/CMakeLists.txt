@@ -22,4 +22,68 @@ iree_cc_library(
   PUBLIC
 )
 
+if(NOT IREE_BUILD_COMPILER)
+  return()
+endif()
+
+iree_bitcode_library(
+  NAME
+    libdevice_wasm32_generic
+  SRCS
+    "device_generic.c"
+  HDRS
+    "device.h"
+  COPTS
+    "-std=c17"
+    "-nostdinc"
+    "-ffreestanding"
+    "-O3"
+    "-fno-ident"
+    "-fdiscard-value-names"
+    "-c"
+    "-emit-llvm"
+    "-DIREE_DEVICE_STANDALONE=1"
+    "--target=wasm32"
+  PUBLIC
+)
+
+iree_bitcode_library(
+  NAME
+    libdevice_wasm64_generic
+  SRCS
+    "device_generic.c"
+  HDRS
+    "device.h"
+  COPTS
+    "-std=c17"
+    "-nostdinc"
+    "-ffreestanding"
+    "-O3"
+    "-fno-ident"
+    "-fdiscard-value-names"
+    "-c"
+    "-emit-llvm"
+    "-DIREE_DEVICE_STANDALONE=1"
+    "--target=wasm64"
+  PUBLIC
+)
+
+iree_c_embed_data(
+  NAME
+    libdevice_bitcode
+  GENERATED_SRCS
+    "libdevice_wasm32_generic.bc"
+    "libdevice_wasm64_generic.bc"
+  DEPS
+
+  C_FILE_OUTPUT
+    "libdevice_bitcode.c"
+  H_FILE_OUTPUT
+    "libdevice_bitcode.h"
+  IDENTIFIER
+    "iree_builtins_libdevice_bitcode"
+  FLATTEN
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

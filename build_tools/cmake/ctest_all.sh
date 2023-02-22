@@ -92,6 +92,14 @@ if [[ "$OSTYPE" =~ ^msys ]]; then
   )
 fi
 
+# TODO(#12305): figure out how to run samples with custom binary outputs
+# on the CI. $IREE_BINARY_DIR may not be setup right or the object files may
+# not be getting deployed to the test_all/test_gpu bots.
+excluded_tests+=(
+  "iree/samples/custom_dispatch/cpu/embedded/example_hal.mlir.test"
+  "iree/samples/custom_dispatch/cpu/embedded/example_stream.mlir.test"
+)
+
 ctest_args=(
   "--test-dir ${BUILD_DIR}"
   "--timeout 900"

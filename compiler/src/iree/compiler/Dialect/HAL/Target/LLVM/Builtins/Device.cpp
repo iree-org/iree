@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/Builtins/Device.h"
 
-#include "iree/builtins/device/bin/libdevice.h"
+#include "iree/builtins/device/libdevice_bitcode.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/Support/MemoryBufferRef.h"
@@ -18,8 +18,8 @@ namespace IREE {
 namespace HAL {
 
 static const iree_file_toc_t *lookupDeviceFile(StringRef filename) {
-  for (size_t i = 0; i < iree_builtins_libdevice_size(); ++i) {
-    const auto &file_toc = iree_builtins_libdevice_create()[i];
+  for (size_t i = 0; i < iree_builtins_libdevice_bitcode_size(); ++i) {
+    const auto &file_toc = iree_builtins_libdevice_bitcode_create()[i];
     if (filename == file_toc.name) return &file_toc;
   }
   return nullptr;
@@ -80,6 +80,14 @@ llvm::Expected<std::unique_ptr<llvm::Module>> loadDeviceBitcode(
   auto bitcodeModuleValue = llvm::parseBitcodeFile(bitcodeBufferRef, context);
   if (!bitcodeModuleValue) return bitcodeModuleValue;
   auto bitcodeModule = std::move(bitcodeModuleValue.get());
+
+  // Clang adds its own per-function attributes that we need to strip so that
+  // our current executable variant target is used instead.
+  for (auto &func : bitcodeModule->functions()) {
+    func.removeFnAttr("target-cpu");
+    func.removeFnAttr("tune-cpu");
+    func.removeFnAttr("target-features");
+  }
 
   // Inject target-specific flags.
   overridePlatformGlobal(*bitcodeModule, "libdevice_platform_example_flag", 0u);
