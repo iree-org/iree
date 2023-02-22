@@ -40,11 +40,6 @@ class BenchmarkThreshold:
 # Order matters here: if multiple regexes match a single benchmark, the first
 # match is used.
 BENCHMARK_THRESHOLDS = [
-    # Compilation time measurement is very stable right now. Use a large
-    # threshold until we make it stable.
-    BenchmarkThreshold(re.compile(r"compilation-time"), 50,
-                       ThresholdUnit.PERCENTAGE),
-
     # Fluctuating benchmarks on CPUs.
     BenchmarkThreshold(re.compile(r"^DeepLabV3.*big-core.*LLVM-CPU.* @ Pixel"),
                        20, ThresholdUnit.PERCENTAGE),
@@ -85,8 +80,9 @@ BENCHMARK_THRESHOLDS = [
 ]
 
 COMPILATION_TIME_THRESHOLDS = [
-    # Default threshold: 5%.
-    BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
+    # Compilation time measurement is very stable right now. Use a large
+    # threshold until we make it stable.
+    BenchmarkThreshold(re.compile(r".*"), 50, ThresholdUnit.PERCENTAGE),
 ]
 
 TOTAL_DISPATCH_SIZE_THRESHOLDS = [
