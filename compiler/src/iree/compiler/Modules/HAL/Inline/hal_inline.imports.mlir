@@ -12,14 +12,14 @@ vm.module @hal_inline {
 //===----------------------------------------------------------------------===//
 
 // Allocates an empty buffer.
-vm.import @buffer.allocate(
+vm.import private @buffer.allocate(
   %minimum_alignment : i32,
   %allocation_size : i64
 ) -> (!vm.ref<!hal.buffer>, !vm.buffer)
 attributes {nosideeffects}
 
 // Allocates a buffer with an initial value provided by a VM byte buffer.
-vm.import @buffer.allocate.initialized(
+vm.import private @buffer.allocate.initialized(
   %minimum_alignment : i32,
   %source : !vm.buffer,
   %offset : i64,
@@ -28,7 +28,7 @@ vm.import @buffer.allocate.initialized(
 attributes {nosideeffects}
 
 // Wraps a VM byte buffer in a HAL buffer.
-vm.import @buffer.wrap(
+vm.import private @buffer.wrap(
   %source : !vm.buffer,
   %offset : i64,
   %length : i64
@@ -36,7 +36,7 @@ vm.import @buffer.wrap(
 attributes {nosideeffects}
 
 // Returns a reference to a subspan of the buffer.
-vm.import @buffer.subspan(
+vm.import private @buffer.subspan(
   %source_buffer : !vm.ref<!hal.buffer>,
   %source_offset : i64,
   %length : i64
@@ -46,14 +46,14 @@ attributes {nosideeffects}
 // TODO(benvanik): make storage return length and remove dedicated length?
 
 // Returns the byte length of the buffer (may be less than total allocation).
-vm.import @buffer.length(
+vm.import private @buffer.length(
   %buffer : !vm.ref<!hal.buffer>
 ) -> i64
 attributes {nosideeffects}
 
 // Returns a mapping to the underlying storage of the buffer sliced to the
 // logical subspan of the HAL buffer.
-vm.import @buffer.storage(
+vm.import private @buffer.storage(
   %buffer : !vm.ref<!hal.buffer>
 ) -> !vm.buffer
 attributes {nosideeffects}
@@ -63,7 +63,7 @@ attributes {nosideeffects}
 //===----------------------------------------------------------------------===//
 
 // Creates a reference to a buffer with a particular shape and element type.
-vm.import @buffer_view.create(
+vm.import private @buffer_view.create(
   %source_buffer : !vm.ref<!hal.buffer>,
   %source_offset : i64,
   %source_length : i64,
@@ -74,7 +74,7 @@ vm.import @buffer_view.create(
 attributes {nosideeffects}
 
 // Asserts a buffer view matches the given tensor encoding and shape.
-vm.import @buffer_view.assert(
+vm.import private @buffer_view.assert(
   %buffer_view : !vm.ref<!hal.buffer_view>,
   %message : !vm.buffer,
   %element_type : i32,
@@ -83,38 +83,38 @@ vm.import @buffer_view.assert(
 )
 
 // Returns the backing buffer of the buffer view.
-vm.import @buffer_view.buffer(
+vm.import private @buffer_view.buffer(
   %buffer_view : !vm.ref<!hal.buffer_view>
 ) -> !vm.ref<!hal.buffer>
 attributes {nosideeffects}
 
 // Returns the element type of the buffer view.
-vm.import @buffer_view.element_type(
+vm.import private @buffer_view.element_type(
   %buffer_view : !vm.ref<!hal.buffer_view>,
 ) -> i32
 attributes {nosideeffects}
 
 // Returns the encoding type of the buffer view.
-vm.import @buffer_view.encoding_type(
+vm.import private @buffer_view.encoding_type(
   %buffer_view : !vm.ref<!hal.buffer_view>,
 ) -> i32
 attributes {nosideeffects}
 
 // Returns the rank of the buffer view.
-vm.import @buffer_view.rank(
+vm.import private @buffer_view.rank(
   %buffer_view : !vm.ref<!hal.buffer_view>,
 ) -> i32
 attributes {nosideeffects}
 
 // Returns the value of the given dimension.
-vm.import @buffer_view.dim(
+vm.import private @buffer_view.dim(
   %buffer_view : !vm.ref<!hal.buffer_view>,
   %index : i32
 ) -> i64
 attributes {nosideeffects}
 
 // Prints out the content of buffer views.
-vm.import @buffer_view.trace(
+vm.import private @buffer_view.trace(
   %key : !vm.buffer,
   %operands : !vm.ref<!hal.buffer_view> ...
 )
@@ -124,7 +124,7 @@ vm.import @buffer_view.trace(
 //===----------------------------------------------------------------------===//
 
 // Returns a tuple of (ok, value) for the given configuration key.
-vm.import @device.query.i64(
+vm.import private @device.query.i64(
   %category : !vm.buffer,
   %key : !vm.buffer
 ) -> (i32, i64)

@@ -36,7 +36,7 @@ vm.module @bytecode_module_benchmark {
   }
 
   // Measures the cost of a call to an imported function.
-  vm.import @native_import_module.add_1(%arg : i32) -> i32
+  vm.import private @native_import_module.add_1(%arg : i32) -> i32
   vm.export @call_imported_func
   vm.func @call_imported_func(%arg0 : i32) -> i32 {
     %0 = vm.call @native_import_module.add_1(%arg0) : (i32) -> i32

@@ -213,6 +213,7 @@ class ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
     // Note that attributes are dropped. Consider preserving some if needed.
     auto importOp = rewriter.create<IREE::VM::ImportOp>(
         srcOp.getLoc(), srcOp.getName(), newSignature);
+    importOp.setSymVisibilityAttr(srcOp.getSymVisibilityAttr());
 
     // If there is a fallback then the import is optional.
     if (srcOp->hasAttr("vm.fallback")) {

@@ -20,7 +20,7 @@ util.initializer {
   util.global.store %0, @v_initialized : !hal.buffer
   util.initializer.return
 }
-// CHECK-NEXT: vm.import @initializer() -> !vm.ref<!hal.buffer>
+// CHECK-NEXT: vm.import private @initializer() -> !vm.ref<!hal.buffer>
 func.func private @initializer() -> !hal.buffer
 
 // -----
