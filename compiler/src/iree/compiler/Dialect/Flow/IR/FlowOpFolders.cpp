@@ -320,9 +320,9 @@ static FailureOr<RankedTensorType> canonicalizeSubViewParts(
   mixedStrides.assign(op.getMixedStrides());
   Builder builder(op.getContext());
   if (failed(foldDynamicIndexList(builder, mixedOffsets)) &&
-        failed(foldDynamicIndexList(builder, mixedSizes)) &&
-        failed(foldDynamicIndexList(builder, mixedStrides))) {
-      return failure();
+      failed(foldDynamicIndexList(builder, mixedSizes)) &&
+      failed(foldDynamicIndexList(builder, mixedStrides))) {
+    return failure();
   }
 
   // Drop out the same dimensions form before.
