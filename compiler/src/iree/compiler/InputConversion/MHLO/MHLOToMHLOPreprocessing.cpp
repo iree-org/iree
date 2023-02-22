@@ -459,7 +459,9 @@ struct ScatterInt64Indices : public OpRewritePattern<mhlo::ScatterOp> {
       for (int i = 0, s = indicesTy.getRank(); i < s; ++i) {
         if (indicesTy.getDimSize(i) > maxSize) {
           return rewriter.notifyMatchFailure(op, "index may exceed i32 max");
-        }}}
+        }
+      }
+    }
 
     indices = rewriter.create<mhlo::ConvertOp>(
         op.getLoc(), indicesTy.clone(rewriter.getI32Type()), indices);
