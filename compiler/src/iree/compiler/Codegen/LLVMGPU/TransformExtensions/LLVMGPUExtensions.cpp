@@ -149,7 +149,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     SmallVector<int64_t> numWarps = {workgroupSize[0] / kWarpSize,
                                      workgroupSize[1], workgroupSize[2]};
     diag = mlir::transform::gpu::mapNestedForeachToThreadsImpl(
-        rewriter, target, workgroupSize, warpIdGenerator, true, transformOp,
+        rewriter, target, numWarps, warpIdGenerator, true, transformOp,
         warpMappingAttributes);
   }
 
