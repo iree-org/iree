@@ -63,6 +63,7 @@ namespace mlir {
 
 TensorDimTrackingRewriter::TensorDimTrackingRewriter(Operation *op)
     : IRRewriter(op->getContext()) {
+  setListener(this);
   op->walk([&](tensor::DimOp dimOp) { dimOps.insert(dimOp.getOperation()); });
 }
 SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
@@ -71,12 +72,12 @@ SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
   return result;
 }
 void TensorDimTrackingRewriter::notifyOperationRemoved(Operation *op) {
-  IRRewriter::notifyOperationRemoved(op);
+  IRRewriter::Listener::notifyOperationRemoved(op);
   if (isa<tensor::DimOp>(op)) dimOps.erase(op);
 }
 
 void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op) {
-  IRRewriter::notifyOperationInserted(op);
+  IRRewriter::Listener::notifyOperationInserted(op);
   if (isa<tensor::DimOp>(op)) dimOps.insert(op);
 }
 
