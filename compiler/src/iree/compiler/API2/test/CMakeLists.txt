@@ -16,7 +16,6 @@ iree_cc_test(
   SRCS
     "api-test-main.c"
   DEPS
-    MLIRCAPIIR
     iree::base
     iree::compiler::API2::Impl
     iree::compiler::API2::MLIRInteropHeaders
