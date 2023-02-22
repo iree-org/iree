@@ -166,3 +166,52 @@ module {
 // CHECK-LABEL: func.func @fuse_only_with_same_marke
 // CHECK:         linalg.generic
 // CHECK-NOT:     linalg.generic
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map3 = affine_map<(d0, d1, d2) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+module {
+  func.func @cleanup_duplicate_input_operands(%arg0: tensor<784x96xf32>) -> tensor<1x28x28x96xf32> {
+    %cst = arith.constant 1.000000e+02 : f32
+    %cst_0 = arith.constant dense<1.000000e+00> : tensor<f32>
+    %cst_1 = arith.constant dense<2.000000e+00> : tensor<f32>
+    %cst_2 = arith.constant dense<0.000000e+00> : tensor<96xf32>
+    %0 = tensor.empty() : tensor<784x96xf32>
+    %1 = linalg.generic {indexing_maps = [#map, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst_2, %arg0 : tensor<96xf32>, tensor<784x96xf32>) outs(%0 : tensor<784x96xf32>) {
+    ^bb0(%in: f32, %in_4: f32, %out: f32):
+      %8 = arith.addf %in, %in_4 : f32
+      linalg.yield %8 : f32
+    } -> tensor<784x96xf32>
+    %expanded = tensor.expand_shape %1 [[0, 1], [2]] : tensor<784x96xf32> into tensor<28x28x96xf32>
+    %2 = tensor.empty() : tensor<28x28x96xf32>
+    %3 = linalg.generic {indexing_maps = [#map2, #map3, #map2], iterator_types = ["parallel", "parallel", "parallel"]} ins(%expanded, %cst_0 : tensor<28x28x96xf32>, tensor<f32>) outs(%2 : tensor<28x28x96xf32>) {
+    ^bb0(%in: f32, %in_4: f32, %out: f32):
+      %8 = arith.addf %in, %in_4 : f32
+      linalg.yield %8 : f32
+    } -> tensor<28x28x96xf32>
+    %4 = linalg.generic {indexing_maps = [#map2, #map2], iterator_types = ["parallel", "parallel", "parallel"]} ins(%3 : tensor<28x28x96xf32>) outs(%2 : tensor<28x28x96xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %8 = arith.minf %in, %cst : f32
+      linalg.yield %8 : f32
+    } -> tensor<28x28x96xf32>
+    %5 = linalg.generic {indexing_maps = [#map2, #map2, #map2], iterator_types = ["parallel", "parallel", "parallel"]} ins(%expanded, %4 : tensor<28x28x96xf32>, tensor<28x28x96xf32>) outs(%2 : tensor<28x28x96xf32>) {
+    ^bb0(%in: f32, %in_4: f32, %out: f32):
+      %8 = arith.mulf %in, %in_4 : f32
+      linalg.yield %8 : f32
+    } -> tensor<28x28x96xf32>
+    %expanded_3 = tensor.expand_shape %5 [[0, 1], [2], [3]] : tensor<28x28x96xf32> into tensor<1x28x28x96xf32>
+    %6 = tensor.empty() : tensor<1x28x28x96xf32>
+    %7 = linalg.generic {indexing_maps = [#map4, #map4], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%expanded_3 : tensor<1x28x28x96xf32>) outs(%6 : tensor<1x28x28x96xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %8 = arith.mulf %in, %in : f32
+      linalg.yield %8 : f32
+    } -> tensor<1x28x28x96xf32>
+    return %7 : tensor<1x28x28x96xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @cleanup_duplicate_input_operands
