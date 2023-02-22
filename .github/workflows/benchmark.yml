@@ -31,4 +31,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "::notice title=BUILD_DIR_GCS_ARTIFACT::abcd"
           build_tools/github_actions/wait_ci.py
