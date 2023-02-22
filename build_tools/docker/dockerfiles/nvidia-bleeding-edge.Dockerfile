@@ -51,14 +51,17 @@ COPY --from=fetch-nvidia \
   "/fetch-nvidia/${NVIDIA_EGL_WAYLAND_DEB}" \
   /tmp/
 
-RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB}" \
-  "/tmp/${NVIDIA_GL_DEB}" \
-  "/tmp/${NVIDIA_COMPUTE_DEB}" \
-  "/tmp/${NVIDIA_EGL_WAYLAND_DEB}"
+# RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB}" \
+#   "/tmp/${NVIDIA_GL_DEB}" \
+#   "/tmp/${NVIDIA_COMPUTE_DEB}" \
+#   "/tmp/${NVIDIA_EGL_WAYLAND_DEB}"
 
-# install cuda sdk (11.7 is the lowest version supports Ubuntu 22.04)
-RUN wget https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installers/cuda-repo-ubuntu2204-11-7-local_11.7.0-515.43.04-1_amd64.deb \
-  && dpkg --install cuda-repo-ubuntu2204-11-7-local_11.7.0-515.43.04-1_amd64.deb \
-  && cp /var/cuda-repo-ubuntu2204-11-7-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
+# install cuda sdk
+# 11.8 is the latest version of 11.x, which is IREE currently compiled with.
+# See https://docs.nvidia.com/cuda/cuda-runtime-api/version-mixing-rules.html
+# about runtime version mixing
+RUN wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda-repo-ubuntu2204-11-8-local_11.8.0-520.61.05-1_amd64.deb \
+  && dpkg --install cuda-repo-ubuntu2204-11-8-local_11.8.0-520.61.05-1_amd64.deb \
+  && cp /var/cuda-repo-ubuntu2204-11-8-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
   && apt-get update \
-  && apt-get -y install cuda-toolkit-11-7
+  && apt-get -y install cuda-toolkit-11-8
