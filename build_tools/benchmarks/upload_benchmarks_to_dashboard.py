@@ -24,8 +24,7 @@ import requests
 from typing import Any, Dict, Optional, Union
 
 from common.common_arguments import expand_and_check_file_paths
-from common import benchmark_definition, benchmark_presentation
-from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
+from common import benchmark_definition, benchmark_presentation, benchmark_thresholds
 
 IREE_DASHBOARD_URL = "https://perf.iree.dev"
 IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/openxla/iree/commit'
@@ -213,15 +212,11 @@ def add_new_iree_series(series_id: str,
                         series_unit: str,
                         series_name: str,
                         series_description: Optional[str] = None,
+                        average_range: Optional[Union[str, int]] = None,
                         override: bool = False,
                         dry_run: bool = False,
                         verbose: bool = False):
   """Posts a new series to the dashboard."""
-  average_range = None
-  for threshold in BENCHMARK_THRESHOLDS:
-    if threshold.regex.match(series_name):
-      average_range = threshold.get_threshold_str()
-      break
   if average_range is None:
     raise ValueError(f"no matched threshold setting for benchmark: {series_id}")
 
@@ -331,6 +326,7 @@ def main(args):
 
   # Upload benchmark results to the dashboard.
   for series_id, benchmark_latency in aggregate_results.items():
+    series_name = benchmark_latency.name
     benchmark_info = benchmark_latency.benchmark_info
     description = get_model_description(benchmark_info.model_name,
                                         benchmark_info.model_source)
@@ -338,11 +334,18 @@ def main(args):
       description = ""
     description += COMMON_DESCRIIPTION
 
+    threshold = next(
+        (threshold for threshold in benchmark_thresholds.BENCHMARK_THRESHOLDS
+         if threshold.regex.match(series_name)), None)
+    average_range = (threshold.get_threshold_str()
+                     if threshold is not None else None)
+
     # Override by default to allow updates to the series.
     add_new_iree_series(series_id=series_id,
                         series_unit="ns",
                         series_name=benchmark_latency.name,
                         series_description=description,
+                        average_range=average_range,
                         override=True,
                         dry_run=args.dry_run,
                         verbose=args.verbose)
@@ -365,13 +368,20 @@ def main(args):
       sample_value, _ = mapper.get_current_and_base_value(compile_metrics)
       series_unit = mapper.get_unit()
       series_id = mapper.get_series_id(target_id)
+      series_name = mapper.get_series_name(compile_metrics.name)
+
+      threshold = next(
+          (threshold for threshold in mapper.get_metric_thresholds()
+           if threshold.regex.match(series_name)), None)
+      average_range = (threshold.get_threshold_str()
+                       if threshold is not None else None)
 
       # Override by default to allow updates to the series.
       add_new_iree_series(series_id=series_id,
                           series_unit=series_unit,
-                          series_name=mapper.get_series_name(
-                              compile_metrics.name),
+                          series_name=series_name,
                           series_description=description,
+                          average_range=average_range,
                           override=True,
                           dry_run=args.dry_run,
                           verbose=args.verbose)
