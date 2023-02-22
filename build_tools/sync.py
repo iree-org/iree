@@ -41,14 +41,14 @@ def sync_nightly():
   pip_install("iree-compiler",
               pip_extra_args=[
                   "--upgrade", "-f",
-                  "https://iree-org.github.io/iree/pip-release-links.html"
+                  "https://openxla.github.io/iree/pip-release-links.html"
               ])
   iree_version, iree_commit = probe_iree_compiler_version()
   log(f"Using IREE compiler binary version={iree_version} at {iree_commit}")
   dylib_path = probe_iree_compiler_dylib()
   log(f"Found IREE compiler dylib: {dylib_path}")
   iree_path = checkout_repo("iree",
-                            clone_url="https://github.com/iree-org/iree.git",
+                            clone_url="https://github.com/openxla/iree.git",
                             commit=iree_commit)
   sync_iree_runtime_submodules(iree_path)
   jax_path = checkout_repo("jax", "https://github.com/google/jax.git")
