@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/AsmParser/AsmParser.h"
+#include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -28,7 +29,6 @@
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
-// using namespace mlir::linalg;
 
 using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgPeelOptions;
@@ -38,6 +38,8 @@ using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationOptions;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorLoweringOptions;
 
 #define DEBUG_TYPE "iree-linalg-tensor-codegen-driver"
+#define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X)
 
 //===----------------------------------------------------------------------===//
 // IREE specific functions
@@ -164,10 +166,129 @@ static SmallVector<int64_t> getCanonicalVectorShape(func::FuncOp funcOp) {
   return canonicalVectorShape;
 }
 
+/// Tries to infer the vector sizes from an IR that has been tiled for
+/// vectorization. Returns failure if vector sizes can't be inferred. For know
+/// this utility is only able to extract tile size information from
+/// `tensor.extract_slice` and `affine.min` ops, which should cover most but not
+/// all the cases.
+/// TODO(dcaballe)" Enhance/replace this logic with `FlatAffineConstraints`
+/// utilities.
+static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
+    linalg::LinalgOp linalgOp) {
+  LDBG("Getting vector sizes for:\n" << linalgOp << "\n");
+
+  auto idxMaps = linalgOp.getIndexingMapsArray();
+  assert(!idxMaps.empty());
+  unsigned numDims = idxMaps[0].getNumDims();
+
+  SmallVector<int64_t> vectorSizes;
+  for (int dim = 0; dim < numDims; ++dim) {
+    // Map dimension `dim` to an operand dimension that we will use to
+    // traverse the U-D chain to get `dim` vector size information.
+    Value operand;
+    unsigned operandDim;
+    if (failed(linalgOp.mapIterationSpaceDimToOperandDim(dim, operand,
+                                                         operandDim))) {
+      return failure();
+    }
+
+    // Static case: `dim` size is available in the operand type.
+    int64_t dimSize =
+        operand.getType().cast<ShapedType>().getShape()[operandDim];
+    if (!ShapedType::isDynamic(dimSize)) {
+      vectorSizes.push_back(dimSize);
+      continue;
+    }
+
+    // Dynamic case: Traverse the U-D chain of the operand and try to find an
+    // operation (e.g., `tensor.extract_slice`, `affine.min`) that contains
+    // static information about the `dim` size.
+    Operation *currentOp = operand.getDefiningOp();
+    while (currentOp) {
+      LDBG("Inspecting for vector sizes: " << *currentOp << "\n");
+
+      if (isa<AffineMinOp>(currentOp)) {
+        break;
+      }
+      if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(currentOp)) {
+        if (!extractSliceOp.isDynamicSize(operandDim)) {
+          // Extract slice has static information about the `dim` size.
+          break;
+        }
+        currentOp = extractSliceOp.getDynamicSize(operandDim).getDefiningOp();
+        continue;
+      }
+      if (auto subviewOp = dyn_cast<memref::SubViewOp>(currentOp)) {
+        if (!subviewOp.isDynamicSize(operandDim)) {
+          // Subview has static information about the `dim` size.
+          break;
+        }
+        currentOp = subviewOp.getDynamicSize(operandDim).getDefiningOp();
+        continue;
+      }
+      if (auto affineApplyOp = dyn_cast<AffineApplyOp>(currentOp)) {
+        AffineValueMap valueMap = affineApplyOp.getAffineValueMap();
+        if (valueMap.getNumDims() != 1 || valueMap.getNumSymbols() != 1)
+          return failure();
+        currentOp = valueMap.getOperand(1).getDefiningOp();
+        continue;
+      }
+
+      // Unexpected op in U-D chain;
+      return failure();
+    }
+
+    // Extract the static information found for `dim`.
+    if (auto extractSliceOp =
+            dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp)) {
+      vectorSizes.push_back(extractSliceOp.getStaticSize(operandDim));
+      continue;
+    }
+
+    if (auto subViewOp = dyn_cast_or_null<memref::SubViewOp>(currentOp)) {
+      vectorSizes.push_back(subViewOp.getStaticSize(operandDim));
+      continue;
+    }
+
+    auto affineMin = dyn_cast_or_null<AffineMinOp>(currentOp);
+    if (!affineMin) {
+      return failure();
+    }
+
+    auto minResults = affineMin.getAffineMap().getResults();
+    if (minResults.size() != 2) {
+      return failure();
+    }
+
+    auto const0Result = minResults[0].dyn_cast<AffineConstantExpr>();
+    auto const1Result = minResults[1].dyn_cast<AffineConstantExpr>();
+    if ((!const0Result && !const1Result) || (const0Result && const1Result)) {
+      return failure();
+    }
+
+    if (const0Result) {
+      vectorSizes.push_back(const0Result.getValue());
+    }
+
+    if (const1Result) {
+      vectorSizes.push_back(const1Result.getValue());
+    }
+  }
+
+  return vectorSizes;
+}
+
 // Give the canonical vector shape of a dispatch, returns the vector sizes for a
 // particular linalg op within that dispatch.
 static SmallVector<int64_t> getVectorSizes(
     linalg::LinalgOp linalgOp, ArrayRef<int64_t> canonicalVectorShape) {
+  // Try to infer the vector sizes from the IR. If it fails, try to get them
+  // from the lowering config.
+  auto inferredVectorSizes = inferVectorSizesFromIR(linalgOp);
+  if (succeeded(inferredVectorSizes)) {
+    return *inferredVectorSizes;
+  }
+
   FailureOr<Operation *> rootOp = getRootOp(linalgOp);
   if (failed(rootOp)) {
     return {};
