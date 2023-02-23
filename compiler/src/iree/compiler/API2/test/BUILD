@@ -18,7 +18,7 @@ iree_compiler_cc_test(
     deps = [
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/API2:Impl",
-        "//compiler/src/iree/compiler/API2:MLIRHeaders",
+        "//compiler/src/iree/compiler/API2:MLIRInteropHeaders",
         "//runtime/src/iree/base",
     ],
 )

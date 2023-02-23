@@ -23,7 +23,7 @@ cc_binary(
     linkshared = 1,
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API2:MLIRHeaders",
+        "//compiler/src/iree/compiler/API2:MLIRInteropHeaders",
         "//compiler/src/iree/compiler/API2:StaticImpl",
         "//compiler/src/iree/compiler/API2:api_exports.ld",
     ],

@@ -18,7 +18,7 @@ iree_cc_test(
   DEPS
     iree::base
     iree::compiler::API2::Impl
-    iree::compiler::API2::MLIRHeaders
+    iree::compiler::API2::MLIRInteropHeaders
     iree::compiler::bindings::c::headers
 )
 

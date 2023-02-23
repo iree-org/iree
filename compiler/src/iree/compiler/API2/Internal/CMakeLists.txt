@@ -101,7 +101,7 @@ iree_cc_library(
   DEPS
     MLIRCAPIIR
     MLIRIR
-    iree::compiler::API2::MLIRHeaders
+    iree::compiler::API2::MLIRInteropHeaders
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Target::Bytecode

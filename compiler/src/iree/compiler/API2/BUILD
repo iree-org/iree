@@ -21,7 +21,7 @@ exports_files([
 
 # All headers for APIs exported by the library.
 iree_compiler_cc_library(
-    name = "MLIRHeaders",
+    name = "MLIRInteropHeaders",
     hdrs = [
         "MLIRInterop.h",
     ],
