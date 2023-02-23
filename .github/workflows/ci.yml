@@ -588,7 +588,7 @@ jobs:
           # Look at the script for the full list.
           override_python_versions: cp37-cp37m
         run: |
-          ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
+          ./build_tools/python_deploy/build_linux_packages.sh
 
   asan:
     needs: setup
