@@ -71,7 +71,6 @@ jobs:
       runner-env: ${{ steps.configure.outputs.runner-env }}
       runner-group: ${{ steps.configure.outputs.runner-group }}
       write-caches: ${{ steps.configure.outputs.write-caches }}
-      benchmark-presets: ${{ steps.configure.outputs.benchmark-presets }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
@@ -157,14 +156,6 @@ jobs:
         run: |
           gcloud storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
           echo "build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
-      - name: "Writing job outputs"
-        env:
-          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
-          BUILD_DIR_GCS_ARTIFACT: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
-        run: |
-          echo "::notice title=JOB_OUTPUT_VARIABLE::build-dir=${BUILD_DIR}"
-          echo "::notice title=JOB_OUTPUT_VARIABLE::build-dir-archive=${BUILD_DIR_ARCHIVE}"
-          echo "::notice title=JOB_OUTPUT_VARIABLE::build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}"
 
   build_test_all_windows:
     needs: setup
@@ -935,183 +926,207 @@ jobs:
               "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
           echo "e2e-test-artifacts-build-log-gcs-artifact=${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
-          echo "::notice title=JOB_OUTPUT_VARIABLE::e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
 
-  compilation_benchmarks:
-    needs: [setup, build_e2e_test_artifacts]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
-      E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
-      E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log }}
-      E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
-    outputs:
-      compile-stats-results: ${{ steps.collect.outputs.compile-stats-results }}
-      compile-stats-results-gcs-artifact: ${{ steps.upload.outputs.compile-stats-results-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: "Exporting configs"
-        id: "export"
-        env:
-          COMPILATION_CONFIG: "compilation-config.json"
-        run: |
-          ./build_tools/benchmarks/export_benchmark_config.py \
-            compilation \
-            --output="${COMPILATION_CONFIG}"
-          echo "compilation-config=${COMPILATION_CONFIG}" >> "${GITHUB_OUTPUT}"
-      - name: "Downloading assets"
-        id: "download-assets"
-        env:
-          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
-        run: |
-          gcloud storage cp \
-            "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" \
-            "${E2E_TEST_ARTIFACTS_BUILD_LOG}"
-          mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
-          jq -r \
-            --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
-            '.module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
-            "${COMPILATION_CONFIG}" | \
-            gcloud storage cp -r --read-paths-from-stdin \
-              "${E2E_TEST_ARTIFACTS_DIR}"
-      - name: "Collecting compilation statistics"
-        id: collect
-        env:
-          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
-          GENERATION_CONFIG: generation-config.json
-          COMPILE_STATS_RESULTS: benchmark-results/compile-stats-results.json
-        run: |
-          jq '.generation_configs' "${COMPILATION_CONFIG}" > "${GENERATION_CONFIG}"
-          mkdir -p benchmark-results
-          ./build_tools/benchmarks/collect_compilation_statistics.py alpha \
-            --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
-            --build_log="${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
-            --generation_config="${GENERATION_CONFIG}" \
-            --output="${COMPILE_STATS_RESULTS}"
-          echo "compile-stats-results=${COMPILE_STATS_RESULTS}" >> "${GITHUB_OUTPUT}"
-      - name: "Uploading benchmark results"
-        id: upload
-        env:
-          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
-          COMPILE_STATS_RESULTS: ${{ steps.collect.outputs.compile-stats-results }}
-          COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.collect.outputs.compile-stats-results }}
-        run: |
-          # Upload files with two commands since they go into different GCS
-          # directories.
-          gcloud storage cp "${COMPILATION_CONFIG}" "${GCS_DIR}"
-          gcloud storage cp \
-            "${COMPILE_STATS_RESULTS}" \
-            "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
-          echo "compile-stats-results-gcs-artifact=${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
-
-  execution_benchmarks:
+  post_benchmark_artifacts:
     needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on: ubuntu-20.04
+    steps:
+      - name: "Posting benchmark GCS artifact links"
+        env:
+          BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
+          E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+        run: |
+          echo "::notice title=GCS Artifact Link::benchmark-tools-gcs-artifact-dir=${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}"
+          echo "::notice title=GCS Artifact Link::e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
+
+  trigger_benchmarks:
+    needs: [setup, build_benchmark_tools, build_e2e_test_artifacts, post_benchmark_artifacts]
+    if: needs.setup.outputs.should-run == 'true'
     uses: ./.github/workflows/benchmark_execution.yml
     with:
-      # env.GCS_DIR is also duplicated in this workflow. See the note there on
-      # why this is.
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
+      ci-stage: ${{ needs.setup.outputs.ci-stage }}
       e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
       e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
       benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
-      benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
 
-  process_benchmark_results:
-    needs: [setup, compilation_benchmarks, execution_benchmarks]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      COMPILE_STATS_RESULTS: ${{ needs.compilation_benchmarks.outputs.compile-stats-results }}
-      COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
-      # Empty if no execution benchmark runs.
-      EXECUTION_BENCHMARK_RESULTS_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-dir }}
-      # Empty if no execution benchmark runs.
-      EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          # We need the full history (and main branch) to generate the report.
-          fetch-depth: 0
-      - name: Downloading compilation benchmark results
-        run: |
-          gcloud storage cp \
-            "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" \
-            "${COMPILE_STATS_RESULTS}"
-      - name: Downloading execution benchmark results
-        id: download-execution-results
-        # Skip the download if there is no execution benchmark results (e.g. no
-        # benchmark matches the preset/filter). In such case, no benchmark job
-        # is run in benchmark_execution.yml and the output variables are empty.
-        if: env.EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR != ''
-        run: |
-          gcloud storage cp -r \
-            "${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/benchmark-results-*.json" \
-            "${EXECUTION_BENCHMARK_RESULTS_DIR}"
-          echo "execution-benchmark-results-pattern=${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-*.json" >> "${GITHUB_OUTPUT}"
-      - name: Generating comment
-        if: needs.setup.outputs.ci-stage == 'presubmit'
-        id: generate-comment
-        env:
-          # Wildcard pattern to match all execution benchmark results. Empty if
-          # execution_benchmarks is skipped, which results in no match.
-          EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
-          IREE_BUILD_URL: https://github.com/openxla/iree/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          BENCHMARK_COMMENT_ARTIFACT: benchmark-comment.json
-        run: |
-          build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
-            ./build_tools/benchmarks/generate_benchmark_comment.py \
-              --verbose \
-              --pr_number="${PR_NUMBER}" \
-              --pr_committish="${GITHUB_SHA}" \
-              --pr_base_branch="origin/${GITHUB_BASE_REF}" \
-              --comment_type="benchmark-summary" \
-              --build_url="${IREE_BUILD_URL}" \
-              --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
-              --compile_stats_files="${COMPILE_STATS_RESULTS}" \
-              --output="${BENCHMARK_COMMENT_ARTIFACT}"
-          echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
-      - name: Uploading comment artifact
-        # Due to security reasons, instead of posting the comment to PR, we only
-        # upload the comment data in presubmit workflow and trigger the posting
-        # workflow on the main branch. See post_benchmark_comment.yaml
-        if: needs.setup.outputs.ci-stage == 'presubmit'
-        env:
-          BENCHMARK_COMMENT_ARTIFACT: ${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
-          BENCHMARK_COMMENT_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
-        run: |
-          gcloud storage cp \
-            "${BENCHMARK_COMMENT_ARTIFACT}" \
-            "${BENCHMARK_COMMENT_GCS_ARTIFACT}"
-      - name: Uploading results to dashboard
-        if: needs.setup.outputs.ci-stage == 'postsubmit'
-        env:
-          EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
-          IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
-        run: |
-          build_tools/github_actions/docker_run.sh \
-            --env "IREE_DASHBOARD_API_TOKEN=${IREE_DASHBOARD_API_TOKEN}" \
-            gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
-            ./build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
-              --verbose \
-              --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
-              --compile_stats_files="${COMPILE_STATS_RESULTS}"
+  # compilation_benchmarks:
+  #   needs: [setup, build_e2e_test_artifacts]
+  #   if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+  #   runs-on:
+  #     - self-hosted  # must come first
+  #     - runner-group=${{ needs.setup.outputs.runner-group }}
+  #     - environment=${{ needs.setup.outputs.runner-env }}
+  #     - cpu
+  #     - os-family=Linux
+  #   env:
+  #     E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+  #     E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+  #     E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log }}
+  #     E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
+  #   outputs:
+  #     compile-stats-results: ${{ steps.collect.outputs.compile-stats-results }}
+  #     compile-stats-results-gcs-artifact: ${{ steps.upload.outputs.compile-stats-results-gcs-artifact }}
+  #   steps:
+  #     - name: "Checking out repository"
+  #       uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+  #     - name: "Exporting configs"
+  #       id: "export"
+  #       env:
+  #         COMPILATION_CONFIG: "compilation-config.json"
+  #       run: |
+  #         ./build_tools/benchmarks/export_benchmark_config.py \
+  #           compilation \
+  #           --output="${COMPILATION_CONFIG}"
+  #         echo "compilation-config=${COMPILATION_CONFIG}" >> "${GITHUB_OUTPUT}"
+  #     - name: "Downloading assets"
+  #       id: "download-assets"
+  #       env:
+  #         COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
+  #       run: |
+  #         gcloud storage cp \
+  #           "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" \
+  #           "${E2E_TEST_ARTIFACTS_BUILD_LOG}"
+  #         mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
+  #         jq -r \
+  #           --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
+  #           '.module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
+  #           "${COMPILATION_CONFIG}" | \
+  #           gcloud storage cp -r --read-paths-from-stdin \
+  #             "${E2E_TEST_ARTIFACTS_DIR}"
+  #     - name: "Collecting compilation statistics"
+  #       id: collect
+  #       env:
+  #         COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
+  #         GENERATION_CONFIG: generation-config.json
+  #         COMPILE_STATS_RESULTS: benchmark-results/compile-stats-results.json
+  #       run: |
+  #         jq '.generation_configs' "${COMPILATION_CONFIG}" > "${GENERATION_CONFIG}"
+  #         mkdir -p benchmark-results
+  #         ./build_tools/benchmarks/collect_compilation_statistics.py alpha \
+  #           --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
+  #           --build_log="${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
+  #           --generation_config="${GENERATION_CONFIG}" \
+  #           --output="${COMPILE_STATS_RESULTS}"
+  #         echo "compile-stats-results=${COMPILE_STATS_RESULTS}" >> "${GITHUB_OUTPUT}"
+  #     - name: "Uploading benchmark results"
+  #       id: upload
+  #       env:
+  #         COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
+  #         COMPILE_STATS_RESULTS: ${{ steps.collect.outputs.compile-stats-results }}
+  #         COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.collect.outputs.compile-stats-results }}
+  #       run: |
+  #         # Upload files with two commands since they go into different GCS
+  #         # directories.
+  #         gcloud storage cp "${COMPILATION_CONFIG}" "${GCS_DIR}"
+  #         gcloud storage cp \
+  #           "${COMPILE_STATS_RESULTS}" \
+  #           "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
+  #         echo "compile-stats-results-gcs-artifact=${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+
+  # execution_benchmarks:
+  #   needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
+  #   if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+  #   uses: ./.github/workflows/benchmark_execution.yml
+  #   with:
+  #     # env.GCS_DIR is also duplicated in this workflow. See the note there on
+  #     # why this is.
+  #     runner-group: ${{ needs.setup.outputs.runner-group }}
+  #     runner-env: ${{ needs.setup.outputs.runner-env }}
+  #     e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+  #     e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+  #     benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
+  #     benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
+
+  # process_benchmark_results:
+  #   needs: [setup, compilation_benchmarks, execution_benchmarks]
+  #   if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+  #   runs-on:
+  #     - self-hosted  # must come first
+  #     - runner-group=${{ needs.setup.outputs.runner-group }}
+  #     - environment=${{ needs.setup.outputs.runner-env }}
+  #     - cpu
+  #     - os-family=Linux
+  #   env:
+  #     COMPILE_STATS_RESULTS: ${{ needs.compilation_benchmarks.outputs.compile-stats-results }}
+  #     COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
+  #     # Empty if no execution benchmark runs.
+  #     EXECUTION_BENCHMARK_RESULTS_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-dir }}
+  #     # Empty if no execution benchmark runs.
+  #     EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
+  #   steps:
+  #     - name: "Checking out repository"
+  #       uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+  #       with:
+  #         # We need the full history (and main branch) to generate the report.
+  #         fetch-depth: 0
+  #     - name: Downloading compilation benchmark results
+  #       run: |
+  #         gcloud storage cp \
+  #           "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" \
+  #           "${COMPILE_STATS_RESULTS}"
+  #     - name: Downloading execution benchmark results
+  #       id: download-execution-results
+  #       # Skip the download if there is no execution benchmark results (e.g. no
+  #       # benchmark matches the preset/filter). In such case, no benchmark job
+  #       # is run in benchmark_execution.yml and the output variables are empty.
+  #       if: env.EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR != ''
+  #       run: |
+  #         gcloud storage cp -r \
+  #           "${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/benchmark-results-*.json" \
+  #           "${EXECUTION_BENCHMARK_RESULTS_DIR}"
+  #         echo "execution-benchmark-results-pattern=${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-*.json" >> "${GITHUB_OUTPUT}"
+  #     - name: Generating comment
+  #       if: needs.setup.outputs.ci-stage == 'presubmit'
+  #       id: generate-comment
+  #       env:
+  #         # Wildcard pattern to match all execution benchmark results. Empty if
+  #         # execution_benchmarks is skipped, which results in no match.
+  #         EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
+  #         IREE_BUILD_URL: https://github.com/openxla/iree/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+  #         PR_NUMBER: ${{ github.event.pull_request.number }}
+  #         BENCHMARK_COMMENT_ARTIFACT: benchmark-comment.json
+  #       run: |
+  #         build_tools/github_actions/docker_run.sh \
+  #           gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
+  #           ./build_tools/benchmarks/generate_benchmark_comment.py \
+  #             --verbose \
+  #             --pr_number="${PR_NUMBER}" \
+  #             --pr_committish="${GITHUB_SHA}" \
+  #             --pr_base_branch="origin/${GITHUB_BASE_REF}" \
+  #             --comment_type="benchmark-summary" \
+  #             --build_url="${IREE_BUILD_URL}" \
+  #             --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
+  #             --compile_stats_files="${COMPILE_STATS_RESULTS}" \
+  #             --output="${BENCHMARK_COMMENT_ARTIFACT}"
+  #         echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+  #     - name: Uploading comment artifact
+  #       # Due to security reasons, instead of posting the comment to PR, we only
+  #       # upload the comment data in presubmit workflow and trigger the posting
+  #       # workflow on the main branch. See post_benchmark_comment.yaml
+  #       if: needs.setup.outputs.ci-stage == 'presubmit'
+  #       env:
+  #         BENCHMARK_COMMENT_ARTIFACT: ${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
+  #         BENCHMARK_COMMENT_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
+  #       run: |
+  #         gcloud storage cp \
+  #           "${BENCHMARK_COMMENT_ARTIFACT}" \
+  #           "${BENCHMARK_COMMENT_GCS_ARTIFACT}"
+  #     - name: Uploading results to dashboard
+  #       if: needs.setup.outputs.ci-stage == 'postsubmit'
+  #       env:
+  #         EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
+  #         IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
+  #       run: |
+  #         build_tools/github_actions/docker_run.sh \
+  #           --env "IREE_DASHBOARD_API_TOKEN=${IREE_DASHBOARD_API_TOKEN}" \
+  #           gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
+  #           ./build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
+  #             --verbose \
+  #             --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
+  #             --compile_stats_files="${COMPILE_STATS_RESULTS}"
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
@@ -1325,9 +1340,10 @@ jobs:
       - test_benchmark_suites
 
       # Benchmark pipeline
-      - compilation_benchmarks
-      - execution_benchmarks
-      - process_benchmark_results
+      - post_benchmark_artifacts
+      # - compilation_benchmarks
+      # - execution_benchmarks
+      # - process_benchmark_results
     steps:
       - name: Getting failed jobs
         id: failed_jobs

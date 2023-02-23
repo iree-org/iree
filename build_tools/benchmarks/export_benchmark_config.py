@@ -47,6 +47,8 @@ from e2e_test_framework.definitions import iree_definitions
 
 PresetMatcher = Callable[[iree_definitions.E2EModelRunConfig], bool]
 BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
+    "all":
+        lambda _config: True,
     "x86_64":
         lambda config: config.target_device_spec.architecture.architecture ==
         "x86_64",
