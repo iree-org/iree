@@ -246,17 +246,6 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create(
   create_info.enabledExtensionCount = enabled_extensions.count;
   create_info.ppEnabledExtensionNames = enabled_extensions.values;
 
-  if (create_info.enabledLayerCount) {
-    printf("[iree][vulkan] enabled layers:\n");
-    for (int i = 0; i < create_info.enabledLayerCount; ++i)
-      printf("  %s\n", create_info.ppEnabledLayerNames[i]);
-  }
-  if (create_info.enabledExtensionCount) {
-    printf("[iree][vulkan] enabled extensions:\n");
-    for (int i = 0; i < create_info.enabledExtensionCount; ++i)
-      printf("  %s\n", create_info.ppEnabledExtensionNames[i]);
-  }
-
   VkInstance instance = VK_NULL_HANDLE;
   VK_RETURN_IF_ERROR(instance_syms->vkCreateInstance(
                          &create_info, /*pAllocator=*/NULL, &instance),
@@ -539,8 +528,6 @@ static iree_status_t iree_hal_vulkan_driver_find_device_by_index(
 
       // Break or advance.
       if (probe_device_index == 0) {
-        printf("[iree][vulkan] selected vulkan device:\n  %s\n\n",
-               physical_device_properties.deviceName);
         found = true;
         break;
       }
