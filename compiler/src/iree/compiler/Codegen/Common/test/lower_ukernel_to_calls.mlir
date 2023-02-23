@@ -55,10 +55,10 @@ func.func @generic_ukernel(%arg0 : memref<?x?xf32>, %arg1 : memref<?x?xf32>,
   %dim_1 = memref.dim %arg0, %c0 : memref<?x?xf32>
   %dim_2 = memref.dim %arg1, %c1 : memref<?x?xf32>
   %dim_3 = memref.dim %arg2, %c1 : memref<?x?xf32>
-  iree_codegen.ukernel.generic "vmvx.matmul.f32.f32.f32" ins(%arg0, %arg1 : memref<?x?xf32>, memref<?x?xf32>) outs(%arg2 : memref<?x?xf32>) (%dim_1, %dim_2, %dim_3, %c0_i32 : index, index, index, i32)
+  iree_codegen.ukernel.generic "vmvx.matmul.f32f32f32" ins(%arg0, %arg1 : memref<?x?xf32>, memref<?x?xf32>) outs(%arg2 : memref<?x?xf32>) (%dim_1, %dim_2, %dim_3, %c0_i32 : index, index, index, i32)
   return
 }
-// CHECK-LABEL: func.func private @vmvx.matmul.f32.f32.f32
+// CHECK-LABEL: func.func private @vmvx.matmul.f32f32f32
 //  CHECK-SAME:     (memref<f32>, index, index, memref<f32>, index, index,
 //  CHECK-SAME:     memref<f32>, index, index, index, index, index, i32)
 // CHECK-LABEL: func.func @generic_ukernel
@@ -74,7 +74,7 @@ func.func @generic_ukernel(%arg0 : memref<?x?xf32>, %arg1 : memref<?x?xf32>,
 //       CHECK:   %[[BASE0:.+]], %[[OFFSET0:.+]], %[[SIZE0:.+]]:2, %[[STRIDES0:.+]]:2 = memref.extract_strided_metadata %[[ARG0]]
 //       CHECK:   %[[BASE1:.+]], %[[OFFSET1:.+]], %[[SIZE1:.+]]:2, %[[STRIDES1:.+]]:2 = memref.extract_strided_metadata %[[ARG1]]
 //       CHECK:   %[[BASE2:.+]], %[[OFFSET2:.+]], %[[SIZE2:.+]]:2, %[[STRIDES2:.+]]:2 = memref.extract_strided_metadata %[[ARG2]]
-//       CHECK:   call @vmvx.matmul.f32.f32.f32(%[[BASE0]], %[[OFFSET0]], %[[STRIDES0]]#0
+//       CHECK:   call @vmvx.matmul.f32f32f32(%[[BASE0]], %[[OFFSET0]], %[[STRIDES0]]#0
 //  CHECK-SAME:       %[[BASE1]], %[[OFFSET1]], %[[STRIDES1]]#0
 //  CHECK-SAME:       %[[BASE2]], %[[OFFSET2]], %[[STRIDES2]]#0
 //  CHECK-SAME:       %[[D0]], %[[D1]], %[[D2]], %[[C0_I32]])
@@ -87,7 +87,7 @@ func.func @mmt4d_ukernel(%arg0 : memref<?x?x?x?xf32>, %arg1 : memref<?x?x?x?xf32
       outs(%arg2 : memref<?x?x?x?xf32>) accumulate(false)
   return
 }
-// CHECK-LABEL: func.func private @vmvx.mmt4d.f32.f32.f32
+// CHECK-LABEL: func.func private @vmvx.mmt4d.f32f32f32
 //  CHECK-SAME:     (memref<f32>, index, index, memref<f32>, index, index,
 //  CHECK-SAME:     memref<f32>, index, index, index, index, index, i32, i32, i32, i32)
 // CHECK-LABEL: func.func @mmt4d_ukernel(
@@ -111,7 +111,7 @@ func.func @mmt4d_ukernel(%arg0 : memref<?x?x?x?xf32>, %arg1 : memref<?x?x?x?xf32
 //   CHECK-DAG:   %[[D5:.+]] = memref.dim %[[ARG0]], %[[C3]]
 //   CHECK-DAG:   %[[D5_I32:.+]] = arith.index_cast %[[D5]]
 //   CHECK-DAG:   %[[C0_I32:.+]] = arith.constant 0 : i32
-//       CHECK:   call @vmvx.mmt4d.f32.f32.f32(%[[BASE0]], %[[OFFSET0]], %[[STRIDES0]]#0
+//       CHECK:   call @vmvx.mmt4d.f32f32f32(%[[BASE0]], %[[OFFSET0]], %[[STRIDES0]]#0
 //  CHECK-SAME:       %[[BASE1]], %[[OFFSET1]], %[[STRIDES1]]#0
 //  CHECK-SAME:       %[[BASE2]], %[[OFFSET2]], %[[STRIDES2]]#0
 //  CHECK-SAME:       %[[D0]], %[[D1]], %[[D2]],
@@ -126,4 +126,4 @@ func.func @mmt4d_ukernel_i8i8i32(%arg0 : memref<?x?x?x?xi8>, %arg1 : memref<?x?x
   return
 }
 // CHECK-LABEL: func @mmt4d_ukernel_i8i8i32(
-//       CHECK:   call @vmvx.mmt4d.i8.i8.i32
+//       CHECK:   call @vmvx.mmt4d.i8i8i32
