@@ -484,7 +484,7 @@ static iree_status_t iree_hal_caching_allocator_trim(
   for (iree_host_size_t i = 0; i < allocator->pool_count; ++i) {
     iree_hal_caching_allocator_pool_trim(allocator->pools[i]);
   }
-  return iree_ok_status();
+  return iree_hal_allocator_trim(allocator->device_allocator);
 }
 
 static void iree_hal_caching_allocator_query_statistics(

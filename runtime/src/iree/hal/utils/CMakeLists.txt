@@ -26,6 +26,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    debug_allocator
+  HDRS
+    "debug_allocator.h"
+  SRCS
+    "debug_allocator.c"
+  DEPS
+    iree::base
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     collective_batch
   HDRS
     "collective_batch.h"
