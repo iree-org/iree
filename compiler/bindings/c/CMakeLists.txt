@@ -40,23 +40,32 @@ iree_cc_library(
 
 # TODO: Make this test work with Bazel once that is more solid.
 
-if(IREE_BUILD_COMPILER AND IREE_BUILD_TESTS)
-    iree_cc_test(
-    NAME
-        loader_test
-    SRCS
-        "iree/compiler/loader/loader_test.c"
-    ARGS
-        "$<TARGET_FILE:iree::compiler::API2::SharedImpl>"
-    DEPS
-        ::loader
-    )
+if(IREE_HAVE_DYNAMIC_LIBRARY_LOADING)
+  # Dynamic library loading enabled.
+  if(IREE_BUILD_COMPILER AND IREE_BUILD_TESTS)
+      iree_cc_test(
+      NAME
+          loader_test
+      SRCS
+          "iree/compiler/loader/loader_test.c"
+      ARGS
+          "$<TARGET_FILE:iree::compiler::API2::SharedImpl>"
+      DEPS
+          ::loader
+      )
 
-    # Must be a build dependency but not a library dep (we depend on it at
-    # runtime).
-    # TODO: Find a better way to do this.
-    add_dependencies(
-        iree_compiler_bindings_c_loader_test
-        iree::compiler::API2::SharedImpl
-    )
+      # Must be a build dependency but not a library dep (we depend on it at
+      # runtime).
+      # TODO: Find a better way to do this.
+      add_dependencies(
+          iree_compiler_bindings_c_loader_test
+          iree::compiler::API2::SharedImpl
+      )
+  endif()
+else()
+  # Dynamic library loading not available. Exclude loader from all.
+  message(STATUS "Disabling compiler loader (platform does not support library loading)")
+  set_target_properties(iree_compiler_bindings_c_loader
+    PROPERTIES EXCLUDE_FROM_ALL ON
+  )
 endif()
