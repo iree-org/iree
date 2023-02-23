@@ -340,7 +340,7 @@ def main(args):
 
     # Override by default to allow updates to the series.
     add_new_iree_series(series_id=series_id,
-                        series_unit="ns",
+                        series_unit="ms",
                         series_name=benchmark_latency.name,
                         series_description=description,
                         override=True,
@@ -348,7 +348,7 @@ def main(args):
                         verbose=args.verbose)
     add_new_sample(series_id=series_id,
                    build_id=commit_count,
-                   sample_unit="ns",
+                   sample_unit="ms",
                    sample_value=benchmark_latency.mean_time,
                    dry_run=args.dry_run,
                    verbose=args.verbose)
