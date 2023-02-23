@@ -588,6 +588,10 @@ jobs:
           override_python_versions: cp37-cp37m
         run: |
           ./build_tools/python_deploy/build_linux_packages.sh
+      # Note that it is just a trade-off decision to have this serialized
+      # as a separate step vs parallelized as a separate job. The runtime
+      # build is fast, pays the clone/docker overhead and provides early
+      # signal (since it runs in just a couple of minutes).
       - name: Build compiler wheels (Linux)
         shell: bash
         env:
