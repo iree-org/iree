@@ -563,6 +563,47 @@ jobs:
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
+  python_release_packages:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        with:
+          submodules: true
+      - name: Build runtime wheels (Linux)
+        shell: bash
+        env:
+          packages: "iree-runtime iree-runtime-instrumented"
+          output_dir: "${{ github.workspace }}/bindist"
+          # Note when upgrading: Build just one Python version synced to our
+          # minimum. Note that 3.7 is the last with this naming convention.
+          # Look at the script for the full list.
+          override_python_versions: cp37-cp37m
+        run: |
+          ./build_tools/python_deploy/build_linux_packages.sh
+      # Note that it is just a trade-off decision to have this serialized
+      # as a separate step vs parallelized as a separate job. The runtime
+      # build is fast, pays the clone/docker overhead and provides early
+      # signal (since it runs in just a couple of minutes).
+      - name: Build compiler wheels (Linux)
+        shell: bash
+        env:
+          packages: "iree-compiler"
+          output_dir: "${{ github.workspace }}/bindist"
+          # Note when upgrading: Build just one Python version synced to our
+          # minimum. Note that 3.7 is the last with this naming convention.
+          # Look at the script for the full list.
+          override_python_versions: cp37-cp37m
+        run: |
+          ./build_tools/python_deploy/build_linux_packages.sh
+
   asan:
     needs: setup
     if: needs.setup.outputs.should-run == 'true'
