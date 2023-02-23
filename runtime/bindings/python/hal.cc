@@ -10,6 +10,7 @@
 #include "iree/base/internal/path.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/hal/utils/allocator_flags.h"
 #include "iree/modules/hal/module.h"
 #include "pybind11/numpy.h"
 
@@ -312,11 +313,21 @@ py::list HalDriver::QueryAvailableDevices() {
   return results;
 }
 
+// Configures |device| based on flags before returning it to the user.
+static iree_status_t ConfigureDevice(iree_hal_device_t* device) {
+  // Optionally wrap the base device allocator with caching/pooling.
+  // Doing this here satisfies the requirement that no buffers have been
+  // allocated yet - if we returned the device without doing this the caller can
+  // more easily break the rules.
+  return iree_hal_configure_allocator_from_flags(device);
+}
+
 HalDevice HalDriver::CreateDefaultDevice() {
   iree_hal_device_t* device;
   CheckApiStatus(iree_hal_driver_create_default_device(
                      raw_ptr(), iree_allocator_system(), &device),
                  "Error creating default device");
+  CheckApiStatus(ConfigureDevice(device), "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);
 }
 
@@ -352,6 +363,7 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id) {
                      raw_ptr(), device_id, params.size(), &params.front(),
                      iree_allocator_system(), &device),
                  "Error creating default device");
+  CheckApiStatus(ConfigureDevice(device), "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);
 }
 
@@ -362,6 +374,7 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri) {
       iree_hal_driver_create_device_by_uri(raw_ptr(), device_uri_sv,
                                            iree_allocator_system(), &device),
       "Error creating device");
+  CheckApiStatus(ConfigureDevice(device), "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);
 }
 
