@@ -462,7 +462,7 @@ static int64_t roundUpToPow2(int64_t size, bool predicate) {
     return size;
   }
   assert(size > 0 && "Negative size");
-  return 1 << llvm::Log2_64_Ceil(size);
+  return llvm::PowerOf2Ceil(size);
 }
 
 /// Adjusts the workload per workgroup to be a multiple of vector size to ensure
@@ -480,8 +480,9 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
   }
 
   // Return the largest suitable power of two if power of two is enforced.
-  if (enforcePowerOfTwo)
+  if (enforcePowerOfTwo) {
     return roundUpToPow2(std::min(maxSize, numIters), enforcePowerOfTwo);
+  }
 
   int64_t scaledUB = std::min(maxSize, numIters) / vectorSize * vectorSize;
   for (int64_t i = scaledUB; i > 0; i -= vectorSize) {
@@ -809,13 +810,14 @@ static LogicalResult setMatmulNoPadRootConfig(
   SmallVector<int64_t> parallelTileSizes;
   for (auto [index, tileSize] : llvm::enumerate(workgroupTileSizes)) {
     int64_t sz = tileSize;
+    bool allowIncompleteTile =
+        vecPreProcStrategy == VectorPreProcStrategy::Peeling ||
+        vecPreProcStrategy == VectorPreProcStrategy::Masking;
+
     if (sz != 0) {
       sz = getMaxTileSize(
           /*lb=*/0, /*ub=*/shape[index],
-          /*maxTileSize=*/sz, vectorSize,
-          /*allowIncompleteTile=*/vecPreProcStrategy ==
-                  VectorPreProcStrategy::Peeling ||
-              vecPreProcStrategy == VectorPreProcStrategy::Masking);
+          /*maxTileSize=*/sz, vectorSize, allowIncompleteTile);
     }
     parallelTileSizes.push_back(sz);
   }
@@ -1492,12 +1494,10 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   DispatchLoweringPassPipeline passPipeline;
   if (genericOp.hasBufferSemantics()) {
     passPipeline = DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  } else if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
+    passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
   } else {
-    if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
-      passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
-    } else {
-      passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-    }
+    passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
   }
 
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,

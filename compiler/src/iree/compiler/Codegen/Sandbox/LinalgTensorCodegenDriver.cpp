@@ -60,6 +60,8 @@ static FailureOr<Operation *> getRootOp(Operation *op) {
     funcOp = op->getParentOfType<func::FuncOp>();
   }
 
+  assert(funcOp && "Missing funcOp");
+
   Operation *rootOp = nullptr;
   mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr rootLoweringConfig;
   auto result = funcOp.walk([&](Operation *op) -> WalkResult {
