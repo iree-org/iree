@@ -12,7 +12,7 @@ documented separately, as they require further setup.
 ### Install Bazel
 
 Install Bazel, matching IREE's
-[`.bazelversion`](https://github.com/iree-org/iree/blob/main/.bazelversion) by
+[`.bazelversion`](https://github.com/openxla/iree/blob/main/.bazelversion) by
 following the
 [official docs](https://docs.bazel.build/versions/master/install.html).
 
@@ -44,7 +44,7 @@ $ python3 -m pip install numpy
 Clone the repository, initialize its submodules and configure:
 
 ```shell
-$ git clone https://github.com/iree-org/iree.git
+$ git clone https://github.com/openxla/iree.git
 $ cd iree
 $ git submodule update --init
 $ python3 configure_bazel.py
@@ -105,7 +105,7 @@ $ ./bazel-bin/tools/iree-compile --help
 ```
 
 Translate a
-[MLIR file](https://github.com/iree-org/iree/blob/main/samples/models/simple_abs.mlir)
+[MLIR file](https://github.com/openxla/iree/blob/main/samples/models/simple_abs.mlir)
 and execute a function in the compiled module:
 
 ```shell

@@ -1,4 +1,4 @@
-// Regression testcase from https://github.com/iree-org/iree/issues/10859
+// Regression testcase from https://github.com/openxla/iree/issues/10859
 
 func.func @main(%arg0: tensor<256xi8>, %arg1: tensor<2xi32>, %arg2: tensor<2x32xi8>, %arg3: tensor<32xi32>, %arg4: tensor<32x32xi8>, %arg5: tensor<32xi32>, %arg6: tensor<32x3360xi8>, %arg7: tensor<?x3360xi8>) -> (tensor<?x2xi8>) {
   %0 = "tosa.fully_connected"(%arg7, %arg6, %arg5) {quantization_info = #tosa.conv_quant<input_zp = -128, weight_zp = 0>} : (tensor<?x3360xi8>, tensor<32x3360xi8>, tensor<32xi32>) -> tensor<?x32xi32>

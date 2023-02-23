@@ -18,7 +18,7 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
 
   let summary = [{defines execution context affinity}];
   let description = [{
-    WIP; see https://github.com/iree-org/iree/issues/10765.
+    WIP; see https://github.com/openxla/iree/issues/10765.
 
     TBD. The intent is that this can specify host, device, and queue affinity.
     Scopes can be annotated with an affinity to ensure execution within happens

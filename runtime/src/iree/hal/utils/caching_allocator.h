@@ -8,8 +8,7 @@
 #define IREE_HAL_UTILS_CACHING_ALLOCATOR_H_
 
 #include "iree/base/api.h"
-#include "iree/hal/allocator.h"
-#include "iree/hal/buffer.h"
+#include "iree/hal/api.h"
 
 #ifdef __cplusplus
 extern "C" {

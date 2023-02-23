@@ -503,11 +503,12 @@ void ConvertToLLVMPass::runOnOperation() {
   bool use32BitImpl = false;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(module);
   if (isRISCV(targetAttr)) {
-    // Use the 32-bit lowering for RISC-V if 'zve32x' is specified and there is
+    // Use the 32-bit lowering for RISC-V if 'zve32*' is specified and there is
     // no 64-bit integer vector support.
     // TODO(#9440) Simplify logic when 'cpu_features' is simplified.
-    use32BitImpl = hasZve32xFeature(targetAttr) && !hasVFeature(targetAttr) &&
-                   !hasZve64xFeature(targetAttr);
+    use32BitImpl =
+        (hasZve32xFeature(targetAttr) || hasZve32fFeature(targetAttr)) &&
+        !hasVFeature(targetAttr) && !hasZve64xFeature(targetAttr);
   }
   tosa::populateTosaRescaleToArithConversionPatterns(&patterns, use32BitImpl);
 

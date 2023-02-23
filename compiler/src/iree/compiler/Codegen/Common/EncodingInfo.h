@@ -17,7 +17,6 @@ namespace iree_compiler {
 enum class MatmulOperandRole {
   LHS,
   RHS,
-  RHS_TRANSPOSE,
   RESULT,
 };
 

@@ -57,6 +57,8 @@ protected:
   // inserted ops are added to the worklist for processing.
   void notifyOperationInserted(Operation *op) override;
 
+  void notifyOperationModified(Operation *op) override;
+
   // Look over the provided operands for any defining operations that should
   // be re-added to the worklist. This function should be called when an
   // operation is modified or removed, as it may trigger further
@@ -70,7 +72,7 @@ protected:
   // When the root of a pattern is about to be replaced, it can trigger
   // simplifications to its users - make sure to add them to the worklist
   // before the root is changed.
-  void notifyRootReplaced(Operation *op, ValueRange replacement) override;
+  void notifyOperationReplaced(Operation *op, ValueRange replacement) override;
 
   //===--------------------------------------------------------------------===//
   // END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
@@ -380,6 +382,14 @@ void GreedyPatternRewriteDriver::notifyOperationInserted(Operation *op) {
   addToWorklist(op);
 }
 
+void GreedyPatternRewriteDriver::notifyOperationModified(Operation *op) {
+  LLVM_DEBUG({
+    logger.startLine() << "** Modified: '" << op->getName() << "'(" << op
+                       << ")\n";
+  });
+  addToWorklist(op);
+}
+
 void GreedyPatternRewriteDriver::addOperandsToWorklist(ValueRange operands) {
   for (Value operand : operands) {
     // If the use count of this operand is now < 2, we re-add the defining
@@ -402,8 +412,8 @@ void GreedyPatternRewriteDriver::notifyOperationRemoved(Operation *op) {
   });
 }
 
-void GreedyPatternRewriteDriver::notifyRootReplaced(Operation *op,
-                                                    ValueRange replacement) {
+void GreedyPatternRewriteDriver::notifyOperationReplaced(
+    Operation *op, ValueRange replacement) {
   LLVM_DEBUG({
     logger.startLine() << "** Replace : '" << op->getName() << "'(" << op
                        << ")\n";

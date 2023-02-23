@@ -417,7 +417,7 @@ static LogicalResult modifyUseToGetValueIntoStoreSet(RewriterBase &rewriter,
 ///    the new use is tied to the result of the user.
 /// This makes the result of the compute op be in the store set, and
 /// bufferizable without using a new stack. See
-/// https://github.com/iree-org/iree/issues/8303.
+/// https://github.com/openxla/iree/issues/8303.
 static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
     func::FuncOp funcOp, bool useWARForCooperativeMatrixCodegen) {
   IRRewriter rewriter(funcOp.getContext());

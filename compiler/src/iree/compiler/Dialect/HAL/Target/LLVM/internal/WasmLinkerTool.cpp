@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
+#include "iree/compiler/Utils/ToolUtils.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/FormatVariadic.h"

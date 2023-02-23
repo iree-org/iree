@@ -58,6 +58,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

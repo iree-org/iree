@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/StringUtils.h"
@@ -16,6 +17,7 @@
 #include "iree_cuda/libdevice_embedded.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -64,6 +66,16 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+static void dumpBitcodeToPath(StringRef path, StringRef baseName,
+                              StringRef suffix, StringRef extension,
+                              llvm::Module &module) {
+  llvm::SmallVector<char, 0> data;
+  llvm::raw_svector_ostream ostream(data);
+  llvm::WriteBitcodeToFile(module, ostream);
+  dumpDataToPath(path, baseName, suffix, extension,
+                 StringRef(data.data(), data.size()));
+}
+
 static std::string translateModuleToISA(llvm::Module &module,
                                         llvm::TargetMachine &targetMachine) {
   std::string targetISA;
@@ -86,53 +98,57 @@ static std::string translateModuleToISA(llvm::Module &module,
   return targetISA;
 }
 
-/// Return true if the moule contain any __nv function that require linking with
-/// libdevice module.
-static bool requiresDeviceLib(const llvm::Module &module) {
-  for (const llvm::Function &function : module.functions()) {
-    if (!function.isIntrinsic() && function.isDeclaration() &&
-        (function.getName().startswith("__nv_"))) {
-      return true;
+/// Resolve __nv function by linking libdevice module.
+/// |objectAttrs| may optionally specify additional bitcode files to link into
+/// the generated code.
+static LogicalResult linkObjects(Location loc, llvm::Module &module,
+                                 llvm::TargetMachine &targetMachine,
+                                 ArrayAttr objectAttrs) {
+  // Ensure consistent target information.
+  const llvm::Triple &targetTriple = targetMachine.getTargetTriple();
+  module.setDataLayout(targetMachine.createDataLayout());
+  module.setTargetTriple(targetTriple.str());
+
+  auto specializationCallback = [&](llvm::Module &userModule) {
+    // TODO(thomasraoux): inject __nvvm_reflect-style functions/globals for
+    // bitcode specialization based on the targetMachine and configuration.
+    // These could use any information we have on the IREE side as well as the
+    // TargetMachine instead of just what __nvvm_reflect supports (arch/etc).
+  };
+
+  // Link user modules and libdevice (if required).
+  // Note that linking order matters:
+  llvm::Linker linker(module);
+  unsigned linkerFlags =
+      llvm::Linker::LinkOnlyNeeded | llvm::Linker::OverrideFromSrc;
+  if (failed(linkBitcodeObjects(loc, linker, linkerFlags, targetMachine,
+                                objectAttrs, module.getContext(),
+                                specializationCallback))) {
+    return mlir::emitError(loc)
+           << "failed linking in user objects for target triple '"
+           << targetTriple.str() << "'";
+  }
+
+  if (anyRequiredSymbols(module, "__nv_")) {
+    llvm::MemoryBufferRef bitcodeBufferRef(
+        llvm::StringRef(libdevice_embedded_create()->data,
+                        libdevice_embedded_create()->size),
+        "libdevice.xx.bc");
+    if (failed(linkBitcodeModule(
+            loc, linker, linkerFlags, targetMachine, "libdevice.xx.bc",
+            llvm::parseBitcodeFile(bitcodeBufferRef, module.getContext())))) {
+      return mlir::emitError(loc) << "failed linking in embedded libdevice "
+                                     "bitcode for target triple '"
+                                  << targetTriple.str() << "'";
     }
   }
-  return false;
+
+  return success();
 }
 
-/// Link libdevice with |module|.
-static void linkModule(llvm::Module &module) {
-  llvm::Linker linker(module);
-
-  llvm::MemoryBufferRef bitcodeBufferRef(
-      llvm::StringRef(libdevice_embedded_create()->data,
-                      libdevice_embedded_create()->size),
-      "libdevice bitcode");
-  auto bitcodeModuleValue =
-      llvm::parseBitcodeFile(bitcodeBufferRef, module.getContext());
-  if (!bitcodeModuleValue) {
-    llvm::errs() << "failed to parse CUDA libdevice bitcode: "
-                 << bitcodeModuleValue.takeError();
-    return;
-  }
-  std::unique_ptr<llvm::Module> bitcodeModule =
-      std::move(bitcodeModuleValue.get());
-  // Ignore the data layout of the module we're importing. This avoids a
-  // warning from the linker.
-  bitcodeModule->setDataLayout(module.getDataLayout());
-  linker.linkInModule(
-      std::move(bitcodeModule), llvm::Linker::Flags::LinkOnlyNeeded,
-      [](llvm::Module &M, const llvm::StringSet<> &GVS) {
-        llvm::internalizeModule(M, [&GVS](const llvm::GlobalValue &GV) {
-          return !GV.hasName() || (GVS.count(GV.getName()) == 0);
-        });
-      });
-}
-
-/// Resolve __nv function by linking libdevice module and run llvm optimization
-/// passes that will inline linked functions and optimize the module.
-static void linkAndOptimize(llvm::Module &module,
-                            llvm::TargetMachine &targetMachine) {
-  if (requiresDeviceLib(module)) linkModule(module);
-
+/// Performs optimizations on |module| (including LTO-style whole-program ones).
+static void optimizeModule(llvm::Module &module,
+                           llvm::TargetMachine &targetMachine) {
   // Workaround run those passed ahead as they are temporarily disabled in NVPTX
   // target.
   llvm::legacy::PassManager legacyPM;
@@ -346,9 +362,32 @@ class CUDATargetBackend final : public TargetBackend {
         }
       }
 
-      llvmModule->setDataLayout(targetMachine->createDataLayout());
+      // Dump just the codegen bitcode before linking and optimization.
+      if (!options.dumpIntermediatesPath.empty()) {
+        dumpBitcodeToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                          variantOp.getName(), ".codegen.bc", *llvmModule);
+      }
 
-      linkAndOptimize(*llvmModule, *targetMachine);
+      // Link user and device bitcode alongside the generated module.
+      if (failed(linkObjects(variantOp.getLoc(), *llvmModule, *targetMachine,
+                             variantOp.getObjectsAttr()))) {
+        return failure();
+      }
+
+      // Dump all linked bitcode prior to optimization.
+      if (!options.dumpIntermediatesPath.empty()) {
+        dumpBitcodeToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                          variantOp.getName(), ".linked.bc", *llvmModule);
+      }
+
+      // Run LTO-style full optimization on the linked modules.
+      optimizeModule(*llvmModule, *targetMachine);
+
+      // Dump bitcode post-linking and optimization.
+      if (!options.dumpIntermediatesPath.empty()) {
+        dumpBitcodeToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                          variantOp.getName(), ".optimized.bc", *llvmModule);
+      }
 
       // Serialize CUDA kernel into the binary that we will embed in the
       // final FlatBuffer.

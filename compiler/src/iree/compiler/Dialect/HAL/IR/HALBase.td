@@ -788,6 +788,12 @@ def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
   let hasCustomAssemblyFormat = 1;
 
   let extraClassDeclaration = [{
+    // Returns a list of all objects with a path matching one of the provided
+    // file extensions.
+    static void filterObjects(
+        ArrayAttr objectAttrs, ArrayRef<StringRef> extensions,
+        SmallVectorImpl<ExecutableObjectAttr> &filteredAttrs);
+
     // Returns the absolute path of the referenced object file if it exists.
     FailureOr<std::string> getAbsolutePath();
 
@@ -858,7 +864,7 @@ def HAL_AffinityQueueAttr : AttrDef<HAL_Dialect, "AffinityQueue", [
   let mnemonic = "affinity.queue";
   let summary = [{specifies a set of allowed queues for an operation}];
   let description = [{
-    WIP; see https://github.com/iree-org/iree/issues/10765.
+    WIP; see https://github.com/openxla/iree/issues/10765.
     This may change in the future to either be a nested attribute on a larger
     affinity struct or be defined by an implementation of the affinity attr
     interface. For now this allows higher levels of the stack to specify

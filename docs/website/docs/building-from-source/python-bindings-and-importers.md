@@ -199,10 +199,10 @@ These tools packages are needed in order for the frontend specific, high-level
 APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
 `import iree.compiler.xla`, and `import iree.jax` to be fully functional.
 
-!!! Warning
+!!! Caution
 
     This section is under construction. Refer to the
-    [source documentation](https://github.com/iree-org/iree/tree/main/integrations/tensorflow#readme)
+    [source documentation](https://github.com/openxla/iree/tree/main/integrations/tensorflow#readme)
     for the latest building from source instructions.
 
 ???+ Note

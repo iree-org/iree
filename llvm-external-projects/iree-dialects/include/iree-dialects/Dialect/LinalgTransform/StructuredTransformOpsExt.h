@@ -58,7 +58,7 @@ public:
 #endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
   }
 
-  void notifyRootReplaced(Operation *op, ValueRange newValues) override;
+  void notifyOperationReplaced(Operation *op, ValueRange newValues) override;
 
   void notifyOperationRemoved(Operation *op) override;
 

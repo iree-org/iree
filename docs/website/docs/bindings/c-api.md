@@ -7,11 +7,11 @@ API header files are organized by runtime component:
 
 | Component header file                                                       | Overview                                                                  |
 |-----------------------------------------------------------------------------|---------------------------------------------------------------------------|
-| [iree/base/api.h](https://github.com/iree-org/iree/blob/main/runtime/src/iree/base/api.h) | Core API, type definitions, ownership policies, utilities                 |
-| [iree/vm/api.h](https://github.com/iree-org/iree/blob/main/runtime/src/iree/vm/api.h)     | VM APIs: loading modules, I/O, calling functions                          |
-| [iree/hal/api.h](https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/api.h)   | HAL APIs: device management, synchronization, accessing hardware features |
+| [iree/base/api.h](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/api.h) | Core API, type definitions, ownership policies, utilities                 |
+| [iree/vm/api.h](https://github.com/openxla/iree/blob/main/runtime/src/iree/vm/api.h)     | VM APIs: loading modules, I/O, calling functions                          |
+| [iree/hal/api.h](https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/api.h)   | HAL APIs: device management, synchronization, accessing hardware features |
 
-The [samples/](https://github.com/iree-org/iree/tree/main/samples)
+The [samples/](https://github.com/openxla/iree/tree/main/samples)
 directory demonstrates several ways to use IREE's C API.
 
 ## Prerequisites
@@ -147,7 +147,7 @@ IREE_CHECK_OK(iree_vm_bytecode_module_create(
 
 !!! note
     Many IREE samples use
-    [`c_embed_data`](https://github.com/iree-org/iree/tree/main/build_tools/embed_data)
+    [`c_embed_data`](https://github.com/openxla/iree/tree/main/build_tools/embed_data)
     to embed vmfb files as C code to avoid file I/O and ease portability.
     Applications should use what makes sense for their platforms and deployment
     configurations.
@@ -211,11 +211,11 @@ iree_vm_instance_release(instance);
 
 [^1]:
   We are exploring adding a C API for IREE's compiler, see
-  [this GitHub issue](https://github.com/iree-org/iree/issues/3817)
+  [this GitHub issue](https://github.com/openxla/iree/issues/3817)
 
 [^2]:
   We plan on deploying via [vcpkg](https://github.com/microsoft/vcpkg) in the
   future too, see
-  [this GitHub project](https://github.com/iree-org/iree/projects/18)
+  [this GitHub project](https://github.com/openxla/iree/projects/18)
 
 *[vmfb]: VM FlatBuffer

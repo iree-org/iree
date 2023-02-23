@@ -133,7 +133,10 @@ function(add_iree_compiler_busybox_tool target)
     ${target}
     ${ARG_SRCS}
   )
-  target_link_libraries(${target} iree_compiler_API2_SharedImpl)
+  target_link_libraries(${target}
+    iree_compiler_bindings_c_headers
+    iree_compiler_API2_SharedImpl
+  )
   set_target_properties(${target}
     PROPERTIES
       OUTPUT_NAME "${ARG_OUTPUT_NAME}"

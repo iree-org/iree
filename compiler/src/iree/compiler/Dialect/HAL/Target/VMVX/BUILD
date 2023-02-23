@@ -40,6 +40,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VMVX/IR:VMVXDialect",
         "//compiler/src/iree/compiler/Dialect/VMVX/Transforms",
         "//compiler/src/iree/compiler/Utils",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

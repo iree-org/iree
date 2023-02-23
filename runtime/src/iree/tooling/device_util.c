@@ -11,6 +11,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/hal/utils/caching_allocator.h"
+#include "iree/hal/utils/debug_allocator.h"
 
 //===----------------------------------------------------------------------===//
 // Shared driver registry
@@ -508,6 +509,11 @@ static iree_status_t iree_hal_configure_allocator_from_spec(
   if (iree_string_view_equal(allocator_name, IREE_SV("caching"))) {
     status = iree_hal_configure_caching_allocator(
         config_pairs, device, base_allocator, out_wrapped_allocator);
+  } else if (iree_string_view_equal(allocator_name, IREE_SV("debug"))) {
+    status = iree_hal_debug_allocator_create(
+        device, base_allocator,
+        iree_hal_allocator_host_allocator(base_allocator),
+        out_wrapped_allocator);
   } else {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unrecognized allocator '%.*s'",

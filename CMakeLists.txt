@@ -10,6 +10,9 @@ cmake_minimum_required(VERSION 3.21...3.24)
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
 # New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
 set(CMAKE_POLICY_DEFAULT_CMP0116 OLD)
+if(POLICY CMP0116)
+  cmake_policy(SET CMP0116 OLD)
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -60,6 +63,7 @@ option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
+option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
 
 option(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
 
@@ -317,7 +321,7 @@ option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler co
 
 # STREQUAL feels wrong here - we don't care about the exact true-value used,
 # ON or TRUE or something else. But we haven't been able to think of a less bad
-# alternative. https://github.com/iree-org/iree/pull/8474#discussion_r840790062
+# alternative. https://github.com/openxla/iree/pull/8474#discussion_r840790062
 if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
   message(SEND_ERROR
       "IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be "
@@ -427,10 +431,12 @@ include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
 include(iree_c_embed_data)
+include(iree_bitcode_library)
 include(iree_bytecode_module)
 include(iree_c_module)
 include(iree_python)
 include(iree_lit_test)
+include(iree_llvm)
 include(iree_add_all_subdirs)
 include(iree_check_test)
 include(iree_trace_runner_test)
@@ -543,173 +549,9 @@ if(IREE_ERROR_ON_MISSING_SUBMODULES AND Python3_FOUND AND Git_FOUND)
 endif()
 
 #-------------------------------------------------------------------------------
-# CUDA configuration for both the compiler and runtime.
-# We do this at the top level so that we can fail fast and make global
-# decisions that effect both compiler and runtime. It also helps with error
-# messaging to do this all in one place, since we can provide very targeted
-# advice.
-#-------------------------------------------------------------------------------
-
-set(IREE_CUDA_LIBDEVICE_PATH "" CACHE FILEPATH "Absolute path to an appropriate libdevice.*.bc (needed to build the IREE cuda compiler target)")
-
-# If any CUDA features are being built, try to locate a CUDA SDK. We will fall
-# back to this as needed for specific features.
-if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
-  add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
-endif()
-
-#-------------------------------------------------------------------------------
-# MLIR/LLVM Dependency
-#-------------------------------------------------------------------------------
-
-if(NOT IREE_BUILD_COMPILER)
-  message(STATUS "Not adding LLVM/MLIR because the configuration does not require it")
-elseif(TARGET LLVMSupport)
-  message(STATUS "Not adding IREE bundled LLVM because it has already been included")
-  if(NOT TARGET MLIRIR)
-    message(FATAL_ERROR "Detected externally provided LLVM project but could not find MLIR projects (is it enabled/installed?)")
-  endif()
-else()
-  message(STATUS "Adding bundled LLVM source dependency")
-  iree_set_llvm_cmake_options()
-
-  # Enable MLIR Python bindings if IREE Python bindings enabled.
-  if(IREE_BUILD_PYTHON_BINDINGS)
-    set(MLIR_ENABLE_BINDINGS_PYTHON ON)
-    set(MHLO_ENABLE_BINDINGS_PYTHON ON)
-  endif()
-
-  # Disable LLVM's warnings.
-  set(LLVM_ENABLE_WARNINGS OFF)
-
-  # Stash cmake build type in case LLVM messes with it.
-  set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
-
-  # Add default external projects.
-  iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
-  iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
-  if(IREE_INPUT_TORCH)
-    iree_add_llvm_external_project(torch-mlir-dialects TORCH_MLIR_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
-  endif()
-
-  add_subdirectory("third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
-
-  # Reset CMAKE_BUILD_TYPE to its previous setting.
-  set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" )
-
-  # Extend module path to allow submodules to use LLVM and MLIR CMake modules.
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
-
-  # Add the bundled include directories for cmake files looking for them.
-  list(APPEND LLVM_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
-  )
-  list(APPEND MLIR_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
-  )
-
-  # TODO: It should be possible to fix upstream targets so as to not require
-  # any of these. Remove as they become unnecessary.
-  function(_hack_llvm_include_paths)
-    set(_COMMON_INCLUDE_DIRS
-      # LLVM
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
-
-      # MLIR
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>
-
-      # LLD
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/lld/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/lld/include>
-
-    )
-    # Avoid globally modifying paths by instead adding the include paths to the
-    # rules that really should have them in the first place.
-    target_include_directories(LLVMSupport PUBLIC ${_COMMON_INCLUDE_DIRS})
-    target_include_directories(MLIRSupport PUBLIC ${_COMMON_INCLUDE_DIRS})
-
-    # Also add a library that can be depended on to get LLVM includes setup
-    # properly. bazel_to_cmake targets this for some header only pseudo deps.
-    add_library(IREELLVMIncludeSetup INTERFACE)
-    target_include_directories(IREELLVMIncludeSetup INTERFACE ${_COMMON_INCLUDE_DIRS})
-  endfunction()
-  _hack_llvm_include_paths()
-endif()
-
-#-------------------------------------------------------------------------------
-# Other dependencies
-#-------------------------------------------------------------------------------
-
-include(external_cc_library)
-include(flatbuffer_c_library)
-
-add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
-
-iree_set_googletest_cmake_options()
-add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
-
-if(IREE_ENABLE_THREADING)
-  iree_set_benchmark_cmake_options()
-  add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
-  if(IREE_ENABLE_CPUINFO)
-    iree_set_cpuinfo_cmake_options()
-    add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
-  endif()
-endif()
-
-# This defines the iree-flatcc-cli target, so we don't use EXCLUDE_FROM_ALL.
-add_subdirectory(build_tools/third_party/flatcc)
-
-if(IREE_HAL_DRIVER_CUDA)
-  add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)
-endif()
-
-if(IREE_HAL_DRIVER_VULKAN)
-  add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
-endif()
-
-if(IREE_BUILD_COMPILER)
-  add_subdirectory(build_tools/third_party/mlir-hlo EXCLUDE_FROM_ALL)
-endif()
-
-if(IREE_BUILD_TESTS)
-  include(iree_configure_testing)
-endif()
-
-if(IREE_BUILD_PYTHON_BINDINGS)
-  if(NOT TARGET pybind11::module)
-    message(STATUS "Using bundled pybind11")
-    add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
-  else()
-    message(STATUS "Not including bundled pybind11 (already configured)")
-  endif()
-endif()
-
-if(IREE_TARGET_BACKEND_METAL_SPIRV)
-  iree_set_spirv_cross_cmake_options()
-  # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
-  add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
-endif()
-
-if(IREE_TARGET_BACKEND_WEBGPU)
-  # Tint is needed to compile SPIR-V into WGSL source code.
-  # Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
-  iree_set_spirv_headers_cmake_options()
-  add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
-  add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)
-  add_subdirectory(build_tools/third_party/tint EXCLUDE_FROM_ALL)
-endif()
-
-#-------------------------------------------------------------------------------
 # IREE top-level targets
+# We define these here because various things in the build tree adds
+# dependencies to them.
 #-------------------------------------------------------------------------------
 
 if(IREE_BUILD_BENCHMARKS OR IREE_BUILD_EXPERIMENTAL_E2E_TEST_ARTIFACTS)
@@ -803,6 +645,135 @@ add_custom_target(iree-run-tests
 )
 add_dependencies(iree-run-tests iree-test-deps)
 
+#-------------------------------------------------------------------------------
+# CUDA configuration for both the compiler and runtime.
+# We do this at the top level so that we can fail fast and make global
+# decisions that effect both compiler and runtime. It also helps with error
+# messaging to do this all in one place, since we can provide very targeted
+# advice.
+#-------------------------------------------------------------------------------
+
+set(IREE_CUDA_LIBDEVICE_PATH "" CACHE FILEPATH "Absolute path to an appropriate libdevice.*.bc (needed to build the IREE cuda compiler target)")
+
+# If any CUDA features are being built, try to locate a CUDA SDK. We will fall
+# back to this as needed for specific features.
+if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
+  add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
+endif()
+
+#-------------------------------------------------------------------------------
+# MLIR/LLVM Dependency
+#-------------------------------------------------------------------------------
+
+if(NOT IREE_BUILD_COMPILER)
+  message(STATUS "Not adding LLVM/MLIR because the configuration does not require it")
+else()
+  # Get the main LLVM deps.
+  if(IREE_BUILD_BUNDLED_LLVM)
+    iree_llvm_configure_bundled()
+  else()
+    iree_llvm_configure_installed()
+  endif()
+
+  # Also add a library that can be depended on to get LLVM includes setup
+  # properly. bazel_to_cmake targets this for some header only pseudo deps.
+  add_library(IREELLVMIncludeSetup INTERFACE)
+  target_include_directories(IREELLVMIncludeSetup INTERFACE
+    ${LLVM_INCLUDE_DIRS}
+    ${MLIR_INCLUDE_DIRS}
+    ${LLD_INCLUDE_DIRS}
+  )
+
+  # Splice the includes setup into base LLVM libraries so that using them
+  # gets everything nice and tidy. It would be super if some day, LLVM
+  # libraries set their right usage requirements for includes. In the meantime
+  # we add usage requirements to libraries at the root of all things LLVM.
+  iree_llvm_add_usage_requirements(LLVMSupport IREELLVMIncludeSetup)
+  iree_llvm_add_usage_requirements(MLIRSupport IREELLVMIncludeSetup)
+
+  # Add default external projects.
+  iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
+  iree_llvm_add_external_project(mlir-hlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
+  if(IREE_INPUT_TORCH)
+    iree_llvm_add_external_project(torch-mlir-dialects ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
+  endif()
+
+  # Ensure that LLVM-based dependencies needed for testing are included.
+  add_dependencies(iree-test-deps FileCheck)
+  if(IREE_LLD_TARGET)
+    add_dependencies(iree-test-deps ${IREE_LLD_TARGET})
+  endif()
+  if(IREE_CLANG_TARGET)
+    add_dependencies(iree-test-deps ${IREE_CLANG_TARGET})
+  endif()
+endif()
+
+#-------------------------------------------------------------------------------
+# Other dependencies
+#-------------------------------------------------------------------------------
+
+include(external_cc_library)
+include(flatbuffer_c_library)
+
+add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
+
+iree_set_googletest_cmake_options()
+add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
+
+if(IREE_ENABLE_THREADING)
+  iree_set_benchmark_cmake_options()
+  add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+  if(IREE_ENABLE_CPUINFO)
+    iree_set_cpuinfo_cmake_options()
+    add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+  endif()
+endif()
+
+# This defines the iree-flatcc-cli target, so we don't use EXCLUDE_FROM_ALL.
+add_subdirectory(build_tools/third_party/flatcc)
+
+if(IREE_HAL_DRIVER_CUDA)
+  add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)
+endif()
+
+if(IREE_HAL_DRIVER_VULKAN)
+  add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+endif()
+
+if(IREE_BUILD_COMPILER)
+  add_subdirectory(build_tools/third_party/mlir-hlo EXCLUDE_FROM_ALL)
+endif()
+
+if(IREE_BUILD_TESTS)
+  include(iree_configure_testing)
+endif()
+
+if(IREE_BUILD_PYTHON_BINDINGS)
+  if(NOT TARGET pybind11::module)
+    message(STATUS "Using bundled pybind11")
+    add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+  else()
+    message(STATUS "Not including bundled pybind11 (already configured)")
+  endif()
+endif()
+
+if(IREE_TARGET_BACKEND_METAL_SPIRV)
+  iree_set_spirv_cross_cmake_options()
+  # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
+  add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
+endif()
+
+if(IREE_TARGET_BACKEND_WEBGPU)
+  # Tint is needed to compile SPIR-V into WGSL source code.
+  # Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
+  iree_set_spirv_headers_cmake_options()
+  add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/tint EXCLUDE_FROM_ALL)
+endif()
 
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
@@ -841,11 +812,7 @@ endif()
 # files with the same names from different rules are disambiguated towards
 # those in tools/.
 add_subdirectory(tools)
-
-if(IREE_BUILD_COMPILER)
-  add_subdirectory(compiler)
-endif()
-
+add_subdirectory(compiler)
 add_subdirectory(runtime)
 
 if(IREE_ENABLE_CLANG_TIDY)

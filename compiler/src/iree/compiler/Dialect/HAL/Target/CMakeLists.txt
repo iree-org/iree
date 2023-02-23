@@ -33,4 +33,22 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    LLVMLinkerUtils
+  HDRS
+    "LLVMLinkerUtils.h"
+  SRCS
+    "LLVMLinkerUtils.cpp"
+  DEPS
+    LLVMBitReader
+    LLVMCore
+    LLVMLinker
+    LLVMSupport
+    LLVMTarget
+    LLVMipo
+    iree::compiler::Dialect::HAL::IR
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

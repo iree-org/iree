@@ -74,6 +74,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArmNeonDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ComplexToLLVM",
+        "@llvm-project//mlir:ComplexToStandard",
         "@llvm-project//mlir:ControlFlowToLLVM",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",

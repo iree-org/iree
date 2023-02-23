@@ -25,8 +25,9 @@ iree_cc_library(
     LLVMSupport
     LLVMTarget
     MLIRSupport
-    iree::builtins::device::bin::libdevice
+    iree::builtins::device::libdevice_bitcode
     iree::builtins::musl::bin::libmusl
+    iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
 

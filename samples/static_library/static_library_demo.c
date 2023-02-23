@@ -27,7 +27,7 @@ extern void print_success();
 // released by the caller.
 iree_status_t create_device_with_static_loader(iree_allocator_t host_allocator,
                                                iree_hal_device_t** out_device) {
-  // Set paramters for the device created in the next step.
+  // Set parameters for the device created in the next step.
   iree_hal_sync_device_params_t params;
   iree_hal_sync_device_params_initialize(&params);
 
@@ -163,7 +163,7 @@ iree_status_t Run() {
     status = iree_runtime_call_invoke(&call, /*flags=*/0);
   }
 
-  // Retreive output buffer view with results from the invocation.
+  // Retrieve output buffer view with results from the invocation.
   iree_hal_buffer_view_t* ret_buffer_view = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_runtime_call_outputs_pop_front_buffer_view(&call,

@@ -41,6 +41,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/LLVMCPU",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target:LLVMLinkerUtils",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVM/Builtins",
         "//compiler/src/iree/compiler/Utils",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",

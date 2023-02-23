@@ -8,10 +8,10 @@
 //
 // Based on mlir-opt but registers the passes and dialects we care about.
 
-#include "iree/compiler/API2/ToolEntryPoints.h"
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_passes.h"
 #include "iree/compiler/Tools/init_targets.h"
+#include "iree/compiler/tool_entry_points_api.h"
 #include "llvm/Support/InitLLVM.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/LogicalResult.h"
@@ -19,7 +19,7 @@
 
 int ireeOptRunMain(int argc, char **argv) {
   llvm::setBugReportMsg(
-      "Please report issues to https://github.com/iree-org/iree/issues and "
+      "Please report issues to https://github.com/openxla/iree/issues and "
       "include the crash backtrace.\n");
   llvm::InitLLVM y(argc, argv);
 

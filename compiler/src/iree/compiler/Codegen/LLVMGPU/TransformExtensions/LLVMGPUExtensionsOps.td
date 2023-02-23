@@ -23,6 +23,9 @@ def MapNestedForallToGpuThreadsOp :
   let description = [{
     Target the whole hal.executable_variant op and rewrite all scf.forall
     to distributed gpu.thread_id and translation_info attribute.
+    
+    This op will handle all the scf.forall using gpu.thread or gpu.warp
+    mapping.
 
     The mapping of threads to gpu.thread_id is currently one-to-one and in order.
     Only **bufferized** scf.forall are currently supported.

@@ -47,7 +47,7 @@ iree_status_t iree_tooling_append_async_fence_inputs(
 // Prints buffers in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in
-// https://github.com/iree-org/iree/tree/main/iree/hal/api.h
+// https://github.com/openxla/iree/tree/main/iree/hal/api.h
 iree_status_t iree_tooling_append_variant_list_lines(
     iree_vm_list_t* list, iree_host_size_t max_element_count,
     iree_string_builder_t* builder);

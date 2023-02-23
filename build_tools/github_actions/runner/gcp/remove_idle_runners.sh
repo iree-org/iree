@@ -27,7 +27,7 @@ MIG="github-runner-${GROUP}-${TYPE}-${REGION}"
 
 function remove_idle_runners() {
   local -a to_delete=($(gh api --paginate -H "Accept: application/vnd.github+json" \
-      /orgs/iree-org/actions/runners?per_page=100 \
+      /orgs/openxla/actions/runners?per_page=100 \
     | jq --raw-output \
       ".runners | .[]
       | select(

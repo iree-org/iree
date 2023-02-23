@@ -35,3 +35,22 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Transforms",
     ],
 )
+
+iree_compiler_cc_library(
+    name = "LLVMLinkerUtils",
+    srcs = [
+        "LLVMLinkerUtils.cpp",
+    ],
+    hdrs = [
+        "LLVMLinkerUtils.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "@llvm-project//llvm:BitReader",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:IPO",
+        "@llvm-project//llvm:Linker",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:Target",
+    ],
+)

@@ -227,7 +227,7 @@ cc_library(
     hdrs = ["iree_compile_lib.h"],
     deps = [
         ":init_iree",
-        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/API2/Internal:Embed",
         "//compiler/src/iree/compiler/Pipelines",
         "@llvm-project//llvm:Support",

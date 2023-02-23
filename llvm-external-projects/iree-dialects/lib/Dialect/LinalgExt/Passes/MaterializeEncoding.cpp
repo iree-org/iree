@@ -81,10 +81,6 @@ chooseEncodingInfo(RankedTensorType tensorType) {
     break;
   case TensorEncoding::MATMUL_F32F32F32_RHS:
   case TensorEncoding::MATMUL_I8I8I32_RHS:
-    return MaterializeEncodingInfo{{0, 1}, {4, 8}, {}};
-    break;
-  case TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE:
-  case TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE:
     return MaterializeEncodingInfo{{1, 0}, {8, 4}, {1, 0}};
     break;
   case TensorEncoding::MATMUL_F32F32F32_RESULT:
@@ -199,7 +195,7 @@ static FailureOr<UnPackOp> lowerUnsetEncodingToUnpackOp(
 
 /// Utility method to convert from `linalg.matmul` with
 /// - lhs encoding of MATMUL_*_LHS
-/// - rhs encoding of MATMUL_*_RHS_TRANSPOSE
+/// - rhs encoding of MATMUL_*_RHS
 /// - result encoding of MATMUL_*_RESULT
 /// to linalg.mmt4d op.
 static FailureOr<Operation *>
@@ -221,8 +217,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
       (lhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_LHS &&
        lhsEncoding.value() != TensorEncoding::MATMUL_I8I8I32_LHS) ||
       !rhsEncoding ||
-      (rhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE &&
-       rhsEncoding.value() != TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE) ||
+      (rhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RHS &&
+       rhsEncoding.value() != TensorEncoding::MATMUL_I8I8I32_RHS) ||
       !resultEncoding ||
       (resultEncoding.value() != TensorEncoding::MATMUL_F32F32F32_RESULT &&
        resultEncoding.value() != TensorEncoding::MATMUL_I8I8I32_RESULT)) {

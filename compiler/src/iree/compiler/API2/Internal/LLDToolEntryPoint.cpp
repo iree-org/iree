@@ -12,7 +12,7 @@
 #include <cstdlib>
 #include <vector>
 
-#include "iree/compiler/API2/ToolEntryPoints.h"
+#include "iree/compiler/tool_entry_points_api.h"
 #include "lld/Common/Driver.h"
 #include "lld/Common/ErrorHandler.h"
 #include "lld/Common/Memory.h"
@@ -70,7 +70,7 @@ static Flavor parseFlavor(std::vector<const char *> &v) {
 
 int ireeCompilerRunLldMain(int argc, char **argv) {
   llvm::setBugReportMsg(
-      "Please report issues to https://github.com/iree-org/iree/issues and "
+      "Please report issues to https://github.com/openxla/iree/issues and "
       "include the crash backtrace.\n");
   InitLLVM x(argc, argv);
   sys::Process::UseANSIEscapeCodes(true);

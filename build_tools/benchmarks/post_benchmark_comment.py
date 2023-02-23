@@ -33,7 +33,7 @@ from typing import Any, Optional
 
 from reporting import benchmark_comment
 
-GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/iree-org/iree"
+GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/openxla/iree"
 GITHUB_GIST_API = "https://api.github.com/gists"
 GITHUB_API_VERSION = "2022-11-28"
 

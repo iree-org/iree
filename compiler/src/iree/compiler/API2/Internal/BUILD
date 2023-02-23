@@ -22,7 +22,7 @@ iree_compiler_cc_library(
         "Diagnostics.h",
     ],
     deps = [
-        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
         "//compiler/src/iree/compiler/Dialect/VM/Target/C",
@@ -44,7 +44,7 @@ iree_compiler_cc_library(
         "IREECompileToolEntryPoint.cpp",
     ],
     deps = [
-        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/Tools:iree_compile_lib",
     ],
 )
@@ -55,7 +55,7 @@ iree_compiler_cc_library(
         "IREEMLIRLSPServerToolEntryPoint.cpp",
     ],
     deps = [
-        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MlirLspServerLib",
@@ -69,7 +69,7 @@ iree_compiler_cc_library(
         "IREEOptToolEntryPoint.cpp",
     ],
     deps = [
-        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "//compiler/src/iree/compiler/Tools:init_targets",
         "@llvm-project//llvm:Support",
@@ -85,7 +85,7 @@ iree_compiler_cc_library(
         "LLDToolEntryPoint.cpp",
     ],
     deps = [
-        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/bindings/c:headers",
         "@llvm-project//lld:COFF",
         "@llvm-project//lld:Common",
         "@llvm-project//lld:ELF",
@@ -102,7 +102,7 @@ iree_compiler_cc_library(
         "MLIRInterop.cpp",
     ],
     deps = [
-        "//compiler/src/iree/compiler/API2:Headers",
+        "//compiler/src/iree/compiler/API2:MLIRInteropHeaders",
         "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",

@@ -167,7 +167,7 @@ jobs:
           output_dir: "${{ github.workspace }}/bindist"
         run: |
           # libzstd on GitHub Action bots is not compatible with MacOS universal.
-          # https://github.com/iree-org/iree/issues/9955
+          # https://github.com/openxla/iree/issues/9955
           sudo rm -rf /usr/local/lib/libzstd*
           sudo rm -rf /usr/local/lib/cmake/zstd/*
 

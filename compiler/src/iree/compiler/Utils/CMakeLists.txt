@@ -23,6 +23,7 @@ iree_cc_library(
     "PassUtils.h"
     "PatternUtils.h"
     "StringUtils.h"
+    "ToolUtils.h"
     "TracingUtils.h"
   SRCS
     "ConversionUtils.cpp"
@@ -31,6 +32,7 @@ iree_cc_library(
     "OptionUtils.cpp"
     "PassUtils.cpp"
     "StringUtils.cpp"
+    "ToolUtils.cpp"
     "TracingUtils.cpp"
   DEPS
     LLVMSupport

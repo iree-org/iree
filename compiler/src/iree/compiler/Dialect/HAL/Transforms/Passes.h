@@ -107,6 +107,16 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
     std::string searchPath);
 
+// Preprocess each executable with either a pass pipeline or external tool.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createPreprocessExecutablesPass(std::string command);
+// Preprocesses each executable with a pass pipeline.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createPreprocessExecutablesWithPipelinePass(std::string pipeline);
+// Preprocesses each executable with an external tool.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createPreprocessExecutablesWithToolPass(std::string command);
+
 // Translates hal.executable.variant ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createTranslateExecutablesPass();
@@ -179,6 +189,7 @@ inline void registerHALPasses() {
   createMaterializeInterfacesPass();
   createMaterializeResourceCachesPass(targetOptions);
   createMemoizeDeviceQueriesPass();
+  createPreprocessExecutablesPass("");
   createResolveExportOrdinalsPass();
   createSerializeExecutablesPass();
   createSerializeTargetExecutablesPass("");

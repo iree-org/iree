@@ -1,7 +1,7 @@
 # TensorFlow Lite bindings
 
 !!! todo
-    [Issue#5462](https://github.com/iree-org/iree/issues/5462): write this documentation
+    [Issue#5462](https://github.com/openxla/iree/issues/5462): write this documentation
 
 <!-- TODO(??): overview, advantages/disadvantages to using TFLite bindings -->
 

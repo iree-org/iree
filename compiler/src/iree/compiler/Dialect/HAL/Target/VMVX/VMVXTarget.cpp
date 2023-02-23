@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/VMVX/VMVXTarget.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -52,7 +53,8 @@ class VMVXTargetBackend final : public TargetBackend {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect, IREE::VM::VMDialect,
-                    IREE::VMVX::VMVXDialect>();
+                    IREE::VMVX::VMVXDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(

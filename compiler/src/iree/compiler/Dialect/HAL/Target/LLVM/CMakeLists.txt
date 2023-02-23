@@ -53,6 +53,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVM::Builtins
+    iree::compiler::Dialect::HAL::Target::LLVMLinkerUtils
     iree::compiler::Utils
   PUBLIC
 )

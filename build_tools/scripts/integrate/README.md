@@ -95,7 +95,7 @@ allowing them to be patched out of band. These repositories are:
 * https://github.com/iree-org/iree-tf-fork (`master` branch)
 
 Iree repository has an
-action named [Advance Upstream Forks](https://github.com/iree-org/iree/actions/workflows/advance_upstream_forks.yml)
+action named [Advance Upstream Forks](https://github.com/openxla/iree/actions/workflows/advance_upstream_forks.yml)
 to update the forks. Just select `Run Workflow` on that action and give it a
 minute. You should see the fork repository mainline branch move forward. This
 action runs hourly. If needing up to the minute changes, you may need to trigger
@@ -304,7 +304,7 @@ git push UPSTREAM_AUTOMATION bump-llvm-...
 
 ### Update C-API exported
 
-If a new symbol needs to be export in the C-API run this [script](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/API2/generate_exports.py)
+If a new symbol needs to be export in the C-API run this [script](https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/API2/generate_exports.py)
 from IREE root directory:
 
 ```
@@ -416,7 +416,7 @@ cmake -G Ninja \
   ..
 ```
 
-To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the [doc](https://github.com/iree-org/iree/blob/main/docs/developers/get_started/building_with_bazel_linux.md) to build IREE using bazel. E.g.,
+To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the [doc](https://github.com/openxla/iree/blob/main/docs/developers/get_started/building_with_bazel_linux.md) to build IREE using bazel. E.g.,
 
 ```bash
 export CC=clang

@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_BUILTINS_DEVICE_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_BUILTINS_DEVICE_H_
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Target/TargetMachine.h"
 
@@ -15,8 +17,14 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+// Loads the libdevice bitcode file and specializes it for |targetMachine|.
 llvm::Expected<std::unique_ptr<llvm::Module>> loadDeviceBitcode(
     llvm::TargetMachine *targetMachine, llvm::LLVMContext &context);
+
+// Specializes |module| using |targetMachine|.
+void specializeDeviceModule(IREE::HAL::ExecutableVariantOp variantOp,
+                            llvm::Module &module,
+                            llvm::TargetMachine &targetMachine);
 
 }  // namespace HAL
 }  // namespace IREE

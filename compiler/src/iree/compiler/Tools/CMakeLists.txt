@@ -232,9 +232,9 @@ iree_cc_library(
   DEPS
     ::init_iree
     LLVMSupport
-    iree::compiler::API2::Headers
     iree::compiler::API2::Internal::Embed
     iree::compiler::Pipelines
+    iree::compiler::bindings::c::headers
   PUBLIC
 )
 
