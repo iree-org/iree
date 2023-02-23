@@ -9,12 +9,6 @@
 namespace mlir {
 
 //===----------------------------------------------------------------------===//
-// RewriteListener
-//===----------------------------------------------------------------------===//
-
-RewriteListener::~RewriteListener() = default;
-
-//===----------------------------------------------------------------------===//
 // ListenerList
 //===----------------------------------------------------------------------===//
 
@@ -28,9 +22,15 @@ void ListenerList::notifyBlockCreated(Block *block) {
     listener->notifyBlockCreated(block);
 }
 
-void ListenerList::notifyRootReplaced(Operation *op, ValueRange newValues) {
+void ListenerList::notifyOperationReplaced(Operation *op,
+                                           ValueRange newValues) {
   for (RewriteListener *listener : listeners)
-    listener->notifyRootReplaced(op, newValues);
+    listener->notifyOperationReplaced(op, newValues);
+}
+
+void ListenerList::notifyOperationModified(Operation *op) {
+  for (RewriteListener *listener : listeners)
+    listener->notifyOperationModified(op);
 }
 
 void ListenerList::notifyOperationRemoved(Operation *op) {

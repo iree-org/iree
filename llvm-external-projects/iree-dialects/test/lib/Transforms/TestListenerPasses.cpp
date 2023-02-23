@@ -17,7 +17,7 @@ namespace {
 /// The test listener prints stuff to `stdout` so that it can be checked by lit
 /// tests.
 struct TestListener : public RewriteListener {
-  void notifyRootReplaced(Operation *op, ValueRange newValues) override {
+  void notifyOperationReplaced(Operation *op, ValueRange newValues) override {
     llvm::outs() << "REPLACED " << op->getName() << "\n";
   }
   void notifyOperationRemoved(Operation *op) override {

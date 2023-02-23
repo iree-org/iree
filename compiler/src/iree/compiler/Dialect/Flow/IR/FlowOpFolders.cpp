@@ -318,9 +318,12 @@ static FailureOr<RankedTensorType> canonicalizeSubViewParts(
   mixedOffsets.assign(op.getMixedOffsets());
   mixedSizes.assign(op.getMixedSizes());
   mixedStrides.assign(op.getMixedStrides());
-  canonicalizeSubViewPart(mixedOffsets, ShapedType::isDynamic);
-  canonicalizeSubViewPart(mixedSizes, ShapedType::isDynamic);
-  canonicalizeSubViewPart(mixedStrides, ShapedType::isDynamic);
+  Builder builder(op.getContext());
+  if (failed(foldDynamicIndexList(builder, mixedOffsets)) &&
+      failed(foldDynamicIndexList(builder, mixedSizes)) &&
+      failed(foldDynamicIndexList(builder, mixedStrides))) {
+    return failure();
+  }
 
   // Drop out the same dimensions form before.
   llvm::SmallVector<int64_t> newShape;

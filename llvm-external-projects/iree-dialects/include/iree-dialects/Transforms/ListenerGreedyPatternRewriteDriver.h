@@ -12,7 +12,6 @@
 // The following are iree-dialects extensions to MLIR.
 namespace mlir {
 struct GreedyRewriteConfig;
-struct RewriteListener;
 
 /// Applies the specified patterns on `op` alone while also trying to fold it,
 /// by selecting the highest benefits patterns in a greedy manner. Returns

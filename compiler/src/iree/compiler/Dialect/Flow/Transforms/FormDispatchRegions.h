@@ -14,7 +14,7 @@
 namespace mlir {
 class Operation;
 /// A rewriter that keeps track of all tensor::DimOps.
-class TensorDimTrackingRewriter : public IRRewriter {
+class TensorDimTrackingRewriter : public IRRewriter, IRRewriter::Listener {
  public:
   /// Create a new rewriter: Scan the given op for tensor::DimOps.
   TensorDimTrackingRewriter(Operation *op);

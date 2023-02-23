@@ -194,7 +194,7 @@ void CSE::replaceUsesAndDelete(ScopedMapTy &knownValues, Operation *op,
     // END copied from mlir/lib/Transforms/CSE.cpp
     //===----------------------------------------------------------------------===//
     if (listener)
-      listener->notifyRootReplaced(op, existing->getResults());
+      listener->notifyOperationReplaced(op, existing->getResults());
     //===----------------------------------------------------------------------===//
     // BEGIN copied from mlir/lib/Transforms/CSE.cpp
     //===----------------------------------------------------------------------===//
