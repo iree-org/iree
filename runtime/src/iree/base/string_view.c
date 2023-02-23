@@ -14,7 +14,8 @@
 
 #include "iree/base/api.h"
 
-static inline size_t iree_min_host_size(size_t a, size_t b) {
+static inline size_t iree_min_host_size(iree_host_size_t a,
+                                        iree_host_size_t b) {
   return a < b ? a : b;
 }
 
@@ -457,4 +458,42 @@ IREE_API_EXPORT bool iree_string_view_parse_hex_bytes(
 
   // Should have consumed all characters.
   return iree_string_view_is_empty(value);
+}
+
+IREE_API_EXPORT iree_status_t iree_string_view_parse_device_size(
+    iree_string_view_t value, iree_device_size_t* out_size) {
+  // TODO(benvanik): probably worth to-lowering here on the size. Having copies
+  // of all the string view utils for just this case is code size overkill. For
+  // now only accept lazy lowercase.
+  iree_device_size_t scale = 1;
+  if (iree_string_view_consume_suffix(&value, IREE_SV("kb"))) {
+    scale = 1000;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("kib"))) {
+    scale = 1024;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("mb"))) {
+    scale = 1000 * 1000;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("mib"))) {
+    scale = 1024 * 1024;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("gb"))) {
+    scale = 1000 * 1000 * 1000;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("gib"))) {
+    scale = 1024 * 1024 * 1024;
+  }
+  uint64_t size = 0;
+  if (!iree_string_view_atoi_uint64(value, &size)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "size must be an integer, got '%.*s'",
+                            (int)value.size, value.data);
+  }
+  size *= scale;
+  if (size > IREE_DEVICE_SIZE_MAX) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "size parsed (%" PRIu64
+        ") is out of the representable range of iree_device_size_t (%" PRIu64
+        ")",
+        size, (uint64_t)IREE_DEVICE_SIZE_MAX);
+  }
+  *out_size = size;
+  return iree_ok_status();
 }

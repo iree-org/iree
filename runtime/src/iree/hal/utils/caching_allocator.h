@@ -90,6 +90,25 @@ iree_status_t iree_hal_caching_allocator_create_with_pools(
     iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
     iree_hal_allocator_t** out_allocator);
 
+// Creates a caching allocator with the given key-value |config_pairs|.
+// When no |config_pairs| are provided the caching allocator will be created as
+// unbounded, retaining all allocations of all sizes in all heaps. If pairs are
+// provided then each specifies a pool in the allocator that maps to a heap
+// based on the heap key as parsed by iree_hal_select_heap. Multiple pools may
+// share the same heap but with different limits, for example allowing at most
+// one device local allocation greater than 100MB to be retained while 10 less
+// than 100MB can be retained. Wildcards can be used to indicate max values or
+// defaults.
+//
+// Expected form:
+//   heap_key=max_allocation_size;max_allocation_capacity;max_free_allocation_count
+// Example:
+//   device_local=1gib;1gib;8
+//   host_local=*;*;32
+iree_status_t iree_hal_caching_allocator_create_from_spec(
+    iree_string_view_t config_pairs, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

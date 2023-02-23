@@ -451,6 +451,155 @@ iree_status_t iree_hal_caching_allocator_create_with_pools(
   return iree_ok_status();
 }
 
+// Selects a heap from |heaps| matching the given |heap_key|.
+// Fails if no heap matches the given key. Optionally a buffer usage bitfield
+// can be provided. Wildcards can be used with either to match the first heap
+// that meets either requirement.
+//
+// Examples:
+//   *: first heap
+//   *;transfer: first heap with transfer usage
+//   device_local: first heap with the IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL bit
+//   device_local|host_visible
+//   device_local;transfer|dispatch_storage
+static iree_status_t iree_hal_select_heap(
+    iree_string_view_t heap_key, iree_host_size_t heap_count,
+    const iree_hal_allocator_memory_heap_t* heaps,
+    const iree_hal_allocator_memory_heap_t** out_heap) {
+  iree_string_view_t memory_type_str = iree_string_view_empty();
+  iree_string_view_t buffer_usage_str = iree_string_view_empty();
+  iree_string_view_split(heap_key, ';', &memory_type_str, &buffer_usage_str);
+
+  // Parse the provided filters, if any.
+  iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_NONE;
+  iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_NONE;
+  if (!iree_string_view_is_empty(memory_type_str) &&
+      !iree_string_view_equal(memory_type_str, IREE_SV("*"))) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_memory_type_parse(memory_type_str, &memory_type));
+  }
+  if (!iree_string_view_is_empty(buffer_usage_str) &&
+      !iree_string_view_equal(buffer_usage_str, IREE_SV("*"))) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_usage_parse(buffer_usage_str, &buffer_usage));
+  }
+
+  // Return the first heap satisfying all filters.
+  for (iree_host_size_t i = 0; i < heap_count; ++i) {
+    if ((!memory_type || iree_all_bits_set(heaps[i].type, memory_type)) &&
+        (!buffer_usage ||
+         iree_all_bits_set(heaps[i].allowed_usage, buffer_usage))) {
+      *out_heap = &heaps[i];
+      return iree_ok_status();
+    }
+  }
+
+  // No matching heap found; can happen if the device doesn't have the kind of
+  // heaps the user was expecting with the configuration.
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "no heap matching requested config params "
+                          "memory_type='%.*s', buffer_usage='%.*s'",
+                          (int)memory_type_str.size, memory_type_str.data,
+                          (int)buffer_usage_str.size, buffer_usage_str.data);
+}
+
+iree_status_t iree_hal_caching_allocator_create_from_spec(
+    iree_string_view_t config_pairs, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
+  if (iree_string_view_is_empty(config_pairs)) {
+    // No parameters implies unbounded; we'll hang on to all memory forever.
+    // This is only useful in very specific usage patterns such as statically
+    // shaped and deterministic benchmarks that always allocate the same amounts
+    // of memory per invocation.
+    return iree_hal_caching_allocator_create_unbounded(
+        device_allocator, host_allocator, out_allocator);
+  }
+
+  // Query all heaps from the base allocator. We'll use this list to match the
+  // user-provided pool parameters to heaps. It's likely that not all heaps
+  // will be selected by the user.
+  iree_host_size_t heap_count = 0;
+  iree_hal_allocator_memory_heap_t heaps[16];
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_query_memory_heaps(
+      device_allocator, IREE_ARRAYSIZE(heaps), heaps, &heap_count));
+
+  // Build a list of pools based on user specification.
+  iree_host_size_t pool_count = 0;
+  iree_hal_caching_allocator_pool_params_t pool_params_storage[16];
+  do {
+    if (pool_count + 1 > IREE_ARRAYSIZE(pool_params_storage)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "too many pools specified");
+    }
+
+    // Pop the key=value config pair from the list.
+    iree_string_view_t config_pair = iree_string_view_empty();
+    iree_string_view_split(config_pairs, ',', &config_pair, &config_pairs);
+    iree_string_view_t heap_key = iree_string_view_empty();
+    iree_string_view_t pool_config = iree_string_view_empty();
+    iree_string_view_split(config_pair, '=', &heap_key, &pool_config);
+    heap_key = iree_string_view_trim(heap_key);
+    if (iree_string_view_is_empty(heap_key)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "heap key must specified in pool params");
+    }
+
+    // Select the heap based on the key.
+    const iree_hal_allocator_memory_heap_t* heap = NULL;
+    IREE_RETURN_IF_ERROR(
+        iree_hal_select_heap(heap_key, heap_count, heaps, &heap));
+
+    // Configure the pool based on the provided parameters.
+    iree_hal_caching_allocator_pool_params_t* pool_params =
+        &pool_params_storage[pool_count++];
+    iree_hal_caching_allocator_pool_params_initialize(*heap, pool_params);
+
+    iree_string_view_t max_allocation_size_str = iree_string_view_empty();
+    iree_string_view_t max_allocation_capacity_str = iree_string_view_empty();
+    iree_string_view_t max_free_allocation_count_str = iree_string_view_empty();
+    iree_string_view_split(pool_config, ';', &max_allocation_size_str,
+                           &pool_config);
+    iree_string_view_split(pool_config, ';', &max_allocation_capacity_str,
+                           &pool_config);
+    iree_string_view_split(pool_config, ';', &max_free_allocation_count_str,
+                           &pool_config);
+    max_allocation_size_str = iree_string_view_trim(max_allocation_size_str);
+    if (!iree_string_view_is_empty(max_allocation_size_str) &&
+        !iree_string_view_equal(max_allocation_size_str, IREE_SV("*"))) {
+      IREE_RETURN_IF_ERROR(
+          iree_string_view_parse_device_size(max_allocation_size_str,
+                                             &pool_params->max_allocation_size),
+          "parsing max_allocation_size");
+    }
+    max_allocation_capacity_str =
+        iree_string_view_trim(max_allocation_capacity_str);
+    if (!iree_string_view_is_empty(max_allocation_capacity_str) &&
+        !iree_string_view_equal(max_allocation_capacity_str, IREE_SV("*"))) {
+      IREE_RETURN_IF_ERROR(iree_string_view_parse_device_size(
+                               max_allocation_capacity_str,
+                               &pool_params->max_allocation_capacity),
+                           "parsing max_allocation_capacity");
+    }
+    max_free_allocation_count_str =
+        iree_string_view_trim(max_free_allocation_count_str);
+    if (!iree_string_view_is_empty(max_free_allocation_count_str) &&
+        !iree_string_view_equal(max_free_allocation_count_str, IREE_SV("*"))) {
+      uint32_t max_free_allocation_count = 0;
+      if (!iree_string_view_atoi_uint32(max_free_allocation_count_str,
+                                        &max_free_allocation_count)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "invalid count '%.*s'",
+                                (int)max_free_allocation_count_str.size,
+                                max_free_allocation_count_str.data);
+      }
+      pool_params->max_free_allocation_count = max_free_allocation_count;
+    }
+  } while (!iree_string_view_is_empty(config_pairs));
+  return iree_hal_caching_allocator_create_with_pools(
+      pool_count, pool_params_storage, device_allocator, host_allocator,
+      out_allocator);
+}
+
 static void iree_hal_caching_allocator_destroy(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_caching_allocator_t* allocator =
