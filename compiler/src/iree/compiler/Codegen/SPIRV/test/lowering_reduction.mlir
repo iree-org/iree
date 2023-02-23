@@ -185,3 +185,144 @@ hal.executable @warp_reduction_dispatch {
 //         CHECK:      %[[SLICE3:.+]] = vector.insert_strided_slice %[[DIV1]], %[[SLICE1]] {offsets = [4], strides = [1]}
 //         CHECK:      vector.transfer_write %[[SLICE3]], %[[SPAN1]][%[[WGIDY]], %[[WGIDX]], %{{.*}}] {in_bounds = [true]} : vector<8xf16>, memref<10x9216x9216xf16{{.*}}>
 //         CHECK:    }
+
+// -----
+
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
+    [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, Unknown:Unknown, #spirv.resource_limits<
+      max_compute_shared_memory_size = 49152,
+      max_compute_workgroup_invocations = 1024,
+      max_compute_workgroup_size = [1024, 1024, 64],
+      subgroup_size = 32>>}>
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
+
+hal.executable @softmax {
+hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+  hal.executable.export public @softmax ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+  builtin.module {
+    func.func @softmax() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant -3.40282347E+38 : f32
+      %cst_0 = arith.constant 0.000000e+00 : f32
+      %cst_1 = arith.constant 1.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
+      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>> -> tensor<12x128x40960xf32>
+      %3 = tensor.empty() : tensor<12x128xf32>
+      %4 = tensor.empty() : tensor<12x128x40960xf32>
+      %5 = linalg.fill ins(%cst : f32) outs(%3 : tensor<12x128xf32>) -> tensor<12x128xf32>
+      %6 = linalg.fill ins(%cst_0 : f32) outs(%3 : tensor<12x128xf32>) -> tensor<12x128xf32>
+      %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<12x128x40960xf32>) outs(%5 : tensor<12x128xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %11 = arith.maxf %in, %out : f32
+        linalg.yield %11 : f32
+      } -> tensor<12x128xf32>
+      %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%2, %7 : tensor<12x128x40960xf32>, tensor<12x128xf32>) outs(%4 : tensor<12x128x40960xf32>) {
+      ^bb0(%in: f32, %in_2: f32, %out: f32):
+        %11 = arith.subf %in, %in_2 : f32
+        %12 = math.exp %11 : f32
+        linalg.yield %12 : f32
+      } -> tensor<12x128x40960xf32>
+      %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%8 : tensor<12x128x40960xf32>) outs(%6 : tensor<12x128xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %11 = arith.addf %in, %out : f32
+        linalg.yield %11 : f32
+      } -> tensor<12x128xf32>
+      %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%8, %9 : tensor<12x128x40960xf32>, tensor<12x128xf32>) outs(%4 : tensor<12x128x40960xf32>) {
+      ^bb0(%in: f32, %in_2: f32, %out: f32):
+        %11 = arith.divf %cst_1, %in_2 : f32
+        %12 = arith.mulf %in, %11 : f32
+        linalg.yield %12 : f32
+      } -> tensor<12x128x40960xf32>
+      flow.dispatch.tensor.store %10, %1, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : tensor<12x128x40960xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
+      return
+    }
+  }
+}
+}
+
+//   CHECK-LABEL:  func.func @softmax
+//         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
+//         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32{{.+}}>, vector<4xf32>
+//         CHECK:      arith.maxf {{.*}} : vector<4xf32>
+//         CHECK:      scf.yield
+//         CHECK:    vector.reduction <maxf>, %{{.*}} : vector<4xf32> into f32
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.maxf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.maxf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.maxf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.maxf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.maxf
+//         CHECK:    arith.remui
+//         CHECK:    scf.if
+//         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
+//         CHECK:    }
+//         CHECK:    gpu.barrier
+//         CHECK:    arith.minui
+//         CHECK:    memref.load
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.maxf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.maxf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.maxf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.maxf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.maxf
+//         CHECK:    arith.maxf
+//         CHECK:    vector.splat %{{.*}} : vector<4xf32>
+//         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
+//         CHECK:      vector.transfer_read
+//         CHECK:      arith.subf
+//         CHECK:      math.exp
+//         CHECK:      arith.addf
+//         CHECK:      scf.yield
+//         CHECK:    vector.reduction <add>, %{{.*}} : vector<4xf32> into f32
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    scf.if
+//         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
+//         CHECK:    }
+//         CHECK:    gpu.barrier
+//         CHECK:    memref.load
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    arith.addf
+//         CHECK:    vector.splat
+//         CHECK:    vector.splat
+//         CHECK:    arith.divf
+//         CHECK:    scf.for
+//         CHECK:      vector.transfer_read
+//         CHECK:      arith.subf
+//         CHECK:      math.exp
+//         CHECK:      arith.mulf
+//         CHECK:      vector.transfer_write
+//         CHECK:    }
+//         CHECK:    return

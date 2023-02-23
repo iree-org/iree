@@ -988,7 +988,13 @@ static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
 static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
                                         linalg::GenericOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as reduction...\n");
-  if (op.hasDynamicShape()) return failure();
+  auto funcOp = op->getParentOfType<FunctionOpInterface>();
+  auto walkResult = funcOp.walk([](linalg::LinalgOp op) {
+    if (op.hasDynamicShape()) return WalkResult::interrupt();
+    return WalkResult::advance();
+  });
+  if (walkResult.wasInterrupted()) return failure();
+
   // This pipeline eventually generates non-uniform group shuffle ops, which
   // requires special capability.
   if (!targetEnv.allows(spirv::Capability::GroupNonUniformShuffle))
@@ -1008,12 +1014,20 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
   }
 
-  // Only support single combiner operations for now.
-  SmallVector<Operation *, 4> combinerOps;
-  if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
-      combinerOps.size() != 1) {
-    return failure();
+  bool foundSingleReductionOutput = false;
+  for (int64_t i = 0, e = op.getDpsInitOperands().size(); i < e; i++) {
+    // Only single combiner operations are supported for now.
+    SmallVector<Operation *, 4> combinerOps;
+    if (matchReduction(op.getRegionOutputArgs(), i, combinerOps) &&
+        combinerOps.size() == 1) {
+      if (foundSingleReductionOutput) return failure();
+      foundSingleReductionOutput = true;
+      continue;
+    }
+    if (!op.getMatchingIndexingMap(op.getDpsInitOperand(i)).isIdentity())
+      return failure();
   }
+  if (!foundSingleReductionOutput) return failure();
 
   const int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
   Optional<int64_t> dimSize = op.getStaticLoopRanges()[reductionDims[0]];
@@ -1070,15 +1084,12 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
   }
 
-  // Set lowering configuration to drive tiling for fused ops too---the pipeline
-  // expects it.
-  tileSizes[0] = {};  // We only need the reduction level tile sizes.
-  for (Operation *userOp : op->getUsers()) {
-    if (auto fusedOp = dyn_cast<linalg::LinalgOp>(userOp)) {
-      setLoweringConfig(fusedOp, IREE::Codegen::LoweringConfigAttr::get(
-                                     fusedOp.getContext(), tileSizes));
-    }
-  }
+  // Set lowering configuration to drive tiling for other Linalg ops too---the
+  // pipeline expects it.
+  funcOp.walk([&](linalg::LinalgOp op) {
+    setLoweringConfig(
+        op, IREE::Codegen::LoweringConfigAttr::get(op.getContext(), tileSizes));
+  });
   return success();
 }
 
