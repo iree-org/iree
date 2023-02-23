@@ -141,6 +141,12 @@ def SplitFullPartialTransfer :
   ];
 }
 
+def TestExecutablePreprocessing :
+    Pass<"iree-codegen-test-executable-preprocessing", ""> {
+  let summary = "Tests iree-hal-preprocess-executables-with behavior.";
+  let constructor = "mlir::iree_compiler::createTestExecutablePreprocessingPass()";
+}
+
 def TestPartitionableLoopsInterface :
     Pass<"iree-codegen-test-partitionable-loops-interface", ""> {
   let summary = "Test the PartitionableLoopsInterface";

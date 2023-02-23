@@ -30,7 +30,7 @@ vm.module @vmvx {
 // Each is specialized by opcode, rank and type width.
 //===----------------------------------------------------------------------===//
 
-vm.import @add.2d.f32(
+vm.import private @add.2d.f32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -46,7 +46,7 @@ vm.import @add.2d.f32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @add.2d.i32(
+vm.import private @add.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -62,7 +62,7 @@ vm.import @add.2d.i32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @and.2d.i32(
+vm.import private @and.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -78,7 +78,7 @@ vm.import @and.2d.i32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @div.2d.f32(
+vm.import private @div.2d.f32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -94,7 +94,7 @@ vm.import @div.2d.f32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @divs.2d.i32(
+vm.import private @divs.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -110,7 +110,7 @@ vm.import @divs.2d.i32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @divu.2d.i32(
+vm.import private @divu.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -126,7 +126,7 @@ vm.import @divu.2d.i32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @mul.2d.f32(
+vm.import private @mul.2d.f32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -142,7 +142,7 @@ vm.import @mul.2d.f32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @mul.2d.i32(
+vm.import private @mul.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -158,7 +158,7 @@ vm.import @mul.2d.i32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @or.2d.i32(
+vm.import private @or.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -174,7 +174,7 @@ vm.import @or.2d.i32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @shl.2d.i32(
+vm.import private @shl.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -190,7 +190,7 @@ vm.import @shl.2d.i32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @shrs.2d.i32(
+vm.import private @shrs.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -206,7 +206,7 @@ vm.import @shrs.2d.i32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @shru.2d.i32(
+vm.import private @shru.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -222,7 +222,7 @@ vm.import @shru.2d.i32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @sub.2d.f32(
+vm.import private @sub.2d.f32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -238,7 +238,7 @@ vm.import @sub.2d.f32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @sub.2d.i32(
+vm.import private @sub.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -254,7 +254,7 @@ vm.import @sub.2d.i32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @xor.2d.i32(
+vm.import private @xor.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -275,7 +275,7 @@ vm.import @xor.2d.i32(
 // Each is specialized by opcode, rank and type width.
 //===----------------------------------------------------------------------===//
 
-vm.import @abs.2d.f32(
+vm.import private @abs.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -285,7 +285,7 @@ vm.import @abs.2d.f32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @ceil.2d.f32(
+vm.import private @ceil.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -295,7 +295,7 @@ vm.import @ceil.2d.f32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @ctlz.2d.i32(
+vm.import private @ctlz.2d.i32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -305,7 +305,7 @@ vm.import @ctlz.2d.i32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @exp.2d.f32(
+vm.import private @exp.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -315,7 +315,7 @@ vm.import @exp.2d.f32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @floor.2d.f32(
+vm.import private @floor.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -325,7 +325,7 @@ vm.import @floor.2d.f32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @log.2d.f32(
+vm.import private @log.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -335,7 +335,7 @@ vm.import @log.2d.f32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @neg.2d.f32(
+vm.import private @neg.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -345,7 +345,7 @@ vm.import @neg.2d.f32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @rsqrt.2d.f32(
+vm.import private @rsqrt.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -360,7 +360,7 @@ vm.import @rsqrt.2d.f32(
 // Variants of copy ops exist for power of two rank and datatype sizes.
 // Current max rank is 2d.
 //==============================================================================
-vm.import @copy.2d.x8(
+vm.import private @copy.2d.x8(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -370,7 +370,7 @@ vm.import @copy.2d.x8(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @copy.2d.x16(
+vm.import private @copy.2d.x16(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -380,7 +380,7 @@ vm.import @copy.2d.x16(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @copy.2d.x32(
+vm.import private @copy.2d.x32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -390,7 +390,7 @@ vm.import @copy.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @copy.2d.x64(
+vm.import private @copy.2d.x64(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -404,7 +404,7 @@ vm.import @copy.2d.x64(
 // Strided fill ops
 //==============================================================================
 
-vm.import @fill.2d.x32(
+vm.import private @fill.2d.x32(
   %fill_value : i32,
   %out_buffer : !vm.buffer,
   %out_offset : i64,
@@ -417,7 +417,7 @@ vm.import @fill.2d.x32(
 // matmul ops
 //==============================================================================
 
-vm.import @matmul.f32f32f32(
+vm.import private @matmul.f32f32f32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_row_stride : i64,
@@ -433,7 +433,7 @@ vm.import @matmul.f32f32f32(
   %flags : i32
 )
 
-vm.import @matmul.i8i8i32(
+vm.import private @matmul.i8i8i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_row_stride : i64,
@@ -453,7 +453,7 @@ vm.import @matmul.i8i8i32(
 // mmt4d ops
 //==============================================================================
 
-vm.import @mmt4d.f32f32f32(
+vm.import private @mmt4d.f32f32f32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_row_stride : i64,
@@ -472,7 +472,7 @@ vm.import @mmt4d.f32f32f32(
   %flags : i32
 )
 
-vm.import @mmt4d.i8i8i32(
+vm.import private @mmt4d.i8i8i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_row_stride : i64,
@@ -495,7 +495,7 @@ vm.import @mmt4d.i8i8i32(
 // pack ops
 //==============================================================================
 
-vm.import @pack.f32f32(
+vm.import private @pack.f32f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_stride0 : i64,
@@ -512,7 +512,7 @@ vm.import @pack.f32f32(
   %flags : i32
 )
 
-vm.import @pack.i8i8(
+vm.import private @pack.i8i8(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_stride0 : i64,
@@ -529,7 +529,7 @@ vm.import @pack.i8i8(
   %flags : i32
 )
 
-vm.import @pack.i32i32(
+vm.import private @pack.i32i32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_stride0 : i64,
@@ -550,7 +550,7 @@ vm.import @pack.i32i32(
 // unpack ops
 //==============================================================================
 
-vm.import @unpack.f32f32(
+vm.import private @unpack.f32f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_stride0 : i64,
@@ -566,7 +566,7 @@ vm.import @unpack.f32f32(
   %flags : i32
 )
 
-vm.import @unpack.i8i8(
+vm.import private @unpack.i8i8(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_stride0 : i64,
@@ -582,7 +582,7 @@ vm.import @unpack.i8i8(
   %flags : i32
 )
 
-vm.import @unpack.i32i32(
+vm.import private @unpack.i32i32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_stride0 : i64,
@@ -602,7 +602,7 @@ vm.import @unpack.i32i32(
 // query_tile_size ops
 //==============================================================================
 
-vm.import @query_tile_sizes.2d(
+vm.import private @query_tile_sizes.2d(
   %sizes : tuple<i64, i64>,
   %flags : i32
 ) -> (i64, i64)

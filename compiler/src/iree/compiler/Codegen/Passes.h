@@ -137,6 +137,9 @@ createSplitFullPartialTransferPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createSplitFullPartialTransferPass(
     StringRef option);
 
+/// Tests iree-hal-preprocess-executables-with behavior.
+std::unique_ptr<OperationPass<void>> createTestExecutablePreprocessingPass();
+
 /// Pass to test Partitionable loop interface
 std::unique_ptr<OperationPass<void>>
 createTestPartitionableLoopsInterfacePass();

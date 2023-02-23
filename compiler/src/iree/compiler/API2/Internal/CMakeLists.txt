@@ -23,7 +23,6 @@ iree_cc_library(
     MLIRIR
     MLIRParser
     MLIRSupport
-    iree::compiler::API2::Headers
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::Target::C
     iree::compiler::Dialect::VM::Target::init_targets
@@ -32,6 +31,7 @@ iree_cc_library(
     iree::compiler::Tools::init_passes_and_dialects
     iree::compiler::Tools::init_targets
     iree::compiler::Utils
+    iree::compiler::bindings::c::headers
   PUBLIC
 )
 
@@ -41,8 +41,8 @@ iree_cc_library(
   SRCS
     "IREECompileToolEntryPoint.cpp"
   DEPS
-    iree::compiler::API2::Headers
     iree::compiler::Tools::iree_compile_lib
+    iree::compiler::bindings::c::headers
   PUBLIC
 )
 
@@ -55,8 +55,8 @@ iree_cc_library(
     MLIRIR
     MLIRLspServerLib
     MLIRSupport
-    iree::compiler::API2::Headers
     iree::compiler::Tools::init_passes_and_dialects
+    iree::compiler::bindings::c::headers
   PUBLIC
 )
 
@@ -70,9 +70,9 @@ iree_cc_library(
     MLIRIR
     MLIROptLib
     MLIRSupport
-    iree::compiler::API2::Headers
     iree::compiler::Tools::init_passes_and_dialects
     iree::compiler::Tools::init_targets
+    iree::compiler::bindings::c::headers
   PUBLIC
 )
 
@@ -84,7 +84,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     LLVMTargetParser
-    iree::compiler::API2::Headers
+    iree::compiler::bindings::c::headers
     lldCOFF
     lldCommon
     lldELF
@@ -101,7 +101,7 @@ iree_cc_library(
   DEPS
     MLIRCAPIIR
     MLIRIR
-    iree::compiler::API2::Headers
+    iree::compiler::API2::MLIRInteropHeaders
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Target::Bytecode

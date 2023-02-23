@@ -14,25 +14,12 @@
 // tools that hard-link to the compiler but are not available via runtime
 // loaded stubs.
 
-#ifndef IREE_COMPILER_API2_EMBED_H
-#define IREE_COMPILER_API2_EMBED_H
+#ifndef IREE_COMPILER_EMBEDDING_API_H
+#define IREE_COMPILER_EMBEDDING_API_H
 
 #include <stddef.h>
 
-#if (defined(_WIN32) || defined(__CYGWIN__))
-// Visibility annotations disabled.
-#define IREE_EMBED_EXPORTED
-#elif defined(_WIN32) || defined(__CYGWIN__)
-// Windows visibility declarations.
-#if IREE_EMBED_BUILDING_LIBRARY
-#define IREE_EMBED_EXPORTED __declspec(dllexport)
-#else
-#define IREE_EMBED_EXPORTED __declspec(dllimport)
-#endif
-#else
-// Non-windows: use visibility attributes.
-#define IREE_EMBED_EXPORTED __attribute__((visibility("default")))
-#endif
+#include "iree/compiler/api_support.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -312,4 +299,4 @@ IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputWrite(
 }
 #endif
 
-#endif  // IREE_COMPILER_API2_EMBED_H
+#endif  // IREE_COMPILER_EMBEDDING_API_H

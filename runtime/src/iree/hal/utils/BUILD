@@ -26,6 +26,18 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "debug_allocator",
+    srcs = ["debug_allocator.c"],
+    hdrs = ["debug_allocator.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "collective_batch",
     srcs = ["collective_batch.c"],
     hdrs = ["collective_batch.h"],

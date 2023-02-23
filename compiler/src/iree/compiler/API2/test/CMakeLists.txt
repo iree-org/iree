@@ -17,8 +17,9 @@ iree_cc_test(
     "api-test-main.c"
   DEPS
     iree::base
-    iree::compiler::API2::Headers
     iree::compiler::API2::Impl
+    iree::compiler::API2::MLIRInteropHeaders
+    iree::compiler::bindings::c::headers
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

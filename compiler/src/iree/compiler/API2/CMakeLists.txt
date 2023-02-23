@@ -12,21 +12,9 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    EmbedHeaders
+    MLIRInteropHeaders
   HDRS
-    "Embed.h"
-  DEPS
-
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    Headers
-  HDRS
-    "Embed.h"
     "MLIRInterop.h"
-    "ToolEntryPoints.h"
   DEPS
     IREELLVMIncludeSetup
   PUBLIC

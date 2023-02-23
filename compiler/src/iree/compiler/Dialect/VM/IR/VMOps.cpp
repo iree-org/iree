@@ -235,6 +235,13 @@ LogicalResult ExportOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 
 ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
   auto builder = parser.getBuilder();
+  StringAttr visibilityAttr;
+  if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
+    return failure();
+  }
+  if (visibilityAttr) {
+    result.addAttribute("sym_visibility", visibilityAttr);
+  }
   if (succeeded(parser.parseOptionalKeyword("optional"))) {
     result.addAttribute("is_optional", builder.getUnitAttr());
   }
@@ -248,17 +255,25 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<DictionaryAttr, 8> argAttrs;
   SmallVector<Type, 8> argTypes;
   while (failed(parser.parseOptionalRParen())) {
-    OpAsmParser::UnresolvedOperand operand;
+    StringRef operandName;
     Type operandType;
     auto operandLoc = parser.getCurrentLocation();
-    if (failed(parser.parseOperand(operand)) ||
-        failed(parser.parseColonType(operandType))) {
-      return parser.emitError(operandLoc) << "invalid operand";
+    OpAsmParser::UnresolvedOperand operand;
+    if (parser.parseOptionalOperand(operand).has_value()) {
+      if (failed(parser.parseColonType(operandType))) {
+        return parser.emitError(operandLoc) << "invalid operand";
+      }
+      operandName = operand.name.substr(1);  // consume `%`
+    } else {
+      if (failed(parser.parseType(operandType))) {
+        return parser.emitError(operandLoc) << "invalid operand";
+      }
     }
     argTypes.push_back(operandType);
     NamedAttrList argAttrList;
-    operand.name.consume_front("%");
-    argAttrList.set("vm.name", builder.getStringAttr(operand.name));
+    if (!operandName.empty()) {
+      argAttrList.set("vm.name", builder.getStringAttr(operandName));
+    }
     if (succeeded(parser.parseOptionalEllipsis())) {
       argAttrList.set("vm.variadic", builder.getUnitAttr());
     }
@@ -297,6 +312,8 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
 void ImportOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
   p << ' ';
+  printSymbolVisibility(p, op, getSymVisibilityAttr());
+  p << ' ';
   if (getIsOptional()) {
     p << "optional ";
   }
@@ -329,6 +346,7 @@ void ImportOp::print(OpAsmPrinter &p) {
           getResAttrsAttrName(),
           "is_variadic",
           getIsOptionalAttrName(),
+          "sym_visibility",
       });
 }
 

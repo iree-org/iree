@@ -116,6 +116,7 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers
     iree::hal::utils::caching_allocator
+    iree::hal::utils::debug_allocator
   PUBLIC
 )
 

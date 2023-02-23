@@ -8,8 +8,8 @@
 //
 // See https://mlir.llvm.org/docs/Tools/MLIRLSP/
 
-#include "iree/compiler/API2/ToolEntryPoints.h"
 #include "iree/compiler/Tools/init_dialects.h"
+#include "iree/compiler/tool_entry_points_api.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Tools/mlir-lsp-server/MlirLspServerMain.h"

@@ -60,7 +60,18 @@ template <typename T>
 SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   SmallPtrSet<const T *, 4> resultSet;
   moduleOp.walk([&](Operation *op) {
-    auto *dialect = op->getDialect();
+    // Special case for declarations which may reference builtins.
+    // TODO(benvanik): add a linking attribute to the module instead to avoid
+    // the walk. All dialects could then indicate they want certain modules
+    // linked in.
+    Dialect *dialect = nullptr;
+    if (auto moduleAttr = op->getAttrOfType<StringAttr>("vm.import.module")) {
+      // Specified dialect lookup.
+      dialect = op->getContext()->getOrLoadDialect(moduleAttr.getValue());
+    } else {
+      // Generic dialect lookup.
+      dialect = op->getDialect();
+    }
     if (!dialect) return;
     auto *dialectInterface = dialect->getRegisteredInterface<T>();
     if (!dialectInterface) return;

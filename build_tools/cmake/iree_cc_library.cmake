@@ -385,3 +385,21 @@ function(iree_cc_unified_library)
     add_library(${_PACKAGE_NS} ALIAS ${_NAME})
   endif()
 endfunction()
+
+# iree_cc_library_exclude_from_all(target exclude)
+#
+# For a target previously defined in the same package, set the 
+# EXCLUDE_FROM_ALL property.
+# 
+# This is necessary because cc_library targets consist of multiple sub-targets
+# and they all must have the property set.
+function(iree_cc_library_exclude_from_all target exclude_from_all)
+  iree_package_ns(_PACKAGE_NS)
+  iree_package_name(_PACKAGE_NAME)
+
+  set(_NAME "${_PACKAGE_NAME}_${target}")
+  set(_OBJECTS_NAME ${_NAME}.objects)
+
+  set_target_properties(${_NAME} ${_OBJECTS_NAME} 
+    PROPERTIES EXCLUDE_FROM_ALL ${exclude_from_all})
+endfunction()

@@ -20,7 +20,7 @@ struct native_import_module_state_s;
 typedef struct native_import_module_t native_import_module_t;
 typedef struct native_import_module_state_t native_import_module_state_t;
 
-// vm.import @native_import_module.add_1(%arg0 : i32) -> i32
+// vm.import private @native_import_module.add_1(%arg0 : i32) -> i32
 static iree_status_t native_import_module_add_1(
     iree_vm_stack_t* stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,

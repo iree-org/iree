@@ -7,10 +7,11 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 
 #include "iree/compiler/Utils/StringUtils.h"
+#include "iree/compiler/Utils/ToolUtils.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
 
-#define DEBUG_TYPE "llvm-linker"
+#define DEBUG_TYPE "iree-tools"
 
 namespace mlir {
 namespace iree_compiler {
@@ -116,52 +117,16 @@ std::string LinkerTool::getSystemToolPath() const {
   return "";
 }
 
-// It's easy to run afoul of quoting rules on Windows, such as when using
-// spaces in the linker environment variable.
-// See: https://stackoverflow.com/a/9965141
-static std::string escapeCommandLineComponent(const std::string &commandLine) {
-#if defined(_MSC_VER)
-  return "\"" + commandLine + "\"";
-#else
-  return commandLine;
-#endif  // _MSC_VER
-}
-
-static std::string normalizeToolNameForPlatform(const std::string &toolName) {
-#if defined(_MSC_VER)
-  return toolName + ".exe";
-#else
-  return toolName;
-#endif  // _MSC_VER
-}
-
-static std::string findToolAtPath(SmallVector<std::string> normalizedToolNames,
-                                  const Twine &path) {
-  LLVM_DEBUG(llvm::dbgs() << "Searching for tool at path '" << path << "'\n");
-  for (auto toolName : normalizedToolNames) {
-    SmallString<256> pathStorage;
-    llvm::sys::path::append(pathStorage, path, toolName);
-
-    if (llvm::sys::fs::exists(pathStorage)) {
-      llvm::sys::fs::make_absolute(pathStorage);
-      (void)llvm::sys::path::remove_dots(pathStorage, /*remove_dot_dot=*/true);
-      return escapeCommandLineComponent(std::string(pathStorage));
-    }
-  }
-
-  return "";
-}
-
 LogicalResult LinkerTool::runLinkCommand(std::string commandLine,
                                          StringRef env) {
   LLVM_DEBUG(llvm::dbgs() << "Running linker command:\n"
                           << env << " " << commandLine << "\n");
   if (!env.empty()) {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
     commandLine = ("set " + env + " && " + commandLine).str();
 #else
     commandLine = (env + " " + commandLine).str();
-#endif  // _MSC_VER
+#endif  // _WIN32
   } else {
     commandLine = escapeCommandLineComponent(commandLine);
   }
@@ -171,70 +136,6 @@ LogicalResult LinkerTool::runLinkCommand(std::string commandLine,
                << exitCode << ":\n\n"
                << commandLine << "\n\n";
   return failure();
-}
-
-static SmallVector<std::string> normalizeToolNames(
-    SmallVector<std::string> toolNames) {
-  SmallVector<std::string> normalizedToolNames;
-  normalizedToolNames.reserve(toolNames.size());
-  for (auto toolName : toolNames) {
-    normalizedToolNames.push_back(normalizeToolNameForPlatform(toolName));
-  }
-  return normalizedToolNames;
-}
-
-std::string LinkerTool::findToolFromExecutableDir(
-    SmallVector<std::string> toolNames) const {
-  const auto &normalizedToolNames = normalizeToolNames(toolNames);
-  std::string mainExecutablePath =
-      llvm::sys::fs::getMainExecutable(nullptr, nullptr);
-  SmallString<256> mainExecutableDir(mainExecutablePath);
-  llvm::sys::path::remove_filename(mainExecutableDir);
-  LLVM_DEBUG(llvm::dbgs() << "Searching from the executable directory "
-                          << mainExecutableDir << " for one of these tools: [";
-             llvm::interleaveComma(normalizedToolNames, llvm::dbgs());
-             llvm::dbgs() << "]\n");
-
-  // First search the current executable's directory. This should find tools
-  // within the install directory (through CMake or binary distributions).
-  std::string toolPath = findToolAtPath(normalizedToolNames, mainExecutableDir);
-  if (!toolPath.empty()) {
-    LLVM_DEBUG(llvm::dbgs() << "Found tool in executable's directory at path "
-                            << toolPath << "\n");
-    return toolPath;
-  }
-
-  // Next search around in the CMake build tree.
-  toolPath = findToolAtPath(normalizedToolNames,
-                            mainExecutableDir + "/../llvm-project/bin/");
-  if (!toolPath.empty()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Found tool in build tree at path " << toolPath << "\n");
-    return toolPath;
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "Tool not found.\n");
-  return "";
-}
-
-std::string LinkerTool::findToolInEnvironment(
-    SmallVector<std::string> toolNames) const {
-  const auto &normalizedToolNames = normalizeToolNames(toolNames);
-  LLVM_DEBUG(
-      llvm::dbgs() << "Searching environment PATH for one of these tools: [";
-      llvm::interleaveComma(normalizedToolNames, llvm::dbgs());
-      llvm::dbgs() << "]\n");
-
-  for (auto toolName : normalizedToolNames) {
-    if (auto result = llvm::sys::Process::FindInEnvPath("PATH", toolName)) {
-      LLVM_DEBUG(llvm::dbgs() << "Found tool on environment PATH at path "
-                              << result << "\n");
-      return escapeCommandLineComponent(std::string(*result));
-    }
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "Tool not found.\n");
-  return "";
 }
 
 }  // namespace HAL
