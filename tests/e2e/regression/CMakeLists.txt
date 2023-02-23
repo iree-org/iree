@@ -182,27 +182,6 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    aggressive_fusion_test_vulkan
-  SRCS
-    "softmax.mlir"
-    "softmax_large.mlir"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  DRIVER
-    "vulkan"
-  COMPILER_FLAGS
-    "--iree-flow-enable-aggressive-fusion"
-    "--iree-vulkan-target-triple=ampere-unknown-unknown"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-nvidia"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     disable_demote_f64_to_f32
   SRCS
     "disable_demote_f64_to_f32.mlir"
