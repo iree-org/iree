@@ -8,11 +8,11 @@ Google Cloud Platform (GCP). These are
 [Managed Instance Groups](https://cloud.google.com/compute/docs/instance-groups)
 that execute the [GitHub actions runner](https://github.com/actions/runner) as a
 service initialized on startup. The scripts automate the creation of VM
-[Instance Templates](http://cloud/compute/docs/instance-templates) and the
-creation and update of the instance groups. These scripts are currently very
-early stage and require editing to execute for different configurations rather
-than taking flags. They mostly just automate some manual tasks and minimize
-errors. Our GCP project is
+[Images]([http://cloud/compute/docs/images](https://cloud.google.com/compute/docs/images)
+and
+[Instance Templates](https://cloud.google.com/compute/docs/instance-templates)
+and the creation and update of the instance groups. These scripts mostly just
+automate some manual tasks and minimize errors. Our GCP project is
 [iree-oss](https://console.cloud.google.com/?project=iree-oss).
 
 Included in the `gcp` directory is the [startup script](./gcp/startup_script.sh)
@@ -182,10 +182,7 @@ build_tools/github_actions/runner/gcp/update_autoscaling.sh \
   github-runner-testing-presubmit-cpu-us-west1 us-west1 0 0
 ```
 
-For now, you'll need to shut down the remaining runners. The easiest way to do
-this for now is to go to the UI for the managed instance group and delete all
-the instances. The necessity for manual deletion will go away with future
-improvements.
+For now, you'll need to shut down the remaining runners:
 
 ```shell
 build_tools/github_actions/runner/gcp/remove_idle_runners.sh \
@@ -231,14 +228,6 @@ There are number of known issues and areas of improvement for the runners:
   from being set to a fixed value for detailed reasons that I won't go into). We
   need to set up autoscaling based on
   [GitHub's job queueing webhooks](https://docs.github.com/en/enterprise-cloud@latest/actions/hosting-your-own-runners/autoscaling-with-self-hosted-runners#using-webhooks-for-autoscaling).
-- The runners currently use a persistent disk, which results in relatively slow
-  IO. Due to errors made in setting these up, the disk image and disk for the
-  runners is 1TB, which is also wasteful and results in quota issues.
-- If the runner fails to register (e.g. GitHub has a server error, which has
-  happened on multiple occasions), the VM will sit idle, running according to
-  the autoscaler. The runner doesn't have a any way to check its health status,
-  which would allow the autoscaler to recognize there was a problem and replace
-  the instance (https://github.com/actions/runner/issues/745).
 - MIG autoscaling has the option to scale groups up and down. We currently have
   it set to only scale up. When scaling down, the autoscaler just sends a
   shutdown signal to the instance and it has
@@ -248,9 +237,10 @@ There are number of known issues and areas of improvement for the runners:
   CPU-usage based autoscaling at the moment because this is an imperfect measure
   and in particular decides that an instance is idle if it is doing IO (e.g.
   uploading artifacts). Job queue based autoscaling would probably help, but the
-  same problem would exist. We likely need to implement functionality in the
-  instance to shut itself down after some period of inactivity.
-- MIG "opportunistic" or "selective" autoscaling will not update an instance
-  when it replaces it for being unhealthy. Unfortunately for us, this includes
-  cases where the instance shut itself down. This means that any updates
-  requiring a restart need to be managed manually.
+  same problem would exist. To get around this, we have runners delete
+  themselves by making a delete call on the MIG via a custom
+  [Cloud Functions proxy](./instance_deleter) that gives only self-deletion
+  permissions. This isn't a full substitute for autoscaling down because it
+  means that after scaling up all the instances will hang around if there isn't
+  any work. Some prototype code had the instances check the autoscaler target at
+  intervals and delete themselves, but it caused instability when rolled out.
