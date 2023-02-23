@@ -130,7 +130,7 @@ private:
 GreedyPatternRewriteDriver::GreedyPatternRewriteDriver(
     Operation *rootOp, const FrozenRewritePatternSet &patterns,
     const GreedyRewriteConfig &config, RewriteListener *listener)
-    : matcher(patterns), folder(rootOp->getContext()), config(config),
+    : matcher(patterns), folder(rootOp->getContext(), this), config(config),
       rewriter(rootOp->getContext()), rootOp(rootOp) {
   // Add self as a listener and the user-provided listener.
   rewriter.addListener(this);
@@ -194,7 +194,7 @@ bool GreedyPatternRewriteDriver::simplify(MutableArrayRef<Region> regions) {
       for (auto &region : regions) {
         region.walk<WalkOrder::PreOrder>([&](Operation *op) {
           if (!insertKnownConstant(op)) {
-            worklist.push_back(op);
+            addToWorklist(op);
             return WalkResult::advance();
           }
           return WalkResult::skip();
@@ -207,9 +207,6 @@ bool GreedyPatternRewriteDriver::simplify(MutableArrayRef<Region> regions) {
       for (size_t i = 0, e = worklist.size(); i != e; ++i)
         worklistMap[worklist[i]] = i;
     }
-
-    // These are scratch vectors used in the folding loop below.
-    SmallVector<Value, 8> originalOperands, resultValues;
 
     changed = false;
     while (!worklist.empty()) {
@@ -246,34 +243,11 @@ bool GreedyPatternRewriteDriver::simplify(MutableArrayRef<Region> regions) {
         continue;
       }
 
-      // Collects all the operands and result uses of the given `op` into work
-      // list. Also remove `op` and nested ops from worklist.
-      originalOperands.assign(op->operand_begin(), op->operand_end());
-      auto preReplaceAction = [&](Operation *op) {
-        // Add the operands to the worklist for visitation.
-        addOperandsToWorklist(originalOperands);
-
-        // Add all the users of the result to the worklist so we make sure
-        // to revisit them.
-        for (auto result : op->getResults())
-          for (auto *userOp : result.getUsers())
-            addToWorklist(userOp);
-
-        notifyOperationRemoved(op);
-      };
-
-      // Add the given operation to the worklist.
-      auto collectOps = [this](Operation *op) { addToWorklist(op); };
-
       // Try to fold this op.
-      bool inPlaceUpdate;
-      if ((succeeded(folder.tryToFold(op, collectOps, preReplaceAction,
-                                      &inPlaceUpdate)))) {
+      if (succeeded(folder.tryToFold(op))) {
         LLVM_DEBUG(logResultWithLine("success", "operation was folded"));
-
         changed = true;
-        if (!inPlaceUpdate)
-          continue;
+        continue;
       }
 
       // Try to match one of the patterns. The rewriter is automatically
