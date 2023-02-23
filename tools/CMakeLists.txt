@@ -205,7 +205,7 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-compile-main.cc"
     DEPS
-      iree::compiler::API2::Headers
+      iree::compiler::bindings::c::headers
       iree::compiler::API2::Impl
     DATA
       ${IREE_LLD_TARGET}
@@ -219,7 +219,7 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-opt-main.cc"
     DEPS
-      iree::compiler::API2::Headers
+      iree::compiler::bindings::c::headers
       iree::compiler::API2::Impl
     DATA
       ${IREE_LLD_TARGET}
@@ -233,7 +233,7 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-mlir-lsp-server.cc"
     DEPS
-      iree::compiler::API2::Headers
+      iree::compiler::bindings::c::headers
       iree::compiler::API2::Impl
     SETUP_INSTALL_RPATH
   )

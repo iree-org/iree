@@ -8,6 +8,6 @@
 //
 // See https://mlir.llvm.org/docs/Tools/MLIRLSP/
 
-#include "iree/compiler/API2/ToolEntryPoints.h"
+#include "iree/compiler/tool_entry_points_api.h"
 
 int main(int argc, char **argv) { return ireeMlirLspServerRunMain(argc, argv); }

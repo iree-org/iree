@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/API2/Embed.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -20,6 +18,7 @@
 #include "iree/compiler/Tools/init_passes.h"
 #include "iree/compiler/Tools/init_targets.h"
 #include "iree/compiler/Utils/TracingUtils.h"
+#include "iree/compiler/embedding_api.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SMLoc.h"

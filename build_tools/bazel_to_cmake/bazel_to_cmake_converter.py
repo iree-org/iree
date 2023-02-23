@@ -179,6 +179,18 @@ def _convert_target_list_block(list_name, targets):
   return _convert_string_list_block(list_name, targets, sort=True, quote=False)
 
 
+def _convert_includes_block(includes):
+  if not includes:
+    return ""
+  dirs = []
+  for include in includes:
+    dirs.append("$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/%s>" %
+                (include,))
+    dirs.append("$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/%s>" %
+                (include,))
+  return _convert_string_list_block("INCLUDES", dirs, sort=False, quote=True)
+
+
 class BuildFileFunctions(object):
   """Object passed to `exec` that has handlers for BUILD file functions."""
 
@@ -302,6 +314,7 @@ class BuildFileFunctions(object):
                  deps=None,
                  testonly=None,
                  linkopts=None,
+                 includes=None,
                  **kwargs):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
@@ -316,6 +329,7 @@ class BuildFileFunctions(object):
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
     testonly_block = _convert_option_block("TESTONLY", testonly)
+    includes_block = _convert_includes_block(includes)
 
     self.converter.body += (f"iree_cc_library(\n"
                             f"{name_block}"
@@ -327,6 +341,7 @@ class BuildFileFunctions(object):
                             f"{deps_block}"
                             f"{defines_block}"
                             f"{testonly_block}"
+                            f"{includes_block}"
                             f"  PUBLIC\n)\n\n")
 
   def iree_compiler_cc_library(self, deps=[], **kwargs):
@@ -346,6 +361,7 @@ class BuildFileFunctions(object):
               timeout=None,
               args=None,
               tags=None,
+              includes=None,
               **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
@@ -357,6 +373,7 @@ class BuildFileFunctions(object):
     args_block = _convert_string_list_block("ARGS", args)
     labels_block = _convert_string_list_block("LABELS", tags)
     timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
+    includes_block = _convert_includes_block(includes)
 
     self.converter.body += (f"iree_cc_test(\n"
                             f"{name_block}"
@@ -369,6 +386,7 @@ class BuildFileFunctions(object):
                             f"{args_block}"
                             f"{labels_block}"
                             f"{timeout_block}"
+                            f"{includes_block}"
                             f")\n\n")
 
   def iree_runtime_cc_test(self, deps=[], **kwargs):
@@ -386,6 +404,7 @@ class BuildFileFunctions(object):
                 defines=None,
                 linkopts=None,
                 testonly=None,
+                includes=None,
                 **kwargs):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
@@ -396,6 +415,7 @@ class BuildFileFunctions(object):
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
     testonly_block = _convert_option_block("TESTONLY", testonly)
+    includes_block = _convert_includes_block(includes)
 
     self.converter.body += (f"iree_cc_binary(\n"
                             f"{name_block}"
@@ -405,6 +425,7 @@ class BuildFileFunctions(object):
                             f"{data_block}"
                             f"{deps_block}"
                             f"{testonly_block}"
+                            f"{includes_block}"
                             f")\n\n")
 
   # Effectively an alias in IREE code.
