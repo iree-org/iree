@@ -47,9 +47,8 @@ static llvm::cl::opt<bool> clDemoteF32ToF16(
     llvm::cl::init(false));
 static llvm::cl::opt<bool> clPromoteBF16ToF32(
     "iree-flow-promote-bf16-to-f32",
-    llvm::cl::desc(
-        "Converts all bf16 ops and values into f32 counterparts "
-                   "unconditionally before main flow conversions."),
+    llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts "
+                    "unconditionally before main flow conversions."),
     llvm::cl::init(false));
 static llvm::cl::opt<bool> clPromoteF16ToF32(
     "iree-flow-promote-f16-to-f32",
