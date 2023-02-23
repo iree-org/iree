@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -218,6 +219,29 @@ struct ConvertTensorStoreOp
     }
     rewriter.replaceOp(op, {newResult});
 
+    return success();
+  }
+};
+
+struct ConvertDynamicizeDimOp
+    : public OpConversionPattern<IREE::Flow::DispatchDynamicizeDimOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::DispatchDynamicizeDimOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, op.getType(),
+                                                   op.getValueAttr());
+    return success();
+  };
+};
+
+struct ConvertDynamicizeShapeOp
+    : public OpConversionPattern<IREE::Flow::DispatchDynamicizeShapeOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::DispatchDynamicizeShapeOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(op, op.getSource());
     return success();
   }
 };
@@ -637,6 +661,8 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
       ConvertTensorReshapeOp, ConvertTensorEmptyOp, ConvertTensorSplatOp,
       ConvertTensorCloneOp, ConvertTensorSliceOp, ConvertTensorUpdateOp,
       ConvertTensorLoadOp, ConvertTensorStoreOp, ConvertTensorTraceOp>(
+      typeConverter, context);
+  patterns.insert<ConvertDynamicizeDimOp, ConvertDynamicizeShapeOp>(
       typeConverter, context);
   patterns.insert<ConvertDispatchOp>(typeConverter, context);
   patterns.insert<ConvertExecutableOp>(typeConverter, context);
