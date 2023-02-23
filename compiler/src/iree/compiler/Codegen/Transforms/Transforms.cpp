@@ -175,14 +175,6 @@ static bool isUseReplaceableWithSubview(OpOperand &use) {
              memref::SubViewOp>(user);
 }
 
-/// Explicit instantiations for `hoistStaticallyBoundAllocationsInFunc`.
-/// Automatically trigger the explicit instantiations of the needed versions of
-/// `hoistOneStaticallyBoundAllocation`.
-template void hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
-    RewriterBase &rewriter, func::FuncOp funcOp);
-template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
-    RewriterBase &rewriter, func::FuncOp funcOp);
-
 template <typename AllocLikeOpType>
 void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
                                            func::FuncOp funcOp) {
@@ -232,6 +224,28 @@ void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
     for (memref::DeallocOp deallocOp : deallocOps) rewriter.eraseOp(deallocOp);
   }
 }
+
+/// Explicit instantiations for `hoistStaticallyBoundAllocationsInFunc` and
+/// dependent functions.
+template std::optional<Value> hoistOneStaticallyBoundAllocation<
+    memref::AllocOp>(func::FuncOp funcOp, OpBuilder &builder, Location loc,
+                     MemRefType allocLikeType, ValueRange dynamicSizes,
+                     std::optional<uint64_t> alignment);
+template std::optional<Value> hoistOneStaticallyBoundAllocation<
+    memref::AllocaOp>(func::FuncOp funcOp, OpBuilder &builder, Location loc,
+                      MemRefType allocLikeType, ValueRange dynamicSizes,
+                      std::optional<uint64_t> alignment);
+template std::optional<Value>
+hoistOneStaticallyBoundAllocation<memref::AllocOp>(func::FuncOp funcOp,
+                                                   OpBuilder &builder,
+                                                   memref::AllocOp allocLikeOp);
+template std::optional<Value>
+hoistOneStaticallyBoundAllocation<memref::AllocaOp>(
+    func::FuncOp funcOp, OpBuilder &builder, memref::AllocaOp allocLikeOp);
+template void hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
+    RewriterBase &rewriter, func::FuncOp funcOp);
+template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
+    RewriterBase &rewriter, func::FuncOp funcOp);
 
 }  // namespace iree_compiler
 }  // namespace mlir
