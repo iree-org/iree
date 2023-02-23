@@ -42,7 +42,7 @@ $ ctest -R iree/compiler/Dialect/VM/Conversion/MathToVM/test/arithmetic_ops.mlir
 With Bazel, run this from the repo root:
 
 ```shell
-$ bazel test iree/compiler/Dialect/VM/Conversion/MathToVM/test:arithmetic_ops.mlir.test
+$ bazel test //compiler/src/iree/compiler/Dialect/VM/Conversion/MathToVM/test:arithmetic_ops.mlir.test
 ```
 
 ### Writing a Test
