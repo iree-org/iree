@@ -65,7 +65,5 @@ if(IREE_HAVE_DYNAMIC_LIBRARY_LOADING)
 else()
   # Dynamic library loading not available. Exclude loader from all.
   message(STATUS "Disabling compiler loader (platform does not support library loading)")
-  set_target_properties(iree_compiler_bindings_c_loader
-    PROPERTIES EXCLUDE_FROM_ALL ON
-  )
+  iree_cc_library_exclude_from_all(loader TRUE)
 endif()
