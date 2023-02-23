@@ -257,6 +257,22 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass() {
 }
 
 namespace {
+struct PromoteBF16ToF32Converter
+    : public PrimitiveTypeConverter<BFloat16Type, Float32Type> {
+  Type getTargetType(BFloat16Type type) override {
+    return Float32Type::get(type.getContext());
+  }
+};
+struct PromoteBF16ToF32Pass
+    : public ConvertTypesPass<PromoteBF16ToF32Base<PromoteBF16ToF32Pass>,
+                              PromoteBF16ToF32Converter> {};
+}  // namespace
+
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass() {
+  return std::make_unique<PromoteBF16ToF32Pass>();
+}
+
+namespace {
 struct DemoteF64ToF32Converter
     : public PrimitiveTypeConverter<Float64Type, Float32Type> {
   Type getTargetType(Float64Type type) override {
