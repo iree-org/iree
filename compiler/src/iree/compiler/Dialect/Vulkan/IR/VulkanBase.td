@@ -32,7 +32,6 @@ def VK_Dialect : Dialect {
     dialect contains useful utilities for targeting Vulkan both in CodeGen and
     runtime.
   }];
-  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 //===----------------------------------------------------------------------===//

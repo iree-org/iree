@@ -45,8 +45,6 @@ def VM_Dialect : Dialect {
     The types in the VM dialect correspond to the storage rather than value
     type, with the interpretation of the type encoded on the op.
   }];
-
-  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 //===----------------------------------------------------------------------===//
