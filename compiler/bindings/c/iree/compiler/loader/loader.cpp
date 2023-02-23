@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/API2/Stub/Loader.h"
+#include "iree/compiler/loader.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "iree/compiler/API2/Embed.h"
+#include "iree/compiler/embedding_api.h"
 
 #if (defined(_WIN32) || defined(__CYGWIN__))
 // Windows implementation
@@ -72,7 +72,7 @@ namespace {
 DlHandle libraryHandle = nullptr;
 
 #define HANDLE_SYMBOL(fn_name) decltype(fn_name) *__##fn_name = nullptr;
-#include "iree/compiler/API2/Stub/HandleSymbols.inc"
+#include "./handle_symbols.inc"
 #undef HANDLE_SYMBOL
 
 void assertLoaded() {
@@ -102,7 +102,7 @@ bool ireeCompilerLoadLibrary(const char *libraryPath) {
             #fn_name);                                                 \
     return false;                                                      \
   }
-#include "iree/compiler/API2/Stub/HandleSymbols.inc"
+#include "./handle_symbols.inc"
 #undef HANDLE_SYMBOL
 
   // Mark as loaded.

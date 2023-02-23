@@ -812,11 +812,7 @@ endif()
 # files with the same names from different rules are disambiguated towards
 # those in tools/.
 add_subdirectory(tools)
-
-if(IREE_BUILD_COMPILER)
-  add_subdirectory(compiler)
-endif()
-
+add_subdirectory(compiler)
 add_subdirectory(runtime)
 
 if(IREE_ENABLE_CLANG_TIDY)

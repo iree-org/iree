@@ -8,6 +8,6 @@
 //
 // Based on mlir-opt but registers the passes and dialects we care about.
 
-#include "iree/compiler/API2/ToolEntryPoints.h"
+#include "iree/compiler/tool_entry_points_api.h"
 
 int main(int argc, char **argv) { return ireeOptRunMain(argc, argv); }

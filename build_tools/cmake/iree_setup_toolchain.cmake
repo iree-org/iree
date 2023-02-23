@@ -6,6 +6,7 @@
 
 include(CheckCXXCompilerFlag)
 include(CheckLinkerFlag)
+include(CheckSymbolExists)
 
 # Appends ${VALUE} to each argument.
 function(iree_append_to_lists VALUE)
@@ -13,6 +14,19 @@ function(iree_append_to_lists VALUE)
     set(${_VARIABLE} "${${_VARIABLE}} ${VALUE}" PARENT_SCOPE)
   endforeach(_VARIABLE)
 endfunction()
+
+#-------------------------------------------------------------------------------
+# Supports dynamic library loading.
+#-------------------------------------------------------------------------------
+
+set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_DL_LIBS})
+check_symbol_exists(dlopen dlfcn.h IREE_HAVE_DLOPEN)
+unset(CMAKE_REQUIRED_LIBRARIES)
+if(WIN32 OR IREE_HAVE_DLOPEN)
+  set(IREE_HAVE_DYNAMIC_LIBRARY_LOADING ON)
+else()
+  set(IREE_HAVE_DYNAMIC_LIBRARY_LOADING OFF)
+endif()
 
 #-------------------------------------------------------------------------------
 # Linker setup

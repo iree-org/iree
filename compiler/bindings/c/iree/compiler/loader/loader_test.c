@@ -4,13 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/loader.h"
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "iree/compiler/API2/Embed.h"
-#include "iree/compiler/API2/Stub/Loader.h"
+#include "iree/compiler/embedding_api.h"
 
 static int flagCount = 0;
 

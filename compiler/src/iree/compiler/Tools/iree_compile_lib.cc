@@ -11,9 +11,9 @@
 #include <string>
 #include <type_traits>
 
-#include "iree/compiler/API2/Embed.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Tools/init_iree.h"
+#include "iree/compiler/embedding_api.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/raw_ostream.h"
