@@ -31,15 +31,14 @@ LogicalResult appendImportModule(IREE::VM::ModuleOp importModuleOp,
   importModuleOp.walk([&](IREE::VM::ImportOp importOp) {
     std::string fullName =
         (importModuleOp.getName() + "." + importOp.getName()).str();
-    auto *existingOp = symbolTable.lookup(fullName);
-    // TODO(benvanik): verify that the imports match.
-    if (!existingOp) {
-      auto clonedOp = cast<IREE::VM::ImportOp>(targetBuilder.clone(*importOp));
-      mlir::StringAttr fullNameAttr =
-          mlir::StringAttr::get(clonedOp.getContext(), fullName);
-      clonedOp.setName(fullNameAttr);
-      clonedOp.setPrivate();
+    if (auto *existingOp = symbolTable.lookup(fullName)) {
+      existingOp->erase();
     }
+    auto clonedOp = cast<IREE::VM::ImportOp>(targetBuilder.clone(*importOp));
+    mlir::StringAttr fullNameAttr =
+        mlir::StringAttr::get(clonedOp.getContext(), fullName);
+    clonedOp.setName(fullNameAttr);
+    clonedOp.setPrivate();
   });
   return success();
 }

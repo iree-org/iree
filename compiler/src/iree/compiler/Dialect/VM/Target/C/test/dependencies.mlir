@@ -2,12 +2,12 @@
 // RUN: --output-format=vm-c --iree-vm-c-module-optimize=false %s | FileCheck %s
 
 vm.module @main_module attributes { version = 100 : i32 } {
-  vm.import @required.method0() attributes { minimum_version = 4 : i32 }
-  vm.import @required.method1() attributes { minimum_version = 5 : i32 }
-  vm.import optional @required.method2() attributes { minimum_version = 6 : i32 }
+  vm.import public @required.method0() attributes { minimum_version = 4 : i32 }
+  vm.import public @required.method1() attributes { minimum_version = 5 : i32 }
+  vm.import public optional @required.method2() attributes { minimum_version = 6 : i32 }
 
-  vm.import optional @optional.method0() attributes { minimum_version = 10 : i32 }
-  vm.import optional @optional.method1() attributes { minimum_version = 11 : i32 }
+  vm.import public optional @optional.method0() attributes { minimum_version = 10 : i32 }
+  vm.import public optional @optional.method1() attributes { minimum_version = 11 : i32 }
 }
 
 // CHECK: main_module_dependencies_[]

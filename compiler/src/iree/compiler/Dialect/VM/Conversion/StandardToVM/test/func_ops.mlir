@@ -30,7 +30,7 @@ module {
 // CHECK-LABEL: @t003_extern_func
 module @t003_extern_func {
 module {
-  // CHECK: vm.import @some.import(i32) -> !vm.buffer
+  // CHECK: vm.import private @some.import(i32) -> !vm.buffer
   // CHECK-SAME: attributes {minimum_version = 4 : i32}
   func.func private @some.import(%arg0: index) -> !util.buffer attributes {
     vm.version = 4 : i32
@@ -56,7 +56,7 @@ module {
     // CHECK: return %[[RET]]
     return %0 : !util.buffer
   }
-  // CHECK: vm.import @some.import(i32) -> !vm.buffer
+  // CHECK: vm.import private @some.import(i32) -> !vm.buffer
   func.func private @some.import(%arg0: index) -> !util.buffer
 }
 }
@@ -65,7 +65,7 @@ module {
 // CHECK-LABEL: @t004_extern_func_signature
 module @t004_extern_func_signature {
 module {
-  // CHECK: vm.import @some.import(i64) -> i64
+  // CHECK: vm.import private @some.import(i64) -> i64
   func.func private @some.import(%arg0: index) -> index attributes {
     vm.signature = (i64) -> i64
   }
@@ -94,7 +94,7 @@ module {
     // CHECK: return %[[RET]] : i32
     return %0 : index
   }
-  // CHECK: vm.import @some.import(i64) -> i64
+  // CHECK: vm.import private @some.import(i64) -> i64
   func.func private @some.import(%arg0: index) -> index attributes {
     vm.signature = (i64) -> i64
   }
@@ -136,7 +136,7 @@ module {
 module @t006_external_call_fallback {
 module {
   // NOTE: we require conversion for the import but not the fallback!
-  // CHECK: vm.import optional @some.import(i64) -> i64
+  // CHECK: vm.import private optional @some.import(i64) -> i64
   func.func private @some.import(%arg0: index) -> index attributes {
     vm.signature = (i64) -> i64,
     vm.fallback = @some_fallback
@@ -173,12 +173,12 @@ module {
 module @t007_external_call_fallback_import {
 module {
   // NOTE: we require conversion for the import but not the fallback!
-  // CHECK: vm.import optional @some.import(i64) -> i64
+  // CHECK: vm.import private optional @some.import(i64) -> i64
   func.func private @some.import(%arg0: index) -> index attributes {
     vm.signature = (i64) -> i64,
     vm.fallback = @other.fallback
   }
-  // CHECK: vm.import @other.fallback(i64) -> i64
+  // CHECK: vm.import private @other.fallback(i64) -> i64
   func.func private @other.fallback(%arg0: index) -> index attributes {
     vm.signature = (i64) -> i64
   }
@@ -211,7 +211,7 @@ module {
 // CHECK-LABEL: @t007_extern_func_opaque_types
 module @t007_extern_func_opaque_types {
 module {
-  // CHECK: vm.import @some.import() -> !vm.ref<!some.type<foo>>
+  // CHECK: vm.import private @some.import() -> !vm.ref<!some.type<foo>>
   func.func private @some.import() -> !some.type<foo>
   // CHECK: vm.func private @my_fn() -> !vm.ref<!some.type<foo>>
   func.func @my_fn() -> !some.type<foo> {
