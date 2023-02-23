@@ -60,6 +60,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
         "//compiler/src/iree/compiler/Dialect/HAL/Transforms",
+        "//compiler/src/iree/compiler/Dialect/Util/Conversion",
         "//compiler/src/iree/compiler/Dialect/Util/Conversion/MemRefToUtil",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
