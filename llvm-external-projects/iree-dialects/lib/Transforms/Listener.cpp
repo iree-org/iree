@@ -22,7 +22,8 @@ void ListenerList::notifyBlockCreated(Block *block) {
     listener->notifyBlockCreated(block);
 }
 
-void ListenerList::notifyOperationReplaced(Operation *op, ValueRange newValues) {
+void ListenerList::notifyOperationReplaced(Operation *op,
+                                           ValueRange newValues) {
   for (RewriteListener *listener : listeners)
     listener->notifyOperationReplaced(op, newValues);
 }
