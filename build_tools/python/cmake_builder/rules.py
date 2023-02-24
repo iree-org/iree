@@ -87,6 +87,11 @@ def _convert_block_to_string(block: List[str]) -> str:
   return "\n".join(block + [""])
 
 
+def sanitize_target_name(target_name: str):
+  """Replace common special character disallowed in CMake target name."""
+  return target_name.replace(",", "-")
+
+
 def build_iree_bytecode_module(target_name: str,
                                src: str,
                                module_name: str,

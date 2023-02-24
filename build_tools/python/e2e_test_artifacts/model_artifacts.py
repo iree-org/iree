@@ -36,5 +36,4 @@ def get_model_path(
   model_ext = "".join(file_exts)
 
   # Model path: <root_path>/<model_artifact_prefix>_<model_id>_<model_name><model_ext>
-  return (root_path /
-          f"{MODEL_ARTIFACT_PREFIX}_{model.id}_{model.name}{model_ext}")
+  return (root_path / f"{MODEL_ARTIFACT_PREFIX}_{model}{model_ext}")

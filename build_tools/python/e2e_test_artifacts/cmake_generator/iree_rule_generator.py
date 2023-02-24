@@ -58,8 +58,8 @@ class IreeRuleBuilder(object):
                                  output_file_path=output_file_path,
                                  cmake_rules=[])
 
-    # Import target name: iree-imported-model-<model_id>
-    target_name = f"iree-imported-model-{model.id}"
+    # Import target name: iree-imported-model-<imported_model_str>
+    target_name = f"iree-imported-model-{imported_model}"
 
     import_flags = import_config.materialize_import_flags(model)
     if import_config.tool == iree_definitions.ImportTool.TFLITE_IMPORTER:
@@ -89,17 +89,18 @@ class IreeRuleBuilder(object):
 
   def build_module_compile_rule(
       self, model_import_rule: IreeModelImportRule,
-      imported_model: iree_definitions.ImportedModel,
-      compile_config: iree_definitions.CompileConfig,
+      module_generation_config: iree_definitions.ModuleGenerationConfig,
       output_file_path: pathlib.PurePath) -> IreeModuleCompileRule:
 
+    imported_model = module_generation_config.imported_model
+    compile_config = module_generation_config.compile_config
     compile_flags = self._generate_compile_flags(
         compile_config=compile_config,
         mlir_dialect_type=imported_model.import_config.dialect_type.value
     ) + compile_config.extra_flags
 
-    # Module target name: iree-module-<model_id>-<compile_config_id>
-    target_name = f"iree-module-{imported_model.model.id}-{compile_config.id}"
+    # Module target name: iree-module-<module_generation_config_str>
+    target_name = f"iree-module-{module_generation_config}"
 
     cmake_rules = [
         cmake_builder.rules.build_iree_bytecode_module(
@@ -116,10 +117,10 @@ class IreeRuleBuilder(object):
                                  cmake_rules=cmake_rules)
 
   def build_target_path(self, target_name: str):
-    """Returns the full target path by combining the package name and the target
-    name.
+    """Returns the full target path by combining the package name and the
+    sanitized target name.
     """
-    return f"{self._package_name}_{target_name}"
+    return f"{self._package_name}_{cmake_builder.rules.sanitize_target_name(target_name)}"
 
   def _generate_compile_flags(self,
                               compile_config: iree_definitions.CompileConfig,
@@ -230,8 +231,7 @@ def generate_rules(
         module_generation_config=gen_config, root_path=root_path)
     module_compile_rule = rule_builder.build_module_compile_rule(
         model_import_rule=model_import_rule,
-        imported_model=gen_config.imported_model,
-        compile_config=gen_config.compile_config,
+        module_generation_config=gen_config,
         output_file_path=module_dir_path / iree_artifacts.MODULE_FILENAME)
     if benchmark_collections.COMPILE_STATS_TAG in gen_config.compile_config.tags:
       compile_stats_module_target_names.append(module_compile_rule.target_name)

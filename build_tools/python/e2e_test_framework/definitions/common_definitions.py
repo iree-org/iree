@@ -138,6 +138,12 @@ class Model(object):
   # Input types. E.g., ["100x100xf32", "200x200x5xf32"].
   input_types: List[str]
 
+  def __str__(self):
+    name = self.name
+    if len(self.tags) > 0:
+      name += f'[{",".join(self.tags)}]'
+    return name
+
 
 @serialization.serializable(type_key="model_input_data")
 @dataclass(frozen=True)

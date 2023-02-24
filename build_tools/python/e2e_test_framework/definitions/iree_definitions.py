@@ -8,8 +8,7 @@
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-import hashlib
-from typing import List, Sequence
+from typing import List
 
 from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework import serialization, unique_ids
@@ -60,6 +59,11 @@ class CompileTarget(object):
   target_architecture: common_definitions.DeviceArchitecture
   target_abi: TargetABI
 
+  def __str__(self):
+    arch = self.target_architecture
+    return (f"{arch.type.value}-{arch.architecture}-{arch.microarchitecture}-"
+            f"{self.target_abi.value}-{self.target_backend.value}")
+
 
 @serialization.serializable(type_key="iree_compile_configs")
 @dataclass(frozen=True)
@@ -69,6 +73,12 @@ class CompileConfig(object):
   tags: List[str]
   compile_targets: List[CompileTarget]
   extra_flags: List[str] = dataclasses.field(default_factory=list)
+
+  def __str__(self):
+    name = f'[{",".join(str(target) for target in self.compile_targets)}]'
+    if len(self.tags) > 0:
+      name += f'[{",".join(self.tags)}]'
+    return name
 
 
 @serialization.serializable(type_key="iree_module_execution_configs")
@@ -110,6 +120,13 @@ class ImportConfig(object):
   tool: ImportTool
   dialect_type: MLIRDialectType
   import_flags: List[str] = dataclasses.field(default_factory=list)
+  tags: List[str] = dataclasses.field(default_factory=list)
+
+  def __str__(self):
+    name = self.dialect_type.value
+    if len(self.tags) > 0:
+      name += f'[{",".join(self.tags)}]'
+    return name
 
   def materialize_import_flags(self,
                                model: common_definitions.Model) -> List[str]:
@@ -171,6 +188,9 @@ class ImportedModel(object):
   def composite_id(self):
     return unique_ids.hash_composite_id([self.model.id, self.import_config.id])
 
+  def __str__(self):
+    return f"{self.model}[{self.import_config}]"
+
   @staticmethod
   def from_model(model: common_definitions.Model):
     config = MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP.get(model.source_type)
@@ -190,6 +210,9 @@ class ModuleGenerationConfig(object):
   def composite_id(self):
     return unique_ids.hash_composite_id(
         [self.imported_model.composite_id(), self.compile_config.id])
+
+  def __str__(self):
+    return f"{self.imported_model}{self.compile_config}"
 
 
 @serialization.serializable
