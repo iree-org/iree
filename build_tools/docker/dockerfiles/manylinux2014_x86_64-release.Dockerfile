@@ -22,14 +22,11 @@ SHELL ["/bin/bash", "-e", "-u", "-o", "pipefail", "-c"]
 USER root
 
 ######## Pre-requisite packages ########
-# Add RHEL7 CUDA repo.
-RUN yum-config-manager --add-repo \
-  https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
 RUN yum install -y \
-  cuda-nvcc-11-6 cuda-cudart-devel-11-6 cuda-cupti-11-6 \
-  java-11-openjdk-devel \
-  ccache \
-  capstone-devel libzstd-devel
+      java-11-openjdk-devel \
+      ccache \
+      capstone-devel libzstd-devel \
+  && yum clean all
 
 ######## Bazel ########
 WORKDIR /install-bazel
@@ -56,10 +53,11 @@ ARG ROCM_VERSION=5.2.1
 ARG AMDGPU_VERSION=22.20.1
 
 # Install the ROCm rpms
-RUN yum clean all \
-  && echo -e "[ROCm]\nname=ROCm\nbaseurl=https://repo.radeon.com/rocm/yum/${ROCM_VERSION}/main\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/rocm.repo \
+RUN  echo -e "[ROCm]\nname=ROCm\nbaseurl=https://repo.radeon.com/rocm/yum/${ROCM_VERSION}/main\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/rocm.repo \
   && echo -e "[amdgpu]\nname=amdgpu\nbaseurl=https://repo.radeon.com/amdgpu/${AMDGPU_VERSION}/rhel/7.9/main/x86_64\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/amdgpu.repo \
-  && yum install -y rocm-dev
+  && yum install -y rocm-dev \
+  && yum clean all
+
 
 ######## GIT CONFIGURATION ########
 # Git started enforcing strict user checking, which thwarts version

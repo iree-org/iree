@@ -761,6 +761,9 @@ IREE::Stream::ResourceSubviewOp ResourceSubviewOp::findSubviewOp(Value value) {
     if (!definingOp) {
       // Defined as a block argument - stop walk.
       break;
+    } else if (isa<IREE::Stream::TimelineOpInterface>(definingOp)) {
+      // Don't traverse timeline ops as time travel isn't possible (yet).
+      break;
     } else if (auto subviewOp =
                    dyn_cast<IREE::Stream::ResourceSubviewOp>(definingOp)) {
       // Found!
