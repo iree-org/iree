@@ -79,6 +79,10 @@ jobs:
             -F per_page=1 | \
             jq --raw-output '.check_runs[0].output.annotations_url')
           echo "annotations_url=${ANNOTATIONS_URL}" >> "${GITHUB_OUTPUT}"
+      - name: "Posting not found"
+        if: steps.search.outputs.annotations_url == 'null'
+        run: |
+          echo "::notice title=Completed CI build not found::Will re-run automatically once the CI build completes."
       - name: "Retrieving artifact links"
         id: retrieve
         if: steps.search.outputs.annotations_url != 'null'
