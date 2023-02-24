@@ -4,9 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Transforms/Listener.h"
 #include "iree-dialects/Transforms/ListenerCSE.h"
-#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -16,7 +14,7 @@ namespace {
 
 /// The test listener prints stuff to `stdout` so that it can be checked by lit
 /// tests.
-struct TestListener : public RewriteListener {
+struct TestListener : public RewriterBase::Listener {
   void notifyOperationReplaced(Operation *op, ValueRange newValues) override {
     llvm::outs() << "REPLACED " << op->getName() << "\n";
   }
@@ -41,7 +39,7 @@ struct TestListenerCanonicalizePass
 
   void runOnOperation() override {
     TestListener listener;
-    RewriteListener *listenerToUse = nullptr;
+    RewriterBase::Listener *listenerToUse = nullptr;
     if (withListener)
       listenerToUse = &listener;
 
@@ -51,9 +49,16 @@ struct TestListenerCanonicalizePass
     for (RegisteredOperationName op : getContext().getRegisteredOperations())
       op.getCanonicalizationPatterns(patterns, &getContext());
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
-                                            GreedyRewriteConfig(),
-                                            listenerToUse)))
+    GreedyRewriteConfig config;
+    config.listener = listenerToUse;
+    // Manually gather list of ops because the other GreedyPatternRewriteDriver
+    // overloads only accepts ops that are isolated from above.
+    SmallVector<Operation *> ops;
+    getOperation()->walk([&](Operation *nestedOp) {
+      if (this->getOperation() != nestedOp)
+        ops.push_back(nestedOp);
+    });
+    if (failed(applyOpPatternsAndFold(ops, std::move(patterns), config)))
       signalPassFailure();
   }
 
@@ -76,7 +81,7 @@ struct TestListenerCSEPass : public PassWrapper<TestListenerCSEPass, Pass> {
 
   void runOnOperation() override {
     TestListener listener;
-    RewriteListener *listenerToUse = nullptr;
+    RewriterBase::Listener *listenerToUse = nullptr;
     if (withListener)
       listenerToUse = &listener;
 
