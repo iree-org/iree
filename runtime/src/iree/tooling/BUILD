@@ -103,8 +103,7 @@ cc_library(
         "//runtime/src/iree/base/internal:synchronization",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers",
-        "//runtime/src/iree/hal/utils:caching_allocator",
-        "//runtime/src/iree/hal/utils:debug_allocator",
+        "//runtime/src/iree/hal/utils:allocators",
     ],
 )
 

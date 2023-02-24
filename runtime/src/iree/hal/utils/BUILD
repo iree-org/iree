@@ -14,6 +14,20 @@ package(
 )
 
 iree_runtime_cc_library(
+    name = "allocators",
+    srcs = ["allocators.c"],
+    hdrs = ["allocators.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":caching_allocator",
+        ":debug_allocator",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "buffer_transfer",
     srcs = ["buffer_transfer.c"],
     hdrs = ["buffer_transfer.h"],
