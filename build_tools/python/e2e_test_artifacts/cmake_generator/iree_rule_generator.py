@@ -107,7 +107,8 @@ class IreeRuleBuilder(object):
             src=str(model_import_rule.output_file_path),
             module_name=str(output_file_path),
             flags=compile_flags,
-            flagfile_name=str(output_file_path.with_name("compilation_flag")))
+            dump_flagfile_name=str(
+                output_file_path.with_name(iree_artifacts.COMPILATION__FLAG)))
     ]
 
     return IreeModuleCompileRule(target_name=target_name,
