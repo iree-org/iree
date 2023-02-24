@@ -51,10 +51,10 @@ COPY --from=fetch-nvidia \
   "/fetch-nvidia/${NVIDIA_EGL_WAYLAND_DEB}" \
   /tmp/
 
-# RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB}" \
-#   "/tmp/${NVIDIA_GL_DEB}" \
-#   "/tmp/${NVIDIA_COMPUTE_DEB}" \
-#   "/tmp/${NVIDIA_EGL_WAYLAND_DEB}"
+RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB}" \
+  "/tmp/${NVIDIA_GL_DEB}" \
+  "/tmp/${NVIDIA_COMPUTE_DEB}" \
+  "/tmp/${NVIDIA_EGL_WAYLAND_DEB}"
 
 # install cuda sdk
 # 11.8 is the latest version of 11.x, which is IREE currently compiled with.
