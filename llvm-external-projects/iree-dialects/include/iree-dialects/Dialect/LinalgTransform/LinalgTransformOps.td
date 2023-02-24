@@ -19,7 +19,6 @@ def Linalg_Transform_Dialect : Dialect {
   let dependentDialects = [
     "linalg::LinalgDialect",
   ];
-  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 // Operations with this trait must provide the following methods:

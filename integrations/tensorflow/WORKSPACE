@@ -7,7 +7,7 @@
 
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
-TENSORFLOW_COMMIT = "e22c3226477d309aa591cc858f4d1c01fa598721"
+TENSORFLOW_COMMIT = "f9eb055db5ee5f3889997f209f8c6efb7842caaa"
 
 git_repository(
     name = "org_tensorflow",
