@@ -128,4 +128,4 @@ iree_cc_library(
   DEPS
     ::StaticImpl
 )
-endif()  # IREE_LINK_COMPILER_SHARED_LIBRARY
+endif()
