@@ -588,6 +588,7 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
     Value getSubrangeResult() { return getResult(); }
 
     // Walks up the use-def chain to find a subview op that feeds into |value|.
+    // Stops at any timeline op that may indicate a change in resource contents.
     static IREE::Stream::ResourceSubviewOp findSubviewOp(Value value);
   }];
 
