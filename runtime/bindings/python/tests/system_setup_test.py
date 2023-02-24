@@ -61,6 +61,13 @@ class DeviceSetupTest(unittest.TestCase):
     with self.assertRaises(ValueError, msg="Device not found: local-sync://1"):
       _ = ss.get_device("local-sync://1")
 
+  def testCreateDeviceWithAllocators(self):
+    driver = ss.get_driver("local-sync")
+    infos = driver.query_available_devices()
+    device1 = driver.create_device(infos[0]["device_id"], allocators=[])
+    device2 = driver.create_device(infos[0]["device_id"],
+                                   allocators=["caching", "debug"])
+
 
 if __name__ == "__main__":
   logging.basicConfig(level=logging.INFO)
