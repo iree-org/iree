@@ -200,6 +200,8 @@ function(iree_cc_library)
     # If in BUILD_SHARED_LIBS mode, then we need to make sure that visibility
     # is not hidden. We default to hidden visibility in the main copts so
     # need to undo it here.
+    # TODO: Switch to the CXX_VISIBILITY_PRESET property and fix the global
+    # hidden setting to follow suit.
     if(BUILD_SHARED_LIBS AND IREE_SUPPORTS_VISIBILITY_DEFAULT)
       target_compile_options(${_OBJECTS_NAME} PRIVATE
         "-fvisibility=default"
@@ -397,9 +399,9 @@ endfunction()
 
 # iree_cc_library_exclude_from_all(target exclude)
 #
-# For a target previously defined in the same package, set the 
+# For a target previously defined in the same package, set the
 # EXCLUDE_FROM_ALL property.
-# 
+#
 # This is necessary because cc_library targets consist of multiple sub-targets
 # and they all must have the property set.
 function(iree_cc_library_exclude_from_all target exclude_from_all)
@@ -409,6 +411,6 @@ function(iree_cc_library_exclude_from_all target exclude_from_all)
   set(_NAME "${_PACKAGE_NAME}_${target}")
   set(_OBJECTS_NAME ${_NAME}.objects)
 
-  set_target_properties(${_NAME} ${_OBJECTS_NAME} 
+  set_target_properties(${_NAME} ${_OBJECTS_NAME}
     PROPERTIES EXCLUDE_FROM_ALL ${exclude_from_all})
 endfunction()

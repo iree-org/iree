@@ -98,10 +98,14 @@ option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 # individual shared libraries similar to if passing -DBUILD_SHARED_LIBS=ON
 # to a standalone LLVM build. This can dramatically reduce linking time and
 # makes the management of some dependencies more strict.
+# This option is considered experimental and should not be relied on until
+# CI coverage is established.
 option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables BUILD_SHARED_LIBS CMake mode for LLVM and the compiler (this is only suitable for development)" OFF)
 
 # Must be defined as an option (CMake does not do it automatically), even though
 # we override it for different parts of the tree.
+# This option is considered experimental and should not be relied on until
+# CI coverage is established.
 option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possible" OFF)
 
 #-------------------------------------------------------------------------------
