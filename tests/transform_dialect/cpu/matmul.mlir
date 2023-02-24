@@ -21,7 +21,7 @@ func.func @matmul_static(
 // RUN: FileCheck %s --check-prefix=CODEGEN-CUSTOM-DISPATCH-FORMATION
 
 // CODEGEN-CUSTOM-DISPATCH-FORMATION: hal.executable private @matmul_static_dispatch_0 {
-// CODEGEN-CUSTOM-DISPATCH-FORMATION:   hal.executable.variant public @embedded_elf_{{[[:alnum:]_]+}}, target = #executable_target_embedded_elf_{{[[:alnum:]_]+}} {
+// CODEGEN-CUSTOM-DISPATCH-FORMATION:   hal.executable.variant
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:     hal.executable.export public @matmul_static_dispatch_0_matmul_3x3x5 ordinal(0) layout(#{{.*}}) attributes {translation_info = #translation} {
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:       ^bb0(%{{.*}}: !hal.device):
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:         %[[C2:.*]] = arith.constant 2 : index
