@@ -9,9 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/ScopedTransform.h"
-#include "iree-dialects/Transforms/Listener.h"
 #include "iree-dialects/Transforms/ListenerCSE.h"
-#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h"
@@ -409,37 +407,45 @@ static scf::ForOp findSingleForOpDefiningAll(ValueRange range) {
 }
 
 /// Find the op that defines all values in the range.
-static Operation *findSingleOpDefiningAll(ValueRange range) {
+static FailureOr<Operation *> findSingleOpDefiningAll(ValueRange range) {
   Operation *op = nullptr;
   for (Value value : range) {
-    if (auto currentSourceOp = value.getDefiningOp()) {
-      if (!op || op == currentSourceOp) {
-        op = currentSourceOp;
-        continue;
-      }
-      LLVM_DEBUG(DBGS() << "different source op when replacing one op\n");
-      return nullptr;
+    // Block arguments are just dropped.
+    auto currentSourceOp = value.getDefiningOp();
+    if (!currentSourceOp) {
+      LLVM_DEBUG(DBGS() << "replacing tracked op with bbarg\n");
+      continue;
     }
 
-    LLVM_DEBUG(
-        DBGS() << "could not find a source op when replacing another op\n");
-    return nullptr;
+    if (!op || op == currentSourceOp) {
+      op = currentSourceOp;
+      continue;
+    }
+
+    LLVM_DEBUG(DBGS() << "different source op when replacing one op\n");
+    return failure();
   }
   return op;
 }
 
 // Find a single op that defines all values in the range, optionally
 // transitively through other operations in an op-specific way.
-static Operation *findSingleDefiningOp(Operation *replacedOp,
-                                       ValueRange range) {
-  return llvm::TypeSwitch<Operation *, Operation *>(replacedOp)
-      .Case<linalg::LinalgOp>([&](linalg::LinalgOp) -> Operation * {
-        return findSingleLinalgOpDefiningAll(range);
+static FailureOr<Operation *> findSingleDefiningOp(Operation *replacedOp,
+                                                   ValueRange range) {
+  return llvm::TypeSwitch<Operation *, FailureOr<Operation *>>(replacedOp)
+      .Case<linalg::LinalgOp>([&](linalg::LinalgOp) -> FailureOr<Operation *> {
+        auto op = findSingleLinalgOpDefiningAll(range);
+        if (!op)
+          return failure();
+        return op.getOperation();
       })
-      .Case<scf::ForOp>([&](scf::ForOp) -> Operation * {
-        return findSingleForOpDefiningAll(range);
+      .Case<scf::ForOp>([&](scf::ForOp) -> FailureOr<Operation *> {
+        auto op = findSingleForOpDefiningAll(range);
+        if (!op)
+          return failure();
+        return op.getOperation();
       })
-      .Default([&](Operation *) -> Operation * {
+      .Default([&](Operation *) -> FailureOr<Operation *> {
         return findSingleOpDefiningAll(range);
       });
 }
@@ -455,15 +461,21 @@ void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
   if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
     return;
 
-  Operation *replacement = findSingleDefiningOp(op, newValues);
-  if (!replacement) {
+  FailureOr<Operation *> replacement = findSingleDefiningOp(op, newValues);
+  if (failed(replacement)) {
     emitError(op) << "could not find replacement for tracked op";
     return;
   }
 
-  LLVM_DEBUG(DBGS() << "replacing tracked @" << op << " : " << *op << " with "
-                    << *replacement << "\n");
-  mayFail(replacePayloadOp(op, replacement));
+  if (*replacement == nullptr) {
+    // TODO: Check if the handle is dead. Otherwise, the op should not be
+    // dropped. This needs a change in the transform dialect interpreter.
+    LLVM_DEBUG(DBGS() << "removing tracked @" << op << " : " << *op << "\n");
+  } else {
+    LLVM_DEBUG(DBGS() << "replacing tracked @" << op << " : " << *op << " with "
+                      << **replacement << "\n");
+  }
+  mayFail(replacePayloadOp(op, *replacement));
 }
 
 void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
@@ -516,14 +528,15 @@ void ::transform_ext::CanonicalizedSequenceOp::build(
 /// Run enabling transformations (LICM and its variants, single-iteration loop
 /// removal, CSE) on the given function.
 static LogicalResult performEnablerTransformations(
-    func::FuncOp func, RewriteListener &listener,
+    func::FuncOp func, RewriterBase::Listener &listener,
     LinalgEnablingOptions options = LinalgEnablingOptions()) {
   MLIRContext *ctx = func->getContext();
   RewritePatternSet patterns(ctx);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-  if (failed(applyPatternsTrackAndFoldGreedily(func, listener,
-                                               std::move(patterns))))
+  GreedyRewriteConfig config;
+  config.listener = &listener;
+  if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns), config)))
     return failure();
 
   // This assumes LICM never removes operations so we don't need tracking.
@@ -550,7 +563,7 @@ static LogicalResult performEnablerTransformations(
 /// Run enabling transformations on the given `containerOp` while preserving the
 /// operation tracking information.
 static LogicalResult performEnablerTransformations(
-    Operation *containerOp, RewriteListener &listener,
+    Operation *containerOp, RewriterBase::Listener &listener,
     LinalgEnablingOptions options = LinalgEnablingOptions()) {
   auto res = containerOp->walk([&](func::FuncOp func) {
     if (failed(performEnablerTransformations(func, listener, options)))
@@ -661,7 +674,7 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
     return DiagnosedSilenceableFailure::definiteFailure();
 
   auto checkedListenerTransform =
-      [&](function_ref<LogicalResult(Operation *, RewriteListener &)>
+      [&](function_ref<LogicalResult(Operation *, RewriterBase::Listener &)>
               transform) {
         SmallVector<Operation *> roots;
         if (Value root = getRoot())
@@ -684,7 +697,7 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
         return success();
       };
 
-  auto performCSE = [](Operation *root, RewriteListener &listener) {
+  auto performCSE = [](Operation *root, RewriterBase::Listener &listener) {
     LogicalResult result =
         eliminateCommonSubexpressions(root, /*domInfo=*/nullptr, &listener);
     LLVM_DEBUG(
@@ -692,7 +705,7 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
                << " CSE\n");
     return result;
   };
-  auto performEnabler = [](Operation *root, RewriteListener &listener) {
+  auto performEnabler = [](Operation *root, RewriterBase::Listener &listener) {
     LogicalResult result = performEnablerTransformations(root, listener);
     LLVM_DEBUG(
         DBGS() << (succeeded(result) ? "successfully performed" : "failed")
@@ -700,9 +713,17 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
     return result;
   };
   auto performCanonicalization = [&patterns](Operation *root,
-                                             RewriteListener &listener) {
-    LogicalResult result =
-        applyPatternsTrackAndFoldGreedily(root, listener, patterns);
+                                             RewriterBase::Listener &listener) {
+    GreedyRewriteConfig config;
+    config.listener = &listener;
+    // Manually gather list of ops because the other GreedyPatternRewriteDriver
+    // overloads only accepts ops that are isolated from above.
+    SmallVector<Operation *> ops;
+    root->walk([&](Operation *op) {
+      if (op != root)
+        ops.push_back(op);
+    });
+    LogicalResult result = applyOpPatternsAndFold(ops, patterns, config);
     LLVM_DEBUG(
         DBGS() << (succeeded(result) ? "successfully performed" : "failed")
                << " canonicalization\n");

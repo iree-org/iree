@@ -9,7 +9,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
-#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
@@ -37,6 +36,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -352,8 +352,15 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
 
   TrackingListener listener(state);
   GreedyRewriteConfig config;
-  LogicalResult result = applyPatternsAndFoldGreedily(
-      target, std::move(patterns), config, &listener);
+  config.listener = &listener;
+  // Manually gather list of ops because the other GreedyPatternRewriteDriver
+  // overloads only accepts ops that are isolated from above.
+  SmallVector<Operation *> ops;
+  target->walk([&](Operation *nestedOp) {
+    if (target != nestedOp) ops.push_back(nestedOp);
+  });
+  LogicalResult result =
+      applyOpPatternsAndFold(ops, std::move(patterns), config);
   LogicalResult listenerResult = listener.checkErrorState();
   if (failed(result)) {
     return mlir::emitDefiniteFailure(target,
@@ -1131,8 +1138,15 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
     TrackingListener listener(state);
     GreedyRewriteConfig config;
-    LogicalResult result = applyPatternsAndFoldGreedily(
-        state.getTopLevel(), std::move(patterns), config, &listener);
+    config.listener = &listener;
+    // Manually gather list of ops because the other GreedyPatternRewriteDriver
+    // overloads only accepts ops that are isolated from above.
+    SmallVector<Operation *> ops;
+    state.getTopLevel()->walk([&](Operation *nestedOp) {
+      if (state.getTopLevel() != nestedOp) ops.push_back(nestedOp);
+    });
+    LogicalResult result =
+        applyOpPatternsAndFold(ops, std::move(patterns), config);
     LogicalResult listenerResult = listener.checkErrorState();
     if (failed(result)) {
       return mlir::emitDefiniteFailure(state.getTopLevel(),

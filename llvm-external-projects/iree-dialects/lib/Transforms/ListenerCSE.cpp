@@ -155,7 +155,7 @@ struct CSE {
 
   // void runOnOperation() override;
   void doItOnOperation(Operation *rootOp, DominanceInfo *domInfo,
-                       RewriteListener *listener);
+                       RewriterBase::Listener *listener);
 
 private:
   void replaceUsesAndDelete(ScopedMapTy &knownValues, Operation *op,
@@ -173,7 +173,7 @@ private:
   // END copied from mlir/lib/Transforms/CSE.cpp
   //===----------------------------------------------------------------------===//
   /// An optional listener to notify of replaced or erased operations.
-  RewriteListener *listener;
+  RewriterBase::Listener *listener;
   int64_t numDCE = 0, numCSE = 0;
 
   //===----------------------------------------------------------------------===//
@@ -412,7 +412,7 @@ void CSE::simplifyRegion(ScopedMapTy &knownValues, Region &region) {
 
 /// Copy of CSE::runOnOperation, without the pass baggage.
 void CSE::doItOnOperation(Operation *rootOp, DominanceInfo *domInfo,
-                          RewriteListener *listener) {
+                          RewriterBase::Listener *listener) {
   /// A scoped hash table of defining operations within a region.
   ScopedMapTy knownValues;
   this->domInfo = domInfo;
@@ -431,9 +431,9 @@ void CSE::doItOnOperation(Operation *rootOp, DominanceInfo *domInfo,
 }
 
 /// Run CSE on the provided operation
-LogicalResult mlir::eliminateCommonSubexpressions(Operation *op,
-                                                  DominanceInfo *domInfo,
-                                                  RewriteListener *listener) {
+LogicalResult
+mlir::eliminateCommonSubexpressions(Operation *op, DominanceInfo *domInfo,
+                                    RewriterBase::Listener *listener) {
   assert(op->hasTrait<OpTrait::IsIsolatedFromAbove>() &&
          "can only do CSE on isolated-from-above ops");
   Optional<DominanceInfo> defaultDomInfo;
