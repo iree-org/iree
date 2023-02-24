@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "create_async_groups.mlir"
     "distribute_foreach.mlir"
     "distribute_to_thread.mlir"
+    "elementwise_pipeline.mlir"
     "gpu_set_num_workgroups.mlir"
     "illegal_configuration.mlir"
     "legalize.mlir"

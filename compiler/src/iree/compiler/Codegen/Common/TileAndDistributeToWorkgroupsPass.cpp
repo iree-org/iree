@@ -104,6 +104,14 @@ static LogicalResult getTileAndDistributeConfig(
     tileSizes[loopId] = 0;
   }
 
+  // Loops with a tile size of 0 shouldn't be distributed.
+  partitionableLoops.erase(
+      std::remove_if(partitionableLoops.begin(), partitionableLoops.end(),
+                     [&](unsigned loopId) {
+                       return loopId >= tileSizes.size() ||
+                              tileSizes[loopId] == 0;
+                     }),
+      partitionableLoops.end());
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*rootOp)) {
     staticLoopRanges = linalgOp.getStaticLoopRanges();
   }
