@@ -1659,6 +1659,8 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-demote-f32-to-f16"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_8da35f2b-a042-4b7d-9dcf-5ebbc1728765-demote-f32-to-16/compilation_flag"
   PUBLIC
 )
 
@@ -1674,6 +1676,8 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-demote-f32-to-f16"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8_8da35f2b-a042-4b7d-9dcf-5ebbc1728765-demote-f32-to-16/compilation_flag"
   PUBLIC
 )
 
@@ -1828,6 +1832,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-flow-demote-f32-to-f16"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_32a56c8d-cc6c-41b8-8620-1f8eda0b8223-demote-f32-to-16/compilation_flag"
   PUBLIC
 )
 
@@ -1844,6 +1850,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-flow-demote-f32-to-f16"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8_32a56c8d-cc6c-41b8-8620-1f8eda0b8223-demote-f32-to-16/compilation_flag"
   PUBLIC
 )
 
@@ -2007,6 +2015,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-flow-demote-f32-to-f16"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_6b601a8d-4824-42e0-bcc6-500c0c3fa346-demote-f32-to-16/compilation_flag"
   PUBLIC
 )
 
@@ -2024,6 +2034,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-flow-demote-f32-to-f16"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8_6b601a8d-4824-42e0-bcc6-500c0c3fa346-demote-f32-to-16/compilation_flag"
   PUBLIC
 )
 
@@ -3700,6 +3712,8 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_8da35f2b-a042-4b7d-9dcf-5ebbc1728765-demote-f32-to-16-compile-stats/compilation_flag"
   PUBLIC
 )
 
@@ -3717,6 +3731,8 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8_8da35f2b-a042-4b7d-9dcf-5ebbc1728765-demote-f32-to-16-compile-stats/compilation_flag"
   PUBLIC
 )
 
@@ -3889,6 +3905,8 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_32a56c8d-cc6c-41b8-8620-1f8eda0b8223-demote-f32-to-16-compile-stats/compilation_flag"
   PUBLIC
 )
 
@@ -3907,6 +3925,8 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8_32a56c8d-cc6c-41b8-8620-1f8eda0b8223-demote-f32-to-16-compile-stats/compilation_flag"
   PUBLIC
 )
 
@@ -4088,6 +4108,8 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8_6b601a8d-4824-42e0-bcc6-500c0c3fa346-demote-f32-to-16-compile-stats/compilation_flag"
   PUBLIC
 )
 
@@ -4107,6 +4129,8 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
+  FLAGFILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8_6b601a8d-4824-42e0-bcc6-500c0c3fa346-demote-f32-to-16-compile-stats/compilation_flag"
   PUBLIC
 )
 
