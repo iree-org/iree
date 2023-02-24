@@ -25,6 +25,7 @@ iree_compiler_cc_library(
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
+        "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
         "//compiler/src/iree/compiler/Dialect/VM/Target/C",
         "//compiler/src/iree/compiler/Pipelines",
         "//compiler/src/iree/compiler/Tools:init_llvmir_translations",
