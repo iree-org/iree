@@ -940,17 +940,17 @@ jobs:
           echo "::notice title=GCS Artifact Link::benchmark-tools-gcs-artifact-dir=${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}"
           echo "::notice title=GCS Artifact Link::e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
 
-  trigger_benchmarks:
-    needs: [setup, build_benchmark_tools, build_e2e_test_artifacts, post_benchmark_artifacts]
-    if: needs.setup.outputs.should-run == 'true'
-    uses: ./.github/workflows/benchmark_execution.yml
-    with:
-      runner-group: ${{ needs.setup.outputs.runner-group }}
-      runner-env: ${{ needs.setup.outputs.runner-env }}
-      ci-stage: ${{ needs.setup.outputs.ci-stage }}
-      e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
-      e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
-      benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
+  # trigger_benchmarks:
+  #   needs: [setup, build_benchmark_tools, build_e2e_test_artifacts, post_benchmark_artifacts]
+  #   if: needs.setup.outputs.should-run == 'true'
+  #   uses: ./.github/workflows/benchmark_execution.yml
+  #   with:
+  #     runner-group: ${{ needs.setup.outputs.runner-group }}
+  #     runner-env: ${{ needs.setup.outputs.runner-env }}
+  #     ci-stage: ${{ needs.setup.outputs.ci-stage }}
+  #     e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+  #     e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+  #     benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
 
   # compilation_benchmarks:
   #   needs: [setup, build_e2e_test_artifacts]
