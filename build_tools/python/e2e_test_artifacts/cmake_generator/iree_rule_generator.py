@@ -59,7 +59,8 @@ class IreeRuleBuilder(object):
                                  cmake_rules=[])
 
     # Import target name: iree-imported-model-<imported_model_str>
-    target_name = f"iree-imported-model-{imported_model}"
+    target_name = cmake_builder.rules.sanitize_target_name(
+        f"iree-imported-model-{imported_model}")
 
     import_flags = import_config.materialize_import_flags(model)
     if import_config.tool == iree_definitions.ImportTool.TFLITE_IMPORTER:
@@ -100,7 +101,8 @@ class IreeRuleBuilder(object):
     ) + compile_config.extra_flags
 
     # Module target name: iree-module-<module_generation_config_str>
-    target_name = f"iree-module-{module_generation_config}"
+    target_name = cmake_builder.rules.sanitize_target_name(
+        f"iree-module-{module_generation_config}")
 
     cmake_rules = [
         cmake_builder.rules.build_iree_bytecode_module(
@@ -117,10 +119,10 @@ class IreeRuleBuilder(object):
                                  cmake_rules=cmake_rules)
 
   def build_target_path(self, target_name: str):
-    """Returns the full target path by combining the package name and the
-    sanitized target name.
+    """Returns the full target path by combining the package name and the target
+    name.
     """
-    return f"{self._package_name}_{cmake_builder.rules.sanitize_target_name(target_name)}"
+    return f"{self._package_name}_{target_name}"
 
   def _generate_compile_flags(self,
                               compile_config: iree_definitions.CompileConfig,

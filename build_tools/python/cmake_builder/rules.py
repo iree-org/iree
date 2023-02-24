@@ -30,9 +30,13 @@ iree_fetch_artifact(
 )
 """
 
+import re
 from typing import List, Optional, Sequence
 
 INDENT_SPACES = " " * 2
+# Match any character not allowed in CMake target name.
+# https://cmake.org/cmake/help/latest/policy/CMP0037.html
+DISALLOWED_TARGET_CHAR_MATCHER = re.compile(r"[^A-Za-z0-9_.+-]")
 
 
 def _get_string_list(values: Sequence[str], quote: bool = True) -> List[str]:
@@ -88,8 +92,8 @@ def _convert_block_to_string(block: List[str]) -> str:
 
 
 def sanitize_target_name(target_name: str):
-  """Replace common special character disallowed in CMake target name."""
-  return target_name.replace(",", "-")
+  """Replace characters disallowed in CMake target name with _."""
+  return DISALLOWED_TARGET_CHAR_MATCHER.sub("_", target_name)
 
 
 def build_iree_bytecode_module(target_name: str,

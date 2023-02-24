@@ -1,6 +1,6 @@
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-DeepLabV3_fp32[fp32][tosa]"
+    "${PACKAGE_NAME}_iree-imported-model-DeepLabV3_fp32_fp32__tosa_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_DeepLabV3_fp32[fp32].tflite"
   IMPORT_FLAGS
@@ -11,7 +11,7 @@ iree_import_tflite_model(
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-EfficientNet_int8[int8][tosa]"
+    "${PACKAGE_NAME}_iree-imported-model-EfficientNet_int8_int8__tosa_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_EfficientNet_int8[int8].tflite"
   IMPORT_FLAGS
@@ -22,7 +22,7 @@ iree_import_tflite_model(
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_fp16[fp16][tosa]"
+    "${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_fp16_fp16__tosa_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_fp16[fp16].tflite"
   IMPORT_FLAGS
@@ -33,7 +33,7 @@ iree_import_tflite_model(
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_fp32[fp32][tosa]"
+    "${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_fp32_fp32__tosa_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_fp32[fp32].tflite"
   IMPORT_FLAGS
@@ -44,7 +44,7 @@ iree_import_tflite_model(
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_int8[int8][tosa]"
+    "${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_int8_int8__tosa_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_int8[int8].tflite"
   IMPORT_FLAGS
@@ -55,7 +55,7 @@ iree_import_tflite_model(
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-MobileNetV1_fp32[fp32-imagenet][tosa]"
+    "${PACKAGE_NAME}_iree-imported-model-MobileNetV1_fp32_fp32_imagenet__tosa_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_MobileNetV1_fp32[fp32,imagenet].0_float.tflite"
   IMPORT_FLAGS
@@ -66,7 +66,7 @@ iree_import_tflite_model(
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-MobileNetV2_fp32[fp32-imagenet][tosa]"
+    "${PACKAGE_NAME}_iree-imported-model-MobileNetV2_fp32_fp32_imagenet__tosa_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_MobileNetV2_fp32[fp32,imagenet].0_224.tflite"
   IMPORT_FLAGS
@@ -77,7 +77,7 @@ iree_import_tflite_model(
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-MobileNetV3Small_fp32[fp32-imagenet][tosa]"
+    "${PACKAGE_NAME}_iree-imported-model-MobileNetV3Small_fp32_fp32_imagenet__tosa_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_MobileNetV3Small_fp32[fp32,imagenet].tflite"
   IMPORT_FLAGS
@@ -88,7 +88,7 @@ iree_import_tflite_model(
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-MobileSSD_fp32[fp32][tosa]"
+    "${PACKAGE_NAME}_iree-imported-model-MobileSSD_fp32_fp32__tosa_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_MobileSSD_fp32[fp32].tflite"
   IMPORT_FLAGS
@@ -99,7 +99,7 @@ iree_import_tflite_model(
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-PersonDetect_int8[int8][tosa]"
+    "${PACKAGE_NAME}_iree-imported-model-PersonDetect_int8_int8__tosa_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_PersonDetect_int8[int8].tflite"
   IMPORT_FLAGS
@@ -110,7 +110,7 @@ iree_import_tflite_model(
 
 iree_import_tflite_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-PoseNet_fp32[fp32][tosa]"
+    "${PACKAGE_NAME}_iree-imported-model-PoseNet_fp32_fp32__tosa_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_PoseNet_fp32[fp32].tflite"
   IMPORT_FLAGS
@@ -121,7 +121,7 @@ iree_import_tflite_model(
 
 iree_import_tf_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-BertForMaskedLMTF[fp32-seqlen512-tensorflow][mhlo]"
+    "${PACKAGE_NAME}_iree-imported-model-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF[fp32,seqlen512,tensorflow]"
   IMPORT_FLAGS
@@ -134,7 +134,7 @@ iree_import_tf_model(
 
 iree_import_tf_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-BertLargeTF[fp32-seqlen384-tensorflow][mhlo]"
+    "${PACKAGE_NAME}_iree-imported-model-BertLargeTF_fp32_seqlen384_tensorflow__mhlo_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_BertLargeTF[fp32,seqlen384,tensorflow]"
   IMPORT_FLAGS
@@ -147,7 +147,7 @@ iree_import_tf_model(
 
 iree_import_tf_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-EfficientNetV2STF[fp32-cnn-tensorflow][mhlo]"
+    "${PACKAGE_NAME}_iree-imported-model-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2STF[fp32,cnn,tensorflow]"
   IMPORT_FLAGS
@@ -160,7 +160,7 @@ iree_import_tf_model(
 
 iree_import_tf_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-MiniLML12H384Uncased[int32-seqlen128][mhlo]"
+    "${PACKAGE_NAME}_iree-imported-model-MiniLML12H384Uncased_int32_seqlen128__mhlo_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_MiniLML12H384Uncased[int32,seqlen128]"
   IMPORT_FLAGS
@@ -173,7 +173,7 @@ iree_import_tf_model(
 
 iree_import_tf_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-Resnet50TF[fp32][mhlo]"
+    "${PACKAGE_NAME}_iree-imported-model-Resnet50TF_fp32__mhlo_"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_Resnet50TF[fp32]"
   IMPORT_FLAGS
@@ -186,7 +186,7 @@ iree_import_tf_model(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -201,7 +201,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-EfficientNet_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -216,7 +216,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp16[fp16][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MobileBertSquad_fp16_fp16__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16[fp16][tosa].mlir"
   MODULE_FILE_NAME
@@ -231,7 +231,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -246,7 +246,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -261,7 +261,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV1_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -276,7 +276,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -291,7 +291,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -306,7 +306,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -321,7 +321,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-PersonDetect_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -336,7 +336,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-PoseNet_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -351,7 +351,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -366,7 +366,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertLargeTF[fp32,seqlen384,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF[fp32,seqlen384,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -381,7 +381,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNetV2STF[fp32,cnn,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF[fp32,cnn,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -396,7 +396,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MiniLML12H384Uncased[int32,seqlen128][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased[int32,seqlen128][mhlo].mlir"
   MODULE_FILE_NAME
@@ -411,7 +411,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-Resnet50TF[fp32][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-Resnet50TF_fp32__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF[fp32][mhlo].mlir"
   MODULE_FILE_NAME
@@ -426,7 +426,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -443,7 +443,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-EfficientNet_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -460,7 +460,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp16[fp16][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-MobileBertSquad_fp16_fp16__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16[fp16][tosa].mlir"
   MODULE_FILE_NAME
@@ -477,7 +477,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -494,7 +494,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -511,7 +511,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV1_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -528,7 +528,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -545,7 +545,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -562,7 +562,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -579,7 +579,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-PersonDetect_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -596,7 +596,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-PoseNet_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -613,7 +613,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -630,7 +630,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertLargeTF[fp32,seqlen384,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF[fp32,seqlen384,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -647,7 +647,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNetV2STF[fp32,cnn,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF[fp32,cnn,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -664,7 +664,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MiniLML12H384Uncased[int32,seqlen128][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding]"
+    "iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased[int32,seqlen128][mhlo].mlir"
   MODULE_FILE_NAME
@@ -681,7 +681,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags]"
+    "iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -695,7 +695,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertLargeTF[fp32,seqlen384,tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags]"
+    "iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF[fp32,seqlen384,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -709,7 +709,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNetV2STF[fp32,cnn,tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags]"
+    "iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF[fp32,cnn,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -723,7 +723,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MiniLML12H384Uncased[int32,seqlen128][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags]"
+    "iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased[int32,seqlen128][mhlo].mlir"
   MODULE_FILE_NAME
@@ -737,7 +737,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-Resnet50TF[fp32][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags]"
+    "iree-module-Resnet50TF_fp32__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF[fp32][mhlo].mlir"
   MODULE_FILE_NAME
@@ -751,7 +751,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -769,7 +769,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -787,7 +787,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV1_fp32[fp32,imagenet][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -805,7 +805,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -823,7 +823,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-PersonDetect_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -841,7 +841,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-EfficientNet_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -859,7 +859,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-EfficientNet_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -877,7 +877,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -895,7 +895,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags]"
+    "iree-module-PersonDetect_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -913,7 +913,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -927,7 +927,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -941,7 +941,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]"
+    "iree-module-PoseNet_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -955,7 +955,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -969,7 +969,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -983,7 +983,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -997,7 +997,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1011,7 +1011,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1028,7 +1028,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1045,7 +1045,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d]"
+    "iree-module-PoseNet_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1062,7 +1062,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1079,7 +1079,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1096,7 +1096,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1113,7 +1113,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d,dotprod]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_dotprod_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1131,7 +1131,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1145,7 +1145,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1159,7 +1159,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1173,7 +1173,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1187,7 +1187,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1201,7 +1201,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1215,7 +1215,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1230,7 +1230,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1245,7 +1245,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1260,7 +1260,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1275,7 +1275,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1290,7 +1290,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1305,7 +1305,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1321,7 +1321,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1337,7 +1337,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1353,7 +1353,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1369,7 +1369,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1383,7 +1383,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1397,7 +1397,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1411,7 +1411,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1425,7 +1425,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1439,7 +1439,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1453,7 +1453,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,demote-f32-to-f16]"
+    "iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16[fp16][tosa].mlir"
   MODULE_FILE_NAME
@@ -1468,7 +1468,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,demote-f32-to-f16]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1483,7 +1483,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,demote-f32-to-f16]"
+    "iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1498,7 +1498,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,demote-f32-to-f16]"
+    "iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1513,7 +1513,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1528,7 +1528,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1543,7 +1543,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1558,7 +1558,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1573,7 +1573,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1588,7 +1588,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1603,7 +1603,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,demote-f32-to-f16]"
+    "iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16[fp16][tosa].mlir"
   MODULE_FILE_NAME
@@ -1619,7 +1619,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,demote-f32-to-f16]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1635,7 +1635,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,demote-f32-to-f16]"
+    "iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1651,7 +1651,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,demote-f32-to-f16]"
+    "iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1667,7 +1667,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1683,7 +1683,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1699,7 +1699,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1715,7 +1715,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1731,7 +1731,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1747,7 +1747,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1763,7 +1763,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,demote-f32-to-f16]"
+    "iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16[fp16][tosa].mlir"
   MODULE_FILE_NAME
@@ -1780,7 +1780,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,demote-f32-to-f16]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1797,7 +1797,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,demote-f32-to-f16]"
+    "iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1814,7 +1814,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,demote-f32-to-f16]"
+    "iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1831,7 +1831,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][cpu-vmvx-generic-vmvx-vmvx][default-flags]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-vmvx-generic-vmvx-vmvx__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1844,7 +1844,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][cpu-vmvx-generic-vmvx-vmvx][default-flags]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-vmvx-generic-vmvx-vmvx__default-flags_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1857,7 +1857,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1874,7 +1874,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-EfficientNet_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1891,7 +1891,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp16[fp16][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileBertSquad_fp16_fp16__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16[fp16][tosa].mlir"
   MODULE_FILE_NAME
@@ -1908,7 +1908,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -1925,7 +1925,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -1942,7 +1942,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV1_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1959,7 +1959,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1976,7 +1976,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -1993,7 +1993,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2010,7 +2010,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-PersonDetect_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2027,7 +2027,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-PoseNet_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2044,7 +2044,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2061,7 +2061,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertLargeTF[fp32,seqlen384,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF[fp32,seqlen384,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2078,7 +2078,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNetV2STF[fp32,cnn,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF[fp32,cnn,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2095,7 +2095,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MiniLML12H384Uncased[int32,seqlen128][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased[int32,seqlen128][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2112,7 +2112,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-Resnet50TF[fp32][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-Resnet50TF_fp32__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF[fp32][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2129,7 +2129,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2148,7 +2148,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-EfficientNet_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2167,7 +2167,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp16[fp16][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileBertSquad_fp16_fp16__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16[fp16][tosa].mlir"
   MODULE_FILE_NAME
@@ -2186,7 +2186,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2205,7 +2205,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2224,7 +2224,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV1_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -2243,7 +2243,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -2262,7 +2262,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -2281,7 +2281,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2300,7 +2300,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-PersonDetect_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2319,7 +2319,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-PoseNet_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2338,7 +2338,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2357,7 +2357,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertLargeTF[fp32,seqlen384,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF[fp32,seqlen384,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2376,7 +2376,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNetV2STF[fp32,cnn,tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF[fp32,cnn,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2395,7 +2395,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MiniLML12H384Uncased[int32,seqlen128][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased[int32,seqlen128][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2414,7 +2414,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags,compile-stats]"
+    "iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF[fp32,seqlen512,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2430,7 +2430,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-BertLargeTF[fp32,seqlen384,tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags,compile-stats]"
+    "iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF[fp32,seqlen384,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2446,7 +2446,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNetV2STF[fp32,cnn,tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags,compile-stats]"
+    "iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF[fp32,cnn,tensorflow][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2462,7 +2462,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MiniLML12H384Uncased[int32,seqlen128][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags,compile-stats]"
+    "iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased[int32,seqlen128][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2478,7 +2478,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-Resnet50TF[fp32][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags,compile-stats]"
+    "iree-module-Resnet50TF_fp32__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF[fp32][mhlo].mlir"
   MODULE_FILE_NAME
@@ -2494,7 +2494,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2514,7 +2514,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2534,7 +2534,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV1_fp32[fp32,imagenet][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -2554,7 +2554,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2574,7 +2574,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-PersonDetect_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2594,7 +2594,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-EfficientNet_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2614,7 +2614,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-EfficientNet_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2634,7 +2634,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2654,7 +2654,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-PersonDetect_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2674,7 +2674,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2690,7 +2690,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2706,7 +2706,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-PoseNet_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2722,7 +2722,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2738,7 +2738,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -2754,7 +2754,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -2770,7 +2770,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags,compile-stats]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2786,7 +2786,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d,compile-stats]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2805,7 +2805,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d,compile-stats]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2824,7 +2824,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d,compile-stats]"
+    "iree-module-PoseNet_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2843,7 +2843,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d,compile-stats]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2862,7 +2862,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d,compile-stats]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -2881,7 +2881,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d,compile-stats]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -2900,7 +2900,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags,mmt4d,dotprod,compile-stats]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_dotprod_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -2920,7 +2920,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2936,7 +2936,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2952,7 +2952,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2968,7 +2968,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -2984,7 +2984,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3000,7 +3000,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3016,7 +3016,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3033,7 +3033,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3050,7 +3050,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3067,7 +3067,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3084,7 +3084,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3101,7 +3101,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3118,7 +3118,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3136,7 +3136,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3154,7 +3154,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3172,7 +3172,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3190,7 +3190,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3206,7 +3206,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3222,7 +3222,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3238,7 +3238,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3254,7 +3254,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3270,7 +3270,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,compile-stats]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3286,7 +3286,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,demote-f32-to-f16,compile-stats]"
+    "iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16[fp16][tosa].mlir"
   MODULE_FILE_NAME
@@ -3303,7 +3303,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,demote-f32-to-f16,compile-stats]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -3320,7 +3320,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,demote-f32-to-f16,compile-stats]"
+    "iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -3337,7 +3337,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags,demote-f32-to-f16,compile-stats]"
+    "iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -3354,7 +3354,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3371,7 +3371,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3388,7 +3388,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3405,7 +3405,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3422,7 +3422,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3439,7 +3439,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,compile-stats]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3456,7 +3456,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,demote-f32-to-f16,compile-stats]"
+    "iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16[fp16][tosa].mlir"
   MODULE_FILE_NAME
@@ -3474,7 +3474,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,demote-f32-to-f16,compile-stats]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -3492,7 +3492,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,demote-f32-to-f16,compile-stats]"
+    "iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -3510,7 +3510,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,demote-f32-to-f16,compile-stats]"
+    "iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -3528,7 +3528,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
+    "iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3546,7 +3546,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
+    "iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3564,7 +3564,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
+    "iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3582,7 +3582,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
+    "iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32[fp32][tosa].mlir"
   MODULE_FILE_NAME
@@ -3600,7 +3600,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3618,7 +3618,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3636,7 +3636,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,demote-f32-to-f16,compile-stats]"
+    "iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16[fp16][tosa].mlir"
   MODULE_FILE_NAME
@@ -3655,7 +3655,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,demote-f32-to-f16,compile-stats]"
+    "iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -3674,7 +3674,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,demote-f32-to-f16,compile-stats]"
+    "iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -3693,7 +3693,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags,fuse-padding,repeated-kernel,demote-f32-to-f16,compile-stats]"
+    "iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8[int8][tosa].mlir"
   MODULE_FILE_NAME
@@ -3712,7 +3712,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV2_fp32[fp32,imagenet][tosa][cpu-vmvx-generic-vmvx-vmvx][default-flags,compile-stats]"
+    "iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-vmvx-generic-vmvx-vmvx__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3727,7 +3727,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-MobileNetV3Small_fp32[fp32,imagenet][tosa][cpu-vmvx-generic-vmvx-vmvx][default-flags,compile-stats]"
+    "iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-vmvx-generic-vmvx-vmvx__default-flags_compile-stats_"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32[fp32,imagenet][tosa].mlir"
   MODULE_FILE_NAME
@@ -3741,240 +3741,240 @@ iree_bytecode_module(
 )
 
 add_dependencies(iree-benchmark-import-models
-  ${PACKAGE_NAME}_iree-imported-model-DeepLabV3_fp32[fp32][tosa]
-  ${PACKAGE_NAME}_iree-imported-model-EfficientNet_int8[int8][tosa]
-  ${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_fp16[fp16][tosa]
-  ${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_fp32[fp32][tosa]
-  ${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_int8[int8][tosa]
-  ${PACKAGE_NAME}_iree-imported-model-MobileNetV1_fp32[fp32-imagenet][tosa]
-  ${PACKAGE_NAME}_iree-imported-model-MobileNetV2_fp32[fp32-imagenet][tosa]
-  ${PACKAGE_NAME}_iree-imported-model-MobileNetV3Small_fp32[fp32-imagenet][tosa]
-  ${PACKAGE_NAME}_iree-imported-model-MobileSSD_fp32[fp32][tosa]
-  ${PACKAGE_NAME}_iree-imported-model-PersonDetect_int8[int8][tosa]
-  ${PACKAGE_NAME}_iree-imported-model-PoseNet_fp32[fp32][tosa]
-  ${PACKAGE_NAME}_iree-imported-model-BertForMaskedLMTF[fp32-seqlen512-tensorflow][mhlo]
-  ${PACKAGE_NAME}_iree-imported-model-BertLargeTF[fp32-seqlen384-tensorflow][mhlo]
-  ${PACKAGE_NAME}_iree-imported-model-EfficientNetV2STF[fp32-cnn-tensorflow][mhlo]
-  ${PACKAGE_NAME}_iree-imported-model-MiniLML12H384Uncased[int32-seqlen128][mhlo]
-  ${PACKAGE_NAME}_iree-imported-model-Resnet50TF[fp32][mhlo]
+  ${PACKAGE_NAME}_iree-imported-model-DeepLabV3_fp32_fp32__tosa_
+  ${PACKAGE_NAME}_iree-imported-model-EfficientNet_int8_int8__tosa_
+  ${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_fp16_fp16__tosa_
+  ${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_fp32_fp32__tosa_
+  ${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_int8_int8__tosa_
+  ${PACKAGE_NAME}_iree-imported-model-MobileNetV1_fp32_fp32_imagenet__tosa_
+  ${PACKAGE_NAME}_iree-imported-model-MobileNetV2_fp32_fp32_imagenet__tosa_
+  ${PACKAGE_NAME}_iree-imported-model-MobileNetV3Small_fp32_fp32_imagenet__tosa_
+  ${PACKAGE_NAME}_iree-imported-model-MobileSSD_fp32_fp32__tosa_
+  ${PACKAGE_NAME}_iree-imported-model-PersonDetect_int8_int8__tosa_
+  ${PACKAGE_NAME}_iree-imported-model-PoseNet_fp32_fp32__tosa_
+  ${PACKAGE_NAME}_iree-imported-model-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo_
+  ${PACKAGE_NAME}_iree-imported-model-BertLargeTF_fp32_seqlen384_tensorflow__mhlo_
+  ${PACKAGE_NAME}_iree-imported-model-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo_
+  ${PACKAGE_NAME}_iree-imported-model-MiniLML12H384Uncased_int32_seqlen128__mhlo_
+  ${PACKAGE_NAME}_iree-imported-model-Resnet50TF_fp32__mhlo_
 )
 
 add_dependencies(iree-benchmark-suites
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16[fp16][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF[fp32-seqlen512-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-BertLargeTF[fp32-seqlen384-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF[fp32-cnn-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased[int32-seqlen128][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-Resnet50TF[fp32][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16[fp16][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF[fp32-seqlen512-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-BertLargeTF[fp32-seqlen384-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF[fp32-cnn-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased[int32-seqlen128][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF[fp32-seqlen512-tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags]
-  ${PACKAGE_NAME}_iree-module-BertLargeTF[fp32-seqlen384-tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags]
-  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF[fp32-cnn-tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags]
-  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased[int32-seqlen128][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags]
-  ${PACKAGE_NAME}_iree-module-Resnet50TF[fp32][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32[fp32-imagenet][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d-dotprod]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-demote-f32-to-f16]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][cpu-vmvx-generic-vmvx-vmvx][default-flags]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][cpu-vmvx-generic-vmvx-vmvx][default-flags]
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_fp16__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Resnet50TF_fp32__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_fp16__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_
+  ${PACKAGE_NAME}_iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_
+  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_
+  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_
+  ${PACKAGE_NAME}_iree-module-Resnet50TF_fp32__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_dotprod_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-vmvx-generic-vmvx-vmvx__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-vmvx-generic-vmvx-vmvx__default-flags_
 )
 
 add_dependencies(iree-e2e-compile-stats-suites
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16[fp16][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF[fp32-seqlen512-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-BertLargeTF[fp32-seqlen384-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF[fp32-cnn-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased[int32-seqlen128][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-Resnet50TF[fp32][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16[fp16][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF[fp32-seqlen512-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-BertLargeTF[fp32-seqlen384-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF[fp32-cnn-tensorflow][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased[int32-seqlen128][mhlo][cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF[fp32-seqlen512-tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-BertLargeTF[fp32-seqlen384-tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF[fp32-cnn-tensorflow][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased[int32-seqlen128][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-Resnet50TF[fp32][mhlo][gpu-cuda-sm_80-linux-gnu-cuda][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32[fp32-imagenet][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][cpu-armv8.2-a-generic-linux-android29-llvm-cpu][experimental-flags-mmt4d-dotprod-compile-stats]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-adreno-generic-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-compile-stats]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][default-flags-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32[fp32][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16[fp16][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8[int8][tosa][gpu-valhall-mali-android31-vulkan-spirv][experimental-flags-fuse-padding-repeated-kernel-demote-f32-to-f16-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32[fp32-imagenet][tosa][cpu-vmvx-generic-vmvx-vmvx][default-flags-compile-stats]
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32[fp32-imagenet][tosa][cpu-vmvx-generic-vmvx-vmvx][default-flags-compile-stats]
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_fp16__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Resnet50TF_fp32__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_fp16__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__cpu-x86_64-cascadelake-linux-gnu-llvm-cpu__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_fp32_seqlen512_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-BertLargeTF_fp32_seqlen384_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_fp32_cnn_tensorflow__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_int32_seqlen128__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Resnet50TF_fp32__mhlo__gpu-cuda-sm_80-linux-gnu-cuda__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_fp32_imagenet__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__cpu-riscv_64-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__cpu-riscv_32-generic-linux-gnu-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__cpu-armv8.2-a-generic-linux-android29-llvm-cpu__experimental-flags_mmt4d_dotprod_compile-stats_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-adreno-generic-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__default-flags_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_fp32__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_fp16__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_int8__tosa__gpu-valhall-mali-android31-vulkan-spirv__experimental-flags_fuse-padding_repeated-kernel_demote-f32-to-f16_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_fp32_imagenet__tosa__cpu-vmvx-generic-vmvx-vmvx__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_fp32_imagenet__tosa__cpu-vmvx-generic-vmvx-vmvx__default-flags_compile-stats_
 )
