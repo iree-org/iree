@@ -96,11 +96,11 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "extract_slice.mlir",
+            "pack.mlir",
             "tensor_insert_slice.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
-            "pack.mlir",
             "tensor_cast.mlir",
             "unpack.mlir",
         ],

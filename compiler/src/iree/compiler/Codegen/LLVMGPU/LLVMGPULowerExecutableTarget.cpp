@@ -180,6 +180,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
         addGPUWarpReductionPassPipeline(executableLoweringPipeline);
         break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDataTiling:
+        addGPUDataTilingPasses(executableLoweringPipeline);
+        break;
       // Transform-dialect pipelines.
       case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
         addGPUTransformDialectPasses(executableLoweringPipeline);
