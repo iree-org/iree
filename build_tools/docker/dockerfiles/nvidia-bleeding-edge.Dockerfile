@@ -11,9 +11,9 @@
 
 # We use .deb files that we host because we have to pin the version and packages
 # routinely dissapear from the Ubuntu apt repositories.
-ARG NVIDIA_GL_DEB="libnvidia-gl-525_525.78.01-0ubuntu0.22.04.1_amd64.deb"
-ARG NVIDIA_COMPUTE_DEB="libnvidia-common-525_525.78.01-0ubuntu0.22.04.1_all.deb"
-ARG NVIDIA_COMMON_DEB="libnvidia-common-525_525.78.01-0ubuntu0.22.04.1_all.deb"
+ARG NVIDIA_GL_DEB="libnvidia-gl-515-server_515.86.01-0ubuntu0.22.04.1_amd64.deb"
+ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-515-server_515.86.01-0ubuntu0.22.04.1_amd64.deb"
+ARG NVIDIA_COMMON_DEB="libnvidia-common-515-server_515.86.01-0ubuntu0.22.04.1_all.deb"
 ARG NVIDIA_EGL_WAYLAND_DEB="libnvidia-egl-wayland1_1.1.9-1.1_amd64.deb"
 
 

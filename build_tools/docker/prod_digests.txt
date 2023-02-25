@@ -16,4 +16,4 @@ gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:9a43a8ef05b6193d6e907bcebcea255
 gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6
 gcr.io/iree-oss/convperf@sha256:8a32b97be7c8817aa12bf669fce4dd1f20d0b01b7aa6f4dbb618e27541d1231d
 gcr.io/iree-oss/perf@sha256:8f4dfc8cf779f6499215a5c4ff2c7608ac3329f23f6ddcf6025e1868e1584222
-gcr.io/iree-oss/nvidia-bleeding-edge@sha256:24cc8f2d974a89899ec90537e63fa75c1bdb68256334f3968daf837d88e301aa
+gcr.io/iree-oss/nvidia-bleeding-edge@sha256:14d6d6b2d9809feeead2215c52d17738380ec6c0ac0cbb889640e6bc463535fa
