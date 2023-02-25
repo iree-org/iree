@@ -49,7 +49,7 @@ CMAKE_ARGS=(
   # IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON.
   "-DIREE_BUILD_SAMPLES=OFF"
 
-  # The libzstd on Ubuntu 18.04 doesn't work with the current LLVM.
+  # The libzstd on Ubuntu 18.04 doesn't work with the IREE integrated LLVM.
   # TODO(#11782): Remove once we bump the minimum supported OS version.
   "-DLLVM_ENABLE_ZSTD=OFF"
 )

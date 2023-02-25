@@ -30,8 +30,8 @@ RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMPUTE_D
 RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_EGL_WAYLAND_DEB}"
 
 
-# Set up the image and working directory by inheriting the vulkan CMake
-# configuration.
+# Set up the image and working directory by inheriting the base-bleeding-edge
+# CMake configuration.
 # Note that we don't start from NVIDIA's docker base:
 # - nvidia/cuda (https://hub.docker.com/r/nvidia/cuda):
 #     it's.. for CUDA.
