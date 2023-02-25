@@ -968,7 +968,7 @@ jobs:
           mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
           jq -r \
             --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
-            '.module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
+            '.artifact_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
             "${COMPILATION_CONFIG}" | \
             gcloud storage cp -r --read-paths-from-stdin \
               "${E2E_TEST_ARTIFACTS_DIR}"

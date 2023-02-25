@@ -99,15 +99,8 @@ def filter_and_group_run_configs(
   return grouped_run_config_map
 
 
-def _get_distinct_module_dir_paths(
-    module_generation_configs: Iterable[
-        iree_definitions.ModuleGenerationConfig],
-    root_path: pathlib.PurePath = pathlib.PurePath()
-) -> List[str]:
-  module_dir_paths = (str(
-      iree_artifacts.get_module_dir_path(config, root_path=root_path))
-                      for config in module_generation_configs)
-  return sorted(set(module_dir_paths))
+def _get_sorted_distinct_paths(paths: List[pathlib.PurePath]):
+  return sorted(set(str(path) for path in paths))
 
 
 def _export_execution_handler(args: argparse.Namespace):
@@ -129,12 +122,16 @@ def _export_execution_handler(args: argparse.Namespace):
       )
     host_environment = host_environments.pop()
 
-    distinct_module_dir_paths = _get_distinct_module_dir_paths(
-        config.module_generation_config for config in run_configs)
+    artifact_paths = []
+    for run_config in run_configs:
+      artifact_paths.append(
+          iree_artifacts.get_module_dir_path(
+              run_config.module_generation_config))
+      artifact_paths.append(iree_artifacts.get_run_dir_path(run_config))
 
     output_map[device_name] = {
         "host_environment": dataclasses.asdict(host_environment),
-        "module_dir_paths": distinct_module_dir_paths,
+        "artifact_paths": _get_sorted_distinct_paths(artifact_paths),
         "run_configs": serialization.serialize_and_pack(run_configs),
     }
 
@@ -148,12 +145,13 @@ def _export_compilation_handler(_args: argparse.Namespace):
       if benchmark_collections.COMPILE_STATS_TAG in config.compile_config.tags
   ]
 
-  distinct_module_dir_paths = _get_distinct_module_dir_paths(
-      compile_stats_gen_configs)
-
+  artifact_paths = [
+      iree_artifacts.get_module_dir_path(config)
+      for config in compile_stats_gen_configs
+  ]
   return {
-      "module_dir_paths":
-          distinct_module_dir_paths,
+      "artifact_paths":
+          _get_sorted_distinct_paths(artifact_paths),
       "generation_configs":
           serialization.serialize_and_pack(compile_stats_gen_configs)
   }

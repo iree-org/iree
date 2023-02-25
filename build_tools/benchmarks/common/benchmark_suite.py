@@ -193,7 +193,8 @@ class BenchmarkSuite(object):
 
   @staticmethod
   def load_from_run_configs(
-      run_configs: Sequence[iree_definitions.E2EModelRunConfig]):
+      run_configs: Sequence[iree_definitions.E2EModelRunConfig],
+      root_benchmark_dir: pathlib.Path):
     """Loads the benchmarks from the run configs.
 
     Args:
@@ -227,6 +228,7 @@ class BenchmarkSuite(object):
           target_arch=target_arch,
           driver_info=driver_info,
           benchmark_tool_name="iree-benchmark-module",
+          benchmark_case_dir=root_benchmark_dir,
           run_config=run_config)
       category = pathlib.Path(model.source_type.value)
       suite_map[category].append(benchmark_case)

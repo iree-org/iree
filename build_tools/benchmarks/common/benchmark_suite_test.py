@@ -199,8 +199,10 @@ class BenchmarkSuiteTest(unittest.TestCase):
         target_device_spec=device_spec_a,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
     run_configs = [run_config_a, run_config_b, run_config_c]
+    root_benchmark_dir = pathlib.Path("e2e_test_artifacts")
 
-    suite = BenchmarkSuite.load_from_run_configs(run_configs=run_configs)
+    suite = BenchmarkSuite.load_from_run_configs(
+        run_configs=run_configs, root_benchmark_dir=root_benchmark_dir)
 
     self.assertEqual(suite.list_categories(),
                      [("exported_tf_v2", pathlib.Path("exported_tf_v2")),
@@ -213,7 +215,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                           target_arch="cpu-riscv_32-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                           benchmark_tool_name="iree-benchmark-module",
-                          benchmark_case_dir=None,
+                          benchmark_case_dir=root_benchmark_dir,
                           run_config=run_config_a),
             BenchmarkCase(model_name=model_tflite.name,
                           model_tags=model_tflite.tags,
@@ -221,7 +223,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                           target_arch="cpu-riscv_64-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
                           benchmark_tool_name="iree-benchmark-module",
-                          benchmark_case_dir=None,
+                          benchmark_case_dir=root_benchmark_dir,
                           run_config=run_config_b)
         ])
     self.assertEqual(
@@ -237,7 +239,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                           target_arch="cpu-riscv_32-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                           benchmark_tool_name="iree-benchmark-module",
-                          benchmark_case_dir=None,
+                          benchmark_case_dir=root_benchmark_dir,
                           run_config=run_config_c)
         ])
     self.assertEqual(

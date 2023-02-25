@@ -147,7 +147,7 @@ jobs:
           jq -r \
             --arg DEVICE_NAME "${DEVICE_NAME}" \
             --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
-            '.[$DEVICE_NAME] | .module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
+            '.[$DEVICE_NAME] | .artifact_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
             "${BENCHMARK_CONFIG}" | \
             gcloud storage cp -r --read-paths-from-stdin "${E2E_TEST_ARTIFACTS_DIR}"
           echo "benchmark-config=${BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"

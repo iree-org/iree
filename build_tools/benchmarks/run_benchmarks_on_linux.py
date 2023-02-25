@@ -84,16 +84,12 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         run_config.target_device_spec)
     cmds.append(tool_path)
 
-    module_dir_path = iree_artifacts.get_module_dir_path(
-        run_config.module_generation_config,
-        root_path=self.config.root_benchmark_dir)
-    cmds += [f"--module={module_dir_path / iree_artifacts.MODULE_FILENAME}"]
-    cmds += run_module_utils.build_run_flags_for_model(
-        model=run_config.module_generation_config.imported_model.model,
-        model_input_data=run_config.input_data)
-    cmds += run_module_utils.build_run_flags_for_execution_config(
-        module_execution_config=run_config.module_execution_config,
-        gpu_id=self.gpu_id)
+    run_dir_path = iree_artifacts.get_run_dir_path(
+        run_config, self.config.root_benchmark_dir)
+    runflag_path = pathlib.Path(run_dir_path / iree_artifacts.RUN_FLAGFILE_NAME)
+    run_flags = [flag.strip() for flag in runflag_path.read_text().splitlines()]
+    cmds += run_module_utils.materialize_run_flags(run_flags,
+                                                   gpu_id=self.gpu_id)
 
     return cmds
 
@@ -162,7 +158,8 @@ def main(args):
         data=run_config_data,
         root_type=typing.List[iree_definitions.E2EModelRunConfig])
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
-        run_configs=run_configs)
+        run_configs=run_configs,
+        root_benchmark_dir=benchmark_config.root_benchmark_dir)
 
   benchmark_driver = LinuxBenchmarkDriver(gpu_id=args.gpu_id,
                                           device_info=device_info,
