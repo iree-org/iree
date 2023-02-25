@@ -40,8 +40,8 @@ def parse_arguments():
 
 def main(args: argparse.Namespace):
   # Currently benchmark is the only source of module generation configs.
-  (iree_module_generation_configs,
-   _) = benchmark_suites.iree.benchmark_collections.generate_benchmarks()
+  (iree_module_generation_configs, iree_e2e_model_run_configs
+  ) = benchmark_suites.iree.benchmark_collections.generate_benchmarks()
 
   dependent_model_map = iree_artifacts.get_dependent_model_map(
       iree_module_generation_configs)
@@ -61,6 +61,7 @@ def main(args: argparse.Namespace):
       package_name=package_name,
       root_path=root_path,
       module_generation_configs=iree_module_generation_configs,
+      e2e_model_run_configs=iree_e2e_model_run_configs,
       model_rule_map=model_rule_map)
 
   (output_dir / GENERATED_E2E_TEST_IREE_ARTIFACTS_CMAKE_FILENAME).write_text(

@@ -11,6 +11,13 @@ from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework.definitions.iree_definitions import ModuleExecutionConfig, RuntimeDriver
 from e2e_test_framework.device_specs import device_parameters
 
+GPU_ID_PLACEHOLDER = "${GPU_ID_PLACEHOLDER}"
+
+
+def materialize_run_flags(run_flags: List[str], gpu_id: str) -> List[str]:
+  """Materialize flags with dependent values."""
+  return [flag.replace(GPU_ID_PLACEHOLDER, gpu_id) for flag in run_flags]
+
 
 def build_run_flags_for_model(
     model: common_definitions.Model,

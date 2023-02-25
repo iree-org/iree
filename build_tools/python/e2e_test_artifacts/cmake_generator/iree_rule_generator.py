@@ -10,10 +10,11 @@ from typing import Dict, List, Sequence
 import pathlib
 
 from benchmark_suites.iree import benchmark_collections
+import cmake_builder.rules
+from e2e_model_tests import run_module_utils
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_artifacts.cmake_generator import model_rule_generator
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-import cmake_builder.rules
 
 BENCHMARK_IMPORT_MODELS_CMAKE_TARGET = "iree-benchmark-import-models"
 BENCHMARK_SUITES_CMAKE_TARGET = "iree-benchmark-suites"
@@ -31,6 +32,13 @@ class IreeModelImportRule(object):
 class IreeModuleCompileRule(object):
   target_name: str
   output_module_path: pathlib.PurePath
+  cmake_rules: List[str]
+
+
+@dataclass(frozen=True)
+class IreeRunFlagDumpRule(object):
+  target_name: str
+  output_flagfile_path: pathlib.PurePath
   cmake_rules: List[str]
 
 
@@ -117,6 +125,28 @@ class IreeRuleBuilder(object):
                                  output_module_path=output_module_path,
                                  cmake_rules=cmake_rules)
 
+  def build_run_flag_dump_rule(
+      self, run_config_id: str, module_path: pathlib.PurePath,
+      flag_vars: List[str],
+      output_flagfile_path: pathlib.PurePath) -> IreeRunFlagDumpRule:
+
+    # Flagfile target name: iree-run-<run_config_id>-flagfile
+    target_name = f"iree-run-{run_config_id}-flagfile"
+
+    flags = [f'"--module={module_path}"'
+            ] + ["${" + flag + "}" for flag in flag_vars]
+    cmake_rules = [
+        cmake_builder.rules.build_iree_dump_flagfile(
+            target_path=self.build_target_path(target_name),
+            output_flagfile_path=str(output_flagfile_path),
+            flags=flags,
+            quote_flags=False)
+    ]
+
+    return IreeRunFlagDumpRule(target_name=target_name,
+                               output_flagfile_path=output_flagfile_path,
+                               cmake_rules=cmake_rules)
+
   def build_target_path(self, target_name: str):
     """Returns the full target path by combining the package name and the target
     name.
@@ -188,6 +218,7 @@ def generate_rules(
     package_name: str, root_path: pathlib.PurePath,
     module_generation_configs: Sequence[
         iree_definitions.ModuleGenerationConfig],
+    e2e_model_run_configs: Sequence[iree_definitions.E2EModelRunConfig],
     model_rule_map: Dict[str, model_rule_generator.ModelRule]) -> List[str]:
   """Generates all rules to build IREE artifacts.
 
@@ -195,6 +226,7 @@ def generate_rules(
     package_name: CMake package name for rules.
     root_path: path of the root artifact directory.
     module_generation_configs: list of IREE module generation configs.
+    e2e_model_run_configs: list of IREE E2E model run configs.
     model_rule_map: map of generated model rules keyed by model id, it must
       cover all model referenced in module_generation_configs.
   Returns:
@@ -240,6 +272,60 @@ def generate_rules(
       module_target_names.append(module_compile_rule.target_name)
     cmake_rules.extend(module_compile_rule.cmake_rules)
 
+  # Collect and define run flags of model inputs and executions so the same set
+  # of flags can be reused by multiple run flag dump rules.
+  model_run_flag_vars = {}
+  exec_run_flag_vars = {}
+  for run_config in e2e_model_run_configs:
+    imported_model = run_config.module_generation_config.imported_model
+    input_data = run_config.input_data
+    model_run_key = (imported_model.composite_id(), input_data.id)
+    if model_run_key not in model_run_flag_vars:
+      # Model input flag variable:
+      # _MODEL_RUN_FLAGS_<imported_config_id>_<input_data_id>
+      var_name = f'_MODEL_RUN_FLAGS_{"_".join(model_run_key)}'
+      rule = cmake_builder.rules.build_set(
+          var_name,
+          run_module_utils.build_run_flags_for_model(
+              model=imported_model.model, model_input_data=input_data))
+      cmake_rules.append(rule)
+      model_run_flag_vars[model_run_key] = var_name
+
+    exec_config = run_config.module_execution_config
+    if exec_config.id not in exec_run_flag_vars:
+      # Execution flag variable: _EXEC_RUN_FLAGS_<exec_config_id>
+      var_name = f"_EXEC_RUN_FLAGS_{exec_config.id}"
+      rule = cmake_builder.rules.build_set(
+          var_name,
+          run_module_utils.build_run_flags_for_execution_config(
+              module_execution_config=exec_config,
+              gpu_id=run_module_utils.GPU_ID_PLACEHOLDER))
+      cmake_rules.append(rule)
+      exec_run_flag_vars[exec_config.id] = var_name
+
+  # Generate rules to dump run flags.
+  for run_config in e2e_model_run_configs:
+    gen_config = run_config.module_generation_config
+    input_data = run_config.input_data
+    model_run_flag_var = model_run_flag_vars[(
+        gen_config.imported_model.composite_id(), input_data.id)]
+    exec_run_flag_var = exec_run_flag_vars[
+        run_config.module_execution_config.id]
+
+    run_dir_path = iree_artifacts.get_run_dir_path(
+        e2e_model_run_config=run_config, root_path=root_path)
+    module_rel_path = iree_artifacts.get_module_dir_path(
+        module_generation_config=gen_config) / iree_artifacts.MODULE_FILENAME
+    dump_rule = rule_builder.build_run_flag_dump_rule(
+        run_config_id=run_config.composite_id(),
+        module_path=module_rel_path,
+        flag_vars=[model_run_flag_var, exec_run_flag_var],
+        output_flagfile_path=run_dir_path / iree_artifacts.RUN_FLAGFILE_NAME)
+
+    module_target_names.append(dump_rule.target_name)
+    cmake_rules += dump_rule.cmake_rules
+
+  # Add generated targets to the dependencies of top-level build targets.
   if len(model_import_rule_map) > 0:
     cmake_rules.append(
         cmake_builder.rules.build_add_dependencies(

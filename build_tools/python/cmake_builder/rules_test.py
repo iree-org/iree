@@ -144,6 +144,49 @@ class RulesTest(unittest.TestCase):
         )
         """))
 
+  def test_build_iree_dump_flagfile(self):
+    rule = cmake_builder.rules.build_iree_dump_flagfile(
+        target_path="pkg_abcd",
+        output_flagfile_path="abcd.flagfile",
+        flags=["--a=10", "--b=20", "c"])
+
+    self.assertEqual(
+        rule,
+        textwrap.dedent("""\
+      iree_dump_flagfile(
+        TARGET_NAME
+          "pkg_abcd"
+        OUTPUT
+          "abcd.flagfile"
+        FLAGS
+          "--a=10"
+          "--b=20"
+          "c"
+      )
+      """))
+
+  def test_build_iree_dump_flagfile_not_quote_flags(self):
+    rule = cmake_builder.rules.build_iree_dump_flagfile(
+        target_path="pkg_abcd",
+        output_flagfile_path="abcd.flagfile",
+        flags=['"--a=10"', '"--b=20"', "${_LONG_FLAGS}"],
+        quote_flags=False)
+
+    self.assertEqual(
+        rule,
+        textwrap.dedent("""\
+      iree_dump_flagfile(
+        TARGET_NAME
+          "pkg_abcd"
+        OUTPUT
+          "abcd.flagfile"
+        FLAGS
+          "--a=10"
+          "--b=20"
+          ${_LONG_FLAGS}
+      )
+      """))
+
   def test_build_iree_benchmark_suite_module_test(self):
     rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
         target_name="model_test",
@@ -199,13 +242,15 @@ class RulesTest(unittest.TestCase):
         """))
 
   def test_build_set(self):
-    rule = cmake_builder.rules.build_set(variable_name="_ABC", value="123")
+    rule = cmake_builder.rules.build_set(variable_name="_ABC",
+                                         values=["123", "abc"])
 
     self.assertEqual(
         rule,
         textwrap.dedent("""\
         set(_ABC
           123
+          abc
         )
         """))
 

@@ -14,6 +14,7 @@ from e2e_test_framework.definitions import common_definitions, iree_definitions
 IREE_ARTIFACT_PREFIX = "iree"
 MODULE_FILENAME = "module.vmfb"
 COMPILATION__FLAG = "compilation.flagfile"
+RUN_FLAGFILE_NAME = "run.flagfile"
 
 
 def _get_model_prefix(imported_model: iree_definitions.ImportedModel) -> str:
@@ -67,6 +68,26 @@ def get_module_dir_path(
   # Module dir path: <root_path>/<model_prefix>_module_<gen_config_id>
   return (root_path /
           f"{model_prefix}_module_{module_generation_config.composite_id()}")
+
+
+def get_run_dir_path(
+    e2e_model_run_config: iree_definitions.E2EModelRunConfig,
+    root_path: pathlib.PurePath = pathlib.PurePath()
+) -> pathlib.PurePath:
+  """Returns the path of an IREE run directory, which contains the related files
+  to run a benchmark.
+
+  Args:
+    e2e_model_run_config: IREE E2E model run config.
+    root_path: path of the root artifact directory, on which the returned path
+      will base.
+  Returns:
+    Path of the run directory.
+  """
+  model_prefix = _get_model_prefix(
+      e2e_model_run_config.module_generation_config.imported_model)
+  # Run dir path: <root_path>/<model_prefix>_run_<run_config_id>
+  return root_path / f"{model_prefix}_run_{e2e_model_run_config.composite_id()}"
 
 
 def get_dependent_model_map(

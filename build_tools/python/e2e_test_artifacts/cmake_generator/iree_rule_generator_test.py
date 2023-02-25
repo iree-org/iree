@@ -109,6 +109,18 @@ class IreeRuleBuilderTest(unittest.TestCase):
     self.assertEqual(rule.output_module_path,
                      output_dir_path / iree_artifacts.MODULE_FILENAME)
 
+  def test_build_run_flag_dump_rule(self):
+    flagfile_path = pathlib.PurePath("xyz.flagfile")
+
+    rule = self._builder.build_run_flag_dump_rule(
+        run_config_id="abcd",
+        module_path=pathlib.PurePath("xyz.vmfb"),
+        flag_vars=["_MODEL_FLAGS", "_EXEC_FLAGS"],
+        output_flagfile_path=flagfile_path)
+
+    self.assertEqual(rule.target_name, "iree-run-abcd-flagfile")
+    self.assertEqual(rule.output_flagfile_path, flagfile_path)
+
   def test_build_target_path(self):
     builder = iree_rule_generator.IreeRuleBuilder(package_name="xyz")
 
@@ -175,6 +187,20 @@ class IreeGeneratorTest(unittest.TestCase):
         imported_model=imported_model_b, compile_config=compile_config_b)
     gen_config_d = iree_definitions.ModuleGenerationConfig(
         imported_model=imported_model_c, compile_config=compile_config_b)
+    run_config_a = iree_definitions.E2EModelRunConfig(
+        module_generation_config=gen_config_a,
+        module_execution_config=iree_definitions.ModuleExecutionConfig(
+            id="exec_a",
+            tags=[],
+            loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
+            driver=iree_definitions.RuntimeDriver.LOCAL_SYNC),
+        target_device_spec=common_definitions.DeviceSpec(
+            id="device_a",
+            device_name="a",
+            host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
+            architecture=common_definitions.DeviceArchitecture.
+            X86_64_CASCADELAKE),
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
     model_rule_map = {
         model_a.id:
             model_rule_generator.ModelRule(
@@ -199,6 +225,7 @@ class IreeGeneratorTest(unittest.TestCase):
         module_generation_configs=[
             gen_config_a, gen_config_b, gen_config_c, gen_config_d
         ],
+        e2e_model_run_configs=[run_config_a],
         model_rule_map=model_rule_map)
 
     concated_cmake_rules = "\n".join(cmake_rules)
@@ -216,6 +243,8 @@ class IreeGeneratorTest(unittest.TestCase):
                      f"iree-module-{gen_config_c.composite_id()}")
     self.assertRegex(concated_cmake_rules,
                      f"iree-module-{gen_config_d.composite_id()}")
+    self.assertRegex(concated_cmake_rules,
+                     f"iree-run-{run_config_a.composite_id()}")
 
 
 if __name__ == "__main__":

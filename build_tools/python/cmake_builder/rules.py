@@ -167,6 +167,32 @@ def build_iree_import_tflite_model(target_path: str, source: str,
                        ]))
 
 
+def build_iree_dump_flagfile(target_path: str,
+                             output_flagfile_path: str,
+                             flags: Optional[List[str]] = None,
+                             quote_flags=True) -> str:
+  """Build IREE_DUMP_FLAGIFILE rule.
+
+  Args:
+    target_path: CMake target path.
+    output_flagfile_path: Path to output flagfile.
+    flags: List of literal flags.
+    quote_flags: Quote each flag in the list. True by default.
+  Returns:
+    CMake rule string.
+  """
+  target_name_block = _get_string_arg_block("TARGET_NAME", target_path)
+  output_block = _get_string_arg_block("OUTPUT", output_flagfile_path)
+
+  flags = [] if flags is None else flags
+  flags_block = _get_string_list_arg_block("FLAGS", flags, quote=quote_flags)
+
+  return _convert_block_to_string(
+      _build_call_rule(
+          rule_name="iree_dump_flagfile",
+          parameter_blocks=[target_name_block, output_block, flags_block]))
+
+
 def build_iree_benchmark_suite_module_test(
     target_name: str,
     driver: str,
@@ -207,6 +233,6 @@ def build_add_dependencies(target: str, deps: List[str]) -> str:
                                   _get_block_body(deps_list) + [")"])
 
 
-def build_set(variable_name: str, value: str) -> str:
+def build_set(variable_name: str, values: List[str]) -> str:
   return _convert_block_to_string([f"set({variable_name}"] +
-                                  _get_block_body([value]) + [")"])
+                                  _get_block_body(values) + [")"])
