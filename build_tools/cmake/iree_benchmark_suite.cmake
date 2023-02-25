@@ -43,7 +43,7 @@ function(iree_import_tflite_model)
       COMMAND
         "${IREE_IMPORT_TFLITE_PATH}"
         "${_RULE_SOURCE}"
-        "-o=${_RULE_OUTPUT_MLIR_FILE}"
+        "-o=\"${_RULE_OUTPUT_MLIR_FILE}\""
         ${_RULE_IMPORT_FLAGS}
       DEPENDS
         "${_RULE_SOURCE}"
@@ -98,7 +98,7 @@ function(iree_import_tf_model)
       COMMAND
         "${IREE_IMPORT_TF_PATH}"
         "${_RULE_SOURCE}"
-        "-o=${_RULE_OUTPUT_MLIR_FILE}"
+        "-o=\"${_RULE_OUTPUT_MLIR_FILE}\""
         ${_RULE_IMPORT_FLAGS}
       DEPENDS
         "${_RULE_SOURCE}"

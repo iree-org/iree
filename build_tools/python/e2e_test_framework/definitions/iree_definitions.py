@@ -189,7 +189,7 @@ class ImportedModel(object):
     return unique_ids.hash_composite_id([self.model.id, self.import_config.id])
 
   def __str__(self):
-    return f"{self.model}[{self.import_config}]"
+    return f"{self.model}({self.import_config})"
 
   @staticmethod
   def from_model(model: common_definitions.Model):

@@ -29,8 +29,7 @@ class ModelArtifactsTest(unittest.TestCase):
 
     self.assertEqual(
         path, root_path /
-        f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{tflite_model.id}_{tflite_model.name}.tflite"
-    )
+        f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{tflite_model}.tflite")
 
   def test_get_model_path_with_tf_model(self):
     tf_model = common_definitions.Model(
@@ -46,9 +45,7 @@ class ModelArtifactsTest(unittest.TestCase):
     path = model_artifacts.get_model_path(model=tf_model, root_path=root_path)
 
     self.assertEqual(
-        path, root_path /
-        f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{tf_model.id}_{tf_model.name}"
-    )
+        path, root_path / f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{tf_model}")
 
 
 if __name__ == "__main__":

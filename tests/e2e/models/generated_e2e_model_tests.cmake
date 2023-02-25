@@ -24,7 +24,7 @@ iree_benchmark_suite_module_test(
   NAME
     "mobilenet_v1_fp32_correctness_test"
   MODEL
-    "MobileNetV1_fp32[fp32,imagenet][tosa]"
+    "MobileNetV1_fp32[fp32,imagenet](tosa)"
   DRIVER
     "local-sync"
   EXPECTED_OUTPUT
@@ -42,7 +42,7 @@ iree_benchmark_suite_module_test(
   NAME
     "efficientnet_int8_correctness_test"
   MODEL
-    "EfficientNet_int8[int8][tosa]"
+    "EfficientNet_int8[int8](tosa)"
   DRIVER
     "local-sync"
   EXPECTED_OUTPUT
@@ -59,7 +59,7 @@ iree_benchmark_suite_module_test(
   NAME
     "deeplab_v3_fp32_correctness_test"
   MODEL
-    "DeepLabV3_fp32[fp32][tosa]"
+    "DeepLabV3_fp32[fp32](tosa)"
   DRIVER
     "local-sync"
   EXPECTED_OUTPUT
@@ -77,7 +77,7 @@ iree_benchmark_suite_module_test(
   NAME
     "person_detect_int8_correctness_test"
   MODEL
-    "PersonDetect_int8[int8][tosa]"
+    "PersonDetect_int8[int8](tosa)"
   DRIVER
     "local-sync"
   EXPECTED_OUTPUT

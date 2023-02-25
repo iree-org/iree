@@ -78,9 +78,7 @@ class IreeArtifactsTest(unittest.TestCase):
         module_generation_config=gen_config, root_path=root_path)
 
     self.assertEqual(
-        path, root_path /
-        f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{model.id}_{model.name}_{compile_config.id}"
-    )
+        path, root_path / f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{gen_config}")
 
   def test_get_dependent_model_map(self):
     model_a = common_definitions.Model(

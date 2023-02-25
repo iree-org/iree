@@ -9,6 +9,7 @@ import unittest
 
 from e2e_test_artifacts.cmake_generator import model_rule_generator, iree_rule_generator
 from e2e_test_framework.definitions import common_definitions, iree_definitions
+import cmake_builder.rules
 
 
 class IreeRuleBuilderTest(unittest.TestCase):
@@ -77,8 +78,8 @@ class IreeRuleBuilderTest(unittest.TestCase):
         source_url="https://example.com/xyz.tflite",
         entry_function="main",
         input_types=["1xf32"])
-    imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
-    compile_config_a = iree_definitions.CompileConfig(
+    imported_model = iree_definitions.ImportedModel.from_model(model_a)
+    compile_config = iree_definitions.CompileConfig(
         id="config_a",
         tags=["defaults"],
         compile_targets=[
@@ -88,6 +89,8 @@ class IreeRuleBuilderTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
+    gen_config = iree_definitions.ModuleGenerationConfig(
+        imported_model=imported_model, compile_config=compile_config)
     model_import_rule = iree_rule_generator.IreeModelImportRule(
         target_name=f"iree-import-model-abcd",
         output_file_path=pathlib.PurePath("root/iree/abcd/1234.mlir"),
@@ -96,12 +99,12 @@ class IreeRuleBuilderTest(unittest.TestCase):
 
     rule = self._builder.build_module_compile_rule(
         model_import_rule=model_import_rule,
-        imported_model=imported_model_a,
-        compile_config=compile_config_a,
+        module_generation_config=gen_config,
         output_file_path=output_file_path)
 
-    self.assertEqual(rule.target_name,
-                     f"iree-module-{model_a.id}-{compile_config_a.id}")
+    self.assertEqual(
+        rule.target_name,
+        cmake_builder.rules.sanitize_target_name(f"iree-module-{gen_config}"))
     self.assertEqual(rule.output_module_path, output_file_path)
 
   def test_build_target_path(self):

@@ -12,7 +12,7 @@ import pathlib
 from benchmark_suites.iree import benchmark_collections
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_artifacts.cmake_generator import model_rule_generator
-from e2e_test_framework.definitions import common_definitions, iree_definitions
+from e2e_test_framework.definitions import iree_definitions
 import cmake_builder.rules
 
 BENCHMARK_IMPORT_MODELS_CMAKE_TARGET = "iree-benchmark-import-models"
