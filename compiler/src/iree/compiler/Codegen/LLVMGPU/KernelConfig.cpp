@@ -463,7 +463,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
         break;
       }
       // If the inner dimension is too small to have one element per thread
-      // reduce the workgroup size try to distribute amonst more dimensions.
+      // reduce the workgroup size try to distribute amongst more dimensions.
       if (shape.back() < vectorSize * workgroupSize[0]) {
         int64_t flatWG = workgroupSize[0];
         vectorSize = 1;
