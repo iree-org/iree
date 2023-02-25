@@ -45,6 +45,7 @@ iree_lit_test_suite(
     "transform_gpu_pipelining.mlir"
     "transform_vector_to_mma.mlir"
     "transpose_pipeline_test.mlir"
+    "unpack_pipeline_test.mlir"
     "vector_to_gpu.mlir"
     "workgroup_specialization_pipeline_test.mlir"
   TOOLS

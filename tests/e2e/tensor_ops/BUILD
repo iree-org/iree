@@ -101,12 +101,12 @@ iree_check_single_backend_test_suite(
             "extract_slice.mlir",
             "pack.mlir",
             "tensor_insert_slice.mlir",
+            "unpack.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
             "pack_dynamic_inner_tiles.mlir",
             "tensor_cast.mlir",
-            "unpack.mlir",
         ],
     ),
     driver = "cuda",

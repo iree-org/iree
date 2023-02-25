@@ -455,6 +455,39 @@ static LogicalResult setPackConfig(func::FuncOp entryPoint,
       workgroupSizes);
 }
 
+static LogicalResult setUnPackConfig(func::FuncOp entryPoint,
+                                     tensor::UnPackOp op) {
+  // TODO(#11505): Consider multi-level tiling for handling unpack + generic
+  // cases.
+  SmallVector<int64_t> tileSizes = getDefaultWorkgroupTileSizesForPackUnPack(
+      cast<TilingInterface>(op.getOperation()),
+      /*defaultSize=*/16);
+
+  // Fixup for making tileSizes be multiple of inner_tile_sizes.
+  SmallVector<int64_t> innerTiles = op.getStaticTiles();
+  ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
+  auto srcType = op.getSourceType();
+  std::array<int64_t, 3> workgroupSizes = {1, 1, 1};
+  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+    tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
+    if (pos >= 3) continue;
+    // Distribute one tile on one thread.
+    if (srcType.isDynamicDim(pos)) {
+      workgroupSizes[pos] = tileSizes[pos] / size;
+    } else {
+      workgroupSizes[pos] =
+          std::min(tileSizes[pos], srcType.getDimSize(pos) * size) / size;
+    }
+  }
+
+  TileSizesListType tileSizesList = {tileSizes};
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizesList,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack,
+      workgroupSizes);
+}
+
 // Basic default properties for linalg ops that haven't been tuned.
 static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
                                           Operation *op) {
@@ -986,6 +1019,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   }
   if (auto packOp = dyn_cast<tensor::PackOp>(computeOp)) {
     return setPackConfig(entryPointFn, packOp);
+  }
+  if (auto unPackOp = dyn_cast<tensor::UnPackOp>(computeOp)) {
+    return setUnPackConfig(entryPointFn, unPackOp);
   }
 
   return setRootDefaultConfig(entryPointFn, computeOp);
