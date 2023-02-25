@@ -91,7 +91,7 @@ def _convert_block_to_string(block: List[str]) -> str:
   return "\n".join(block + [""])
 
 
-def sanitize_target_name(target_name: str):
+def sanitize_target(target_name: str):
   """Replace characters disallowed in CMake target name with _."""
   return DISALLOWED_TARGET_CHAR_MATCHER.sub("_", target_name)
 
