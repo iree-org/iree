@@ -408,23 +408,32 @@ function(iree_benchmark_suite)
 
       # Create the command and target for the flagfile spec used to execute
       # the generated artifacts.
-      set(_FLAG_FILE "${_RUN_SPEC_DIR}/flagfile")
-      set(_ADDITIONAL_ARGS "${_RULE_RUNTIME_FLAGS}")
-      list(APPEND _ADDITIONAL_ARGS "--device_allocator=caching")
-      set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_ADDITIONAL_ARGS}\"")
+      set(_RUN_ARGS "${_RULE_RUNTIME_FLAGS}")
       file(RELATIVE_PATH _MODULE_FILE_FLAG "${_RUN_SPEC_DIR}" "${_VMFB_FILE}")
+      list(APPEND _RUN_ARGS "--module=${_MODULE_FILE_FLAG}")
+      list(APPEND _RUN_ARGS "--device=${_RULE_DRIVER}")
+      list(APPEND _RUN_ARGS "--function=${_MODULE_ENTRY_FUNCTION}")
+      # CMake doesn't have string(SPLIT), replace "," with list delimiter ";" to
+      # split the input string (assume inputs don't contain ";").
+      # See https://stackoverflow.com/q/5272781
+      string(REPLACE "," ";" _MODULE_INPUT_LIST "${_MODULE_FUNCTION_INPUTS}")
+      foreach(_MODULE_FUNCTION_INPUT IN LISTS _MODULE_INPUT_LIST)
+        list(APPEND _RUN_ARGS "--input=${_MODULE_FUNCTION_INPUT}")
+      endforeach()
+      list(APPEND _RUN_ARGS "--device_allocator=caching")
+
+      set(_FLAG_FILE "${_RUN_SPEC_DIR}/flagfile")
+      # Generate the flagfile with python command. We can't use "file" because
+      # it can't be part of a target's dependency and generated lazily. And
+      # "cmake -E echo" doesn't work with newlines.
       add_custom_command(
         OUTPUT "${_FLAG_FILE}"
         COMMAND
           "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
-            --module="${_MODULE_FILE_FLAG}"
-            --device=${_RULE_DRIVER}
-            --function=${_MODULE_ENTRY_FUNCTION}
-            --inputs=${_MODULE_FUNCTION_INPUTS}
-            "${_ADDITIONAL_ARGS_CL}"
-            -o "${_FLAG_FILE}"
+            --output "${_FLAG_FILE}"
+            -- ${_RUN_ARGS}
         DEPENDS
-          "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
+          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
         WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
         COMMENT "Generating ${_FLAG_FILE}"
       )
@@ -460,9 +469,11 @@ function(iree_benchmark_suite)
       add_custom_command(
         OUTPUT "${_COMPILATION_FLAGFILE}"
         COMMAND
-          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_compilation_flagfile.py"
+          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
             --output "${_COMPILATION_FLAGFILE}"
             -- ${_COMPILATION_ARGS}
+        DEPENDS
+          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
         WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
         COMMENT "Generating ${_COMPILATION_FLAGFILE}"
       )
