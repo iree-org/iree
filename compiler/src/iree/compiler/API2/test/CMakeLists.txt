@@ -33,4 +33,16 @@ if(TARGET iree_compiler_API2_test_api-test-binary)
     OUTPUT_NAME "test-iree-compiler-api-test-binary"
     RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/tools"
   )
+
+  if(BUILD_SHARED_LIBS)
+    # When the compiler/LLVM is built in shared library mode, we can't
+    # do C++ linking against re-exported libraries, so we have to link
+    # against the parts that the test uses of the MLIR API explicitly.
+    # There are various ways to solve this layering problem, but none
+    # of them are very nice. So long as this is the only in-tree example,
+    # it should be ok.
+    target_link_libraries(iree_compiler_API2_test_api-test-binary
+      PRIVATE MLIRCAPIIR
+    )
+  endif()
 endif()

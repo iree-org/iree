@@ -16,7 +16,29 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+#-------------------------------------------------------------------------------
+# Project customization. We have various tools which will write gitignored
+# .cmake files to the source tree which configure environment specific
+# default settings for advanced cases. We check for these and load them here.
+# Because this comes after project() declaration and before options, it can
+# change defaults in ways that can typically only be done from the command line.
+# This lets us simulate the effect of CMAKE_PROJECT_TOP_LEVEL_INCLUDES but
+# hard-coded for our project based on the availability of certain config
+# files.
+#-------------------------------------------------------------------------------
+
+macro(iree_include_optional_customization file_name)
+  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${file_name})
+    message(STATUS "Including customization file: ${file_name}")
+    include(${CMAKE_CURRENT_SOURCE_DIR}/${file_name})
+  endif()
+endmacro()
+
+iree_include_optional_customization(".toolchain_config.cmake")
+iree_include_optional_customization(".llvm_dep_config.cmake")
+
 project(IREE ASM C CXX)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 # LLVM defines this as a CACHE property and uses a policy that causes the
@@ -42,11 +64,11 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
 endif()
 
-include(CMakeDependentOption)
-
 #-------------------------------------------------------------------------------
 # Project component configuration
 #-------------------------------------------------------------------------------
+
+include(CMakeDependentOption)
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
