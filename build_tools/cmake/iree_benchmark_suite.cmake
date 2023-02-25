@@ -422,26 +422,16 @@ function(iree_benchmark_suite)
       endforeach()
       list(APPEND _RUN_ARGS "--device_allocator=caching")
 
-      set(_FLAG_FILE "${_RUN_SPEC_DIR}/flagfile")
-      # Generate the flagfile with python command. We can't use "file" because
-      # it can't be part of a target's dependency and generated lazily. And
-      # "cmake -E echo" doesn't work with newlines.
-      add_custom_command(
-        OUTPUT "${_FLAG_FILE}"
-        COMMAND
-          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
-            --output "${_FLAG_FILE}"
-            -- ${_RUN_ARGS}
-        DEPENDS
-          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
-        WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
-        COMMENT "Generating ${_FLAG_FILE}"
-      )
-
       set(_FLAGFILE_GEN_TARGET_NAME
         "${_PACKAGE_NAME}_iree-generate-benchmark-flagfile__${_RUN_SPEC_TARGET_SUFFIX}")
-      add_custom_target("${_FLAGFILE_GEN_TARGET_NAME}"
-        DEPENDS "${_FLAG_FILE}"
+      set(_FLAG_FILE "${_RUN_SPEC_DIR}/flagfile")
+      iree_dump_flagfile(
+        TARGET_NAME "${_FLAGFILE_GEN_TARGET_NAME}"
+        OUTPUT "${_FLAG_FILE}"
+        FLAGS
+          ${_RUN_ARGS}
+        WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
+        COMMENT "Generating ${_FLAG_FILE}"
       )
 
       # Create the command and target for the toolfile spec used to execute
@@ -463,25 +453,15 @@ function(iree_benchmark_suite)
       # Generate a flagfile containing command-line options used to compile the
       # generated artifacts.
       set(_COMPILATION_FLAGFILE "${_RUN_SPEC_DIR}/compilation_flagfile")
-      # Generate the flagfile with python command. We can't use "file" because
-      # it can't be part of a target's dependency and generated lazily. And
-      # "cmake -E echo" doesn't work with newlines.
-      add_custom_command(
-        OUTPUT "${_COMPILATION_FLAGFILE}"
-        COMMAND
-          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
-            --output "${_COMPILATION_FLAGFILE}"
-            -- ${_COMPILATION_ARGS}
-        DEPENDS
-          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
-        WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
-        COMMENT "Generating ${_COMPILATION_FLAGFILE}"
-      )
-
       set(_COMPILATION_FLAGFILE_GEN_TARGET_NAME
         "${_PACKAGE_NAME}_iree-generate-benchmark-compilation-flagfile__${_RUN_SPEC_TARGET_SUFFIX}")
-      add_custom_target("${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}"
-        DEPENDS "${_COMPILATION_FLAGFILE}"
+      iree_dump_flagfile(
+        TARGET_NAME "${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}"
+        OUTPUT "${_COMPILATION_FLAGFILE}"
+        FLAGS
+          ${_COMPILATION_ARGS}
+        WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
+        COMMENT "Generating ${_COMPILATION_FLAGFILE}"
       )
 
       # Mark dependency so that we have one target to drive them all.
