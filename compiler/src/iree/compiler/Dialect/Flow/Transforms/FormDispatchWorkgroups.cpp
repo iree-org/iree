@@ -29,8 +29,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/RegionUtils.h"
-#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-flow-form-dispatch-workgroups"
 
@@ -38,86 +36,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
-
-//===---------------------------------------------------------------------===//
-// Methods to legalize a dispatch region op, i.e. make it isolated from above.
-//===---------------------------------------------------------------------===//
-
-/// Checks if the `Value` has a use within the dispatch that is unfusable.
-static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
-  for (OpOperand &use : v.getUses()) {
-    Operation *user = use.getOwner();
-    Operation *ownerWorkgroupsOp =
-        user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>();
-    Operation *ownerRegionOp =
-        user->getParentOfType<IREE::Flow::DispatchRegionOp>();
-    Operation *owner = ownerWorkgroupsOp ? ownerWorkgroupsOp : ownerRegionOp;
-
-    // Ignore uses outside of dispatch workgroups op.
-    if (owner != dispatchOp) continue;
-
-    // Cannot fuse producer of `dest` with `tensor.insert_slice`.
-    if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
-      if (insertSliceUser.getDest() == v) return true;
-    }
-  }
-  return false;
-}
-
-/// Collect all ops that should be cloned into the given dispatch region op.
-static SmallVector<Operation *> getCloneableOps(
-    Flow::DispatchRegionOp regionOp) {
-  // Find values that are used inside of the dispatch region but defined outside
-  // of the dispatch region.
-  llvm::SetVector<Value> valuesDefinedAbove;
-  mlir::getUsedValuesDefinedAbove(regionOp.getBody(), valuesDefinedAbove);
-  if (valuesDefinedAbove.empty()) return {};
-
-  // Traverse the defining ops of these values (and the ops on their reverse
-  // SSA use-def chain).
-  SmallVector<Operation *> result;
-  llvm::SetVector<Value> visited;
-  SmallVector<Value, 4> worklist;
-  worklist.assign(valuesDefinedAbove.begin(), valuesDefinedAbove.end());
-  while (!worklist.empty()) {
-    Value outsideValue = worklist.pop_back_val();
-    // Skip values that were already visited.
-    if (visited.count(outsideValue)) continue;
-    visited.insert(outsideValue);
-
-    Operation *definingOp = outsideValue.getDefiningOp();
-    if (!definingOp || !isClonableIntoDispatchOp(definingOp) ||
-        hasUnfusableUseInDispatch(outsideValue, regionOp)) {
-      valuesDefinedAbove.insert(outsideValue);
-      continue;
-    }
-    result.push_back(definingOp);
-    worklist.append(definingOp->operand_begin(), definingOp->operand_end());
-    llvm::SetVector<Value> nestedValues;
-    mlir::getUsedValuesDefinedAbove(definingOp->getRegions(), nestedValues);
-    worklist.append(nestedValues.begin(), nestedValues.end());
-  }
-
-  return result;
-}
-
-/// Clone producers into the dispatch region.
-static LogicalResult cloneProducers(RewriterBase &rewriter,
-                                    Flow::DispatchRegionOp regionOp) {
-  SmallVector<Operation *> cloneableOps = getCloneableOps(regionOp);
-  bool sortResult = mlir::computeTopologicalSorting(cloneableOps);
-  (void)sortResult;
-  assert(sortResult && "could not compute topological sorting");
-
-  for (Operation *producer : llvm::reverse(cloneableOps)) {
-    if (failed(
-            clonePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp))) {
-      return failure();
-    }
-  }
-
-  return success();
-}
 
 //===----------------------------------------------------------------------===//
 // Dispatch workgroups formation
@@ -136,7 +54,7 @@ createDispatchWorkgroups(mlir::TensorDimTrackingRewriter &rewriter,
   // Clone additional producers and rewrite to DispatchWorkgroupsOp.
   SmallVector<Flow::DispatchWorkgroupsOp> result;
   for (auto regionOp : regionOps) {
-    if (failed(cloneProducers(rewriter, regionOp))) return failure();
+    if (failed(cloneProducersToRegion(rewriter, regionOp))) return failure();
     auto maybeWorkgroupOp =
         rewriteFlowDispatchRegionToFlowDispatchWorkgroups(regionOp, rewriter);
     if (failed(maybeWorkgroupOp)) return failure();
@@ -175,7 +93,7 @@ static FailureOr<Flow::DispatchWorkgroupsOp> wrapInWorkgroupsOp(
   // Wrap operation.
   auto regionOp = Flow::wrapOpInDispatchRegion(rewriter, op, workloadBuilder);
   if (failed(regionOp)) return failure();
-  if (failed(cloneProducers(rewriter, *regionOp))) return failure();
+  if (failed(cloneProducersToRegion(rewriter, *regionOp))) return failure();
   auto workgroupsOp = Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       *regionOp, rewriter);
   if (failed(workgroupsOp)) return failure();
