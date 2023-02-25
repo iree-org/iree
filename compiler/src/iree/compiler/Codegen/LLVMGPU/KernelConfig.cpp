@@ -480,6 +480,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
           id++;
           if (flatWG <= 1 || id >= workgroupSize.size()) break;
         }
+        break;
       }
     }
   }
