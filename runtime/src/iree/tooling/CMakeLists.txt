@@ -97,7 +97,7 @@ iree_cc_library(
     iree::modules::hal::loader
     iree::modules::vmvx
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
   PUBLIC
 )
 
@@ -182,7 +182,7 @@ iree_cc_library(
     iree::hal
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
   PUBLIC
 )
 
@@ -223,7 +223,7 @@ iree_cc_library(
     iree::hal
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
     yaml
   PUBLIC
 )

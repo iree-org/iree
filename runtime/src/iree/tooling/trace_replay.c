@@ -17,7 +17,7 @@
 #include "iree/base/internal/path.h"
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/module.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 // Parameter for locally defined lcg similar to std::minstd_rand.
 #define IREE_PRNG_MULTIPLIER 48271

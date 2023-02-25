@@ -88,7 +88,7 @@ cc_library(
         "//runtime/src/iree/modules/hal/loader",
         "//runtime/src/iree/modules/vmvx",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 
@@ -160,7 +160,7 @@ cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 
@@ -202,7 +202,7 @@ cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
         "@com_github_yaml_libyaml//:yaml",
     ],
 )

@@ -37,7 +37,7 @@ cc_binary(
         "//runtime/src/iree/hal/local/loaders:vmvx_module_loader",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 
@@ -89,7 +89,7 @@ cc_binary(
         "//runtime/src/iree/hal/local/loaders:embedded_elf_loader",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 
@@ -196,7 +196,7 @@ cc_binary(
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/task:api",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 
@@ -235,7 +235,7 @@ cc_binary(
         "//runtime/src/iree/hal/drivers/vulkan/registration",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 
@@ -287,7 +287,7 @@ endif()
 #         "//runtime/src/iree/hal/drivers/cuda/registration",
 #         "//runtime/src/iree/modules/hal",
 #         "//runtime/src/iree/vm",
-#         "//runtime/src/iree/vm:bytecode_module",
+#         "//runtime/src/iree/vm/bytecode:module",
 #     ],
 # )
 

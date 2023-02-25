@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/vm/bytecode_disasm.h"
+#include "iree/vm/bytecode/disassembler.h"
 
 #include <inttypes.h>
 
@@ -132,7 +132,7 @@
         b, "%u", ((regs)->i32[(reg)&IREE_I32_REGISTER_MASK])));             \
   }
 
-static iree_status_t iree_vm_bytecode_disasm_emit_type_name(
+static iree_status_t iree_vm_bytecode_disassembler_emit_type_name(
     const iree_vm_type_def_t* type_def, iree_string_builder_t* b) {
   if (iree_vm_type_def_is_value(type_def)) {
     const char* type_name;
@@ -169,13 +169,13 @@ static iree_status_t iree_vm_bytecode_disasm_emit_type_name(
   }
 }
 #define EMIT_TYPE_NAME(type_def) \
-  iree_vm_bytecode_disasm_emit_type_name(type_def, b);
+  iree_vm_bytecode_disassembler_emit_type_name(type_def, b);
 
-static iree_status_t iree_vm_bytecode_disasm_emit_operand_list(
+static iree_status_t iree_vm_bytecode_disassembler_emit_operand_list(
     const iree_vm_registers_t* regs, const iree_vm_register_list_t* list,
-    iree_vm_bytecode_disasm_format_t format, iree_string_builder_t* b) {
+    iree_vm_bytecode_disassembly_format_t format, iree_string_builder_t* b) {
   bool include_values =
-      regs && (format & IREE_VM_BYTECODE_DISASM_FORMAT_INLINE_VALUES);
+      regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES);
   for (uint16_t i = 0; i < list->size; ++i) {
     if (i > 0) {
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
@@ -191,10 +191,10 @@ static iree_status_t iree_vm_bytecode_disasm_emit_operand_list(
   return iree_ok_status();
 }
 #define EMIT_OPERAND_REG_LIST(reg_list) \
-  iree_vm_bytecode_disasm_emit_operand_list(regs, reg_list, format, b)
-static iree_status_t iree_vm_bytecode_disasm_emit_result_list(
+  iree_vm_bytecode_disassembler_emit_operand_list(regs, reg_list, format, b)
+static iree_status_t iree_vm_bytecode_disassembler_emit_result_list(
     const iree_vm_register_list_t* list,
-    iree_vm_bytecode_disasm_format_t format, iree_string_builder_t* b) {
+    iree_vm_bytecode_disassembly_format_t format, iree_string_builder_t* b) {
   for (uint16_t i = 0; i < list->size; ++i) {
     if (i > 0) {
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
@@ -205,13 +205,13 @@ static iree_status_t iree_vm_bytecode_disasm_emit_result_list(
   return iree_ok_status();
 }
 #define EMIT_RESULT_REG_LIST(reg_list) \
-  iree_vm_bytecode_disasm_emit_result_list(reg_list, format, b)
-static iree_status_t iree_vm_bytecode_disasm_emit_remap_list(
+  iree_vm_bytecode_disassembler_emit_result_list(reg_list, format, b)
+static iree_status_t iree_vm_bytecode_disassembler_emit_remap_list(
     const iree_vm_registers_t* regs,
     const iree_vm_register_remap_list_t* remap_list,
-    iree_vm_bytecode_disasm_format_t format, iree_string_builder_t* b) {
+    iree_vm_bytecode_disassembly_format_t format, iree_string_builder_t* b) {
   bool include_values =
-      regs && (format & IREE_VM_BYTECODE_DISASM_FORMAT_INLINE_VALUES);
+      regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES);
   for (uint16_t i = 0; i < remap_list->size; ++i) {
     if (i > 0) {
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
@@ -228,30 +228,30 @@ static iree_status_t iree_vm_bytecode_disasm_emit_remap_list(
   return iree_ok_status();
 }
 #define EMIT_REMAP_LIST(remap_list) \
-  iree_vm_bytecode_disasm_emit_remap_list(regs, remap_list, format, b)
+  iree_vm_bytecode_disassembler_emit_remap_list(regs, remap_list, format, b)
 
 #define EMIT_OPTIONAL_VALUE_I32(expr)                                          \
-  if (regs && (format & IREE_VM_BYTECODE_DISASM_FORMAT_INLINE_VALUES)) {       \
+  if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) {  \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_format(b, "(%" PRId32 ")", \
                                                            (int32_t)(expr)));  \
   }
-#define EMIT_OPTIONAL_VALUE_I64(expr)                                    \
-  if (regs && (format & IREE_VM_BYTECODE_DISASM_FORMAT_INLINE_VALUES)) { \
-    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(              \
-        b, "(%" PRId64 ")", *(int64_t*)&(expr)));                        \
+#define EMIT_OPTIONAL_VALUE_I64(expr)                                         \
+  if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) { \
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                   \
+        b, "(%" PRId64 ")", *(int64_t*)&(expr)));                             \
   }
-#define EMIT_OPTIONAL_VALUE_F32(expr)                                    \
-  if (regs && (format & IREE_VM_BYTECODE_DISASM_FORMAT_INLINE_VALUES)) { \
-    IREE_RETURN_IF_ERROR(                                                \
-        iree_string_builder_append_format(b, "(%f)", *(float*)&(expr))); \
+#define EMIT_OPTIONAL_VALUE_F32(expr)                                         \
+  if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) { \
+    IREE_RETURN_IF_ERROR(                                                     \
+        iree_string_builder_append_format(b, "(%f)", *(float*)&(expr)));      \
   }
-#define EMIT_OPTIONAL_VALUE_F64(expr)                                     \
-  if (regs && (format & IREE_VM_BYTECODE_DISASM_FORMAT_INLINE_VALUES)) {  \
-    IREE_RETURN_IF_ERROR(                                                 \
-        iree_string_builder_append_format(b, "(%f)", *(double*)&(expr))); \
+#define EMIT_OPTIONAL_VALUE_F64(expr)                                         \
+  if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) { \
+    IREE_RETURN_IF_ERROR(                                                     \
+        iree_string_builder_append_format(b, "(%f)", *(double*)&(expr)));     \
   }
 #define EMIT_OPTIONAL_VALUE_REF(expr)                                         \
-  if (regs && (format & IREE_VM_BYTECODE_DISASM_FORMAT_INLINE_VALUES)) {      \
+  if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) { \
     iree_vm_ref_t* ref = (expr);                                              \
     if (iree_vm_ref_is_null(ref)) {                                           \
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "(null)"));  \
@@ -406,11 +406,11 @@ static iree_status_t iree_vm_bytecode_disasm_emit_remap_list(
     break;                                                             \
   }
 
-iree_status_t iree_vm_bytecode_disasm_op(
+iree_status_t iree_vm_bytecode_disassemble_op(
     iree_vm_bytecode_module_t* module,
     iree_vm_bytecode_module_state_t* module_state, uint16_t function_ordinal,
     iree_vm_source_offset_t pc, const iree_vm_registers_t* regs,
-    iree_vm_bytecode_disasm_format_t format, iree_string_builder_t* b) {
+    iree_vm_bytecode_disassembly_format_t format, iree_string_builder_t* b) {
   const uint8_t* IREE_RESTRICT bytecode_data =
       module->bytecode_data.data +
       module->function_descriptor_table[function_ordinal].bytecode_offset;
@@ -2130,10 +2130,9 @@ iree_status_t iree_vm_bytecode_disasm_op(
   return iree_ok_status();
 }
 
-iree_status_t iree_vm_bytecode_trace_disasm(iree_vm_stack_frame_t* frame,
-                                            iree_vm_source_offset_t pc,
-                                            const iree_vm_registers_t* regs,
-                                            FILE* file) {
+iree_status_t iree_vm_bytecode_trace_disassembly(
+    iree_vm_stack_frame_t* frame, iree_vm_source_offset_t pc,
+    const iree_vm_registers_t* regs, FILE* file) {
   iree_string_builder_t b;
   iree_string_builder_initialize(iree_allocator_system(), &b);
 
@@ -2188,11 +2187,11 @@ iree_status_t iree_vm_bytecode_trace_disasm(iree_vm_stack_frame_t* frame,
   }
 
   if (iree_status_is_ok(status)) {
-    status = iree_vm_bytecode_disasm_op(
+    status = iree_vm_bytecode_disassemble_op(
         (iree_vm_bytecode_module_t*)frame->function.module,
         (iree_vm_bytecode_module_state_t*)frame->module_state,
         frame->function.ordinal, pc, regs,
-        IREE_VM_BYTECODE_DISASM_FORMAT_INLINE_VALUES, &b);
+        IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES, &b);
   }
 
   if (iree_status_is_ok(status)) {

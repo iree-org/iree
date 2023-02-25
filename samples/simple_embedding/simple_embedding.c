@@ -18,7 +18,7 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 // A function to create the HAL device from the different backend targets.
 // The HAL device is returned based on the implementation, and it must be

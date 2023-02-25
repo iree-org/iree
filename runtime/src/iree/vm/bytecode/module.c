@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -13,7 +13,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module_impl.h"
+#include "iree/vm/bytecode/module_impl.h"
 
 // Alignment applied to each segment of the archive.
 // All embedded file contents (FlatBuffers, rodata, etc) are aligned to this

@@ -75,7 +75,7 @@ cc_binary(
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 
@@ -99,7 +99,7 @@ cc_binary(
         "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal/flatcc:debugging",
         "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 
@@ -143,7 +143,7 @@ cc_binary(
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",

@@ -55,7 +55,7 @@ iree_pyext_module(
     iree::hal::utils::allocators
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
 )
 
 iree_py_library(

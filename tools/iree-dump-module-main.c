@@ -9,7 +9,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/schemas/bytecode_module_def_json_printer.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 // Today we just print to JSON. We could do something more useful (size
 // analysis, etc), but JSON should be enough.

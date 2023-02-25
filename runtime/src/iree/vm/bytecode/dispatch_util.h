@@ -13,8 +13,8 @@
 #include "iree/base/alignment.h"
 #include "iree/base/config.h"
 #include "iree/base/target_platform.h"
-#include "iree/vm/bytecode_module_impl.h"
-#include "iree/vm/generated/bytecode_op_table.h"
+#include "iree/vm/bytecode/generated/op_table.h"
+#include "iree/vm/bytecode/module_impl.h"
 
 //===----------------------------------------------------------------------===//
 // Shared data structures
@@ -130,10 +130,10 @@ static inline const iree_vm_type_def_t* iree_vm_map_type(
 #endif  // IREE_VM_EXECUTION_TRACING_FORCE_ENABLE
 
 #if IREE_VM_EXECUTION_TRACING_ENABLE
-#define IREE_DISPATCH_TRACE_INSTRUCTION(pc_offset, op_name) \
-  if (IREE_IS_DISPATCH_TRACING_ENABLED()) {                 \
-    IREE_RETURN_IF_ERROR(iree_vm_bytecode_trace_disasm(     \
-        current_frame, (pc - (pc_offset)), &regs, stderr)); \
+#define IREE_DISPATCH_TRACE_INSTRUCTION(pc_offset, op_name)  \
+  if (IREE_IS_DISPATCH_TRACING_ENABLED()) {                  \
+    IREE_RETURN_IF_ERROR(iree_vm_bytecode_trace_disassembly( \
+        current_frame, (pc - (pc_offset)), &regs, stderr));  \
   }
 
 #else

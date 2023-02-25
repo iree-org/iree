@@ -13,7 +13,7 @@
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 // Compiled module embedded here to avoid file IO:
 #include "iree/vm/test/all_bytecode_modules.h"

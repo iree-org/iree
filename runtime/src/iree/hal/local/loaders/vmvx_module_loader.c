@@ -16,7 +16,7 @@
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/modules/vmvx/module.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 #define IREE_VMVX_ENTRY_SIGNATURE "0rrriiiiiiiii_v"
 

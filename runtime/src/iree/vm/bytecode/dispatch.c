@@ -11,9 +11,9 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_disasm.h"
-#include "iree/vm/bytecode_dispatch_util.h"
-#include "iree/vm/bytecode_module_impl.h"
+#include "iree/vm/bytecode/disassembler.h"
+#include "iree/vm/bytecode/dispatch_util.h"
+#include "iree/vm/bytecode/module_impl.h"
 #include "iree/vm/ops.h"
 
 //===----------------------------------------------------------------------===//
