@@ -209,20 +209,30 @@ class OptionsBinder {
   llvm::SmallVector<LocalOptionInfo> localOptions;
 };
 
+// Generic class that is used for allocating an Options class that initializes
+// from flags. Every Options type that can have FromFlags called on it needs
+// to include definitions in one implementation module (at the top level
+// namespace):
+//   IREE_DEFINE_COMPILER_OPTION_FLAGS(DerivedTy);
 template <typename DerivedTy>
 class OptionsFromFlags {
  public:
-  static DerivedTy &get() {
-    struct InitializedTy : DerivedTy {
-      InitializedTy() {
-        OptionsBinder binder = OptionsBinder::global();
-        DerivedTy::bindOptions(binder);
-      }
-    };
-    static InitializedTy singleton;
-    return singleton;
-  }
+  static DerivedTy &get();
 };
+
+#define IREE_DEFINE_COMPILER_OPTION_FLAGS(DerivedTy)                   \
+  template <>                                                          \
+  DerivedTy &mlir::iree_compiler::OptionsFromFlags<DerivedTy>::get() { \
+    struct InitializedTy : DerivedTy {                                 \
+      InitializedTy() {                                                \
+        mlir::iree_compiler::OptionsBinder binder =                    \
+            mlir::iree_compiler::OptionsBinder::global();              \
+        DerivedTy::bindOptions(binder);                                \
+      }                                                                \
+    };                                                                 \
+    static InitializedTy singleton;                                    \
+    return singleton;                                                  \
+  }
 
 }  // namespace iree_compiler
 }  // namespace mlir

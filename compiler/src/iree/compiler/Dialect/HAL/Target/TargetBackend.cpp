@@ -15,6 +15,9 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/FileUtilities.h"
 
+IREE_DEFINE_COMPILER_OPTION_FLAGS(
+    mlir::iree_compiler::IREE::HAL::TargetOptions);
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
