@@ -10,7 +10,8 @@
 # To use the host GPUs, `docker run` must be called with the `--gpus all` flag.
 
 # We use .deb files that we host because we have to pin the version and packages
-# routinely dissapear from the Ubuntu apt repositories.
+# routinely dissapear from the Ubuntu apt repositories. The versions need to be
+# compatible with the host driver (usually <= host driver version).
 ARG NVIDIA_GL_DEB="libnvidia-gl-515-server_515.86.01-0ubuntu0.22.04.1_amd64.deb"
 ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-515-server_515.86.01-0ubuntu0.22.04.1_amd64.deb"
 ARG NVIDIA_COMMON_DEB="libnvidia-common-515-server_515.86.01-0ubuntu0.22.04.1_all.deb"
