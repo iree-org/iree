@@ -104,14 +104,6 @@ static LogicalResult getTileAndDistributeConfig(
     tileSizes[loopId] = 0;
   }
 
-  // Loops with a tile size of 0 shouldn't be distributed.
-  partitionableLoops.erase(
-      std::remove_if(partitionableLoops.begin(), partitionableLoops.end(),
-                     [&](unsigned loopId) {
-                       return loopId >= tileSizes.size() ||
-                              tileSizes[loopId] == 0;
-                     }),
-      partitionableLoops.end());
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*rootOp)) {
     staticLoopRanges = linalgOp.getStaticLoopRanges();
   }
@@ -211,6 +203,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
     // slowest varying.
     SmallVector<Value> numWorkgroups;
     for (auto partitionedLoop : llvm::reverse(partitionedLoops)) {
+      if (isConstantIntValue(tileSizes[partitionedLoop], 0)) continue;
       Value numTileAlongDim = getValueOrCreateConstantIndexOp(
           rewriter, loc, numTiles[partitionedLoop]);
       if (numWorkgroups.size() == kNumMaxParallelDims) {
