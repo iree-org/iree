@@ -227,4 +227,47 @@ class OptionsFromFlags {
 }  // namespace iree_compiler
 }  // namespace mlir
 
+namespace llvm {
+namespace cl {
+
+struct ByteSize {
+  int64_t value = 0;
+  ByteSize() = default;
+  ByteSize(int64_t value) : value(value) {}
+  operator bool() const noexcept { return value != 0; }
+};
+
+struct PowerOf2ByteSize : public ByteSize {
+  using ByteSize::ByteSize;
+};
+
+extern template class basic_parser<ByteSize>;
+extern template class basic_parser<PowerOf2ByteSize>;
+
+template <>
+class parser<ByteSize> : public basic_parser<ByteSize> {
+ public:
+  parser(Option &O) : basic_parser(O) {}
+  bool parse(Option &O, StringRef ArgName, StringRef Arg, ByteSize &Val);
+  StringRef getValueName() const override { return "byte size"; }
+  void printOptionDiff(const Option &O, ByteSize V, const OptVal &Default,
+                       size_t GlobalWidth) const;
+  void anchor() override;
+};
+
+template <>
+class parser<PowerOf2ByteSize> : public basic_parser<PowerOf2ByteSize> {
+ public:
+  parser(Option &O) : basic_parser(O) {}
+  bool parse(Option &O, StringRef ArgName, StringRef Arg,
+             PowerOf2ByteSize &Val);
+  StringRef getValueName() const override { return "power of two byte size"; }
+  void printOptionDiff(const Option &O, PowerOf2ByteSize V,
+                       const OptVal &Default, size_t GlobalWidth) const;
+  void anchor() override;
+};
+
+}  // namespace cl
+}  // namespace llvm
+
 #endif  // IREE_COMPILER_UTILS_FLAG_UTILS_H

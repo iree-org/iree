@@ -478,6 +478,8 @@ IREE_API_EXPORT iree_status_t iree_string_view_parse_device_size(
     scale = 1000 * 1000 * 1000;
   } else if (iree_string_view_consume_suffix(&value, IREE_SV("gib"))) {
     scale = 1024 * 1024 * 1024;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("b"))) {
+    scale = 1;
   }
   uint64_t size = 0;
   if (!iree_string_view_atoi_uint64(value, &size)) {

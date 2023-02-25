@@ -25,6 +25,7 @@ iree_cc_library(
     "FixupLegacySync.cpp"
     "InlineDeviceSwitches.cpp"
     "LinkExecutables.cpp"
+    "MaterializeDispatchInstrumentation.cpp"
     "MaterializeInterfaces.cpp"
     "MaterializeResourceCaches.cpp"
     "MemoizeDeviceQueries.cpp"
@@ -67,6 +68,8 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils
+    iree::schemas::instruments
+    iree::schemas::instruments::dispatch_def_c_fbs
   PUBLIC
 )
 

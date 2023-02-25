@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -30,14 +31,18 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   //     *this, "targets", llvm::cl::desc("One or more HAL devices to target."),
   //     llvm::cl::ZeroOrMore};
   Option<bool> serializeExecutables{
-      *this, "serialize-executables",
+      *this,
+      "serialize-executables",
       llvm::cl::desc("Whether to serialize hal.executable.variant ops to "
                      "hal.executable.binary ops."),
-      llvm::cl::init(true)};
+      llvm::cl::init(true),
+  };
   Option<bool> linkExecutables{
-      *this, "link-executables",
+      *this,
+      "link-executables",
       llvm::cl::desc("Whether to link hal.executable ops together."),
-      llvm::cl::init(true)};
+      llvm::cl::init(true),
+  };
 };
 
 static llvm::cl::opt<unsigned> clBenchmarkDispatchRepeatCount{
@@ -46,7 +51,15 @@ static llvm::cl::opt<unsigned> clBenchmarkDispatchRepeatCount{
         "The number of times to repeat each hal.command_buffer.dispatch op. "
         "This simply duplicates the dispatch op and inserts barriers. It's "
         "meant for command buffers having linear dispatch structures."),
-    llvm::cl::init(1)};
+    llvm::cl::init(1),
+};
+
+static llvm::cl::opt<llvm::cl::PowerOf2ByteSize> clInstrumentDispatchBufferSize{
+    "iree-hal-instrument-dispatches",
+    llvm::cl::desc("Enables dispatch instrumentation with a power-of-two byte "
+                   "size used for storage (16mib, 64mib, 2gib, etc)."),
+    llvm::cl::init(llvm::cl::PowerOf2ByteSize(0)),
+};
 
 static llvm::cl::list<std::string> clSubstituteExecutableSource{
     "iree-hal-substitute-executable-source",
@@ -147,6 +160,13 @@ void buildHALConfigurationPassPipeline(OpPassManager &passManager,
     passManager.addPass(createAssignTargetDevicesPass(targetOptions.targets));
   }
   passManager.addPass(createVerifyTargetEnvironmentPass());
+
+  // Add dispatch instrumentation prior to materializing interfaces so we can
+  // more easily mutate the stream dispatch ops and exports.
+  if (auto bufferSize = clInstrumentDispatchBufferSize.getValue()) {
+    passManager.addPass(
+        createMaterializeDispatchInstrumentationPass(bufferSize.value));
+  }
 
   // Each executable needs a hal.interface to specify how the host and
   // device communicate across the ABI boundary.

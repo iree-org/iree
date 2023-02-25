@@ -126,8 +126,7 @@ iree_vm_buffer_length(const iree_vm_buffer_t* buffer);
 // WARNING: this performs no validation of the access allowance on the buffer
 // and the caller is responsible for all range checking. Use with caution and
 // prefer the utility methods instead.
-IREE_API_EXPORT iree_byte_span_t
-iree_vm_buffer_data(const iree_vm_buffer_t* buffer);
+IREE_API_EXPORT uint8_t* iree_vm_buffer_data(const iree_vm_buffer_t* buffer);
 
 // Copies a byte range from |source_buffer| to |target_buffer|.
 IREE_API_EXPORT iree_status_t iree_vm_buffer_copy_bytes(

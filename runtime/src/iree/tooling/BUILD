@@ -108,6 +108,21 @@ cc_library(
 )
 
 cc_library(
+    name = "instrument_util",
+    srcs = ["instrument_util.c"],
+    hdrs = ["instrument_util.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal:types",
+        "//runtime/src/iree/schemas/instruments",
+        "//runtime/src/iree/vm",
+    ],
+)
+
+cc_library(
     name = "numpy_io",
     srcs = ["numpy_io.c"],
     hdrs = ["numpy_io.h"],

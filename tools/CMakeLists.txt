@@ -102,6 +102,20 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-dump-instruments
+  SRCS
+    "iree-dump-instruments-main.c"
+  DEPS
+    flatcc::runtime
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flatcc::parsing
+    iree::schemas::instruments
+    iree::schemas::instruments::dispatch_def_c_fbs
+)
+
+iree_cc_binary(
+  NAME
     iree-dump-module
   SRCS
     "iree-dump-module-main.c"
@@ -128,6 +142,7 @@ iree_cc_binary(
     iree::tooling::comparison
     iree::tooling::context_util
     iree::tooling::device_util
+    iree::tooling::instrument_util
     iree::tooling::vm_util
     iree::vm
 )

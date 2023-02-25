@@ -121,6 +121,24 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    instrument_util
+  HDRS
+    "instrument_util.h"
+  SRCS
+    "instrument_util.c"
+  DEPS
+    iree::base
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal
+    iree::modules::hal::types
+    iree::schemas::instruments
+    iree::vm
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     numpy_io
   HDRS
     "numpy_io.h"

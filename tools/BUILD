@@ -80,6 +80,18 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iree-dump-instruments",
+    srcs = ["iree-dump-instruments-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/base/internal/flatcc:parsing",
+        "//runtime/src/iree/schemas/instruments",
+        "//runtime/src/iree/schemas/instruments:dispatch_def_c_fbs",
+    ],
+)
+
+cc_binary(
     name = "iree-dump-module",
     srcs = ["iree-dump-module-main.c"],
     deps = [
@@ -154,6 +166,7 @@ cc_binary(
         "//runtime/src/iree/tooling:comparison",
         "//runtime/src/iree/tooling:context_util",
         "//runtime/src/iree/tooling:device_util",
+        "//runtime/src/iree/tooling:instrument_util",
         "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/vm",
     ],
