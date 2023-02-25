@@ -30,7 +30,7 @@ class IreeArtifactsTest(unittest.TestCase):
 
     self.assertEqual(
         path, root_path /
-        f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{model.id}_{model.name}.mlir")
+        f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{imported_model}.mlir")
 
   def test_get_imported_model_path_with_mlir_model(self):
     model = common_definitions.Model(

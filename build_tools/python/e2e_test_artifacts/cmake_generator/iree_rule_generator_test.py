@@ -41,7 +41,10 @@ class IreeRuleBuilderTest(unittest.TestCase):
         imported_model=tflite_imported_model,
         output_file_path=output_file_path)
 
-    self.assertEqual(rule.target_name, f"iree-imported-model-{tflite_model.id}")
+    self.assertEqual(
+        rule.target_name,
+        cmake_builder.rules.sanitize_target_name(
+            f"iree-imported-model-{tflite_imported_model}"))
     self.assertEqual(rule.output_file_path, output_file_path)
 
   def test_build_model_import_rule_linalg(self):
@@ -200,17 +203,30 @@ class IreeGeneratorTest(unittest.TestCase):
         model_rule_map=model_rule_map)
 
     concated_cmake_rules = "\n".join(cmake_rules)
-    self.assertRegex(concated_cmake_rules, f"iree-imported-model-{model_a.id}")
-    self.assertRegex(concated_cmake_rules, f"iree-imported-model-{model_b.id}")
-    self.assertRegex(concated_cmake_rules, f"iree-imported-model-{model_c.id}")
-    self.assertRegex(concated_cmake_rules,
-                     f"iree-module-{model_a.id}-{compile_config_a.id}")
-    self.assertRegex(concated_cmake_rules,
-                     f"iree-module-{model_b.id}-{compile_config_a.id}")
-    self.assertRegex(concated_cmake_rules,
-                     f"iree-module-{model_b.id}-{compile_config_b.id}")
-    self.assertRegex(concated_cmake_rules,
-                     f"iree-module-{model_c.id}-{compile_config_b.id}")
+    self.assertRegex(
+        concated_cmake_rules,
+        cmake_builder.rules.sanitize_target_name(
+            f"iree-imported-model-{imported_model_a}"))
+    self.assertRegex(
+        concated_cmake_rules,
+        cmake_builder.rules.sanitize_target_name(
+            f"iree-imported-model-{imported_model_b}"))
+    self.assertRegex(
+        concated_cmake_rules,
+        cmake_builder.rules.sanitize_target_name(
+            f"iree-imported-model-{imported_model_c}"))
+    self.assertRegex(
+        concated_cmake_rules,
+        cmake_builder.rules.sanitize_target_name(f"iree-module-{gen_config_a}"))
+    self.assertRegex(
+        concated_cmake_rules,
+        cmake_builder.rules.sanitize_target_name(f"iree-module-{gen_config_b}"))
+    self.assertRegex(
+        concated_cmake_rules,
+        cmake_builder.rules.sanitize_target_name(f"iree-module-{gen_config_c}"))
+    self.assertRegex(
+        concated_cmake_rules,
+        cmake_builder.rules.sanitize_target_name(f"iree-module-{gen_config_d}"))
 
 
 if __name__ == "__main__":
