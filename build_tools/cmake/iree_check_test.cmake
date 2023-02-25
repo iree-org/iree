@@ -201,6 +201,9 @@ function(iree_check_single_backend_test_suite)
     ${ARGN}
   )
 
+  string(TOUPPER "${IREE_EXTERNAL_HAL_DRIVERS}" _UPPERCASE_EXTERNAL_DRIVERS)
+  string(REPLACE "-" "_" _NORMALIZED_EXTERNAL_DRIVERS "${_UPPERCASE_EXTERNAL_DRIVERS}")
+
   # Omit tests for which the specified driver or target backend is not enabled.
   # This overlaps with directory exclusions and other filtering mechanisms.
   #
@@ -209,8 +212,6 @@ function(iree_check_single_backend_test_suite)
   if(DEFINED _RULE_DRIVER)
     string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
     string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
-    string(TOUPPER ${IREE_EXTERNAL_HAL_DRIVERS} _UPPERCASE_EXTERNAL_DRIVERS)
-    string(REPLACE "-" "_" _NORMALIZED_EXTERNAL_DRIVERS ${_UPPERCASE_DRIVER})
     if((NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER}) AND (NOT ${_NORMALIZED_DRIVER} IN_LIST _NORMALIZED_EXTERNAL_DRIVERS))
       message(SEND_ERROR "Unknown driver '${_RULE_DRIVER}'. Check IREE_HAL_DRIVER_*/IREE_EXTERNAL_HAL_DRIVERS options.")
     endif()
