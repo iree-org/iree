@@ -428,7 +428,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       workgroupTileSizes[depth] = 0;
     }
   }
-
+  int64_t skipInnerTiling = 0;
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     for (auto [index, outputOperand] :
          llvm::enumerate(genericOp.getDpsInitOperands())) {
@@ -462,6 +462,26 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
         vectorSize = 1;
         break;
       }
+      // If the inner dimension is too small to have one element per thread
+      // reduce the workgroup size try to distribute amongst more dimensions.
+      if (shape.back() < vectorSize * workgroupSize[0]) {
+        int64_t flatWG = workgroupSize[0];
+        vectorSize = 1;
+        int64_t id = 0;
+        for (int64_t dim : llvm::reverse(shape)) {
+          if (dim < flatWG) {
+            skipInnerTiling++;
+            workgroupSize[id] = dim;
+          } else {
+            workgroupSize[id] = flatWG;
+            break;
+          }
+          flatWG = flatWG / dim;
+          id++;
+          if (flatWG <= 1 || id >= workgroupSize.size()) break;
+        }
+        break;
+      }
     }
   }
 
@@ -480,13 +500,24 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
         IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize;
   }
 
+  int64_t id = 0;
   // Set the inner most parallel loop to `lowerTs`.
   for (int64_t depth = numLoops; depth > 0; depth--) {
     if (partitionedLoopsSet.count(depth - 1)) {
-      workgroupTileSizes[depth - 1] = workgroupSize[0] * vectorSize;
+      if (skipInnerTiling > 0) {
+        // For dimensions that don't need to be distributed across blocks skip
+        // tiling by setting tile size to 0.
+        workgroupTileSizes[depth - 1] = 0;
+        skipInnerTiling--;
+        id++;
+        if (id >= workgroupSize.size()) break;
+        continue;
+      }
+      workgroupTileSizes[depth - 1] = workgroupSize[id] * vectorSize;
       break;
     }
   }
+
   if (linalgOp) {
     // Tile reduction dimension to 4 to allow doing load4 if the reduction size
     // is the most inner dimension.
