@@ -472,11 +472,13 @@ Error *Invocation::outputVMBytecode(Output &output) {
   auto builtinModule = llvm::dyn_cast<mlir::ModuleOp>(*parsedModule);
   LogicalResult result = failure();
   if (vmModule) {
-    result = translateModuleToBytecode(vmModule, session.bytecodeTargetOptions,
+    result = translateModuleToBytecode(vmModule, session.vmTargetOptions,
+                                       session.bytecodeTargetOptions,
                                        *output.outputStream);
   } else if (builtinModule) {
-    result = translateModuleToBytecode(
-        builtinModule, session.bytecodeTargetOptions, *output.outputStream);
+    result = translateModuleToBytecode(builtinModule, session.vmTargetOptions,
+                                       session.bytecodeTargetOptions,
+                                       *output.outputStream);
   } else {
     (*parsedModule)->emitError() << "expected a vm.module or builtin.module";
   }

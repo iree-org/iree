@@ -236,6 +236,33 @@ static iree_status_t iree_vm_bytecode_module_resolve_types(
   return status;
 }
 
+// clang-format off
+static const iree_bitfield_string_mapping_t iree_vm_bytecode_feature_mappings[] = {
+  {iree_vm_FeatureBits_EXT_F32, IREE_SVL("EXT_F32")},
+  {iree_vm_FeatureBits_EXT_F64, IREE_SVL("EXT_F64")},
+};
+// clang-format on
+
+// Formats a buffer usage bitfield as a string.
+// See iree_bitfield_format for usage.
+static iree_string_view_t iree_vm_bytecode_features_format(
+    iree_vm_FeatureBits_enum_t value, iree_bitfield_string_temp_t* out_temp) {
+  return iree_bitfield_format_inline(
+      value, IREE_ARRAYSIZE(iree_vm_bytecode_feature_mappings),
+      iree_vm_bytecode_feature_mappings, out_temp);
+}
+
+static iree_vm_FeatureBits_enum_t iree_vm_bytecode_available_features(void) {
+  iree_vm_FeatureBits_enum_t result = 0;
+#if IREE_VM_EXT_F32_ENABLE
+  result |= iree_vm_FeatureBits_EXT_F32;
+#endif  // IREE_VM_EXT_F32_ENABLE
+#if IREE_VM_EXT_F64_ENABLE
+  result |= iree_vm_FeatureBits_EXT_F64;
+#endif  // IREE_VM_EXT_F64_ENABLE
+  return result;
+}
+
 // Verifies the structure of the FlatBuffer so that we can avoid doing so during
 // runtime. There are still some conditions we must be aware of (such as omitted
 // names on functions with internal linkage), however we shouldn't need to
@@ -257,6 +284,33 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
 
   iree_vm_BytecodeModuleDef_table_t module_def =
       iree_vm_BytecodeModuleDef_as_root(flatbuffer_contents.data);
+
+  const iree_vm_FeatureBits_enum_t available_features =
+      iree_vm_bytecode_available_features();
+  const iree_vm_FeatureBits_enum_t required_features =
+      iree_vm_BytecodeModuleDef_requirements(module_def);
+  if (!iree_all_bits_set(available_features, required_features)) {
+#if IREE_STATUS_MODE
+    const iree_vm_FeatureBits_enum_t needed_features =
+        required_features & ~available_features;
+    iree_bitfield_string_temp_t temp0, temp1, temp2;
+    iree_string_view_t available_features_str =
+        iree_vm_bytecode_features_format(available_features, &temp0);
+    iree_string_view_t required_features_str =
+        iree_vm_bytecode_features_format(required_features, &temp1);
+    iree_string_view_t needed_features_str =
+        iree_vm_bytecode_features_format(needed_features, &temp2);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "required module features [%.*s] are not available in this runtime "
+        "configuration; have [%.*s] while module requires [%.*s]",
+        (int)needed_features_str.size, needed_features_str.data,
+        (int)available_features_str.size, available_features_str.data,
+        (int)required_features_str.size, required_features_str.data);
+#else
+    return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+#endif  // IREE_STATUS_MODE
+  }
 
   flatbuffers_string_t name = iree_vm_BytecodeModuleDef_name(module_def);
   if (!flatbuffers_string_len(name)) {
@@ -317,8 +371,19 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
       iree_vm_BytecodeModuleDef_imported_functions(module_def);
   iree_vm_ExportFunctionDef_vec_t exported_functions =
       iree_vm_BytecodeModuleDef_exported_functions(module_def);
+  iree_vm_FunctionSignatureDef_vec_t function_signatures =
+      iree_vm_BytecodeModuleDef_function_signatures(module_def);
   iree_vm_FunctionDescriptor_vec_t function_descriptors =
       iree_vm_BytecodeModuleDef_function_descriptors(module_def);
+
+  if (iree_vm_FunctionSignatureDef_vec_len(function_signatures) !=
+      iree_vm_FunctionDescriptor_vec_len(function_descriptors)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "function signature and descriptor table length mismatch (%zu vs %zu)",
+        iree_vm_FunctionSignatureDef_vec_len(function_signatures),
+        iree_vm_FunctionDescriptor_vec_len(function_descriptors));
+  }
 
   for (size_t i = 0; i < iree_vm_ImportFunctionDef_vec_len(imported_functions);
        ++i) {
@@ -359,6 +424,16 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
           "exports[%zu] internal_ordinal out of bounds (0 < %zu < %zu)", i,
           internal_ordinal,
           iree_vm_FunctionDescriptor_vec_len(function_descriptors));
+    }
+  }
+
+  for (size_t i = 0;
+       i < iree_vm_FunctionSignatureDef_vec_len(function_signatures); ++i) {
+    iree_vm_FunctionSignatureDef_table_t function_signature =
+        iree_vm_FunctionSignatureDef_vec_at(function_signatures, i);
+    if (!function_signature) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "function_signatures[%zu] missing body", i);
     }
   }
 
@@ -427,7 +502,8 @@ static iree_status_t iree_vm_bytecode_map_internal_ordinal(
     iree_vm_ExportFunctionDef_table_t function_def =
         iree_vm_ExportFunctionDef_vec_at(exported_functions, function.ordinal);
     ordinal = iree_vm_ExportFunctionDef_internal_ordinal(function_def);
-    signature_def = iree_vm_ExportFunctionDef_signature(function_def);
+    signature_def = iree_vm_FunctionSignatureDef_vec_at(
+        iree_vm_BytecodeModuleDef_function_signatures(module->def), ordinal);
   } else {
     // TODO(benvanik): support querying the internal functions, which could be
     // useful for debugging. Or maybe we just drop them forever?
@@ -653,12 +729,16 @@ static iree_status_t iree_vm_bytecode_module_get_function(
     iree_vm_ExportFunctionDef_table_t export_def =
         iree_vm_ExportFunctionDef_vec_at(exported_functions, ordinal);
     name = iree_vm_ExportFunctionDef_local_name(export_def);
-    signature = iree_vm_ExportFunctionDef_signature(export_def);
+    signature = iree_vm_FunctionSignatureDef_vec_at(
+        iree_vm_BytecodeModuleDef_function_signatures(module->def),
+        iree_vm_ExportFunctionDef_internal_ordinal(export_def));
   } else if (linkage == IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
 #if IREE_VM_BACKTRACE_ENABLE
     name = iree_vm_bytecode_module_lookup_internal_function_name(module->def,
                                                                  ordinal);
 #endif  // IREE_VM_BACKTRACE_ENABLE
+    signature = iree_vm_FunctionSignatureDef_vec_at(
+        iree_vm_BytecodeModuleDef_function_signatures(module->def), ordinal);
   }
 
   if (out_function) {
@@ -692,6 +772,8 @@ static iree_status_t iree_vm_bytecode_module_get_function_attr(
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
   iree_vm_ExportFunctionDef_vec_t exported_functions =
       iree_vm_BytecodeModuleDef_exported_functions(module->def);
+  iree_vm_FunctionSignatureDef_vec_t function_signatures =
+      iree_vm_BytecodeModuleDef_function_signatures(module->def);
 
   if (ordinal >= iree_vm_ExportFunctionDef_vec_len(exported_functions)) {
     return iree_make_status(
@@ -703,7 +785,9 @@ static iree_status_t iree_vm_bytecode_module_get_function_attr(
   iree_vm_ExportFunctionDef_table_t function_def =
       iree_vm_ExportFunctionDef_vec_at(exported_functions, ordinal);
   iree_vm_FunctionSignatureDef_table_t signature_def =
-      iree_vm_ExportFunctionDef_signature(function_def);
+      iree_vm_FunctionSignatureDef_vec_at(
+          function_signatures,
+          iree_vm_ExportFunctionDef_internal_ordinal(function_def));
   if (!signature_def) {
     return iree_make_status(
         IREE_STATUS_NOT_FOUND,

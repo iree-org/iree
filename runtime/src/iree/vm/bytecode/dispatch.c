@@ -1638,6 +1638,9 @@ static iree_status_t iree_vm_bytecode_dispatch(
     // Control flow
     //===------------------------------------------------------------------===//
 
+    // No-op in the interpreter.
+    DISPATCH_OP(CORE, Block, {});
+
     DISPATCH_OP(CORE, Branch, {
       int32_t block_pc = VM_DecBranchTarget("dest");
       const iree_vm_register_remap_list_t* remap_list =

@@ -1515,6 +1515,12 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     // Control flow
     //===------------------------------------------------------------------===//
 
+    DISASM_OP(CORE, Block) {
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_string(b, IREE_SV("<block>")));
+      break;
+    }
+
     DISASM_OP(CORE, Branch) {
       int32_t block_pc = VM_ParseBranchTarget("dest");
       const iree_vm_register_remap_list_t* remap_list =

@@ -33,7 +33,7 @@ extern "C" {
 // Major bytecode version; mismatches on this will fail in either direction.
 // This allows coarse versioning of completely incompatible versions.
 // Matches BytecodeEncoder::kVersionMajor in the compiler.
-#define IREE_VM_BYTECODE_VERSION_MAJOR 13
+#define IREE_VM_BYTECODE_VERSION_MAJOR 14
 // Minor bytecode version; lower versions are allowed to enable newer runtimes
 // to load older serialized files when there are backwards-compatible changes.
 // Higher versions are disallowed as they occur when new ops are added that
