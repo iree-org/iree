@@ -45,7 +45,7 @@ iree_cc_test(
     iree::testing::gtest_main
     iree::tooling::device_util
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
     iree::vm::cc
 )
 

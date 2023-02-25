@@ -94,7 +94,7 @@ iree_cc_library(
     iree::hal::local::executable_loader
     iree::modules::vmvx
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
   DEFINES
     "IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE=1"
   PUBLIC

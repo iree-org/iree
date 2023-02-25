@@ -54,7 +54,7 @@
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"

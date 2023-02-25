@@ -8,7 +8,7 @@
 // This means mostly just FlatBuffer verification, module interface functions,
 // etc. bytecode_dispatch_test.cc covers actual dispatch.
 
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 #include <memory>
 #include <vector>
@@ -17,7 +17,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module_test_module_c.h"
+#include "iree/vm/bytecode/module_test_module_c.h"
 
 static bool operator==(const iree_vm_value_t& lhs,
                        const iree_vm_value_t& rhs) noexcept {

@@ -72,7 +72,7 @@ Include headers:
 // Functionality extensions can be used via custom modules.
 #include "iree/modules/hal/module.h"
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 ```
 
 Check the API version and register components:

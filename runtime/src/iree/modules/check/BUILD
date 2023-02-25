@@ -42,7 +42,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
         "//runtime/src/iree/vm:cc",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )

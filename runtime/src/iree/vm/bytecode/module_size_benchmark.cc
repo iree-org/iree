@@ -6,8 +6,8 @@
 
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
-#include "iree/vm/bytecode_module_size_benchmark_module_c.h"
+#include "iree/vm/bytecode/module.h"
+#include "iree/vm/bytecode/module_size_benchmark_module_c.h"
 
 extern "C" int main(int argc, char** argv) {
   iree_vm_instance_t* instance = nullptr;

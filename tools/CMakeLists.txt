@@ -96,7 +96,7 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::tooling::vm_util
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
   TESTONLY
 )
 
@@ -125,7 +125,7 @@ iree_cc_binary(
     iree::base::internal::file_io
     iree::base::internal::flatcc::debugging
     iree::schemas::bytecode_module_def_c_fbs
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
 )
 
 iree_cc_binary(
@@ -281,7 +281,7 @@ if(IREE_BUILD_COMPILER)
       iree::tooling::device_util
       iree::tooling::vm_util
       iree::vm
-      iree::vm::bytecode_module
+      iree::vm::bytecode::module
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY

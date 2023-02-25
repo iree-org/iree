@@ -79,7 +79,7 @@ iree_compiler_cc_library(
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
         "@llvm-project//mlir:IR",
     ],
 )

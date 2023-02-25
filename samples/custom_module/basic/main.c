@@ -12,7 +12,7 @@
 // uses base VM types.
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 // HACK: this pokes in to private APIs for IO helpers while we expect
 // applications to bring their own IO.

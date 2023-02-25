@@ -11,7 +11,7 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 //===----------------------------------------------------------------------===//
 // Public API

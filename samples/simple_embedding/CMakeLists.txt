@@ -28,7 +28,7 @@ iree_cc_binary(
     iree::hal::local::loaders::vmvx_module_loader
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
 )
 
 iree_bytecode_module(
@@ -74,7 +74,7 @@ iree_cc_binary(
     iree::hal::local::loaders::embedded_elf_loader
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
 )
 
 iree_bytecode_module(
@@ -192,7 +192,7 @@ iree_cc_binary(
     iree::modules::hal
     iree::task::api
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
 )
 
 iree_native_test(
@@ -222,7 +222,7 @@ iree_cc_binary(
     iree::hal::drivers::vulkan::registration
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
 )
 
 iree_bytecode_module(

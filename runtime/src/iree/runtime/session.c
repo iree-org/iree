@@ -16,7 +16,7 @@
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/instance.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 //===----------------------------------------------------------------------===//
 // iree_runtime_session_options_t
