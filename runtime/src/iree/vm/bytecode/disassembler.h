@@ -9,7 +9,7 @@
 
 #include <stdio.h>
 
-#include "iree/base/string_builder.h"
+#include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/dispatch_util.h"
 #include "iree/vm/bytecode/module_impl.h"

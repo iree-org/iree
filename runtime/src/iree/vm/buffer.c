@@ -12,8 +12,6 @@
 #include "iree/base/tracing.h"
 #include "iree/vm/instance.h"
 
-static iree_vm_ref_type_descriptor_t iree_vm_buffer_descriptor = {0};
-
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_buffer, iree_vm_buffer_t);
 
 static iree_status_t iree_vm_buffer_map(const iree_vm_buffer_t* buffer,
@@ -141,7 +139,7 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_clone(
 
   // Try to map the source buffer first; no use continuing if we can't read the
   // data to clone.
-  iree_const_byte_span_t source_span;
+  iree_const_byte_span_t source_span = iree_const_byte_span_empty();
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_vm_buffer_map_ro(source_buffer, source_offset, length, 1,
                                 &source_span));
@@ -192,10 +190,10 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_copy_bytes(
     iree_host_size_t length) {
   IREE_ASSERT_ARGUMENT(source_buffer);
   IREE_ASSERT_ARGUMENT(target_buffer);
-  iree_const_byte_span_t source_span;
+  iree_const_byte_span_t source_span = iree_const_byte_span_empty();
   IREE_RETURN_IF_ERROR(iree_vm_buffer_map_ro(source_buffer, source_offset,
                                              length, 1, &source_span));
-  iree_byte_span_t target_span;
+  iree_byte_span_t target_span = iree_byte_span_empty();
   IREE_RETURN_IF_ERROR(iree_vm_buffer_map_rw(target_buffer, target_offset,
                                              length, 1, &target_span));
   memcpy(target_span.data, source_span.data, length);
@@ -208,10 +206,10 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_compare_bytes(
     iree_host_size_t length, bool* out_result) {
   IREE_ASSERT_ARGUMENT(lhs_buffer);
   IREE_ASSERT_ARGUMENT(rhs_buffer);
-  iree_const_byte_span_t lhs_span;
+  iree_const_byte_span_t lhs_span = iree_const_byte_span_empty();
   IREE_RETURN_IF_ERROR(
       iree_vm_buffer_map_ro(lhs_buffer, lhs_offset, length, 1, &lhs_span));
-  iree_const_byte_span_t rhs_span;
+  iree_const_byte_span_t rhs_span = iree_const_byte_span_empty();
   IREE_RETURN_IF_ERROR(
       iree_vm_buffer_map_ro(rhs_buffer, rhs_offset, length, 1, &rhs_span));
   *out_result = memcmp(lhs_span.data, rhs_span.data, length) == 0;
@@ -230,7 +228,7 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_fill_elements(
     iree_host_size_t element_count, iree_host_size_t element_length,
     const void* value) {
   IREE_ASSERT_ARGUMENT(target_buffer);
-  iree_byte_span_t span;
+  iree_byte_span_t span = iree_byte_span_empty();
   IREE_RETURN_IF_ERROR(iree_vm_buffer_map_rw(
       target_buffer, target_offset * element_length,
       element_count * element_length, element_length, &span));
@@ -274,7 +272,7 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_read_elements(
     void* target_ptr, iree_host_size_t element_count,
     iree_host_size_t element_length) {
   IREE_ASSERT_ARGUMENT(source_buffer);
-  iree_const_byte_span_t source_span;
+  iree_const_byte_span_t source_span = iree_const_byte_span_empty();
   IREE_RETURN_IF_ERROR(iree_vm_buffer_map_ro(
       source_buffer, source_offset * element_length,
       element_count * element_length, element_length, &source_span));
@@ -288,7 +286,7 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
     iree_host_size_t element_length) {
   IREE_ASSERT_ARGUMENT(source_ptr);
   IREE_ASSERT_ARGUMENT(target_buffer);
-  iree_byte_span_t target_span;
+  iree_byte_span_t target_span = iree_byte_span_empty();
   IREE_RETURN_IF_ERROR(iree_vm_buffer_map_rw(
       target_buffer, target_offset * element_length,
       element_count * element_length, element_length, &target_span));
@@ -301,7 +299,6 @@ iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance) {
     // Already registered.
     return iree_ok_status();
   }
-
   iree_vm_buffer_descriptor.destroy = iree_vm_buffer_destroy;
   iree_vm_buffer_descriptor.offsetof_counter =
       offsetof(iree_vm_buffer_t, ref_object.counter);

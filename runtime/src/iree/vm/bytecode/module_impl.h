@@ -10,47 +10,13 @@
 #include <stdint.h>
 #include <string.h>
 
-// VC++ does not have C11's stdalign.h.
-#if !defined(_MSC_VER)
-#include <stdalign.h>
-#endif  // _MSC_VER
-
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
-
-// NOTE: include order matters:
-#include "iree/base/internal/flatcc/parsing.h"
-#include "iree/schemas/bytecode_module_def_reader.h"
-#include "iree/schemas/bytecode_module_def_verifier.h"
+#include "iree/vm/bytecode/utils/isa.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-
-#define VMMAX(a, b) (((a) > (b)) ? (a) : (b))
-#define VMMIN(a, b) (((a) < (b)) ? (a) : (b))
-
-// Major bytecode version; mismatches on this will fail in either direction.
-// This allows coarse versioning of completely incompatible versions.
-// Matches BytecodeEncoder::kVersionMajor in the compiler.
-#define IREE_VM_BYTECODE_VERSION_MAJOR 14
-// Minor bytecode version; lower versions are allowed to enable newer runtimes
-// to load older serialized files when there are backwards-compatible changes.
-// Higher versions are disallowed as they occur when new ops are added that
-// otherwise cannot be executed by older runtimes.
-// Matches BytecodeEncoder::kVersionMinor in the compiler.
-#define IREE_VM_BYTECODE_VERSION_MINOR 0
-
-// Maximum register count per bank.
-// This determines the bits required to reference registers in the VM bytecode.
-#define IREE_I32_REGISTER_COUNT 0x7FFF
-#define IREE_REF_REGISTER_COUNT 0x7FFF
-
-#define IREE_I32_REGISTER_MASK 0x7FFF
-
-#define IREE_REF_REGISTER_TYPE_BIT 0x8000
-#define IREE_REF_REGISTER_MOVE_BIT 0x4000
-#define IREE_REF_REGISTER_MASK 0x3FFF
 
 // A loaded bytecode module.
 typedef struct iree_vm_bytecode_module_t {

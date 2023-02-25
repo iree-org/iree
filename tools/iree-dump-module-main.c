@@ -9,6 +9,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/schemas/bytecode_module_def_json_printer.h"
+#include "iree/vm/bytecode/archive.h"
 #include "iree/vm/bytecode/module.h"
 
 // Today we just print to JSON. We could do something more useful (size
@@ -28,7 +29,7 @@ int main(int argc, char** argv) {
                                         &file_contents));
 
   iree_const_byte_span_t flatbuffer_contents = iree_const_byte_span_empty();
-  IREE_CHECK_OK(iree_vm_bytecode_module_parse_header(
+  IREE_CHECK_OK(iree_vm_bytecode_archive_parse_header(
       file_contents->const_buffer, &flatbuffer_contents,
       /*out_rodata_offset=*/NULL));
 

@@ -28,7 +28,7 @@
 // no swapping hazards (such as 0->1,1->0). The register allocator in the
 // compiler should ensure this is the case when it can occur.
 static void iree_vm_bytecode_dispatch_remap_branch_registers(
-    const iree_vm_registers_t regs,
+    int32_t* IREE_RESTRICT regs_i32, iree_vm_ref_t* IREE_RESTRICT regs_ref,
     const iree_vm_register_remap_list_t* IREE_RESTRICT remap_list) {
   for (int i = 0; i < remap_list->size; ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
@@ -37,10 +37,10 @@ static void iree_vm_bytecode_dispatch_remap_branch_registers(
     uint16_t dst_reg = remap_list->pairs[i].dst_reg;
     if (src_reg & IREE_REF_REGISTER_TYPE_BIT) {
       iree_vm_ref_retain_or_move(src_reg & IREE_REF_REGISTER_MOVE_BIT,
-                                 &regs.ref[src_reg & regs.ref_mask],
-                                 &regs.ref[dst_reg & regs.ref_mask]);
+                                 &regs_ref[src_reg & IREE_REF_REGISTER_MASK],
+                                 &regs_ref[dst_reg & IREE_REF_REGISTER_MASK]);
     } else {
-      regs.i32[dst_reg & regs.i32_mask] = regs.i32[src_reg & regs.i32_mask];
+      regs_i32[dst_reg] = regs_i32[src_reg];
     }
   }
 }
@@ -49,14 +49,14 @@ static void iree_vm_bytecode_dispatch_remap_branch_registers(
 // This can be used to eagerly release resources we don't need and reduces
 // memory consumption if used effectively prior to yields/waits.
 static void iree_vm_bytecode_dispatch_discard_registers(
-    const iree_vm_registers_t regs,
+    iree_vm_ref_t* IREE_RESTRICT regs_ref,
     const iree_vm_register_list_t* IREE_RESTRICT reg_list) {
   for (int i = 0; i < reg_list->size; ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     uint16_t reg = reg_list->registers[i];
     if ((reg & (IREE_REF_REGISTER_TYPE_BIT | IREE_REF_REGISTER_MOVE_BIT)) ==
         (IREE_REF_REGISTER_TYPE_BIT | IREE_REF_REGISTER_MOVE_BIT)) {
-      iree_vm_ref_release(&regs.ref[reg & regs.ref_mask]);
+      iree_vm_ref_release(&regs_ref[reg & IREE_REF_REGISTER_MASK]);
     }
   }
 }
@@ -65,45 +65,36 @@ static void iree_vm_bytecode_dispatch_discard_registers(
 // Stack management
 //===----------------------------------------------------------------------===//
 
-static iree_vm_registers_t iree_vm_bytecode_get_register_storage(
+static inline iree_vm_registers_t iree_vm_bytecode_get_register_storage(
     iree_vm_stack_frame_t* frame) {
   const iree_vm_bytecode_frame_storage_t* stack_storage =
       (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(frame);
-
-  // Masks indicate the valid bits of any register value within the range we
-  // have allocated in the storage. So for 4 registers we'd expect a 0b11 mask.
-  iree_vm_registers_t registers;
-  memset(&registers, 0, sizeof(registers));
-  registers.i32_mask = (uint16_t)(stack_storage->i32_register_count
-                                      ? stack_storage->i32_register_count - 1
-                                      : 0);
-  registers.ref_mask = (uint16_t)(stack_storage->ref_register_count
-                                      ? stack_storage->ref_register_count - 1
-                                      : 0);
-
-  // Register storage immediately follows the stack storage header.
-  registers.i32 =
-      (int32_t*)((uintptr_t)stack_storage + stack_storage->i32_register_offset);
-  registers.ref = (iree_vm_ref_t*)((uintptr_t)stack_storage +
-                                   stack_storage->ref_register_offset);
-
-  return registers;
+  return (iree_vm_registers_t){
+      .i32 = (int32_t*)((uintptr_t)stack_storage +
+                        stack_storage->i32_register_offset),
+      .ref = (iree_vm_ref_t*)((uintptr_t)stack_storage +
+                              stack_storage->ref_register_offset),
+  };
 }
 
 // Releases any remaining refs held in the frame storage.
 static void iree_vm_bytecode_stack_frame_cleanup(iree_vm_stack_frame_t* frame) {
-  iree_vm_registers_t regs = iree_vm_bytecode_get_register_storage(frame);
   // TODO(benvanik): allow the VM to elide this when it's known that there are
   // no more live registers.
-  for (uint16_t i = 0; i <= regs.ref_mask; ++i) {
-    iree_vm_ref_t* ref = &regs.ref[i];
+  const iree_vm_bytecode_frame_storage_t* stack_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(frame);
+  iree_vm_ref_t* refs = (iree_vm_ref_t*)((uintptr_t)stack_storage +
+                                         stack_storage->ref_register_offset);
+  for (uint16_t i = 0; i < stack_storage->ref_register_count; ++i) {
+    iree_vm_ref_t* ref = &refs[i];
     if (ref->ptr) iree_vm_ref_release(ref);
   }
 }
 
 static iree_status_t iree_vm_bytecode_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t function,
-    iree_string_view_t cconv_results, iree_vm_stack_frame_t** out_callee_frame,
+    iree_string_view_t cconv_results,
+    iree_vm_stack_frame_t* IREE_RESTRICT* out_callee_frame,
     iree_vm_registers_t* out_callee_registers) {
   iree_vm_bytecode_module_t* module =
       (iree_vm_bytecode_module_t*)function.module->self;
@@ -118,26 +109,11 @@ static iree_status_t iree_vm_bytecode_function_enter(
   // bounds check register access. This lets us allocate the entire frame
   // (header, frame, and register storage) as a single pointer bump below.
 
-  // Round up register counts to the nearest power of 2 (if not already).
-  // This let's us use bit masks on register accesses to do bounds checking
-  // instead of more complex logic. The cost of these extra registers is only at
-  // worst 2x the required cost: so not large when thinking about the normal
-  // size of data used in an IREE app for tensors.
-  //
-  // Note that to allow the masking to work as a guard we need to ensure we at
-  // least allocate 1 register; this way an i32[reg & mask] will always point at
-  // valid memory even if mask == 0.
-  uint32_t i32_register_count = iree_math_round_up_to_pow2_u32(
-      VMMAX(1, target_descriptor->i32_register_count));
-  uint32_t ref_register_count = iree_math_round_up_to_pow2_u32(
-      VMMAX(1, target_descriptor->ref_register_count));
-  if (IREE_UNLIKELY(i32_register_count > IREE_I32_REGISTER_MASK) ||
-      IREE_UNLIKELY(ref_register_count > IREE_REF_REGISTER_MASK)) {
-    // Register count overflow. A valid compiler should never produce files that
-    // hit this.
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "register count overflow");
-  }
+  // We've verified all register storage prior to execution.
+  uint32_t i32_register_count = target_descriptor->i32_register_count;
+  uint32_t ref_register_count = target_descriptor->ref_register_count;
+  IREE_ASSERT_LE(i32_register_count, IREE_I32_REGISTER_MASK);
+  IREE_ASSERT_LE(ref_register_count, IREE_REF_REGISTER_MASK);
 
   // We need to align the ref register start to the natural machine
   // alignment in case the compiler is expecting that (it makes it easier to
@@ -162,8 +138,8 @@ static iree_status_t iree_vm_bytecode_function_enter(
           *out_callee_frame);
   stack_storage->cconv_results = cconv_results;
   stack_storage->i32_register_count = i32_register_count;
-  stack_storage->ref_register_count = ref_register_count;
   stack_storage->i32_register_offset = header_size;
+  stack_storage->ref_register_count = ref_register_count;
   stack_storage->ref_register_offset = header_size + i32_register_size;
   *out_callee_registers =
       iree_vm_bytecode_get_register_storage(*out_callee_frame);
@@ -181,7 +157,8 @@ static iree_status_t iree_vm_bytecode_function_enter(
 static iree_status_t iree_vm_bytecode_external_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t function,
     iree_string_view_t cconv_arguments, iree_byte_span_t arguments,
-    iree_string_view_t cconv_results, iree_vm_stack_frame_t** out_callee_frame,
+    iree_string_view_t cconv_results,
+    iree_vm_stack_frame_t* IREE_RESTRICT* out_callee_frame,
     iree_vm_registers_t* out_callee_registers) {
   // Enter the bytecode function and allocate registers.
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_enter(
@@ -199,23 +176,21 @@ static iree_status_t iree_vm_bytecode_external_enter(
       case IREE_VM_CCONV_TYPE_I32:
       case IREE_VM_CCONV_TYPE_F32: {
         uint16_t dst_reg = i32_reg++;
-        memcpy(&callee_registers.i32[dst_reg & callee_registers.i32_mask], p,
-               sizeof(int32_t));
+        memcpy(&callee_registers.i32[dst_reg], p, sizeof(int32_t));
         p += sizeof(int32_t);
       } break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64: {
         uint16_t dst_reg = i32_reg;
         i32_reg += 2;
-        memcpy(&callee_registers.i32[dst_reg & callee_registers.i32_mask], p,
-               sizeof(int64_t));
+        memcpy(&callee_registers.i32[dst_reg], p, sizeof(int64_t));
         p += sizeof(int64_t);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         uint16_t dst_reg = ref_reg++;
         iree_vm_ref_move(
             (iree_vm_ref_t*)p,
-            &callee_registers.ref[dst_reg & callee_registers.ref_mask]);
+            &callee_registers.ref[dst_reg & IREE_REF_REGISTER_MASK]);
         p += sizeof(iree_vm_ref_t);
       } break;
     }
@@ -248,22 +223,18 @@ static iree_status_t iree_vm_bytecode_external_leave(
         break;
       case IREE_VM_CCONV_TYPE_I32:
       case IREE_VM_CCONV_TYPE_F32: {
-        memcpy(p, &callee_registers->i32[src_reg & callee_registers->i32_mask],
-               sizeof(int32_t));
+        memcpy(p, &callee_registers->i32[src_reg], sizeof(int32_t));
         p += sizeof(int32_t);
       } break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64: {
-        memcpy(
-            p,
-            &callee_registers->i32[src_reg & (callee_registers->i32_mask & ~1)],
-            sizeof(int64_t));
+        memcpy(p, &callee_registers->i32[src_reg], sizeof(int64_t));
         p += sizeof(int64_t);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         iree_vm_ref_retain_or_move(
             src_reg & IREE_REF_REGISTER_MOVE_BIT,
-            &callee_registers->ref[src_reg & callee_registers->ref_mask],
+            &callee_registers->ref[src_reg & IREE_REF_REGISTER_MASK],
             (iree_vm_ref_t*)p);
         p += sizeof(iree_vm_ref_t);
       } break;
@@ -281,7 +252,7 @@ static iree_status_t iree_vm_bytecode_internal_enter(
     iree_vm_stack_t* stack, iree_vm_module_t* module, int32_t function_ordinal,
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
-    iree_vm_stack_frame_t** out_callee_frame,
+    iree_vm_stack_frame_t* IREE_RESTRICT* out_callee_frame,
     iree_vm_registers_t* out_callee_registers) {
   // Stash the destination register list for result values on the caller.
   iree_vm_bytecode_frame_storage_t* caller_storage =
@@ -317,15 +288,15 @@ static iree_status_t iree_vm_bytecode_internal_enter(
     uint16_t src_reg = src_reg_list->registers[i];
     if (src_reg & IREE_REF_REGISTER_TYPE_BIT) {
       uint16_t dst_reg = ref_reg_offset++;
-      memset(&dst_regs->ref[dst_reg & dst_regs->ref_mask], 0,
+      memset(&dst_regs->ref[dst_reg & IREE_REF_REGISTER_MASK], 0,
              sizeof(iree_vm_ref_t));
-      iree_vm_ref_retain_or_move(src_reg & IREE_REF_REGISTER_MOVE_BIT,
-                                 &src_regs.ref[src_reg & src_regs.ref_mask],
-                                 &dst_regs->ref[dst_reg & dst_regs->ref_mask]);
+      iree_vm_ref_retain_or_move(
+          src_reg & IREE_REF_REGISTER_MOVE_BIT,
+          &src_regs.ref[src_reg & IREE_REF_REGISTER_MASK],
+          &dst_regs->ref[dst_reg & IREE_REF_REGISTER_MASK]);
     } else {
       uint16_t dst_reg = i32_reg_offset++;
-      dst_regs->i32[dst_reg & dst_regs->i32_mask] =
-          src_regs.i32[src_reg & src_regs.i32_mask];
+      dst_regs->i32[dst_reg] = src_regs.i32[src_reg];
     }
   }
 
@@ -339,7 +310,7 @@ static iree_status_t iree_vm_bytecode_internal_leave(
     iree_vm_stack_t* stack, iree_vm_stack_frame_t* callee_frame,
     const iree_vm_registers_t callee_registers,
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
-    iree_vm_stack_frame_t** out_caller_frame,
+    iree_vm_stack_frame_t* IREE_RESTRICT* out_caller_frame,
     iree_vm_registers_t* out_caller_registers) {
   // Remaps registers from source to destination across frames.
   // Registers from the |src_regs| will be copied/moved to |dst_regs| with the
@@ -357,7 +328,7 @@ static iree_status_t iree_vm_bytecode_internal_leave(
           caller_frame);
   const iree_vm_register_list_t* dst_reg_list =
       caller_storage->return_registers;
-  VMCHECK(src_reg_list->size <= dst_reg_list->size);
+  IREE_ASSERT_LE(src_reg_list->size, dst_reg_list->size);
   if (IREE_UNLIKELY(src_reg_list->size > dst_reg_list->size)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "src/dst reg count mismatch on internal return");
@@ -372,11 +343,10 @@ static iree_status_t iree_vm_bytecode_internal_leave(
     if (src_reg & IREE_REF_REGISTER_TYPE_BIT) {
       iree_vm_ref_retain_or_move(
           src_reg & IREE_REF_REGISTER_MOVE_BIT,
-          &callee_registers.ref[src_reg & callee_registers.ref_mask],
-          &caller_registers.ref[dst_reg & caller_registers.ref_mask]);
+          &callee_registers.ref[src_reg & IREE_REF_REGISTER_MASK],
+          &caller_registers.ref[dst_reg & IREE_REF_REGISTER_MASK]);
     } else {
-      caller_registers.i32[dst_reg & caller_registers.i32_mask] =
-          callee_registers.i32[src_reg & callee_registers.i32_mask];
+      caller_registers.i32[dst_reg] = callee_registers.i32[src_reg];
     }
   }
 
@@ -401,29 +371,25 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
         break;
       case IREE_VM_CCONV_TYPE_I32:
       case IREE_VM_CCONV_TYPE_F32: {
-        memcpy(p,
-               &caller_registers.i32[src_reg_list->registers[reg_i++] &
-                                     caller_registers.i32_mask],
+        memcpy(p, &caller_registers.i32[src_reg_list->registers[reg_i++]],
                sizeof(int32_t));
         p += sizeof(int32_t);
       } break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64: {
-        memcpy(p,
-               &caller_registers.i32[src_reg_list->registers[reg_i++] &
-                                     (caller_registers.i32_mask & ~1)],
+        memcpy(p, &caller_registers.i32[src_reg_list->registers[reg_i++]],
                sizeof(int64_t));
         p += sizeof(int64_t);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         uint16_t src_reg = src_reg_list->registers[reg_i++];
         iree_vm_ref_assign(
-            &caller_registers.ref[src_reg & caller_registers.ref_mask],
+            &caller_registers.ref[src_reg & IREE_REF_REGISTER_MASK],
             (iree_vm_ref_t*)p);
         p += sizeof(iree_vm_ref_t);
       } break;
       case IREE_VM_CCONV_TYPE_SPAN_START: {
-        VMCHECK(segment_size_list);
+        IREE_ASSERT(segment_size_list);
         int32_t span_count = segment_size_list->registers[seg_i];
         memcpy(p, &span_count, sizeof(int32_t));
         p += sizeof(int32_t);
@@ -448,23 +414,21 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
               case IREE_VM_CCONV_TYPE_I32:
               case IREE_VM_CCONV_TYPE_F32: {
                 memcpy(p,
-                       &caller_registers.i32[src_reg_list->registers[reg_i++] &
-                                             caller_registers.i32_mask],
+                       &caller_registers.i32[src_reg_list->registers[reg_i++]],
                        sizeof(int32_t));
                 p += sizeof(int32_t);
               } break;
               case IREE_VM_CCONV_TYPE_I64:
               case IREE_VM_CCONV_TYPE_F64: {
                 memcpy(p,
-                       &caller_registers.i32[src_reg_list->registers[reg_i++] &
-                                             (caller_registers.i32_mask & ~1)],
+                       &caller_registers.i32[src_reg_list->registers[reg_i++]],
                        sizeof(int64_t));
                 p += sizeof(int64_t);
               } break;
               case IREE_VM_CCONV_TYPE_REF: {
                 uint16_t src_reg = src_reg_list->registers[reg_i++];
                 iree_vm_ref_assign(
-                    &caller_registers.ref[src_reg & caller_registers.ref_mask],
+                    &caller_registers.ref[src_reg & IREE_REF_REGISTER_MASK],
                     (iree_vm_ref_t*)p);
                 p += sizeof(iree_vm_ref_t);
               } break;
@@ -481,7 +445,7 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
     iree_vm_stack_t* stack, const iree_vm_function_call_t call,
     iree_string_view_t cconv_results,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
-    iree_vm_stack_frame_t** out_caller_frame,
+    iree_vm_stack_frame_t* IREE_RESTRICT* out_caller_frame,
     iree_vm_registers_t* out_caller_registers) {
   // Call external function.
   iree_status_t call_status =
@@ -517,21 +481,18 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
         break;
       case IREE_VM_CCONV_TYPE_I32:
       case IREE_VM_CCONV_TYPE_F32:
-        memcpy(&caller_registers.i32[dst_reg & caller_registers.i32_mask], p,
-               sizeof(int32_t));
+        memcpy(&caller_registers.i32[dst_reg], p, sizeof(int32_t));
         p += sizeof(int32_t);
         break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64:
-        memcpy(
-            &caller_registers.i32[dst_reg & (caller_registers.i32_mask & ~1)],
-            p, sizeof(int64_t));
+        memcpy(&caller_registers.i32[dst_reg], p, sizeof(int64_t));
         p += sizeof(int64_t);
         break;
       case IREE_VM_CCONV_TYPE_REF:
         iree_vm_ref_move(
             (iree_vm_ref_t*)p,
-            &caller_registers.ref[dst_reg & caller_registers.ref_mask]);
+            &caller_registers.ref[dst_reg & IREE_REF_REGISTER_MASK]);
         p += sizeof(iree_vm_ref_t);
         break;
     }
@@ -546,26 +507,27 @@ static iree_status_t iree_vm_bytecode_verify_import(
     uint32_t import_ordinal, const iree_vm_bytecode_import_t** out_import) {
   *out_import = NULL;
 
+  // Ordinal has been checked as in-bounds during verification.
   import_ordinal &= 0x7FFFFFFFu;
-  if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "import ordinal %u out of range", import_ordinal);
-  }
+  IREE_ASSERT(import_ordinal < module_state->import_count);
 
   const iree_vm_bytecode_import_t* import =
       &module_state->import_table[import_ordinal];
   if (!import->function.module) {
+#if IREE_STATUS_MODE
     iree_vm_function_t decl_function;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
         iree_vm_stack_current_frame(stack)->function.module,
         IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL, import_ordinal,
         &decl_function));
     iree_string_view_t import_name = iree_vm_function_name(&decl_function);
-    (void)import_name;
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "optional import `%.*s` (ordinal %u) not resolved",
                             (int)import_name.size, import_name.data,
                             import_ordinal);
+#else
+    return iree_make_status(IREE_STATUS_NOT_FOUND);
+#endif  // IREE_STATUS_MODE
   }
 
   *out_import = import;
@@ -580,7 +542,7 @@ static iree_status_t iree_vm_bytecode_call_import(
     uint32_t import_ordinal, const iree_vm_registers_t caller_registers,
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
-    iree_vm_stack_frame_t** out_caller_frame,
+    iree_vm_stack_frame_t* IREE_RESTRICT* out_caller_frame,
     iree_vm_registers_t* out_caller_registers) {
   // Prepare |call| by looking up the import information.
   const iree_vm_bytecode_import_t* import = NULL;
@@ -617,7 +579,7 @@ static iree_status_t iree_vm_bytecode_call_import_variadic(
     const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
-    iree_vm_stack_frame_t** out_caller_frame,
+    iree_vm_stack_frame_t* IREE_RESTRICT* out_caller_frame,
     iree_vm_registers_t* out_caller_registers) {
   // Prepare |call| by looking up the import information.
   const iree_vm_bytecode_import_t* import = NULL;
@@ -692,9 +654,10 @@ iree_status_t iree_vm_bytecode_dispatch_resume(
 }
 
 static iree_status_t iree_vm_bytecode_dispatch(
-    iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
-    iree_vm_stack_frame_t* current_frame, iree_vm_registers_t regs,
-    iree_byte_span_t call_results) {
+    iree_vm_stack_t* IREE_RESTRICT stack,
+    iree_vm_bytecode_module_t* IREE_RESTRICT module,
+    iree_vm_stack_frame_t* IREE_RESTRICT current_frame,
+    iree_vm_registers_t regs, iree_byte_span_t call_results) {
   // When required emit the dispatch tables here referencing the labels we are
   // defining below.
   DEFINE_DISPATCH_TABLES();
@@ -712,8 +675,13 @@ static iree_status_t iree_vm_bytecode_dispatch(
       module->bytecode_data.data +
       module->function_descriptor_table[current_frame->function.ordinal]
           .bytecode_offset;
-  iree_vm_source_offset_t pc = current_frame->pc;
 
+  int32_t* IREE_RESTRICT regs_i32 = regs.i32;
+  IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+  iree_vm_ref_t* IREE_RESTRICT regs_ref = regs.ref;
+  IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
+
+  iree_vm_source_offset_t pc = current_frame->pc;
   BEGIN_DISPATCH_CORE() {
     //===------------------------------------------------------------------===//
     // Globals
@@ -721,13 +689,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, GlobalLoadI32, {
       uint32_t byte_offset = VM_DecGlobalAttr("global");
-      if (IREE_UNLIKELY(byte_offset >=
-                        module_state->rwdata_storage.data_length)) {
-        return iree_make_status(
-            IREE_STATUS_OUT_OF_RANGE,
-            "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
-            module_state->rwdata_storage.data_length);
-      }
+      IREE_ASSERT(byte_offset + 4 <= module_state->rwdata_storage.data_length);
       int32_t* value = VM_DecResultRegI32("value");
       const int32_t global_value =
           vm_global_load_i32(module_state->rwdata_storage.data, byte_offset);
@@ -736,13 +698,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, GlobalStoreI32, {
       uint32_t byte_offset = VM_DecGlobalAttr("global");
-      if (IREE_UNLIKELY(byte_offset >=
-                        module_state->rwdata_storage.data_length)) {
-        return iree_make_status(
-            IREE_STATUS_OUT_OF_RANGE,
-            "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
-            module_state->rwdata_storage.data_length);
-      }
+      IREE_ASSERT(byte_offset + 4 <= module_state->rwdata_storage.data_length);
       int32_t value = VM_DecOperandRegI32("value");
       vm_global_store_i32(module_state->rwdata_storage.data, byte_offset,
                           value);
@@ -750,7 +706,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, GlobalLoadIndirectI32, {
       uint32_t byte_offset = VM_DecOperandRegI32("global");
-      if (IREE_UNLIKELY(byte_offset >=
+      if (IREE_UNLIKELY(byte_offset + 4 >
                         module_state->rwdata_storage.data_length)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
@@ -765,7 +721,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, GlobalStoreIndirectI32, {
       uint32_t byte_offset = VM_DecOperandRegI32("global");
-      if (IREE_UNLIKELY(byte_offset >=
+      if (IREE_UNLIKELY(byte_offset + 4 >
                         module_state->rwdata_storage.data_length)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
@@ -779,13 +735,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, GlobalLoadI64, {
       uint32_t byte_offset = VM_DecGlobalAttr("global");
-      if (IREE_UNLIKELY(byte_offset >=
-                        module_state->rwdata_storage.data_length)) {
-        return iree_make_status(
-            IREE_STATUS_OUT_OF_RANGE,
-            "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
-            module_state->rwdata_storage.data_length);
-      }
+      IREE_ASSERT(byte_offset + 8 <= module_state->rwdata_storage.data_length);
       int64_t* value = VM_DecResultRegI64("value");
       const int64_t global_value =
           vm_global_load_i64(module_state->rwdata_storage.data, byte_offset);
@@ -794,13 +744,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, GlobalStoreI64, {
       uint32_t byte_offset = VM_DecGlobalAttr("global");
-      if (IREE_UNLIKELY(byte_offset >=
-                        module_state->rwdata_storage.data_length)) {
-        return iree_make_status(
-            IREE_STATUS_OUT_OF_RANGE,
-            "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
-            module_state->rwdata_storage.data_length);
-      }
+      IREE_ASSERT(byte_offset + 8 <= module_state->rwdata_storage.data_length);
       int64_t value = VM_DecOperandRegI64("value");
       vm_global_store_i64(module_state->rwdata_storage.data, byte_offset,
                           value);
@@ -808,7 +752,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, GlobalLoadIndirectI64, {
       uint32_t byte_offset = VM_DecOperandRegI32("global");
-      if (IREE_UNLIKELY(byte_offset >=
+      if (IREE_UNLIKELY(byte_offset + 8 >
                         module_state->rwdata_storage.data_length)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
@@ -823,7 +767,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, GlobalStoreIndirectI64, {
       uint32_t byte_offset = VM_DecOperandRegI32("global");
-      if (IREE_UNLIKELY(byte_offset >=
+      if (IREE_UNLIKELY(byte_offset + 8 >
                         module_state->rwdata_storage.data_length)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
@@ -837,12 +781,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, GlobalLoadRef, {
       uint32_t global = VM_DecGlobalAttr("global");
-      if (IREE_UNLIKELY(global >= module_state->global_ref_count)) {
-        return iree_make_status(
-            IREE_STATUS_OUT_OF_RANGE,
-            "global ref ordinal out of range: %d (table=%zu)", global,
-            module_state->global_ref_count);
-      }
+      IREE_ASSERT(global < module_state->global_ref_count);
       const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
@@ -853,12 +792,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, GlobalStoreRef, {
       uint32_t global = VM_DecGlobalAttr("global");
-      if (IREE_UNLIKELY(global >= module_state->global_ref_count)) {
-        return iree_make_status(
-            IREE_STATUS_OUT_OF_RANGE,
-            "global ref ordinal out of range: %d (table=%zu)", global,
-            module_state->global_ref_count);
-      }
+      IREE_ASSERT(global < module_state->global_ref_count);
       const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
       bool value_is_move;
       iree_vm_ref_t* value = VM_DecOperandRegRef("value", &value_is_move);
@@ -933,12 +867,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, ConstRefRodata, {
       uint32_t rodata_ordinal = VM_DecRodataAttr("rodata");
-      if (IREE_UNLIKELY(rodata_ordinal >= module_state->rodata_ref_count)) {
-        return iree_make_status(
-            IREE_STATUS_OUT_OF_RANGE,
-            "rodata ref ordinal out of range: %d (table=%zu)", rodata_ordinal,
-            module_state->rodata_ref_count);
-      }
+      IREE_ASSERT(rodata_ordinal < module_state->rodata_ref_count);
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
       IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_retain(
@@ -1444,7 +1373,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
           VM_DecVariadicOperands("values");
       int32_t* result = VM_DecResultRegI32("result");
       if (index >= 0 && index < value_reg_list->size) {
-        *result = regs.i32[value_reg_list->registers[index] & regs.i32_mask];
+        *result = regs_i32[value_reg_list->registers[index]];
       } else {
         *result = default_value;
       }
@@ -1457,8 +1386,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
           VM_DecVariadicOperands("values");
       int64_t* result = VM_DecResultRegI64("result");
       if (index >= 0 && index < value_reg_list->size) {
-        *result =
-            regs.i32[value_reg_list->registers[index] & (regs.i32_mask & ~1)];
+        *result = regs_i32[value_reg_list->registers[index]];
       } else {
         *result = default_value;
       }
@@ -1477,8 +1405,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
       if (index >= 0 && index < value_reg_list->size) {
         bool is_move =
             value_reg_list->registers[index] & IREE_REF_REGISTER_MOVE_BIT;
-        iree_vm_ref_t* new_value =
-            &regs.ref[value_reg_list->registers[index] & regs.ref_mask];
+        iree_vm_ref_t* new_value = &regs_ref[value_reg_list->registers[index] &
+                                             IREE_REF_REGISTER_MASK];
         IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
             is_move, new_value, type_def->ref_type, result));
       } else {
@@ -1645,8 +1573,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
       int32_t block_pc = VM_DecBranchTarget("dest");
       const iree_vm_register_remap_list_t* remap_list =
           VM_DecBranchOperands("operands");
-      pc = block_pc;
-      iree_vm_bytecode_dispatch_remap_branch_registers(regs, remap_list);
+      pc = block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
+      if (IREE_UNLIKELY(remap_list->size > 0)) {
+        iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
+                                                         remap_list);
+      }
     });
 
     DISPATCH_OP(CORE, CondBranch, {
@@ -1658,12 +1589,17 @@ static iree_status_t iree_vm_bytecode_dispatch(
       const iree_vm_register_remap_list_t* false_remap_list =
           VM_DecBranchOperands("false_operands");
       if (condition) {
-        pc = true_block_pc;
-        iree_vm_bytecode_dispatch_remap_branch_registers(regs, true_remap_list);
+        pc = true_block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
+        if (IREE_UNLIKELY(true_remap_list->size > 0)) {
+          iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
+                                                           true_remap_list);
+        }
       } else {
-        pc = false_block_pc;
-        iree_vm_bytecode_dispatch_remap_branch_registers(regs,
-                                                         false_remap_list);
+        pc = false_block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
+        if (IREE_UNLIKELY(false_remap_list->size > 0)) {
+          iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
+                                                           false_remap_list);
+        }
       }
     });
 
@@ -1692,6 +1628,10 @@ static iree_status_t iree_vm_bytecode_dispatch(
         bytecode_data =
             module->bytecode_data.data +
             module->function_descriptor_table[function_ordinal].bytecode_offset;
+        regs_i32 = regs.i32;
+        IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+        regs_ref = regs.ref;
+        IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
         pc = current_frame->pc;
       }
     });
@@ -1747,6 +1687,10 @@ static iree_status_t iree_vm_bytecode_dispatch(
           module->bytecode_data.data +
           module->function_descriptor_table[current_frame->function.ordinal]
               .bytecode_offset;
+      regs_i32 = regs.i32;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+      regs_ref = regs.ref;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
       pc = current_frame->pc;
     });
 
@@ -1765,10 +1709,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       uint32_t function_ordinal = VM_DecFuncAttr("import");
       int32_t* result = VM_DecResultRegI32("result");
       uint32_t import_ordinal = function_ordinal & 0x7FFFFFFFu;
-      if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
-        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "import ordinal out of range");
-      }
+      IREE_ASSERT(import_ordinal < module_state->import_count);
       const iree_vm_bytecode_import_t* import =
           &module_state->import_table[import_ordinal];
       *result = import->function.module != NULL ? 1 : 0;
@@ -1784,8 +1725,10 @@ static iree_status_t iree_vm_bytecode_dispatch(
       int32_t block_pc = VM_DecBranchTarget("dest");
       const iree_vm_register_remap_list_t* remap_list =
           VM_DecBranchOperands("operands");
-      iree_vm_bytecode_dispatch_remap_branch_registers(regs, remap_list);
-      current_frame->pc = block_pc;
+      iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
+                                                       remap_list);
+      current_frame->pc =
+          block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
 
       // Return magic status code indicating a yield.
       // This isn't an error, though callers not supporting coroutines will
@@ -1803,7 +1746,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       const iree_vm_register_list_t* src_reg_list =
           VM_DecVariadicOperands("operands");
       // TODO(benvanik): trace (if enabled).
-      iree_vm_bytecode_dispatch_discard_registers(regs, src_reg_list);
+      iree_vm_bytecode_dispatch_discard_registers(regs_ref, src_reg_list);
     });
 
     DISPATCH_OP(CORE, Print, {
@@ -1812,7 +1755,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       const iree_vm_register_list_t* src_reg_list =
           VM_DecVariadicOperands("operands");
       // TODO(benvanik): print.
-      iree_vm_bytecode_dispatch_discard_registers(regs, src_reg_list);
+      iree_vm_bytecode_dispatch_discard_registers(regs_ref, src_reg_list);
     });
 
     DISPATCH_OP(CORE, Break, {
@@ -1820,7 +1763,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
       int32_t block_pc = VM_DecBranchTarget("dest");
       const iree_vm_register_remap_list_t* remap_list =
           VM_DecBranchOperands("operands");
-      iree_vm_bytecode_dispatch_remap_branch_registers(regs, remap_list);
+      iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
+                                                       remap_list);
       pc = block_pc;
     });
 
@@ -1832,8 +1776,9 @@ static iree_status_t iree_vm_bytecode_dispatch(
       int32_t block_pc = VM_DecBranchTarget("dest");
       const iree_vm_register_remap_list_t* remap_list =
           VM_DecBranchOperands("operands");
-      iree_vm_bytecode_dispatch_remap_branch_registers(regs, remap_list);
-      pc = block_pc;
+      iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
+                                                       remap_list);
+      pc = block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
     });
 
     //===------------------------------------------------------------------===//
@@ -1848,13 +1793,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
       DISPATCH_OP(EXT_F32, GlobalLoadF32, {
         uint32_t byte_offset = VM_DecGlobalAttr("global");
-        if (IREE_UNLIKELY(byte_offset >=
-                          module_state->rwdata_storage.data_length)) {
-          return iree_make_status(
-              IREE_STATUS_OUT_OF_RANGE,
-              "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
-              module_state->rwdata_storage.data_length);
-        }
+        IREE_ASSERT(byte_offset + 4 <=
+                    module_state->rwdata_storage.data_length);
         float* value = VM_DecResultRegF32("value");
         const float global_value =
             vm_global_load_f32(module_state->rwdata_storage.data, byte_offset);
@@ -1863,13 +1803,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
       DISPATCH_OP(EXT_F32, GlobalStoreF32, {
         uint32_t byte_offset = VM_DecGlobalAttr("global");
-        if (IREE_UNLIKELY(byte_offset >=
-                          module_state->rwdata_storage.data_length)) {
-          return iree_make_status(
-              IREE_STATUS_OUT_OF_RANGE,
-              "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
-              module_state->rwdata_storage.data_length);
-        }
+        IREE_ASSERT(byte_offset + 4 <=
+                    module_state->rwdata_storage.data_length);
         float value = VM_DecOperandRegF32("value");
         vm_global_store_f32(module_state->rwdata_storage.data, byte_offset,
                             value);
@@ -1877,7 +1812,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
       DISPATCH_OP(EXT_F32, GlobalLoadIndirectF32, {
         uint32_t byte_offset = VM_DecOperandRegI32("global");
-        if (IREE_UNLIKELY(byte_offset >=
+        if (IREE_UNLIKELY(byte_offset + 4 >
                           module_state->rwdata_storage.data_length)) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
@@ -1892,7 +1827,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
       DISPATCH_OP(EXT_F32, GlobalStoreIndirectF32, {
         uint32_t byte_offset = VM_DecOperandRegI32("global");
-        if (IREE_UNLIKELY(byte_offset >=
+        if (IREE_UNLIKELY(byte_offset + 4 >
                           module_state->rwdata_storage.data_length)) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
@@ -1970,8 +1905,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
             VM_DecVariadicOperands("values");
         float* result = VM_DecResultRegF32("result");
         if (index >= 0 && index < value_reg_list->size) {
-          *result = *((float*)&regs.i32[value_reg_list->registers[index] &
-                                        (regs.i32_mask & ~1)]);
+          *result = *((float*)&regs_i32[value_reg_list->registers[index]]);
         } else {
           *result = default_value;
         }

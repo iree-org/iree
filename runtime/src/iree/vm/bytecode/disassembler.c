@@ -8,7 +8,6 @@
 
 #include <inttypes.h>
 
-#include "iree/base/config.h"
 #include "iree/vm/ops.h"
 
 #define BEGIN_DISASM_PREFIX(op_name, ext) \
@@ -64,39 +63,39 @@
 #define VM_ParseBranchOperands(operands_name) \
   VM_DecBranchOperandsImpl(bytecode_data, &pc)
 #define VM_ParseOperandRegI32(name) \
-  OP_I16(0) & regs->i32_mask;       \
-  pc += kRegSize;
-#define VM_ParseOperandRegI64(name)  \
-  OP_I16(0) & (regs->i32_mask & ~1); \
-  pc += kRegSize;
+  OP_I16(0);                        \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_ParseOperandRegI64(name) \
+  OP_I16(0);                        \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseOperandRegF32(name) \
-  OP_I16(0) & regs->i32_mask;       \
-  pc += kRegSize;
-#define VM_ParseOperandRegF64(name)  \
-  OP_I16(0) & (regs->i32_mask & ~1); \
-  pc += kRegSize;
+  OP_I16(0);                        \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_ParseOperandRegF64(name) \
+  OP_I16(0);                        \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseOperandRegRef(name, out_is_move)                    \
-  OP_I16(0) & regs->ref_mask;                                       \
+  OP_I16(0) & IREE_REF_REGISTER_MASK;                               \
   *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
-  pc += kRegSize;
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseVariadicOperands(name) \
   VM_DecVariadicOperandsImpl(bytecode_data, &pc)
 #define VM_ParseResultRegI32(name) \
-  OP_I16(0) & regs->i32_mask;      \
-  pc += kRegSize;
-#define VM_ParseResultRegI64(name)   \
-  OP_I16(0) & (regs->i32_mask & ~1); \
-  pc += kRegSize;
+  OP_I16(0);                       \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_ParseResultRegI64(name) \
+  OP_I16(0);                       \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseResultRegF32(name) \
-  OP_I16(0) & regs->i32_mask;      \
-  pc += kRegSize;
-#define VM_ParseResultRegF64(name)   \
-  OP_I16(0) & (regs->i32_mask & ~1); \
-  pc += kRegSize;
+  OP_I16(0);                       \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_ParseResultRegF64(name) \
+  OP_I16(0);                       \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseResultRegRef(name, out_is_move)                     \
-  OP_I16(0) & regs->ref_mask;                                       \
+  OP_I16(0) & IREE_REF_REGISTER_MASK;                               \
   *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
-  pc += kRegSize;
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseVariadicResults(name) VM_ParseVariadicOperands(name)
 
 #define EMIT_REG_NAME(reg)                \
@@ -1320,6 +1319,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     DISASM_OP_CORE_BINARY_I32(RemI32S, "vm.rem.i32.s");
     DISASM_OP_CORE_BINARY_I32(RemI32U, "vm.rem.i32.u");
     DISASM_OP_CORE_TERNARY_I32(FMAI32, "vm.fma.i32");
+    DISASM_OP_CORE_UNARY_I32(AbsI32, "vm.abs.i32");
     DISASM_OP_CORE_UNARY_I32(NotI32, "vm.not.i32");
     DISASM_OP_CORE_BINARY_I32(AndI32, "vm.and.i32");
     DISASM_OP_CORE_BINARY_I32(OrI32, "vm.or.i32");
@@ -1334,6 +1334,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     DISASM_OP_CORE_BINARY_I64(RemI64S, "vm.rem.i64.s");
     DISASM_OP_CORE_BINARY_I64(RemI64U, "vm.rem.i64.u");
     DISASM_OP_CORE_TERNARY_I64(FMAI64, "vm.fma.i64");
+    DISASM_OP_CORE_UNARY_I64(AbsI64, "vm.abs.i64");
     DISASM_OP_CORE_UNARY_I64(NotI64, "vm.not.i64");
     DISASM_OP_CORE_BINARY_I64(AndI64, "vm.and.i64");
     DISASM_OP_CORE_BINARY_I64(OrI64, "vm.or.i64");

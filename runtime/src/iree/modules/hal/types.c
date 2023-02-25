@@ -7,22 +7,28 @@
 #include "iree/modules/hal/types.h"
 
 //===----------------------------------------------------------------------===//
-// Type registration
+// Type wrappers
 //===----------------------------------------------------------------------===//
 
-static iree_vm_ref_type_descriptor_t iree_hal_allocator_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_buffer_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_buffer_view_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_channel_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_command_buffer_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_descriptor_set_layout_descriptor =
-    {0};
-static iree_vm_ref_type_descriptor_t iree_hal_device_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_event_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_executable_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_fence_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_pipeline_layout_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_semaphore_descriptor = {0};
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_allocator, iree_hal_allocator_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_buffer, iree_hal_buffer_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_buffer_view, iree_hal_buffer_view_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_channel, iree_hal_channel_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_command_buffer,
+                             iree_hal_command_buffer_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_descriptor_set_layout,
+                             iree_hal_descriptor_set_layout_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_device, iree_hal_device_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_event, iree_hal_event_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable, iree_hal_executable_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_pipeline_layout,
+                             iree_hal_pipeline_layout_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_fence, iree_hal_fence_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
+
+//===----------------------------------------------------------------------===//
+// Type registration
+//===----------------------------------------------------------------------===//
 
 #define IREE_VM_REGISTER_HAL_C_TYPE(type, name, destroy_fn, descriptor)   \
   descriptor.type_name = iree_make_cstring_view(name);                    \
@@ -112,26 +118,6 @@ iree_hal_module_register_all_types(iree_vm_instance_t* instance) {
   return iree_ok_status();
 }
 
-//===----------------------------------------------------------------------===//
-// Type wrappers
-//===----------------------------------------------------------------------===//
-
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_allocator, iree_hal_allocator_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_buffer, iree_hal_buffer_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_buffer_view, iree_hal_buffer_view_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_channel, iree_hal_channel_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_command_buffer,
-                             iree_hal_command_buffer_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_descriptor_set_layout,
-                             iree_hal_descriptor_set_layout_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_device, iree_hal_device_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_event, iree_hal_event_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable, iree_hal_executable_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_pipeline_layout,
-                             iree_hal_pipeline_layout_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_fence, iree_hal_fence_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
-
 //===--------------------------------------------------------------------===//
 // Utilities
 //===--------------------------------------------------------------------===//
@@ -139,7 +125,7 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
 IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_assign(
     const iree_vm_list_t* list, iree_host_size_t i) {
   return (iree_hal_buffer_view_t*)iree_vm_list_get_ref_deref(
-      list, i, iree_hal_buffer_view_get_descriptor());
+      list, i, &iree_hal_buffer_view_descriptor);
 }
 
 IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_retain(

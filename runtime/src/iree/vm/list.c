@@ -62,8 +62,6 @@ struct iree_vm_list_t {
   void* storage;
 };
 
-static iree_vm_ref_type_descriptor_t iree_vm_list_descriptor = {0};
-
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_list, iree_vm_list_t);
 
 static void iree_vm_list_retain_range(iree_vm_list_t* list,
