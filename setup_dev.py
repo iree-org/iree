@@ -92,6 +92,14 @@ set(IREE_ENABLE_THIN_ARCHIVES ON CACHE BOOL "Auto Configured" FORCE)
 set(LLVM_USE_SPLIT_DWARF ON CACHE BOOL "Auto Configured" FORCE)
 """
 
+TOOLCHAIN_DEV_SETUP_CMAKE_TRAILER += f"""
+# Set up a project wide version script that keeps dev builds from conflicting
+# with system libraries, even if build shared.
+set(CMAKE_EXE_LINKER_FLAGS "-Wl,--version-script={repo_root}/build_tools/toolchain/dev_shared_version_script.map")
+set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--version-script={repo_root}/build_tools/toolchain/dev_shared_version_script.map")
+set(CMAKE_MODULE_LINKER_FLAGS "-Wl,--version-script={repo_root}/build_tools/toolchain/dev_shared_version_script.map")
+"""
+
 BUILD_CONFIG_TYPES = [
     "debug",
     "release",

@@ -1,0 +1,8 @@
+# This linker version script applies a version project wide, and we use this
+# for development shared library builds. This allows us to co-exist with
+# naughty system libraries that conflict in the same process due to GCC
+# emitting statics as globals, which alias each other (even with DEEP_BIND).
+IREE_SODEV_1.0 {
+   global: *;
+   local: *;
+};
