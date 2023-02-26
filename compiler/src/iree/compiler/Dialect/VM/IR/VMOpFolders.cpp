@@ -607,6 +607,38 @@ static Attribute constFoldTernaryOp(Attribute rawA, Attribute rawB,
   return {};
 }
 
+// %0 = vm.mul.f32 %a, %b : f32
+// %1 = vm.add.f32 %0, %c : f32
+// ->
+// %1 = vm.fma.f32 %a, %b, %c : f32
+template <class MulOp, class AddOp, class FMAOp>
+struct FuseFMAOp : public OpRewritePattern<AddOp> {
+  using OpRewritePattern<AddOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(AddOp addOp,
+                                PatternRewriter &rewriter) const override {
+    auto fuse = [&](MulOp mulOp, Value a, Value b, Value c) {
+      if (!mulOp->hasOneUse() ||
+          mulOp->isUsedOutsideOfBlock(mulOp->getBlock())) {
+        return failure();
+      }
+      rewriter.replaceOp(
+          addOp,
+          rewriter
+              .create<FMAOp>(rewriter.getFusedLoc({a.getLoc(), c.getLoc()}),
+                             a.getType(), a, b, c)
+              .getResult());
+      return success();
+    };
+    if (auto mulOp = dyn_cast_or_null<MulOp>(addOp.getLhs().getDefiningOp())) {
+      return fuse(mulOp, mulOp.getLhs(), mulOp.getRhs(), addOp.getRhs());
+    } else if (auto mulOp =
+                   dyn_cast_or_null<MulOp>(addOp.getRhs().getDefiningOp())) {
+      return fuse(mulOp, mulOp.getLhs(), mulOp.getRhs(), addOp.getLhs());
+    }
+    return failure();
+  }
+};
+
 template <class AttrElementT, typename ADD, typename SUB,
           class ElementValueT = typename AttrElementT::ValueType>
 static OpFoldResult foldAddOp(ADD op, Attribute lhs, Attribute rhs) {
@@ -634,9 +666,19 @@ OpFoldResult AddI32Op::fold(FoldAdaptor operands) {
                                                     operands.getRhs());
 }
 
+void AddI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.insert<FuseFMAOp<MulI32Op, AddI32Op, FMAI32Op>>(context);
+}
+
 OpFoldResult AddI64Op::fold(FoldAdaptor operands) {
   return foldAddOp<IntegerAttr, AddI64Op, SubI64Op>(*this, operands.getLhs(),
                                                     operands.getRhs());
+}
+
+void AddI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.insert<FuseFMAOp<MulI64Op, AddI64Op, FMAI64Op>>(context);
 }
 
 template <class AttrElementT, typename SUB, typename ADD,
@@ -922,9 +964,21 @@ OpFoldResult AddF32Op::fold(FoldAdaptor operands) {
                                                   operands.getRhs());
 }
 
+void AddF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.insert<FoldConstantMulOperand<FloatAttr, MulF32Op, ConstF32Op>>(
+      context);
+  results.insert<FuseFMAOp<MulF32Op, AddF32Op, FMAF32Op>>(context);
+}
+
 OpFoldResult AddF64Op::fold(FoldAdaptor operands) {
   return foldAddOp<FloatAttr, AddF64Op, SubF64Op>(*this, operands.getLhs(),
                                                   operands.getRhs());
+}
+
+void AddF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.insert<FuseFMAOp<MulF64Op, AddF64Op, FMAF64Op>>(context);
 }
 
 OpFoldResult SubF32Op::fold(FoldAdaptor operands) {

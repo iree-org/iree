@@ -2105,12 +2105,14 @@ def VM_AddI32Op :
     VM_BinaryArithmeticOp<I32, "add.i32", VM_OPC_AddI32, [Commutative]> {
   let summary = [{integer add operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_AddI64Op :
     VM_BinaryArithmeticOp<I64, "add.i64", VM_OPC_AddI64, [Commutative]> {
   let summary = [{integer add operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_SubI32Op :
@@ -2222,6 +2224,7 @@ def VM_AddF32Op :
                                [VM_ExtF32, Commutative]> {
   let summary = [{floating-point add operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_AddF64Op :
@@ -2229,6 +2232,7 @@ def VM_AddF64Op :
                                [VM_ExtF64, Commutative]> {
   let summary = [{floating-point add operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_SubF32Op :
