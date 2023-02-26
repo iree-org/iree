@@ -456,6 +456,37 @@ static iree_status_t iree_hal_metal_command_buffer_fill_buffer(
   return status;
 }
 
+static iree_status_t iree_hal_metal_command_buffer_copy_buffer_internal(
+    iree_hal_metal_command_buffer_t* command_buffer, id<MTLBuffer> source_device_buffer,
+    iree_device_size_t source_offset, id<MTLBuffer> target_device_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length) {
+  // Per the spec for copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size, the source/target
+  // offset and length must be a multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS.
+#if defined(IREE_PLATFORM_MACOS)
+  bool can_use_metal_api = source_offset % 4 == 0 && target_offset % 4 == 0 && length % 4 == 0;
+#else
+  bool can_use_metal_api = true;
+#endif
+
+  iree_status_t status = iree_ok_status();
+  if (can_use_metal_api) {
+    id<MTLBlitCommandEncoder> encoder = iree_hal_metal_get_or_begin_blit_encoder(command_buffer);
+    [encoder copyFromBuffer:source_device_buffer
+               sourceOffset:source_offset
+                   toBuffer:target_device_buffer
+          destinationOffset:target_offset
+                       size:length];
+  } else {
+    id<MTLComputeCommandEncoder> encoder =
+        iree_hal_metal_get_or_begin_compute_encoder(command_buffer);
+    status = iree_hal_metal_builtin_executable_copy_buffer(
+        command_buffer->builtin_executable, encoder, source_device_buffer, source_offset,
+        target_device_buffer, target_offset, length);
+  }
+
+  return status;
+}
+
 static iree_status_t iree_hal_metal_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
@@ -465,16 +496,6 @@ static iree_status_t iree_hal_metal_command_buffer_update_buffer(
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Per the spec for copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size, the source/target
-  // offset and length must be a multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS.
-#if defined(IREE_PLATFORM_MACOS)
-  if (source_offset % 4 != 0 || target_offset % 4 != 0 || length % 4 != 0) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "unimplemented buffer update with non-4-multiple offset/length");
-  }
-#endif
 
   id<MTLDevice> device = command_buffer->command_buffer.device;
   MTLResourceOptions options = MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined;
@@ -492,15 +513,12 @@ static iree_status_t iree_hal_metal_command_buffer_update_buffer(
       iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
 
-  id<MTLBlitCommandEncoder> encoder = iree_hal_metal_get_or_begin_blit_encoder(command_buffer);
-  [encoder copyFromBuffer:data_buffer
-             sourceOffset:0
-                 toBuffer:target_device_buffer
-        destinationOffset:target_offset
-                     size:length];
+  iree_status_t status = iree_hal_metal_command_buffer_copy_buffer_internal(
+      command_buffer, data_buffer, /*source_offset=*/0, target_device_buffer, target_offset,
+      length);
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_hal_metal_command_buffer_copy_buffer(
@@ -510,16 +528,6 @@ static iree_status_t iree_hal_metal_command_buffer_copy_buffer(
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Per the spec for copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size, the source/target
-  // offset and length must be a multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS.
-#if defined(IREE_PLATFORM_MACOS)
-  if (source_offset % 4 != 0 || target_offset % 4 != 0 || length % 4 != 0) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "unimplemented copy buffer with non-4-multiple offset/length");
-  }
-#endif
 
   const iree_hal_buffer_t* buffers[2] = {source_buffer, target_buffer};
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -533,14 +541,12 @@ static iree_status_t iree_hal_metal_command_buffer_copy_buffer(
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
 
-  id<MTLBlitCommandEncoder> encoder = iree_hal_metal_get_or_begin_blit_encoder(command_buffer);
-  [encoder copyFromBuffer:source_device_buffer
-             sourceOffset:source_offset
-                 toBuffer:target_device_buffer
-        destinationOffset:target_offset
-                     size:length];
+  iree_status_t status = iree_hal_metal_command_buffer_copy_buffer_internal(
+      command_buffer, source_device_buffer, source_offset, target_device_buffer, target_offset,
+      length);
 
-  return iree_ok_status();
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 static iree_status_t iree_hal_metal_command_buffer_collective(

@@ -7,17 +7,25 @@
 #include "experimental/metal/builtin_executables.h"
 
 #include <string.h>
-#include "experimental/metal/builtin/fill_buffer_generic.h"
+
+#include "experimental/metal/builtin/metal_buffer_kernels.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 
-// The list of builtin executable entry points. This MUST be consistent with kernel function names
-// in MSL source code.
-static const char* iree_hal_metal_builtin_executable_entry_points[] = {
-    "fill_buffer_16byte",  // Buffer fills; 16-byte aligned offset/length
-    "fill_buffer_4byte",   // Buffer fills; 4-byte aligned offset/length
-    "fill_buffer_1byte",   // Buffer fills; 1-byte aligned offset/length
+typedef struct iree_hal_metal_builtin_executable_data_t {
+  const char* entry_point;
+  uint32_t file_index;
+} iree_hal_metal_builtin_executable_data_t;
+
+// The list of builtin executable entry points and their source file index in builtin exectuable
+// embedded data. This MUST be consistent with kernel function names in MSL source code and the file
+// order in embedded data.
+static iree_hal_metal_builtin_executable_data_t iree_hal_metal_builtin_executable_entry_points[] = {
+    {"fill_buffer_16byte", 1},  // Buffer fills; 16-byte aligned offset/length
+    {"fill_buffer_4byte", 1},   // Buffer fills; 4-byte aligned offset/length
+    {"fill_buffer_1byte", 1},   // Buffer fills; 1-byte aligned offset/length
+    {"copy_buffer_1byte", 0},   // Buffer copies; 1-byte aligned offset/length
 };
 
 // The buffer fill specificiation. This MUST be consistent with the same struct in MSL source code.
@@ -26,6 +34,12 @@ typedef struct iree_hal_metal_buffer_fill_spec_t {
   uint64_t buffer_length;  // Buffer length to fill (in bytes)
   uint32_t pattern;        // 32-bit fill pattern
 } iree_hal_metal_buffer_fill_spec_t;
+
+typedef struct iree_hal_metal_buffer_copy_spec_t {
+  uint64_t src_buffer_offset;  // Source buffer offset (in bytes)
+  uint64_t dst_buffer_offset;  // Destination buffer offset (in bytes)
+  uint64_t length;             // Buffer length to fill (in bytes)
+} iree_hal_metal_buffer_copy_spec_t;
 
 iree_status_t iree_hal_metal_builtin_executable_create(
     id<MTLDevice> device, iree_allocator_t host_allocator,
@@ -54,15 +68,17 @@ iree_status_t iree_hal_metal_builtin_executable_create(
     MTLCompileOptions* compile_options = [MTLCompileOptions new];  // +1
     compile_options.languageVersion = MTLLanguageVersion3_0;
 
-    const char* fill_buffer_source_data = fill_buffer_generic_create()[0].data;
-    for (unsigned i = 0; i < IREE_ARRAYSIZE(iree_hal_metal_builtin_executable_entry_points); ++i) {
-      const char* entry_point = iree_hal_metal_builtin_executable_entry_points[i];
+    for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(iree_hal_metal_builtin_executable_entry_points);
+         ++i) {
+      const char* entry_point = iree_hal_metal_builtin_executable_entry_points[i].entry_point;
+      uint32_t file_index = iree_hal_metal_builtin_executable_entry_points[i].file_index;
+      const char* source_data = metal_buffer_kernels_create()[file_index].data;
 
       id<MTLLibrary> library = nil;
       id<MTLFunction> function = nil;
       id<MTLComputePipelineState> pso = nil;
-      status = iree_hal_metal_compile_msl(fill_buffer_source_data, entry_point, device,
-                                          compile_options, &library, &function, &pso);
+      status = iree_hal_metal_compile_msl(source_data, entry_point, device, compile_options,
+                                          &library, &function, &pso);
       if (!iree_status_is_ok(status)) break;
 
       // Package required parameters for kernel launches for each entry point.
@@ -160,6 +176,40 @@ iree_status_t iree_hal_metal_builtin_executable_fill_buffer(
   [encoder useResource:target_buffer usage:usage];
   // buffer(1) is the buffer fill spec.
   [encoder setBytes:&spec length:sizeof(spec) atIndex:1];
+
+  // Encode the dispatch.
+  [encoder dispatchThreadgroups:MTLSizeMake(workgroup_count, 1, 1)
+          threadsPerThreadgroup:MTLSizeMake(workgroup_size, 1, 1)];
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_metal_builtin_executable_copy_buffer(
+    const iree_hal_metal_builtin_executable_t* executable, id<MTLComputeCommandEncoder> encoder,
+    id<MTLBuffer> source_buffer, iree_device_size_t source_offset, id<MTLBuffer> target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length) {
+  id<MTLComputePipelineState> pso = executable->entry_points[3].pso;
+  const iree_device_size_t workgroup_size = 32;
+  iree_device_size_t workgroup_count = iree_hal_metal_ceil_div(length, workgroup_size * 4);
+
+  iree_hal_metal_buffer_copy_spec_t spec = {
+      .src_buffer_offset = source_offset,
+      .dst_buffer_offset = target_offset,
+      .length = length,
+  };
+
+  [encoder setComputePipelineState:pso];
+
+  // The following MUST exactly match the pipeline layout from MSL source code.
+  // buffer(0) is the source buffer. Note that we MUST set 0 as offset here--the offset is to be
+  // handled directly in the kernels!
+  [encoder setBuffer:source_buffer offset:0 atIndex:0];
+  [encoder useResource:source_buffer usage:MTLResourceUsageRead];
+  // buffer(0) is the target buffer. Note that we MUST set 0 as offset here--the offset is to be
+  // handled directly in the kernels!
+  [encoder setBuffer:target_buffer offset:0 atIndex:1];
+  [encoder useResource:target_buffer usage:MTLResourceUsageWrite];
+  // buffer(1) is the buffer copy spec.
+  [encoder setBytes:&spec length:sizeof(spec) atIndex:2];
 
   // Encode the dispatch.
   [encoder dispatchThreadgroups:MTLSizeMake(workgroup_count, 1, 1)

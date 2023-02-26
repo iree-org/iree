@@ -47,6 +47,18 @@ iree_status_t iree_hal_metal_builtin_executable_fill_buffer(
     iree_device_size_t target_offset, iree_device_size_t length,
     uint32_t pattern);
 
+// Copies the |source_buffer| at |source_offset| to the |target_buffer| at
+// |target_offset| of |length| using builtin executables dispatched via
+// |encoder|.
+//
+// Under the hood, this will record all necessary commands to bind kernel
+// objects and buffer resources, and the perform dispatch.
+iree_status_t iree_hal_metal_builtin_executable_copy_buffer(
+    const iree_hal_metal_builtin_executable_t* executable,
+    id<MTLComputeCommandEncoder> encoder, id<MTLBuffer> source_buffer,
+    iree_device_size_t source_offset, id<MTLBuffer> target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

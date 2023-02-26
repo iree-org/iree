@@ -10,13 +10,14 @@ iree_c_embed_data(
   NAME
     builtin
   SRCS
+    "copy_buffer_generic.metal"
     "fill_buffer_generic.metal"
   C_FILE_OUTPUT
-    "fill_buffer_generic.c"
+    "metal_buffer_kernels.c"
   H_FILE_OUTPUT
-    "fill_buffer_generic.h"
+    "metal_buffer_kernels.h"
   IDENTIFIER
-    "fill_buffer_generic"
+    "metal_buffer_kernels"
   FLATTEN
   PUBLIC
 )
