@@ -17,21 +17,21 @@ package(
 
 CHECK_FRAMEWORK_TESTS = [
     "bert_encoder_unrolled_fake_weights.mlir",
+    "collatz.mlir",
+    "edge_detection.mlir",
+    "fragment_000.mlir",
+    "fullyconnected.mlir",
+    "mnist_fake_weights.mlir",
     "mobilenetv3_fake_weights.mlir",
+    "resnet50_fake_weights.mlir",
+    "unidirectional_lstm.mlir",
 ]
 
 iree_lit_test_suite(
     name = "lit",
-    timeout = "long",  # needed for resnet50_fake_weights / VMVX / TSan
+    timeout = "long",
     srcs = enforce_glob(
         [
-            "collatz.mlir",
-            "edge_detection.mlir",
-            "fragment_000.mlir",
-            "fullyconnected.mlir",
-            "mnist_fake_weights.mlir",
-            "resnet50_fake_weights.mlir",
-            "unidirectional_lstm.mlir",
         ],
         include =
             ["*.mlir"],
@@ -53,6 +53,7 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
+    timeout = "long",
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "local-task",
@@ -60,12 +61,20 @@ iree_check_single_backend_test_suite(
 )
 
 # TODO(#5880): VMVX is not yet fast enough to run the larger model tests.
-# iree_check_single_backend_test_suite(
-#     name = "check_vmvx_local-task",
-#     srcs = CHECK_FRAMEWORK_TESTS,
-#     driver = "local-task",
-#     target_backend = "vmvx",
-# )
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_local-task",
+    timeout = "long",
+    srcs = [
+        "collatz.mlir",
+        "edge_detection.mlir",
+        "fragment_000.mlir",
+        "mnist_fake_weights.mlir",
+        "unidirectional_lstm.mlir",
+    ],
+    compiler_flags = ["--iree-input-type=mhlo"],
+    driver = "local-task",
+    target_backend = "vmvx",
+)
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",

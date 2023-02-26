@@ -1,16 +1,12 @@
 // MNIST model with placeholder weights, for testing.
 
-// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vmvx %s --input=1x28x28x1xf32 | FileCheck %s
-// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=llvm-cpu %s --input=1x28x28x1xf32 | FileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vulkan-spirv %s --input=1x28x28x1xf32 | FileCheck %s)
-
 module {
   util.global private @"__iree_flow___sm_node17__model.layer-1.kernel" {noinline} = dense<1.000000e+00> : tensor<784x128xf32>
   util.global private @"__iree_flow___sm_node18__model.layer-1.bias" {noinline} = dense<5.000000e-01> : tensor<128xf32>
   util.global private @"__iree_flow___sm_node24__model.layer-2.kernel" {noinline} = dense<0.333333343> : tensor<128x10xf32>
   util.global private @"__iree_flow___sm_node25__model.layer-2.bias" {noinline} = dense<2.500000e-01> : tensor<10xf32>
-  // CHECK-LABEL: EXEC @predict
-  func.func @predict(%arg0: tensor<1x28x28x1xf32>) -> tensor<1x10xf32> attributes {iree.module.export, iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I8!S5!k0_0R3!_0"}} {
+  func.func @predict() {
+    %arg0 = util.unfoldable_constant dense<0.0> : tensor<1x28x28x1xf32>
     %0 = util.global.address @"__iree_flow___sm_node17__model.layer-1.kernel" : !util.ptr<tensor<784x128xf32>>
     %1 = util.global.address @"__iree_flow___sm_node18__model.layer-1.bias" : !util.ptr<tensor<128xf32>>
     %2 = util.global.address @"__iree_flow___sm_node24__model.layer-2.kernel" : !util.ptr<tensor<128x10xf32>>
@@ -45,8 +41,7 @@ module {
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
     %24 = "mhlo.broadcast_in_dim"(%23) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<1xf32>) -> tensor<1x10xf32>
     %25 = mhlo.divide %22, %24 : tensor<1x10xf32>
-    return %25 : tensor<1x10xf32>
+    check.expect_eq_const(%25, dense<0.1> : tensor<1x10xf32>) : tensor<1x10xf32>
+    return
   }
 }
-
-// CHECK: 1x10xf32=[0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1]

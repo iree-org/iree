@@ -1,8 +1,6 @@
-// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=llvm-cpu %s --input=1x5xf32=1,-2,-3,4,-5 --input=1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1 | FileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vulkan-spirv %s --input=1x5xf32=1,-2,-3,4,-5 --input=1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1 | FileCheck %s)
-
-// CHECK-LABEL: EXEC @main
-func.func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tensor<5x1x5xf32> {
+func.func @main() {
+  %arg0 = util.unfoldable_constant dense<[[1.0, -2.0, -3.0 ,4.0, -5.0]]> : tensor<1x5xf32>
+  %arg1 = util.unfoldable_constant dense<[[[[15.0], [14.0], [13.0]], [[12.0], [11.0], [10.0]], [[9.0], [8.0], [7.0]], [[6.0], [5.0], [4.0]], [[3.0], [2.0], [1.0]]]]> : tensor<1x5x3x1xf32>
   %0 = "mhlo.reshape"(%arg0) {name = "reshape.3"} : (tensor<1x5xf32>) -> tensor<1x5xf32>
   %1 = "mhlo.transpose"(%0) {name = "transpose.41", permutation = dense<[1, 0]> : tensor<2xi64>} : (tensor<1x5xf32>) -> tensor<5x1xf32>
   %2 = "mhlo.reshape"(%1) {name = "reshape.42"} : (tensor<5x1xf32>) -> tensor<5x1x1xf32>
@@ -76,18 +74,12 @@ func.func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tensor<5x
   %52 = "mhlo.reshape"(%51) {name = "reshape.94"} : (tensor<5x5xf32>) -> tensor<5x1x5xf32>
   %53 = "mhlo.select"(%8, %9, %52) {name = "select.95"} : (tensor<5x1x5xi1>, tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
   %54 = "mhlo.reshape"(%53) {name = "reshape.96"} : (tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
-  return %54 : tensor<5x1x5xf32>
+  check.expect_almost_eq_const(%54, dense<[
+    [[0., 0., 0., 0., 0.]],
+    [[3.79097, 4.99298, 0.908289, 0., 0.]],
+    [[2.80419, 3.7808, 0.560048, 0., 0.]],
+    [[0., 0., 0., 0., 0.]],
+    [[0.879467, 1.21822, 0.134155, 0., 0.]]
+  ]> : tensor<5x1x5xf32>) : tensor<5x1x5xf32>
+  return
 }
-
-// On separate lines to avoid "[[" which FileCheck interprets as substitutions
-// CHECK: 5x1x5xf32=[
-// CHECK-SAME:   [0 0 0 0 0]
-// CHECK-SAME: ][
-// CHECK-SAME:   [3.79{{[0-9]+}} 4.99{{[0-9]+}} 0.90{{[0-9]+}} 0 0]
-// CHECK-SAME: ][
-// CHECK-SAME:   [2.80{{[0-9]+}} 3.78{{[0-9]+}} 0.56{{[0-9]+}} 0 0]
-// CHECK-SAME: ][
-// CHECK-SAME:   [0 0 0 0 0]
-// CHECK-SAME: ][
-// CHECK-SAME:   [0.87{{[0-9]+}} 1.21{{[0-9]+}} 0.13{{[0-9]+}} 0 0]
-// CHECK-SAME: ]

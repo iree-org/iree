@@ -13,14 +13,6 @@ iree_add_all_subdirs()
 iree_lit_test_suite(
   NAME
     lit
-  SRCS
-    "collatz.mlir"
-    "edge_detection.mlir"
-    "fragment_000.mlir"
-    "fullyconnected.mlir"
-    "mnist_fake_weights.mlir"
-    "resnet50_fake_weights.mlir"
-    "unidirectional_lstm.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
@@ -39,13 +31,41 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
+    "collatz.mlir"
+    "edge_detection.mlir"
+    "fragment_000.mlir"
+    "fullyconnected.mlir"
+    "mnist_fake_weights.mlir"
     "mobilenetv3_fake_weights.mlir"
+    "resnet50_fake_weights.mlir"
+    "unidirectional_lstm.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
     "local-task"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
+  TIMEOUT
+    900
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_local-task
+  SRCS
+    "collatz.mlir"
+    "edge_detection.mlir"
+    "fragment_000.mlir"
+    "mnist_fake_weights.mlir"
+    "unidirectional_lstm.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-input-type=mhlo"
+  TIMEOUT
+    900
 )
 
 iree_check_single_backend_test_suite(
@@ -53,7 +73,14 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
+    "collatz.mlir"
+    "edge_detection.mlir"
+    "fragment_000.mlir"
+    "fullyconnected.mlir"
+    "mnist_fake_weights.mlir"
     "mobilenetv3_fake_weights.mlir"
+    "resnet50_fake_weights.mlir"
+    "unidirectional_lstm.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
@@ -69,7 +96,14 @@ iree_check_single_backend_test_suite(
     check_cuda_cuda
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
+    "collatz.mlir"
+    "edge_detection.mlir"
+    "fragment_000.mlir"
+    "fullyconnected.mlir"
+    "mnist_fake_weights.mlir"
     "mobilenetv3_fake_weights.mlir"
+    "resnet50_fake_weights.mlir"
+    "unidirectional_lstm.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER

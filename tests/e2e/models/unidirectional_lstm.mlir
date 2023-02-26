@@ -1,9 +1,5 @@
 // An example LSTM exported from a python reference model with dummy weights.
 
-// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=llvm-cpu %s --input="1x5xf32=[0,1,0,3,4]" --input="1x5x2x2xf32=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]" | FileCheck %s
-// RUN: [[ $IREE_VMVX_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vmvx %s --input="1x5xf32=[0,1,0,3,4]" --input="1x5x2x2xf32=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]" | FileCheck %s)
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vulkan-spirv %s --input="1x5xf32=[0,1,0,3,4]" --input="1x5x2x2xf32=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]" | FileCheck %s)
-
 // Exported via the XLA HLO Importer
 // The resulting MLIR was modified by hand by changing all large constants to be
 // splats of 0.42, removing the leading "module" wrapper, removing "name"
@@ -140,7 +136,9 @@ func.func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%
 ^bb3(%108: tensor<i64>, %109: tensor<i64>, %110: tensor<1x10xf32>, %111: tensor<1x10xf32>, %112: tensor<5xi64>, %113: tensor<5x1x10xf32>, %114: tensor<5x1x10xf32>):  // pred: ^bb1
   return %108, %112, %113, %114, %109, %110, %111 : tensor<i64>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>
 }
-func.func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x2x2xf32>) -> tensor<5x1x10xf32> {
+func.func @main() {
+  %arg0 = util.unfoldable_constant dense<[[0.0, 1.0, 0.0 ,3.0, 4.0]]> : tensor<1x5xf32>
+  %arg1 = util.unfoldable_constant dense<[[[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]], [[9.0, 10.0], [11.0, 12.0]], [[13.0, 14.0], [15.0, 16.0]], [[17.0, 18.0], [19.0, 20.0]]]]> : tensor<1x5x2x2xf32>
   %0 = mhlo.constant dense<0.000000e+00> : tensor<1x10xf32>
   %cst = arith.constant dense<0.000000e+00> : tensor<f32>
   %1 = mhlo.constant dense<0.000000e+00> : tensor<5x1x1xf32>
@@ -150,18 +148,12 @@ func.func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x2x2xf32>) -> tensor<5x
   %5 = "mhlo.transpose"(%arg0) {permutation = dense<[1, 0]> : tensor<2xi64>} : (tensor<1x5xf32>) -> tensor<5x1xf32>
   %6 = "mhlo.reshape"(%5) : (tensor<5x1xf32>) -> tensor<5x1x1xf32>
   %7:7 = call @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%0, %0, %4, %6, %1) : (tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>) -> (tensor<i64>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>)
-  return %7#3 : tensor<5x1x10xf32>
+  check.expect_almost_eq_const(%7#3, dense<[
+    [[0.743973, 0.743973, 0.743973, 0.743973, 0.743973, 0.743973, 0.743973, 0.743973, 0.743973, 0.743973]],
+    [[0.743973, 0.743973, 0.743973, 0.743973, 0.743973, 0.743973, 0.743973, 0.743973, 0.743973, 0.743973]],
+    [[0.962937, 0.962937, 0.962937, 0.962937, 0.962937, 0.962937, 0.962937, 0.962937, 0.962937, 0.962937]],
+    [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]],
+    [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+  ]> : tensor<5x1x10xf32>) : tensor<5x1x10xf32>
+  return
 }
-
-// CHECK: 5x1x10xf32=
-// CHECK-SAME: [
-// CHECK-SAME:   [0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}}]
-// CHECK-SAME: ][
-// CHECK-SAME:   [0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}} 0.7{{[0-9]+}}]
-// CHECK-SAME: ][
-// CHECK-SAME:   [0.9{{[0-9]+}} 0.9{{[0-9]+}} 0.9{{[0-9]+}} 0.9{{[0-9]+}} 0.9{{[0-9]+}} 0.9{{[0-9]+}} 0.9{{[0-9]+}} 0.9{{[0-9]+}} 0.9{{[0-9]+}} 0.9{{[0-9]+}}]
-// CHECK-SAME: ][
-// CHECK-SAME:   [0 0 0 0 0 0 0 0 0 0]
-// CHECK-SAME: ][
-// CHECK-SAME:   [0 0 0 0 0 0 0 0 0 0]
-// CHECK-SAME: ]

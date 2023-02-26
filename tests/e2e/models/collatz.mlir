@@ -1,8 +1,4 @@
-// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vmvx %s | FileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vulkan-spirv %s | FileCheck %s)
-
-// CHECK-LABEL: EXEC @collatz
-func.func @collatz() -> tensor<f32> {
+func.func @collatz() {
   %arg0 = util.unfoldable_constant dense<178.0> : tensor<f32>
   %0 = mhlo.constant dense<1.0> : tensor<f32>
   %1 = mhlo.constant dense<3.0> : tensor<f32>
@@ -36,6 +32,6 @@ func.func @collatz() -> tensor<f32> {
 ^bb5(%24: tensor<f32>): // 2 preds: ^bb3, ^bb4
   cf.br ^bb1(%10, %24 : tensor<f32>, tensor<f32>)
 ^bb6(%25: tensor<f32>): // pred: ^bb1
-  return %25 : tensor<f32>
+  check.expect_eq_const(%25, dense<31.0> : tensor<f32>) : tensor<f32>
+  return
 }
-// CHECK: f32=31
