@@ -30,7 +30,7 @@ iree_fetch_artifact(
 )
 """
 
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 INDENT_SPACES = " " * 2
 
@@ -166,19 +166,20 @@ def build_iree_import_tflite_model(target_path: str, source: str,
 
 def build_iree_benchmark_suite_module_test(
     target_name: str,
-    model: str,
     driver: str,
     expected_output: str,
+    platform_module_map: Dict[str, str],
     runner_args: Sequence[str],
     timeout_secs: Optional[int] = None,
     labels: Sequence[str] = [],
-    xfail_platforms: Sequence[str] = [],
-    unsupported_platforms: Sequence[str] = []) -> str:
+    xfail_platforms: Sequence[str] = []) -> str:
   name_block = _get_string_arg_block("NAME", target_name)
-  model_block = _get_string_arg_block("MODEL", model)
   driver_block = _get_string_arg_block("DRIVER", driver)
   expected_output_block = _get_string_arg_block("EXPECTED_OUTPUT",
                                                 expected_output)
+  modules_block = _get_string_list_arg_block(
+      "MODULES",
+      [f"{platform}={path}" for platform, path in platform_module_map.items()])
   timeout_block = _get_string_arg_block(
       "TIMEOUT",
       str(timeout_secs) if timeout_secs is not None else None)
@@ -186,15 +187,12 @@ def build_iree_benchmark_suite_module_test(
   labels_block = _get_string_list_arg_block("LABELS", labels)
   xfail_platforms_block = _get_string_list_arg_block("XFAIL_PLATFORMS",
                                                      xfail_platforms)
-  unsupported_platforms_block = _get_string_list_arg_block(
-      "UNSUPPORTED_PLATFORMS", unsupported_platforms)
   return _convert_block_to_string(
       _build_call_rule(rule_name="iree_benchmark_suite_module_test",
                        parameter_blocks=[
-                           name_block, model_block, driver_block,
-                           expected_output_block, timeout_block,
-                           runner_args_block, labels_block,
-                           xfail_platforms_block, unsupported_platforms_block
+                           name_block, driver_block, expected_output_block,
+                           timeout_block, modules_block, runner_args_block,
+                           labels_block, xfail_platforms_block
                        ]))
 
 
