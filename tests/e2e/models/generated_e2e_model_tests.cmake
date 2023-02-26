@@ -4,27 +4,55 @@
 # file.                                                                        #
 ################################################################################
 
-set(IREE_MODULE_COMPILE_CONFIG_ID_ANDROID-ARM64-V8A
-  "cpu-armv8.2-a-generic-linux-android29-llvm-cpu[default-flags]"
+set(IREE_TEST_MODULE_A359C8F1E19B6F476E843BDC5566F9554E329CBFB3B4437995AD9CCCFB381AEE_RISCV64-LINUX
+  "iree_module_MobileNetV1_fp32_fp32_imagenet__tosa_cpu-riscv_64-generic-linux-gnu-llvm-cpu_default-flags_/module.vmfb"
 )
 
-set(IREE_MODULE_COMPILE_CONFIG_ID_RISCV32-LINUX
-  "cpu-riscv_32-generic-linux-gnu-llvm-cpu[default-flags]"
+set(IREE_TEST_MODULE_A359C8F1E19B6F476E843BDC5566F9554E329CBFB3B4437995AD9CCCFB381AEE_X86_64
+  "iree_module_MobileNetV1_fp32_fp32_imagenet__tosa_cpu-x86_64-cascadelake-linux-gnu-llvm-cpu_default-flags_/module.vmfb"
 )
 
-set(IREE_MODULE_COMPILE_CONFIG_ID_RISCV64-LINUX
-  "cpu-riscv_64-generic-linux-gnu-llvm-cpu[default-flags]"
+set(IREE_TEST_MODULE_3F492FDE47ABECD3640F1E04C14F2BFC24940F1CF11F66E72128C590BC711025_RISCV32-LINUX
+  "iree_module_EfficientNet_int8_int8__tosa_cpu-riscv_32-generic-linux-gnu-llvm-cpu_default-flags_/module.vmfb"
 )
 
-set(IREE_MODULE_COMPILE_CONFIG_ID_X86_64
-  "cpu-x86_64-cascadelake-linux-gnu-llvm-cpu[default-flags]"
+set(IREE_TEST_MODULE_3F492FDE47ABECD3640F1E04C14F2BFC24940F1CF11F66E72128C590BC711025_RISCV64-LINUX
+  "iree_module_EfficientNet_int8_int8__tosa_cpu-riscv_64-generic-linux-gnu-llvm-cpu_default-flags_/module.vmfb"
+)
+
+set(IREE_TEST_MODULE_3F492FDE47ABECD3640F1E04C14F2BFC24940F1CF11F66E72128C590BC711025_X86_64
+  "iree_module_EfficientNet_int8_int8__tosa_cpu-x86_64-cascadelake-linux-gnu-llvm-cpu_default-flags_/module.vmfb"
+)
+
+set(IREE_TEST_MODULE_05C50F54FFEA1FCE722D07588E7DE026CE10324ECCC5D83D1EAC2C5A9F5D639D_ANDROID-ARM64-V8A
+  "iree_module_DeepLabV3_fp32_fp32__tosa_cpu-armv8.2-a-generic-linux-android29-llvm-cpu_default-flags_/module.vmfb"
+)
+
+set(IREE_TEST_MODULE_05C50F54FFEA1FCE722D07588E7DE026CE10324ECCC5D83D1EAC2C5A9F5D639D_RISCV64-LINUX
+  "iree_module_DeepLabV3_fp32_fp32__tosa_cpu-riscv_64-generic-linux-gnu-llvm-cpu_default-flags_/module.vmfb"
+)
+
+set(IREE_TEST_MODULE_05C50F54FFEA1FCE722D07588E7DE026CE10324ECCC5D83D1EAC2C5A9F5D639D_X86_64
+  "iree_module_DeepLabV3_fp32_fp32__tosa_cpu-x86_64-cascadelake-linux-gnu-llvm-cpu_default-flags_/module.vmfb"
+)
+
+set(IREE_TEST_MODULE_93C0F75188363AF77647CB2F1DEB41446575C9CD084D86119287156EB181D850_RISCV32-LINUX
+  "iree_module_PersonDetect_int8_int8__tosa_cpu-riscv_32-generic-linux-gnu-llvm-cpu_default-flags_/module.vmfb"
+)
+
+set(IREE_TEST_MODULE_93C0F75188363AF77647CB2F1DEB41446575C9CD084D86119287156EB181D850_RISCV64-LINUX
+  "iree_module_PersonDetect_int8_int8__tosa_cpu-riscv_64-generic-linux-gnu-llvm-cpu_default-flags_/module.vmfb"
+)
+
+set(IREE_TEST_MODULE_93C0F75188363AF77647CB2F1DEB41446575C9CD084D86119287156EB181D850_X86_64
+  "iree_module_PersonDetect_int8_int8__tosa_cpu-x86_64-cascadelake-linux-gnu-llvm-cpu_default-flags_/module.vmfb"
 )
 
 iree_benchmark_suite_module_test(
   NAME
     "mobilenet_v1_fp32_correctness_test"
-  MODEL
-    "MobileNetV1_fp32[fp32,imagenet](tosa)"
+  IMPORTED_MODEL
+    "a359c8f1e19b6f476e843bdc5566f9554e329cbfb3b4437995ad9cccfb381aee"
   DRIVER
     "local-sync"
   EXPECTED_OUTPUT
@@ -41,8 +69,8 @@ iree_benchmark_suite_module_test(
 iree_benchmark_suite_module_test(
   NAME
     "efficientnet_int8_correctness_test"
-  MODEL
-    "EfficientNet_int8[int8](tosa)"
+  IMPORTED_MODEL
+    "3f492fde47abecd3640f1e04c14f2bfc24940f1cf11f66e72128c590bc711025"
   DRIVER
     "local-sync"
   EXPECTED_OUTPUT
@@ -58,8 +86,8 @@ iree_benchmark_suite_module_test(
 iree_benchmark_suite_module_test(
   NAME
     "deeplab_v3_fp32_correctness_test"
-  MODEL
-    "DeepLabV3_fp32[fp32](tosa)"
+  IMPORTED_MODEL
+    "05c50f54ffea1fce722d07588e7de026ce10324eccc5d83d1eac2c5a9f5d639d"
   DRIVER
     "local-sync"
   EXPECTED_OUTPUT
@@ -76,8 +104,8 @@ iree_benchmark_suite_module_test(
 iree_benchmark_suite_module_test(
   NAME
     "person_detect_int8_correctness_test"
-  MODEL
-    "PersonDetect_int8[int8](tosa)"
+  IMPORTED_MODEL
+    "93c0f75188363af77647cb2f1deb41446575c9cd084d86119287156eb181d850"
   DRIVER
     "local-sync"
   EXPECTED_OUTPUT

@@ -147,7 +147,7 @@ class RulesTest(unittest.TestCase):
   def test_build_iree_benchmark_suite_module_test(self):
     rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
         target_name="model_test",
-        model="123_abc",
+        imported_model="123",
         driver="LOCAL_TASK",
         expected_output="xyz",
         runner_args=["--x=0", "--y=1"],
@@ -162,8 +162,8 @@ class RulesTest(unittest.TestCase):
         iree_benchmark_suite_module_test(
           NAME
             "model_test"
-          MODEL
-            "123_abc"
+          IMPORTED_MODEL
+            "123"
           DRIVER
             "LOCAL_TASK"
           EXPECTED_OUTPUT

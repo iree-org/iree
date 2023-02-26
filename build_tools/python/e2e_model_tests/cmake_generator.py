@@ -8,18 +8,39 @@
 from typing import List
 
 from e2e_model_tests import test_definitions, run_module_utils
+from e2e_test_artifacts import iree_artifacts
+from e2e_test_framework.definitions import iree_definitions
 import cmake_builder.rules
 
 
-def generate_rules() -> List[str]:
+def generate_rules(
+    module_generation_configs: List[iree_definitions.ModuleGenerationConfig]
+) -> List[str]:
   """Generates CMake rules for e2e model tests."""
-  cmake_rules = []
 
-  for platform in test_definitions.CMakePlatform:
-    cmake_rule = cmake_builder.rules.build_set(
-        variable_name=f"IREE_MODULE_COMPILE_CONFIG_ID_{platform.value.upper()}",
-        value=f'"{test_definitions.PLATFORM_COMPILE_CONFIG_MAP[platform]}"')
-    cmake_rules.append(cmake_rule)
+  gen_config_lookup_map = {}
+  for gen_config in module_generation_configs:
+    gen_config_lookup_map[(gen_config.imported_model.composite_id(),
+                           gen_config.compile_config.id)] = gen_config
+
+  cmake_rules = []
+  for test_config in test_definitions.TEST_CONFIGS:
+    for platform in test_definitions.CMakePlatform:
+      if platform in test_config.unsupported_platforms:
+        continue
+
+      imported_model_id = test_config.imported_model.composite_id()
+      compile_config_id = test_definitions.PLATFORM_COMPILE_CONFIG_MAP[
+          platform].id
+      gen_config = gen_config_lookup_map[(imported_model_id, compile_config_id)]
+
+      module_path = iree_artifacts.get_module_dir_path(
+          gen_config) / iree_artifacts.MODULE_FILENAME
+      cmake_rule = cmake_builder.rules.build_set(
+          variable_name=f"IREE_TEST_MODULE_{imported_model_id}_{platform.value}"
+          .upper(),
+          value=f'"{module_path}"')
+      cmake_rules.append(cmake_rule)
 
   for test_config in test_definitions.TEST_CONFIGS:
     imported_model = test_config.imported_model
@@ -33,7 +54,7 @@ def generate_rules() -> List[str]:
         test_config.execution_config, with_driver=False)
     cmake_rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
         target_name=test_config.name,
-        model=f"{imported_model}",
+        imported_model=imported_model.composite_id(),
         driver=test_config.execution_config.driver.value,
         expected_output=test_config.expected_output,
         runner_args=runner_args,

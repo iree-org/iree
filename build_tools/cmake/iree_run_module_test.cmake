@@ -215,9 +215,9 @@ endfunction()
 #
 # Parameters:
 #   NAME: Name of the target
-#   MODEL: "<UUID>_<model name>" of models defined under
-#       "build_tools/python/e2e_test_framework/models" with UUID in
-#       "build_tools/python/e2e_test_framework/unique_ids.py".
+#   IMPORTED_MODEL: Generated composite ID of an iree_definitions.ImportedModel.
+#       See "build_tools/python/e2e_test_framework/iree_definitions.py" for how
+#       it is generated.
 #   DRIVER: Driver to run the module with.
 #   RUNNER_ARGS: additional args to pass to iree-run-module. The driver
 #       and input file are passed automatically.
@@ -239,8 +239,8 @@ endfunction()
 # iree_benchmark_suite_module_test(
 #   NAME
 #     mobilenet_v1_fp32_correctness_test
-#   MODEL
-#     "bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8"
+#   IMPORTED_MODEL
+#     "3f492fde47abecd3640f1e04c14f2bfc24940f1cf11f66e72128c590bc711025"
 #   DRIVER
 #     "local-sync"
 #   RUNNER_ARGS
@@ -260,7 +260,7 @@ function(iree_benchmark_suite_module_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;MODEL;DRIVER;EXPECTED_OUTPUT;TIMEOUT"
+    "NAME;IMPORTED_MODEL;DRIVER;EXPECTED_OUTPUT;TIMEOUT"
     "RUNNER_ARGS;LABELS;XFAIL_PLATFORMS;UNSUPPORTED_PLATFORMS"
     ${ARGN}
   )
@@ -276,15 +276,14 @@ function(iree_benchmark_suite_module_test)
     return()
   endif()
 
+  string(TOUPPER "${_RULE_IMPORTED_MODEL}" _UPPER_IMPORTED_MODEL)
   string(TOUPPER "${_PLATFORM}" _UPPER_PLATFORM)
-  set(_IREE_MODULE_COMPILE_CONFIG_ID "${IREE_MODULE_COMPILE_CONFIG_ID_${_UPPER_PLATFORM}}")
-  if("${_IREE_MODULE_COMPILE_CONFIG_ID}" STREQUAL "")
-    message(SEND_ERROR "No compile config for ${_PLATFORM}. Skip ${_RULE_MODEL}.")
+  set(_IREE_TEST_MODULE_PATH "${IREE_TEST_MODULE_${_UPPER_IMPORTED_MODEL}_${_UPPER_PLATFORM}}")
+  if("${_IREE_TEST_MODULE_PATH}" STREQUAL "")
+    message(SEND_ERROR "No module found for ${_PLATFORM}. Skip ${_RULE_NAME}.")
     return()
   endif()
-  # TODO(#11136): We shouldn't composite the module path here by better
-  # integrating with e2e test framework.
-  set(_SRC "${IREE_E2E_TEST_ARTIFACTS_DIR}/iree_${_RULE_MODEL}_${_IREE_MODULE_COMPILE_CONFIG_ID}/module.vmfb")
+  set(_SRC "${IREE_E2E_TEST_ARTIFACTS_DIR}/${_IREE_TEST_MODULE_PATH}")
 
   iree_run_module_test(
     NAME

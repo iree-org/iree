@@ -175,7 +175,7 @@ def build_iree_import_tflite_model(target_path: str, source: str,
 
 def build_iree_benchmark_suite_module_test(
     target_name: str,
-    model: str,
+    imported_model: str,
     driver: str,
     expected_output: str,
     runner_args: Sequence[str],
@@ -184,7 +184,7 @@ def build_iree_benchmark_suite_module_test(
     xfail_platforms: Sequence[str] = [],
     unsupported_platforms: Sequence[str] = []) -> str:
   name_block = _get_string_arg_block("NAME", target_name)
-  model_block = _get_string_arg_block("MODEL", model)
+  imported_model_block = _get_string_arg_block("IMPORTED_MODEL", imported_model)
   driver_block = _get_string_arg_block("DRIVER", driver)
   expected_output_block = _get_string_arg_block("EXPECTED_OUTPUT",
                                                 expected_output)
@@ -200,7 +200,7 @@ def build_iree_benchmark_suite_module_test(
   return _convert_block_to_string(
       _build_call_rule(rule_name="iree_benchmark_suite_module_test",
                        parameter_blocks=[
-                           name_block, model_block, driver_block,
+                           name_block, imported_model_block, driver_block,
                            expected_output_block, timeout_block,
                            runner_args_block, labels_block,
                            xfail_platforms_block, unsupported_platforms_block
