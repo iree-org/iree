@@ -9,6 +9,7 @@ import pathlib
 import urllib.parse
 
 from e2e_test_framework.definitions import common_definitions
+import e2e_test_artifacts.utils
 
 MODEL_ARTIFACT_PREFIX = "model"
 # Archive extensions used to pack models.
@@ -35,5 +36,6 @@ def get_model_path(
     file_exts.pop()
   model_ext = "".join(file_exts)
 
-  # Model path: <root_path>/<model_artifact_prefix>_<model_id>_<model_name><model_ext>
-  return (root_path / f"{MODEL_ARTIFACT_PREFIX}_{model}{model_ext}")
+  # Model path: <root_path>/<model_artifact_prefix>_<model_str><model_ext>
+  model_str = e2e_test_artifacts.utils.sanitize_path_name(str(model))
+  return (root_path / f"{MODEL_ARTIFACT_PREFIX}_{model_str}{model_ext}")

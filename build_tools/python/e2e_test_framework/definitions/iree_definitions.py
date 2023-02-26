@@ -75,7 +75,7 @@ class CompileConfig(object):
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
   def __str__(self):
-    name = f'[{",".join(str(target) for target in self.compile_targets)}]'
+    name = f'{",".join(str(target) for target in self.compile_targets)}'
     if len(self.tags) > 0:
       name += f'[{",".join(self.tags)}]'
     return name

@@ -9,6 +9,7 @@ from typing import Dict, Iterable
 import pathlib
 
 from e2e_test_artifacts import model_artifacts
+import e2e_test_artifacts.utils
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
 IREE_ARTIFACT_PREFIX = "iree"
@@ -35,7 +36,9 @@ def get_imported_model_path(
     return model_artifacts.get_model_path(model=model, root_path=root_path)
 
   # Imported model path: <root_path>/<artifact_prefix>_<imported_model_str>.mlir
-  return root_path / f"{IREE_ARTIFACT_PREFIX}_{imported_model}.mlir"
+  imported_model_str = e2e_test_artifacts.utils.sanitize_path_name(
+      str(imported_model))
+  return root_path / f"{IREE_ARTIFACT_PREFIX}_{imported_model_str}.mlir"
 
 
 def get_module_dir_path(
@@ -52,8 +55,10 @@ def get_module_dir_path(
   Returns:
     Path of the module directory.
   """
-  # Module path: <root_path>/<artifact_prefix>_<module_generation_config_str>
-  return root_path / f"{IREE_ARTIFACT_PREFIX}_{module_generation_config}"
+  # Module path: <root_path>/<artifact_prefix>_module_<module_generation_config_str>
+  gen_config_str = e2e_test_artifacts.utils.sanitize_path_name(
+      str(module_generation_config))
+  return root_path / f"{IREE_ARTIFACT_PREFIX}_module_{gen_config_str}"
 
 
 def get_dependent_model_map(

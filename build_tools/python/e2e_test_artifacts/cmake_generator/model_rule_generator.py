@@ -30,7 +30,7 @@ def generate_model_rule_map(
   model_rules = {}
   for model in models:
     # Model target: <package_name>-model-<model_id>
-    target_name = cmake_builder.rules.sanitize_target(f"model-{model}")
+    target_name = cmake_builder.rules.sanitize_target_name(f"model-{model}")
     model_path = model_artifacts.get_model_path(model=model,
                                                 root_path=root_path)
 

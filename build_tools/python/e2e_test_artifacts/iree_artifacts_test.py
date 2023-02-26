@@ -7,8 +7,9 @@
 import pathlib
 import unittest
 
-from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_artifacts import model_artifacts, iree_artifacts
+import e2e_test_artifacts.utils
+from e2e_test_framework.definitions import common_definitions, iree_definitions
 
 
 class IreeArtifactsTest(unittest.TestCase):
@@ -28,9 +29,11 @@ class IreeArtifactsTest(unittest.TestCase):
     path = iree_artifacts.get_imported_model_path(imported_model=imported_model,
                                                   root_path=root_path)
 
+    imported_model_str = e2e_test_artifacts.utils.sanitize_path_name(
+        str(imported_model))
     self.assertEqual(
         path, root_path /
-        f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{imported_model}.mlir")
+        f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{imported_model_str}.mlir")
 
   def test_get_imported_model_path_with_mlir_model(self):
     model = common_definitions.Model(
@@ -77,8 +80,11 @@ class IreeArtifactsTest(unittest.TestCase):
     path = iree_artifacts.get_module_dir_path(
         module_generation_config=gen_config, root_path=root_path)
 
+    gen_config_str = e2e_test_artifacts.utils.sanitize_path_name(
+        str(gen_config))
     self.assertEqual(
-        path, root_path / f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{gen_config}")
+        path, root_path /
+        f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_module_{gen_config_str}")
 
   def test_get_dependent_model_map(self):
     model_a = common_definitions.Model(

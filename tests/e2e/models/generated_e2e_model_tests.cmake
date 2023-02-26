@@ -5,19 +5,19 @@
 ################################################################################
 
 set(IREE_MODULE_COMPILE_CONFIG_ID_ANDROID-ARM64-V8A
-  "[cpu-armv8.2-a-generic-linux-android29-llvm-cpu][default-flags]"
+  "cpu-armv8.2-a-generic-linux-android29-llvm-cpu[default-flags]"
 )
 
 set(IREE_MODULE_COMPILE_CONFIG_ID_RISCV32-LINUX
-  "[cpu-riscv_32-generic-linux-gnu-llvm-cpu][default-flags]"
+  "cpu-riscv_32-generic-linux-gnu-llvm-cpu[default-flags]"
 )
 
 set(IREE_MODULE_COMPILE_CONFIG_ID_RISCV64-LINUX
-  "[cpu-riscv_64-generic-linux-gnu-llvm-cpu][default-flags]"
+  "cpu-riscv_64-generic-linux-gnu-llvm-cpu[default-flags]"
 )
 
 set(IREE_MODULE_COMPILE_CONFIG_ID_X86_64
-  "[cpu-x86_64-cascadelake-linux-gnu-llvm-cpu][default-flags]"
+  "cpu-x86_64-cascadelake-linux-gnu-llvm-cpu[default-flags]"
 )
 
 iree_benchmark_suite_module_test(

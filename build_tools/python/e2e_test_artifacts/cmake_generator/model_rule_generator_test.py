@@ -38,13 +38,15 @@ class CommonGeneratorsTest(unittest.TestCase):
         root_path=root_path, models=[model_a, model_b])
 
     self.assertEqual(list(rule_map.keys()), [model_a.id, model_b.id])
-    self.assertEqual(rule_map[model_a.id].target_name,
-                     cmake_builder.rules.sanitize_target(f"model-{model_a}"))
+    self.assertEqual(
+        rule_map[model_a.id].target_name,
+        cmake_builder.rules.sanitize_target_name(f"model-{model_a}"))
     self.assertEqual(
         rule_map[model_a.id].file_path,
         model_artifacts.get_model_path(model=model_a, root_path=root_path))
-    self.assertEqual(rule_map[model_b.id].target_name,
-                     cmake_builder.rules.sanitize_target(f"model-{model_b}"))
+    self.assertEqual(
+        rule_map[model_b.id].target_name,
+        cmake_builder.rules.sanitize_target_name(f"model-{model_b}"))
     self.assertEqual(
         rule_map[model_b.id].file_path,
         model_artifacts.get_model_path(model=model_b, root_path=root_path))

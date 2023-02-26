@@ -8,6 +8,7 @@ import pathlib
 import unittest
 
 from e2e_test_artifacts import model_artifacts
+import e2e_test_artifacts.utils
 from e2e_test_framework.definitions import common_definitions
 
 
@@ -17,7 +18,7 @@ class ModelArtifactsTest(unittest.TestCase):
     tflite_model = common_definitions.Model(
         id="1234",
         name="tflite_m",
-        tags=[],
+        tags=["fp16"],
         source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
         source_url="https://example.com/xyz.tflite",
         entry_function="main",
@@ -27,15 +28,16 @@ class ModelArtifactsTest(unittest.TestCase):
     path = model_artifacts.get_model_path(model=tflite_model,
                                           root_path=root_path)
 
+    model_str = e2e_test_artifacts.utils.sanitize_path_name(str(tflite_model))
     self.assertEqual(
         path, root_path /
-        f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{tflite_model}.tflite")
+        f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{model_str}.tflite")
 
   def test_get_model_path_with_tf_model(self):
     tf_model = common_definitions.Model(
         id="5678",
         name="tf_m",
-        tags=[],
+        tags=["fp32"],
         source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
         source_url="https://example.com/xyz_saved_model",
         entry_function="predict",
@@ -44,8 +46,10 @@ class ModelArtifactsTest(unittest.TestCase):
 
     path = model_artifacts.get_model_path(model=tf_model, root_path=root_path)
 
+    model_str = e2e_test_artifacts.utils.sanitize_path_name(str(tf_model))
     self.assertEqual(
-        path, root_path / f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{tf_model}")
+        path,
+        root_path / f"{model_artifacts.MODEL_ARTIFACT_PREFIX}_{model_str}")
 
 
 if __name__ == "__main__":

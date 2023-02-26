@@ -59,7 +59,7 @@ class IreeRuleBuilder(object):
                                  cmake_rules=[])
 
     # Import target name: iree-imported-model-<imported_model_str>
-    target_name = cmake_builder.rules.sanitize_target(
+    target_name = cmake_builder.rules.sanitize_target_name(
         f"iree-imported-model-{imported_model}")
 
     import_flags = import_config.materialize_import_flags(model)
@@ -101,7 +101,7 @@ class IreeRuleBuilder(object):
     ) + compile_config.extra_flags
 
     # Module target name: iree-module-<module_generation_config_str>
-    target_name = cmake_builder.rules.sanitize_target(
+    target_name = cmake_builder.rules.sanitize_target_name(
         f"iree-module-{module_generation_config}")
 
     cmake_rules = [
