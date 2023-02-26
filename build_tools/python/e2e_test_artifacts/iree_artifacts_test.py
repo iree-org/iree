@@ -70,7 +70,7 @@ class IreeArtifactsTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config = iree_definitions.ModuleGenerationConfig(
+    gen_config = iree_definitions.ModuleGenerationConfig.composite(
         imported_model=imported_model, compile_config=compile_config)
     root_path = pathlib.PurePath("root")
 
@@ -121,11 +121,11 @@ class IreeArtifactsTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config_a = iree_definitions.ModuleGenerationConfig(
+    gen_config_a = iree_definitions.ModuleGenerationConfig.composite(
         imported_model=imported_model_a, compile_config=compile_config_a)
-    gen_config_b = iree_definitions.ModuleGenerationConfig(
+    gen_config_b = iree_definitions.ModuleGenerationConfig.composite(
         imported_model=imported_model_b, compile_config=compile_config_a)
-    gen_config_c = iree_definitions.ModuleGenerationConfig(
+    gen_config_c = iree_definitions.ModuleGenerationConfig.composite(
         imported_model=imported_model_b, compile_config=compile_config_b)
 
     models = iree_artifacts.get_dependent_model_map(

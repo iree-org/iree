@@ -162,13 +162,13 @@ class IreeGeneratorTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config_a = iree_definitions.ModuleGenerationConfig(
+    gen_config_a = iree_definitions.ModuleGenerationConfig.composite(
         imported_model=imported_model_a, compile_config=compile_config_a)
-    gen_config_b = iree_definitions.ModuleGenerationConfig(
+    gen_config_b = iree_definitions.ModuleGenerationConfig.composite(
         imported_model=imported_model_b, compile_config=compile_config_a)
-    gen_config_c = iree_definitions.ModuleGenerationConfig(
+    gen_config_c = iree_definitions.ModuleGenerationConfig.composite(
         imported_model=imported_model_b, compile_config=compile_config_b)
-    gen_config_d = iree_definitions.ModuleGenerationConfig(
+    gen_config_d = iree_definitions.ModuleGenerationConfig.composite(
         imported_model=imported_model_c, compile_config=compile_config_b)
     model_rule_map = {
         model_a.id:

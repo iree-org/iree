@@ -155,7 +155,7 @@ def get_module_map_from_generation_config(
         model_source=model.source_type.value,
         target_arch=f"[{','.join(target_archs)}]",
         compile_tags=tuple(compile_config.tags),
-        gen_config_id=gen_config.composite_id())
+        gen_config_id=gen_config.composite_id)
     module_dir_path = iree_artifacts.get_module_dir_path(
         module_generation_config=gen_config, root_path=e2e_test_artifacts_dir)
     module_path = module_dir_path / iree_artifacts.MODULE_FILENAME

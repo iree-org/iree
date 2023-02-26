@@ -127,9 +127,9 @@ class CollectCompilationStatistics(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config_a = iree_definitions.ModuleGenerationConfig(
+    gen_config_a = iree_definitions.ModuleGenerationConfig.composite(
         imported_model=imported_model_a, compile_config=compile_config_a)
-    gen_config_b = iree_definitions.ModuleGenerationConfig(
+    gen_config_b = iree_definitions.ModuleGenerationConfig.composite(
         imported_model=imported_model_a, compile_config=compile_config_b)
     serialized_gen_config = json.dumps(
         serialization.serialize_and_pack([gen_config_a, gen_config_b]))
@@ -145,7 +145,7 @@ class CollectCompilationStatistics(unittest.TestCase):
         model_source=model_a.source_type.value,
         target_arch=f"[cpu-x86_64-cascadelake-linux-gnu]",
         compile_tags=tuple(gen_config_a.compile_config.tags),
-        gen_config_id=gen_config_a.composite_id())
+        gen_config_id=gen_config_a.composite_id)
     module_a_path = iree_artifacts.get_module_dir_path(
         gen_config_a, root_dir) / iree_artifacts.MODULE_FILENAME
     compile_info_b = common.benchmark_definition.CompilationInfo(
@@ -155,7 +155,7 @@ class CollectCompilationStatistics(unittest.TestCase):
         target_arch=
         f"[cpu-riscv_64-generic-linux-gnu,cpu-riscv_32-generic-linux-gnu]",
         compile_tags=tuple(gen_config_a.compile_config.tags),
-        gen_config_id=gen_config_b.composite_id())
+        gen_config_id=gen_config_b.composite_id)
     module_b_path = iree_artifacts.get_module_dir_path(
         gen_config_b, root_dir) / iree_artifacts.MODULE_FILENAME
     self.assertEqual(module_map, {
