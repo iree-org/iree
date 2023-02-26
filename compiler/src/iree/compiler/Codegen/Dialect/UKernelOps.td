@@ -11,6 +11,25 @@ include "iree/compiler/Codegen/Dialect/IREECodegenDialect.td"
 include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 
+def IREECodegen_GetBasePointerOp :
+    Op<IREECodegen_Dialect, "get_base_pointer", []> {
+  let summary = "Operation to get the base address of `memref`";
+  let description = [{
+    Similar to `memref.extract_strided_metadata` but only returns
+    the base pointer.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$source
+  );
+  let results = (outs
+    MemRefRankOf<[AnyType], [0]>:$result
+  );
+  let assemblyFormat = [{
+    attr-dict $source `:` type($source) `->` type($result)
+  }];
+}
+
 class IREECodegen_UKernelOp<string mnemonic, list<Trait> traits = []> : 
   Op<IREECodegen_Dialect, mnemonic, !listconcat(traits,
     [DeclareOpInterfaceMethods<UKernelOpInterface,

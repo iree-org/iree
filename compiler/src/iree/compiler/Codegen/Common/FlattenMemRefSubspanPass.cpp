@@ -33,6 +33,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -600,6 +601,21 @@ struct AdjustConversionCast final
   }
 };
 
+/// Update the source operand to use the converted source.
+struct AdjustGetBasePointer final
+    : public OpConversionPattern<IREE::Codegen::GetBasePointerOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IREE::Codegen::GetBasePointerOp getBasePointerOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.updateRootInPlace(getBasePointerOp, [&] {
+      getBasePointerOp->setOperand(0, adaptor.getSource());
+    });
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Folding Patterns
 //===----------------------------------------------------------------------===//
@@ -856,7 +872,8 @@ struct FlattenMemRefSubspanPass
              LinearizeMMALoadIndices, LinearizeStoreIndices,
              LinearizeMMAStoreIndices, LinearizeTransferReadIndices,
              LinearizeTransferWriteIndices, AdjustConversionCast,
-             FlattenSubView, FoldMemRefReshape<memref::CollapseShapeOp>,
+             AdjustGetBasePointer, FlattenSubView,
+             FoldMemRefReshape<memref::CollapseShapeOp>,
              FoldMemRefReshape<memref::ExpandShapeOp>>(internalTypeConverter,
                                                        context);
 
@@ -918,9 +935,14 @@ struct FlattenMemRefSubspanPass
     target.addDynamicallyLegalOp<memref::SubViewOp>([](memref::SubViewOp op) {
       return isRankZeroOrOneMemRef(op.getType());
     });
+    target.addDynamicallyLegalOp<IREE::Codegen::GetBasePointerOp>(
+        [](IREE::Codegen::GetBasePointerOp op) {
+          return isRankZeroOrOneMemRef(
+              op.getSource().getType().cast<MemRefType>());
+        });
 
-    // Use partial conversion here so that we can ignore allocations created by
-    // promotion and their load/store ops.
+    // Use partial conversion here so that we can ignore allocations created
+    // by promotion and their load/store ops.
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(flattenPatterns)))) {
       return signalPassFailure();
