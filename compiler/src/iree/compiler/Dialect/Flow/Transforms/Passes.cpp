@@ -45,6 +45,11 @@ static llvm::cl::opt<bool> clDemoteF32ToF16(
     llvm::cl::desc("Converts all f32 ops and values into f16 counterparts "
                    "unconditionally before main flow conversions."),
     llvm::cl::init(false));
+static llvm::cl::opt<bool> clPromoteBF16ToF32(
+    "iree-flow-promote-bf16-to-f32",
+    llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts "
+                   "unconditionally before main flow conversions."),
+    llvm::cl::init(false));
 static llvm::cl::opt<bool> clPromoteF16ToF32(
     "iree-flow-promote-f16-to-f32",
     llvm::cl::desc("Converts all f16 ops and values into f32 counterparts "
@@ -173,6 +178,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   }
   if (clDemoteI64ToI32) {
     passManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
+  }
+  if (clPromoteBF16ToF32) {
+    passManager.addPass(IREE::Util::createPromoteBF16ToF32Pass());
   }
 
   // Preprocessing passes to get the program into a canonical state.
