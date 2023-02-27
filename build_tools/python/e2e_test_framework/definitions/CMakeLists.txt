@@ -1,4 +1,4 @@
-# Copyright 2022 The IREE Authors
+# Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -6,16 +6,7 @@
 
 iree_build_tools_py_test(
   NAME
-    serialization_test
+    iree_definitions_test
   SRC
-    "serialization_test.py"
+    "iree_definitions_test.py"
 )
-
-iree_build_tools_py_test(
-  NAME
-    unique_ids_test
-  SRC
-    "unique_ids_test.py"
-)
-
-iree_add_all_subdirs()

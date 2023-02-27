@@ -209,6 +209,10 @@ class ModuleGenerationConfig(object):
             compile_config, imported_model.import_config.dialect_type))
 
 
+# Placeholder to be replaced with gpu id when outputting the actual flag list.
+E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER = r"${GPU_ID_PLACEHOLDER}"
+
+
 @serialization.serializable
 @dataclass(frozen=True)
 class E2EModelRunConfig(object):
@@ -217,6 +221,11 @@ class E2EModelRunConfig(object):
   module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
   input_data: common_definitions.ModelInputData
+  # Full list of flags to run with, derived from sub-components, with
+  # unmaterialized placeholders. Allows the run flags to be persisted and
+  # decouple from the generation code. Also serves as useful information in the
+  # serialized JSON.
+  composite_flags: List[str]
 
   def composite_id(self):
     return unique_ids.hash_composite_id([
@@ -224,6 +233,64 @@ class E2EModelRunConfig(object):
         self.module_execution_config.id, self.target_device_spec.id,
         self.input_data.id
     ])
+
+  def materialize_run_flags(self, gpu_id: str = "0"):
+    """Materialize flags with dependent values."""
+    return [
+        flag.replace(E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER, gpu_id)
+        for flag in self.composite_flags
+    ]
+
+  @staticmethod
+  def with_flag_generation(module_generation_config: ModuleGenerationConfig,
+                           module_execution_config: ModuleExecutionConfig,
+                           target_device_spec: common_definitions.DeviceSpec,
+                           input_data: common_definitions.ModelInputData):
+    return E2EModelRunConfig(
+        module_generation_config=module_generation_config,
+        module_execution_config=module_execution_config,
+        target_device_spec=target_device_spec,
+        input_data=input_data,
+        composite_flags=generate_run_flags(
+            imported_model=module_generation_config.imported_model,
+            input_data=input_data,
+            module_execution_config=module_execution_config,
+            gpu_id=E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER))
+
+
+def generate_run_flags(imported_model: ImportedModel,
+                       input_data: common_definitions.ModelInputData,
+                       module_execution_config: ModuleExecutionConfig,
+                       gpu_id: str = "0",
+                       with_driver: bool = True) -> List[str]:
+  """Returns the IREE run module flags of the input model and execution config.
+  Args:
+    model: source model.
+    input_data: model input data.
+    module_execution_config: execution config.
+    gpu_id: target gpu id, if runs on GPUs.
+    with_driver: populate the driver flags if true. False can be used for
+      generating flags for some CMake rules with a separate DRIVER arg.
+  Returns:
+    List of flags.
+  """
+
+  model = imported_model.model
+  run_flags = [f"--function={model.entry_function}"]
+  if input_data != common_definitions.ZEROS_MODEL_INPUT_DATA:
+    raise ValueError("Currently only support all-zeros data.")
+  run_flags += [f"--input={input_type}=0" for input_type in model.input_types]
+
+  exec_config = module_execution_config
+  run_flags += exec_config.extra_flags.copy()
+  if with_driver:
+    driver = exec_config.driver
+    if driver == RuntimeDriver.CUDA:
+      run_flags.append(f"--device=cuda://{gpu_id}")
+    else:
+      run_flags.append(f"--device={driver.value}")
+
+  return run_flags
 
 
 def _generate_compile_flags(compile_config: CompileConfig,

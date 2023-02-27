@@ -5,48 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Utils that help launch iree run module tools."""
 
-from typing import Any, List
+from typing import List
 
 from e2e_test_framework.definitions import common_definitions
-from e2e_test_framework.definitions.iree_definitions import ModuleExecutionConfig, RuntimeDriver
 from e2e_test_framework.device_specs import device_parameters
-
-
-def build_run_flags_for_model(
-    model: common_definitions.Model,
-    model_input_data: common_definitions.ModelInputData) -> List[str]:
-  """Returns the IREE run module flags for the model and its inputs."""
-
-  run_flags = [f"--function={model.entry_function}"]
-  if model_input_data != common_definitions.ZEROS_MODEL_INPUT_DATA:
-    raise ValueError("Currently only support all-zeros data.")
-  run_flags += [f"--input={input_type}=0" for input_type in model.input_types]
-  return run_flags
-
-
-def build_run_flags_for_execution_config(
-    module_execution_config: ModuleExecutionConfig,
-    gpu_id: str = "0",
-    with_driver: bool = True) -> List[str]:
-  """Returns the IREE run module flags of the execution config.
-
-  Args:
-    module_execution_config: execution config.
-    gpu_id: target gpu id, if runs on GPUs.
-    with_driver: populate the driver flags if true. False can be used for
-      generating flags for some CMake rules with a separate DRIVER arg.
-  Returns:
-    List of flags.
-  """
-
-  run_flags = module_execution_config.extra_flags.copy()
-  if with_driver:
-    driver = module_execution_config.driver
-    if driver == RuntimeDriver.CUDA:
-      run_flags.append(f"--device=cuda://{gpu_id}")
-    else:
-      run_flags.append(f"--device={driver.value}")
-  return run_flags
 
 
 def build_linux_wrapper_cmds_for_device_spec(
