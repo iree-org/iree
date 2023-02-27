@@ -18,11 +18,18 @@ COMMON_MODEL = common_definitions.Model(
     source_url="",
     entry_function="predict",
     input_types=["1xf32"])
-COMMON_GEN_CONFIG = iree_definitions.ModuleGenerationConfig(
+COMMON_GEN_CONFIG = iree_definitions.ModuleGenerationConfig.with_flag_generation(
     imported_model=iree_definitions.ImportedModel.from_model(COMMON_MODEL),
-    compile_config=iree_definitions.CompileConfig(id="1",
-                                                  tags=[],
-                                                  compile_targets=[]))
+    compile_config=iree_definitions.CompileConfig(
+        id="1",
+        tags=[],
+        compile_targets=[
+            iree_definitions.CompileTarget(
+                target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+                target_architecture=common_definitions.DeviceArchitecture.
+                RV64_GENERIC,
+                target_abi=iree_definitions.TargetABI.LINUX_GNU)
+        ]))
 COMMON_EXEC_CONFIG = iree_definitions.ModuleExecutionConfig(
     id="exec",
     tags=[],
@@ -170,13 +177,16 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         source_url="",
         entry_function="predict",
         input_types=["1xf32"])
-    compile_config = iree_definitions.CompileConfig(id="1",
-                                                    tags=[],
-                                                    compile_targets=[])
-    small_gen_config = iree_definitions.ModuleGenerationConfig(
+    compile_target = iree_definitions.CompileTarget(
+        target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+        target_architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
+        target_abi=iree_definitions.TargetABI.LINUX_GNU)
+    compile_config = iree_definitions.CompileConfig(
+        id="1", tags=[], compile_targets=[compile_target])
+    small_gen_config = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=iree_definitions.ImportedModel.from_model(small_model),
         compile_config=compile_config)
-    big_gen_config = iree_definitions.ModuleGenerationConfig(
+    big_gen_config = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=iree_definitions.ImportedModel.from_model(big_model),
         compile_config=compile_config)
     device_spec_a = common_definitions.DeviceSpec(

@@ -71,18 +71,18 @@ class Android_ARMv8_A_Benchmarks(object):
     ]
 
     default_gen_confings = [
-        iree_definitions.ModuleGenerationConfig(
+        iree_definitions.ModuleGenerationConfig.with_flag_generation(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in self.NONQUANT_MODELS + self.QUANT_MODELS
     ]
     experimental_gen_confings = [
-        iree_definitions.ModuleGenerationConfig(
+        iree_definitions.ModuleGenerationConfig.with_flag_generation(
             compile_config=self.MMT4D_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in self.NONQUANT_MODELS
     ] + [
-        iree_definitions.ModuleGenerationConfig(
+        iree_definitions.ModuleGenerationConfig.with_flag_generation(
             compile_config=self.MMT4D_AND_DOTPROD_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in self.QUANT_MODELS

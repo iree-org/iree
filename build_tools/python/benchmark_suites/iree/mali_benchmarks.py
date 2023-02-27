@@ -114,17 +114,17 @@ class Android_Mali_Benchmarks(object):
         extra_flags=compile_config.extra_flags +
         ["--iree-flow-demote-f32-to-f16"])
     return [
-        iree_definitions.ModuleGenerationConfig(
+        iree_definitions.ModuleGenerationConfig.with_flag_generation(
             compile_config=compile_config,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in fp32_models
     ] + [
-        iree_definitions.ModuleGenerationConfig(
+        iree_definitions.ModuleGenerationConfig.with_flag_generation(
             compile_config=demote_compile_config,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in fp16_models
     ] + [
-        iree_definitions.ModuleGenerationConfig(
+        iree_definitions.ModuleGenerationConfig.with_flag_generation(
             compile_config=demote_compile_config,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in quant_models
