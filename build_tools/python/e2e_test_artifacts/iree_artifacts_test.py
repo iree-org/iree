@@ -30,7 +30,7 @@ class IreeArtifactsTest(unittest.TestCase):
 
     self.assertEqual(
         path, root_path / f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{model.name}_"
-        f"{imported_model.composite_id()}.mlir")
+        f"{imported_model.composite_id}.mlir")
 
   def test_get_imported_model_path_with_mlir_model(self):
     model = common_definitions.Model(
@@ -70,7 +70,7 @@ class IreeArtifactsTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config = iree_definitions.ModuleGenerationConfig(
+    gen_config = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model, compile_config=compile_config)
     root_path = pathlib.PurePath("root")
 
@@ -79,7 +79,7 @@ class IreeArtifactsTest(unittest.TestCase):
 
     self.assertEqual(
         path, root_path / f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{model.name}_"
-        f"module_{gen_config.composite_id()}")
+        f"module_{gen_config.composite_id}")
 
   def test_get_dependent_model_map(self):
     model_a = common_definitions.Model(
@@ -120,11 +120,11 @@ class IreeArtifactsTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config_a = iree_definitions.ModuleGenerationConfig(
+    gen_config_a = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_a, compile_config=compile_config_a)
-    gen_config_b = iree_definitions.ModuleGenerationConfig(
+    gen_config_b = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_b, compile_config=compile_config_a)
-    gen_config_c = iree_definitions.ModuleGenerationConfig(
+    gen_config_c = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_b, compile_config=compile_config_b)
 
     models = iree_artifacts.get_dependent_model_map(

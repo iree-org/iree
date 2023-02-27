@@ -161,15 +161,14 @@ MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP = {
 }
 
 
-@serialization.serializable
+@serialization.serializable(type_key="iree_imported_models",
+                            id_field="composite_id")
 @dataclass(frozen=True)
 class ImportedModel(object):
   """Describes an imported MLIR model."""
+  composite_id: str
   model: common_definitions.Model
   import_config: ImportConfig
-
-  def composite_id(self):
-    return unique_ids.hash_composite_id([self.model.id, self.import_config.id])
 
   @staticmethod
   def from_model(model: common_definitions.Model):
@@ -177,33 +176,183 @@ class ImportedModel(object):
     if config is None:
       raise ValueError(f"Unsupported model source type: {model.source_type}.")
 
-    return ImportedModel(model=model, import_config=config)
+    composite_id = unique_ids.hash_composite_id([model.id, config.id])
+    return ImportedModel(composite_id=composite_id,
+                         model=model,
+                         import_config=config)
 
 
-@serialization.serializable
+@serialization.serializable(type_key="iree_module_generation_configs",
+                            id_field="composite_id")
 @dataclass(frozen=True)
 class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
+  composite_id: str
   imported_model: ImportedModel
   compile_config: CompileConfig
+  # Full list of flags to compile with, derived from sub-components, with
+  # unmaterialized placeholders. Allows the compile flags to be persisted and
+  # decouple from the generation code. Also serves as useful information in the
+  # serialized JSON.
+  compile_flags: List[str]
 
-  def composite_id(self):
-    return unique_ids.hash_composite_id(
-        [self.imported_model.composite_id(), self.compile_config.id])
+  def materialize_compile_flags(self):
+    """Materialize flags with dependent values."""
+    return self.compile_flags
+
+  @staticmethod
+  def with_flag_generation(imported_model: ImportedModel,
+                           compile_config: CompileConfig):
+    composite_id = unique_ids.hash_composite_id(
+        [imported_model.composite_id, compile_config.id])
+    return ModuleGenerationConfig(
+        composite_id=composite_id,
+        imported_model=imported_model,
+        compile_config=compile_config,
+        compile_flags=_generate_compile_flags(
+            compile_config, imported_model.import_config.dialect_type))
 
 
-@serialization.serializable
+# Placeholder to be replaced with gpu id when outputting the actual flag list.
+E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER = r"${GPU_ID_PLACEHOLDER}"
+
+
+@serialization.serializable(type_key="iree_e2e_model_run_configs",
+                            id_field="composite_id")
 @dataclass(frozen=True)
 class E2EModelRunConfig(object):
   """Describes an e2e run."""
+  composite_id: str
   module_generation_config: ModuleGenerationConfig
   module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
   input_data: common_definitions.ModelInputData
+  # Full list of flags to run with, derived from sub-components, with
+  # unmaterialized placeholders. Allows the run flags to be persisted and
+  # decouple from the generation code. Also serves as useful information in the
+  # serialized JSON.
+  run_flags: List[str]
 
-  def composite_id(self):
-    return unique_ids.hash_composite_id([
-        self.module_generation_config.composite_id(),
-        self.module_execution_config.id, self.target_device_spec.id,
-        self.input_data.id
+  def materialize_run_flags(self, gpu_id: str = "0"):
+    """Materialize flags with dependent values."""
+    return [
+        flag.replace(E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER, gpu_id)
+        for flag in self.run_flags
+    ]
+
+  @staticmethod
+  def with_flag_generation(module_generation_config: ModuleGenerationConfig,
+                           module_execution_config: ModuleExecutionConfig,
+                           target_device_spec: common_definitions.DeviceSpec,
+                           input_data: common_definitions.ModelInputData):
+    composite_id = unique_ids.hash_composite_id([
+        module_generation_config.composite_id, module_execution_config.id,
+        target_device_spec.id, input_data.id
     ])
+    run_flags = generate_run_flags(
+        imported_model=module_generation_config.imported_model,
+        input_data=input_data,
+        module_execution_config=module_execution_config,
+        gpu_id=E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER)
+    return E2EModelRunConfig(composite_id=composite_id,
+                             module_generation_config=module_generation_config,
+                             module_execution_config=module_execution_config,
+                             target_device_spec=target_device_spec,
+                             input_data=input_data,
+                             run_flags=run_flags)
+
+
+def generate_run_flags(imported_model: ImportedModel,
+                       input_data: common_definitions.ModelInputData,
+                       module_execution_config: ModuleExecutionConfig,
+                       gpu_id: str = "0",
+                       with_driver: bool = True) -> List[str]:
+  """Returns the IREE run module flags of the input model and execution config.
+  Args:
+    model: source model.
+    input_data: model input data.
+    module_execution_config: execution config.
+    gpu_id: target gpu id, if runs on GPUs.
+    with_driver: populate the driver flags if true. False can be used for
+      generating flags for some CMake rules with a separate DRIVER arg.
+  Returns:
+    List of flags.
+  """
+
+  model = imported_model.model
+  run_flags = [f"--function={model.entry_function}"]
+  if input_data != common_definitions.ZEROS_MODEL_INPUT_DATA:
+    raise ValueError("Currently only support all-zeros data.")
+  run_flags += [f"--input={input_type}=0" for input_type in model.input_types]
+
+  exec_config = module_execution_config
+  run_flags += exec_config.extra_flags.copy()
+  if with_driver:
+    driver = exec_config.driver
+    if driver == RuntimeDriver.CUDA:
+      run_flags.append(f"--device=cuda://{gpu_id}")
+    else:
+      run_flags.append(f"--device={driver.value}")
+
+  return run_flags
+
+
+def _generate_compile_flags(compile_config: CompileConfig,
+                            dialect_type: MLIRDialectType) -> List[str]:
+  if len(compile_config.compile_targets) != 1:
+    raise ValueError(f"Only one compile target is supported. Got:"
+                     f" {compile_config.compile_targets}")
+
+  compile_target = compile_config.compile_targets[0]
+  flags = [
+      f"--iree-hal-target-backends={compile_target.target_backend.value}",
+      f"--iree-input-type={dialect_type.value}"
+  ]
+  flags += _generate_compile_target_flags(compile_target)
+  flags += compile_config.extra_flags
+  return flags
+
+
+def _generate_compile_target_flags(target: CompileTarget) -> List[str]:
+  arch_info = target.target_architecture
+  if target.target_backend == TargetBackend.VULKAN_SPIRV:
+    return [
+        f"--iree-vulkan-target-triple={arch_info.architecture}-unknown-{target.target_abi.value}",
+    ]
+
+  if arch_info.architecture == "x86_64":
+    flags = [
+        f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
+        f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
+    ]
+  elif arch_info.architecture == "riscv_64":
+    flags = [
+        f"--iree-llvm-target-triple=riscv64-pc-{target.target_abi.value}",
+        "--iree-llvm-target-cpu=generic-rv64", "--iree-llvm-target-abi=lp64d",
+        "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v",
+        "--riscv-v-fixed-length-vector-lmul-max=8"
+    ]
+  elif arch_info.architecture == "riscv_32":
+    # TODO(llvm-project/60463): Replace 'zve32f' with 'zve32x'.
+    flags = [
+        f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
+        "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
+        "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
+        "--riscv-v-fixed-length-vector-lmul-max=8"
+    ]
+  elif arch_info.architecture == "armv8.2-a":
+    flags = [
+        f"--iree-llvm-target-triple=aarch64-none-{target.target_abi.value}",
+    ]
+  elif arch_info.architecture == "cuda":
+    if target.target_abi != TargetABI.LINUX_GNU:
+      raise ValueError(
+          f"Unsupported target ABI for CUDA backend: `{target.target_abi}`")
+    flags = [
+        f"--iree-hal-cuda-llvm-target-arch={arch_info.microarchitecture}",
+    ]
+  elif arch_info.architecture == "vmvx":
+    flags = []
+  else:
+    raise ValueError(f"Unsupported architecture: '{arch_info.architecture}'")
+  return flags

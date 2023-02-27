@@ -169,32 +169,36 @@ class BenchmarkSuiteTest(unittest.TestCase):
         architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         device_parameters=[])
-    run_config_a = iree_definitions.E2EModelRunConfig(
-        module_generation_config=iree_definitions.ModuleGenerationConfig(
+    compile_target = iree_definitions.CompileTarget(
+        target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+        target_architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
+        target_abi=iree_definitions.TargetABI.LINUX_GNU)
+    run_config_a = iree_definitions.E2EModelRunConfig.with_flag_generation(
+        module_generation_config=iree_definitions.ModuleGenerationConfig.
+        with_flag_generation(
             imported_model=iree_definitions.ImportedModel.from_model(
                 model_tflite),
-            compile_config=iree_definitions.CompileConfig(id="1",
-                                                          tags=[],
-                                                          compile_targets=[])),
+            compile_config=iree_definitions.CompileConfig(
+                id="1", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_a,
         target_device_spec=device_spec_a,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
-    run_config_b = iree_definitions.E2EModelRunConfig(
-        module_generation_config=iree_definitions.ModuleGenerationConfig(
+    run_config_b = iree_definitions.E2EModelRunConfig.with_flag_generation(
+        module_generation_config=iree_definitions.ModuleGenerationConfig.
+        with_flag_generation(
             imported_model=iree_definitions.ImportedModel.from_model(
                 model_tflite),
-            compile_config=iree_definitions.CompileConfig(id="2",
-                                                          tags=[],
-                                                          compile_targets=[])),
+            compile_config=iree_definitions.CompileConfig(
+                id="2", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_b,
         target_device_spec=device_spec_b,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
-    run_config_c = iree_definitions.E2EModelRunConfig(
-        module_generation_config=iree_definitions.ModuleGenerationConfig(
+    run_config_c = iree_definitions.E2EModelRunConfig.with_flag_generation(
+        module_generation_config=iree_definitions.ModuleGenerationConfig.
+        with_flag_generation(
             imported_model=iree_definitions.ImportedModel.from_model(model_tf),
-            compile_config=iree_definitions.CompileConfig(id="3",
-                                                          tags=[],
-                                                          compile_targets=[])),
+            compile_config=iree_definitions.CompileConfig(
+                id="3", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_a,
         target_device_spec=device_spec_a,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)

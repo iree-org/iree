@@ -33,7 +33,7 @@ class Linux_CUDA_Benchmarks(object):
     """Generates IREE compile and run configs."""
 
     gen_configs = [
-        iree_definitions.ModuleGenerationConfig(
+        iree_definitions.ModuleGenerationConfig.with_flag_generation(
             compile_config=self.SM_80_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in model_groups.LARGE
