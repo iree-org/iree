@@ -23,7 +23,7 @@
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
 
 // For now as we only need ISA feature bits and no CPU identification beyond
-// that, and as we are OK with requring a sufficiently recent linux kernel to
+// that, and as we are OK with requiring a sufficiently recent linux kernel to
 // expose the features that we need, we can just rely on the basic HWCAP way.
 #include <sys/auxv.h>
 
@@ -35,8 +35,8 @@
 
 static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
                                               uint64_t* out_fields) {
-  uint32_t auvx_HWCAP = getauxval(AT_HWCAP);
-  uint32_t auvx_HWCAP2 = getauxval(AT_HWCAP2);
+  uint32_t hwcap = getauxval(AT_HWCAP);
+  uint32_t hwcap2 = getauxval(AT_HWCAP2);
   if (hwcap & IREE_HWCAP_ASIMDDP)
     out_fields[0] |= IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD;
   if (hwcap2 & IREE_HWCAP2_I8MM)
