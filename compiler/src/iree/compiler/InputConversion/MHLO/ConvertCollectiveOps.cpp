@@ -129,6 +129,36 @@ static IREE::Flow::CollectiveElementTypeAttr getCollectiveElementTypeAttr(
                                                     *collectiveElemType);
 }
 
+template <typename T>
+static LogicalResult checkCollectiveAttrs(T op, PatternRewriter &rewriter) {
+  // Check there is only one group in the replica_groups
+  ShapedType replicaGroupType = op.getReplicaGroups().getType();
+  if (replicaGroupType.getRank() != 2 || replicaGroupType.getDimSize(0) != 1) {
+    return rewriter.notifyMatchFailure(op, "must have a single replica group");
+  }
+
+  int64_t channelHandle =
+      op.getChannelHandle() ? op.getChannelHandleAttr().getHandle() : 0;
+  if (channelHandle <= 0) {
+    if (!op.getUseGlobalDeviceIds()) {
+      // When the channel handle attribute is not present, it means the
+      // channel ID is 0. When this case is combined with
+      // `use_global_device_ids=false`, the communication type is
+      // `cross-replica`, but since there is only one replica group, it is
+      // effectively the same as `flatten_ids`, which is supported.
+    } else {
+      return rewriter.notifyMatchFailure(
+          op, "must not set use_global_device_ids when channel_id <= 0");
+    }
+  } else {
+    if (!op.getUseGlobalDeviceIds()) {
+      return rewriter.notifyMatchFailure(op, "must set use_global_device_ids");
+    }
+  }
+
+  return success();
+}
+
 }  // namespace
 
 /// Converts mhlo.replica_id to flow.channel.default + flow.channel.rank.
@@ -161,21 +191,13 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
   LogicalResult matchAndRewrite(
       mhlo::AllGatherOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto loc = op.getLoc();
-
-    if (!op.getUseGlobalDeviceIds()) {
-      return rewriter.notifyMatchFailure(op, "must use global device IDs");
-    }
-
-    // Check there is only one group in the replica_groups
-    ShapedType replicaGroupType = op.getReplicaGroups().getType();
-    if (replicaGroupType.getRank() != 2 ||
-        replicaGroupType.getDimSize(0) != 1) {
-      return rewriter.notifyMatchFailure(op,
-                                         "must have a single replica group");
+    if (checkCollectiveAttrs<mhlo::AllGatherOp>(op, rewriter).failed()) {
+      return failure();
     }
 
     // Currently only the default channel is used.
+
+    auto loc = op.getLoc();
 
     // Create a default channel.
     auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
@@ -242,18 +264,8 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
   LogicalResult matchAndRewrite(
       mhlo::AllReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto loc = op.getLoc();
-
-    if (!op.getUseGlobalDeviceIds()) {
-      return rewriter.notifyMatchFailure(op, "must use global device IDs");
-    }
-
-    // Check there is only one group in the replica_groups.
-    ShapedType replicaGroupType = op.getReplicaGroups().getType();
-    if (replicaGroupType.getRank() != 2 ||
-        replicaGroupType.getDimSize(0) != 1) {
-      return rewriter.notifyMatchFailure(op,
-                                         "must have a single replica group");
+    if (checkCollectiveAttrs<mhlo::AllReduceOp>(op, rewriter).failed()) {
+      return failure();
     }
 
     // Only single elementwise op is supported.
@@ -288,6 +300,8 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
                                          "the second op must be a terminator");
     }
     // Currently only the default channel is used.
+
+    auto loc = op.getLoc();
 
     // Create a default channel.
     auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
@@ -324,18 +338,8 @@ struct ReduceScatterOpConversion
   LogicalResult matchAndRewrite(
       mhlo::ReduceScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto loc = op.getLoc();
-
-    if (!op.getUseGlobalDeviceIds()) {
-      return rewriter.notifyMatchFailure(op, "must use global device IDs");
-    }
-
-    // Check if there is only one group in the replica_groups.
-    ShapedType replicaGroupType = op.getReplicaGroups().getType();
-    if (replicaGroupType.getRank() != 2 ||
-        replicaGroupType.getDimSize(0) != 1) {
-      return rewriter.notifyMatchFailure(op,
-                                         "must have a single replica group");
+    if (checkCollectiveAttrs<mhlo::ReduceScatterOp>(op, rewriter).failed()) {
+      return failure();
     }
 
     // Only single elementwise op is supported.
@@ -375,6 +379,8 @@ struct ReduceScatterOpConversion
         IREE::Flow::CollectiveReductionOpAttr::get(op.getContext(), *redOp);
 
     // Currently only the default channel is used.
+
+    auto loc = op.getLoc();
 
     // Create a default channel.
     auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
