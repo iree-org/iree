@@ -47,7 +47,6 @@ struct ApplyPatternsOpPatterns {
   bool promoteForallCaptureToShared = false;
   bool rankReducingLinalg = false;
   bool rankReducingVector = false;
-  bool rewritePackOps = false;
   bool swapPaddingElideConditional = false;
   bool swappingPatterns = false;
   bool unrollVectorsGpuMmaSync = false;

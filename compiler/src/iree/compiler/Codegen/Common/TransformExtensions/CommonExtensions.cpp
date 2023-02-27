@@ -146,7 +146,6 @@ void transform_dialect::ApplyPatternsOp::build(
               getLowerTransferOpPermutationsAttrName)
   ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
   ADD_PATTERN(rankReducingVector, getRankReducingVectorAttrName)
-  ADD_PATTERN(rewritePackOps, getRewritePackOpsAttrName)
   ADD_PATTERN(swapPaddingElideConditional,
               getSwapPaddingElideConditionalAttrName)
   ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
@@ -195,32 +194,6 @@ struct FoldTensorEmptyExtract
     return success();
   }
 };
-
-/// Trivial 1-1 pattern to retire once IREE adopts tensor.pack.
-struct TensorPackToLinalgExt : public OpRewritePattern<tensor::PackOp> {
-  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(tensor::PackOp packOp,
-                                PatternRewriter &rewriter) const final {
-    rewriter.replaceOpWithNewOp<LinalgExt::PackOp>(
-        packOp, packOp.getSource(), packOp.getDest(), packOp.getInnerDimsPos(),
-        packOp.getMixedTiles(), packOp.getPaddingValue(),
-        packOp.getOuterDimsPerm());
-    return success();
-  }
-};
-
-/// Trivial 1-1 pattern to retire once IREE adopts tensor.unpack.
-struct TensorUnPackToLinalgExt : public OpRewritePattern<tensor::UnPackOp> {
-  using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
-                                PatternRewriter &rewriter) const final {
-    rewriter.replaceOpWithNewOp<LinalgExt::UnPackOp>(
-        unPackOp, unPackOp.getSource(), unPackOp.getDest(),
-        unPackOp.getInnerDimsPos(), unPackOp.getMixedTiles(),
-        unPackOp.getOuterDimsPerm());
-    return success();
-  }
-};
 }  // namespace
 
 static void addLowerTransferOpPermutationsPatterns(
@@ -252,11 +225,6 @@ static void addRankReducingLinalgPatterns(RewritePatternSet &patterns) {
 
 static void addRankReducingVectorPatterns(RewritePatternSet &patterns) {
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-}
-
-static void addRewritePackOpsPatterns(RewritePatternSet &patterns) {
-  patterns.add<TensorPackToLinalgExt, TensorUnPackToLinalgExt>(
-      patterns.getContext());
 }
 
 static void addSwappingPatterns(RewritePatternSet &patterns,
@@ -338,7 +306,6 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
   if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
   if (getRankReducingVector()) addRankReducingVectorPatterns(patterns);
-  if (getRewritePackOps()) addRewritePackOpsPatterns(patterns);
   if (getSwappingPatterns())
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());
   if (getAdditionalIreePatterns()) addAdditionalIreePatterns(patterns);
