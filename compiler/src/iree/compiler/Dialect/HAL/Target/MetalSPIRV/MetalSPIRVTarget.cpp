@@ -38,7 +38,7 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
       Extension::SPV_KHR_storage_buffer_storage_class,
       Extension::SPV_KHR_variable_pointers,
   };
-  const std::array<Capability, 11> capabilities = {
+  const std::array<Capability, 21> capabilities = {
       Capability::Shader,
       Capability::Int8,
       Capability::Int16,
@@ -50,6 +50,16 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
       Capability::StorageUniform16,
       Capability::StorageBuffer16BitAccess,
       Capability::StoragePushConstant16,
+      Capability::GroupNonUniform,
+      Capability::GroupNonUniformVote,
+      Capability::GroupNonUniformArithmetic,
+      Capability::GroupNonUniformBallot,
+      Capability::GroupNonUniformShuffle,
+      Capability::GroupNonUniformShuffleRelative,
+      Capability::GroupNonUniformQuad,
+      Capability::StoragePushConstant16,
+      Capability::VariablePointers,
+      Capability::VariablePointersStorageBuffer,
   };
   auto limits = spirv::ResourceLimitsAttr::get(
       context,
