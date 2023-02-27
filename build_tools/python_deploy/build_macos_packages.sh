@@ -29,7 +29,6 @@ packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
 # Note that this typically is selected to match the version that the official
 # Python distributed is built at.
 export MACOSX_DEPLOYMENT_TARGET=11.0
-export CMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 
 # cpuinfo is incompatible with universal builds.
 export IREE_ENABLE_CPUINFO=OFF
