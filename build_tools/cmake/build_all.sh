@@ -55,13 +55,19 @@ echo "Building all"
 echo "------------"
 "$CMAKE_BIN" --build "${BUILD_DIR}" -- -k 0
 
+df -h
+
 echo "Building 'install'"
 echo "------------------"
 "${CMAKE_BIN}" --build "${BUILD_DIR}" --target install -- -k 0
 
+df -h
+
 echo "Building test deps"
 echo "------------------"
 "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
+
+df -h
 
 if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats
