@@ -413,6 +413,19 @@ TEST_P(command_buffer_test, FillBuffer_pattern4_size4_offset0_length4) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
+TEST_P(command_buffer_test, FillBuffer_pattern4_size4_offset16_length4) {
+  iree_device_size_t buffer_size = 20;
+  iree_device_size_t target_offset = 16;
+  iree_device_size_t fill_length = 4;
+  uint32_t pattern = 0xAB23CD45;
+  std::vector<uint8_t> reference_buffer(buffer_size, 0);
+  *reinterpret_cast<uint32_t*>(&reference_buffer[target_offset]) = pattern;
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
 TEST_P(command_buffer_test, FillBuffer_pattern4_size16_offset0_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
@@ -422,6 +435,21 @@ TEST_P(command_buffer_test, FillBuffer_pattern4_size16_offset0_length8) {
                                         0x45, 0xCD, 0x23, 0xAB,  //
                                         0x00, 0x00, 0x00, 0x00,  //
                                         0x00, 0x00, 0x00, 0x00};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(command_buffer_test, FillBuffer_pattern4_size16_offset8_length8) {
+  iree_device_size_t buffer_size = 16;
+  iree_device_size_t target_offset = 8;
+  iree_device_size_t fill_length = 8;
+  uint32_t pattern = 0xAB23CD45;
+  std::vector<uint8_t> reference_buffer{0x00, 0x00, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00,  //
+                                        0x45, 0xCD, 0x23, 0xAB,  //
+                                        0x45, 0xCD, 0x23, 0xAB};
   std::vector<uint8_t> actual_buffer =
       RunFillBufferTest(buffer_size, target_offset, fill_length,
                         (void*)&pattern, sizeof(pattern));

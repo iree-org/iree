@@ -97,7 +97,7 @@ iree_cc_library(
     iree::modules::hal::loader
     iree::modules::vmvx
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
   PUBLIC
 )
 
@@ -115,8 +115,25 @@ iree_cc_library(
     iree::base::tracing
     iree::hal
     iree::hal::drivers
-    iree::hal::utils::caching_allocator
-    iree::hal::utils::debug_allocator
+    iree::hal::utils::allocators
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    instrument_util
+  HDRS
+    "instrument_util.h"
+  SRCS
+    "instrument_util.c"
+  DEPS
+    iree::base
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal
+    iree::modules::hal::types
+    iree::schemas::instruments
+    iree::vm
   PUBLIC
 )
 
@@ -165,7 +182,7 @@ iree_cc_library(
     iree::hal
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
   PUBLIC
 )
 
@@ -206,7 +223,7 @@ iree_cc_library(
     iree::hal
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
     yaml
   PUBLIC
 )

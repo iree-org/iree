@@ -42,7 +42,7 @@ class ModelTestConfig(object):
   """Defines an e2e model test to run by iree-run-module."""
   # Test name shown in the test rule.
   name: str
-  model: common_definitions.Model
+  imported_model: iree_definitions.ImportedModel
   execution_config: iree_definitions.ModuleExecutionConfig
 
   # Either a string literal or a file path.
@@ -62,7 +62,8 @@ TEST_CONFIGS = [
     # mobilenet_v1_fp32_correctness_test
     ModelTestConfig(
         name="mobilenet_v1_fp32_correctness_test",
-        model=tflite_models.MOBILENET_V1,
+        imported_model=iree_definitions.ImportedModel.from_model(
+            tflite_models.MOBILENET_V1),
         execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
         expected_output="mobilenet_v1_fp32_expected_output.txt",
         unsupported_platforms=[
@@ -71,14 +72,16 @@ TEST_CONFIGS = [
     # efficientnet_int8_correctness_test
     ModelTestConfig(
         name="efficientnet_int8_correctness_test",
-        model=tflite_models.EFFICIENTNET_INT8,
+        imported_model=iree_definitions.ImportedModel.from_model(
+            tflite_models.EFFICIENTNET_INT8),
         execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
         expected_output="efficientnet_int8_expected_output.txt",
         unsupported_platforms=[CMakePlatform.ANDROID_ARMV8_A]),
     # deeplab_v3_fp32_correctness_test
     ModelTestConfig(
         name="deeplab_v3_fp32_correctness_test",
-        model=tflite_models.DEEPLABV3_FP32,
+        imported_model=iree_definitions.ImportedModel.from_model(
+            tflite_models.DEEPLABV3_FP32),
         execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
         expected_output="deeplab_v3_fp32_input_0_expected_output.npy",
         extra_test_flags=["--expected_f32_threshold=0.001"],
@@ -86,7 +89,8 @@ TEST_CONFIGS = [
     # person_detect_int8_correctness_test
     ModelTestConfig(
         name="person_detect_int8_correctness_test",
-        model=tflite_models.PERSON_DETECT_INT8,
+        imported_model=iree_definitions.ImportedModel.from_model(
+            tflite_models.PERSON_DETECT_INT8),
         execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
         expected_output="1x2xi8=[72 -72]",
         unsupported_platforms=[CMakePlatform.ANDROID_ARMV8_A])

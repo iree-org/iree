@@ -33,13 +33,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-/// A heuristic that decides which ops should be cloned and fused into a
-/// dispatch region.
-///
-/// Note: This function returns `false` for ops that should be tiled and fused
-/// into a dispatch region.
-bool isClonableIntoDispatchOp(Operation *op);
-
 /// Computes the workload and provides a workload region builder for the given
 /// root op.
 FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,

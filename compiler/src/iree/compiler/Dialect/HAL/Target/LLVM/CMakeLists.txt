@@ -143,19 +143,23 @@ iree_cc_library(
 
 add_library(IREELLVMCPUTargetDeps INTERFACE)
 
-function(_add_optional_llvm_dep dep)
-  if(TARGET ${dep})
-    target_link_libraries(IREELLVMCPUTargetDeps INTERFACE ${dep})
+function(_add_optional_llvm_target_deps target)
+  # Key off of the CodeGen target and then include the rest.
+  if(TARGET "LLVM${target}CodeGen")
+    target_link_libraries(IREELLVMCPUTargetDeps INTERFACE
+      "LLVM${target}AsmParser"
+      "LLVM${target}CodeGen"
+      "LLVM${target}Desc"
+      "LLVM${target}Info")
   endif()
 endfunction()
 
-_add_optional_llvm_dep(LLVMAArch64AsmParser)
-_add_optional_llvm_dep(LLVMAArch64CodeGen)
-_add_optional_llvm_dep(LLVMARMAsmParser)
-_add_optional_llvm_dep(LLVMARMCodeGen)
-_add_optional_llvm_dep(LLVMRISCVAsmParser)
-_add_optional_llvm_dep(LLVMRISCVCodeGen)
-_add_optional_llvm_dep(LLVMWebAssemblyAsmParser)
-_add_optional_llvm_dep(LLVMWebAssemblyCodeGen)
-_add_optional_llvm_dep(LLVMX86AsmParser)
-_add_optional_llvm_dep(LLVMX86CodeGen)
+# This is just the CPU backends that we hard-link to. Single-target backends
+# like CUDA and ROCM bring their dependencies explicitly.
+# TODO: More archaeology and tieing this to explicit top-level configuration
+# of backends.
+_add_optional_llvm_target_deps(AArch64)
+_add_optional_llvm_target_deps(ARM)
+_add_optional_llvm_target_deps(RISCV)
+_add_optional_llvm_target_deps(WebAssembly)
+_add_optional_llvm_target_deps(X86)

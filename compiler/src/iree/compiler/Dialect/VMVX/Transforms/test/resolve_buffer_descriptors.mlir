@@ -81,12 +81,13 @@ func.func @resolve_binding_subspan_offset_index(%arg0 : index) -> (!util.buffer,
   %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<512x384xindex> -> !util.buffer, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : !util.buffer, index, index, index, index, index
 }
+//     CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 floordiv s1)>
 //     CHECK: func @resolve_binding_subspan_offset_index(
 // CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
 // CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[INDEX_SIZE:.+]] = util.sizeof index
-// CHECK-DAG:   %[[OFFSET:.+]] = arith.divui %arg0, %[[INDEX_SIZE]] : index
+// CHECK-DAG:   %[[OFFSET:.+]] = affine.apply #map()[%arg0, %[[INDEX_SIZE]]]
 //     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer set(0) binding(0)
 //     CHECK:   return %[[CAST]], %[[OFFSET]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
@@ -214,7 +215,6 @@ func.func @resolve_subview_rankreducing_not_at_the_end_memref(%arg0: memref<8x16
 //     CHECK:   %[[SUB_OFFSET:.+]] = affine.apply #[[MAP]]()[%arg1, %arg2]
 //     CHECK:   return %[[BASE_BUFFER]], %[[SUB_OFFSET]], %[[C6]], %[[C3]], %[[C4]], %[[C1]]
 
-
 // -----
 
 func.func @resolve_binding_subspan_zero_offset_memref() -> (memref<f32>, index, index, index, index, index) {
@@ -238,13 +238,16 @@ func.func @resolve_binding_subspan_offset_index_memref(%arg0 : index) -> (memref
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<512x384xindex, strided<[384, 1], offset:?>> -> memref<index>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<index>, index, index, index, index, index
 }
+//     CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 floordiv s1)>
 //     CHECK: func @resolve_binding_subspan_offset_index_memref(
 // CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
 // CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%arg0) : memref<index>
-//     CHECK:   return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
+//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<index>
+//     CHECK:   %[[SIZEOF:.+]] = util.sizeof index
+//     CHECK:   %[[OFFSET:.+]] = affine.apply #[[MAP]]()[%arg0, %[[SIZEOF]]]
+//     CHECK:   return %[[BINDING]], %[[OFFSET]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
 

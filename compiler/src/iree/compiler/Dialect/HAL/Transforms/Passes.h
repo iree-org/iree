@@ -155,6 +155,10 @@ createSerializeTargetExecutablesPass(StringRef target, int debugLevel = 2,
 // Resource initialization, caching, and optimization
 //===----------------------------------------------------------------------===//
 
+// Materializes host and device dispatch instrumentation resources on stream IR.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createMaterializeDispatchInstrumentationPass(int64_t bufferSize);
+
 // Finds all resource lookups (such as hal.executable.lookup), materializes
 // their cache storage and initialization, and rewrites the lookups to
 // references.
@@ -186,6 +190,7 @@ inline void registerHALPasses() {
   createFixupLegacySyncPass();
   createLinkExecutablesPass();
   createLinkTargetExecutablesPass("");
+  createMaterializeDispatchInstrumentationPass(0);
   createMaterializeInterfacesPass();
   createMaterializeResourceCachesPass(targetOptions);
   createMemoizeDeviceQueriesPass();

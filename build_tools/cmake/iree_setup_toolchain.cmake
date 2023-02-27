@@ -29,6 +29,12 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
+# Compiler flag support
+#-------------------------------------------------------------------------------
+
+check_cxx_compiler_flag(-fvisibility=default IREE_SUPPORTS_VISIBILITY_DEFAULT)
+
+#-------------------------------------------------------------------------------
 # Linker setup
 #-------------------------------------------------------------------------------
 
@@ -91,6 +97,13 @@ endif()
 if(IREE_ENABLE_ASAN)
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=address")
   string(APPEND CMAKE_C_FLAGS " -fsanitize=address")
+  # If doing any kind of shared library builds, then we have to link against
+  # the shared libasan, and the user will be responsible for adding the
+  # appropriate path to LD_LIBRARY_PATH (or else binaries will fail to launch).
+  if(BUILD_SHARED_LIBS OR IREE_COMPILER_BUILD_SHARED_LIBS)
+    string(APPEND CMAKE_EXE_LINKER_FLAGS " -shared-libasan")
+    string(APPEND CMAKE_SHARED_LINKER_FLAGS " -shared-libasan")
+  endif()
 endif()
 if(IREE_ENABLE_MSAN)
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=memory")

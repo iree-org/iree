@@ -105,6 +105,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
+    iree::schemas::instruments
   PUBLIC
 )
 

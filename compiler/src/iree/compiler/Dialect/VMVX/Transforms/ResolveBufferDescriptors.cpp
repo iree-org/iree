@@ -89,6 +89,50 @@ static SmallVector<OpFoldResult> getStridesFromSizes(
   return strides;
 }
 
+static FailureOr<DescriptorInfo> resolveBufferDescriptorForInterfaceBinding(
+    IREE::HAL::InterfaceBindingSubspanOp binding, RewriterBase &rewriter,
+    Location loc) {
+  auto memRefType = binding.getResult().getType().template cast<MemRefType>();
+  int rank = memRefType.getRank();
+  DescriptorInfo resultDescriptor;
+
+  // Compute sizes.
+  auto dynamicDimIt = binding.getDynamicDims().begin();
+  for (int i = 0; i < rank; ++i) {
+    if (memRefType.isDynamicDim(i)) {
+      resultDescriptor.sizes.push_back(*dynamicDimIt);
+      dynamicDimIt++;
+    } else {
+      resultDescriptor.sizes.push_back(
+          rewriter.getIndexAttr(memRefType.getDimSize(i)));
+    }
+  }
+  // Strides.
+  resultDescriptor.strides =
+      getStridesFromSizes(rewriter, loc, resultDescriptor.sizes);
+
+  // Offset.
+  Type elementType = memRefType.getElementType();
+  OpFoldResult elementWidth =
+      TypeSwitch<Type, OpFoldResult>(elementType)
+          .Case<ComplexType, IntegerType, FloatType>(
+              [&](auto type) -> OpFoldResult {
+                return rewriter.getIndexAttr(
+                    IREE::Util::getRoundedElementByteWidth(
+                        memRefType.getElementType()));
+              })
+          .Default([&](Type t) -> OpFoldResult {
+            return rewriter.create<IREE::Util::SizeOfOp>(loc, elementType)
+                .getResult();
+          });
+  AffineExpr s0, s1;
+  bindSymbols(rewriter.getContext(), s0, s1);
+  resultDescriptor.offset = makeComposedFoldedAffineApply(
+      rewriter, loc, s0.floorDiv(s1),
+      ArrayRef<OpFoldResult>{binding.getByteOffset(), elementWidth});
+  return resultDescriptor;
+}
+
 static FailureOr<DescriptorInfo> resolveBufferDescriptorForAllocation(
     memref::AllocaOp alloca, RewriterBase &rewriter, Location loc) {
   DescriptorInfo resultDescriptor;
@@ -260,34 +304,14 @@ struct FromHalInterfaceBindingSubspan
     if (!binding) return failure();
 
     auto loc = op.getLoc();
-
-    auto memRefType = binding.getResult().getType().cast<MemRefType>();
-    int rank = memRefType.getRank();
-    DescriptorInfo resultDescriptor;
-
-    // Compute sizes.
-    auto dynamicDimIt = binding.getDynamicDims().begin();
-    for (int i = 0; i < rank; ++i) {
-      if (memRefType.isDynamicDim(i)) {
-        resultDescriptor.sizes.push_back(*dynamicDimIt);
-        dynamicDimIt++;
-      } else {
-        resultDescriptor.sizes.push_back(
-            rewriter.getIndexAttr(memRefType.getDimSize(i)));
-      }
+    FailureOr<DescriptorInfo> resultDescriptor =
+        resolveBufferDescriptorForInterfaceBinding(binding, rewriter, loc);
+    if (failed(resultDescriptor)) {
+      return rewriter.notifyMatchFailure(
+          op, "failed to resolve descriptor with source being binding op");
     }
 
-    // Strides.
-    resultDescriptor.strides =
-        getStridesFromSizes(rewriter, loc, resultDescriptor.sizes);
-
-    // Offset.
-    auto elementSize =
-        rewriter.create<IREE::Util::SizeOfOp>(loc, memRefType.getElementType());
-    resultDescriptor.offset = rewriter.createOrFold<arith::DivUIOp>(
-        loc, binding.getByteOffset(), elementSize);
-
-    replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor);
+    replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor.value());
 
     // Base buffer.
     rewriter.replaceAllUsesWith(
@@ -316,32 +340,19 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     if (memRefType.getRank() < 1) return failure();
 
     auto loc = op.getLoc();
-    int rank = memRefType.getRank();
-    DescriptorInfo resultDescriptor;
-
-    // Compute sizes.
-    auto dynamicDimIt = binding.getDynamicDims().begin();
-    for (int i = 0; i < rank; ++i) {
-      if (memRefType.isDynamicDim(i)) {
-        resultDescriptor.sizes.push_back(*dynamicDimIt);
-        dynamicDimIt++;
-      } else {
-        resultDescriptor.sizes.push_back(
-            rewriter.getIndexAttr(memRefType.getDimSize(i)));
-      }
+    FailureOr<DescriptorInfo> resultDescriptor =
+        resolveBufferDescriptorForInterfaceBinding(binding, rewriter, loc);
+    if (failed(resultDescriptor)) {
+      return rewriter.notifyMatchFailure(
+          op, "failed to resolve descriptor with source being binding op");
     }
 
-    // Strides.
-    resultDescriptor.strides =
-        getStridesFromSizes(rewriter, loc, resultDescriptor.sizes);
-    resultDescriptor.offset = rewriter.getIndexAttr(0);
-
-    replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor);
+    replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor.value());
 
     // Base buffer. Use a 1D memref for hal.interface.binding.subspan.
     AffineMap mulMap = getMulMap(rewriter.getContext());
     OpFoldResult linearizedMemrefSize = rewriter.getIndexAttr(1);
-    for (auto size : resultDescriptor.sizes) {
+    for (auto size : resultDescriptor->sizes) {
       linearizedMemrefSize = makeComposedFoldedAffineApply(
           rewriter, loc, mulMap, {linearizedMemrefSize, size});
     }
@@ -349,13 +360,16 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     SmallVector<Value> dynamicLinearShape;
     dispatchIndexOpFoldResult(linearizedMemrefSize, dynamicLinearShape,
                               staticLinearShape);
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(binding);
+
+    Value newOffset = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     Value linearInterfaceBinding =
         rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
             loc, op.getBaseBuffer().getType(), binding.getSetAttr(),
             binding.getBindingAttr(), binding.getDescriptorTypeAttr(),
-            binding.getByteOffset(),
-            /*dynamicDims =*/ValueRange{}, binding.getAlignmentAttr(),
-            binding.getDescriptorFlagsAttr());
+            newOffset, /*dynamicDims =*/ValueRange{},
+            binding.getAlignmentAttr(), binding.getDescriptorFlagsAttr());
     rewriter.replaceAllUsesWith(op.getBaseBuffer(), linearInterfaceBinding);
 
     rewriter.eraseOp(op);

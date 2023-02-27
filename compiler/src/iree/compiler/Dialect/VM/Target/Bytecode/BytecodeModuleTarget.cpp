@@ -39,6 +39,9 @@
 #include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
 
+IREE_DEFINE_COMPILER_OPTION_FLAGS(
+    mlir::iree_compiler::IREE::VM::BytecodeTargetOptions);
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {

@@ -24,6 +24,7 @@ iree_cc_library(
     MLIRParser
     MLIRSupport
     iree::compiler::ConstEval
+    iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::C
     iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Pipelines

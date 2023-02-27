@@ -8,6 +8,8 @@
 
 #include "llvm/Support/CommandLine.h"
 
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::IREE::VM::TargetOptions);
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {

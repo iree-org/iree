@@ -88,7 +88,7 @@ cc_library(
         "//runtime/src/iree/modules/hal/loader",
         "//runtime/src/iree/modules/vmvx",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 
@@ -103,8 +103,22 @@ cc_library(
         "//runtime/src/iree/base/internal:synchronization",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers",
-        "//runtime/src/iree/hal/utils:caching_allocator",
-        "//runtime/src/iree/hal/utils:debug_allocator",
+        "//runtime/src/iree/hal/utils:allocators",
+    ],
+)
+
+cc_library(
+    name = "instrument_util",
+    srcs = ["instrument_util.c"],
+    hdrs = ["instrument_util.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal:types",
+        "//runtime/src/iree/schemas/instruments",
+        "//runtime/src/iree/vm",
     ],
 )
 
@@ -146,7 +160,7 @@ cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 
@@ -188,7 +202,7 @@ cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
         "@com_github_yaml_libyaml//:yaml",
     ],
 )

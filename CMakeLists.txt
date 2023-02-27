@@ -94,6 +94,20 @@ cmake_dependent_option(IREE_ENABLE_COMPILATION_BENCHMARKS "Builds IREE benchmark
 
 option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 
+# For development, builds LLVM (and in the future) the whole compiler as
+# individual shared libraries similar to if passing -DBUILD_SHARED_LIBS=ON
+# to a standalone LLVM build. This can dramatically reduce linking time and
+# makes the management of some dependencies more strict.
+# This option is considered experimental and should not be relied on until
+# CI coverage is established.
+option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables BUILD_SHARED_LIBS CMake mode for LLVM and the compiler (this is only suitable for development)" OFF)
+
+# Must be defined as an option (CMake does not do it automatically), even though
+# we override it for different parts of the tree.
+# This option is considered experimental and should not be relied on until
+# CI coverage is established.
+option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possible" OFF)
+
 #-------------------------------------------------------------------------------
 # Experimental project flags
 #-------------------------------------------------------------------------------
@@ -668,6 +682,12 @@ endif()
 if(NOT IREE_BUILD_COMPILER)
   message(STATUS "Not adding LLVM/MLIR because the configuration does not require it")
 else()
+  # Force enable BUILD_SHARED_LIBS for the compiler if instructed.
+  set(_IREE_ORIG_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+  if(IREE_COMPILER_BUILD_SHARED_LIBS)
+    set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+  endif()
+
   # Get the main LLVM deps.
   if(IREE_BUILD_BUNDLED_LLVM)
     iree_llvm_configure_bundled()
@@ -706,6 +726,8 @@ else()
   if(IREE_CLANG_TARGET)
     add_dependencies(iree-test-deps ${IREE_CLANG_TARGET})
   endif()
+
+  set(BUILD_SHARED_LIBS ${_IREE_ORIG_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
 endif()
 
 #-------------------------------------------------------------------------------

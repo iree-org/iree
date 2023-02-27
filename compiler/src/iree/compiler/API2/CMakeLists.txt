@@ -109,8 +109,12 @@ install(
 
 # The bazel side uses a "Impl" library alias to generically represent
 # static or shared. Provide a corresponding one here.
+# When in BUILD_SHARED_LIBS mode, we do CMake level linking against the
+# non-shared library, since strict layering is enforced there. The mondo
+# shared library can still be generated and used dynamically but is not
+# generally depended on from a normal C++ link.
 
-if(IREE_LINK_COMPILER_SHARED_LIBRARY)
+if(IREE_LINK_COMPILER_SHARED_LIBRARY AND NOT BUILD_SHARED_LIBS)
 iree_cc_library(
   NAME
     Impl
@@ -124,4 +128,4 @@ iree_cc_library(
   DEPS
     ::StaticImpl
 )
-endif()  # IREE_LINK_COMPILER_SHARED_LIBRARY
+endif()

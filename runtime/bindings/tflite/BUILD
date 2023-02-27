@@ -49,7 +49,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/drivers",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 

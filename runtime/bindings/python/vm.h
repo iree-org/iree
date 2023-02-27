@@ -13,7 +13,7 @@
 #include "./status_utils.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 namespace iree {
 namespace python {

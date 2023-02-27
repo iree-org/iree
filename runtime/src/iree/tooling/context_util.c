@@ -18,7 +18,7 @@
 #include "iree/modules/hal/loader/module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 #if defined(IREE_HAVE_VMVX_MODULE)
 #include "iree/modules/vmvx/module.h"

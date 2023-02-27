@@ -25,6 +25,7 @@ iree_lit_test_suite(
             "create_async_groups.mlir",
             "distribute_to_thread.mlir",
             "distribute_foreach.mlir",
+            "elementwise_pipeline.mlir",
             "gpu_set_num_workgroups.mlir",
             "nvvm_pipeline_test.mlir",
             "nvvm_mma_sync_pipeline_test.mlir",

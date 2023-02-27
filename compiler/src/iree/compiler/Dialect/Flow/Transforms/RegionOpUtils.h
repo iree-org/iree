@@ -7,7 +7,6 @@
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_
 
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
-#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -83,6 +82,18 @@ FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
 FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(
     RewriterBase &rewriter, Operation *op,
     Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt);
+
+/// Decide whether the given op should be cloned and fused into a dispatch
+/// region using heuristics.
+///
+/// Note: This function returns `false` for ops that should be tiled and fused
+/// into a dispatch region.
+bool isClonableIntoDispatchOp(Operation *op);
+
+/// Clone into the region producers of those value used in the region but
+/// defined above, to prepare the dispatch region isolated from above.
+LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
+                                     Flow::DispatchRegionOp regionOp);
 
 }  // namespace Flow
 }  // namespace IREE

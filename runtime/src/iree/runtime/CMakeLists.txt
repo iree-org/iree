@@ -42,7 +42,7 @@ iree_cc_library(
     iree::hal::drivers
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
   PUBLIC
 )
 

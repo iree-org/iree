@@ -69,7 +69,7 @@ iree_cc_library(
     iree::modules::hal
     iree::tooling::vm_util
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
   PUBLIC
 )
 

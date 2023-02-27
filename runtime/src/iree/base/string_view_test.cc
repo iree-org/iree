@@ -537,10 +537,13 @@ TEST(StringViewTest, ParseDeviceSize) {
   EXPECT_THAT(ParseDeviceSize("0"), IsOkAndHolds(Eq(0u)));
   EXPECT_THAT(ParseDeviceSize("1"), IsOkAndHolds(Eq(1u)));
   EXPECT_THAT(ParseDeviceSize("10000"), IsOkAndHolds(Eq(10000u)));
+  EXPECT_THAT(ParseDeviceSize("0b"), IsOkAndHolds(Eq(0u)));
   EXPECT_THAT(ParseDeviceSize("0kb"), IsOkAndHolds(Eq(0u)));
   EXPECT_THAT(ParseDeviceSize("0gib"), IsOkAndHolds(Eq(0u)));
+  EXPECT_THAT(ParseDeviceSize("1b"), IsOkAndHolds(Eq(1)));
   EXPECT_THAT(ParseDeviceSize("1kb"), IsOkAndHolds(Eq(1 * 1000u)));
   EXPECT_THAT(ParseDeviceSize("1kib"), IsOkAndHolds(Eq(1 * 1024u)));
+  EXPECT_THAT(ParseDeviceSize("1000b"), IsOkAndHolds(Eq(1000 * 1u)));
   EXPECT_THAT(ParseDeviceSize("1000kb"), IsOkAndHolds(Eq(1000 * 1000u)));
   EXPECT_THAT(ParseDeviceSize("1000kib"), IsOkAndHolds(Eq(1000 * 1024u)));
 

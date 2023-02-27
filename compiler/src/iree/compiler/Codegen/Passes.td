@@ -336,6 +336,12 @@ def RematerializeParallelOps :
   let constructor = "mlir::iree_compiler::createRematerializeParallelOpsPass()";
 }
 
+def InstrumentMemoryAccesses :
+    Pass<"iree-codegen-instrument-memory-accesses", "func::FuncOp"> {
+  let summary = "Instruments memory reads and writes for address tracking when dispatch instrumentation is enabled.";
+  let constructor = "mlir::iree_compiler::createInstrumentMemoryAccessesPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------

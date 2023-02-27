@@ -19,7 +19,7 @@
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 namespace iree {
 namespace {
