@@ -74,6 +74,13 @@ static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
 
 #endif  // IREE_PLATFORM_*
 
+#else  // defined(IREE_ARCH_ARM_64)
+
+static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
+                                              uint64_t* out_fields) {
+  // No implementation available. CPU data will be all zeros.
+}
+
 #endif  // defined(IREE_ARCH_ARM_64)
 
 //===----------------------------------------------------------------------===//
