@@ -519,8 +519,12 @@ FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
     for (auto [index, range] : llvm::enumerate(producerIterationDomain)) {
       if (index < tilingResult->tiledLoops.size() &&
           tilingResult->tiledLoops.test(index)) {
-        producerOffset.push_back(tilingResult->tileOffsets[index]);
-        producerSizes.push_back(tilingResult->tileSizes[index]);
+        // It is not true that the tiling sizes for produces are always as same
+        // as the tiling sizes for consumers. The tensor.extract_slice op
+        // carries the information, so we can get the tiling sizes and offsets
+        // from it.
+        producerOffset.push_back(sliceOp.getMixedOffsets()[index]);
+        producerSizes.push_back(sliceOp.getMixedSizes()[index]);
       } else {
         producerOffset.push_back(range.offset);
         producerSizes.push_back(range.size);
