@@ -118,7 +118,8 @@ class IreeRuleBuilder(object):
             module_name=str(output_module_path),
             flags=compile_flags,
             dump_flagfile_name=str(output_dir_path /
-                                   iree_artifacts.COMPILATION__FLAG))
+                                   iree_artifacts.COMPILATION__FLAG),
+            compact=True)
     ]
 
     return IreeModuleCompileRule(target_name=target_name,
@@ -140,7 +141,8 @@ class IreeRuleBuilder(object):
             target_path=self.build_target_path(target_name),
             output_flagfile_path=str(output_flagfile_path),
             flags=flags,
-            quote_flags=False)
+            quote_flags=False,
+            compact=True)
     ]
 
     return IreeRunFlagDumpRule(target_name=target_name,
@@ -287,7 +289,8 @@ def generate_rules(
       rule = cmake_builder.rules.build_set(
           var_name,
           run_module_utils.build_run_flags_for_model(
-              model=imported_model.model, model_input_data=input_data))
+              model=imported_model.model, model_input_data=input_data),
+          compact=True)
       cmake_rules.append(rule)
       model_run_flag_vars[model_run_key] = var_name
 
@@ -299,7 +302,8 @@ def generate_rules(
           var_name,
           run_module_utils.build_run_flags_for_execution_config(
               module_execution_config=exec_config,
-              gpu_id=run_module_utils.GPU_ID_PLACEHOLDER))
+              gpu_id=run_module_utils.GPU_ID_PLACEHOLDER),
+          compact=True)
       cmake_rules.append(rule)
       exec_run_flag_vars[exec_config.id] = var_name
 

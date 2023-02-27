@@ -47,20 +47,26 @@ def _get_block_body(body: List[str]) -> List[str]:
 
 def _get_string_arg_block(keyword: str,
                           value: Optional[str],
-                          quote: bool = True) -> List[str]:
+                          quote: bool = True,
+                          compact: bool = True) -> List[str]:
   if value is None:
     return []
   if quote:
     value = f'"{value}"'
+  if compact:
+    return [f'{keyword} {value}']
   return [keyword] + _get_block_body([value])
 
 
 def _get_string_list_arg_block(keyword: str,
                                values: Sequence[str],
-                               quote: bool = True) -> List[str]:
+                               quote: bool = True,
+                               compact: bool = False) -> List[str]:
   if len(values) == 0:
     return []
   body = _get_string_list(values, quote)
+  if compact:
+    return [f'{keyword} {" ".join(body)}']
   return [keyword] + _get_block_body(body)
 
 
@@ -97,7 +103,8 @@ def build_iree_bytecode_module(target_name: str,
                                dump_flagfile_name: Optional[str] = None,
                                deps: List[str] = [],
                                testonly: bool = False,
-                               public: bool = True) -> str:
+                               public: bool = True,
+                               compact: bool = False) -> str:
   name_block = _get_string_arg_block("NAME", target_name)
   src_block = _get_string_arg_block("SRC", src)
   module_name_block = _get_string_arg_block("MODULE_FILE_NAME", module_name)
@@ -107,8 +114,8 @@ def build_iree_bytecode_module(target_name: str,
                                               dump_flagfile_name)
   compile_tool_target_block = _get_string_arg_block("COMPILE_TOOL",
                                                     compile_tool_target)
-  flags_block = _get_string_list_arg_block("FLAGS", flags)
-  deps_block = _get_string_list_arg_block("DEPS", deps)
+  flags_block = _get_string_list_arg_block("FLAGS", flags, compact=compact)
+  deps_block = _get_string_list_arg_block("DEPS", deps, compact=compact)
   testonly_block = _get_option_arg_block("TESTONLY", testonly)
   public_block = _get_option_arg_block("PUBLIC", public)
   return _convert_block_to_string(
@@ -170,7 +177,8 @@ def build_iree_import_tflite_model(target_path: str, source: str,
 def build_iree_dump_flagfile(target_path: str,
                              output_flagfile_path: str,
                              flags: Optional[List[str]] = None,
-                             quote_flags=True) -> str:
+                             quote_flags=True,
+                             compact: bool = False) -> str:
   """Build IREE_DUMP_FLAGIFILE rule.
 
   Args:
@@ -185,7 +193,10 @@ def build_iree_dump_flagfile(target_path: str,
   output_block = _get_string_arg_block("OUTPUT", output_flagfile_path)
 
   flags = [] if flags is None else flags
-  flags_block = _get_string_list_arg_block("FLAGS", flags, quote=quote_flags)
+  flags_block = _get_string_list_arg_block("FLAGS",
+                                           flags,
+                                           quote=quote_flags,
+                                           compact=compact)
 
   return _convert_block_to_string(
       _build_call_rule(
@@ -233,6 +244,8 @@ def build_add_dependencies(target: str, deps: List[str]) -> str:
                                   _get_block_body(deps_list) + [")"])
 
 
-def build_set(variable_name: str, values: List[str]) -> str:
-  return _convert_block_to_string([f"set({variable_name}"] +
-                                  _get_block_body(values) + [")"])
+def build_set(variable_name: str,
+              values: List[str],
+              compact: bool = False) -> str:
+  body = [" ".join(values)] if compact else _get_block_body(values)
+  return _convert_block_to_string([f"set({variable_name}"] + body + [")"])
