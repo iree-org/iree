@@ -24,7 +24,7 @@ def generate_rules(
   for gen_config in module_generation_configs:
     module_path = iree_artifacts.get_module_dir_path(
         gen_config) / iree_artifacts.MODULE_FILENAME
-    all_module_path_map[(gen_config.imported_model.composite_id(),
+    all_module_path_map[(gen_config.imported_model.composite_id,
                          gen_config.compile_config.id)] = module_path
 
   cmake_rules = []
@@ -37,7 +37,7 @@ def generate_rules(
 
       compile_config = test_definitions.PLATFORM_COMPILE_CONFIG_MAP[platform]
       module_path = all_module_path_map.get(
-          (imported_model.composite_id(), compile_config.id))
+          (imported_model.composite_id, compile_config.id))
       if module_path is None:
         raise ValueError(
             f"Module for {test_config.name} on {platform} not found.")

@@ -45,7 +45,7 @@ def get_imported_model_path(
 
   model_prefix = _get_model_prefix(imported_model)
   # Imported model path: <root_path>/<model_prefix>_<imported_model_id>.mlir
-  return (root_path / f"{model_prefix}_{imported_model.composite_id()}.mlir")
+  return (root_path / f"{model_prefix}_{imported_model.composite_id}.mlir")
 
 
 def get_module_dir_path(
@@ -65,7 +65,7 @@ def get_module_dir_path(
   model_prefix = _get_model_prefix(module_generation_config.imported_model)
   # Module dir path: <root_path>/<model_prefix>_module_<gen_config_id>
   return (root_path /
-          f"{model_prefix}_module_{module_generation_config.composite_id()}")
+          f"{model_prefix}_module_{module_generation_config.composite_id}")
 
 
 def get_dependent_model_map(
