@@ -1294,7 +1294,30 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
       /*.command_buffers=*/command_buffers,
       /*.signal_semaphores=*/signal_semaphore_list,
   };
-  return queue->Submit(1, &batch);
+
+  iree_status_t result = queue->Submit(1, &batch);
+
+  if (command_buffer_count > 0)
+  {
+    auto& syms = device->logical_device->syms();
+    if (syms->vkQueueInsertDebugUtilsLabelEXT) {
+      VkDebugUtilsLabelEXT end_label = {};
+      end_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+      end_label.pNext = NULL;
+      end_label.pLabelName = "AmdFrameEnd";
+      device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
+          device->dispatch_queues[0]->handle(), &end_label);
+
+      VkDebugUtilsLabelEXT begin_label = {};
+      begin_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+      begin_label.pNext = NULL;
+      begin_label.pLabelName = "AmdFrameBegin";
+      device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
+          device->dispatch_queues[0]->handle(), &begin_label);
+    }
+  }
+
+  return result;
 }
 
 static iree_status_t iree_hal_vulkan_device_queue_flush(
