@@ -707,6 +707,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env CC=/usr/bin/gcc-9 \
             --env CXX=/usr/bin/g++-9 \
+            --env CMAKE_BUILD_TYPE=Release \
             --env "IREE_TARGET_BACKEND_WEBGPU=OFF" \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
