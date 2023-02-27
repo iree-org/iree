@@ -30,7 +30,7 @@ class IreeArtifactsTest(unittest.TestCase):
 
     self.assertEqual(
         path, root_path / f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{model.name}_"
-        f"{imported_model.composite_id()}.mlir")
+        f"{imported_model.composite_id}.mlir")
 
   def test_get_imported_model_path_with_mlir_model(self):
     model = common_definitions.Model(
@@ -79,7 +79,7 @@ class IreeArtifactsTest(unittest.TestCase):
 
     self.assertEqual(
         path, root_path / f"{iree_artifacts.IREE_ARTIFACT_PREFIX}_{model.name}_"
-        f"module_{gen_config.composite_id()}")
+        f"module_{gen_config.composite_id}")
 
   def test_get_dependent_model_map(self):
     model_a = common_definitions.Model(

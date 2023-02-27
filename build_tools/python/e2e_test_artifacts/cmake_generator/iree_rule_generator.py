@@ -59,7 +59,7 @@ class IreeRuleBuilder(object):
                                  cmake_rules=[])
 
     # Import target name: iree-imported-model-<imported_model_id>
-    target_name = f"iree-imported-model-{imported_model.composite_id()}"
+    target_name = f"iree-imported-model-{imported_model.composite_id}"
 
     import_flags = import_config.materialize_import_flags(model)
     if import_config.tool == iree_definitions.ImportTool.TFLITE_IMPORTER:
@@ -95,7 +95,7 @@ class IreeRuleBuilder(object):
     compile_flags = module_generation_config.materialize_compile_flags()
 
     # Module target name: iree-module-<gen_config_id>
-    target_name = f"iree-module-{module_generation_config.composite_id()}"
+    target_name = f"iree-module-{module_generation_config.composite_id}"
 
     cmake_rules = [
         cmake_builder.rules.build_iree_bytecode_module(
@@ -138,7 +138,7 @@ def generate_rules(
   rule_builder = IreeRuleBuilder(package_name=package_name)
 
   all_imported_models = dict(
-      (config.imported_model.composite_id(), config.imported_model)
+      (config.imported_model.composite_id, config.imported_model)
       for config in module_generation_configs)
 
   cmake_rules = []
@@ -161,7 +161,7 @@ def generate_rules(
   compile_stats_module_target_names = []
   for gen_config in module_generation_configs:
     model_import_rule = model_import_rule_map[
-        gen_config.imported_model.composite_id()]
+        gen_config.imported_model.composite_id]
     module_dir_path = iree_artifacts.get_module_dir_path(
         module_generation_config=gen_config, root_path=root_path)
     module_compile_rule = rule_builder.build_module_compile_rule(

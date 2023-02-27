@@ -161,15 +161,14 @@ MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP = {
 }
 
 
-@serialization.serializable
+@serialization.serializable(type_key="iree_imported_models",
+                            id_field="composite_id")
 @dataclass(frozen=True)
 class ImportedModel(object):
   """Describes an imported MLIR model."""
+  composite_id: str
   model: common_definitions.Model
   import_config: ImportConfig
-
-  def composite_id(self):
-    return unique_ids.hash_composite_id([self.model.id, self.import_config.id])
 
   @staticmethod
   def from_model(model: common_definitions.Model):
@@ -177,13 +176,18 @@ class ImportedModel(object):
     if config is None:
       raise ValueError(f"Unsupported model source type: {model.source_type}.")
 
-    return ImportedModel(model=model, import_config=config)
+    composite_id = unique_ids.hash_composite_id([model.id, config.id])
+    return ImportedModel(composite_id=composite_id,
+                         model=model,
+                         import_config=config)
 
 
-@serialization.serializable
+@serialization.serializable(type_key="iree_module_generation_configs",
+                            id_field="composite_id")
 @dataclass(frozen=True)
 class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
+  composite_id: str
   imported_model: ImportedModel
   compile_config: CompileConfig
   # Full list of flags to compile with, derived from sub-components, with
@@ -192,10 +196,6 @@ class ModuleGenerationConfig(object):
   # serialized JSON.
   compile_flags: List[str]
 
-  def composite_id(self):
-    return unique_ids.hash_composite_id(
-        [self.imported_model.composite_id(), self.compile_config.id])
-
   def materialize_compile_flags(self):
     """Materialize flags with dependent values."""
     return self.compile_flags
@@ -203,7 +203,10 @@ class ModuleGenerationConfig(object):
   @staticmethod
   def with_flag_generation(imported_model: ImportedModel,
                            compile_config: CompileConfig):
+    composite_id = unique_ids.hash_composite_id(
+        [imported_model.composite_id, compile_config.id])
     return ModuleGenerationConfig(
+        composite_id=composite_id,
         imported_model=imported_model,
         compile_config=compile_config,
         compile_flags=_generate_compile_flags(
@@ -214,10 +217,12 @@ class ModuleGenerationConfig(object):
 E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER = r"${GPU_ID_PLACEHOLDER}"
 
 
-@serialization.serializable
+@serialization.serializable(type_key="iree_e2e_model_run_configs",
+                            id_field="composite_id")
 @dataclass(frozen=True)
 class E2EModelRunConfig(object):
   """Describes an e2e run."""
+  composite_id: str
   module_generation_config: ModuleGenerationConfig
   module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
@@ -227,13 +232,6 @@ class E2EModelRunConfig(object):
   # decouple from the generation code. Also serves as useful information in the
   # serialized JSON.
   run_flags: List[str]
-
-  def composite_id(self):
-    return unique_ids.hash_composite_id([
-        self.module_generation_config.composite_id(),
-        self.module_execution_config.id, self.target_device_spec.id,
-        self.input_data.id
-    ])
 
   def materialize_run_flags(self, gpu_id: str = "0"):
     """Materialize flags with dependent values."""
@@ -247,12 +245,17 @@ class E2EModelRunConfig(object):
                            module_execution_config: ModuleExecutionConfig,
                            target_device_spec: common_definitions.DeviceSpec,
                            input_data: common_definitions.ModelInputData):
+    composite_id = unique_ids.hash_composite_id([
+        module_generation_config.composite_id, module_execution_config.id,
+        target_device_spec.id, input_data.id
+    ])
     run_flags = generate_run_flags(
         imported_model=module_generation_config.imported_model,
         input_data=input_data,
         module_execution_config=module_execution_config,
         gpu_id=E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER)
-    return E2EModelRunConfig(module_generation_config=module_generation_config,
+    return E2EModelRunConfig(composite_id=composite_id,
+                             module_generation_config=module_generation_config,
                              module_execution_config=module_execution_config,
                              target_device_spec=target_device_spec,
                              input_data=input_data,
