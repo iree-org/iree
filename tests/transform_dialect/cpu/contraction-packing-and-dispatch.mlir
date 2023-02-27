@@ -66,8 +66,4 @@ transform.sequence failures(propagate) {
   transform.structured.pack_greedily %matmul
       gemm_packed_sizes = [8, 16, 32] gemm_inner_dims_order = [0, 1, 2]
     : (!pdl.operation) -> !transform.op<"linalg.generic">
-
-  // TODO: Remove once IREE adopts tensor.pack/unpack.
-  %func = transform.structured.match ops{["func.func"]} in %module_op
-    : (!pdl.operation) -> (!pdl.operation)
 }
