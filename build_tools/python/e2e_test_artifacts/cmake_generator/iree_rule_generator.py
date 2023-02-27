@@ -58,8 +58,8 @@ class IreeRuleBuilder(object):
                                  output_file_path=output_file_path,
                                  cmake_rules=[])
 
-    # Import target name: iree-imported-model-<model_id>
-    target_name = f"iree-imported-model-{model.id}"
+    # Import target name: iree-imported-model-<imported_model_id>
+    target_name = f"iree-imported-model-{imported_model.composite_id()}"
 
     import_flags = import_config.materialize_import_flags(model)
     if import_config.tool == iree_definitions.ImportTool.TFLITE_IMPORTER:
@@ -89,17 +89,18 @@ class IreeRuleBuilder(object):
 
   def build_module_compile_rule(
       self, model_import_rule: IreeModelImportRule,
-      imported_model: iree_definitions.ImportedModel,
-      compile_config: iree_definitions.CompileConfig,
+      module_generation_config: iree_definitions.ModuleGenerationConfig,
       output_file_path: pathlib.PurePath) -> IreeModuleCompileRule:
 
+    imported_model = module_generation_config.imported_model
+    compile_config = module_generation_config.compile_config
     compile_flags = self._generate_compile_flags(
         compile_config=compile_config,
         mlir_dialect_type=imported_model.import_config.dialect_type.value
     ) + compile_config.extra_flags
 
-    # Module target name: iree-module-<model_id>-<compile_config_id>
-    target_name = f"iree-module-{imported_model.model.id}-{compile_config.id}"
+    # Module target name: iree-module-<gen_config_id>
+    target_name = f"iree-module-{module_generation_config.composite_id()}"
 
     cmake_rules = [
         cmake_builder.rules.build_iree_bytecode_module(
@@ -202,12 +203,12 @@ def generate_rules(
   rule_builder = IreeRuleBuilder(package_name=package_name)
 
   all_imported_models = dict(
-      (config.imported_model.model.id, config.imported_model)
+      (config.imported_model.composite_id(), config.imported_model)
       for config in module_generation_configs)
 
   cmake_rules = []
   model_import_rule_map = {}
-  for model_id, imported_model in all_imported_models.items():
+  for imported_model_id, imported_model in all_imported_models.items():
     model_rule = model_rule_map.get(imported_model.model.id)
     if model_rule is None:
       raise ValueError(f"Model rule not found for {imported_model.model.id}.")
@@ -218,20 +219,19 @@ def generate_rules(
         source_model_rule=model_rule,
         imported_model=imported_model,
         output_file_path=imported_model_path)
-    model_import_rule_map[model_id] = model_import_rule
+    model_import_rule_map[imported_model_id] = model_import_rule
     cmake_rules.extend(model_import_rule.cmake_rules)
 
   module_target_names = []
   compile_stats_module_target_names = []
   for gen_config in module_generation_configs:
     model_import_rule = model_import_rule_map[
-        gen_config.imported_model.model.id]
+        gen_config.imported_model.composite_id()]
     module_dir_path = iree_artifacts.get_module_dir_path(
         module_generation_config=gen_config, root_path=root_path)
     module_compile_rule = rule_builder.build_module_compile_rule(
         model_import_rule=model_import_rule,
-        imported_model=gen_config.imported_model,
-        compile_config=gen_config.compile_config,
+        module_generation_config=gen_config,
         output_file_path=module_dir_path / iree_artifacts.MODULE_FILENAME)
     if benchmark_collections.COMPILE_STATS_TAG in gen_config.compile_config.tags:
       compile_stats_module_target_names.append(module_compile_rule.target_name)

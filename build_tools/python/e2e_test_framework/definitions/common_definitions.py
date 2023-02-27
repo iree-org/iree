@@ -128,7 +128,7 @@ class DeviceSpec(object):
 class Model(object):
   """Model to be benchmarked."""
   id: str
-  # Friendly name.
+  # Friendly unique name.
   name: str
   # Tags that describe the model characteristics.
   tags: List[str]

@@ -16,10 +16,12 @@ MODULE_FILENAME = "module.vmfb"
 
 
 def _get_model_prefix(imported_model: iree_definitions.ImportedModel) -> str:
-  """Returns the path of an IREE model dir."""
+  """Returns the model prefix for IREE artifacts. The common prefix helps group
+  artifacts from the same model together for easier navigation.
+  """
   model = imported_model.model
-  # IREE model prefix: <iree_artifact_prefix>_<model_id>_<model_name>
-  return f"{IREE_ARTIFACT_PREFIX}_{model.id}_{model.name}"
+  # IREE model prefix: <iree_artifact_prefix>_<model_name>
+  return f"{IREE_ARTIFACT_PREFIX}_{model.name}"
 
 
 def get_imported_model_path(
@@ -42,8 +44,8 @@ def get_imported_model_path(
     return model_artifacts.get_model_path(model=model, root_path=root_path)
 
   model_prefix = _get_model_prefix(imported_model)
-  # Imported model path: <root_path>/<model_prefix>.mlir
-  return root_path / f"{model_prefix}.mlir"
+  # Imported model path: <root_path>/<model_prefix>_<imported_model_id>.mlir
+  return (root_path / f"{model_prefix}_{imported_model.composite_id()}.mlir")
 
 
 def get_module_dir_path(
@@ -61,8 +63,9 @@ def get_module_dir_path(
     Path of the module directory.
   """
   model_prefix = _get_model_prefix(module_generation_config.imported_model)
-  # Module path: <root_path>/<model_prefix>_<compile_config_id>
-  return root_path / f"{model_prefix}_{module_generation_config.compile_config.id}"
+  # Module dir path: <root_path>/<model_prefix>_module_<gen_config_id>
+  return (root_path /
+          f"{model_prefix}_module_{module_generation_config.composite_id()}")
 
 
 def get_dependent_model_map(
