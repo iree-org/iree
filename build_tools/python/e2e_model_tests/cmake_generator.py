@@ -7,7 +7,7 @@
 
 from typing import List
 
-from e2e_model_tests import test_definitions, run_module_utils
+from e2e_model_tests import test_definitions
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.definitions import iree_definitions
 import cmake_builder.rules
@@ -43,14 +43,14 @@ def generate_rules(
             f"Module for {test_config.name} on {platform} not found.")
       platform_module_map[platform.value] = module_path
 
-    runner_args = run_module_utils.build_run_flags_for_model(
-        model=imported_model.model,
-        model_input_data=test_config.input_data) + test_config.extra_test_flags
     # TODO(#11136): Currently the DRIVER is a separate field in the CMake rule (
     # and has effect on test labels). Rules should be generated in another way
     # to avoid that. Generates the flags without the driver for now.
-    runner_args += run_module_utils.build_run_flags_for_execution_config(
-        test_config.execution_config, with_driver=False)
+    runner_args = iree_definitions.generate_run_flags(
+        imported_model=imported_model,
+        input_data=test_config.input_data,
+        module_execution_config=test_config.execution_config,
+        with_driver=False) + test_config.extra_test_flags
     cmake_rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
         target_name=test_config.name,
         driver=test_config.execution_config.driver.value,

@@ -88,12 +88,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         run_config.module_generation_config,
         root_path=self.config.root_benchmark_dir)
     cmds += [f"--module={module_dir_path / iree_artifacts.MODULE_FILENAME}"]
-    cmds += run_module_utils.build_run_flags_for_model(
-        model=run_config.module_generation_config.imported_model.model,
-        model_input_data=run_config.input_data)
-    cmds += run_module_utils.build_run_flags_for_execution_config(
-        module_execution_config=run_config.module_execution_config,
-        gpu_id=self.gpu_id)
+    cmds += run_config.materialize_run_flags(gpu_id=self.gpu_id)
 
     return cmds
 

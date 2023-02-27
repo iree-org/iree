@@ -51,8 +51,8 @@ iree_benchmark_suite_module_test(
   RUNNER_ARGS
     "--function=main"
     "--input=1x257x257x3xf32=0"
-    "--expected_f32_threshold=0.001"
     "--device_allocator=caching"
+    "--expected_f32_threshold=0.001"
 )
 
 iree_benchmark_suite_module_test(
