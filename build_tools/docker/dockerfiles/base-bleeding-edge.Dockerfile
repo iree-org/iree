@@ -33,7 +33,7 @@ RUN apt-get update \
     gnupg2
 
 # Install the latest supported compiler tools
-ARG LLVM_VERSION=16
+ARG LLVM_VERSION=17
 ENV CC /usr/bin/clang-${LLVM_VERSION}
 ENV CXX /usr/bin/clang++-${LLVM_VERSION}
 
