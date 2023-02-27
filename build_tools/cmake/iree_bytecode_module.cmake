@@ -25,6 +25,9 @@ include(CMakeParseArguments)
 # STATIC_LIB_PATH: When added, the module is compiled into a LLVM static
 #     library with the specified library path.
 # FRIENDLY_NAME: Optional. Name to use to display build progress info.
+# DUMP_FLAGFILE_NAME: Optional. When specified, dumps the compilation flag into
+#    the specified file name and a target ${NAME}_FLAGFILE will be added to the
+#    dependencies of ${NAME}.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 #     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
 #     will be in ${PACKAGE}/internal.
@@ -41,7 +44,7 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME;STATIC_LIB_PATH"
+    "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME;STATIC_LIB_PATH;DUMP_FLAGFILE_NAME"
     "FLAGS;DEPENDS;DEPS"
     ${ARGN}
   )
@@ -133,6 +136,7 @@ function(iree_bytecode_module)
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
       ${_RULE_DEPENDS}
+      ${_RULE_DUMP_FLAGFILE_NAME}
     COMMENT
       "Generating ${_MODULE_FILE_NAME} from ${_FRIENDLY_NAME}"
     VERBATIM
@@ -141,9 +145,24 @@ function(iree_bytecode_module)
   # Only add iree_${NAME} as custom target doesn't support aliasing to
   # iree::${NAME}.
   iree_package_name(_PACKAGE_NAME)
-  add_custom_target("${_PACKAGE_NAME}_${_RULE_NAME}"
+  set(_MODULE_TARGET "${_PACKAGE_NAME}_${_RULE_NAME}")
+  add_custom_target("${_MODULE_TARGET}"
     DEPENDS "${_MODULE_FILE_NAME}"
   )
+
+  if(_RULE_DUMP_FLAGFILE_NAME)
+    set(_FLAGFILE_TARGET "${_MODULE_TARGET}_FLAGFILE")
+    iree_dump_flagfile(
+      TARGET_NAME
+        "${_FLAGFILE_TARGET}"
+      OUTPUT
+        "${_RULE_DUMP_FLAGFILE_NAME}"
+      FLAGS
+        ${_ARGS}
+      COMMENT "Generating flagfile ${_RULE_DUMP_FLAGFILE_NAME}"
+    )
+    add_dependencies("${_MODULE_TARGET}" "${_FLAGFILE_TARGET}")
+  endif()
 
   if(_RULE_TESTONLY)
     set(_TESTONLY_ARG "TESTONLY")

@@ -90,7 +90,7 @@ class IreeRuleBuilder(object):
   def build_module_compile_rule(
       self, model_import_rule: IreeModelImportRule,
       module_generation_config: iree_definitions.ModuleGenerationConfig,
-      output_file_path: pathlib.PurePath) -> IreeModuleCompileRule:
+      output_dir_path: pathlib.PurePath) -> IreeModuleCompileRule:
 
     imported_model = module_generation_config.imported_model
     compile_config = module_generation_config.compile_config
@@ -102,18 +102,19 @@ class IreeRuleBuilder(object):
     # Module target name: iree-module-<gen_config_id>
     target_name = f"iree-module-{module_generation_config.composite_id()}"
 
+    output_module_path = output_dir_path / iree_artifacts.MODULE_FILENAME
     cmake_rules = [
         cmake_builder.rules.build_iree_bytecode_module(
             target_name=target_name,
             src=str(model_import_rule.output_file_path),
-            module_name=str(output_file_path),
-            flags=compile_flags)
+            module_name=str(output_module_path),
+            flags=compile_flags,
+            dump_flagfile_name=str(output_dir_path /
+                                   iree_artifacts.COMPILATION__FLAG))
     ]
 
-    # TODO(#10155): Dump the compile flags from iree_bytecode_module into a flagfile.
-
     return IreeModuleCompileRule(target_name=target_name,
-                                 output_module_path=output_file_path,
+                                 output_module_path=output_module_path,
                                  cmake_rules=cmake_rules)
 
   def build_target_path(self, target_name: str):
@@ -232,7 +233,7 @@ def generate_rules(
     module_compile_rule = rule_builder.build_module_compile_rule(
         model_import_rule=model_import_rule,
         module_generation_config=gen_config,
-        output_file_path=module_dir_path / iree_artifacts.MODULE_FILENAME)
+        output_dir_path=module_dir_path)
     if benchmark_collections.COMPILE_STATS_TAG in gen_config.compile_config.tags:
       compile_stats_module_target_names.append(module_compile_rule.target_name)
     else:

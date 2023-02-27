@@ -7,6 +7,7 @@
 import pathlib
 import unittest
 
+from e2e_test_artifacts import iree_artifacts
 from e2e_test_artifacts.cmake_generator import model_rule_generator, iree_rule_generator
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
@@ -96,16 +97,17 @@ class IreeRuleBuilderTest(unittest.TestCase):
         target_name=f"iree-import-model-abcd",
         output_file_path=pathlib.PurePath("root/iree/abcd/1234.mlir"),
         cmake_rules=["abc"])
-    output_file_path = pathlib.PurePath("root/iree/test_output")
+    output_dir_path = pathlib.PurePath("root/iree/test_output")
 
     rule = self._builder.build_module_compile_rule(
         model_import_rule=model_import_rule,
         module_generation_config=gen_config,
-        output_file_path=output_file_path)
+        output_dir_path=output_dir_path)
 
     self.assertEqual(rule.target_name,
                      f"iree-module-{gen_config.composite_id()}")
-    self.assertEqual(rule.output_module_path, output_file_path)
+    self.assertEqual(rule.output_module_path,
+                     output_dir_path / iree_artifacts.MODULE_FILENAME)
 
   def test_build_target_path(self):
     builder = iree_rule_generator.IreeRuleBuilder(package_name="xyz")

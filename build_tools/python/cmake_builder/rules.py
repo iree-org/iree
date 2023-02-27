@@ -94,6 +94,7 @@ def build_iree_bytecode_module(target_name: str,
                                compile_tool_target: Optional[str] = None,
                                c_identifier: Optional[str] = None,
                                static_lib_path: Optional[str] = None,
+                               dump_flagfile_name: Optional[str] = None,
                                deps: List[str] = [],
                                testonly: bool = False,
                                public: bool = True) -> str:
@@ -102,6 +103,8 @@ def build_iree_bytecode_module(target_name: str,
   module_name_block = _get_string_arg_block("MODULE_FILE_NAME", module_name)
   c_identifier_block = _get_string_arg_block("C_IDENTIFIER", c_identifier)
   static_lib_block = _get_string_arg_block("STATIC_LIB_PATH", static_lib_path)
+  flagfile_name_block = _get_string_arg_block("DUMP_FLAGFILE_NAME",
+                                              dump_flagfile_name)
   compile_tool_target_block = _get_string_arg_block("COMPILE_TOOL",
                                                     compile_tool_target)
   flags_block = _get_string_list_arg_block("FLAGS", flags)
@@ -113,8 +116,8 @@ def build_iree_bytecode_module(target_name: str,
                        parameter_blocks=[
                            name_block, src_block, module_name_block,
                            c_identifier_block, compile_tool_target_block,
-                           static_lib_block, flags_block, deps_block,
-                           testonly_block, public_block
+                           static_lib_block, flags_block, flagfile_name_block,
+                           deps_block, testonly_block, public_block
                        ]))
 
 
