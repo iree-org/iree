@@ -33,7 +33,7 @@ class Android_VMVX_Benchmarks(object):
     """Generates IREE compile and run configs."""
 
     gen_configs = [
-        iree_definitions.ModuleGenerationConfig(
+        iree_definitions.ModuleGenerationConfig.with_flag_generation(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model)) for
         model in [tflite_models.MOBILENET_V2, tflite_models.MOBILENET_V3SMALL]

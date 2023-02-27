@@ -90,7 +90,7 @@ class IreeRuleBuilderTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config = iree_definitions.ModuleGenerationConfig(
+    gen_config = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model, compile_config=compile_config)
     model_import_rule = iree_rule_generator.IreeModelImportRule(
         target_name=f"iree-import-model-abcd",
@@ -165,13 +165,13 @@ class IreeGeneratorTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config_a = iree_definitions.ModuleGenerationConfig(
+    gen_config_a = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_a, compile_config=compile_config_a)
-    gen_config_b = iree_definitions.ModuleGenerationConfig(
+    gen_config_b = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_b, compile_config=compile_config_a)
-    gen_config_c = iree_definitions.ModuleGenerationConfig(
+    gen_config_c = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_b, compile_config=compile_config_b)
-    gen_config_d = iree_definitions.ModuleGenerationConfig(
+    gen_config_d = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_c, compile_config=compile_config_b)
     model_rule_map = {
         model_a.id:

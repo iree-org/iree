@@ -186,10 +186,27 @@ class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
   imported_model: ImportedModel
   compile_config: CompileConfig
+  # Full list of flags to compile with, derived from sub-components, with
+  # unmaterialized placeholders. Allows the compile flags to be persisted and
+  # decouple from the generation code. Also serves as useful information in the
+  # serialized JSON.
+  composite_flags: List[str]
 
   def composite_id(self):
     return unique_ids.hash_composite_id(
         [self.imported_model.composite_id(), self.compile_config.id])
+
+  def materialize_compile_flags(self):
+    return self.composite_flags
+
+  @staticmethod
+  def with_flag_generation(imported_model: ImportedModel,
+                           compile_config: CompileConfig):
+    return ModuleGenerationConfig(
+        imported_model=imported_model,
+        compile_config=compile_config,
+        composite_flags=_generate_compile_flags(
+            compile_config, imported_model.import_config.dialect_type))
 
 
 @serialization.serializable
@@ -207,3 +224,64 @@ class E2EModelRunConfig(object):
         self.module_execution_config.id, self.target_device_spec.id,
         self.input_data.id
     ])
+
+
+def _generate_compile_flags(compile_config: CompileConfig,
+                            dialect_type: MLIRDialectType) -> List[str]:
+  if len(compile_config.compile_targets) != 1:
+    raise ValueError(f"Only one compile target is supported. Got:"
+                     f" {compile_config.compile_targets}")
+
+  compile_target = compile_config.compile_targets[0]
+  flags = [
+      f"--iree-hal-target-backends={compile_target.target_backend.value}",
+      f"--iree-input-type={dialect_type.value}"
+  ]
+  flags += _generate_compile_target_flags(compile_target)
+  flags += compile_config.extra_flags
+  return flags
+
+
+def _generate_compile_target_flags(target: CompileTarget) -> List[str]:
+  arch_info = target.target_architecture
+  if target.target_backend == TargetBackend.VULKAN_SPIRV:
+    return [
+        f"--iree-vulkan-target-triple={arch_info.architecture}-unknown-{target.target_abi.value}",
+    ]
+
+  if arch_info.architecture == "x86_64":
+    flags = [
+        f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
+        f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
+    ]
+  elif arch_info.architecture == "riscv_64":
+    flags = [
+        f"--iree-llvm-target-triple=riscv64-pc-{target.target_abi.value}",
+        "--iree-llvm-target-cpu=generic-rv64", "--iree-llvm-target-abi=lp64d",
+        "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v",
+        "--riscv-v-fixed-length-vector-lmul-max=8"
+    ]
+  elif arch_info.architecture == "riscv_32":
+    # TODO(llvm-project/60463): Replace 'zve32f' with 'zve32x'.
+    flags = [
+        f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
+        "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
+        "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
+        "--riscv-v-fixed-length-vector-lmul-max=8"
+    ]
+  elif arch_info.architecture == "armv8.2-a":
+    flags = [
+        f"--iree-llvm-target-triple=aarch64-none-{target.target_abi.value}",
+    ]
+  elif arch_info.architecture == "cuda":
+    if target.target_abi != TargetABI.LINUX_GNU:
+      raise ValueError(
+          f"Unsupported target ABI for CUDA backend: `{target.target_abi}`")
+    flags = [
+        f"--iree-hal-cuda-llvm-target-arch=sm_80",
+    ]
+  elif arch_info.architecture == "vmvx":
+    flags = []
+  else:
+    raise ValueError(f"Unsupported architecture: '{arch_info.architecture}'")
+  return flags
