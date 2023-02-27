@@ -33,8 +33,7 @@
 #define IREE_HWCAP_ASIMDDP (1u << 20)
 #define IREE_HWCAP2_I8MM (1u << 13)
 
-static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
-                                              uint64_t* out_fields) {
+static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
   uint32_t hwcap = getauxval(AT_HWCAP);
   uint32_t hwcap2 = getauxval(AT_HWCAP2);
   if (hwcap & IREE_HWCAP_ASIMDDP)
@@ -57,8 +56,7 @@ static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
     }                                                             \
   } while (0)
 
-static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
-                                              uint64_t* out_fields) {
+static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
   IREE_QUERY_SYSCTL("hw.optional.arm.FEAT_DotProd", out_fields[0],
                     IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD);
   IREE_QUERY_SYSCTL("hw.optional.arm.FEAT_I8MM", out_fields[0],
@@ -67,21 +65,23 @@ static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
 
 #else
 
-static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
-                                              uint64_t* out_fields) {
+static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
   // No implementation available. CPU data will be all zeros.
 }
 
 #endif  // IREE_PLATFORM_*
 
-#else  // defined(IREE_ARCH_ARM_64)
+#endif  // defined(IREE_ARCH_ARM_64)
 
 static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
                                               uint64_t* out_fields) {
+#if defined(IREE_ARCH_ARM_64)
+  (void)temp_allocator;  // unused on ARM_64
+  iree_cpu_initialize_from_platform_arm_64(out_fields);
+#else
   // No implementation available. CPU data will be all zeros.
+#endif
 }
-
-#endif  // defined(IREE_ARCH_ARM_64)
 
 //===----------------------------------------------------------------------===//
 // Architecture-specific string lookup
