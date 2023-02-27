@@ -2,8 +2,6 @@
 requires = [
     "setuptools>=42",
     "wheel",
-    # There is no fundamental reason to pin this CMake version, beyond
-    # build stability.
     "cmake",
     "ninja",
     # MLIR build depends.
