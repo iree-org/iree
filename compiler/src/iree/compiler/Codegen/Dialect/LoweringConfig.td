@@ -36,7 +36,7 @@ def LLVMGPU_MatmulSimt : I32EnumAttrCase<"LLVMGPUMatmulSimt", 11>;
 def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 12>;
 def LLVMGPU_TransposeSharedMem : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 13>;
 def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 14>;
-def LLVMGPU_DataTiling : I32EnumAttrCase<"LLVMGPUDataTiling", 15>;
+def LLVMGPU_PackUnPack : I32EnumAttrCase<"LLVMGPUPackUnPack", 15>;
 
 def SPIRV_BaseDistribute
     : I32EnumAttrCase<"SPIRVBaseDistribute", 16>;
@@ -71,7 +71,7 @@ def DispatchLoweringPassPipelineEnum
             CPU_TripleTilingExpert, CPU_DataTiling, LLVMGPU_SimpleDistribute,
             LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
             LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
-            LLVMGPU_DataTiling, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
+            LLVMGPU_PackUnPack, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
             SPIRV_MatmulPromoteVectorize, SPIRV_CooperativeMatrixVectorize,
             SPIRV_SubgroupReduce, SPIRV_WinogradVectorize, VMVX_Default,
             // Transform dialect based codegen

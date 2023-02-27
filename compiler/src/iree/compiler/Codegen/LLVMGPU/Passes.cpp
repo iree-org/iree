@@ -301,6 +301,7 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   addBufferizePasses(nestedModulePM);
 
   // distribute foreach threads
+  addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
@@ -363,13 +364,23 @@ void addGPUDataTilingPasses(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createVectorizePackUnPackOpsPass());
-  addBufferizePasses(nestedModulePM);
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileAndDistribute());
+      createWorkgroupSpecializationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createVectorizePackUnPackOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+
+  addBufferizePasses(nestedModulePM);
+
+  // distribute foreach threads
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSplitFullPartialTransferPass("linalg-copy"));
 }

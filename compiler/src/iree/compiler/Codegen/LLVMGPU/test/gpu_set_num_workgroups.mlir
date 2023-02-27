@@ -624,7 +624,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 }
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUDataTiling>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUPackUnPack>
 //      CHECK: hal.executable.export public @dynamic_pack_2x2
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   func.func @dynamic_pack_2x2

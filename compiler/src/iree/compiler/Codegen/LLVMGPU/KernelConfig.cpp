@@ -435,12 +435,10 @@ static LogicalResult setPackConfig(func::FuncOp entryPoint,
   }
 
   TileSizesListType tileSizesList = {tileSizes};
-  SmallVector<int64_t> workgroupSizes = tileSizes;
-  if (workgroupSizes.size() < 3)
-    workgroupSizes.append(3 - workgroupSizes.size(), 1);
+  std::array<int64_t, 3> workgroupSizes = {cudaWarpSize, 1, 1};
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, packOp, tileSizesList,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDataTiling,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack,
       workgroupSizes);
 }
 
