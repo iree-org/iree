@@ -1062,12 +1062,8 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
   return workgroupTileSizes;
 }
 
-template <typename OpTy>
-static LogicalResult setPackOpRootConfig(func::FuncOp entryPointFn, OpTy op) {
-  // TODO(hanchung): Retire IREE::LinalgExt::PackOp. This is for having
-  // consistent configurations for pack ops.
-  static_assert(
-      llvm::is_one_of<OpTy, IREE::LinalgExt::PackOp, tensor::PackOp>::value);
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   tensor::PackOp op) {
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
       cast<TilingInterface>(op.getOperation()), defaultWorkgroupTileSize);
 
@@ -1088,16 +1084,10 @@ static LogicalResult setPackOpRootConfig(func::FuncOp entryPointFn, OpTy op) {
       DispatchLoweringPassPipeline::CPUDataTiling);
 }
 
-template <typename OpTy>
 static LogicalResult setUnPackOpRootConfig(
-    func::FuncOp entryPointFn, OpTy op,
+    func::FuncOp entryPointFn, tensor::UnPackOp op,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDataTiling) {
-  // TODO(hanchung): Retire IREE::LinalgExt::UnPackOp. This is for having
-  // consistent configurations for unpack ops.
-  static_assert(llvm::is_one_of<OpTy, IREE::LinalgExt::UnPackOp,
-                                tensor::UnPackOp>::value);
-
   // TODO(#11505): Consider multi-level tiling for handling unpack + generic
   // cases.
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
@@ -1707,16 +1697,14 @@ static LogicalResult setRootConfigImpl(
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
         })
-        .Case<IREE::LinalgExt::FftOp, linalg::Mmt4DOp, linalg::Conv2DNhwcHwcfOp,
-              linalg::Conv2DNchwFchwOp, linalg::PoolingNhwcSumOp,
-              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
-              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
-              linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp,
-              linalg::DepthwiseConv2DNhwcHwcOp>(
+        .Case<IREE::LinalgExt::FftOp, tensor::PackOp, linalg::Mmt4DOp,
+              linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
+              linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+              linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
+              linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
-        .Case<IREE::LinalgExt::PackOp, tensor::PackOp>(
-            [&](auto op) { return setPackOpRootConfig(entryPointFn, op); })
-        .Case<IREE::LinalgExt::UnPackOp, tensor::UnPackOp>(
+        .Case<tensor::UnPackOp>(
             [&](auto op) { return setUnPackOpRootConfig(entryPointFn, op); })
         .Case<linalg::ContractionOpInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
@@ -1746,7 +1734,7 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
           return setRootConfig(entryPointFn, op,
                                DispatchLoweringPassPipeline::VMVXDefault);
         })
-        .Case<IREE::LinalgExt::UnPackOp, tensor::UnPackOp>([&](auto op) {
+        .Case<tensor::UnPackOp>([&](auto op) {
           return setUnPackOpRootConfig(
               entryPointFn, op, DispatchLoweringPassPipeline::VMVXDefault);
         })
