@@ -67,18 +67,18 @@ namespace {
 // Type Conversion
 //===----------------------------------------------------------------------===//
 
-/// Returns true if the given `type` is a MemRef of rank 1.
-static bool isRankOneOrZeroMemRef(Type type) {
+/// Returns true if the given `type` is a 0-D MemRef.
+static bool isRankZeroMemRef(Type type) {
   if (auto memrefType = type.dyn_cast<MemRefType>()) {
-    return memrefType.hasRank() && memrefType.getRank() <= 1;
+    return memrefType.hasRank() && memrefType.getRank() == 0;
   }
   return false;
 }
 
-/// Returns true if the given `type` is a MemRef of rank 1.
-static bool isRankOneMemRef(Type type) {
+/// Returns true if the given `type` is a 0-D or 1-D MemRef.
+static bool isRankZeroOrOneMemRef(Type type) {
   if (auto memrefType = type.dyn_cast<MemRefType>()) {
-    return memrefType.hasRank() && memrefType.getRank() == 1;
+    return memrefType.hasRank() && memrefType.getRank() <= 1;
   }
   return false;
 }
@@ -91,7 +91,6 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
 
     // Convert n-D MemRef to 1-D MemRef.
     addConversion([](MemRefType type) -> Optional<Type> {
-      if (type.getRank() <= 1) return type;
       if (Attribute storage = type.getMemorySpace()) {
         if (auto dtAttr = storage.dyn_cast<IREE::HAL::DescriptorTypeAttr>()) {
           // Uniform buffers are faster but generally have a much smaller
@@ -252,7 +251,7 @@ struct FlattenBindingSubspan final
         subspanOp.getLoc(), newType, subspanOp.getSet(), subspanOp.getBinding(),
         subspanOp.getDescriptorType(), subspanOp.getByteOffset(), dynamicDims,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
-    if (isRankOneOrZeroMemRef(oldType)) {
+    if (isRankZeroOrOneMemRef(oldType)) {
       rewriter.replaceOpWithNewOp<memref::CastOp>(subspanOp, oldType, newOp);
     } else {
       rewriter.replaceOp(subspanOp, newOp.getResult());
@@ -273,12 +272,7 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   assert(sourceType.hasRank());
 
   int64_t rank = sourceType.getRank();
-  if (rank == 0) {
-    // For source 0-D MemRef, we convert them into 1-D MemRef with unknown
-    // dimension size. To convert its consumer load/store ops, we also need to
-    // create an index for it.
-    return builder.create<arith::ConstantIndexOp>(loc, 0);
-  }
+  assert(rank > 0);
 
   // First try to get the strides from the MemRef type itself. This applies to
   // cases where we have static shapes and only the leading dimension is
@@ -351,13 +345,13 @@ struct FlattenSubView final : public OpConversionPattern<memref::SubViewOp> {
   LogicalResult matchAndRewrite(
       memref::SubViewOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankOneOrZeroMemRef(adaptor.getSource().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getSource().getType())) {
       return rewriter.notifyMatchFailure(
-          op, "expected converted memref of rank == 1");
+          op, "expected converted memref of rank <= 1");
     }
     Type neededResultType =
         getTypeConverter()->convertType(op.getResult().getType());
-    if (!neededResultType || !isRankOneOrZeroMemRef(neededResultType))
+    if (!neededResultType || !isRankZeroOrOneMemRef(neededResultType))
       return failure();
     Value size = createTotalElementCountValue(op.getType(), op.sizes(),
                                               op.getLoc(), rewriter);
@@ -382,9 +376,9 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
   LogicalResult matchAndRewrite(
       memref::LoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankOneOrZeroMemRef(adaptor.getMemref().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getMemref().getType())) {
       return rewriter.notifyMatchFailure(
-          loadOp, "expected converted memref of rank == 1");
+          loadOp, "expected converted memref of rank <= 1");
     }
 
     Value linearIndex = linearizeIndices(
@@ -407,9 +401,9 @@ struct LinearizeMMALoadIndices final
   LogicalResult matchAndRewrite(
       gpu::SubgroupMmaLoadMatrixOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankOneOrZeroMemRef(adaptor.getSrcMemref().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getSrcMemref().getType())) {
       return rewriter.notifyMatchFailure(
-          loadOp, "expected converted memref of rank == 1");
+          loadOp, "expected converted memref of rank <= 1");
     }
 
     Value linearIndex = linearizeIndices(
@@ -433,9 +427,9 @@ struct LinearizeStoreIndices final
   LogicalResult matchAndRewrite(
       memref::StoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankOneOrZeroMemRef(adaptor.getMemref().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getMemref().getType())) {
       return rewriter.notifyMatchFailure(
-          storeOp, "expected converted memref of rank == 1");
+          storeOp, "expected converted memref of rank <= 1");
     }
 
     Value linearIndex = linearizeIndices(
@@ -458,9 +452,9 @@ struct LinearizeMMAStoreIndices final
   LogicalResult matchAndRewrite(
       gpu::SubgroupMmaStoreMatrixOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankOneOrZeroMemRef(adaptor.getDstMemref().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getDstMemref().getType())) {
       return rewriter.notifyMatchFailure(
-          storeOp, "expected converted memref of rank == 1");
+          storeOp, "expected converted memref of rank <= 1");
     }
 
     Value linearIndex =
@@ -489,9 +483,9 @@ struct LinearizeTransferReadIndices final
       return rewriter.notifyMatchFailure(
           transferReadOp, "cannot convert op with non-minor identity map");
     }
-    if (!isRankOneOrZeroMemRef(adaptor.getSource().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getSource().getType())) {
       return rewriter.notifyMatchFailure(
-          transferReadOp, "expected converted memref of rank == 1");
+          transferReadOp, "expected converted memref of rank <= 1");
     }
     Value linearIndex = linearizeIndices(transferReadOp.getSource(),
                                          transferReadOp.getIndices(),
@@ -521,9 +515,9 @@ struct LinearizeTransferWriteIndices final
       return rewriter.notifyMatchFailure(
           transferWriteOp, "cannot convert op with non-minor identity map");
     }
-    if (!isRankOneOrZeroMemRef(adaptor.getSource().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getSource().getType())) {
       return rewriter.notifyMatchFailure(
-          transferWriteOp, "expected converted memref of rank == 1");
+          transferWriteOp, "expected converted memref of rank <= 1");
     }
     Value linearIndex = linearizeIndices(transferWriteOp.getSource(),
                                          transferWriteOp.getIndices(),
@@ -554,9 +548,9 @@ struct AdjustConversionCast final
     // We only want to handle cases where the cast op handles memref types.
     if (!input.getType().isa<BaseMemRefType>()) return failure();
 
-    if (!isRankOneOrZeroMemRef(input.getType())) {
+    if (!isRankZeroOrOneMemRef(input.getType())) {
       return rewriter.notifyMatchFailure(
-          castOp, "expected converted memref of rank == 1");
+          castOp, "expected converted memref of rank <= 1");
     }
     rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
         castOp, castOp.getResultTypes(), input);
@@ -578,9 +572,9 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
       ReshapeOpTy op, typename ReshapeOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto typeConverter = OpConversionPattern<ReshapeOpTy>::typeConverter;
-    if (!isRankOneOrZeroMemRef(adaptor.getSrc().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getSrc().getType())) {
       return rewriter.notifyMatchFailure(
-          op, "expected converted memref of rank == 1");
+          op, "expected converted memref of rank <= 1");
     }
 
     // If the types are the same, just elide. Otherwise, introduce a cast
@@ -594,7 +588,7 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
     if (newSourceType == neededResultType) {
       rewriter.replaceOp(op, adaptor.getSrc());
       return success();
-    } else if (isRankOneOrZeroMemRef(neededResultType)) {
+    } else if (isRankZeroOrOneMemRef(neededResultType)) {
       rewriter.replaceOpWithNewOp<memref::CastOp>(op, neededResultType,
                                                   adaptor.getSrc());
       return success();
@@ -642,7 +636,7 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
       memref = castOp.getSource();
     }
     auto memrefType = memref.getType().template cast<MemRefType>();
-    if (!isRankOneOrZeroMemRef(memrefType)) {
+    if (!isRankZeroOrOneMemRef(memrefType)) {
       return rewriter.notifyMatchFailure(op, "expected 0-D or 1-D memref");
     }
 
@@ -672,6 +666,10 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
                                    subspanOp.getDynamicDims().end());
     Type resultType = memrefType;
     if (memrefType.getRank() == 0) {
+      // The current MemRef has rank zero but a non-zero offset. This only works
+      // in IREE's subspan ops--a subview of the underlying whole buffer. For
+      // such cases we'd need to make the type and offset consistent to utilize
+      // MLIR IR constructs. Turn the 0-D MemRef into a 1-D dynamic one.
       resultType =
           MemRefType::get(ShapedType::kDynamic, memrefType.getElementType(),
                           AffineMap(), memrefType.getMemorySpace());
@@ -786,6 +784,14 @@ struct FlattenMemRefSubspanPass
     // uniform buffers and dynamic for storage buffers. This matches how IREE
     // models runtime buffers nicely.
     FlattenMemRefTypeConverter interfaceTypeConverter;
+    interfaceTypeConverter.addConversion([](MemRefType type) -> Optional<Type> {
+      // 0-D MemRef types can be used to represent raw pointers for micro-kernel
+      // ABI purposes. Specially allow it.
+      if (isRankZeroMemRef(type)) return type;
+
+      // Fall back to the default conversion flow.
+      return std::nullopt;
+    });
     flattenPatterns.add<FlattenBindingSubspan>(interfaceTypeConverter, context);
 
     // Other ops generate MemRef values representing internal allocations (e.g.,
@@ -794,8 +800,8 @@ struct FlattenMemRefSubspanPass
     // Still convert everything to 1-D though.
     FlattenMemRefTypeConverter internalTypeConverter;
     internalTypeConverter.addConversion([](MemRefType type) -> Optional<Type> {
-      // 1-D MemRef types are okay.
-      if (isRankOneOrZeroMemRef(type)) return type;
+      // 0-D or 1-D MemRef types are okay.
+      if (isRankZeroOrOneMemRef(type)) return type;
 
       // Fall back to the default conversion flow.
       return std::nullopt;
@@ -814,43 +820,43 @@ struct FlattenMemRefSubspanPass
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     target.addDynamicallyLegalOp<memref::AllocaOp, memref::AllocOp,
                                  memref::GetGlobalOp>([](Operation *op) {
-      return isRankOneOrZeroMemRef(op->getResultTypes().front());
+      return isRankZeroOrOneMemRef(op->getResultTypes().front());
     });
     target
         .addDynamicallyLegalOp<memref::CollapseShapeOp, memref::ExpandShapeOp>(
             [](Operation *op) {
-              return isRankOneOrZeroMemRef(op->getResultTypes().front()) &&
-                     isRankOneOrZeroMemRef(op->getOperandTypes().front());
+              return isRankZeroOrOneMemRef(op->getResultTypes().front()) &&
+                     isRankZeroOrOneMemRef(op->getOperandTypes().front());
             });
     target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
         [&](IREE::HAL::InterfaceBindingSubspanOp op) {
           return interfaceTypeConverter.isLegal(op.getType());
         });
     target.addDynamicallyLegalOp<memref::GlobalOp>([](memref::GlobalOp op) {
-      return isRankOneOrZeroMemRef(op.getType());
+      return isRankZeroOrOneMemRef(op.getType());
     });
     target.addDynamicallyLegalOp<memref::LoadOp>([](memref::LoadOp loadOp) {
-      return isRankOneOrZeroMemRef(loadOp.getMemRefType());
+      return isRankZeroOrOneMemRef(loadOp.getMemRefType());
     });
     target.addDynamicallyLegalOp<gpu::SubgroupMmaLoadMatrixOp>(
         [](gpu::SubgroupMmaLoadMatrixOp loadOp) {
-          return isRankOneOrZeroMemRef(loadOp.getSrcMemref().getType());
+          return isRankZeroOrOneMemRef(loadOp.getSrcMemref().getType());
         });
     target.addDynamicallyLegalOp<memref::StoreOp>([](memref::StoreOp storeOp) {
-      return isRankOneOrZeroMemRef(storeOp.getMemRefType());
+      return isRankZeroOrOneMemRef(storeOp.getMemRefType());
     });
     target.addDynamicallyLegalOp<gpu::SubgroupMmaStoreMatrixOp>(
         [](gpu::SubgroupMmaStoreMatrixOp storeOp) {
-          return isRankOneOrZeroMemRef(storeOp.getDstMemref().getType());
+          return isRankZeroOrOneMemRef(storeOp.getDstMemref().getType());
         });
     target.addDynamicallyLegalOp<vector::TransferReadOp>(
         [](vector::TransferReadOp readOp) {
-          return isRankOneOrZeroMemRef(
+          return isRankZeroOrOneMemRef(
               readOp.getSource().getType().cast<MemRefType>());
         });
     target.addDynamicallyLegalOp<vector::TransferWriteOp>(
         [](vector::TransferWriteOp writeOp) {
-          return isRankOneOrZeroMemRef(
+          return isRankZeroOrOneMemRef(
               writeOp.getSource().getType().cast<MemRefType>());
         });
     target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
@@ -859,10 +865,10 @@ struct FlattenMemRefSubspanPass
 
           Type inputType = castOp->getOperandTypes().front();
           return !inputType.isa<BaseMemRefType>() ||
-                 isRankOneOrZeroMemRef(inputType);
+                 isRankZeroOrOneMemRef(inputType);
         });
     target.addDynamicallyLegalOp<memref::SubViewOp>([](memref::SubViewOp op) {
-      return isRankOneOrZeroMemRef(op.getType());
+      return isRankZeroOrOneMemRef(op.getType());
     });
 
     // Use partial conversion here so that we can ignore allocations created by
