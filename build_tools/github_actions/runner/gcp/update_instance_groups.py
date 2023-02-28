@@ -311,7 +311,7 @@ def parse_args():
   # These shouldn't be set very often, but it's just as easy to make them flags
   # as it is to make them global constants.
   subparser_base.add_argument("--name-prefix",
-                              default="github-runner",
+                              default="gh-runner",
                               help="The first part of MIG and template names.")
   subparser_base.add_argument(
       "--base-version-name",
