@@ -1,9 +1,6 @@
 // RUN: iree-opt --split-input-file \
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile,canonicalize,cse,iree-spirv-vectorize,canonicalize,cse)))))' %s | FileCheck %s
 
-// Note: upstream hoisting on tensors does not canonicalize `scf.for` anymore,
-// run canonicalization to make this test happy.
-
 #config = #iree_codegen.lowering_config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
