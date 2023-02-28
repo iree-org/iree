@@ -40,8 +40,9 @@ static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
   uint32_t hwcap = getauxval(AT_HWCAP);
   uint32_t hwcap2 = getauxval(AT_HWCAP2);
   uint64_t out0 = 0;
-  iree_copy_bits(out0, IREE_CPU_DATA0_ARM_DOTPROD, hwcap, IREE_HWCAP_ASIMDDP);
-  iree_copy_bits(out0, IREE_CPU_DATA0_ARM_I8MM, hwcap2, IREE_HWCAP2_I8MM);
+  iree_copy_bits(out0, IREE_CPU_DATA0_ARM_64_DOTPROD, hwcap,
+                 IREE_HWCAP_ASIMDDP);
+  iree_copy_bits(out0, IREE_CPU_DATA0_ARM_64_I8MM, hwcap2, IREE_HWCAP2_I8MM);
   out_fields[0] = out0;
 }
 
@@ -61,9 +62,9 @@ static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
 
 static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
   IREE_QUERY_SYSCTL("hw.optional.arm.FEAT_DotProd", out_fields[0],
-                    IREE_CPU_DATA0_ARM_DOTPROD);
+                    IREE_CPU_DATA0_ARM_64_DOTPROD);
   IREE_QUERY_SYSCTL("hw.optional.arm.FEAT_I8MM", out_fields[0],
-                    IREE_CPU_DATA0_ARM_I8MM);
+                    IREE_CPU_DATA0_ARM_64_I8MM);
 }
 
 #else
@@ -100,8 +101,8 @@ static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
 static bool iree_cpu_lookup_data_by_key_for_arch(
     const uint64_t* fields, iree_string_view_t key,
     int64_t* IREE_RESTRICT out_value) {
-  IREE_TEST_FIELD_BIT("dotprod", fields[0], IREE_CPU_DATA0_ARM_DOTPROD);
-  IREE_TEST_FIELD_BIT("i8mm", fields[0], IREE_CPU_DATA0_ARM_I8MM);
+  IREE_TEST_FIELD_BIT("dotprod", fields[0], IREE_CPU_DATA0_ARM_64_DOTPROD);
+  IREE_TEST_FIELD_BIT("i8mm", fields[0], IREE_CPU_DATA0_ARM_64_I8MM);
   return false;
 }
 

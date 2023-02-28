@@ -21,9 +21,7 @@
 // will ever be used in a compiled binary from another architecture. This
 // allows us to simplify this interface as we can't for example load the same
 // executable library for both aarch64 on riscv32 and don't need to normalize
-// any of the fields across them both. However, we may choose to share constants
-// among some closely related architectures, e.g. 32bit/64bit variants of x86 or
-// ARM, just for convenience, shrinking some boilerplate code, etc.
+// any of the fields across them both.
 //
 // As the values of the fields are encoded in generated binaries their meaning
 // here cannot change once deployed: only new meaning for unused bits can be
@@ -73,8 +71,8 @@ enum iree_cpu_data_field_0_e {
   // bits for some families/eras. If we just start out with bits 0 and 1
   // allocated for dotprod and i8mm, we are quickly going to have a hard-to-read
   // enumeration here.
-  IREE_CPU_DATA0_ARM_DOTPROD = 1ull << 0,
-  IREE_CPU_DATA0_ARM_I8MM = 1ull << 1,
+  IREE_CPU_DATA0_ARM_64_DOTPROD = 1ull << 0,
+  IREE_CPU_DATA0_ARM_64_I8MM = 1ull << 1,
 
 };
 

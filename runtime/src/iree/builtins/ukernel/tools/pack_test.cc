@@ -265,7 +265,7 @@ PACK_TEST(i8i8, 8, 8, generic, 0)
 #define PACK_ARM_64_TEST_WITH_CPU_FEATURE(type, tile_size0, tile_size1, \
                                           FEATURE)                      \
   PACK_TEST(type, tile_size0, tile_size1, arm_64_##FEATURE,             \
-            IREE_CPU_DATA0_ARM_##FEATURE)
+            IREE_CPU_DATA0_ARM_64_##FEATURE)
 
 PACK_ARM_64_TEST(f32f32, 8, 1)
 PACK_ARM_64_TEST(f32f32, 8, 8)
