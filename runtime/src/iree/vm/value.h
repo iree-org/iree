@@ -40,7 +40,7 @@ typedef enum iree_vm_value_type_e {
 } iree_vm_value_type_t;
 
 // Maximum size, in bytes, of any value type we can represent.
-#define IREE_VM_VALUE_STORAGE_SIZE 8
+#define IREE_VM_VALUE_STORAGE_SIZE 16
 
 // A variant value type.
 typedef struct iree_vm_value_t {
