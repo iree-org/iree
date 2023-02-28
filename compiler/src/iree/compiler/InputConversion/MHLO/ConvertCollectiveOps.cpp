@@ -137,16 +137,17 @@ static LogicalResult checkCollectiveAttrs(T op, PatternRewriter &rewriter) {
     return rewriter.notifyMatchFailure(op, "must have a single replica group");
   }
 
-  int64_t channelHandle =
+  // Note that the channel handle attribute consists of two 64-bit values,
+  // handle and type.
+  int64_t handle =
       op.getChannelHandle() ? op.getChannelHandleAttr().getHandle() : 0;
-  if (channelHandle <= 0) {
-    if (!op.getUseGlobalDeviceIds()) {
-      // When the channel handle attribute is not present, it means the
-      // channel ID is 0. When this case is combined with
-      // `use_global_device_ids=false`, the communication type is
-      // `cross-replica`, but since there is only one replica group, it is
-      // effectively the same as `flatten_ids`, which is supported.
-    } else {
+  if (handle <= 0) {
+    // When the channel handle attribute is not present, it means the
+    // handle (a.k.a. channel_id in stablehlo) is 0. When this case is combined
+    // with `use_global_device_ids=false`, the communication type is
+    // `cross-replica`, but since there is only one replica group, it is
+    // effectively the same as `flatten_ids`, which is supported.
+    if (op.getUseGlobalDeviceIds()) {
       return rewriter.notifyMatchFailure(
           op, "must not set use_global_device_ids when channel_id <= 0");
     }
