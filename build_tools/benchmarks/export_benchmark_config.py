@@ -39,7 +39,7 @@ import dataclasses
 import json
 import textwrap
 
-from benchmark_suites.iree import benchmark_collections
+from benchmark_suites.iree import benchmark_collections, export_definitions
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework import serialization
 from e2e_test_framework.definitions import common_definitions, iree_definitions
@@ -72,7 +72,8 @@ BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
 def filter_and_group_run_configs(
     run_configs: List[iree_definitions.E2EModelRunConfig],
     target_device_names: Optional[Set[str]] = None,
-    preset_matchers: Optional[List[PresetMatcher]] = None
+    preset_matchers: Optional[List[PresetMatcher]] = None,
+    single_group: Optional[str] = None,
 ) -> Dict[str, List[iree_definitions.E2EModelRunConfig]]:
   """Filters run configs and groups by target device name.
   
@@ -80,6 +81,7 @@ def filter_and_group_run_configs(
     run_configs: source e2e model run configs.
     target_device_names: list of target device names, includes all if not set.
     preset_matchers: list of preset matcher, matches all if not set.
+    single_group: groups into a single group <single_group> if set.
 
   Returns:
     A map of e2e model run configs keyed by target device name.
@@ -94,7 +96,8 @@ def filter_and_group_run_configs(
     if (preset_matchers is not None and
         not any(matcher(run_config) for matcher in preset_matchers)):
       continue
-    grouped_run_config_map[device_name].append(run_config)
+    grouped_run_config_map[device_name if single_group is None else
+                           single_group].append(run_config)
 
   return grouped_run_config_map
 
@@ -111,34 +114,43 @@ def _get_distinct_module_dir_paths(
 
 
 def _export_execution_handler(args: argparse.Namespace):
+  is_ci = args.ci
   _, all_run_configs = benchmark_collections.generate_benchmarks()
   target_device_names = (set(args.target_device_names)
                          if args.target_device_names is not None else None)
   grouped_run_config_map = filter_and_group_run_configs(
       all_run_configs,
       target_device_names=target_device_names,
-      preset_matchers=args.benchmark_presets)
+      preset_matchers=args.benchmark_presets,
+      single_group=None if is_ci else "local")
 
   output_map = {}
   for device_name, run_configs in grouped_run_config_map.items():
-    host_environments = set(run_config.target_device_spec.host_environment
-                            for run_config in run_configs)
-    if len(host_environments) > 1:
-      raise ValueError(
-          "Device specs of the same device should have the same host environment."
-      )
-    host_environment = host_environments.pop()
-
     distinct_module_dir_paths = _get_distinct_module_dir_paths(
         config.module_generation_config for config in run_configs)
 
-    output_map[device_name] = {
-        "host_environment": dataclasses.asdict(host_environment),
-        "module_dir_paths": distinct_module_dir_paths,
-        "run_configs": serialization.serialize_and_pack(run_configs),
-    }
+    if is_ci:
+      host_environments = set(run_config.target_device_spec.host_environment
+                              for run_config in run_configs)
+      if len(host_environments) > 1:
+        raise ValueError(
+            "Device specs of the same device should have the same host environment."
+        )
+      host_environment = dataclasses.asdict(host_environments.pop())
+    else:
+      host_environment = None
 
-  return output_map
+    output = export_definitions.ExecutionBenchmarkConfig(
+        run_configs=serialization.serialize_and_pack(run_configs),
+        module_dir_paths=distinct_module_dir_paths,
+        host_environment=host_environment)
+
+    output_map[device_name] = dataclasses.asdict(output)
+
+  if is_ci:
+    return output_map
+  # No CI-specific device level for local run.
+  return output_map["local"]
 
 
 def _export_compilation_handler(_args: argparse.Namespace):
@@ -151,12 +163,11 @@ def _export_compilation_handler(_args: argparse.Namespace):
   distinct_module_dir_paths = _get_distinct_module_dir_paths(
       compile_stats_gen_configs)
 
-  return {
-      "module_dir_paths":
-          distinct_module_dir_paths,
-      "generation_configs":
-          serialization.serialize_and_pack(compile_stats_gen_configs)
-  }
+  return dataclasses.asdict(
+      export_definitions.CompilationBenchmarkConfig(
+          module_dir_paths=distinct_module_dir_paths,
+          generation_configs=serialization.serialize_and_pack(
+              compile_stats_gen_configs)))
 
 
 def _parse_and_strip_list_argument(arg) -> List[str]:
@@ -183,6 +194,10 @@ def _parse_arguments():
   subparser_base.add_argument("--output",
                               type=pathlib.Path,
                               help="Path to write the JSON output.")
+  subparser_base.add_argument("--ci",
+                              action="store_true",
+                              default=False,
+                              help="Output CI-specific multiple device format.")
 
   parser = argparse.ArgumentParser(
       formatter_class=argparse.RawDescriptionHelpFormatter,

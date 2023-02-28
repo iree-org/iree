@@ -5,12 +5,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import dataclasses
 from io import BytesIO, StringIO
 import json
 import pathlib
 import unittest
 import zipfile
 
+from benchmark_suites.iree import export_definitions
 from common.benchmark_definition import ModuleComponentSizes
 from collect_compilation_statistics import CONST_COMPONENT_NAME, VM_COMPONENT_NAME, get_module_component_info, get_module_path, parse_compilation_time_from_ninja_log
 from e2e_test_artifacts import iree_artifacts
@@ -92,7 +94,7 @@ class CollectCompilationStatistics(unittest.TestCase):
 
     self.assertEqual(moduel_path, "/abcd-compile-stats.vmfb")
 
-  def test_get_module_map_from_generation_config(self):
+  def test_get_module_map_from_compilation_benchmark_config(self):
     model_a = common_definitions.Model(
         id="1234",
         name="tflite_m",
@@ -126,12 +128,15 @@ class CollectCompilationStatistics(unittest.TestCase):
         imported_model=imported_model_a, compile_config=compile_config_a)
     gen_config_b = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_a, compile_config=compile_config_b)
-    serialized_gen_config = json.dumps(
-        serialization.serialize_and_pack([gen_config_a, gen_config_b]))
+    compile_bench_config = export_definitions.CompilationBenchmarkConfig(
+        generation_configs=serialization.serialize_and_pack(
+            [gen_config_a, gen_config_b]),
+        module_dir_paths=["a", "b"])
     root_dir = pathlib.PurePath("artifacts_dir")
 
-    module_map = collect_compilation_statistics.get_module_map_from_generation_config(
-        serialized_gen_config=StringIO(serialized_gen_config),
+    module_map = collect_compilation_statistics.get_module_map_from_compilation_benchmark_config(
+        compilation_benchmark_config_data=StringIO(
+            json.dumps(dataclasses.asdict(compile_bench_config))),
         e2e_test_artifacts_dir=root_dir)
 
     compile_info_a = common.benchmark_definition.CompilationInfo(

@@ -59,7 +59,7 @@ class Parser(argparse.ArgumentParser):
         help=(
             "Path to the IREE e2e test artifacts directory. This will override "
             "<build-dir> and eventually replace it. For now must use with "
-            "--run_config"))
+            "--execution_benchmark_config"))
 
     self.add_argument(
         "--normal_benchmark_tool_dir",
@@ -155,17 +155,19 @@ class Parser(argparse.ArgumentParser):
         "for). In that case, no --benchmark_repetitions flag will be passed."
         " If not specified, a --benchmark_repetitions will be passed "
         "instead.")
-    self.add_argument("--run_config",
+    self.add_argument("--execution_benchmark_config",
                       type=_check_file_path,
                       default=None,
-                      help="JSON file of the run config")
+                      help="JSON config for the execution benchmarks")
 
   def parse_args(
       self, arg_strs: Optional[Sequence[str]] = None) -> argparse.Namespace:
     args = super().parse_args(arg_strs)
 
-    if args.e2e_test_artifacts_dir is not None and args.run_config is None:
-      raise self.error("--e2e_test_artifacts_dir requires --run_config.")
+    if (args.e2e_test_artifacts_dir is not None and
+        args.execution_benchmark_config is None):
+      self.error(
+          "--e2e_test_artifacts_dir requires --execution_benchmark_config.")
 
     return args
 

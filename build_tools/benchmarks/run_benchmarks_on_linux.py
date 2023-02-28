@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import tarfile
 
+from benchmark_suites.iree import export_definitions
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
@@ -147,14 +148,15 @@ def main(args):
   commit = get_git_commit_hash("HEAD")
   benchmark_config = BenchmarkConfig.build_from_args(args, commit)
 
-  if args.run_config is None:
+  if args.execution_benchmark_config is None:
     # TODO(#11076): Remove legacy path.
     benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
         benchmark_config.root_benchmark_dir)
   else:
-    run_config_data = json.loads(args.run_config.read_text())
+    execution_benchmark_config = export_definitions.ExecutionBenchmarkConfig(
+        **json.loads(args.execution_benchmark_config.read_text()))
     run_configs = serialization.unpack_and_deserialize(
-        data=run_config_data,
+        data=execution_benchmark_config.run_configs,
         root_type=typing.List[iree_definitions.E2EModelRunConfig])
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
         run_configs=run_configs)
