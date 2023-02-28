@@ -39,6 +39,7 @@ iree_check_single_backend_test_suite(
         [
             "extract_slice.mlir",
             "pack.mlir",
+            "pack_dynamic_inner_tiles.mlir",
             "tensor_insert_slice.mlir",
             "unpack.mlir",
         ],
@@ -58,6 +59,7 @@ iree_check_single_backend_test_suite(
         [
             "extract_slice.mlir",
             "pack.mlir",
+            "pack_dynamic_inner_tiles.mlir",
             "tensor_insert_slice.mlir",
             "unpack.mlir",
         ],
@@ -74,6 +76,7 @@ iree_check_single_backend_test_suite(
     name = "check_vmvx_ukernel_local-task",
     srcs = [
         "pack.mlir",
+        "pack_dynamic_inner_tiles.mlir",
         "unpack.mlir",
     ],
     compiler_flags = [
@@ -96,11 +99,12 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "extract_slice.mlir",
+            "pack.mlir",
             "tensor_insert_slice.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
-            "pack.mlir",
+            "pack_dynamic_inner_tiles.mlir",
             "tensor_cast.mlir",
             "unpack.mlir",
         ],
@@ -127,6 +131,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "pack.mlir",
+            "pack_dynamic_inner_tiles.mlir",
             "tensor_cast.mlir",
             "unpack.mlir",
         ],

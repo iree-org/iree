@@ -25,11 +25,6 @@ declare -a PACKAGES=(
     # Optional for tools like llvm-symbolizer, which we could build from
     # source but would rather just have available ahead of time
     llvm-dev
-    # Tracy build and run dependencies
-    pkg-config
-    libcapstone-dev
-    libtbb-dev
-    libzstd-dev
 )
 
 apt-get update

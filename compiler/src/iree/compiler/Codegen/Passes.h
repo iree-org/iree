@@ -445,6 +445,8 @@ void addGPUTransformDialectPasses(OpPassManager &pm);
 /// module-level pass manager.
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm);
 
+void addGPUPackUnPackPasses(OpPassManager &pm);
+
 /// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via
 /// the structured ops path. The pass manager `pm` in here should operate on
 /// the module within the IREE::HAL::ExecutableOp.

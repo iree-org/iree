@@ -23,7 +23,7 @@ REGION="$3"
 # the number of runners removed at a time.
 COUNT="${4:--0}"
 
-MIG="github-runner-${GROUP}-${TYPE}-${REGION}"
+MIG="gh-runner-${GROUP}-${TYPE}-${REGION}"
 
 function remove_idle_runners() {
   local -a to_delete=($(gh api --paginate -H "Accept: application/vnd.github+json" \

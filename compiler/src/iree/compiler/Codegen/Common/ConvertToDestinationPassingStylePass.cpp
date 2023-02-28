@@ -471,22 +471,6 @@ static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
 /// of tensor.unpack op for more details.
 static LogicalResult replaceUnpackEmptyWithAllocTensor(OpBuilder &b,
                                                        func::FuncOp funcOp) {
-  // TODO(hanchung): retire IREE::LinalgExt version.
-  funcOp.walk([&](IREE::LinalgExt::UnPackOp unpackOp) {
-    if (!unpackOp->hasOneUse() ||
-        !isa<tensor::ExtractSliceOp>(*(unpackOp->user_begin()))) {
-      return;
-    }
-    auto emptyOp = unpackOp.getOutput().getDefiningOp<tensor::EmptyOp>();
-    if (!emptyOp) return;
-
-    OpBuilder::InsertionGuard g(b);
-    b.setInsertionPointAfter(emptyOp);
-    auto allocTensor = b.create<bufferization::AllocTensorOp>(
-        emptyOp.getLoc(), emptyOp.getType(), emptyOp.getDynamicSizes());
-    emptyOp.replaceAllUsesWith(allocTensor.getResult());
-  });
-
   funcOp.walk([&](tensor::UnPackOp unpackOp) {
     if (!unpackOp->hasOneUse() ||
         !isa<tensor::ExtractSliceOp>(*(unpackOp->user_begin()))) {

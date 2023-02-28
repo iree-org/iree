@@ -587,3 +587,46 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize
 //      CHECK: hal.executable.export public @contract_reduction
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @dynamic_pack_2x2 {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}> {
+  hal.executable.export public @dynamic_pack_2x2 layout(#pipeline_layout)
+  builtin.module {
+    func.func @dynamic_pack_2x2() {
+      %c0 = arith.constant 0 : index
+      %c64 = arith.constant 64 : index
+      %0 = hal.interface.constant.load[0] : i32
+      %1 = hal.interface.constant.load[1] : i32
+      %2 = hal.interface.constant.load[2] : i32
+      %3 = hal.interface.constant.load[3] : i32
+      %4 = arith.index_castui %0 : i32 to index
+      %5 = arith.index_castui %1 : i32 to index
+      %6 = arith.index_castui %2 : i32 to index
+      %7 = arith.index_castui %3 : i32 to index
+      %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c64) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%4, %5}
+      %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?x2x2xi32>>{%6, %7}
+      %10 = flow.dispatch.tensor.load %8, offsets = [0, 0], sizes = [%4, %5], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%4, %5} -> tensor<?x?xi32>
+      %11 = tensor.empty(%6, %7) : tensor<?x?x2x2xi32>
+      %pack = tensor.pack %10 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %11 : tensor<?x?xi32> -> tensor<?x?x2x2xi32>
+      flow.dispatch.tensor.store %pack, %9, offsets = [0, 0, 0, 0], sizes = [%6, %7, 2, 2], strides = [1, 1, 1, 1] : tensor<?x?x2x2xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x2x2xi32>>{%6, %7}
+      return
+    }
+  }
+}
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUPackUnPack>
+//      CHECK: hal.executable.export public @dynamic_pack_2x2
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   func.func @dynamic_pack_2x2
+//      CHECK:     tensor.pack
+// CHECK-SAME:       lowering_config = #[[CONFIG]]

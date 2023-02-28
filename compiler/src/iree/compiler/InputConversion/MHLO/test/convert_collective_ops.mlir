@@ -89,6 +89,23 @@ func.func @all_reduce_maximum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
 
 // -----
 
+// CHECK-LABEL: @all_reduce_maximum_optional_attrs
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<2304xf32>)
+func.func @all_reduce_maximum_optional_attrs(%input : tensor<2304xf32>) -> tensor<2304xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2304xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_reduce maximum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> [[EMPTY]] as tensor<2304xf32>
+  // CHECK: return [[OP]] : tensor<2304xf32>
+  %out = "mhlo.all_reduce"(%input) ({
+    ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
+      %mul = mhlo.maximum %arg0, %arg1 : tensor<f32>
+      mhlo.return %mul : tensor<f32>
+    }) {replica_groups = dense<[[0, 1, 2, 3, 4, 5, 6, 7]]> : tensor<1x8xi64>} : (tensor<2304xf32>) -> tensor<2304xf32>
+  return %out : tensor<2304xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @all_gather_dim_0
 // CHECK-SAME: ([[ARG0:%.+]]: tensor<512xf32>) -> tensor<1024xf32>
 func.func @all_gather_dim_0(%input : tensor<512xf32>) -> tensor<1024xf32> {
@@ -121,6 +138,20 @@ func.func @all_gather_dim_1(%input : tensor<2x2xf32>) -> tensor<2x4xf32> {
      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
      use_global_device_ids} : (tensor<2x2xf32>) -> tensor<2x4xf32>
   return %out : tensor<2x4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @all_gather_dim_0_optional_attrs
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<512xf32>) -> tensor<1024xf32>
+func.func @all_gather_dim_0_optional_attrs(%input : tensor<512xf32>) -> tensor<1024xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<1024xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_gather f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<1024xf32>, tensor<512xf32>, !flow.channel) -> [[EMPTY]] as tensor<1024xf32>
+  // CHECK: return [[OP]] : tensor<1024xf32>
+  %out = "mhlo.all_gather"(%input) {all_gather_dim = 0 : i64,
+     replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>} : (tensor<512xf32>) -> tensor<1024xf32>
+  return %out : tensor<1024xf32>
 }
 
 // -----
@@ -163,5 +194,23 @@ func.func @reduce_scatter_dim_1(%input : tensor<2x4xf32>) -> tensor<2x2xf32> {
       channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
       use_global_device_ids} : (tensor<2x4xf32>) -> tensor<2x2xf32>
+  return %out : tensor<2x2xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @reduce_scatter_dim_0_optional_attrs
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<4x2xf32>) -> tensor<2x2xf32>
+func.func @reduce_scatter_dim_0_optional_attrs(%input : tensor<4x2xf32>) -> tensor<2x2xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2x2xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.reduce_scatter sum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2x2xf32>, tensor<4x2xf32>, !flow.channel) -> [[EMPTY]] as tensor<2x2xf32>
+  // CHECK: return [[OP]] : tensor<2x2xf32>
+  %out = "mhlo.reduce_scatter"(%input) ({
+  ^bb0(%arg0: tensor<f32> , %arg1: tensor<f32>) :
+    %sum = mhlo.add %arg0, %arg1 : tensor<f32>
+    mhlo.return %sum : tensor<f32>
+  }) {scatter_dimension = 0 : i64,
+      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>} : (tensor<4x2xf32>) -> tensor<2x2xf32>
   return %out : tensor<2x2xf32>
 }

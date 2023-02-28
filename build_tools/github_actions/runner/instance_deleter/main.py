@@ -34,7 +34,7 @@ own docker container. For local development:
 You'll need to get a token that corresponds to an actual instance though or
 you'll get an error:
 
-  gcloud compute ssh github-runner-testing-presubmit-cpu-us-west1-h58j \
+  gcloud compute ssh gh-runner-testing-presubmit-cpu-us-west1-h58j \
     --user-output-enabled=false \
     --command "curl -sSfL \
         -H 'Metadata-Flavor: Google' \
@@ -54,7 +54,7 @@ To deploy:
     --service-account=managed-instance-deleter@iree-oss.iam.gserviceaccount.com \
     --ingress-settings=internal-only \
     --timeout=120s \
-    --set-env-vars ALLOWED_MIG_PATTERN='github-runner-.*'
+    --set-env-vars ALLOWED_MIG_PATTERN='gh-runner-.*'
 
 
 See https://cloud.google.com/functions/docs for more details.

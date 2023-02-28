@@ -28,6 +28,7 @@ iree_lit_test_suite(
     "linalg_transform.mlir"
     "nvvm_mma_sync_pipeline_test.mlir"
     "nvvm_pipeline_test.mlir"
+    "pack_pipeline_test.mlir"
     "reduction_pipeline.mlir"
     "reduction_pipeline_transform.mlir"
     "rocdl_pipeline_test.mlir"

@@ -71,17 +71,6 @@ def TopkSplitReduction:
   ];
 }
 
-def LinalgExtVectorization:
-    Pass<"iree-linalg-ext-vectorization", "func::FuncOp"> {
-  let summary = "Vectorization pass for LinalgExt pack ops.";
-  let description = [{
-    Vectorizes LinalgExt ops when they meet the conditions, e.g., having static
-    shapes, etc.
-  }];
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createLinalgExtVectorizationPass()";
-}
-
 def TileAndDecomposeWinogradTransform :
     Pass<"iree-linalg-ext-tile-and-decompose-winograd", "func::FuncOp"> {
   let summary =
