@@ -301,7 +301,6 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   addBufferizePasses(nestedModulePM);
 
   // distribute foreach threads
-  addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
