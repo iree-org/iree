@@ -72,7 +72,7 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
       /*max_subgroup_size=*/std::nullopt,
       /*cooperative_matrix_properties_nv=*/ArrayAttr());
 
-  auto triple = spirv::VerCapExtAttr::get(spirv::Version::V_1_0, capabilities,
+  auto triple = spirv::VerCapExtAttr::get(spirv::Version::V_1_3, capabilities,
                                           extensions, context);
   // Further assuming Apple GPUs.
   return spirv::TargetEnvAttr::get(
