@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/base-bleeding-edge@sha256:fa9591127f8e64003df7b86333df1258108923905ec866d9d9b30f73b0a1d7ea AS install-swiftshader
+FROM gcr.io/iree-oss/base-bleeding-edge@sha256:31b1896efbb3d1f17aa1a5fe58d9f07ed475c8f099c4b313a590bde9a15097ef AS install-swiftshader
 WORKDIR /install-swiftshader
 
 COPY build_tools/third_party/swiftshader/build_vk_swiftshader.sh ./
