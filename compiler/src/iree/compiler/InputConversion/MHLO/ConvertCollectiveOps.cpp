@@ -191,7 +191,7 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
   LogicalResult matchAndRewrite(
       mhlo::AllGatherOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (checkCollectiveAttrs<mhlo::AllGatherOp>(op, rewriter).failed()) {
+    if (checkCollectiveAttrs(op, rewriter).failed()) {
       return failure();
     }
 
@@ -264,7 +264,7 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
   LogicalResult matchAndRewrite(
       mhlo::AllReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (checkCollectiveAttrs<mhlo::AllReduceOp>(op, rewriter).failed()) {
+    if (checkCollectiveAttrs(op, rewriter).failed()) {
       return failure();
     }
 
@@ -338,7 +338,7 @@ struct ReduceScatterOpConversion
   LogicalResult matchAndRewrite(
       mhlo::ReduceScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (checkCollectiveAttrs<mhlo::ReduceScatterOp>(op, rewriter).failed()) {
+    if (checkCollectiveAttrs(op, rewriter).failed()) {
       return failure();
     }
 
