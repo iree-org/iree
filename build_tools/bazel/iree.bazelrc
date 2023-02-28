@@ -279,8 +279,8 @@ build:remote_cache_bazel_ci --config=_remote_cache_base
 # specific docker container the CI Bazel builds are run in. The image URL is
 # included for clarity and so that this reference is automatically updated by
 # manage_images.py
-build:remote_cache_bazel_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:9a43a8ef05b6193d6e907bcebcea255977a7cea8a0f19a936dc0e46a69e69bc5"}'
-build:remote_cache_bazel_tf_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/frontends-swiftshader@sha256:2e8b2d276b8141cd877c42bf768c1e14c115362f4a5d75bacde54e312c7f1875"}'
+build:remote_cache_bazel_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:8be446ba48a571b37c861574391c10715130d28cd5cadc86e5ec8080c0c6d4fa"}'
+build:remote_cache_bazel_tf_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/frontends-swiftshader@sha256:414071144e8b742ec61eccf69a657e13424513b7574153820367de355e494e0a"}'
 
 
 ###############################################################################
