@@ -43,12 +43,24 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
   return builder.create<memref::AllocOp>(loc, memrefType);
 }
 
-/// Returns true if the given op is a memref.load from a uniform buffer.
-static bool isUniformBufferLoad(Operation *op) {
-  if (auto loadOp = dyn_cast<memref::LoadOp>(op)) {
-    auto space = loadOp.getMemRefType().getMemorySpace();
-    if (auto attr = space.dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>())
-      return attr.getValue() == IREE::HAL::DescriptorType::UniformBuffer;
+/// Returns true if the given op is a memref.load from a uniform buffer or
+/// read-only storage buffer.
+static bool isUniformLoad(Operation *op) {
+  using namespace IREE::HAL;
+
+  auto loadOp = dyn_cast<memref::LoadOp>(op);
+  if (!loadOp) return false;
+  auto space = loadOp.getMemRefType().getMemorySpace();
+  auto attr = space.dyn_cast_or_null<DescriptorTypeAttr>();
+  if (!attr) return false;
+
+  if (attr.getValue() == DescriptorType::UniformBuffer) return true;
+
+  auto subspan = loadOp.getMemRef().getDefiningOp<InterfaceBindingSubspanOp>();
+  if (!subspan) return false;
+  if (auto flags = subspan.getDescriptorFlags()) {
+    if (bitEnumContainsAll(*flags, IREE::HAL::DescriptorFlags::ReadOnly))
+      return true;
   }
   return false;
 }
@@ -67,8 +79,7 @@ static void moveScalarAndBindingUniformCode(
     if (isa<IREE::HAL::InterfaceBindingSubspanOp,
             IREE::HAL::InterfaceConstantLoadOp, memref::AssumeAlignmentOp>(op))
       return true;
-    // Loading from uniform buffers are also uniform across the warp.
-    if (isUniformBufferLoad(op)) return true;
+    if (isUniformLoad(op)) return true;
 
     return false;
   };
@@ -90,7 +101,7 @@ static void moveScalarAndBindingUniformCode(
     bool hasVectorResult = llvm::any_of(op.getResults(), [](Value result) {
       return result.getType().isa<VectorType>();
     });
-    if ((!hasVectorResult || isUniformBufferLoad(&op)) &&
+    if ((!hasVectorResult || isUniformLoad(&op)) &&
         canBeHoisted(&op, isDefinedOutsideOfBody)) {
       opsToMove.insert(&op);
     }
