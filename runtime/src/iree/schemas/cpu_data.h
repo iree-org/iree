@@ -21,7 +21,9 @@
 // will ever be used in a compiled binary from another architecture. This
 // allows us to simplify this interface as we can't for example load the same
 // executable library for both aarch64 on riscv32 and don't need to normalize
-// any of the fields across them both.
+// any of the fields across them both. However, we may choose to share constants
+// among some closely related architectures, e.g. 32bit/64bit variants of x86 or
+// ARM, just for convenience, shrinking some boilerplate code, etc.
 //
 // As the values of the fields are encoded in generated binaries their meaning
 // here cannot change once deployed: only new meaning for unused bits can be
@@ -29,6 +31,17 @@
 // Since IREE executables can run on many architectures and operating systems we
 // also cannot directly expose the architecture-specific registers as not all
 // environments and access-levels can query them.
+//
+// On a best-effort basis, we try to pack the most commonly used values in data
+// field 0, and we try to have some consistency in the bit allocation: ideally,
+// ISA extensions that are either closely related or from the same era should
+// occupy bits close to each other, if only so that the bit values enumedated
+// below from lowest to highest bits are easier to read (e.g. look up at a
+// glance which AVX512 features we already have bits for). Inevitably, the
+// aforementioned requirement that bits are set in stone, will force us away
+// from that at times. To strike a decent compromise, we typically try to
+// reserve some range of bits for families or eras of ISA extensions, but don't
+// overthink it.
 //
 // This is similar in functionality to getauxval(AT_HWCAP*) in linux but
 // platform-independent and with additional fields and values that may not yet
@@ -53,25 +66,15 @@
 enum iree_cpu_data_field_0_e {
 
   //===--------------------------------------------------------------------===//
-  // IREE_ARCH_ARM_64 / aarch64
+  // IREE_ARCH_ARM_32 | IREE_ARCH_ARM_64
   //===--------------------------------------------------------------------===//
 
-  // Indicates support for Dot Product instructions.
-  //
-  // UDOT and SDOT instructions implemented.
-  //
-  // Source: ID_AA64ISAR0_EL1.DP [47:44] == 0b0001 / HWCAP_ASIMDDP
-  // Canonical key: "dotprod"
-  IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD = 1ull << 0,
-
-  // Indicates support for Advanced SIMD and Floating-point Int8 matrix
-  // multiplication instructions.
-  //
-  // SMMLA, SUDOT, UMMLA, USMMLA, and USDOT instructions are implemented.
-  //
-  // Source: ID_AA64ISAR1_EL1.I8MM [55:52] == 0b0001 / HWCAP2_I8MM
-  // Canonical key: "i8mm"
-  IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM = 1ull << 1,
+  // TODO: add several common ARM ISA extensions and allocate some ranges of
+  // bits for some families/eras. If we just start out with bits 0 and 1
+  // allocated for dotprod and i8mm, we are quickly going to have a hard-to-read
+  // enumeration here.
+  IREE_CPU_DATA0_ARM_DOTPROD = 1ull << 0,
+  IREE_CPU_DATA0_ARM_I8MM = 1ull << 1,
 
 };
 

@@ -16,6 +16,9 @@
 // Platform-specific processor data queries
 //===----------------------------------------------------------------------===//
 
+#define iree_copy_bits(dst_val, dst_mask, src_val, src_mask) \
+  ((dst_val) |= (iree_all_bits_set((src_val), (src_mask)) ? (dst_mask) : 0))
+
 #if defined(IREE_ARCH_ARM_64)
 // On ARM, CPU feature info is not directly accessible to userspace (EL0). The
 // OS needs to be involved one way or another.
@@ -36,10 +39,10 @@
 static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
   uint32_t hwcap = getauxval(AT_HWCAP);
   uint32_t hwcap2 = getauxval(AT_HWCAP2);
-  if (hwcap & IREE_HWCAP_ASIMDDP)
-    out_fields[0] |= IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD;
-  if (hwcap2 & IREE_HWCAP2_I8MM)
-    out_fields[0] |= IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM;
+  uint64_t out0 = 0;
+  iree_copy_bits(out0, IREE_CPU_DATA0_ARM_DOTPROD, hwcap, IREE_HWCAP_ASIMDDP);
+  iree_copy_bits(out0, IREE_CPU_DATA0_ARM_I8MM, hwcap2, IREE_HWCAP2_I8MM);
+  out_fields[0] = out0;
 }
 
 #elif defined(IREE_PLATFORM_MACOS) || defined(IREE_PLATFORM_IOS)
@@ -58,9 +61,9 @@ static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
 
 static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
   IREE_QUERY_SYSCTL("hw.optional.arm.FEAT_DotProd", out_fields[0],
-                    IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD);
+                    IREE_CPU_DATA0_ARM_DOTPROD);
   IREE_QUERY_SYSCTL("hw.optional.arm.FEAT_I8MM", out_fields[0],
-                    IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM);
+                    IREE_CPU_DATA0_ARM_I8MM);
 }
 
 #else
@@ -76,11 +79,10 @@ static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
 static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
                                               uint64_t* out_fields) {
 #if defined(IREE_ARCH_ARM_64)
-  (void)temp_allocator;  // unused on ARM_64
   iree_cpu_initialize_from_platform_arm_64(out_fields);
 #else
   // No implementation available. CPU data will be all zeros.
-#endif
+#endif  // defined(IREE_ARCH_ARM_64)
 }
 
 //===----------------------------------------------------------------------===//
@@ -98,10 +100,8 @@ static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
 static bool iree_cpu_lookup_data_by_key_for_arch(
     const uint64_t* fields, iree_string_view_t key,
     int64_t* IREE_RESTRICT out_value) {
-  IREE_TEST_FIELD_BIT("dotprod", fields[0],
-                      IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD);
-  IREE_TEST_FIELD_BIT("i8mm", fields[0],
-                      IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM);
+  IREE_TEST_FIELD_BIT("dotprod", fields[0], IREE_CPU_DATA0_ARM_DOTPROD);
+  IREE_TEST_FIELD_BIT("i8mm", fields[0], IREE_CPU_DATA0_ARM_I8MM);
   return false;
 }
 
