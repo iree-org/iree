@@ -74,7 +74,7 @@ static Value getByteLength(OpBuilder &builder, Location loc,
                            Value memrefValue) {
   auto memrefType = memrefValue.getType().cast<MemRefType>();
   if (memrefType.getRank() == 0) {
-    return builder.createOrFold<arith::ConstantIndexOp>(loc, 0);
+    return getElementTypeByteSize(builder, loc, memrefValue);
   }
   if (memrefType.getRank() != 1) {
     emitError(loc, "memrefs should have been flattened");
