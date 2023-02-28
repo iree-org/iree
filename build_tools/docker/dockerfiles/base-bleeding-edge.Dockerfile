@@ -30,7 +30,8 @@ RUN apt-get update \
     unzip \
     wget \
     curl \
-    gnupg2
+    gnupg2 \
+    lsb-release
 
 # Install the latest supported compiler tools
 ARG LLVM_VERSION=17
