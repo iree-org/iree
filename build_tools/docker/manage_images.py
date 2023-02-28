@@ -62,7 +62,6 @@ IMAGES_TO_DEPENDENCIES = {
     # instead of the oldest.
     "base-bleeding-edge": [],
     "swiftshader-bleeding-edge": ["base-bleeding-edge"],
-    "nvidia-bleeding-edge": ["base-bleeding-edge"],
 }
 
 IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES}

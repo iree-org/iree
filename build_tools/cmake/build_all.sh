@@ -48,10 +48,6 @@ declare -a CMAKE_ARGS=(
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
   "-DIREE_TARGET_BACKEND_WEBGPU=${IREE_TARGET_BACKEND_WEBGPU}"
-
-  # The libzstd on Ubuntu 18.04 doesn't work with the IREE integrated LLVM.
-  # TODO(#11782): Remove once we bump the minimum supported OS version.
-  "-DLLVM_ENABLE_ZSTD=OFF"
 )
 
 "$CMAKE_BIN" "${CMAKE_ARGS[@]}"
