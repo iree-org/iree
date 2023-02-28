@@ -231,9 +231,9 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_fill_elements(
     const void* value) {
   IREE_ASSERT_ARGUMENT(target_buffer);
   iree_byte_span_t span;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_map_rw(target_buffer, target_offset,
-                                             element_count * element_length,
-                                             element_length, &span));
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_map_rw(
+      target_buffer, target_offset * element_length,
+      element_count * element_length, element_length, &span));
   switch (element_length) {
     case 1: {
       const uint8_t pattern_value = *(const uint8_t*)value;
@@ -275,9 +275,9 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_read_elements(
     iree_host_size_t element_length) {
   IREE_ASSERT_ARGUMENT(source_buffer);
   iree_const_byte_span_t source_span;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_map_ro(source_buffer, source_offset,
-                                             element_count * element_length,
-                                             element_length, &source_span));
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_map_ro(
+      source_buffer, source_offset * element_length,
+      element_count * element_length, element_length, &source_span));
   memcpy(target_ptr, source_span.data, source_span.data_length);
   return iree_ok_status();
 }
@@ -289,9 +289,9 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
   IREE_ASSERT_ARGUMENT(source_ptr);
   IREE_ASSERT_ARGUMENT(target_buffer);
   iree_byte_span_t target_span;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_map_rw(target_buffer, target_offset,
-                                             element_count * element_length,
-                                             element_length, &target_span));
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_map_rw(
+      target_buffer, target_offset * element_length,
+      element_count * element_length, element_length, &target_span));
   memcpy(target_span.data, source_ptr, target_span.data_length);
   return iree_ok_status();
 }

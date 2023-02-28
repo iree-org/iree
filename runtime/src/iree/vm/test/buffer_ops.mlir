@@ -280,10 +280,8 @@ vm.module @buffer_ops {
     // Fill the middle two elements.
     %c2 = vm.const.i64 1
     %c4 = vm.const.i64 2
-    %c2_byte = vm.mul.i64 %c2, %element_size : i64
-    %c4_byte = vm.mul.i64 %c4, %element_size : i64
     %value = vm.const.f32 42.0
-    vm.buffer.fill.f32 %buf_dno, %c2_byte, %c4_byte, %value : f32 -> !vm.buffer
+    vm.buffer.fill.f32 %buf_dno, %c2, %c4, %value : f32 -> !vm.buffer
 
     // Compare to reference.
     %c0 = vm.const.i64 0
@@ -295,7 +293,7 @@ vm.module @buffer_ops {
   }
 
   vm.rodata private @test_fill_i8_ref  dense<[0, 102, 102, 0]> : tensor<4xi8>
-  
+
   // Tests filling a buffer with 8-bit values.
   vm.export @test_fill_i8
   vm.func @test_fill_i8() {
@@ -310,10 +308,8 @@ vm.module @buffer_ops {
     // Fill the middle two elements.
     %c2 = vm.const.i64 1
     %c4 = vm.const.i64 2
-    %c2_byte = vm.mul.i64 %c2, %element_size : i64
-    %c4_byte = vm.mul.i64 %c4, %element_size : i64
     %value = vm.const.i32 102
-    vm.buffer.fill.i8 %buf_dno, %c2_byte, %c4_byte, %value : i32 -> !vm.buffer
+    vm.buffer.fill.i8 %buf_dno, %c2, %c4, %value : i32 -> !vm.buffer
 
     // Compare to reference.
     %c0 = vm.const.i64 0
@@ -325,7 +321,7 @@ vm.module @buffer_ops {
   }
 
   vm.rodata private @test_fill_i16_ref dense<[0, 51966, 51966, 0]> : tensor<4xi16>
-  
+
   // Tests filling a buffer with 16-bit values.
   vm.export @test_fill_i16
   vm.func @test_fill_i16() {
@@ -340,10 +336,8 @@ vm.module @buffer_ops {
     // Fill the middle two elements.
     %c2 = vm.const.i64 1
     %c4 = vm.const.i64 2
-    %c2_byte = vm.mul.i64 %c2, %element_size : i64
-    %c4_byte = vm.mul.i64 %c4, %element_size : i64
     %value = vm.const.i32 0xCAFE
-    vm.buffer.fill.i16 %buf_dno, %c2_byte, %c4_byte, %value : i32 -> !vm.buffer
+    vm.buffer.fill.i16 %buf_dno, %c2, %c4, %value : i32 -> !vm.buffer
 
     // Compare to reference.
     %c0 = vm.const.i64 0
@@ -355,7 +349,7 @@ vm.module @buffer_ops {
   }
 
   vm.rodata private @test_fill_i32_ref dense<[0, 0xFFFF0000, 0xFFFF0000, 0]> : tensor<4xi32>
-  
+
   // Tests filling a buffer with 32-bit values.
   vm.export @test_fill_i32
   vm.func @test_fill_i32() {
@@ -370,10 +364,8 @@ vm.module @buffer_ops {
     // Fill the middle two elements.
     %c2 = vm.const.i64 1
     %c4 = vm.const.i64 2
-    %c2_byte = vm.mul.i64 %c2, %element_size : i64
-    %c4_byte = vm.mul.i64 %c4, %element_size : i64
     %value = vm.const.i32 0xFFFF0000
-    vm.buffer.fill.i32 %buf_dno, %c2_byte, %c4_byte, %value : i32 -> !vm.buffer
+    vm.buffer.fill.i32 %buf_dno, %c2, %c4, %value : i32 -> !vm.buffer
 
     // Compare to reference.
     %c0 = vm.const.i64 0
@@ -385,7 +377,7 @@ vm.module @buffer_ops {
   }
 
   vm.rodata private @test_fill_i64_ref dense<[0, 0x100000000, 0x100000000, 0]> : tensor<4xi64>
-  
+
   // Tests filling a buffer with 64-bit values.
   vm.export @test_fill_i64
   vm.func @test_fill_i64() {
@@ -400,64 +392,13 @@ vm.module @buffer_ops {
     // Fill the middle two elements.
     %c2 = vm.const.i64 1
     %c4 = vm.const.i64 2
-    %c2_byte = vm.mul.i64 %c2, %element_size : i64
-    %c4_byte = vm.mul.i64 %c4, %element_size : i64
     %value = vm.const.i64 0x100000000
-    vm.buffer.fill.i64 %buf_dno, %c2_byte, %c4_byte, %value : i64 -> !vm.buffer
+    vm.buffer.fill.i64 %buf_dno, %c2, %c4, %value : i64 -> !vm.buffer
 
     // Compare to reference.
     %c0 = vm.const.i64 0
     %rodata_ref = vm.const.ref.rodata @test_fill_i64_ref : !vm.buffer
     %cmp = vm.buffer.compare %rodata_ref, %c0, %buf_dno, %c0, %buffer_size : !vm.buffer, !vm.buffer
-    vm.check.nz %cmp, "buffer should match reference" : i32
-
-    vm.return
-  }
-
-  vm.rodata private @test_fill_i16_misaligned_offset_ref dense<[0xCAFE, 0xCAFE, 0, 0]> : tensor<4xi16>
-
-  // Tests that misaligned fill offsets will succeed but round down.
-  vm.export @test_fill_i16_misaligned_offset
-  vm.func @test_fill_i16_misaligned_offset() {
-    // Allocate zeroed buffer.
-    %c8 = vm.const.i64 8
-    %buf = vm.buffer.alloc %c8 : !vm.buffer
-    %buf_dno = util.optimization_barrier %buf : !vm.buffer
-
-    // Try filling from offset 1, which is not i16-aligned.
-    %c1 = vm.const.i64 1
-    %c4 = vm.const.i64 4
-    %cafe = vm.const.i32 0xCAFE
-    vm.buffer.fill.i16 %buf_dno, %c1, %c4, %cafe : i32 -> !vm.buffer
-
-    // Compare to reference - should have written at offset 0.
-    %c0 = vm.const.i64 0
-    %rodata_ref = vm.const.ref.rodata @test_fill_i16_misaligned_offset_ref : !vm.buffer
-    %cmp = vm.buffer.compare %rodata_ref, %c0, %buf_dno, %c0, %c8 : !vm.buffer, !vm.buffer
-    vm.check.nz %cmp, "buffer should match reference" : i32
-
-    vm.return
-  }
-
-  vm.rodata private @test_fill_i16_misaligned_length_ref dense<[0, 0, 0, 0]> : tensor<4xi16>
-
-  // Tests that misaligned fill lengths will succeed but round down.
-  vm.export @test_fill_i16_misaligned_length
-  vm.func @test_fill_i16_misaligned_length() {
-    // Allocate zeroed buffer.
-    %c8 = vm.const.i64 8
-    %buf = vm.buffer.alloc %c8 : !vm.buffer
-    %buf_dno = util.optimization_barrier %buf : !vm.buffer
-
-    // Try filling for length 1, which is not i16-aligned.
-    %c0 = vm.const.i64 0
-    %c1 = vm.const.i64 1
-    %cafe = vm.const.i32 0xCAFE
-    vm.buffer.fill.i16 %buf_dno, %c0, %c1, %cafe : i32 -> !vm.buffer
-
-    // Compare to reference - should have written 0 bytes.
-    %rodata_ref = vm.const.ref.rodata @test_fill_i16_misaligned_length_ref : !vm.buffer
-    %cmp = vm.buffer.compare %rodata_ref, %c0, %buf_dno, %c0, %c8 : !vm.buffer, !vm.buffer
     vm.check.nz %cmp, "buffer should match reference" : i32
 
     vm.return
