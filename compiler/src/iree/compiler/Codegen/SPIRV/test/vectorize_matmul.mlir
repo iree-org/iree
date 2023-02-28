@@ -1,8 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-spirv-vectorize --canonicalize %s | FileCheck %s
 
-// Note: upstream hoisting on tensors does not canonicalize `scf.for` anymore,
-// run canonicalization to make this test happy.
-
 func.func @matmul_1x4x4(%lhs: tensor<1x4xf32>, %rhs: tensor<4x4xf32>, %init: tensor<1x4xf32>) -> tensor<1x4xf32> {
   %0 = linalg.matmul ins(%lhs, %rhs : tensor<1x4xf32>, tensor<4x4xf32>) outs(%init : tensor<1x4xf32>) -> tensor<1x4xf32>
   return %0: tensor<1x4xf32>
