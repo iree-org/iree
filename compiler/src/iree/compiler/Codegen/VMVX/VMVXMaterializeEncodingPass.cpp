@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -53,9 +54,10 @@ static MaterializeEncodingValueFn getMaterializeEncodingValueFn(
 struct VMVXMaterializeEncodingPass
     : public VMVXMaterializeEncodingBase<VMVXMaterializeEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, AffineDialect, IREE::Flow::FlowDialect,
-                    IREE::LinalgExt::IREELinalgExtDialect,
-                    IREE::VMVX::VMVXDialect>();
+    registry
+        .insert<arith::ArithDialect, AffineDialect, tensor::TensorDialect,
+                IREE::Flow::FlowDialect, IREE::LinalgExt::IREELinalgExtDialect,
+                IREE::VMVX::VMVXDialect>();
   }
   void runOnOperation() override;
 };
@@ -101,7 +103,7 @@ void VMVXMaterializeEncodingPass::runOnOperation() {
   // dims ops.
   {
     RewritePatternSet patterns(context);
-    populateFoldIntoPackAndUnpackOpsPatterns(patterns);
+    tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(operation, std::move(patterns)))) {
       operation.emitOpError("folding patterns failed");

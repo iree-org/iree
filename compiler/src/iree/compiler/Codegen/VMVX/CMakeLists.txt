@@ -34,6 +34,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
+    MLIRTensorTransforms
     MLIRTransforms
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common

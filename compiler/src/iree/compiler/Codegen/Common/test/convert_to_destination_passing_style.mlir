@@ -821,7 +821,7 @@ func.func @non_perfect_tiling_unpack() {
       %16 = affine.apply affine_map<(d0)[s0] -> (d0 floordiv s0)>(%arg1)[%8#1]
       %17 = flow.dispatch.tensor.load %3, offsets = [%15, %16, 0, 0], sizes = [%c1, %c1, %8#0, %8#1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%6, %7, %5#0, %5#1} -> tensor<?x?x?x?xi32>
       %18 = tensor.empty(%8#0, %8#1) : tensor<?x?xi32>
-      %19 = iree_linalg_ext.unpack %17 inner_dims_pos = [0, 1] inner_tiles = [%8#0, %8#1] into %18 : (tensor<?x?x?x?xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+      %19 = tensor.unpack %17 inner_dims_pos = [0, 1] inner_tiles = [%8#0, %8#1] into %18 : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
       %extracted_slice = tensor.extract_slice %19[%13, %14] [1, 1] [1, 1] : tensor<?x?xi32> to tensor<1x1xi32>
       %cast = tensor.cast %extracted_slice : tensor<1x1xi32> to tensor<?x?xi32>
       flow.dispatch.tensor.store %cast, %4, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<1x1xi32>>
@@ -831,7 +831,7 @@ func.func @non_perfect_tiling_unpack() {
 }
 // CHECK-LABEL: func.func @non_perfect_tiling_unpack
 // CHECK:         %[[ALLOC:.+]] = bufferization.alloc_tensor
-// CHECK:         %[[UNPACK:.+]] = iree_linalg_ext.unpack
+// CHECK:         %[[UNPACK:.+]] = tensor.unpack
 // CHECK-SAME:      into %[[ALLOC]]
 // CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[UNPACK]]
 

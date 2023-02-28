@@ -80,6 +80,7 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRTensorDialect
+    MLIRTensorTransforms
     MLIRTosaDialect
     MLIRTosaToArith
     MLIRTransformDialect

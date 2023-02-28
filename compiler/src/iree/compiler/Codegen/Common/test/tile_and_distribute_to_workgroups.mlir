@@ -1915,9 +1915,9 @@ hal.executable private @pack_lowering {
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [100, 250], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:tensor<100x250xf32>> -> tensor<100x250xf32>
         %3 = tensor.empty() : tensor<14x64x8x4xf32>
-        %4 = iree_linalg_ext.pack {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>} %2
-            padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %3
-            : (tensor<100x250xf32> tensor<14x64x8x4xf32>) -> tensor<14x64x8x4xf32>
+        %4 = tensor.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %3
+            {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
+            : tensor<100x250xf32> -> tensor<14x64x8x4xf32>
         flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [14, 64, 8, 4], strides = [1, 1, 1, 1]
             : tensor<14x64x8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<14x64x8x4xf32>>
         return
@@ -1960,9 +1960,9 @@ hal.executable private @pack_lowering {
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [250, 500], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:tensor<250x500xf32>> -> tensor<250x500xf32>
         %3 = tensor.empty() : tensor<64x64x8x4xf32>
-        %4 = iree_linalg_ext.pack {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>} %2
-            padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 4] into %3
-            : (tensor<250x500xf32> tensor<64x64x8x4xf32>) -> tensor<64x64x8x4xf32>
+        %4 = tensor.pack %2 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 4] into %3
+            {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
+            : tensor<250x500xf32> -> tensor<64x64x8x4xf32>
         flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [64, 64, 8, 4], strides = [1, 1, 1, 1]
             : tensor<64x64x8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<64x64x8x4xf32>>
         return
@@ -2018,9 +2018,9 @@ hal.executable private @clone_index_computations {
         %15 = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%13]
         %16 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%14]
         %17 = tensor.empty(%15, %16) : tensor<?x?x8x4xf32>
-        %18 = iree_linalg_ext.pack {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>} %12
-            padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %17
-            : (tensor<?x?xf32> tensor<?x?x8x4xf32>) -> tensor<?x?x8x4xf32>
+        %18 = tensor.pack %12 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %17
+            {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
+            : tensor<?x?xf32> -> tensor<?x?x8x4xf32>
         %19 = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%6]
         %20 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%7]
         flow.dispatch.tensor.store %18, %11, offsets = [0, 0, 0, 0], sizes = [%19, %20, 8, 4], strides = [1, 1, 1, 1]
@@ -2070,8 +2070,9 @@ hal.executable private @dynamic_unpack {
         %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, 32, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5} -> tensor<?x?x32x16xi32>
         %11 = tensor.empty(%6, %7) : tensor<?x?xi32>
-        %12 = iree_linalg_ext.unpack {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
-          %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11 : (tensor<?x?x32x16xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+        %12 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11
+          {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
+          : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
         flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [%6, %7], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         return
       }
@@ -2081,7 +2082,7 @@ hal.executable private @dynamic_unpack {
 // CHECK-LABEL: func.func @dynamic_unpack
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             iree_linalg_ext.unpack
+// CHECK:             tensor.unpack
 
 // -----
 
@@ -2115,8 +2116,9 @@ hal.executable private @dynamic_unpack_dynamic_tile {
         %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, %c32, %c16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%4, %5, %c32, %c16} -> tensor<?x?x?x?xi32>
         %11 = tensor.empty(%6, %7) : tensor<?x?xi32>
-        %12 = iree_linalg_ext.unpack {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
-          %10 inner_dims_pos = [0, 1] inner_tiles = [%c32, %c16] into %11 : (tensor<?x?x?x?xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+        %12 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [%c32, %c16] into %11
+          {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
+          : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
         flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [%6, %7], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         return
       }
@@ -2126,7 +2128,7 @@ hal.executable private @dynamic_unpack_dynamic_tile {
 // CHECK-LABEL: func.func @dynamic_unpack_dynamic_tile
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             iree_linalg_ext.unpack
+// CHECK:             tensor.unpack
 
 // -----
 
@@ -2149,7 +2151,7 @@ hal.executable private @unpack_elem {
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x384xf32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [16, 48, 8, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<16x48x8x8xf32>> -> tensor<16x48x8x8xf32>
         %3 = tensor.empty() : tensor<128x384xf32>
-        %4 = iree_linalg_ext.unpack {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>} %2 inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %3 : (tensor<16x48x8x8xf32> tensor<128x384xf32>) -> tensor<128x384xf32>
+        %4 = tensor.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %3 {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>} : tensor<16x48x8x8xf32> -> tensor<128x384xf32>
         %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<128x384xf32>) outs(%3 : tensor<128x384xf32>) {
         ^bb0(%in: f32, %out: f32):
           %6 = arith.addf %in, %in : f32
@@ -2165,7 +2167,7 @@ hal.executable private @unpack_elem {
 // CHECK-LABEL: func.func @unpack_elem
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             iree_linalg_ext.unpack
+// CHECK:             tensor.unpack
 // CHECK:             linalg.generic
 
 // -----
@@ -2205,7 +2207,7 @@ hal.executable private @dynamic_unpack_fusion {
         %13 = tensor.empty() : tensor<12544x16xi32>
         %14 = tensor.empty() : tensor<12544x16xi32>
         %15:2 = vmvx.query_tile_sizes sizes(%c12544, %c16) flags(1245184) -> index, index
-        %16 = iree_linalg_ext.unpack {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[16, 16]]>} %10 inner_dims_pos = [0, 1] inner_tiles = [%15#0, %15#1] into %14 : (tensor<?x?x?x?xi32> tensor<12544x16xi32>) -> tensor<12544x16xi32>
+        %16 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [%15#0, %15#1] into %14 {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[16, 16]]>} : tensor<?x?x?x?xi32> -> tensor<12544x16xi32>
         %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%cst, %16, %11, %12 : tensor<16xi32>, tensor<12544x16xi32>, tensor<12544xi32>, tensor<16xi32>) outs(%13 : tensor<12544x16xi32>) {
         ^bb0(%in: i32, %in_0: i32, %in_1: i32, %in_2: i32, %out: i32):
           %18 = arith.muli %in_1, %c-30_i32 : i32
@@ -2225,7 +2227,7 @@ hal.executable private @dynamic_unpack_fusion {
 // CHECK-LABEL: func.func @dynamic_unpack_fusion
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             iree_linalg_ext.unpack
+// CHECK:             tensor.unpack
 // CHECK:             tensor.extract_slice
 // CHECK:             linalg.generic
 
@@ -2273,7 +2275,7 @@ hal.executable private @elem_pack {
           linalg.yield %23, %25 : f32, f32
         } -> (tensor<384x512xf32>, tensor<384x512xf32>)
         %17 = tensor.empty() : tensor<48x512x8x1xf32>
-        %18 = iree_linalg_ext.pack {encoding = #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>, lowering_config = #iree_codegen.lowering_config<tile_sizes = [[8, 64]]>} %16#0 inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %17 : (tensor<384x512xf32> tensor<48x512x8x1xf32>) -> tensor<48x512x8x1xf32>
+        %18 = tensor.pack %16#0 inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %17 {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[8, 64]]>} : tensor<384x512xf32> -> tensor<48x512x8x1xf32>
         flow.dispatch.tensor.store %18, %6, offsets = [0, 0, 0, 0], sizes = [48, 512, 8, 1], strides = [1, 1, 1, 1] : tensor<48x512x8x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<48x512x8x1xf32>>
         flow.dispatch.tensor.store %16#0, %7, offsets = [0, 0], sizes = [384, 512], strides = [1, 1] : tensor<384x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
         flow.dispatch.tensor.store %16#1, %8, offsets = [0, 0], sizes = [384, 512], strides = [1, 1] : tensor<384x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
@@ -2286,7 +2288,7 @@ hal.executable private @elem_pack {
 // CHECK:         scf.for
 // CHECK:           scf.for
 // CHECK:             %[[ELEM:.+]]:2 = linalg.generic
-// CHECK:             %[[PACK:.+]] = iree_linalg_ext.pack
+// CHECK:             %[[PACK:.+]] = tensor.pack
 // CHECK-DAG:         flow.dispatch.tensor.store %[[PACK]], {{.*}} sizes = [8, 64, 8, 1]
 // CHECK-DAG:         flow.dispatch.tensor.store %[[ELEM]]#0, {{.*}} sizes = [64, 64]
 // CHECK-DAG:         flow.dispatch.tensor.store %[[ELEM]]#1, {{.*}} sizes = [64, 64]

@@ -112,9 +112,9 @@ static LogicalResult getTileAndDistributeConfig(
   return success();
 }
 
-/// Get the materialization information from a `iree_linalg_ext.pack` operation.
+/// Get the materialization information from a `tensor.pack` operation.
 static FailureOr<IREE::LinalgExt::MaterializeEncodingInfo>
-getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
+getMaterializationInfo(tensor::PackOp packOp) {
   IREE::LinalgExt::MaterializeEncodingInfo encodingInfo;
   SmallVector<OpFoldResult> mixedTileSizes = packOp.getMixedTiles();
   encodingInfo.innerTileSizes.reserve(mixedTileSizes.size());
@@ -128,7 +128,7 @@ getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
   }
   encodingInfo.innerDimsPos = llvm::to_vector(packOp.getInnerDimsPos());
   encodingInfo.outerDimsPerm = llvm::to_vector(packOp.getOuterDimsPerm());
-  encodingInfo.srcRank = packOp.getInputRank();
+  encodingInfo.srcRank = packOp.getSourceRank();
   return encodingInfo;
 }
 
@@ -277,11 +277,10 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
     auto innerTileSizes = getInnerTileSizesOfr(rewriter, loc, inputType,
                                                materializeEncodingInfo, {});
     if (failed(innerTileSizes)) return failure();
-    SmallVector<OpFoldResult> resultShape =
-        IREE::LinalgExt::PackOp::getResultShape(
-            rewriter, loc, getAsOpFoldResult(workload), *innerTileSizes,
-            materializeEncodingInfo.innerDimsPos,
-            materializeEncodingInfo.outerDimsPerm);
+    SmallVector<OpFoldResult> resultShape = tensor::PackOp::getResultShape(
+        rewriter, loc, getAsOpFoldResult(workload), *innerTileSizes,
+        materializeEncodingInfo.innerDimsPos,
+        materializeEncodingInfo.outerDimsPerm);
     resultShape.resize(materializeEncodingInfo.srcRank);
 
     rewriter
@@ -351,14 +350,13 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       patterns.insert<LowerDispatchWorkgroupCountForDagRootOp>(
           context, tileSizes, staticLoopRanges, interchange,
           partitionableLoops);
-      if (auto packRootOp =
-              dyn_cast_or_null<IREE::LinalgExt::PackOp>(dispatchRootOp)) {
+      if (auto packRootOp = dyn_cast_or_null<tensor::PackOp>(dispatchRootOp)) {
         FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
             getMaterializationInfo(packRootOp);
         if (failed(encodingInfo)) {
           return signalPassFailure();
         }
-        auto tensorType = packRootOp.getInputType().cast<RankedTensorType>();
+        auto tensorType = packRootOp.getSourceType();
         // The LowerDispatchWorkgroupCountFromSetEncodingOp pattern is going to
         // call materializeEncodingValueFn, passing it a tensor type, expecting
         // that tensor type to have a TensorEncodingAttr. The problem is that
