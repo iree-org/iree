@@ -217,7 +217,8 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
       ins PDL_Operation:$target,
           UnitAttr:$target_gpu,
           UnitAttr:$test_analysis_only,
-          UnitAttr:$print_conflicts
+          UnitAttr:$print_conflicts,
+          UnitAttr:$allow_return_allocs
   );
   let results = (outs PDL_Operation:$result);
 
@@ -228,7 +229,8 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     OpBuilder<(ins "Value":$target,
                    CArg<"bool", "false">:$targetGpu,
                    CArg<"bool", "false">:$testAnalysisOnly,
-                   CArg<"bool", "false">:$printConflicts)>
+                   CArg<"bool", "false">:$printConflicts,
+                   CArg<"bool", "false">:$allowReturnAllocs)>
   ];
 }
 

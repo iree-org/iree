@@ -970,7 +970,8 @@ void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
                                                OperationState &result,
                                                Value target, bool targetGpu,
                                                bool testAnalysisOnly,
-                                               bool printConflicts) {
+                                               bool printConflicts,
+                                               bool allowReturnAllocs) {
   result.addOperands(target);
   if (targetGpu) {
     result.addAttribute(IREEBufferizeOp::getTargetGpuAttrName(result.name),
@@ -983,6 +984,10 @@ void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
   }
   if (printConflicts) {
     result.addAttribute(IREEBufferizeOp::getPrintConflictsAttrName(result.name),
+                        builder.getUnitAttr());
+  }
+  if (allowReturnAllocs) {
+    result.addAttribute(IREEBufferizeOp::getAllowReturnAllocsAttrName(result.name),
                         builder.getUnitAttr());
   }
   MLIRContext *ctx = builder.getContext();
@@ -1059,8 +1064,6 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 
 static OneShotBufferizationOptions getBufferizationOptions() {
   OneShotBufferizationOptions options;
-  // options.testAnalysisOnly = testAnalysisOnly;
-  // options.printConflicts = printConflicts;
 
   // bufferization.to_memref is used to bufferize constants in IREE. IREE has
   // it's own logic to handle constants. We'd like to leave the arith.constant
@@ -1160,6 +1163,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   //   2. Run one-shot-bufferize, without the pass baggage.
   OneShotBufferizationOptions options = getBufferizationOptions();
   options.allocationFn = allocationFn;
+  options.allowReturnAllocs = getAllowReturnAllocs();
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = getTestAnalysisOnly();
