@@ -29,6 +29,55 @@ vm.module @add_i32_folds {
     %0 = vm.add.i32 %c1, %c4 : i32
     vm.return %0 : i32
   }
+
+  // CHECK-LABEL: @mul_add_i32_lhs
+  vm.func @mul_add_i32_lhs(%arg0: i32, %arg1: i32, %arg2: i32) -> i32 {
+    %0 = vm.mul.i32 %arg0, %arg1 : i32
+    // CHECK: %[[RET:.+]] = vm.fma.i32 %arg0, %arg1, %arg2 : i32
+    %1 = vm.add.i32 %0, %arg2 : i32
+    // CHECK: return %[[RET]]
+    vm.return %1 : i32
+  }
+
+  // CHECK-LABEL: @mul_add_i32_rhs
+  vm.func @mul_add_i32_rhs(%arg0: i32, %arg1: i32, %arg2: i32) -> i32 {
+    %0 = vm.mul.i32 %arg0, %arg1 : i32
+    // CHECK: %[[RET:.+]] = vm.fma.i32 %arg0, %arg1, %arg2 : i32
+    %1 = vm.add.i32 %arg2, %0 : i32
+    // CHECK: return %[[RET]]
+    vm.return %1 : i32
+  }
+
+  // Expect this not to fold:
+  // CHECK-LABEL: @mul_add_i32_multiple_users
+  vm.func @mul_add_i32_multiple_users(%arg0: i32, %arg1: i32, %arg2: i32) -> (i32, i32) {
+    // CHECK: vm.mul.i32
+    %0 = vm.mul.i32 %arg0, %arg1 : i32
+    // CHECK-NOT: vm.fma.i32
+    // CHECK-NEXT: vm.add.i32
+    %1 = vm.add.i32 %0, %arg2 : i32
+    // CHECK-NEXT: vm.add.i32
+    %2 = vm.add.i32 %0, %arg1 : i32
+    vm.return %1, %2 : i32, i32
+  }
+
+  // Expect this not to fold:
+  // CHECK-LABEL: @mul_add_i32_dont_sink
+  vm.func @mul_add_i32_dont_sink(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i32) -> i32 {
+    // CHECK: vm.mul.i32
+    %0 = vm.mul.i32 %arg0, %arg1 : i32
+    vm.cond_br %cond, ^bb1, ^bb2
+  ^bb1:
+    // CHECK: vm.add.i32
+    %1 = vm.add.i32 %0, %arg2 : i32
+    vm.return %1 : i32
+  ^bb2:
+    // CHECK: vm.add.i32
+    %2 = vm.add.i32 %0, %arg1 : i32
+    // CHECK: vm.div.i32.s
+    %3 = vm.div.i32.s %2, %arg1 : i32
+    vm.return %3 : i32
+  }
 }
 
 // -----
