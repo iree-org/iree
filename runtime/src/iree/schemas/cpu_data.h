@@ -64,7 +64,7 @@
 enum iree_cpu_data_field_0_e {
 
   //===--------------------------------------------------------------------===//
-  // IREE_ARCH_ARM_32 | IREE_ARCH_ARM_64
+  // IREE_ARCH_ARM_64 / aarch64
   //===--------------------------------------------------------------------===//
 
   // TODO: add several common ARM ISA extensions and allocate some ranges of
