@@ -36,21 +36,22 @@ def LLVMGPU_MatmulSimt : I32EnumAttrCase<"LLVMGPUMatmulSimt", 11>;
 def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 12>;
 def LLVMGPU_TransposeSharedMem : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 13>;
 def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 14>;
+def LLVMGPU_PackUnPack : I32EnumAttrCase<"LLVMGPUPackUnPack", 15>;
 
 def SPIRV_BaseDistribute
-    : I32EnumAttrCase<"SPIRVBaseDistribute", 15>;
+    : I32EnumAttrCase<"SPIRVBaseDistribute", 16>;
 def SPIRV_BaseVectorize
-    : I32EnumAttrCase<"SPIRVBaseVectorize", 16>;
+    : I32EnumAttrCase<"SPIRVBaseVectorize", 17>;
 def SPIRV_MatmulPromoteVectorize
-    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 17>;
+    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 18>;
 def SPIRV_CooperativeMatrixVectorize
-    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 18>;
+    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 19>;
 def SPIRV_SubgroupReduce
-    : I32EnumAttrCase<"SPIRVSubgroupReduce", 19>;
+    : I32EnumAttrCase<"SPIRVSubgroupReduce", 20>;
 def SPIRV_WinogradVectorize
-    : I32EnumAttrCase<"SPIRVWinogradVectorize", 20>;
+    : I32EnumAttrCase<"SPIRVWinogradVectorize", 21>;
 
-def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 21>;
+def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 22>;
 
 
 def Linalg_TransformDialectCodegen
@@ -61,23 +62,21 @@ def None : I32EnumAttrCase<"None", 0xff>;
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
 def DispatchLoweringPassPipelineEnum
-    : I32EnumAttr<"DispatchLoweringPassPipeline",
-                  "identifier for pass pipeline use to lower dispatch region", [
-                    CPU_Default, CPU_DoubleTilingExpert,
-                    CPU_DoubleTilingPadExpert, CPU_DoubleTilingPeelingExpert,
-                    CPU_ConvTileAndDecomposeExpert, CPU_Mmt4dTilingExpert,
-                    CPU_BufferOpsTileAndVectorize, CPU_TripleTilingExpert,
-                    CPU_DataTiling, LLVMGPU_SimpleDistribute,
-                    LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
-                    LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
-                    SPIRV_BaseDistribute, SPIRV_BaseVectorize,
-                    SPIRV_MatmulPromoteVectorize, SPIRV_CooperativeMatrixVectorize,
-                    SPIRV_SubgroupReduce, SPIRV_WinogradVectorize,
-                    VMVX_Default,
-                    // Transform dialect based codegen
-                    Linalg_TransformDialectCodegen,
-                    None
-                  ]> {
+    : I32EnumAttr<
+          "DispatchLoweringPassPipeline",
+          "identifier for pass pipeline use to lower dispatch region", [
+            CPU_Default, CPU_DoubleTilingExpert, CPU_DoubleTilingPadExpert,
+            CPU_DoubleTilingPeelingExpert, CPU_ConvTileAndDecomposeExpert,
+            CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
+            CPU_TripleTilingExpert, CPU_DataTiling, LLVMGPU_SimpleDistribute,
+            LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
+            LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
+            LLVMGPU_PackUnPack, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
+            SPIRV_MatmulPromoteVectorize, SPIRV_CooperativeMatrixVectorize,
+            SPIRV_SubgroupReduce, SPIRV_WinogradVectorize, VMVX_Default,
+            // Transform dialect based codegen
+            Linalg_TransformDialectCodegen, None
+          ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef
   let genSpecializedAttr = 0;

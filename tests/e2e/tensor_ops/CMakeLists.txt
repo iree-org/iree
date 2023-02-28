@@ -32,6 +32,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "extract_slice.mlir"
     "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
   TARGET_BACKEND
@@ -46,6 +47,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "extract_slice.mlir"
     "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
   TARGET_BACKEND
@@ -59,6 +61,7 @@ iree_check_single_backend_test_suite(
     check_vmvx_ukernel_local-task
   SRCS
     "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
     "unpack.mlir"
   TARGET_BACKEND
     "vmvx"
@@ -74,6 +77,7 @@ iree_check_single_backend_test_suite(
     check_cuda
   SRCS
     "extract_slice.mlir"
+    "pack.mlir"
     "tensor_insert_slice.mlir"
   TARGET_BACKEND
     "cuda"

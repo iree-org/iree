@@ -401,6 +401,47 @@ static LogicalResult setSortConfig(func::FuncOp entryPoint, Operation *op) {
       workgroupSize);
 }
 
+static SmallVector<int64_t> getDefaultWorkgroupTileSizesForPackUnPack(
+    TilingInterface op, int64_t defaultSize) {
+  unsigned numLoops = op.getLoopIteratorTypes().size();
+  auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
+                              .getPartitionableLoops(kNumMaxParallelDims);
+  SmallVector<int64_t> workgroupTileSizes(numLoops, defaultSize);
+  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
+                                               partitionedLoops.end());
+  for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
+    if (!partitionedLoopsSet.count(dim)) {
+      workgroupTileSizes[dim] = 0;
+    }
+  }
+
+  return workgroupTileSizes;
+}
+
+static LogicalResult setPackConfig(func::FuncOp entryPoint,
+                                   tensor::PackOp packOp) {
+  SmallVector<int64_t> tileSizes = getDefaultWorkgroupTileSizesForPackUnPack(
+      cast<TilingInterface>(packOp.getOperation()), cudaWarpSize);
+
+  // The default function aims to returns the number of workload per workgroup,
+  // but it does not know that it is working on packed domain. We need to take
+  // inner tile sizes into account and adjust the distribution tile sizes.
+  SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
+  ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+    tileSizes[pos] = tileSizes[pos] / size;
+    tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
+  }
+
+  TileSizesListType tileSizesList = {tileSizes};
+  std::array<int64_t, 3> workgroupSizes = {cudaWarpSize, 1, 1};
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, packOp, tileSizesList,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack,
+      workgroupSizes);
+}
+
 // Basic default properties for linalg ops that haven't been tuned.
 static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
                                           Operation *op) {
@@ -930,6 +971,10 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   if (auto sortOp = dyn_cast<IREE::LinalgExt::SortOp>(computeOp)) {
     return setSortConfig(entryPointFn, sortOp);
   }
+  if (auto packOp = dyn_cast<tensor::PackOp>(computeOp)) {
+    return setPackConfig(entryPointFn, packOp);
+  }
+
   return setRootDefaultConfig(entryPointFn, computeOp);
 }
 

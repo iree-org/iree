@@ -36,6 +36,7 @@ iree_lit_test_suite(
             "illegal_configuration.mlir",
             "linalg_transform.mlir",
             "legalize.mlir",
+            "pack_pipeline_test.mlir",
             "tensor_alloc.mlir",
             "tensor_pad.mlir",
             "tensorcore_vectorization.mlir",
