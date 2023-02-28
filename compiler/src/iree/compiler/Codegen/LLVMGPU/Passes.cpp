@@ -270,9 +270,12 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
+  PipeliningSchedulingStrategy schedule =
+      llvmgpuUseMMASync ? PipeliningSchedulingStrategy::nvidiaTensorCore
+                        : PipeliningSchedulingStrategy::loadGlobalStage0;
   // Pipeline memory operations.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUPipeliningPass(/*epiloguePeeling=*/false, pipelineDepth));
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
+      /*epiloguePeeling=*/false, pipelineDepth, schedule));
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {
