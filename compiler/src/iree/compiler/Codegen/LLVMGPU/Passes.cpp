@@ -360,7 +360,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 }
 
-void addGPUDataTilingPasses(OpPassManager &pm) {
+void addGPUPackUnPackPasses(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(

@@ -181,7 +181,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
         addGPUWarpReductionPassPipeline(executableLoweringPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack:
-        addGPUDataTilingPasses(executableLoweringPipeline);
+        addGPUPackUnPackPasses(executableLoweringPipeline);
         break;
       // Transform-dialect pipelines.
       case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
