@@ -876,40 +876,84 @@ LogicalResult transform_ext::CanonicalizedSequenceOp::verify() {
   return success();
 }
 
-void transform_ext::CanonicalizedSequenceOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  auto *mappingResource = transform::TransformMappingResource::get();
-  // Effects on root if present.
-  if (getRoot())
-    effects.emplace_back(MemoryEffects::Read::get(), getRoot(),
-                         mappingResource);
-  // Effects on results.
-  for (Value result : getResults()) {
-    effects.emplace_back(MemoryEffects::Allocate::get(), result,
-                         mappingResource);
-    effects.emplace_back(MemoryEffects::Write::get(), result, mappingResource);
-  }
 
-  for (Operation &op : *getBodyBlock()) {
-    auto iface = dyn_cast<MemoryEffectOpInterface>(&op);
-    if (!iface) {
-      // TODO: fill all possible effects; or require ops to actually implement
-      // the memory effect interface always
-      assert(false);
-    }
-    if (getRoot()) {
-      // Carry over all effects on the argument of the entry block as those on
-      // the operand, this is the same value just remapped.
+//===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+// BEGIN: Template function available upstream but not exposed atm due to 
+// template instantiation brittleness across compilers/platforms.
+//===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+/// Appends to `effects` the memory effect instances on `target` with the same
+/// resource and effect as the ones the operation `iface` having on `source`.
+static void
+remapEffects(MemoryEffectOpInterface iface, BlockArgument source, Value target,
+             SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  SmallVector<MemoryEffects::EffectInstance> nestedEffects;
+  iface.getEffectsOnValue(source, nestedEffects);
+  for (const auto &effect : nestedEffects)
+    effects.emplace_back(effect.getEffect(), target, effect.getResource());
+}
+
+namespace {
+template <typename T>
+using has_get_extra_bindings = decltype(std::declval<T &>().getExtraBindings());
+} // namespace
+
+/// Populate `effects` with transform dialect memory effects for the potential
+/// top-level operation. Such operations have recursive effects from nested
+/// operations. When they have an operand, we can additionally remap effects on
+/// the block argument to be effects on the operand.
+template <typename OpTy>
+static void getPotentialTopLevelEffects(
+    OpTy operation, SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(operation->getOperands(), effects);
+  transform::producesHandle(operation->getResults(), effects);
+
+  if (!operation.getRoot()) {
+    for (Operation &op : *operation.getBodyBlock()) {
+      auto iface = dyn_cast<MemoryEffectOpInterface>(&op);
+      if (!iface)
+        continue;
+
       SmallVector<MemoryEffects::EffectInstance, 2> nestedEffects;
-      iface.getEffectsOnValue(getBodyBlock()->getArgument(0), nestedEffects);
-      for (const auto &effect : nestedEffects)
-        effects.emplace_back(effect.getEffect(), getRoot(),
-                             effect.getResource());
-    } else {
-      // Otherwise, get all the effects.
       iface.getEffects(effects);
     }
+    return;
   }
+
+  // Carry over all effects on arguments of the entry block as those on the
+  // operands, this is the same value just remapped.
+  for (Operation &op : *operation.getBodyBlock()) {
+    auto iface = dyn_cast<MemoryEffectOpInterface>(&op);
+    if (!iface)
+      continue;
+
+    remapEffects(iface, operation.getBodyBlock()->getArgument(0),
+                 operation.getRoot(), effects);
+    if constexpr (llvm::is_detected<has_get_extra_bindings, OpTy>::value) {
+      for (auto [source, target] :
+           llvm::zip(operation.getBodyBlock()->getArguments().drop_front(),
+                     operation.getExtraBindings())) {
+        remapEffects(iface, source, target, effects);
+      }
+    }
+
+    SmallVector<MemoryEffects::EffectInstance> nestedEffects;
+    iface.getEffectsOnResource(transform::PayloadIRResource::get(),
+                               nestedEffects);
+    llvm::append_range(effects, nestedEffects);
+  }
+}
+//===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+// END: Template function available upstream but not exposed atm due to 
+// template instantiation brittleness across compilers/platforms.
+//===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+void transform_ext::CanonicalizedSequenceOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  getPotentialTopLevelEffects(*this, effects);
 }
 
 OperandRange transform_ext::CanonicalizedSequenceOp::getSuccessorEntryOperands(

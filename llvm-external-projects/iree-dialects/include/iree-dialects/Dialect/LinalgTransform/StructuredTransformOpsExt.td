@@ -20,17 +20,20 @@ def CanonicalizedSequenceOp
     : TransformDialectOp<"structured.canonicalized_sequence",
       [OpAsmOpInterface,
        PossibleTopLevelTransformOpTrait,
+       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
        DeclareOpInterfaceMethods<RegionBranchOpInterface,
           ["getSuccessorEntryOperands", "getSuccessorRegions",
            "getRegionInvocationBounds"]>,
        DeclareOpInterfaceMethods<TransformOpInterface>,
-       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
        SingleBlockImplicitTerminator<"::mlir::transform::YieldOp">]> {
 
   let summary = "A transformation sequence interspersed with canonicalizations";
   let description = [{
     This op is a copy of `transform.sequence`, but applies canonicalizations
-    after each step in the sequence.
+    and other enabling transformations after each step in the sequence.
+
+    // TODO: Once IR listening is done properly and IREE is cleaned up, this op
+    // could be removed and jsut become a mode of transform.sequence.
   }];
 
   let arguments = (ins FailurePropagationMode:$failure_propagation_mode,
@@ -38,8 +41,13 @@ def CanonicalizedSequenceOp
   let results = (outs Variadic<AnyType>:$results);
   let regions = (region SizedRegion<1>:$body);
 
-  let assemblyFormat =
-    "($root^)? `failures` `(` $failure_propagation_mode `)` attr-dict-with-keyword regions (`:` type($results)^)?";
+  let assemblyFormat = [{
+    ($root^)? 
+    `failures` `(` $failure_propagation_mode `)` 
+    attr-dict-with-keyword 
+    regions 
+    (`:` type($results)^)?
+  }];
 
   let builders = [
     OpBuilder<(ins "::mlir::transform::FailurePropagationMode":$failure_propagation_mode,
