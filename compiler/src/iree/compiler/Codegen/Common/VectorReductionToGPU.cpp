@@ -43,6 +43,16 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
   return builder.create<memref::AllocOp>(loc, memrefType);
 }
 
+/// Returns true if the given op is a memref.load from a uniform buffer.
+static bool isUniformBufferLoad(Operation *op) {
+  if (auto loadOp = dyn_cast<memref::LoadOp>(op)) {
+    auto space = loadOp.getMemRefType().getMemorySpace();
+    if (auto attr = space.dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>())
+      return attr.getValue() == IREE::HAL::DescriptorType::UniformBuffer;
+  }
+  return false;
+}
+
 /// Hoist uniform operations as well as special hal operations that have side
 /// effect but are safe to move out of the warp single lane region.
 static void moveScalarAndBindingUniformCode(
@@ -50,12 +60,17 @@ static void moveScalarAndBindingUniformCode(
   /// Hoist ops without side effect as well as special binding ops.
   auto canBeHoisted = [](Operation *op,
                          function_ref<bool(Value)> definedOutside) {
-    return llvm::all_of(op->getOperands(), definedOutside) &&
-           (isMemoryEffectFree(op) ||
-            isa<IREE::HAL::InterfaceBindingSubspanOp,
-                IREE::HAL::InterfaceConstantLoadOp, memref::AssumeAlignmentOp>(
-                op)) &&
-           op->getNumRegions() == 0;
+    if (op->getNumRegions() != 0) return false;
+    if (!llvm::all_of(op->getOperands(), definedOutside)) return false;
+    if (isMemoryEffectFree(op)) return true;
+
+    if (isa<IREE::HAL::InterfaceBindingSubspanOp,
+            IREE::HAL::InterfaceConstantLoadOp, memref::AssumeAlignmentOp>(op))
+      return true;
+    // Loading from uniform buffers are also uniform across the warp.
+    if (isUniformBufferLoad(op)) return true;
+
+    return false;
   };
   Block *body = warpOp.getBody();
 
@@ -75,8 +90,10 @@ static void moveScalarAndBindingUniformCode(
     bool hasVectorResult = llvm::any_of(op.getResults(), [](Value result) {
       return result.getType().isa<VectorType>();
     });
-    if (!hasVectorResult && canBeHoisted(&op, isDefinedOutsideOfBody))
+    if ((!hasVectorResult || isUniformBufferLoad(&op)) &&
+        canBeHoisted(&op, isDefinedOutsideOfBody)) {
       opsToMove.insert(&op);
+    }
   }
 
   // Move all the ops marked as uniform outside of the region.
