@@ -144,7 +144,6 @@ iree_check_single_backend_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
-            "reverse.mlir",
             "scatter.mlir",
             # Top-k test disabled due to miscompile on vulkan.
             #    "top-k.mlir",
@@ -154,6 +153,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "reverse.mlir",  #TODO(#12415): disabled due to miscompilation on Pixel 6.
             # TODO(antiagainst): scan fails on Adreno GPUs due to driver bug.
             # Re-enable this once we have new devices with up-to-date drivers.
             "top-k.mlir",
