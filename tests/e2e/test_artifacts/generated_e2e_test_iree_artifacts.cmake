@@ -922,6 +922,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -936,6 +937,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -950,6 +952,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -964,6 +967,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -978,6 +982,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -992,6 +997,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -1006,6 +1012,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -1023,6 +1030,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -1040,6 +1048,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -1057,6 +1066,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -1074,6 +1084,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -1091,6 +1102,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -1108,6 +1120,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -1126,6 +1139,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu-features=+dotprod"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
   PUBLIC
 )
 
@@ -2683,6 +2697,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2699,6 +2714,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2715,6 +2731,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2731,6 +2748,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2747,6 +2765,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2763,6 +2782,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2779,6 +2799,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2798,6 +2819,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2817,6 +2839,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2836,6 +2859,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2855,6 +2879,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2874,6 +2899,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2893,6 +2919,7 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC
@@ -2913,6 +2940,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu-features=+dotprod"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--aarch64-enable-gep-opt"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvm-debug-symbols=false"
   PUBLIC

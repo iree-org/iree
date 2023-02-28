@@ -35,7 +35,10 @@ class Android_ARMv8_A_Benchmarks(object):
   DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_DEFAULTS,
       tags=["default-flags"],
-      compile_targets=[ARMV8_A_CPU_TARGET])
+      compile_targets=[ARMV8_A_CPU_TARGET],
+      extra_flags=[
+          "--aarch64-enable-gep-opt"
+      ])
   MMT4D_COMPILE_CONFIG = iree_definitions.CompileConfig(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D,
       tags=["experimental-flags", "mmt4d"],
@@ -43,7 +46,8 @@ class Android_ARMv8_A_Benchmarks(object):
       extra_flags=[
           "--iree-flow-enable-data-tiling",
           "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
-          "--iree-llvmcpu-enable-pad-consumer-fusion"
+          "--iree-llvmcpu-enable-pad-consumer-fusion",
+          "--aarch64-enable-gep-opt"
       ])
   MMT4D_AND_DOTPROD_COMPILE_CONFIG = iree_definitions.CompileConfig(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D_DOTPROD,
@@ -53,7 +57,8 @@ class Android_ARMv8_A_Benchmarks(object):
           "--iree-flow-enable-data-tiling",
           "--iree-llvm-target-cpu-features=+dotprod",
           "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
-          "--iree-llvmcpu-enable-pad-consumer-fusion"
+          "--iree-llvmcpu-enable-pad-consumer-fusion",
+          "--aarch64-enable-gep-opt"
       ])
 
   def generate(

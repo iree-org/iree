@@ -18,6 +18,7 @@
 
 set(ANDROID_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
+  "--aarch64-enable-gep-opt"
   "--iree-llvm-target-triple=aarch64-none-linux-android29")
 
 # CPU, LLVM, local-sync, big/little-core, full-inference
