@@ -95,8 +95,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       behavior on subset-based linalg operations.
       - rank_reducing_vector: adds patterns that results in rank-reducing 
       behavior on subset-based vector operations.
-      - rewrite_pack_ops: rewrite tensor.pack/unpack to linalg_ext.pack/unpack.
-      This is a temporary pattern that is needed to connect to IREE until it 
       adopts the upstream version.
       - swapping_patterns: adds patterns that swap operations for a better outcome.
       This is a catch all that can be refined further if/when needed.
@@ -137,7 +135,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$lower_transfer_op_permutations,
                        UnitAttr:$rank_reducing_linalg,
                        UnitAttr:$rank_reducing_vector,
-                       UnitAttr:$rewrite_pack_ops,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns,
                        UnitAttr:$unroll_vectors_gpu_mma_sync,
