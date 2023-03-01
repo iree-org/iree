@@ -266,12 +266,12 @@ static void getNvidiaTensorCorePipeline(
     unsigned depth) {
   bool loopCanBePipelined = false;
   // TODO: Tune this and make it a more fine grain logic.
-  static constexpr int64_t prefetchSize = 4;
-  SmallVector<Operation*> stage0;
+  static constexpr int64_t numPrefetchSmemLoadPerOperand = 4;
+  SmallVector<Operation*> stageCopyToSharedMemory;
   SmallVector<Operation*> stagePrefetch;
-  SmallVector<Operation*> stageLast;
-  int64_t sizeReadA = 0;
-  int64_t sizeReadB = 0;
+  SmallVector<Operation*> stageCompute;
+  int64_t numLoadA = 0;
+  int64_t numLoadB = 0;
   for (Operation& op : forOp.getBody()->getOperations()) {
     // Pipeline the most inner for op that should be a flat region.
     if (op.getNumRegions() > 0) {
@@ -282,49 +282,51 @@ static void getNvidiaTensorCorePipeline(
       stagePrefetch.push_back(&op);
     }
     if (isa<nvgpu::MmaSyncOp>(op)) {
-      stageLast.push_back(&op);
+      stageCompute.push_back(&op);
     }
     if (isa<nvgpu::DeviceAsyncCopyOp, nvgpu::DeviceAsyncCreateGroupOp>(op)) {
-      stage0.push_back(&op);
+      stageCopyToSharedMemory.push_back(&op);
     }
     if (isa<nvgpu::LdMatrixOp>(op)) {
       // Prefecth some of the ldmatrix.
       if (isAOperand(&op)) {
-        sizeReadA++;
-        if (sizeReadA <= prefetchSize) {
+        numLoadA++;
+        if (numLoadA <= numPrefetchSmemLoadPerOperand) {
           stagePrefetch.push_back(&op);
           continue;
         }
       }
       if (isBOperand(&op)) {
-        sizeReadB++;
-        if (sizeReadB <= prefetchSize) {
+        numLoadB++;
+        if (numLoadB <= numPrefetchSmemLoadPerOperand) {
           stagePrefetch.push_back(&op);
           continue;
         }
       }
       // If not prefected go in the last stage.
-      stageLast.push_back(&op);
+      stageCompute.push_back(&op);
     }
   }
 
   // Return an empty schedule if the loop is not a candidate to be pipelined.
-  if (loopCanBePipelined || stage0.empty() || stageLast.empty()) return;
+  if (loopCanBePipelined || stageCopyToSharedMemory.empty() ||
+      stageCompute.empty())
+    return;
 
   // Track dependencies of stage 0 ops.
   llvm::SmallDenseSet<Operation*> deps;
-  llvm::SmallDenseSet<Operation*> stage0Deps;
+  llvm::SmallDenseSet<Operation*> stageCopyToSharedMemoryDeps;
   llvm::SmallDenseSet<Operation*> stageNMinusOneDeps;
   llvm::SmallDenseSet<Operation*> stageNDeps;
-  for (Operation* op : stage0) {
-    addOpsAndDeps(deps, stage0Deps, op, forOp.getBody());
+  for (Operation* op : stageCopyToSharedMemory) {
+    addOpsAndDeps(deps, stageCopyToSharedMemoryDeps, op, forOp.getBody());
   }
 
   for (Operation* op : stagePrefetch) {
     addOpsAndDeps(deps, stageNMinusOneDeps, op, forOp.getBody());
   }
 
-  for (Operation* op : stageLast) {
+  for (Operation* op : stageCompute) {
     addOpsAndDeps(deps, stageNDeps, op, forOp.getBody());
   }
   // Schedule Last stage followed by stage 0 follwed by prefetch.
@@ -332,7 +334,8 @@ static void getNvidiaTensorCorePipeline(
     if (stageNDeps.count(&op)) ops.push_back(std::make_pair(&op, depth - 1));
   }
   for (Operation& op : forOp.getBody()->getOperations()) {
-    if (stage0Deps.count(&op)) ops.push_back(std::make_pair(&op, 0));
+    if (stageCopyToSharedMemoryDeps.count(&op))
+      ops.push_back(std::make_pair(&op, 0));
   }
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (stageNMinusOneDeps.count(&op))
