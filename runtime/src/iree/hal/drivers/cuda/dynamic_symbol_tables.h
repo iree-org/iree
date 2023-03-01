@@ -106,3 +106,15 @@ NCCL_PFN_DECL(ncclRecv, void*, size_t, ncclDataType_t, int, ncclComm_t,
               cudaStream_t)
 NCCL_PFN_DECL(ncclGroupStart)
 NCCL_PFN_DECL(ncclGroupEnd)
+
+// KVS
+
+KVS_PFN_DECL(kvs_client_create, kvs_client_t**, const char*,
+             kvs_client_config_t*)
+KVS_PFN_DECL(kvs_client_destroy, kvs_client_t**)
+KVS_PFN_DECL(kvs_client_get, kvs_client_t*, const char*, char*, int)
+KVS_PFN_DECL(kvs_client_set, kvs_client_t*, const char*, char*)
+KVS_PFN_DECL(kvs_server_create, kvs_server_t**, const char*,
+             kvs_server_config_t*)
+KVS_PFN_DECL(kvs_server_wait, kvs_server_t*)
+KVS_PFN_DECL(kvs_server_destroy, kvs_server_t**)
