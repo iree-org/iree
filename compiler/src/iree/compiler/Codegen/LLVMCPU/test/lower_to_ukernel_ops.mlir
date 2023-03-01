@@ -15,7 +15,7 @@ func.func @matmul(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
 //  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1 : i32
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG2]], %[[C1]]
+//  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "vmvx.matmul.f32f32f32"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
@@ -45,7 +45,7 @@ func.func @matmul_fill(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tens
 //      CHECK:   %[[EMPTY:.+]] = tensor.empty
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[EMPTY]], %[[C1]]
+//  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "vmvx.matmul.f32f32f32"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[EMPTY]] :
@@ -69,7 +69,7 @@ func.func @matmul_i8i8i32(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?xi8>,
 //  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1 : i32
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG2]], %[[C1]]
+//  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "vmvx.matmul.i8i8i32"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
