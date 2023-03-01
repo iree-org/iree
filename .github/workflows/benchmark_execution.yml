@@ -76,6 +76,7 @@ jobs:
         run: |
           ./build_tools/benchmarks/export_benchmark_config.py \
             execution \
+            --ci \
             --benchmark_presets="${BENCHMARK_PRESETS}" \
             --output="${BENCHMARK_CONFIG}"
           echo "benchmark-config=${BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"
@@ -171,13 +172,14 @@ jobs:
           IREE_TRACED_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.traced-benchmark-tools-dir }}
           IREE_DEVICE_NAME: ${{ env.DEVICE_NAME }}
           IREE_E2E_TEST_ARTIFACTS_DIR: ${{ env.E2E_TEST_ARTIFACTS_DIR }}
-          IREE_RUN_CONFIG: run-config.json
+          IREE_EXECUTION_BENCHMARK_CONFIG: execution-benchmark-config.json
           IREE_BENCHMARK_RESULTS: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-results-${{ matrix.benchmark.device_name }}.json
         run: |
           mkdir -p ${BENCHMARK_RESULTS_DIR}
+          # Extract the execution benchmark config of the current device.
           jq --arg DEVICE_NAME "${IREE_DEVICE_NAME}" \
-            '.[$DEVICE_NAME] | .run_configs' \
-            "${BENCHMARK_CONFIG}" > "${IREE_RUN_CONFIG}"
+            '.[$DEVICE_NAME]' \
+            "${BENCHMARK_CONFIG}" > "${IREE_EXECUTION_BENCHMARK_CONFIG}"
           ./build_tools/benchmarks/run_benchmarks.sh
           echo "benchmark-results=${IREE_BENCHMARK_RESULTS}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading benchmark results"
