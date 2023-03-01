@@ -13,9 +13,11 @@ set(LIBS
   MLIRAffineDialect
   MLIRArithDialect
   MLIRAsyncDialect
+  MLIRBufferizationTransformOps
   MLIRControlFlowDialect
   MLIRDialect
   MLIRFuncDialect
+  MLIRIndexToLLVM
   MLIRLinalgDialect
   MLIRLinalgTransformOps
   MLIRMemRefDialect

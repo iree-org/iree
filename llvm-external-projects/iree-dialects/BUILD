@@ -553,6 +553,7 @@ cc_library(
         # Conversions
         "@llvm-project//mlir:AsyncToLLVM",
         "@llvm-project//mlir:FuncToLLVM",
+        "@llvm-project//mlir:IndexToLLVM",
         "@llvm-project//mlir:LinalgToLLVM",
         "@llvm-project//mlir:LinalgToStandard",
         "@llvm-project//mlir:MathToLLVM",
@@ -674,6 +675,7 @@ cc_binary(
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:AsyncDialect",
+        "@llvm-project//mlir:BufferizationTransformOps",
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
