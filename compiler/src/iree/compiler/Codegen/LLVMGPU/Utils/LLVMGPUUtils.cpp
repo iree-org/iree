@@ -7,20 +7,31 @@
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Visitors.h"
 
+using namespace mlir;
+
+#define DEBUG_TYPE "llvm-gpu-utils"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+
 namespace mlir {
 namespace iree_compiler {
 
 void createAsyncGroups(func::FuncOp funcOp, bool useMMASync) {
+  LLVM_DEBUG(DBGS() << "Start asyncGroups: useMMASync=" << useMMASync << "\n");
   llvm::SmallSetVector<vector::TransferWriteOp, 16> copyToSharedMem;
   // Look for all the copy that can be converted to async copy ops.
   funcOp.walk([&](vector::TransferWriteOp writeOp) {
+    LLVM_DEBUG(DBGS() << "--candidate writeOp: " << writeOp << "\n");
     if (!writeOp.getPermutationMap().isMinorIdentity() ||
         writeOp.getVectorType().getRank() != 1 || !writeOp.isDimInBounds(0)) {
+      LLVM_DEBUG(
+          DBGS()
+          << "----writeOp is not an inbounds 1-D minor identity -> Skip \n");
       return WalkResult::advance();
     }
     auto addressSpaceAttr = writeOp.getShapedType()
@@ -29,17 +40,34 @@ void createAsyncGroups(func::FuncOp funcOp, bool useMMASync) {
                                 .dyn_cast_or_null<gpu::AddressSpaceAttr>();
     if (!addressSpaceAttr || addressSpaceAttr.getValue() !=
                                  gpu::GPUDialect::getWorkgroupAddressSpace()) {
+      LLVM_DEBUG(DBGS() << "----address space is not workgroup -> Skip \n");
       return WalkResult::advance();
     }
-    auto read = writeOp.getVector().getDefiningOp<vector::TransferReadOp>();
-    if (!read || read.getVectorType() != writeOp.getVectorType() ||
-        !read.isDimInBounds(0) || !read.getPermutationMap().isMinorIdentity())
+    auto readOp = writeOp.getVector().getDefiningOp<vector::TransferReadOp>();
+    if (!readOp) {
+      LLVM_DEBUG(DBGS() << "----no readOp defining the writeOp -> Skip \n");
       return WalkResult::advance();
-    if (!((read.getVectorType().getElementType().isF32() &&
-           read.getVectorType().getNumElements() <= 4) ||
-          (read.getVectorType().getElementType().isF16() &&
-           read.getVectorType().getNumElements() <= 8)))
+    }
+
+    LLVM_DEBUG(DBGS() << "--candidate readOp: " << readOp << " \n");
+    if (readOp.getVectorType() != writeOp.getVectorType() ||
+        !readOp.isDimInBounds(0) ||
+        !readOp.getPermutationMap().isMinorIdentity()) {
+      LLVM_DEBUG(
+          DBGS()
+          << "----readOp is not an in-bounds 1-D minor identity -> Skip \n");
       return WalkResult::advance();
+    }
+    if (!((readOp.getVectorType().getElementType().isF32() &&
+           readOp.getVectorType().getNumElements() <= 4) ||
+          (readOp.getVectorType().getElementType().isF16() &&
+           readOp.getVectorType().getNumElements() <= 8))) {
+      LLVM_DEBUG(
+          DBGS() << "----readOp is not (<=4)xf32 or (<=8)xf16 -> Skip \n");
+      return WalkResult::advance();
+    }
+
+    LLVM_DEBUG(DBGS() << "--writeOp can be made async -> SUCCESS\n");
     copyToSharedMem.insert(writeOp);
     return WalkResult::advance();
   });
