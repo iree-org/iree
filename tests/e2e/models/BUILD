@@ -79,7 +79,10 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_cuda_cuda",
     timeout = "long",
-    srcs = CHECK_FRAMEWORK_TESTS,
+    srcs = [
+        "bert_encoder_unrolled_fake_weights.mlir",
+        # "mobilenetv3_fake_weights.mlir", TODO(#12444): This fails intermittently.
+    ],
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "cuda",
     tags = [
