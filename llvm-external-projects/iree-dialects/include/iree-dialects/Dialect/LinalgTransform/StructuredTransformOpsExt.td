@@ -59,17 +59,6 @@ def CanonicalizedSequenceOp
   let hasVerifier = 1;
 }
 
-//===----------------------------------------------------------------------===//
-
-def BufferizeOp : Op<Transform_Dialect, "bufferize",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let description = [{Indicates that the entire module should be bufferized.}];
-  let assemblyFormat = "attr-dict";
-  let cppNamespace = "mlir::transform_ext";
-}
-
 def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,

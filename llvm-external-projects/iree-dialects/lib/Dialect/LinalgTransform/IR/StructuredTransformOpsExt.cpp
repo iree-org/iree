@@ -949,37 +949,6 @@ void transform_ext::CanonicalizedSequenceOp::getRegionInvocationBounds(
 using namespace mlir::linalg;
 
 //===---------------------------------------------------------------------===//
-// BufferizeOp
-//===---------------------------------------------------------------------===//
-
-static void applyBufferizationEnablingTransformations(ModuleOp moduleOp) {
-  RewritePatternSet patterns(moduleOp.getContext());
-  patterns.add<GeneralizePadOpPattern>(moduleOp.getContext());
-  (void)applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
-}
-
-DiagnosedSilenceableFailure
-transform_ext::BufferizeOp::apply(mlir::transform::TransformResults &result,
-                                  mlir::transform::TransformState &state) {
-  bufferization::OneShotBufferizationOptions options;
-  options.bufferizeFunctionBoundaries = true;
-  options.memCpyFn = [](OpBuilder &builder, Location loc, Value from,
-                        Value to) {
-    return success(linalg::makeMemRefCopyOp(builder, loc, from, to));
-  };
-
-  auto moduleOp = cast<ModuleOp>(state.getTopLevel());
-  applyBufferizationEnablingTransformations(moduleOp);
-  if (failed(runOneShotModuleBufferize(moduleOp, options)))
-    return DiagnosedSilenceableFailure::definiteFailure();
-
-  // Perform buffer-level hoistings.
-  state.getTopLevel()->walk(
-      [&](func::FuncOp funcOp) { hoistRedundantVectorTransfers(funcOp); });
-  return DiagnosedSilenceableFailure::success();
-}
-
-//===---------------------------------------------------------------------===//
 // LowerToLLVMOp
 //===---------------------------------------------------------------------===//
 
