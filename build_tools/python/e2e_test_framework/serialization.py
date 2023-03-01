@@ -20,7 +20,8 @@ SUPPORTED_PRIMITIVE_TYPES = {str, int, float, bool, NONE_TYPE}
 
 def serialize_and_pack(obj,
                        root_obj_field_name="root_obj",
-                       keyed_obj_map_field_name="keyed_obj_map"):
+                       keyed_obj_map_field_name="keyed_obj_map",
+                       use_ref: bool = True):
   """Converts and packs the object into a serializable object.
   
   Args:
@@ -28,6 +29,8 @@ def serialize_and_pack(obj,
     root_obj_field_name: field name of the top-level object in the return dict.
     keyed_obj_map_field_name: field name of the keyed object map in the return
       dict.
+    use_ref: put serialized keyed objects into keyed_obj_map field and only
+      store references in fields to eliminate duplications.
   Returns
     A serializable dict.
   """
@@ -36,12 +39,16 @@ def serialize_and_pack(obj,
     raise ValueError(
         f"root_obj and keyed_obj_map can't have the same field name.")
 
-  keyed_obj_map = {}
+  keyed_obj_map = {} if use_ref else None
   root_obj = _serialize(obj=obj, keyed_obj_map=keyed_obj_map)
-  return {
-      root_obj_field_name: root_obj,
-      keyed_obj_map_field_name: keyed_obj_map
-  }
+
+  if use_ref:
+    return {
+        root_obj_field_name: root_obj,
+        keyed_obj_map_field_name: keyed_obj_map
+    }
+
+  return {root_obj_field_name: root_obj}
 
 
 T = TypeVar('T')
@@ -61,18 +68,22 @@ def unpack_and_deserialize(data,
   Returns:
     A deserialized object.
   """
+  # The keyed_obj_map field might not exist if the serializer doens't use
+  # references for keyed objects.
+  keyed_obj_map = data.get(keyed_obj_map_field_name)
   obj = _deserialize(data=data[root_obj_field_name],
                      obj_type=root_type,
-                     keyed_obj_map=data[keyed_obj_map_field_name])
+                     keyed_obj_map=keyed_obj_map)
   return typing.cast(root_type, obj)
 
 
-def _serialize(obj, keyed_obj_map: Dict[str, Any]):
+def _serialize(obj, keyed_obj_map: Optional[Dict[str, Any]]):
   """Converts the object into a serializable object.
   
   Args:
     obj: object to be serialized.
     keyed_obj_map: mutable container to store the keyed serializable object.
+      None if we don't store references for keyed objects.
   Returns
     A serializable object.
   """
@@ -103,14 +114,15 @@ def _serialize(obj, keyed_obj_map: Dict[str, Any]):
 
 def _deserialize(data,
                  obj_type: Type,
-                 keyed_obj_map: Dict[str, Any],
+                 keyed_obj_map: Optional[Dict[str, Any]],
                  obj_cache: Dict[str, Any] = {}):
   """Deserializes the data back to the typed object.
 
   Args:
     data: serialized data.
     obj_type: type of the data.
-    keyed_obj_map: container of the keyed serializable object.
+    keyed_obj_map: container of the keyed serializable object. None if we don't
+      use references for keyed objects.
   Returns:
     A deserialized object.
   """
@@ -198,8 +210,16 @@ def serializable(cls=None,
     if type_key is not None and all(field.name != id_field for field in fields):
       raise ValueError(f'Id field "{id_field}" not found in the class {cls}.')
 
-    def serialize(self, keyed_obj_map: Dict[str, Any]):
-      if type_key is None:
+    def serialize(self, keyed_obj_map: Optional[Dict[str, Any]]):
+      """Serialize the object.
+      
+      Args:
+        keyed_obj_map: the map to store serialized keyed objects. None if we
+          don't use references for keyed objects.
+      Returns:
+        Serialized data, or an id if the object is stored in keyed_obj_map.
+      """
+      if type_key is None or keyed_obj_map is None:
         return _fields_to_dict(self, fields, keyed_obj_map)
 
       obj_id = getattr(self, id_field)
@@ -218,20 +238,45 @@ def serializable(cls=None,
       keyed_obj_map[obj_key] = obj_dict
       return obj_id
 
-    def deserialize(data, keyed_obj_map: Dict[str, Any], obj_cache: Dict[str,
-                                                                         Any]):
+    def deserialize(data, keyed_obj_map: Optional[Dict[str, Any]],
+                    obj_cache: Dict[str, Any]):
+      """Deserialize the data.
+      
+      Args:
+        data: the serialized object, or a string id references to a serialized
+          object in keyed_obj_map if the object is encoded.
+        keyed_obj_map: the map stored all serialized keyed objects. None if we
+          don't use references for keyed objects.
+        obj_cache: the cache of deserialized objects.
+      Returns:
+        Deserialized object.
+      """
       if type_key is None:
         field_value_map = _dict_to_fields(data, fields, keyed_obj_map,
                                           obj_cache)
         return cls(**field_value_map)
 
-      obj_id = data
+      # We don't use references for keyed objects if keyed_obj_map is None. Get
+      # the id from the serialized keyed object's field.
+      if keyed_obj_map is None:
+        obj_id = data[id_field]
+      else:
+        obj_id = data
+
       obj_key = f"{type_key}:{obj_id}"
       if obj_key in obj_cache:
         return obj_cache[obj_key]
 
-      field_value_map = _dict_to_fields(keyed_obj_map[obj_key], fields,
-                                        keyed_obj_map, obj_cache)
+      # The keyed object is not in the cache. Deserialize it either from data or
+      # keyed_obj_map (if we use references for keyed objects).
+      if keyed_obj_map is None:
+        serialized_obj = data
+      else:
+        if obj_key not in keyed_obj_map:
+          raise ValueError(f"{obj_key} not found in keyed object map.")
+        serialized_obj = keyed_obj_map[obj_key]
+      field_value_map = _dict_to_fields(serialized_obj, fields, keyed_obj_map,
+                                        obj_cache)
       derialized_obj = cls(**field_value_map)
       obj_cache[obj_key] = derialized_obj
       return derialized_obj
@@ -248,13 +293,13 @@ def serializable(cls=None,
 
 
 def _fields_to_dict(obj, fields: Sequence[dataclasses.Field],
-                    keyed_obj_map: Dict[str, Any]) -> Dict[str, Any]:
+                    keyed_obj_map: Optional[Dict[str, Any]]) -> Dict[str, Any]:
   return dict((field.name, _serialize(getattr(obj, field.name), keyed_obj_map))
               for field in fields)
 
 
 def _dict_to_fields(obj_dict, fields: Sequence[dataclasses.Field],
-                    keyed_obj_map: Dict[str, Any],
+                    keyed_obj_map: Optional[Dict[str, Any]],
                     obj_cache: Dict[str, Any]) -> Dict[str, Any]:
   return dict(
       (field.name,

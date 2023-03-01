@@ -77,7 +77,6 @@ class SerializationTest(unittest.TestCase):
         root_obj_field_name="main_obj",
         keyed_obj_map_field_name="obj_map")
 
-    self.maxDiff = None
     self.assertEqual(
         results, {
             "main_obj": [
@@ -96,6 +95,31 @@ class SerializationTest(unittest.TestCase):
             }
         })
 
+  def test_serialize_and_pack_not_use_ref(self):
+    b_obj_a = TestB(key="id_a", int_val=10)
+    b_obj_b = TestB(key="id_b", int_val=20)
+    test_objs = [
+        TestA(b_list=[b_obj_a, b_obj_b],
+              c_obj=TestC(float_val=0.1),
+              str_val="test1",
+              enum_val=EnumX.OPTION_B),
+    ]
+
+    results = serialization.serialize_and_pack(test_objs, use_ref=False)
+
+    self.assertEqual(
+        results, {
+            "root_obj": [
+                dict(b_list=[
+                    dict(key="id_a", int_val=10),
+                    dict(key="id_b", int_val=20)
+                ],
+                     c_obj=dict(float_val=0.1),
+                     str_val="test1",
+                     enum_val="OPTION_B")
+            ]
+        })
+
   def test_serialize_and_pack_with_unsupported_type(self):
     self.assertRaises(
         ValueError, lambda: serialization.serialize_and_pack(
@@ -112,6 +136,18 @@ class SerializationTest(unittest.TestCase):
 
     self.assertRaises(ValueError,
                       lambda: serialization.serialize_and_pack(obj_a))
+
+  def test_deserialize_keyed_object_not_found(self):
+    serialized_root_obj = dict(b_list=["id_a"],
+                               c_obj=dict(float_val=0.1),
+                               str_val="test",
+                               enmu_val="b")
+
+    # The keyed object TestB(key=id_a) is not in keyed_obj_map.
+    self.assertRaises(
+        ValueError, lambda: serialization.unpack_and_deserialize(
+            data=dict(root_obj=serialized_root_obj, keyed_obj_map={}),
+            root_type=TestA))
 
   def test_roundtrip(self):
     b_obj_a = TestB(key="id_a", int_val=10)
@@ -133,6 +169,30 @@ class SerializationTest(unittest.TestCase):
 
     results = serialization.unpack_and_deserialize(
         serialization.serialize_and_pack(test_objs), typing.List[TestA])
+
+    self.assertEqual(results, test_objs)
+
+  def test_roundtrip_not_use_ref(self):
+    b_obj_a = TestB(key="id_a", int_val=10)
+    b_obj_b = TestB(key="id_b", int_val=20)
+    test_objs = [
+        TestA(b_list=[b_obj_a, b_obj_b],
+              c_obj=TestC(float_val=0.1),
+              str_val="test1",
+              enum_val=EnumX.OPTION_B),
+        TestA(b_list=[b_obj_a],
+              c_obj=TestC(float_val=0.2),
+              str_val=None,
+              enum_val=EnumX.OPTION_C),
+        TestA(b_list=[b_obj_b],
+              c_obj=TestC(float_val=0.3),
+              str_val="test3",
+              enum_val=EnumX.OPTION_A),
+    ]
+
+    results = serialization.unpack_and_deserialize(
+        serialization.serialize_and_pack(test_objs, use_ref=False),
+        typing.List[TestA])
 
     self.assertEqual(results, test_objs)
 
