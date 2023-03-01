@@ -2,10 +2,8 @@
 requires = [
     "setuptools>=42",
     "wheel",
-    # There is no fundamental reason to pin this CMake version, beyond
-    # build stability.
-    "cmake==3.22.2",
-    "ninja==1.10.2",
+    "cmake",
+    "ninja",
     "packaging",
     "pybind11>=2.10.1",
     "PyYAML",
