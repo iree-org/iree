@@ -74,7 +74,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
 
   // Setup dispatch constants and bindings:
-  // CHECK: hal.command_buffer.push_constants<%[[CMD]] : !hal.command_buffer> layout(%{{.+}} : !hal.pipeline_layout) offset(0) values([%c0_i32, %c0_i32]) : i32, i32
+  // CHECK: hal.command_buffer.push_constants<%[[CMD]] : !hal.command_buffer> layout(%{{.+}} : !hal.pipeline_layout) offset(0) values([%c100_i32, %c200_i32]) : i32, i32
   // CHECK: %[[BUFFER:.+]] = util.global.load @ex0_embedded_elf_x86_64_dispatch0_512_buffer
   // CHECK: hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer> layout(%{{.+}} : !hal.pipeline_layout)[%c0] bindings([
   // CHECK-NEXT:    %c0 = (%[[BUFFER]] : !hal.buffer)[%c0, %c32],
@@ -111,22 +111,34 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: func.func @ex0_embedded_elf_x86_64_dispatch1_128x32(%arg0: i32)
   // CHECK:   hal.command_buffer.dispatch.symbol<%{{.+}} : !hal.command_buffer> target(@ex0::@embedded_elf_x86_64::@dispatch1)
 
-  func.func private @main() -> !stream.timepoint {
+  func.func private @main(%dynamic_arg: i32) -> !stream.timepoint {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c32 = arith.constant 32 : index
     %c64 = arith.constant 64 : index
     %c128 = arith.constant 128 : index
     %c512 = arith.constant 512 : index
-    %c0_i32 = arith.constant 0 : i32
-    %c1_i32 = arith.constant 1 : i32
+    %c100_i32 = arith.constant 100 : i32
+    %c200_i32 = arith.constant 200 : i32
+    %c300_i32 = arith.constant 300 : i32
     %result, %result_timepoint = stream.resource.alloca uninitialized : !stream.resource<transient>{%c128} => !stream.timepoint
-    %6 = stream.cmd.execute await(%result_timepoint) => with(%result as %arg0: !stream.resource<transient>{%c128}) {
-      // Dispatch with dynamic args.
-      stream.cmd.dispatch @ex0::@dispatch0[%c512](%c0_i32, %c1_i32 : i32, i32) {
-        ro %arg0[%c0 for %c32] : !stream.resource<transient>{%c128},
-        rw %arg0[%c32 for %c32] : !stream.resource<transient>{%c128},
-        rw %arg0[%c64 for %c32] : !stream.resource<transient>{%c128}
+    %6 = stream.cmd.execute await(%result_timepoint) => with(%result as %result_capture: !stream.resource<transient>{%c128}) {
+      // Dispatches with static and dynamic args.
+      stream.cmd.dispatch @ex0::@dispatch0[%c512](%c100_i32, %c200_i32 : i32, i32) {
+        ro %result_capture[%c0 for %c32] : !stream.resource<transient>{%c128},
+        rw %result_capture[%c32 for %c32] : !stream.resource<transient>{%c128},
+        rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
+      } attributes {hal.interface.bindings = [
+        #hal.interface.binding<0, 0>,
+        #hal.interface.binding<0, 1>,
+        #hal.interface.binding<0, 2>
+      ]}
+      // NOTE: today the dynamic args will prevent us from generating
+      // benchmarks. We could handle this better by tracking alignment and such.
+      stream.cmd.dispatch @ex0::@dispatch0[%c512](%c300_i32, %dynamic_arg : i32, i32) {
+        ro %result_capture[%c0 for %c32] : !stream.resource<transient>{%c128},
+        rw %result_capture[%c32 for %c32] : !stream.resource<transient>{%c128},
+        rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
       } attributes {hal.interface.bindings = [
         #hal.interface.binding<0, 0>,
         #hal.interface.binding<0, 1>,
@@ -136,22 +148,22 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
       // Multiple dispatches to a single entry point.
       // Dispatches are deduplicated and the two 128x32x1 should combine.
       stream.cmd.dispatch @ex0::@dispatch1[%c512, %c1] {
-        ro %arg0[%c0 for %c64] : !stream.resource<transient>{%c128},
-        rw %arg0[%c64 for %c32] : !stream.resource<transient>{%c128}
+        ro %result_capture[%c0 for %c64] : !stream.resource<transient>{%c128},
+        rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
       } attributes {hal.interface.bindings = [
         #hal.interface.binding<0, 0>,
         #hal.interface.binding<0, 1>
       ]}
       stream.cmd.dispatch @ex0::@dispatch1[%c128, %c32] {
-        ro %arg0[%c0 for %c64] : !stream.resource<transient>{%c128},
-        rw %arg0[%c64 for %c32] : !stream.resource<transient>{%c128}
+        ro %result_capture[%c0 for %c64] : !stream.resource<transient>{%c128},
+        rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
       } attributes {hal.interface.bindings = [
         #hal.interface.binding<0, 0>,
         #hal.interface.binding<0, 1>
       ]}
       stream.cmd.dispatch @ex0::@dispatch1[%c128, %c32] {
-        ro %arg0[%c0 for %c64] : !stream.resource<transient>{%c128},
-        rw %arg0[%c64 for %c32] : !stream.resource<transient>{%c128}
+        ro %result_capture[%c0 for %c64] : !stream.resource<transient>{%c128},
+        rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
       } attributes {hal.interface.bindings = [
         #hal.interface.binding<0, 0>,
         #hal.interface.binding<0, 1>
