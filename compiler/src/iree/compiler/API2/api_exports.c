@@ -388,6 +388,7 @@ extern void mlirOpOperandIsNull();
 extern void mlirOpPassManagerAddOwnedPass();
 extern void mlirOpPassManagerAddPipeline();
 extern void mlirOpPassManagerGetNestedUnder();
+extern void mlirOpPrintingFlagsAssumeVerified();
 extern void mlirOpPrintingFlagsCreate();
 extern void mlirOpPrintingFlagsDestroy();
 extern void mlirOpPrintingFlagsElideLargeElementsAttrs();
@@ -970,6 +971,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirOpPassManagerAddOwnedPass;
   x += (uintptr_t)&mlirOpPassManagerAddPipeline;
   x += (uintptr_t)&mlirOpPassManagerGetNestedUnder;
+  x += (uintptr_t)&mlirOpPrintingFlagsAssumeVerified;
   x += (uintptr_t)&mlirOpPrintingFlagsCreate;
   x += (uintptr_t)&mlirOpPrintingFlagsDestroy;
   x += (uintptr_t)&mlirOpPrintingFlagsElideLargeElementsAttrs;
