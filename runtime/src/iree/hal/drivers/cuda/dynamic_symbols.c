@@ -29,6 +29,14 @@ static const char* kNCCLLoaderSearchNames[] = {
 #endif  // IREE_PLATFORM_WINDOWS
 };
 
+static const char* kKVSLoaderSearchNames[] = {
+#if defined(IREE_PLATFORM_WINDOWS)
+    "kvs.dll",
+#else
+    "libkvs.so",
+#endif  // IREE_PLATFORM_WINDOWS
+};
+
 #define concat(A, B) A B
 
 // Load CUDA entry points, prefer _v2 version if it exists.
@@ -46,10 +54,12 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
   }
 #define NCCL_PFN_DECL(ncclSymbolName, ...)
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
+#define KVS_PFN_DECL(kvsSymbolName, ...)
 #include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL
 #undef NCCL_PFN_DECL
 #undef NCCL_PFN_DECL_STR_RETURN
+#undef KVS_PFN_DECL
   return iree_ok_status();
 }
 
@@ -69,10 +79,32 @@ static iree_status_t iree_hal_cuda_nccl_dynamic_symbols_resolve_all(
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(        \
         syms->nccl_library, kName, (void**)&syms->ncclSymbolName)); \
   }
+#define KVS_PFN_DECL(kvsSymbolName, ...)
 #include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL
 #undef NCCL_PFN_DECL
 #undef NCCL_PFN_DECL_STR_RETURN
+#undef KVS_PFN_DECL
+  return iree_ok_status();
+}
+
+// Load KVS entry points.
+static iree_status_t iree_hal_cuda_kvs_dynamic_symbols_resolve_all(
+    iree_hal_cuda_dynamic_symbols_t* syms) {
+#define CU_PFN_DECL(cudaSymbolName, ...)
+#define NCCL_PFN_DECL(ncclSymbolName, ...)
+#define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
+#define KVS_PFN_DECL(kvsSymbolName, ...)                          \
+  {                                                               \
+    static const char* kName = #kvsSymbolName;                    \
+    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(      \
+        syms->kvs_library, kName, (void**)&syms->kvsSymbolName)); \
+  }
+#include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
+#undef CU_PFN_DECL
+#undef NCCL_PFN_DECL
+#undef NCCL_PFN_DECL_STR_RETURN
+#undef KVS_PFN_DECL
   return iree_ok_status();
 }
 
@@ -163,11 +195,47 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
   return status;
 }
 
+iree_status_t iree_hal_cuda_kvs_dynamic_symbols_initialize(
+    iree_allocator_t host_allocator,
+    iree_hal_cuda_dynamic_symbols_t* out_syms) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (!out_syms->cuda_library) {
+    iree_status_t status =
+        iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                         "CUDA dynamic symbols are not loaded first.");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, status, "iree_hal_cuda_kvs_dynamic_symbols_initialize");
+  }
+
+  out_syms->kvs_library = NULL;
+  iree_status_t status = iree_dynamic_library_load_from_files(
+      IREE_ARRAYSIZE(kKVSLoaderSearchNames), kKVSLoaderSearchNames,
+      IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->kvs_library);
+  if (iree_status_is_not_found(status)) {
+    iree_status_ignore(status);
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "KVS runtime library not available; ensure "
+                            "installed and on path");
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cuda_kvs_dynamic_symbols_resolve_all(out_syms);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    iree_hal_cuda_dynamic_symbols_deinitialize(out_syms);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 void iree_hal_cuda_dynamic_symbols_deinitialize(
     iree_hal_cuda_dynamic_symbols_t* syms) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_dynamic_library_release(syms->cuda_library);
   iree_dynamic_library_release(syms->nccl_library);
+  iree_dynamic_library_release(syms->kvs_library);
   memset(syms, 0, sizeof(*syms));
   IREE_TRACE_ZONE_END(z0);
 }

@@ -101,6 +101,10 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
         // Get a unique ID from the environmental variable.
         status = iree_hal_nccl_get_unique_id_from_env(driver);
       }
+
+      // Load the KVS symbols needed for NCCL multi-channel creation.
+      status = iree_hal_cuda_kvs_dynamic_symbols_initialize(host_allocator,
+                                                            &driver->syms);
     }
   }
 

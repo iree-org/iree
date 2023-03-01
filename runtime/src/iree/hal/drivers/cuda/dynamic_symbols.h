@@ -17,12 +17,13 @@ extern "C" {
 #endif  // __cplusplus
 
 // DynamicSymbols allow loading dynamically a subset of CUDA driver and NCCL
-// API. It loads all the function declared in `dynamic_symbol_tables.h` and fail
-// if any of the symbol is not available. The functions signatures are matching
-// the declarations in `cuda.h` and `nccl.h"`.
+// and KVS API. It loads all the function declared in `dynamic_symbol_tables.h`
+// and fail if any of the symbol is not available. The functions signatures are
+// matching the declarations in `cuda.h`, `nccl.h`, and `kvs.h`.
 typedef struct iree_hal_cuda_dynamic_symbols_t {
   iree_dynamic_library_t* cuda_library;
   iree_dynamic_library_t* nccl_library;
+  iree_dynamic_library_t* kvs_library;
 
 #define CU_PFN_DECL(cudaSymbolName, ...) \
   CUresult (*cudaSymbolName)(__VA_ARGS__);
@@ -30,10 +31,13 @@ typedef struct iree_hal_cuda_dynamic_symbols_t {
   ncclResult_t (*ncclSymbolName)(__VA_ARGS__);
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...) \
   const char* (*ncclSymbolName)(__VA_ARGS__);
+#define KVS_PFN_DECL(kvsSymbolName, ...) \
+  const kvs_status_t (*kvsSymbolName)(__VA_ARGS__);
 #include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: export
 #undef CU_PFN_DECL
 #undef NCCL_PFN_DECL
 #undef NCCL_PFN_DECL_STR_RETURN
+#undef KVS_PFN_DECL
 } iree_hal_cuda_dynamic_symbols_t;
 
 // Initializes |out_syms| in-place with dynamically loaded CUDA symbols.
@@ -46,6 +50,12 @@ iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
 // iree_hal_cuda_dynamic_symbols_deinitialize must be used to release the
 // library resources.
 iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
+    iree_allocator_t host_allocator, iree_hal_cuda_dynamic_symbols_t* out_syms);
+
+// Initializes |out_syms| in-place with dynamically loaded KVS symbols.
+// iree_hal_cuda_dynamic_symbols_deinitialize must be used to release the
+// library resources.
+iree_status_t iree_hal_cuda_kvs_dynamic_symbols_initialize(
     iree_allocator_t host_allocator, iree_hal_cuda_dynamic_symbols_t* out_syms);
 
 // Deinitializes |syms| by unloading the backing library. All function pointers
