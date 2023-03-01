@@ -69,12 +69,14 @@ iree_check_single_backend_test_suite(
     check_cuda_cuda
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
+    "mobilenetv3_fake_weights.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
     "cuda"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-jit=false"
   LABELS
     "noasan"
     "nomsan"
