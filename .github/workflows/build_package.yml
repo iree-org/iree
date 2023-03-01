@@ -53,11 +53,17 @@ jobs:
             experimental: false
 
           # MacOS packages.
-          - runs-on: [self-hosted, os-family=macOS, runner-group=releaser]
+          - runs-on:
+              - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
+              - os-family=macOS
+              - runner-group=releaser
             build-family: macos
             build-package: py-compiler-pkg
             experimental: true
-          - runs-on: [self-hosted, os-family=macOS, runner-group=releaser]
+          - runs-on:
+              - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
+              - os-family=macOS
+              - runner-group=releaser
             build-family: macos
             build-package: py-runtime-pkg
             experimental: true
