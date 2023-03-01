@@ -63,8 +63,6 @@ jobs:
       # The commit being checked out is the merge commit for the PR. Its first
       # parent will be the tip of main.
       BASE_REF: HEAD^
-      PR_TITLE: ${{ github.event.pull_request.title }}
-      PR_BODY: ${{ github.event.pull_request.body }}
     outputs:
       should-run: ${{ steps.configure.outputs.should-run }}
       ci-stage: ${{ steps.configure.outputs.ci-stage }}
@@ -78,8 +76,33 @@ jobs:
         with:
           # We need the parent commit to do a diff
           fetch-depth: 2
+      - name: "Fetching PR description"
+        # We fetch the latest pull request data (description, labels, ...) from
+        # API instead of using stale one from pull_request event. This makes it
+        # possible to update the trailers, labels on the pull request and re-run
+        # the workflow to make them take effect.
+        # This is majorly for triggering benchmarks without pushing new commits.
+        # See https://github.com/openxla/iree/issues/10042#issuecomment-1449250094
+        # for more details.
+        id: fetch-pr
+        if: github.event_name == 'pull_request'
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          PR_JSON: pull_request.json
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "${PR_JSON}"
+          # It requires delimiter to pass multiline strings through
+          # GITHUB_OUTPUT. Since these are already escaped JSON strings, pass
+          # the JSON strings and later use fromJSON to decode them.
+          echo "pr-title=$(jq '.title' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
+          echo "pr-body=$(jq '.body' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
+
       - name: "Configuring CI options"
         id: configure
+        env:
+          PR_TITLE: ${{ fromJSON(steps.fetch-pr.outputs.pr-title || '""') }}
+          PR_BODY: ${{ fromJSON(steps.fetch-pr.outputs.pr-body || '""') }}
         run: |
           # Just informative logging. There should only be two commits in the
           # history here, but limiting the depth helps when copying from a local
@@ -88,7 +111,6 @@ jobs:
           git log --oneline --graph --max-count=3
 
           ./build_tools/github_actions/configure_ci.py
-
 
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
