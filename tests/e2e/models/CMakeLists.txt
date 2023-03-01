@@ -76,7 +76,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
-    "--iree-codegen-llvmgpu-enable-transform-dialect-jit=false"
   LABELS
     "noasan"
     "nomsan"

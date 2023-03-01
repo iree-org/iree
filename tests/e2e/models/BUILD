@@ -80,11 +80,7 @@ iree_check_single_backend_test_suite(
     name = "check_cuda_cuda",
     timeout = "long",
     srcs = CHECK_FRAMEWORK_TESTS,
-    compiler_flags = [
-        "--iree-input-type=mhlo",
-        #TODO(#12445): Drop this flag once the test is fixed.
-        "--iree-codegen-llvmgpu-enable-transform-dialect-jit=false",
-    ],
+    compiler_flags = ["--iree-input-type=mhlo"],
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
