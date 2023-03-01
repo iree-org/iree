@@ -20,6 +20,7 @@ iree_lit_test_suite(
         [
             "compile_to_phase.mlir",
             "executable_benchmarks.mlir",
+            "executable_sources.mlir",
             "iree-benchmark-module.mlir",
             "iree-run-mlir.mlir",
             "iree-run-module.mlir",

@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "compile_to_phase.mlir"
     "executable_benchmarks.mlir"
+    "executable_sources.mlir"
     "iree-benchmark-module.mlir"
     "iree-run-mlir.mlir"
     "iree-run-module-expected.mlir"
