@@ -77,6 +77,13 @@ jobs:
           # We need the parent commit to do a diff
           fetch-depth: 2
       - name: "Fetching PR description"
+        # We fetch the latest pull request data (description, labels, ...) from
+        # API instead of using stale one from pull_request event. This makes it
+        # possible to update the trailers, labels on the pull request and re-run
+        # the workflow to make them take effect.
+        # This is majorly for triggering benchmarks without pushing new commits.
+        # See https://github.com/openxla/iree/issues/10042#issuecomment-1449250094
+        # for more details.
         id: fetch-pr
         if: github.event_name == 'pull_request'
         env:
@@ -88,8 +95,9 @@ jobs:
           # It requires delimiter to pass multiline strings through
           # GITHUB_OUTPUT. Since these are already escaped JSON strings, pass
           # the JSON strings and later use fromJSON to decode them.
-          echo pr-title=$(jq '.title' "${PR_JSON}") >> "${GITHUB_OUTPUT}"
-          echo pr-body=$(jq '.body' "${PR_JSON}") >> "${GITHUB_OUTPUT}"
+          echo "pr-title=$(jq '.title' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
+          echo "pr-body=$(jq '.body' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
+
       - name: "Configuring CI options"
         id: configure
         env:
