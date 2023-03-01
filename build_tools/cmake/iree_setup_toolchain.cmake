@@ -97,6 +97,14 @@ endif()
 if(IREE_ENABLE_ASAN)
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=address")
   string(APPEND CMAKE_C_FLAGS " -fsanitize=address")
+
+  # Not technically ASAN, but it guards against similar bugs in accessing
+  # uninitialized memory. See the extensive description in that patch that
+  # originally introduced it:
+  # https://reviews.llvm.org/rG14daa20be1ad89639ec209d969232d19cf698845
+  string(APPEND CMAKE_CXX_FLAGS " -ftrivial-auto-var-init=pattern")
+  string(APPEND CMAKE_C_FLAGS " -ftrivial-auto-var-init=pattern")
+
   # If doing any kind of shared library builds, then we have to link against
   # the shared libasan, and the user will be responsible for adding the
   # appropriate path to LD_LIBRARY_PATH (or else binaries will fail to launch).
