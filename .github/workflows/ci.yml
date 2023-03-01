@@ -78,7 +78,7 @@ jobs:
           fetch-depth: 2
       - name: "Fetching PR description"
         id: fetch-pr
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'pull_request'
         env:
           PR_NUMBER: ${{ github.event.number }}
           PR_JSON: pull_request.json
@@ -93,8 +93,8 @@ jobs:
       - name: "Configuring CI options"
         id: configure
         env:
-          PR_TITLE: ${{ fromJSON(steps.fetch-pr.outputs.pr-title) }}
-          PR_BODY: ${{ fromJSON(steps.fetch-pr.outputs.pr-body) }}
+          PR_TITLE: ${{ fromJSON(steps.fetch-pr.outputs.pr-title || '""') }}
+          PR_BODY: ${{ fromJSON(steps.fetch-pr.outputs.pr-body || '""') }}
         run: |
           # Just informative logging. There should only be two commits in the
           # history here, but limiting the depth helps when copying from a local
