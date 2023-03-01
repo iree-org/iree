@@ -74,6 +74,45 @@ enum iree_cpu_data_field_0_e {
   IREE_CPU_DATA0_ARM_64_DOTPROD = 1ull << 0,
   IREE_CPU_DATA0_ARM_64_I8MM = 1ull << 1,
 
+  //===--------------------------------------------------------------------===//
+  // IREE_ARCH_X86_64 / x86-64
+  //===--------------------------------------------------------------------===//
+
+  // SSE features. Note: SSE and SSE2 are mandatory parts of X86-64.
+  IREE_CPU_DATA0_X86_64_SSE3 = 1ull << 0,
+  IREE_CPU_DATA0_X86_64_SSSE3 = 1ull << 1,
+  IREE_CPU_DATA0_X86_64_SSE41 = 1ull << 2,
+  IREE_CPU_DATA0_X86_64_SSE42 = 1ull << 3,
+  IREE_CPU_DATA0_X86_64_SSE4A = 1ull << 4,
+
+  // AVX features.
+  IREE_CPU_DATA0_X86_64_AVX = 1ull << 10,
+  IREE_CPU_DATA0_X86_64_FMA3 = 1ull << 11,
+  IREE_CPU_DATA0_X86_64_FMA4 = 1ull << 12,
+  IREE_CPU_DATA0_X86_64_XOP = 1ull << 13,
+  IREE_CPU_DATA0_X86_64_F16C = 1ull << 14,
+  IREE_CPU_DATA0_X86_64_AVX2 = 1ull << 15,
+
+  // AVX-512 features.
+  IREE_CPU_DATA0_X86_64_AVX512F = 1ull << 20,
+  IREE_CPU_DATA0_X86_64_AVX512CD = 1ull << 21,
+  IREE_CPU_DATA0_X86_64_AVX512VL = 1ull << 22,
+  IREE_CPU_DATA0_X86_64_AVX512DQ = 1ull << 23,
+  IREE_CPU_DATA0_X86_64_AVX512BW = 1ull << 24,
+  IREE_CPU_DATA0_X86_64_AVX512IFMA = 1ull << 25,
+  IREE_CPU_DATA0_X86_64_AVX512VBMI = 1ull << 26,
+  IREE_CPU_DATA0_X86_64_AVX512VPOPCNTDQ = 1ull << 27,
+  IREE_CPU_DATA0_X86_64_AVX512VNNI = 1ull << 28,
+  IREE_CPU_DATA0_X86_64_AVX512VBMI2 = 1ull << 29,
+  IREE_CPU_DATA0_X86_64_AVX512BITALG = 1ull << 30,
+  IREE_CPU_DATA0_X86_64_AVX512BF16 = 1ull << 31,
+  IREE_CPU_DATA0_X86_64_AVX512FP16 = 1ull << 32,
+
+  // AMX features.
+  IREE_CPU_DATA0_X86_64_AMXTILE = 1ull << 50,
+  IREE_CPU_DATA0_X86_64_AMXINT8 = 1ull << 51,
+  IREE_CPU_DATA0_X86_64_AMXBF16 = 1ull << 52,
+
 };
 
 #endif  // IREE_SCHEMAS_CPU_DATA_H_
