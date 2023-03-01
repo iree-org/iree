@@ -130,7 +130,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Location loc = op.getLoc();
   Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
   Value n = rewriter.create<tensor::DimOp>(loc, rhs, 1);
-  Value k = rewriter.create<tensor::DimOp>(loc, out, 1);
+  Value k = rewriter.create<tensor::DimOp>(loc, lhs, 1);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
