@@ -112,11 +112,6 @@ jobs:
 
           ./build_tools/github_actions/configure_ci.py
 
-      - name: "Posting information"
-        env:
-          BENCHMARK_PRESETS: ${{ steps.configure.outputs.benchmark-presets }}
-        run: echo "::notice title=Benchmark Presets::${BENCHMARK_PRESETS}"
-
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
