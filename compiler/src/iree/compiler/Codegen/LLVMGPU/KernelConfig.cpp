@@ -69,6 +69,7 @@ struct TileWorkgroupSizePair {
   // How many scalar elements each workgroup should handle along each dimension.
   std::array<int64_t, 3> tileSize;
   std::array<int64_t, 3> workgroupSize;
+  int64_t pipelineDepth;
 };
 
 // Software pipeline depths
@@ -83,30 +84,42 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   // Pick tile size so that M*K and K*N dividible by wgSize * \*vecSize=*\4.
   // This way workgroup memory copy don't need to be masked. Once we support
   // masked load we can get performance out of more configuration.
-  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 32}, {32, 8, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 32}, {32, 8, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}, 1}));
 
-  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}, 1}));
 }
 
 /// Return the best combination of tile size and wg size when using tensorcore
 /// operations.
 static void getTensorCoreConfig(
-    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16) {
+    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16, int64_t M,
+    int64_t N, int64_t K) {
   // Tile sizes are skewed towards small matmul for now. Long term the plan is
   // to not rely on hardcoded configurations.
   if (isFp16) {
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}}));
+    int64_t parallelDim = M * N;
+    static constexpr int64_t kLargDimThreashold = 1536;
+    // Based on early analysis we found that 128x256x32_3 gives acceptable
+    // performance across many of the large matrix sizes for f16. This needs to
+    // be refined into a better startegy based on empircal data but this gives
+    // us a quick solution to achieve performance in the right order of
+    // magnitude for large square like cases.
+    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
+      tileSizes.push_back(
+          TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
+    }
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
   } else {
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}}));
-    tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}}));
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}}));
-    tileSizes.push_back(TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}));
+    tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}));
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}));
+    tileSizes.push_back(TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}, 4}));
   }
 }
 
@@ -264,13 +277,13 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op, targetInfo)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
-
-      getTensorCoreConfig(TCtileSizeConfig, op.getDpsInputOperand(0)
-                                                ->get()
-                                                .getType()
-                                                .cast<RankedTensorType>()
-                                                .getElementType()
-                                                .isF16());
+      bool isFp16 = op.getDpsInputOperand(0)
+                        ->get()
+                        .getType()
+                        .cast<RankedTensorType>()
+                        .getElementType()
+                        .isF16();
+      getTensorCoreConfig(TCtileSizeConfig, isFp16, sizeM, sizeN, sizeK);
       // Pick the best configuration where the original shape is aligned on the
       // tile size.
       for (TileWorkgroupSizePair &config : TCtileSizeConfig) {
@@ -280,7 +293,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,
-              sizeK == config.tileSize[2] ? 1 : softwarePipelineDepthTensorCore,
+              sizeK == config.tileSize[2] ? 1 : config.pipelineDepth,
               IREE::Codegen::DispatchLoweringPassPipeline::
                   LLVMGPUMatmulTensorCore);
         }
