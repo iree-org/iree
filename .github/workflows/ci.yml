@@ -78,7 +78,7 @@ jobs:
           fetch-depth: 2
       - name: "Fetching PR description"
         id: fetch-pr
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'pull_request'
         env:
           PR_NUMBER: ${{ github.event.number }}
           PR_JSON: pull_request.json
