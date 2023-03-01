@@ -485,31 +485,4 @@ def TileToForallAndWorkgroupCountRegionOp :
   }];
 }
 
-def ConfigExtractPart :
-    Op<Transform_Dialect, "iree.config.extract_part",
-      [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-       TransformOpInterface]> {
-  let description = [{
-  }];
-  let arguments = (ins PDL_Operation:$target,
-                       StrAttr:$attr_name,
-                       OptionalAttr<I64Attr>:$level);
-  // TODO: allow return attributes ?
-  let results = (outs PDL_Operation:$resultConfigPart);
-  let assemblyFormat = "attr-dict $target";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  // TODO: impl me.
-  // let hasVerifier = 1;
-
-  let builders = [
-    OpBuilder<(ins "Value":$target, "StringRef":$attrName,
-               CArg<"Optional<int64_t>", "std::nullopt">:$level)>
-  ];
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS
