@@ -741,8 +741,8 @@ void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
 /// pdl::OperationType handles on the fly.
 static LogicalResult lowerWorkgroupCountComputingRegion(
     transform::TransformState &state, RewriterBase &rewriter, Location loc,
-    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> tileSizes,
-    Optional<ArrayAttr> mapping) {
+    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> numThreads,
+    ArrayRef<OpFoldResult> tileSizes, Optional<ArrayAttr> mapping) {
   Region &r = exportOp.getWorkgroupCount();
   if (!r.hasOneBlock()) {
     return rewriter.notifyMatchFailure(exportOp,
@@ -760,31 +760,37 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
   auto workgroupCountOp = *workgroupCountOps.begin();
   auto workload = workgroupCountOp.getOperands();
 
-  SmallVector<OpFoldResult> unpackedTileSizes;
+  bool useNumThreads = !numThreads.empty();
+  ArrayRef<OpFoldResult> tileSizesOrNumThreads =
+      useNumThreads ? numThreads : tileSizes;
+  StringRef kindStr = useNumThreads ? "num thread" : "tile size";
+
+  SmallVector<OpFoldResult> unpackedTileSizesOrNumThreads;
   int64_t numTiledDims = 0;
-  for (auto ofr : tileSizes) {
+  for (auto ofr : tileSizesOrNumThreads) {
     if (ofr.is<Value>() &&
         ofr.get<Value>().getType().isa<pdl::OperationType>()) {
       for (Operation *sizeProducer : state.getPayloadOps(ofr.get<Value>())) {
         if (sizeProducer->getNumResults() != 1) {
-          auto diag =
-              mlir::emitDefiniteFailure(sizeProducer)
-              << "the operation producing tile size must have one result";
+          auto diag = mlir::emitDefiniteFailure(sizeProducer)
+                      << "the operation producing " << kindStr
+                      << " must have one result";
           diag.attachNote(loc) << "when applying this transform";
           return diag;
         }
-        unpackedTileSizes.push_back(sizeProducer->getResult(0));
+        unpackedTileSizesOrNumThreads.push_back(sizeProducer->getResult(0));
       }
     } else {
-      unpackedTileSizes.push_back(ofr);
+      unpackedTileSizesOrNumThreads.push_back(ofr);
     }
-    if (!isConstantIntValue(unpackedTileSizes.back(), 0)) ++numTiledDims;
+    if (!isConstantIntValue(unpackedTileSizesOrNumThreads.back(), 0))
+      ++numTiledDims;
   }
 
-  if (unpackedTileSizes.size() > workload.size()) {
+  if (unpackedTileSizesOrNumThreads.size() > workload.size()) {
     return rewriter.notifyMatchFailure(
         exportOp,
-        "number of tile sizes overflow the dimension from the workload");
+        "number of " + kindStr + "s overflow the dimension from the workload");
   }
 
   // Generate permutation of tiled dims based on the specified mapping.
@@ -793,7 +799,8 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
     if (numTiledDims != mapping->size()) {
       return rewriter.notifyMatchFailure(exportOp,
                                          "number of mapping elements must "
-                                         "match number of non-zero tile sizes");
+                                         "match number of non-zero " +
+                                             kindStr + "s");
     }
     for (DeviceMappingAttrInterface map : mapping.value())
       mappingPermutation.push_back(map.getMappingId());
@@ -810,15 +817,20 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
   int64_t nextTiledDim = 0;
   for (int64_t workgroupsDim : mappingPermutation) {
     // Skip dims with tile size 0. These are not tiled.
-    while (isConstantIntValue(unpackedTileSizes[nextTiledDim], 0))
+    while (isConstantIntValue(unpackedTileSizesOrNumThreads[nextTiledDim], 0))
       ++nextTiledDim;
-    AffineExpr s0, s1;
-    bindSymbols(rewriter.getContext(), s0, s1);
-    auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
-    workgroupCount[workgroupsDim] = makeComposedFoldedAffineApply(
-        rewriter, loc, m,
-        ArrayRef<OpFoldResult>{workload[nextTiledDim],
-                               unpackedTileSizes[nextTiledDim]});
+    if (useNumThreads) {
+      workgroupCount[workgroupsDim] =
+          unpackedTileSizesOrNumThreads[nextTiledDim];
+    } else {
+      AffineExpr s0, s1;
+      bindSymbols(rewriter.getContext(), s0, s1);
+      auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
+      workgroupCount[workgroupsDim] = makeComposedFoldedAffineApply(
+          rewriter, loc, m,
+          ArrayRef<OpFoldResult>{workload[nextTiledDim],
+                                 unpackedTileSizesOrNumThreads[nextTiledDim]});
+    }
     ++nextTiledDim;
   }
 
@@ -882,8 +894,8 @@ transform_dialect::TileToForallAndWorkgroupCountRegionOp::apply(
   /// regions are created by default in IREEs compilation flow.
   IRRewriter rewriter(getContext());
   if (failed(lowerWorkgroupCountComputingRegion(
-          state, rewriter, getLoc(), exportOp.value(), getMixedTileSizes(),
-          getMapping()))) {
+          state, rewriter, getLoc(), exportOp.value(), getMixedNumThreads(),
+          getMixedTileSizes(), getMapping()))) {
     return mlir::emitDefiniteFailure(exportOp.value(),
                                      "failed to lower workgroup count region");
   }
