@@ -14,6 +14,7 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
+#include "mlir/Conversion/IndexToLLVM/IndexToLLVM.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LinalgToStandard/LinalgToStandard.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
@@ -21,44 +22,28 @@
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
+#include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Async/Passes.h"
-#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
-#include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
-#include "mlir/Dialect/Bufferization/Transforms/OneShotModuleBufferize.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/PDL/IR/PDLTypes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/SymbolTable.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "mlir/Interfaces/TilingInterface.h"
-#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/InliningUtils.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 #include "mlir/Transforms/Passes.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/FormatVariadic.h"
 
 #define DEBUG_TYPE "transform-ops-ext"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
@@ -949,49 +934,31 @@ void transform_ext::CanonicalizedSequenceOp::getRegionInvocationBounds(
 using namespace mlir::linalg;
 
 //===---------------------------------------------------------------------===//
-// BufferizeOp
-//===---------------------------------------------------------------------===//
-
-static void applyBufferizationEnablingTransformations(ModuleOp moduleOp) {
-  RewritePatternSet patterns(moduleOp.getContext());
-  patterns.add<GeneralizePadOpPattern>(moduleOp.getContext());
-  (void)applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
-}
-
-DiagnosedSilenceableFailure
-transform_ext::BufferizeOp::apply(mlir::transform::TransformResults &result,
-                                  mlir::transform::TransformState &state) {
-  bufferization::OneShotBufferizationOptions options;
-  options.bufferizeFunctionBoundaries = true;
-  options.memCpyFn = [](OpBuilder &builder, Location loc, Value from,
-                        Value to) {
-    return success(linalg::makeMemRefCopyOp(builder, loc, from, to));
-  };
-
-  auto moduleOp = cast<ModuleOp>(state.getTopLevel());
-  applyBufferizationEnablingTransformations(moduleOp);
-  if (failed(runOneShotModuleBufferize(moduleOp, options)))
-    return DiagnosedSilenceableFailure::definiteFailure();
-
-  // Perform buffer-level hoistings.
-  state.getTopLevel()->walk(
-      [&](func::FuncOp funcOp) { hoistRedundantVectorTransfers(funcOp); });
-  return DiagnosedSilenceableFailure::success();
-}
-
-//===---------------------------------------------------------------------===//
 // LowerToLLVMOp
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
 transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
                                     mlir::transform::TransformState &state) {
+
+  //===------------------------------------------------------------------===//
+  // BEGIN: Copied from upstream, this needs to be retired once we have a
+  // proper upstream transform op.
+  //===------------------------------------------------------------------===//
+
   // TODO: it is feasible to scope lowering at arbitrary level and introduce
   // unrealized casts, but there needs to be the final module-wise cleanup in
   // the end. Keep module-level for now.
   PassManager pm(getContext());
 
+  auto enableOpaquePointers = [](auto options) {
+    options.useOpaquePointers = true;
+    return options;
+  };
+
+  // Blanket-convert any remaining high-level vector ops to loops if any remain.
   pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
+  // Blanket-convert any remaining linalg ops to loops if any remain.
   pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   if (getEnableAsync()) {
     pm.addPass(createAsyncToAsyncRuntimePass());
@@ -999,8 +966,14 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
     pm.addPass(createAsyncRuntimeRefCountingOptPass());
   }
   pm.addPass(createCanonicalizerPass());
+  // Blanket-convert any remaining affine ops if any remain.
   pm.addPass(createLowerAffinePass());
+  // Convert SCF to CF (always needed).
   pm.addPass(createConvertSCFToCFPass());
+  // Sprinkle some cleanups.
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+  // Blanket-convert any remaining linalg ops to LLVM if any remain.
   pm.addPass(createConvertLinalgToLLVMPass());
   {
     auto options = ConvertVectorToLLVMPassOptions();
@@ -1010,16 +983,35 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
     options.armSVE = getEnableArmSve();
     options.amx = getEnableAmx();
     options.x86Vector = getEnableX86vector();
+    options.useOpaquePointers = true;
     pm.addPass(createConvertVectorToLLVMPass(options));
   }
+  // Convert Math to LLVM (always needed).
   pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
-  pm.addPass(createFinalizeMemRefToLLVMConversionPass());
+  // Expand complicated MemRef operations before lowering them.
+  pm.addPass(memref::createExpandStridedMetadataPass());
+  // The expansion may create affine expressions. Get rid of them.
+  pm.addPass(createLowerAffinePass());
+  // Convert MemRef to LLVM (always needed).
+  pm.addPass(createFinalizeMemRefToLLVMConversionPass(
+      enableOpaquePointers(FinalizeMemRefToLLVMConversionPassOptions{})));
   if (getEnableAsync())
     pm.addPass(createConvertAsyncToLLVMPass());
-  pm.addPass(createConvertFuncToLLVMPass());
+  // Convert Func to LLVM (always needed).
+  pm.addPass(createConvertFuncToLLVMPass(
+      enableOpaquePointers(ConvertFuncToLLVMPassOptions{})));
+  // Convert Index to LLVM (always needed).
+  pm.addPass(createConvertIndexToLLVMPass());
+  // Convert remaining unrealized_casts (always needed).
   pm.addPass(createReconcileUnrealizedCastsPass());
+
   if (failed(pm.run(state.getTopLevel())))
     return DiagnosedSilenceableFailure::definiteFailure();
+
+  //===------------------------------------------------------------------===//
+  // END: Copied from upstream, this needs to be retired once we have a
+  // proper upstream transform op.
+  //===------------------------------------------------------------------===//
 
   // Make all arguments noalias for now.
   // FIXME: this is a terrible hack!

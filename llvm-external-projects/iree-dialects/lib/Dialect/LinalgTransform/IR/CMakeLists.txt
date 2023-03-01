@@ -22,14 +22,17 @@ add_mlir_library(IREELinalgTransformDialect
   MLIRTransformDialect
 
   # Transforms
+  MLIRAffineToStandard
   MLIRAsyncTransforms
   MLIRLinalgTransforms
-  MLIRAffineToStandard
-  MLIRTransforms
+  MLIRMemRefTransforms
   MLIRReconcileUnrealizedCasts
+  MLIRTransforms
+  MLIRVectorToSCF
   
   # Conversions
   MLIRAsyncToLLVM
+  MLIRIndexToLLVM
   MLIRMemRefToLLVM
   MLIRMathToLLVM
   MLIRVectorToLLVM
