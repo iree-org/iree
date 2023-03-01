@@ -39,11 +39,10 @@ import dataclasses
 import json
 import textwrap
 
-from benchmark_suites.iree import benchmark_collections
+from benchmark_suites.iree import benchmark_collections, export_definitions
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework import serialization
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework.definitions import iree_definitions
 
 PresetMatcher = Callable[[iree_definitions.E2EModelRunConfig], bool]
 BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
@@ -132,11 +131,12 @@ def _export_execution_handler(args: argparse.Namespace):
     distinct_module_dir_paths = _get_distinct_module_dir_paths(
         config.module_generation_config for config in run_configs)
 
-    output_map[device_name] = {
-        "host_environment": dataclasses.asdict(host_environment),
-        "module_dir_paths": distinct_module_dir_paths,
-        "run_configs": serialization.serialize_and_pack(run_configs),
-    }
+    output_map[device_name] = dataclasses.asdict(
+        export_definitions.ExecutionBenchmarkConfig(
+            host_environment=dataclasses.asdict(host_environment),
+            module_dir_paths=distinct_module_dir_paths,
+            run_configs=serialization.serialize_and_pack(run_configs),
+        ))
 
   return output_map
 
@@ -151,12 +151,11 @@ def _export_compilation_handler(_args: argparse.Namespace):
   distinct_module_dir_paths = _get_distinct_module_dir_paths(
       compile_stats_gen_configs)
 
-  return {
-      "module_dir_paths":
-          distinct_module_dir_paths,
-      "generation_configs":
-          serialization.serialize_and_pack(compile_stats_gen_configs)
-  }
+  return dataclasses.asdict(
+      export_definitions.CompilationBenchmarkConfig(
+          module_dir_paths=distinct_module_dir_paths,
+          generation_configs=serialization.serialize_and_pack(
+              compile_stats_gen_configs)))
 
 
 def _parse_and_strip_list_argument(arg) -> List[str]:
