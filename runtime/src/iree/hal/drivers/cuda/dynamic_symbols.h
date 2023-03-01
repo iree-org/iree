@@ -10,6 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/hal/drivers/cuda/cuda_headers.h"
+#include "third_party/kvs/kvs.h"
 #include "third_party/nccl/nccl.h"
 
 #ifdef __cplusplus
