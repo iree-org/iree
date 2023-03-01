@@ -11,8 +11,12 @@
 
 #include "experimental/metal/api.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+
+IREE_FLAG(bool, metal_serial_command_dispatch, false,
+          "Run all commands in command encoder sequentially");
 
 static iree_status_t iree_hal_metal_driver_factory_enumerate(
     void* self, iree_host_size_t* out_driver_info_count,
@@ -47,6 +51,10 @@ static iree_status_t iree_hal_metal_driver_factory_try_create(
 
   iree_hal_metal_device_params_t device_params;
   iree_hal_metal_device_params_initialize(&device_params);
+  device_params.command_dispatch_type =
+      FLAG_metal_serial_command_dispatch
+          ? IREE_HAL_METAL_COMMAND_DISPATCH_TYPE_SERIAL
+          : IREE_HAL_METAL_COMMAND_DISPATCH_TYPE_CONCURRENT;
 
   iree_status_t status = iree_hal_metal_driver_create(
       driver_name, &device_params, host_allocator, out_driver);
