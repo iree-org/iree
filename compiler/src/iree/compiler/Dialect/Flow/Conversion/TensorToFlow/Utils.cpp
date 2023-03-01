@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 
@@ -122,7 +123,8 @@ LogicalResult convertInsertSliceOpToFlowUpdateOp(
         loc, sourceType, source, sourceDynamicDims, sourceDynamicDims);
   }
 
-  auto offsetVals = getAsValues(rewriter, loc, insertOp.getMixedOffsets());
+  auto offsetVals = getValueOrCreateConstantIndexOp(rewriter, loc,
+                                                    insertOp.getMixedOffsets());
   Value dest = insertOp.getDest();
   auto destDynamicDims = tensor::createDynamicDimValues(rewriter, loc, dest);
   rewriter.replaceOpWithNewOp<TensorUpdateOp>(
@@ -161,8 +163,8 @@ LogicalResult convertExtractSliceOpToFlowSliceOp(
         RankedTensorType::get(unreducedShape, sourceType.getElementType());
   }
 
-  auto offsetVals = getAsValues(rewriter, loc, offsets);
-  auto sizeVals = getAsValues(rewriter, loc, sizes);
+  auto offsetVals = getValueOrCreateConstantIndexOp(rewriter, loc, offsets);
+  auto sizeVals = getValueOrCreateConstantIndexOp(rewriter, loc, sizes);
   auto sourceDynamicDims =
       tensor::createDynamicDimValues(rewriter, loc, sliceOp.getSource());
   auto resultDynamicDims = getDynamicValues(sizes);
