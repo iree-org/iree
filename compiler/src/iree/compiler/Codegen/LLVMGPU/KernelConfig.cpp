@@ -37,11 +37,10 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
 
-// TODO(#12444): Re-enable once test failure are resolved.
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag(
     "iree-codegen-llvmgpu-transform-dialect-debug-payload-tag",
