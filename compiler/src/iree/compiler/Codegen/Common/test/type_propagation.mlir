@@ -331,3 +331,31 @@ func.func @tensor_extract() {
 //       CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[BINDING]]
 //       CHECK:   %[[EXTRACTED:.+]] = tensor.extract %[[LOAD]]
 //       CHECK:   arith.trunci %[[EXTRACTED]] : i8 to i1
+
+// -----
+
+func.func @named_op(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?xi8>) -> tensor<?x?xi8> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %false = arith.constant false
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi8>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xi8>
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xi1>
+  %fill = linalg.fill ins(%false : i1) outs(%empty : tensor<?x?xi1>) -> tensor<?x?xi1>
+  %arg0_i1 = arith.trunci %arg0 : tensor<?x?xi8> to tensor<?x?xi1>
+  %arg1_i1 = arith.trunci %arg1 : tensor<?x?xi8> to tensor<?x?xi1>
+  %gemm = linalg.matmul ins(%arg0_i1, %arg1_i1 : tensor<?x?xi1>, tensor<?x?xi1>)
+      outs(%fill : tensor<?x?xi1>) -> tensor<?x?xi1>
+  %result_i8 = arith.extui %gemm : tensor<?x?xi1> to tensor<?x?xi8>
+  return %result_i8 : tensor<?x?xi8>
+}
+//      CHECK: func @named_op(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xi8>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xi8>
+//  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%{{.+}}, %{{.+}}) : tensor<?x?xi8>
+//      CHECK:   %[[FILL:.+]] = linalg.fill
+// CHECK-SAME:       outs(%[[EMPTY]] :
+//      CHECK:   %[[GEMM:.+]] = linalg.matmul
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
+// CHECK-SAME:       outs(%[[FILL]] :
+//      CHECK:   return %[[GEMM]]
