@@ -188,7 +188,8 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
     if (spec == "?") {
       elementType = OpaqueType::get(getContext());
     } else {
-      elementType = mlir::parseType(spec, getContext());
+      // Make sure to pass a null-terminated string to the type parser.
+      elementType = mlir::parseType(spec.str(), getContext());
     }
     if (!elementType) {
       parser.emitError(parser.getCurrentLocation())
