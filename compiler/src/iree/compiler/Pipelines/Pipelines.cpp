@@ -145,6 +145,19 @@ void buildIREEVMTransformPassPipeline(
       break;
   }
 
+  IREE::HAL::PipelinePhase halCompileTo;
+  switch (compileTo) {
+    default:
+      halCompileTo = IREE::HAL::PipelinePhase::End;
+      break;
+    case IREEVMPipelinePhase::ExecutableSources:
+      halCompileTo = IREE::HAL::PipelinePhase::ExecutableSources;
+      break;
+    case IREEVMPipelinePhase::ExecutableTargets:
+      halCompileTo = IREE::HAL::PipelinePhase::ExecutableTargets;
+      break;
+  }
+
   IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "HAL");
   switch (schedulingOptions.executionModel) {
     case SchedulingOptions::ExecutionModel::HostOnly:
@@ -153,7 +166,8 @@ void buildIREEVMTransformPassPipeline(
     default:
     case SchedulingOptions::ExecutionModel::AsyncInternal:
     case SchedulingOptions::ExecutionModel::AsyncExternal:
-      IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
+      IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions,
+                                               halCompileTo);
       break;
     case SchedulingOptions::ExecutionModel::InlineStatic:
       IREE::HAL::Inline::buildHALInlineStaticTransformPassPipeline(
@@ -165,7 +179,10 @@ void buildIREEVMTransformPassPipeline(
       break;
   }
   IREE_TRACE_ADD_END_FRAME_PASS(passManager, "HAL");
-  if (compileTo == IREEVMPipelinePhase::HAL) return;  // early-exit
+  if (compileTo == IREEVMPipelinePhase::HAL ||
+      halCompileTo != IREE::HAL::PipelinePhase::End) {
+    return;  // early-exit
+  }
 
   IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "VM");
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);

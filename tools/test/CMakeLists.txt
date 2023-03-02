@@ -14,6 +14,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "compile_pipelines.mlir"
+    "compile_to_continuation.mlir"
     "compile_to_phase.mlir"
     "executable_benchmarks.mlir"
     "executable_sources.mlir"
@@ -32,6 +34,7 @@ iree_lit_test_suite(
     FileCheck
     iree-benchmark-module
     iree-compile
+    iree-opt
     iree-run-mlir
     iree-run-module
     not
