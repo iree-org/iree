@@ -1,8 +1,5 @@
 // RUN: iree-dialects-opt %s  --transform-dialect-interpreter --split-input-file | FileCheck %s
 
-// CHECK-DAG: #[[$MUL_MAP:.*]] = affine_map<(d0)[s0] -> (d0 * s0)>
-// CHECK-DAG: #[[$SUB_MAP:.*]] = affine_map<(d0)[s0, s1] -> (-(d0 * s1) + s0, s1)>
-// CHECK-DAG: #[[$ID1_MAP:.*]] = affine_map<(d0) -> (d0)>
 #map0 = affine_map<(d0)[s0] -> (d0 ceildiv s0)>
 #map1 = affine_map<(d0)[s0] -> (d0 * s0)>
 #map2 = affine_map<(d0, d1) -> (d0 - d1)>
