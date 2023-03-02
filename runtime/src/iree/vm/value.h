@@ -46,15 +46,14 @@ typedef enum iree_vm_value_type_e {
 typedef struct iree_vm_value_t {
   iree_vm_value_type_t type;
   union {
+    uint8_t value_storage[IREE_VM_VALUE_STORAGE_SIZE];  // max size of all value
+                                                        // types
     int8_t i8;
     int16_t i16;
     int32_t i32;
     int64_t i64;
     float f32;
     double f64;
-
-    uint8_t value_storage[IREE_VM_VALUE_STORAGE_SIZE];  // max size of all value
-                                                        // types
   };
 } iree_vm_value_t;
 

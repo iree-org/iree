@@ -116,6 +116,8 @@ typedef enum iree_e2e_test_value_type_e {
 typedef struct iree_e2e_test_value_t {
   iree_e2e_test_value_type_t type;
   union {
+    uint8_t value_storage[IREE_E2E_TEST_VALUE_STORAGE_SIZE];  // max size of all
+                                                              // value types
     int8_t i8;
     int16_t i16;
     int32_t i32;
@@ -123,9 +125,6 @@ typedef struct iree_e2e_test_value_t {
     float f32;
     uint16_t f16_u16;
     double f64;
-
-    uint8_t value_storage[IREE_E2E_TEST_VALUE_STORAGE_SIZE];  // max size of all
-                                                              // value types
   };
 } iree_e2e_test_value_t;
 
