@@ -186,7 +186,7 @@ struct ReplaceDispatchResultIfZeroElements
         auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
         auto emptyOp = rewriter.create<IREE::Flow::TensorEmptyOp>(
             result.getLoc(), result.getType(), dynamicDims);
-        result.replaceAllUsesWith(emptyOp);
+        rewriter.replaceAllUsesWith(result, emptyOp);
         didReplaceAny = true;
       }
     }
@@ -226,7 +226,8 @@ namespace {
 // The dimension values may be derived values that are redundant with captured
 // dimensions and by redirecting to the captured values we can simplify things.
 // Returns true if the dims were changed.
-static bool updateTensorOpDims(Operation *op, Value tensorValue,
+static bool updateTensorOpDims(RewriterBase &rewriter, Operation *op,
+                               Value tensorValue,
                                MutableOperandRange mutableDimValues) {
   auto dynamicDimsOr = IREE::Util::findDynamicDims(tensorValue, op->getBlock(),
                                                    Block::iterator(op));
@@ -237,7 +238,8 @@ static bool updateTensorOpDims(Operation *op, Value tensorValue,
   auto oldValues = llvm::to_vector<4>(oldValueRange);
   for (unsigned i = 0; i < dynamicDims.size(); ++i) {
     if (oldValues[i] != dynamicDims[i]) {
-      mutableDimValues.slice(i, 1).assign(dynamicDims[i]);
+      rewriter.updateRootInPlace(
+          op, [&]() { mutableDimValues.slice(i, 1).assign(dynamicDims[i]); });
       anyChanged = true;
     }
   }
@@ -249,7 +251,7 @@ struct ReuseDispatchTensorLoadShapeDims
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
-    return success(updateTensorOpDims(loadOp, loadOp.getSource(),
+    return success(updateTensorOpDims(rewriter, loadOp, loadOp.getSource(),
                                       loadOp.getSourceDimsMutable()));
   }
 };
@@ -400,7 +402,7 @@ struct ReuseDispatchTensorStoreShapeDims
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
-    return success(updateTensorOpDims(storeOp, storeOp.getTarget(),
+    return success(updateTensorOpDims(rewriter, storeOp, storeOp.getTarget(),
                                       storeOp.getTargetDimsMutable()));
   }
 };
