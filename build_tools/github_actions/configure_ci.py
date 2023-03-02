@@ -17,10 +17,11 @@ variables to be set:
 - PR_TITLE (required): PR title.
 - PR_BODY (optional): PR description.
 - BASE_REF (required): base commit SHA of the PR.
-- ORIGIN_PR_TITLE (optional): PR title from the original PR event, showing a
+- ORIGINAL_PR_TITLE (optional): PR title from the original PR event, showing a
     notice if PR_TITLE is different.
-- ORIGIN_PR_BODY (optional): PR description from the original PR event, showing
-    a notice if PR_BODY is different. ORIGIN_PR_TITLE must also be set.
+- ORIGINAL_PR_BODY (optional): PR description from the original PR event,
+    showing a notice if PR_BODY is different. ORIGINAL_PR_TITLE must also be
+    set.
 
 Exit code 0 indicates that it should and exit code 2 indicates that it should
 not.
@@ -95,12 +96,12 @@ def write_job_summary(summary: str):
     f.write(summary + "\n\n")
 
 
-def check_description_and_show_diff(origin_description: str,
+def check_description_and_show_diff(original_description: str,
                                     current_description: str):
-  if origin_description == current_description:
+  if original_description == current_description:
     return
 
-  diffs = difflib.unified_diff(origin_description.splitlines(keepends=True),
+  diffs = difflib.unified_diff(original_description.splitlines(keepends=True),
                                current_description.splitlines(keepends=True))
 
   write_job_summary(
@@ -120,20 +121,20 @@ def check_description_and_show_diff(origin_description: str,
 def get_trailers() -> Mapping[str, str]:
   title = os.environ["PR_TITLE"]
   body = os.environ.get("PR_BODY", "")
-  origin_title = os.environ.get("ORIGIN_PR_TITLE")
-  origin_body = os.environ.get("ORIGIN_PR_BODY", "")
+  original_title = os.environ.get("ORIGINAL_PR_TITLE")
+  original_body = os.environ.get("ORIGINAL_PR_BODY", "")
 
   description = PR_DESCRIPTION_TEMPLATE.format(title=title, body=body)
 
   # PR_TITLE and PR_BODY can be fetched from API for the latest updates. If
-  # ORIGIN_PR_TITLE is set, compare the current and original description and
+  # ORIGINAL_PR_TITLE is set, compare the current and original description and
   # show a notice if they are different. This is mostly to inform users that the
   # workflow might not parse the PR description they expect.
-  if origin_title is not None:
-    origin_description = PR_DESCRIPTION_TEMPLATE.format(title=origin_title,
-                                                        body=origin_body)
-    print("Original PR description:", origin_description, sep="\n")
-    check_description_and_show_diff(origin_description=origin_description,
+  if original_title is not None:
+    original_description = PR_DESCRIPTION_TEMPLATE.format(title=original_title,
+                                                          body=original_body)
+    print("Original PR description:", original_description, sep="\n")
+    check_description_and_show_diff(original_description=original_description,
                                     current_description=description)
 
   print("Parsing PR description:", description, sep="\n")
