@@ -380,7 +380,6 @@ EXPORTS
   mlirOpPassManagerAddOwnedPass
   mlirOpPassManagerAddPipeline
   mlirOpPassManagerGetNestedUnder
-  mlirOpPrintingFlagsAssumeVerified
   mlirOpPrintingFlagsCreate
   mlirOpPrintingFlagsDestroy
   mlirOpPrintingFlagsElideLargeElementsAttrs

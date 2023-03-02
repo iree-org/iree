@@ -39,6 +39,15 @@ transform.structured.canonicalized_sequence failures(propagate) {
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb0(%arg0: !pdl.operation):
   %0 = pdl_match @match in %arg0 : (!pdl.operation) -> !pdl.operation
+  // expected-error@below {{expects hoist_paddings to contain positive integers, found [1, -7]}}
+  transform.structured.pad %0 {hoist_paddings=[1, -7]}
+}
+
+// -----
+
+transform.structured.canonicalized_sequence failures(propagate) {
+^bb0(%arg0: !pdl.operation):
+  %0 = pdl_match @match in %arg0 : (!pdl.operation) -> !pdl.operation
   // expected-error@below {{expects transpose_paddings to be a permutation, found [1, 1]}}
   transform.structured.pad %0 {transpose_paddings=[[1, 1]]}
 }

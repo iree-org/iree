@@ -7,7 +7,7 @@ func.func @matmul_tensors_1(
     -> tensor<128x128xf32> {
   // This operation is marked for tiling only.
   // CHECK-COUNT-3: scf.for
-  // CHECK-COUNT-2: tensor.extract_slice
+  // CHECK-COUNT-3: tensor.extract_slice
   // CHECK: linalg.matmul
   // CHECK-SAME: -> tensor<4x4xf32>
   %0 = linalg.matmul { test.attrA }
