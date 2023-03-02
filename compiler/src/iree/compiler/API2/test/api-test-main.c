@@ -16,7 +16,6 @@
 
 #include "iree/base/api.h"
 #include "iree/compiler/API2/MLIRInterop.h"
-#include "mlir-c/IR.h"
 
 static void bytecode_builder_callback(MlirStringRef str, void* userdata) {
   iree_string_builder_t* builder = (iree_string_builder_t*)userdata;
