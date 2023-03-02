@@ -396,6 +396,7 @@ _mlirOpaqueTypeGetData
 _mlirOpaqueTypeGetDialectNamespace
 _mlirOperationClone
 _mlirOperationCreate
+_mlirOperationCreateParse
 _mlirOperationDestroy
 _mlirOperationDump
 _mlirOperationEqual

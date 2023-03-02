@@ -435,6 +435,7 @@ extern void mlirOperationPrint();
 extern void mlirOperationPrintWithFlags();
 extern void mlirOperationRemoveAttributeByName();
 extern void mlirOperationRemoveFromParent();
+extern void mlirOperationCreateParse();
 extern void mlirOperationSetAttributeByName();
 extern void mlirOperationSetOperand();
 extern void mlirOperationStateAddAttributes();
@@ -1018,6 +1019,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirOperationPrintWithFlags;
   x += (uintptr_t)&mlirOperationRemoveAttributeByName;
   x += (uintptr_t)&mlirOperationRemoveFromParent;
+  x += (uintptr_t)&mlirOperationCreateParse;
   x += (uintptr_t)&mlirOperationSetAttributeByName;
   x += (uintptr_t)&mlirOperationSetOperand;
   x += (uintptr_t)&mlirOperationStateAddAttributes;

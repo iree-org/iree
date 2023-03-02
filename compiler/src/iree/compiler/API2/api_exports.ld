@@ -398,6 +398,7 @@ VER_0 {
     mlirOpaqueTypeGetDialectNamespace;
     mlirOperationClone;
     mlirOperationCreate;
+    mlirOperationCreateParse;
     mlirOperationDestroy;
     mlirOperationDump;
     mlirOperationEqual;

@@ -43,7 +43,7 @@ with ir.Context() as ctx:
   print(options)
   pm = passmanager.PassManager(anchor_op="builtin.module")
   ireec.build_iree_vm_pass_pipeline(options, pm)
-  pm.run(input_module)
+  pm.run(input_module.operation)
 
   print(input_module)
   bytecode_io = io.BytesIO()

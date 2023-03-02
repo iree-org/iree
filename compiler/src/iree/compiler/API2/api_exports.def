@@ -397,6 +397,7 @@ EXPORTS
   mlirOpaqueTypeGetDialectNamespace
   mlirOperationClone
   mlirOperationCreate
+  mlirOperationCreateParse
   mlirOperationDestroy
   mlirOperationDump
   mlirOperationEqual
