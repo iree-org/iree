@@ -357,9 +357,10 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
       // upstream moveLoopInvariantCode if necessary.
       funcOp->walk(
           [](LoopLikeOpInterface loopLike) { moveLoopInvariantCode(loopLike); });
-      // For now, put single loop promotion as part of licm.
-      // TODO: This is almost certainly mising rewriter/listener and needs to be 
-      // plumbed through upstream `promoteIfSingleIteration`.
+      // For now, put single loop promotion as part of licm. Underlying 
+      // implementations perform splice operations which shouldn't need tracking.
+      // TODO: confirm / revisit this assumption and plumb a rewriter through
+      // upstream moveLoopInvariantCode if necessary.
       funcOp->walk([](Operation *op) {
         (void)llvm::TypeSwitch<Operation *, LogicalResult>(op)
             .Case<AffineForOp, scf::ForOp>(
