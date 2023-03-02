@@ -16,7 +16,7 @@
 #                                                                              #
 ################################################################################
 
-if(NOT IREE_BUILD_EXPERIMENTAL_E2E_TEST_ARTIFACTS)
+if(NOT IREE_BUILD_E2E_TEST_ARTIFACTS)
   return()
 endif()
 
