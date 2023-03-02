@@ -235,6 +235,7 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
         llvm::TargetRegistry::printRegisteredTargetsForVersion(llvm::outs());
         exit(0);
       }));
+  llvm::errs() << "Murali: " << targetOptions.target.cpuFeatures << "\n";
 
   return targetOptions;
 }
