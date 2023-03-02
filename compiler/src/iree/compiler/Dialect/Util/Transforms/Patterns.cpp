@@ -260,7 +260,7 @@ struct ElideBranchOperandsPattern
         if (!uniformValue.getDefiningOp() ||
             dominance.dominates(uniformValue.getDefiningOp()->getBlock(),
                                 &block)) {
-          block.getArgument(argIndex).replaceAllUsesWith(uniformValue);
+          rewriter.replaceAllUsesWith(block.getArgument(argIndex), uniformValue);
           elidedArgs.set(argIndex);
         }
       }

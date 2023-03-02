@@ -104,15 +104,18 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   // Returns true if a change was made.
   bool applyResultTransition(Operation *op, Value result,
                              PatternRewriter &rewriter) const {
+    llvm::errs() << "op: " << *op << "\n";
     auto oldType = result.getType().dyn_cast<IREE::Stream::ResourceType>();
     if (!oldType) return false;
     auto newUsage = analysis.lookupResourceUsage(result);
     auto newLifetime = convertUsageToLifetime(newUsage);
     auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
     if (oldType == newType) {
+      llvm::errs() << "- a\n";
       // Old and new lifetimes match; no need to apply a transition.
       return false;
     } else if (oldType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+      llvm::errs() << "- b\n";
       // Transitioning from one lifetime to another; insert a transfer
       // placeholder (as we may later decide it's ok to transition on a
       // particular device).
@@ -129,6 +132,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
       });
       return true;
     } else {
+      llvm::errs() << "- c\n";
       // Directly overwrite the existing lifetime.
       result.setType(newType);
       return true;
@@ -141,15 +145,23 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   bool applyResultTransition(Value result, Value resultSize,
                              IREE::Stream::AffinityAttr affinityAttr,
                              PatternRewriter &rewriter) const {
+    Operation *x = result.getDefiningOp();
+    OperationFingerPrint fp1(x);
+    llvm::errs() << "op BBB : " << result << "\n";
+
     auto oldType = result.getType().dyn_cast<IREE::Stream::ResourceType>();
     if (!oldType) return false;
     auto newUsage = analysis.lookupResourceUsage(result);
     auto newLifetime = convertUsageToLifetime(newUsage);
     auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
     if (oldType == newType) {
+      llvm::errs() << "- a\n";
+
       // Old and new lifetimes match; no need to apply a transition.
       return false;
     } else if (oldType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+      llvm::errs() << "- b\n";
+
       // Transitioning from one lifetime to another; insert a transfer
       // placeholder (as we may later decide it's ok to transition on a
       // particular device).
@@ -160,9 +172,14 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
       result.replaceAllUsesExcept(transferOp.getResult(), transferOp);
       return true;
     } else {
+      llvm::errs() << "- c\n";
+
       // Directly overwrite the existing lifetime.
       assert(result.getType() != newType);
       result.setType(newType);
+    llvm::errs() << "op BBB : " << result << "\n";
+      OperationFingerPrint fp2(x);
+      llvm::errs() << "SAME FP :  " << (fp1 == fp2) << "\n";
       return true;
     }
   }
@@ -300,9 +317,11 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
   using UsageRefinementPattern<Op>::UsageRefinementPattern;
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
+    llvm::errs() << "ENTER: ApplyStreamableOp\n";
     // Walk into nested regions first so we have the final result types returned
     // by the regions.
     bool didChange = this->applyRegionTransitions(op, rewriter);
+    llvm::errs() << "didChange1 = " << didChange << "\n";
     auto affinityAttr = getOpAffinity(op);
 
     rewriter.startRootUpdate(op);
@@ -319,6 +338,7 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
       if (this->applyResultTransition(result, resultSize, affinityAttr,
                                       rewriter)) {
         didChange = true;
+        llvm::errs() << "didChange2 = " << didChange << "\n";
       }
     }
 

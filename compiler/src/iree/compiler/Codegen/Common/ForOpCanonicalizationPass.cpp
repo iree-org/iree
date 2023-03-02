@@ -86,7 +86,9 @@ struct CanonicalizeForOpInductionVarShape final
     rewriter.mergeBlocks(source, dest, dest->getArguments());
     // Replace the yield op by one that returns only the used values.
     auto yieldOp = cast<scf::YieldOp>(dest->getTerminator());
-    yieldOp.getOperation()->setOperands(results);
+    rewriter.updateRootInPlace(yieldOp, [&]() {
+      yieldOp.getOperation()->setOperands(results);
+    });
   }
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
@@ -131,7 +133,7 @@ struct CanonicalizeForOpInductionVarShape final
       Operation* oldOp =
           newLoop.getRegionIterArgs()[index].use_begin()->getOwner();
       SmallVector<Value, 1> arg(1, newLoop.getRegionIterArgs()[index]);
-      oldOp->replaceAllUsesWith(arg);
+      rewriter.replaceAllUsesWith(oldOp->getResults(), arg);
     }
     rewriter.replaceOp(forOp, repResults);
     return success();
