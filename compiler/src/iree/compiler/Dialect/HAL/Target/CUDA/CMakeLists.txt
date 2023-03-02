@@ -51,6 +51,7 @@ iree_cc_library(
     iree::compiler::Codegen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMGPU
+    iree::compiler::Codegen::Microkernels::CUDA::Precompiled::libuCUDAKernels
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVMLinkerUtils

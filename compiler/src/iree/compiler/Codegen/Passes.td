@@ -709,6 +709,14 @@ def LLVMGPUPackSharedMemoryAlloc :
   let constructor = "mlir::iree_compiler::createLLVMGPUPackSharedMemoryAlloc()";
 }
 
+def LLVMGPULowerToUKernels :
+    Pass<"iree-llvmgpu-lower-to-ukernels", "func::FuncOp"> {
+  let summary =
+      "Separate out parts of the IR that lower to a micro-kernel";
+  let constructor =
+      "mlir::iree_compiler::createLLVMGPULowerToUKernelsPass()";
+}
+
 def LLVMGPUTensorCoreVectorization :
     Pass<"iree-llvmgpu-tensorcore-vectorization", "func::FuncOp"> {
   let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";

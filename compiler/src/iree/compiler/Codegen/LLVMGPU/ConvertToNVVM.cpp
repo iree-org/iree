@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
+#include "iree/compiler/Codegen/Microkernels/CUDA/uCUDAContract.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -144,7 +145,10 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToNVVMConversionLegality(target);
       target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
-        if (isEntryPoint(funcOp)) return false;
+        if (funcOp.getSymName().starts_with(StringRef(ugpu_kernel_prefix())) ||
+            isEntryPoint(funcOp)) {
+          return false;
+        }
         return true;
       });
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {

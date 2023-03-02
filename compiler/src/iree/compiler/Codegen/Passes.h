@@ -516,6 +516,14 @@ LogicalResult verifyGPUMatmulPipeline(
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 
 /// Lowering using wmma Tensor Core operations.
+void addGPUMicrokernelPipeline(OpPassManager &pm);
+
+/// Lowering using tensorcore operations.
+LogicalResult verifyGPUMatmulTensorCorePipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize);
+
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth);
 
@@ -567,6 +575,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
     GPUPromoteSharedMemPattern promoteSharedMemPattern =
         GPUPromoteSharedMemPattern::ContractionOpPattern);
+
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPULowerToUKernelsPass();
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>

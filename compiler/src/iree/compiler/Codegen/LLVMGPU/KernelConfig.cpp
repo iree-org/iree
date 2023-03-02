@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
+#include "iree/compiler/Codegen/Microkernels/CUDA/uCUDAContract.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
@@ -23,6 +24,8 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
+
+#define DEBUG_TYPE "iree-codegen-llvmgpu-kernelconfig"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -48,6 +51,11 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag(
                    "payload root operation"),
     llvm::cl::init(""));
 
+llvm::cl::opt<bool> clGPUEnableMicroKernel(
+    "iree-codegen-llvmgpu-enable-microkernels",
+    llvm::cl::desc("Enable using micro kernels for ops"),
+    llvm::cl::init(false));
+
 llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
     "iree-codegen-llvmgpu-transform-dialect-debug-transform-tag",
     llvm::cl::desc(
@@ -71,13 +79,6 @@ llvm::cl::opt<bool> clGPUUseMMASync(
 
 namespace {
 
-/// Structure to represent target features.
-struct TargetInfo {
-  // TODO: add finer grain control for other tensorcore types.
-  bool hasTF32TensorCore = false;
-  bool hasWarpShuffle = false;
-};
-
 struct TileWorkgroupSizePair {
   // How many scalar elements each workgroup should handle along each dimension.
   std::array<int64_t, 3> tileSize;
@@ -85,8 +86,37 @@ struct TileWorkgroupSizePair {
   int64_t pipelineDepth;
 };
 
+// Software pipeline depths
+constexpr unsigned softwarePipelineDepthTensorCore = 4;
 // Simt codegen does not do software pipelining.
 constexpr unsigned softwarePipelineDepthSimt = 0;
+
+static FailureOr<StringRef> returnCtype(Type type) {
+  if (auto ttype = dyn_cast<TensorType>(type)) {
+    if (ttype.getElementType().isF32()) return StringRef("float");
+    // todo(guray) support other types
+  }
+  return failure();
+}
+
+/// Checks the generated CUDA microkernels and fills the tile sizes.
+static bool ukernelAddTileSizes(
+    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, linalg::LinalgOp op,
+    int64_t M, int64_t N, int64_t K) {
+  auto elementTypeA = returnCtype(op.getDpsInputOperand(0)->get().getType());
+  auto elementTypeAccum = returnCtype(op.getDpsInitOperand(0)->get().getType());
+  if (failed(elementTypeA) || failed(elementTypeAccum)) return false;
+
+  auto adder = [&](int64_t tileM, int64_t tileN, int64_t tileK, int64_t nWarps,
+                   int64_t stages) {
+    tileSizes.push_back(TileWorkgroupSizePair(
+        {{tileM, tileN, tileK}, {cudaWarpSize * nWarps, 1, 1}, stages}));
+  };
+
+  return adduCUDAContracts(M, N, K, elementTypeA.value().str(),
+                           elementTypeAccum.value().str(), adder);
+}
+
 }  // namespace
 
 /// Return the best combination of tile size and wg size. It will then used to
@@ -183,6 +213,17 @@ static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
   return info;
 }
 
+FailureOr<TargetInfo> mlir::iree_compiler::getTargetInfoFromAnyOp(
+    Operation *op) {
+  if (auto result = dyn_cast<func::FuncOp>(op)) {
+    return getTargetInfo(result);
+  }
+  if (auto result = op->getParentOfType<func::FuncOp>()) {
+    return getTargetInfo(result);
+  }
+  return failure();
+}
+
 static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
                                const TargetInfo &targetInfo) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose
@@ -265,7 +306,6 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
             workgroupTileSizes[loopID] = 0;
           }
         }
-
         tileSizes.emplace_back(
             std::move(workgroupTileSizes));  // Workgroup level.
         return setOpConfigAndEntryPointFnTranslation(
@@ -327,7 +367,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
             sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
           IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
-              getTensorCorePipeline(isFp16);
+              getTensorCorePipeline(TCtileSizeConfig, isFp16, op);
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,

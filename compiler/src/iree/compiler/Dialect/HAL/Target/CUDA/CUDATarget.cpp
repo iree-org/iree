@@ -7,6 +7,8 @@
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Microkernels/CUDA/Precompiled/uCUDAkernels.h"
+#include "iree/compiler/Codegen/Microkernels/CUDA/uCUDAContract.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
@@ -51,6 +53,16 @@
 static llvm::cl::opt<bool> dumpPtx(
     "iree-hal-cuda-dump-ptx", llvm::cl::init(false),
     llvm::cl::desc("Dump ptx to the debug stream."));
+
+static llvm::cl::opt<bool> linkUKernelBitcode(
+    "iree-hal-cuda-link-uk-bitcode", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Links clang precompiled bitcode instead of precompiled PTX"));
+
+static llvm::cl::opt<bool> linkUKernelDebug(
+    "iree-hal-cuda-link-uk-debug", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Links debug version of microkernels that includes line numbers"));
 
 static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
@@ -225,6 +237,92 @@ static void dumpBitcodeToPath(StringRef path, StringRef baseName,
                  StringRef(data.data(), data.size()));
 }
 
+static const iree_file_toc_t *lookupDeviceFile(StringRef filename) {
+  for (size_t i = 0; i < libuCUDAKernels_size(); ++i) {
+    const auto &file_toc = libuCUDAKernels_create()[i];
+    if (filename == file_toc.name) return &file_toc;
+  }
+  return nullptr;
+}
+
+static const iree_file_toc_t *lookupDeviceFile(
+    llvm::TargetMachine &targetMachine, bool isPTX = false,
+    bool isDebug = false) {
+  std::string fname = "ukernels-cuda-";
+  fname += isDebug ? "debug-" : "";
+  fname += targetMachine.getTargetTriple().getTriple();
+  fname += "-";
+  fname += targetMachine.getTargetCPU();
+  fname += isPTX ? ".ptx" : ".bc";
+  return lookupDeviceFile(fname);
+}
+
+/// Link libdevice with |module|.
+static void linkUKernelsBitcode(llvm::Module &module,
+                                llvm::TargetMachine &targetMachine) {
+  llvm::Linker linker(module);
+
+  const auto *file = lookupDeviceFile(targetMachine);
+  if (!file) {
+    llvm::errs() << "no matching architecture bitcode file";
+    return;
+  }
+
+  // Load the generic bitcode file contents.
+  llvm::MemoryBufferRef bitcodeBufferRef(
+      llvm::StringRef(file->data, file->size), file->name);
+  auto bitcodeModuleValue =
+      llvm::parseBitcodeFile(bitcodeBufferRef, module.getContext());
+  if (!bitcodeModuleValue) {
+    llvm::errs() << "failed to parse CUDA libdevice bitcode: "
+                 << bitcodeModuleValue.takeError();
+    return;
+  }
+
+  std::unique_ptr<llvm::Module> bitcodeModule =
+      std::move(bitcodeModuleValue.get());
+  bitcodeModule->setDataLayout(module.getDataLayout());
+  linker.linkInModule(
+      std::move(bitcodeModule), llvm::Linker::Flags::LinkOnlyNeeded,
+      [](llvm::Module &M, const llvm::StringSet<> &GVS) {
+        llvm::internalizeModule(M, [&GVS](const llvm::GlobalValue &GV) {
+          return !GV.hasName() || (GVS.count(GV.getName()) == 0);
+        });
+      });
+}
+
+static std::string linkUKernelsPTX(std::string ptxImage,
+                                   llvm::TargetMachine &targetMachine) {
+  const auto *file = lookupDeviceFile(targetMachine, true, linkUKernelDebug);
+  if (!file) {
+    llvm::errs() << "no matching architecture bitcode file";
+    return ptxImage;
+  }
+
+  // Make externs functions visible
+  std::string prefix = ugpu_kernel_prefix();
+  std::string ukernels_name = ".extern .func " + prefix;
+  std::string ukernels_visible_name = ".visible .func " + prefix;
+  auto replaceAll = [](std::string &content, const std::string &from,
+                       const std::string &to) {
+    size_t start_pos = 0;
+    while ((start_pos = content.find(from, start_pos)) != std::string::npos) {
+      content.replace(start_pos, from.length(), to);
+      start_pos += to.length();
+    }
+  };
+  replaceAll(ptxImage, ukernels_name, ukernels_visible_name);
+
+  ptxImage.append("//===-------------------------------------------===//\n");
+  ptxImage.append("// IREE Microkernels\n");
+  ptxImage.append("//===-------------------------------------------===//\n\n");
+
+  // Load the generic bitcode file contents.
+  auto ukernelPtx = llvm::StringRef(file->data, file->size);
+  ptxImage.append(ukernelPtx);
+  return ptxImage;
+}
+
 static std::string translateModuleToISA(llvm::Module &module,
                                         llvm::TargetMachine &targetMachine) {
   std::string targetISA;
@@ -244,7 +342,7 @@ static std::string translateModuleToISA(llvm::Module &module,
 /// the generated code.
 static LogicalResult linkObjects(Location loc, llvm::Module &module,
                                  llvm::TargetMachine &targetMachine,
-                                 ArrayAttr objectAttrs) {
+                                 ArrayAttr objectAttrs, bool &needPTXLink) {
   // Ensure consistent target information.
   const llvm::Triple &targetTriple = targetMachine.getTargetTriple();
   module.setDataLayout(targetMachine.createDataLayout());
@@ -281,6 +379,13 @@ static LogicalResult linkObjects(Location loc, llvm::Module &module,
       return mlir::emitError(loc) << "failed linking in embedded libdevice "
                                      "bitcode for target triple '"
                                   << targetTriple.str() << "'";
+    }
+  }
+
+  if (anyRequiredSymbols(module, StringRef(ugpu_kernel_prefix()))) {
+    needPTXLink = !linkUKernelBitcode;
+    if (linkUKernelBitcode) {
+      linkUKernelsBitcode(module, targetMachine);
     }
   }
 
@@ -492,7 +597,8 @@ class CUDATargetBackend final : public TargetBackend {
       {
         llvm::Triple triple("nvptx64-nvidia-cuda");
         std::string targetChip = clTargetChip;
-        std::string features = "+ptx60";
+        // PTX version is backward compatible
+        std::string features = "+ptx78";
         std::string error;
         const llvm::Target *target =
             llvm::TargetRegistry::lookupTarget("", triple, error);
@@ -512,9 +618,10 @@ class CUDATargetBackend final : public TargetBackend {
                           variantOp.getName(), ".codegen.bc", *llvmModule);
       }
 
+      bool needPTXLink = false;
       // Link user and device bitcode alongside the generated module.
       if (failed(linkObjects(variantOp.getLoc(), *llvmModule, *targetMachine,
-                             variantOp.getObjectsAttr()))) {
+                             variantOp.getObjectsAttr(), needPTXLink))) {
         return failure();
       }
 
@@ -543,6 +650,7 @@ class CUDATargetBackend final : public TargetBackend {
       // Serialize CUDA kernel into the binary that we will embed in the
       // final FlatBuffer.
       ptxImage = translateModuleToISA(*llvmModule, *targetMachine);
+      if (needPTXLink) ptxImage = linkUKernelsPTX(ptxImage, *targetMachine);
     }
 
     if (dumpPtx) {

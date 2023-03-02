@@ -212,6 +212,57 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass());
 }
 
+void addGPUMicrokernelPipeline(OpPassManager &pm) {
+  tileAndDistributeToWorkgroup(pm);
+
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkgroupSpecializationPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPULowerToUKernelsPass());
+
+  // Distribute linalg onto threads within the workgroup.
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+
+  // Linalg -> vector
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+
+  // tensor to memref
+  addBufferizePasses(nestedModulePM);
+
+  // distribute foreach threads
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  // Post bufferization optimizations.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+}
+
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth) {
   tileAndBufferize(pm);
@@ -522,6 +573,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
   pm.addPass(createStripDebugInfoPass());
+  // Lower ukernel op to a function call, it is noop if ukernel isn't present
+  pm.addPass(createLowerUKernelOpsToCallsPass());
   if (useROCM) {
     // convert to ROCDL.
     pm.addPass(createConvertToROCDLPass());
