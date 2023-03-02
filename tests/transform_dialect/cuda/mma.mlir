@@ -27,7 +27,7 @@ func.func @wmma(%a: memref<16x16xf32>, %b: memref<16x16xf32>, %c: memref<16x16xf
   return
 }
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%module: !pdl.operation):
   %func = transform.structured.match ops{["func.func"]} in %module
     : (!pdl.operation) -> !pdl.operation
@@ -62,7 +62,7 @@ func.func @mma_sync(%a: memref<16x16xf32>, %b: memref<16x16xf32>, %c: memref<16x
   return
 }
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%module: !pdl.operation):
   %func = transform.structured.match ops{["func.func"]} in %module
     : (!pdl.operation) -> !pdl.operation

@@ -29,7 +29,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 }
 
 //   CHECK-LABEL: func.func @group_reduction
-//         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
+//         CHECK:   transform.sequence failures(propagate)
 //         CHECK:   transform.iree.match_callback failures(propagate) "reduction"(%{{.+}})
 //         CHECK:   transform.iree.take_first
 //         CHECK:   transform.iree.tile_to_forall_and_workgroup_count_region {{.*}} tile_sizes [1](mapping = [#gpu.block<x>])
@@ -91,7 +91,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Checking only the tile sizes.
 
 //   CHECK-LABEL: func.func @group_reduction_128
-//         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
+//         CHECK:   transform.sequence failures(propagate)
 //         CHECK:   transform.structured.tile_reduction_using_forall %{{.*}} by num_threads = [0, 32], tile_sizes = [0, 4], mapping = [#gpu.thread<x>]
 //         CHECK:   transform.iree.map_nested_forall_to_gpu_threads %{{.*}} {workgroup_size = [32, 1, 1]}
 //         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 32 : i64}
@@ -133,7 +133,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Checking only the tile sizes.
 
 //   CHECK-LABEL: func.func @group_reduction_D
-//         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
+//         CHECK:   transform.sequence failures(propagate)
 //         CHECK:   transform.structured.tile_reduction_using_forall %{{.*}} by num_threads = [0, 256], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
 //         CHECK:   transform.iree.map_nested_forall_to_gpu_threads %{{.*}} {workgroup_size = [256, 1, 1]}
 //         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 256 : i64}
@@ -173,7 +173,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Checking only the tile sizes.
 
 //   CHECK-LABEL: func.func @group_reduction_34
-//         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
+//         CHECK:   transform.sequence failures(propagate)
 //         CHECK:   transform.iree.tile_to_forall_and_workgroup_count_region %{{.*}} num_threads [] tile_sizes [64](mapping = [#gpu.block<x>])
 //         CHECK:   transform.structured.tile_to_forall_op %{{.*}}   num_threads [64] tile_sizes [](mapping = [#gpu.thread<x>])
 // CHECK-COUNT-4:   transform.structured.scalarize %{{.*}}
@@ -226,7 +226,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 }
 
 //   CHECK-LABEL: func.func @group_reduction_12345
-//         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
+//         CHECK:   transform.sequence failures(propagate)
 //         CHECK:   transform.iree.tile_to_forall_and_workgroup_count_region %{{.*}} num_threads [] tile_sizes [1](mapping = [#gpu.block<x>])
 //         CHECK:   transform.structured.tile_to_forall_op %{{.*}}   num_threads [] tile_sizes [1](mapping = [#gpu.thread<y>])
 //         CHECK:   transform.structured.split %{{.*}} after 8192  {dimension = 1 : i64}

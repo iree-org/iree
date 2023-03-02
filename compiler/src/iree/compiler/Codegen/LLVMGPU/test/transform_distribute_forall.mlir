@@ -41,7 +41,7 @@ hal.executable private @distribute {
         return
       }
       module {
-        transform.structured.canonicalized_sequence failures(propagate) {
+        transform.sequence failures(propagate) {
         ^bb0(%arg0: !pdl.operation):
         %17 = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation
         %18 = transform.iree.map_nested_forall_to_gpu_threads %17 {workgroup_size = [256, 1, 1]}

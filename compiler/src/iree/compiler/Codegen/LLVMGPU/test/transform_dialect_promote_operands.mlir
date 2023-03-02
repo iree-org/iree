@@ -30,7 +30,7 @@ hal.executable private @pad_matmul_static_dispatch_0  {
     }
   }
 
-  transform.structured.canonicalized_sequence failures(propagate) {
+  transform.sequence failures(propagate) {
   ^bb1(%variant_op: !pdl.operation):
     %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
       : (!pdl.operation) -> !pdl.operation

@@ -47,7 +47,7 @@ func.func @matmul() {
   return
 }
 }
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %func_2 = transform.iree.apply_patterns %func { unroll_vectors_gpu_wmma }
