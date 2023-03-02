@@ -259,9 +259,6 @@ jobs:
       - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}  # must come first
       # - runner-group=postsubmit
       - os-family=macOS
-    defaults:
-      run:
-        shell: bash
     env:
       BUILD_DIR: build-macos
     steps:
@@ -269,10 +266,6 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
-      - name: "Setting up Python"
-        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
-        with:
-          python-version: "3.11"
       - name: "Installing Python packages"
         run: |
           python3 -m venv .venv
@@ -285,11 +278,13 @@ jobs:
           IREE_WRITE_REMOTE_CCACHE: 0
           IREE_READ_LOCAL_CCACHE: 1
           IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
-          CCACHE_DIR: ${{ github.workspace }}/.ccache
+          # We'll remove the GITHUB_WORKSPACE directory after the job.
+          # Persist the cache by storing in the parent directory.
+          CCACHE_DIR: ${{ github.workspace }}/../.ccache
           CCACHE_MAXSIZE: 30G
-        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+        run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
-        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+        run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
   build_test_all_bazel:
     needs: setup
