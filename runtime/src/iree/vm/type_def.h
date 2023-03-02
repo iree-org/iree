@@ -58,7 +58,7 @@ static inline iree_vm_type_def_t iree_vm_type_def_make_ref_type(
   ((v)->value_type == IREE_VM_VALUE_TYPE_NONE && \
    (v)->ref_type == IREE_VM_REF_TYPE_NULL)
 
-#define IREE_VM_VARIANT_STORAGE_SIZE 16
+#define IREE_VM_VARIANT_STORAGE_SIZE sizeof(iree_vm_ref_t)
 
 // An variant value that can be either a primitive value type or a ref type.
 // Each variant value stores its type but users are required to check the type
