@@ -562,7 +562,7 @@ struct SwitchStoreOfIfResultValue
 
     auto resultNumber = storeOp.getValue().cast<OpResult>().getResultNumber();
     auto moveStoreInsideBody = [&](Block *body) {
-      OpBuilder::InsertionGuard g2(rewriter);
+      OpBuilder::InsertionGuard guard(rewriter);
       auto yieldOp = cast<scf::YieldOp>(body->getTerminator());
       rewriter.setInsertionPoint(yieldOp);
       auto yieldedVal = yieldOp.getOperand(resultNumber);
