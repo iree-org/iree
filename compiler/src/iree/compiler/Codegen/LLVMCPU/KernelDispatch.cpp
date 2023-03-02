@@ -171,6 +171,22 @@ static llvm::raw_ostream &operator<<(
   return os;
 }
 
+/// Splits the given `Range` vector and returns the `lbs` and the `ubs` as
+/// separate lists.
+static void getBoundsFromRange(ArrayRef<Range> loopRange,
+                               SmallVector<int64_t> &lb,
+                               SmallVector<int64_t> &ub) {
+  auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
+    Optional<int64_t> intVal = getConstantIntValue(ofr);
+    if (!intVal) return ShapedType::kDynamic;
+    return intVal.value();
+  };
+  lb = llvm::to_vector(llvm::map_range(
+      loopRange, [&](Range r) { return getStaticValue(r.offset); }));
+  ub = llvm::to_vector(llvm::map_range(
+      loopRange, [&](Range r) { return getStaticValue(r.size); }));
+}
+
 /// Returns true if all the input and output tensor operands of 'op' are fully
 /// dynamic.
 static bool isFullyDynamicOp(linalg::LinalgOp op) {
@@ -1751,6 +1767,46 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
 }
 
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   tensor::PadOp padOp) {
+  OpBuilder builder(padOp.getContext());
+  builder.setInsertionPoint(padOp);
+  SmallVector<Range> iterationDomain =
+      cast<TilingInterface>(padOp.getOperation()).getIterationDomain(builder);
+  SmallVector<int64_t> lbs, ubs;
+  getBoundsFromRange(iterationDomain, lbs, ubs);
+
+  SmallVector<int64_t> minTileSizes(lbs.size(), 1);
+  SmallVector<int64_t> maxTileSizes(ubs.size(), defaultWorkgroupTileSize);
+  SmallVector<int64_t> vectorTileSizes(lbs.size(), 1);
+
+  unsigned typeWidthInBytes = IREE::Util::getRoundedElementByteWidth(
+      padOp.getResultType().getElementType());
+  int64_t typeVectorSize = getVectorSize(entryPointFn, typeWidthInBytes);
+  vectorTileSizes.back() = (ubs.back() == ShapedType::kDynamic
+                                ? 1
+                                : std::min(typeVectorSize, ubs.back()));
+  minTileSizes.back() = vectorTileSizes.back();
+
+  SmallVector<unsigned> partitionableLoops =
+      cast<PartitionableLoopsInterface>(padOp.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  SmallVector<int64_t> distributedTileSizes =
+      getDefaultDistributedLevelTileSizes(partitionableLoops, lbs, ubs,
+                                          minTileSizes, maxTileSizes);
+  TileSizesListType tileSizes;
+  // Distribution tiling
+  tileSizes.emplace_back(std::move(distributedTileSizes));
+  // Tiling for vectorization.
+  tileSizes.emplace_back(std::move(vectorTileSizes));
+  // No further tiling.
+  tileSizes.push_back({});
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, padOp, tileSizes,
+      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
+}
+
 /// Set default configuration for Linalg ops.
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::LinalgOp linalgOp,
@@ -1812,12 +1868,13 @@ static LogicalResult setRootConfigImpl(
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
         })
-        .Case<IREE::LinalgExt::FftOp, tensor::PackOp, linalg::Mmt4DOp,
-              linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-              linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-              linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-              linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+        .Case<IREE::LinalgExt::FftOp, tensor::PackOp, tensor::PadOp,
+              linalg::Mmt4DOp, linalg::Conv2DNhwcHwcfOp,
+              linalg::Conv2DNchwFchwOp, linalg::PoolingNhwcSumOp,
+              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
+              linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp,
+              linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<tensor::UnPackOp>(
             [&](auto op) { return setUnPackOpRootConfig(entryPointFn, op); })
@@ -1867,21 +1924,47 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
 /// to the end of the function is the root op.
 static FailureOr<Operation *> getRootOperation(
     ArrayRef<Operation *> computeOps) {
+  Operation *rootOperation = nullptr;
   for (auto op : llvm::reverse(computeOps)) {
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-    if (!linalgOp) continue;
-    if (linalgOp.getNumReductionLoops()) return op;
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+      // Do not treat linalg ops that are all parallel as root operations in
+      // this sweep.
+      if (linalgOp.getNumLoops() == linalgOp.getNumParallelLoops()) continue;
+
+      // All other linalg ops are root ops.
+      rootOperation = op;
+      break;
+    }
+
+    if (isa<TilingInterface>(op) &&
+        !isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
+      // All other operations that implement this interface are root ops.
+      rootOperation = op;
+      break;
+    }
   }
 
-  for (auto op : llvm::reverse(computeOps)) {
-    if (isa<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>(op)) return op;
+  if (!rootOperation) {
+    // Check for elementwise operations.
+    for (auto op : llvm::reverse(computeOps)) {
+      if (isa<linalg::LinalgOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
   }
 
-  for (auto op : llvm::reverse(computeOps)) {
-    if (isa<TilingInterface>(op)) return op;
+  if (!rootOperation) {
+    // Check for pad/pack/unpack ops by themselves.
+    for (auto op : llvm::reverse(computeOps)) {
+      if (isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
   }
 
-  return nullptr;
+  return rootOperation;
 }
 
 static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
