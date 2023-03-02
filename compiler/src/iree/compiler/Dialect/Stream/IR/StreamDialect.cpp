@@ -78,10 +78,10 @@ struct StripResourceConversionCastPattern
     for (auto &use : llvm::make_early_inc_range(result.getUses())) {
       if (auto sizeOp =
               dyn_cast<IREE::Stream::ResourceSizeOp>(use.getOwner())) {
-        sizeOp.getResult().replaceAllUsesWith(sizeValue);
-        rewriter.eraseOp(sizeOp);
+        rewriter.replaceOp(sizeOp, sizeValue);
       } else {
-        use.set(resourceValue);
+        rewriter.updateRootInPlace(use.getOwner(),
+                                   [&]() { use.set(resourceValue); });
       }
     }
     rewriter.eraseOp(castOp);
