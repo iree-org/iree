@@ -74,7 +74,7 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
     if (rank == 0) continue;
     SmallVector<int64_t> tileSizes(rank - 1, 0);
     tileSizes.push_back(strategy.getVectorSize());
-    buildTileFuseToScfFor(b, val, {},
+    buildTileFuseToScfFor(b, variantH, val, {},
                           getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)));
   }
 
