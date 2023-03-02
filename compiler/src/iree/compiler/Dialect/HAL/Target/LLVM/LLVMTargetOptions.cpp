@@ -117,6 +117,14 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   if (clTargetCPU != "host" && clTargetCPU != "generic") {
     addTargetCPUFeaturesForCPU(targetOptions.target);
   }
+  // TODO(muralivi): Move this into `addTargetCPUFeaturesForCPU`, after fixing
+  // the predicate for when `addTargetCPUFeaturesForCPU` is called (i.e.
+  // removing the condition that clTargetCPU is neither host nor generic).
+  if (llvm::Triple(targetOptions.target.triple).isAArch64()) {
+    llvm::SubtargetFeatures targetCpuFeatures(targetOptions.target.cpuFeatures);
+    targetCpuFeatures.AddFeature("reserve-x18", true);
+    targetOptions.target.cpuFeatures = targetCpuFeatures.getString();
+  }
 
   // LLVM opt options.
   targetOptions.pipelineTuningOptions.LoopInterleaving = llvmLoopInterleaving;
