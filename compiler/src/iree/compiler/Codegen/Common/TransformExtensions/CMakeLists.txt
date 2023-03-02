@@ -36,6 +36,7 @@ iree_cc_library(
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
+    MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
@@ -51,6 +52,8 @@ iree_cc_library(
     MLIRPDLDialect
     MLIRPass
     MLIRSCFDialect
+    MLIRSCFTransforms
+    MLIRSCFUtils
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTransformDialect
