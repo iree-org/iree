@@ -58,12 +58,17 @@ static inline iree_vm_type_def_t iree_vm_type_def_make_ref_type(
   ((v)->value_type == IREE_VM_VALUE_TYPE_NONE && \
    (v)->ref_type == IREE_VM_REF_TYPE_NULL)
 
+#define IREE_VM_VARIANT_STORAGE_SIZE 16
+
 // An variant value that can be either a primitive value type or a ref type.
 // Each variant value stores its type but users are required to check the type
 // prior to accessing any of the data.
 typedef struct iree_vm_variant_t {
   iree_vm_type_def_t type;
   union {
+    uint8_t value_storage[IREE_VM_VARIANT_STORAGE_SIZE];  // max size of all
+                                                          // variant types
+
     // TODO(benvanik): replace with iree_vm_value_t.
     int8_t i8;
     int16_t i16;
@@ -72,14 +77,11 @@ typedef struct iree_vm_variant_t {
     float f32;
     double f64;
     iree_vm_ref_t ref;
-
-    uint8_t value_storage[IREE_VM_VALUE_STORAGE_SIZE];  // max size of all value
-                                                        // types
   };
 } iree_vm_variant_t;
 
 #define iree_vm_variant_empty() \
-  { {IREE_VM_VALUE_TYPE_NONE, IREE_VM_REF_TYPE_NULL}, {.value_storage = {0}}, }
+  { {IREE_VM_VALUE_TYPE_NONE, IREE_VM_REF_TYPE_NULL}, {{0}}, }
 #define iree_vm_variant_is_value(v) iree_vm_type_def_is_value(&(v).type)
 #define iree_vm_variant_is_ref(v) iree_vm_type_def_is_ref(&(v).type)
 #define iree_vm_variant_is_empty(v) iree_vm_type_def_is_variant(&(v).type)
