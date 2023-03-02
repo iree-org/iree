@@ -39,18 +39,18 @@ hal.executable private @split_reduction_pass1_dispatch_0 {
   }
 }
 
-// CHECK:     func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_supported()
-// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
-// CHECK:       scf.for
+// CHECK-LABEL: func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_supported()
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
-// CHECK:               %[[RES:.+]] = arith.addi
-// CHECK:               scf.yield %[[RES]] : vector<1x1x4xi32>
-// CHECK:             vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
-// CHECK:           arith.addi %{{.+}}, %{{.+}} : vector<1x4xi32>
+// CHECK:             scf.for
+// CHECK:               scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
+// CHECK:                 %[[RES:.+]] = arith.addi
+// CHECK:                 scf.yield %[[RES]] : vector<1x1x4xi32>
+// CHECK:               vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
+// CHECK:             arith.addi %{{.+}}, %{{.+}} : vector<1x4xi32>
 
 // -----
 
@@ -92,21 +92,21 @@ hal.executable private @split_reduction_pass1_dispatch_0 {
   }
 }
 
-// CHECK:     func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_float_supported_with_flag()
-// CHECK-NOT:   scf.yield %{{.+}} : vector<1x1x4xf32>
+// CHECK-LABEL: func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_float_supported_with_flag()
+// CHECK-NOT:     scf.yield %{{.+}} : vector<1x1x4xf32>
 
-// REORDERCHECK:     func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_float_supported_with_flag()
-// REORDERCHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-// REORDERCHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-// REORDERCHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
-// REORDERCHECK:       scf.for
+// REORDERCHECK-LABEL: func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_float_supported_with_flag()
+// REORDERCHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// REORDERCHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// REORDERCHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
 // REORDERCHECK:         scf.for
 // REORDERCHECK:           scf.for
-// REORDERCHECK:             scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
-// REORDERCHECK:               %[[RES:.+]] = arith.addf
-// REORDERCHECK:               scf.yield %[[RES]] : vector<1x1x4xf32>
-// REORDERCHECK:             vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xf32> into f32
-// REORDERCHECK:           arith.addf %{{.+}}, %{{.+}} : vector<1x4xf32>
+// REORDERCHECK:             scf.for
+// REORDERCHECK:               scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
+// REORDERCHECK:                 %[[RES:.+]] = arith.addf
+// REORDERCHECK:                 scf.yield %[[RES]] : vector<1x1x4xf32>
+// REORDERCHECK:               vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xf32> into f32
+// REORDERCHECK:             arith.addf %{{.+}}, %{{.+}} : vector<1x4xf32>
 
 // -----
 
@@ -144,17 +144,17 @@ hal.executable private @split_reduction_pass2_dispatch_0 {
   }
 }
 
-// CHECK:     func.func @split_reduction_innermost_reduction_next_dynamic_supported()
-// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
-// CHECK:       scf.for
-// CHECK:         scf.for
-// CHECK:           scf.for
-// CHECK:             scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
-// CHECK:               %[[RES:.+]] = arith.addi
-// CHECK:               scf.yield %[[RES]] : vector<1x1x4xi32>
-// CHECK:             vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
+// CHECK-LABEL:  func.func @split_reduction_innermost_reduction_next_dynamic_supported()
+// CHECK-DAG:      %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:      %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:      %[[C64:.+]] = arith.constant 64 : index
+// CHECK:          scf.for
+// CHECK:            scf.for
+// CHECK:              scf.for
+// CHECK:                scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
+// CHECK:                  %[[RES:.+]] = arith.addi
+// CHECK:                  scf.yield %[[RES]] : vector<1x1x4xi32>
+// CHECK:                vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
 
 // -----
 
@@ -188,17 +188,17 @@ hal.executable private @split_reduction_pass3_dispatch_0 {
   }
 }
 
-// CHECK:     func.func @split_reduction_innermost_reduction_next_imperfect_tiling_supported()
-// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
-// CHECK:       scf.for
-// CHECK:         scf.for
-// CHECK:           scf.for
-// CHECK:             scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
-// CHECK:               %[[RES:.+]] = arith.addi
-// CHECK:               scf.yield %[[RES]] : vector<1x1x4xi32>
-// CHECK:             vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
+// CHECK-LABEL:  func.func @split_reduction_innermost_reduction_next_imperfect_tiling_supported()
+// CHECK-DAG:      %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:      %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:      %[[C64:.+]] = arith.constant 64 : index
+// CHECK:          scf.for
+// CHECK:            scf.for
+// CHECK:              scf.for
+// CHECK:                scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
+// CHECK:                  %[[RES:.+]] = arith.addi
+// CHECK:                  scf.yield %[[RES]] : vector<1x1x4xi32>
+// CHECK:                vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
 
 // -----
 
@@ -234,9 +234,8 @@ hal.executable private @split_reduction_fail1_dispatch_0 {
   }
 }
 
-// CHECK:     func.func @split_reduction_innermost_dynamic_reduction_unsupported()
-// CHECK-NOT:   scf.yield %{{.+}} : vector<1x1x4xi32>
-// CHECK-NOT:   vector.reduction
+// CHECK-LABEL:  func.func @split_reduction_innermost_dynamic_reduction_unsupported()
+//     CHECK-4:    vector.mask %{{.*}} { vector.reduction <add>
 
 // -----
 
@@ -270,9 +269,8 @@ hal.executable private @split_reduction_fail2_dispatch_0 {
   }
 }
 
-// CHECK:     func.func @split_reduction_innermost_imperfect_reduction_unsupported()
-// CHECK-NOT:   scf.yield %{{.+}} : vector<1x1x4xi32>
-// CHECK-NOT:   vector.reduction
+// CHECK-LABEL:  func.func @split_reduction_innermost_imperfect_reduction_unsupported()
+//     CHECK-4:    vector.mask %{{.*}} { vector.reduction <add>
 
 // -----
 
@@ -306,9 +304,9 @@ hal.executable private @split_reduction_fail3_dispatch_0 {
   }
 }
 
-// CHECK:     func.func @split_reduction_not_innermost_reduction_unsupported()
-// CHECK-NOT:   scf.yield %{{.+}} : vector<1x1x4xi32>
-// CHECK-NOT:   vector.reduction
+// CHECK-LABEL:  func.func @split_reduction_not_innermost_reduction_unsupported()
+// CHECK-NOT:      scf.yield %{{.+}} : vector<1x1x4xi32>
+// CHECK-NOT:      vector.reduction
 
 // -----
 
@@ -342,6 +340,6 @@ hal.executable private @split_reduction_fail4_dispatch_0 {
   }
 }
 
-// CHECK:     func.func @split_reduction_double_reduction_unsupported()
-// CHECK:       vector.insertelement %{{.+}}, %{{.+}} : vector<4xi32>
-// CHECK-NOT:   vector.insertelement %{{.+}}, %{{.+}} : vector<1xi32>
+// CHECK-LABEL:  func.func @split_reduction_double_reduction_unsupported()
+// CHECK:          vector.insertelement %{{.+}}, %{{.+}} : vector<4xi32>
+// CHECK-NOT:      vector.insertelement %{{.+}}, %{{.+}} : vector<1xi32>
