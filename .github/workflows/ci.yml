@@ -114,6 +114,13 @@ jobs:
 
           ./build_tools/github_actions/configure_ci.py
 
+      - name: "Show benchmark presets"
+        env:
+          BENCHMARK_PRESETS: ${{ steps.configure.outputs.benchmark-presets }}
+        run: |
+          echo ":stopwatch: Enabled benchmarks: \`${BENCHMARK_PRESETS}\`" \
+            >> "${GITHUB_STEP_SUMMARY}"
+
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
