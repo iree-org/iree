@@ -20,10 +20,11 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
@@ -41,7 +42,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
 using namespace mlir;
@@ -349,16 +349,18 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   LogicalResult listenerResult = listener.checkErrorState();
   if (failed(listenerResult))
     return mlir::emitDefiniteFailure(target, "pattern listener tracker fail");
-  
+
   if (getLicm()) {
-    target->walk([&](func::FuncOp funcOp){
+    target->walk([&](func::FuncOp funcOp) {
       // This assumes LICM never removes operations so we don't need tracking.
       // TODO: confirm / revisit this assumption and plumb a rewriter through
       // upstream moveLoopInvariantCode if necessary.
-      funcOp->walk(
-          [](LoopLikeOpInterface loopLike) { moveLoopInvariantCode(loopLike); });
-      // For now, put single loop promotion as part of licm. Underlying 
-      // implementations perform splice operations which shouldn't need tracking.
+      funcOp->walk([](LoopLikeOpInterface loopLike) {
+        moveLoopInvariantCode(loopLike);
+      });
+      // For now, put single loop promotion as part of licm. Underlying
+      // implementations perform splice operations which shouldn't need
+      // tracking.
       // TODO: confirm / revisit this assumption and plumb a rewriter through
       // upstream moveLoopInvariantCode if necessary.
       funcOp->walk([](Operation *op) {
