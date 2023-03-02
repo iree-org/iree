@@ -267,7 +267,7 @@ SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   return ranges;
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 ScatterOp::getTiledImplementation(OpBuilder &builder,
                                   ArrayRef<OpFoldResult> offsets,
                                   ArrayRef<OpFoldResult> sizes) {
@@ -316,7 +316,8 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledScatterOp =
       mlir::clone(builder, getOperation(), resultTypes,
                   ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
-  return {tiledScatterOp};
+  return TilingResult{{tiledScatterOp},
+                      SmallVector<Value>(tiledScatterOp->getResults())};
 }
 
 LogicalResult ScatterOp::getResultTilePosition(
@@ -484,7 +485,7 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 SortOp::getTiledImplementation(OpBuilder &builder,
                                ArrayRef<OpFoldResult> offsets,
                                ArrayRef<OpFoldResult> sizes) {
@@ -506,7 +507,8 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   }
   Operation *tiledSortOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return {tiledSortOp};
+  return TilingResult{{tiledSortOp},
+                      SmallVector<Value>{tiledSortOp->getResults()}};
 }
 
 LogicalResult SortOp::getResultTilePosition(
@@ -807,7 +809,7 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 FftOp::getTiledImplementation(OpBuilder &builder,
                               ArrayRef<OpFoldResult> offsets,
                               ArrayRef<OpFoldResult> sizes) {
@@ -828,7 +830,8 @@ FftOp::getTiledImplementation(OpBuilder &builder,
   }
   Operation *tiledFftOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return {tiledFftOp};
+  return TilingResult{{tiledFftOp},
+                      SmallVector<Value>(tiledFftOp->getResults())};
 }
 
 LogicalResult FftOp::getResultTilePosition(
@@ -1006,7 +1009,7 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 ScanOp::getTiledImplementation(OpBuilder &builder,
                                ArrayRef<OpFoldResult> offsets,
                                ArrayRef<OpFoldResult> sizes) {
@@ -1042,7 +1045,8 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledScanOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return {tiledScanOp};
+  return TilingResult{{tiledScanOp},
+                      SmallVector<Value>(tiledScanOp->getResults())};
 }
 
 LogicalResult ScanOp::getResultTilePosition(
@@ -1161,7 +1165,7 @@ LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
   return success();
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 ReverseOp::getTiledImplementation(OpBuilder &builder,
                                   ArrayRef<OpFoldResult> offsets,
                                   ArrayRef<OpFoldResult> sizes) {
@@ -1191,7 +1195,8 @@ ReverseOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledRevOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return {tiledRevOp};
+  return TilingResult{{tiledRevOp},
+                      SmallVector<Value>(tiledRevOp->getResults())};
 }
 
 LogicalResult ReverseOp::getResultTilePosition(
@@ -1424,7 +1429,7 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 TopkOp::getTiledImplementation(OpBuilder &builder,
                                ArrayRef<OpFoldResult> offsets,
                                ArrayRef<OpFoldResult> sizes) {
@@ -1465,7 +1470,8 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledTopkOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return {tiledTopkOp};
+  return TilingResult{{tiledTopkOp},
+                      SmallVector<Value>(tiledTopkOp->getResults())};
 }
 
 LogicalResult TopkOp::getResultTilePosition(
@@ -2170,7 +2176,7 @@ WinogradInputTransformOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
                                                  ArrayRef<OpFoldResult> offsets,
                                                  ArrayRef<OpFoldResult> sizes) {
@@ -2213,7 +2219,7 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return {tiledOp};
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
 }
 
 LogicalResult WinogradInputTransformOp::getResultTilePosition(
@@ -2332,7 +2338,7 @@ WinogradOutputTransformOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Operation *> WinogradOutputTransformOp::getTiledImplementation(
+FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
     OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes) {
 
@@ -2374,7 +2380,7 @@ SmallVector<Operation *> WinogradOutputTransformOp::getTiledImplementation(
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return {tiledOp};
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
 }
 
 LogicalResult WinogradOutputTransformOp::getResultTilePosition(
@@ -2450,7 +2456,7 @@ SmallVector<utils::IteratorType> SoftmaxOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 SoftmaxOp::getTiledImplementation(OpBuilder &builder,
                                   ArrayRef<OpFoldResult> offsets,
                                   ArrayRef<OpFoldResult> sizes) {
@@ -2470,7 +2476,7 @@ SoftmaxOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return {tiledOp};
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
 }
 
 LogicalResult SoftmaxOp::getResultTilePosition(
@@ -2546,7 +2552,7 @@ SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 AttentionOp::getTiledImplementation(OpBuilder &builder,
                                     ArrayRef<OpFoldResult> offsets,
                                     ArrayRef<OpFoldResult> sizes) {
@@ -2594,7 +2600,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return {tiledOp};
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
 }
 
 LogicalResult AttentionOp::getResultTilePosition(

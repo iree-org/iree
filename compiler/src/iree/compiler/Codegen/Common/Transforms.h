@@ -30,11 +30,11 @@ LogicalResult runIREEOneShotBufferize(
 /// For a given operation within a dispatch, tile and distribute the operation
 /// to workgroups as well as tile + fuse its producers. Returns the
 /// generated tiled and fused ops, as well as the loops used for distribution.
-struct TileAndFuseResult {
+struct IREETileAndFuseResult {
   SmallVector<Operation *> tiledAndFusedOps;
   SmallVector<scf::ForOp> loops;
 };
-FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
+FailureOr<IREETileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
     TilingInterface op, linalg::LinalgTilingOptions tilingOptions,
     RewriterBase &rewriter);
 
