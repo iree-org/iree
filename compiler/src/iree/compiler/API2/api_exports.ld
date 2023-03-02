@@ -381,6 +381,7 @@ VER_0 {
     mlirOpPassManagerAddOwnedPass;
     mlirOpPassManagerAddPipeline;
     mlirOpPassManagerGetNestedUnder;
+    mlirOpPrintingFlagsAssumeVerified;
     mlirOpPrintingFlagsCreate;
     mlirOpPrintingFlagsDestroy;
     mlirOpPrintingFlagsElideLargeElementsAttrs;
