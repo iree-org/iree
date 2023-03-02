@@ -63,20 +63,15 @@ static LLVMTargetOptions getDefaultLLVMTargetOptions() {
 }
 
 static void addTargetCPUFeaturesForCPU(LLVMTarget &target) {
-  if (!(llvm::Triple(target.triple).isX86() ||
-        llvm::Triple(target.triple).isMacOSX())) {
-    // Currently only implemented on x86 or AArch64.
+  if (!llvm::Triple(target.triple).isX86()) {
+    // Currently only implemented on x86.
     return;
   }
   llvm::SubtargetFeatures targetCpuFeatures(target.cpuFeatures);
-  if (llvm::Triple(target.triple).isMacOSX()) {
-    targetCpuFeatures.AddFeature("reserve-x18", true);
-  } else {
-    llvm::SmallVector<llvm::StringRef> cpuFeatures;
-    llvm::X86::getFeaturesForCPU(target.cpu, cpuFeatures);
-    for (auto &feature : cpuFeatures) {
-      targetCpuFeatures.AddFeature(feature);
-    }
+  llvm::SmallVector<llvm::StringRef> cpuFeatures;
+  llvm::X86::getFeaturesForCPU(target.cpu, cpuFeatures);
+  for (auto &feature : cpuFeatures) {
+    targetCpuFeatures.AddFeature(feature);
   }
   target.cpuFeatures = targetCpuFeatures.getString();
 }
@@ -121,6 +116,11 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   }
   if (clTargetCPU != "host" && clTargetCPU != "generic") {
     addTargetCPUFeaturesForCPU(targetOptions.target);
+  }
+  if (llvm::Triple(targetOptions.target.triple).isAArch64()) {
+    llvm::SubtargetFeatures targetCpuFeatures(targetOptions.target.cpuFeatures);
+    targetCpuFeatures.AddFeature("reserve-x18", true);
+    targetOptions.target.cpuFeatures = targetCpuFeatures.getString();
   }
 
   // LLVM opt options.
@@ -235,7 +235,6 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
         llvm::TargetRegistry::printRegisteredTargetsForVersion(llvm::outs());
         exit(0);
       }));
-  llvm::errs() << "Murali: " << targetOptions.target.cpuFeatures << "\n";
 
   return targetOptions;
 }
