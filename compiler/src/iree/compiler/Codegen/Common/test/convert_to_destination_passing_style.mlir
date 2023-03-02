@@ -896,3 +896,123 @@ func.func @multi_result_dispatches() {
 //  CHECK-SAME:       outs(%[[RESULT0]] :
 //       CHECK:   flow.dispatch.tensor.store %[[MATMUL]], %[[RESULT_BINDING1]]
 //       CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[RESULT_BINDING0]]
+
+// -----
+
+func.func @if_conversion() {
+  %0 = hal.interface.constant.load[0] : index
+  %offset = hal.interface.constant.load[1] : index
+  %size = hal.interface.constant.load[2] : index
+  %cond = hal.interface.constant.load[3] : i1
+  %result_offset = hal.interface.constant.load[4] : index
+  %then = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+    : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%0}
+  %else = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+    : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%0}
+  %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+    : !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%0}
+  %then_value = flow.dispatch.tensor.load %then, offsets = [%offset], sizes = [%size], strides = [1]
+    : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%0} -> tensor<?xf32>
+  %else_value = flow.dispatch.tensor.load %else, offsets = [%offset], sizes = [%size], strides = [1]
+    : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%0} -> tensor<?xf32>
+  %if = scf.if %cond -> (tensor<?xf32>) {
+    scf.yield %then_value : tensor<?xf32>
+  } else {
+    scf.yield %else_value : tensor<?xf32>
+  }
+  flow.dispatch.tensor.store %if, %result, offsets = [%result_offset], sizes = [%size], strides = [1]
+    : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%0}
+  return
+}
+// CHECK-LABEL: func @if_conversion()
+//   CHECK-DAG:   %[[S0:.+]] = hal.interface.constant.load[0]
+//   CHECK-DAG:   %[[S1:.+]] = hal.interface.constant.load[2]
+//   CHECK-DAG:   %[[COND:.+]] = hal.interface.constant.load[3]
+//   CHECK-DAG:   %[[OFFSET:.+]] = hal.interface.constant.load[4]
+//   CHECK-DAG:   %[[THEN_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//   CHECK-DAG:   %[[ELSE_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//   CHECK-DAG:   %[[RESULT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(2)
+//   CHECK-DAG:   %[[THEN:.+]] = flow.dispatch.tensor.load %[[THEN_BINDING]]
+//   CHECK-DAG:   %[[ELSE:.+]] = flow.dispatch.tensor.load %[[ELSE_BINDING]]
+//       CHECK:   scf.if %[[COND]] {
+//  CHECK-NEXT:     flow.dispatch.tensor.store %[[THEN]], %[[RESULT_BINDING]]
+//  CHECK-SAME:         offsets = [%[[OFFSET]]], sizes = [%[[S1]]]
+//  CHECK-SAME:         flow.dispatch.tensor<writeonly:tensor<?xf32>>{%[[S0]]}
+//  CHECK-NEXT:   } else {
+//  CHECK-NEXT:     flow.dispatch.tensor.store %[[ELSE]], %[[RESULT_BINDING]]
+//  CHECK-SAME:         offsets = [%[[OFFSET]]], sizes = [%[[S1]]]
+//  CHECK-SAME:         flow.dispatch.tensor<writeonly:tensor<?xf32>>{%[[S0]]}
+//  CHECK-NEXT:   }
+//  CHECK-NEXT:   return
+
+// -----
+
+func.func @if_conversion_clone_offsets() {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load[0] : i32
+  %1 = hal.interface.constant.load[1] : i32
+  %2 = hal.interface.constant.load[2] : i32
+  %3 = hal.interface.constant.load[3] : i32
+  %4 = hal.interface.constant.load[4] : i32
+  %5 = arith.index_castui %0 : i32 to index
+  %6 = arith.index_castui %1 : i32 to index
+  %7 = arith.index_castui %2 : i32 to index
+  %8 = arith.index_castui %3 : i32 to index
+  %9 = arith.index_castui %4 : i32 to index
+  %10 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%6, %7}
+  %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%8, %9}
+  %12 = affine.apply affine_map<()[s0, s1] -> (-s0 + s1 + (s0 ceildiv 16) * 16)>()[%6, %6]
+  %13 = affine.apply affine_map<()[s0, s1] -> (-s0 + s1 + (s0 ceildiv 16) * 16)>()[%7, %7]
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %14 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
+  %15 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_y]
+  scf.for %arg0 = %14 to %12 step %15 {
+    %16 = affine.min affine_map<(d0)[s0, s1] -> (64, -d0 - s0 + s1 + (s0 ceildiv 16) * 16)>(%arg0)[%6, %6]
+    %17 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
+    %18 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
+    scf.for %arg1 = %17 to %13 step %18 {
+      %19 = affine.min affine_map<(d0)[s0, s1] -> (64, -d0 - s0 + s1 + (s0 ceildiv 16) * 16)>(%arg1)[%7, %7]
+      %20 = affine.min affine_map<(d0)[s0] -> (s0, d0)>(%arg0)[%6]
+      %21 = affine.min affine_map<(d0, d1)[s0] -> (s0, d0 + d1)>(%arg0, %16)[%6]
+      %22 = affine.apply affine_map<(d0, d1) -> (d0 - d1)>(%21, %20)
+      %23 = arith.cmpi eq, %22, %c0 : index
+      %24 = affine.apply affine_map<(d0, d1, d2) -> (d0 - d1 + d2)>(%16, %21, %20)
+      %25 = affine.min affine_map<(d0)[s0] -> (s0, d0)>(%arg1)[%7]
+      %26 = affine.min affine_map<(d0, d1)[s0] -> (s0, d0 + d1)>(%arg1, %19)[%7]
+      %27 = affine.apply affine_map<(d0, d1) -> (d0 - d1)>(%26, %25)
+      %28 = arith.cmpi eq, %27, %c0 : index
+      %29 = arith.ori %28, %23 : i1
+      %30 = affine.apply affine_map<(d0, d1, d2) -> (d0 - d1 + d2)>(%19, %26, %25)
+      %31 = scf.if %29 -> (tensor<?x?xf32>) {
+        %generated = tensor.generate %16, %19 {
+        ^bb0(%arg2: index, %arg3: index):
+          tensor.yield %cst : f32
+        } : tensor<?x?xf32>
+        scf.yield %generated : tensor<?x?xf32>
+      } else {
+        %34 = flow.dispatch.tensor.load %10, offsets = [%20, %25], sizes = [%22, %27], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%6, %7} -> tensor<?x?xf32>
+        %padded = tensor.pad %34 low[0, 0] high[%24, %30] {
+        ^bb0(%arg2: index, %arg3: index):
+          tensor.yield %cst : f32
+        } : tensor<?x?xf32> to tensor<?x?xf32>
+        scf.yield %padded : tensor<?x?xf32>
+      }
+      %32 = arith.index_castui %3 : i32 to index
+      %33 = arith.index_castui %4 : i32 to index
+      flow.dispatch.tensor.store %31, %11, offsets = [%arg0, %arg1], sizes = [%16, %19], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%32, %33}
+    }
+  }
+  return
+}
+// CHECK-LABEL: func @if_conversion_clone_offsets()
+//       CHECK:   scf.if
+//  CHECK-NEXT:     %[[GENERATED:.+]] = tensor.generate
+//       CHECK:     flow.dispatch.tensor.store %[[GENERATED]]
+//       CHECK:   else
+//       CHECK:     %[[VAL:.+]] = flow.dispatch.tensor.load
+//       CHECK:     %[[PADDED:.+]] = tensor.pad %[[VAL]]
+//       CHECK:     flow.dispatch.tensor.store %[[PADDED]]
