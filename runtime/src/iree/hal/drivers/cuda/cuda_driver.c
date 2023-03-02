@@ -33,6 +33,9 @@ typedef struct iree_hal_cuda_driver_t {
   int default_device_index;
   // CUDA symbols.
   iree_hal_cuda_dynamic_symbols_t syms;
+  // KVS client and server
+  kvs_client_t* kvs_client;
+  kvs_server_t* kvs_server;  // Rank 0 runs the server.
 } iree_hal_cuda_driver_t;
 
 static const iree_hal_driver_vtable_t iree_hal_cuda_driver_vtable;
@@ -49,26 +52,85 @@ IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
   out_options->default_device_index = 0;
 }
 
-static iree_status_t iree_hal_nccl_get_unique_id_from_env(
+static iree_status_t iree_hal_kvs_create_and_run_server(
+    iree_hal_cuda_driver_t* driver, const char* kvs_addr) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  kvs_server_config_t config = {.timeout_ms = 1000};
+  iree_status_t status = KVS_RESULT_TO_STATUS(
+      &driver->syms, kvs_server_create(&driver->kvs_server, kvs_addr, &config));
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static void iree_hal_kvs_destroy(iree_hal_cuda_driver_t* driver) {
+  if (driver->kvs_client) {
+    KVS_IGNORE_ERROR(&driver->syms, kvs_client_destroy(&driver->kvs_client));
+  }
+  if (driver->kvs_server) {
+    KVS_IGNORE_ERROR(&driver->syms, kvs_server_destroy(&driver->kvs_server));
+  }
+}
+
+static iree_status_t iree_hal_kvs_create_client(iree_hal_cuda_driver_t* driver,
+                                                const char* kvs_addr) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  kvs_client_config_t config = {.connection_timeout_ms = 30000};
+  iree_status_t status = KVS_RESULT_TO_STATUS(
+      &driver->syms, kvs_client_create(&driver->kvs_client, kvs_addr, &config));
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_nccl_get_unique_id_for_default_channel(
     iree_hal_cuda_driver_t* driver) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  char* nccl_comm_id_str = getenv("NCCL_COMM_ID");
-  if (!nccl_comm_id_str) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "expected NCCL_COMM_ID environment variable to be "
-                            "set when using the default NCCL configuration");
+  iree_status_t status = iree_ok_status();
+  const bool is_root = driver->default_params.nccl_default_rank == 0;
+
+  // TODO(okkwon): get the server address from a command line option or
+  // an environmental variable.
+  const char kvs_addr[] = "127.0.0.1:50051";
+
+  if (is_root) {
+    // The root process runs the key value server.
+    status = iree_hal_kvs_create_and_run_server(driver, kvs_addr);
   }
 
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, NCCL_RESULT_TO_STATUS(
-              &driver->syms,
-              ncclGetUniqueId(
-                  (ncclUniqueId*)&driver->default_params.nccl_default_id),
-              "ncclGetUniqueId"));
+  if (iree_status_is_ok(status)) {
+    // Every process is a client.
+    status = iree_hal_kvs_create_client(driver, kvs_addr);
+  }
+
+  if (iree_status_is_ok(status)) {
+    const char default_id_str[] = "default_id";
+    if (is_root) {
+      // Create a NCCL unique ID for the default channel and set in the KVS.
+      status = NCCL_RESULT_TO_STATUS(
+          &driver->syms,
+          ncclGetUniqueId(
+              (ncclUniqueId*)&driver->default_params.nccl_default_id),
+          "ncclGetUniqueId");
+      if (iree_status_is_ok(status)) {
+        status = KVS_RESULT_TO_STATUS(
+            &driver->syms,
+            kvs_client_set(
+                driver->kvs_client, default_id_str, sizeof(default_id_str),
+                driver->default_params.nccl_default_id.data,
+                sizeof(driver->default_params.nccl_default_id.data)));
+      }
+    } else {
+      status = KVS_RESULT_TO_STATUS(
+          &driver->syms,
+          kvs_client_get(driver->kvs_client, default_id_str,
+                         sizeof(default_id_str),
+                         driver->default_params.nccl_default_id.data,
+                         sizeof(driver->default_params.nccl_default_id.data)));
+    }
+  }
+
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_hal_cuda_driver_create_internal(
@@ -98,13 +160,12 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
       status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
                                                              &driver->syms);
       if (iree_status_is_ok(status)) {
-        // Get a unique ID from the environmental variable.
-        status = iree_hal_nccl_get_unique_id_from_env(driver);
+        // Load the KVS symbols needed for NCCL multi-channel creation.
+        status = iree_hal_cuda_kvs_dynamic_symbols_initialize(host_allocator,
+                                                              &driver->syms);
       }
-
-      // Load the KVS symbols needed for NCCL multi-channel creation.
-      status = iree_hal_cuda_kvs_dynamic_symbols_initialize(host_allocator,
-                                                            &driver->syms);
+      // Get a unique ID for the default channel.
+      status = iree_hal_nccl_get_unique_id_for_default_channel(driver);
     }
   }
 
@@ -121,6 +182,7 @@ static void iree_hal_cuda_driver_destroy(iree_hal_driver_t* base_driver) {
   iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_kvs_destroy(driver);
   iree_hal_cuda_dynamic_symbols_deinitialize(&driver->syms);
   iree_allocator_free(host_allocator, driver);
 

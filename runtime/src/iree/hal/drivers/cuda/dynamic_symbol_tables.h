@@ -112,8 +112,8 @@ NCCL_PFN_DECL(ncclGroupEnd)
 KVS_PFN_DECL(kvs_client_create, kvs_client_t**, const char*,
              kvs_client_config_t*)
 KVS_PFN_DECL(kvs_client_destroy, kvs_client_t**)
-KVS_PFN_DECL(kvs_client_get, kvs_client_t*, const char*, char*, int)
-KVS_PFN_DECL(kvs_client_set, kvs_client_t*, const char*, char*)
+KVS_PFN_DECL(kvs_client_get, kvs_client_t*, const char*, int, char*, int)
+KVS_PFN_DECL(kvs_client_set, kvs_client_t*, const char*, int, char*, int)
 KVS_PFN_DECL(kvs_server_create, kvs_server_t**, const char*,
              kvs_server_config_t*)
 KVS_PFN_DECL(kvs_server_wait, kvs_server_t*)
