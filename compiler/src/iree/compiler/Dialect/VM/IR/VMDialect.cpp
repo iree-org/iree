@@ -209,7 +209,8 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
       return IREE::VM::RefType::getChecked(
           IREE::VM::OpaqueType::get(getContext()), loc);
     }
-    auto objectType = mlir::parseType(spec, getContext());
+    // Make sure to pass a null-terminated string to the type parser.
+    auto objectType = mlir::parseType(spec.str(), getContext());
     if (!objectType) {
       parser.emitError(parser.getCurrentLocation())
           << "invalid ref object type specification: '"
