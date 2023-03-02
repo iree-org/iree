@@ -52,12 +52,18 @@ jobs:
             build-package: py-tf-compiler-tools-pkg
             experimental: false
 
-          # Macos packages.
-          - runs-on: macos-11
+          # MacOS packages.
+          - runs-on:
+              - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
+              - os-family=macOS
+              - runner-group=releaser
             build-family: macos
             build-package: py-compiler-pkg
             experimental: true
-          - runs-on: macos-11
+          - runs-on:
+              - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
+              - os-family=macOS
+              - runner-group=releaser
             build-family: macos
             build-package: py-runtime-pkg
             experimental: true
@@ -74,11 +80,6 @@ jobs:
       ##########################################################################
       # OS specific setup
       ##########################################################################
-      - name: Install MacOS Deps
-        if: "matrix.build-family == 'macos'"
-        shell: bash
-        run: |
-          sudo ./main_checkout/build_tools/python_deploy/install_macos_deps.sh
 
       ##########################################################################
       # Write version_info.json
@@ -140,6 +141,7 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-runtime iree-runtime-instrumented"
           output_dir: "${{ github.workspace }}/bindist"
+          override_python_versions: "3.11"
         run: |
           ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
 
@@ -165,12 +167,8 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-compiler"
           output_dir: "${{ github.workspace }}/bindist"
+          override_python_versions: "3.11"
         run: |
-          # libzstd on GitHub Action bots is not compatible with MacOS universal.
-          # https://github.com/openxla/iree/issues/9955
-          sudo rm -rf /usr/local/lib/libzstd*
-          sudo rm -rf /usr/local/lib/cmake/zstd/*
-
           ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
 
       ##########################################################################
