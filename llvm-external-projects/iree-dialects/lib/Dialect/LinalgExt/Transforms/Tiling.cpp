@@ -195,15 +195,16 @@ private:
 
 /// Second pattern to implement the switch of `TilingInterface ->
 /// tensor.extract_slice` to `tensor.extract_slice -> `TilingInterface`.
-FailureOr<Operation *> SwapTilingInterfaceOp::returningMatchAndRewrite(
+FailureOr<TilingResult> SwapTilingInterfaceOp::returningMatchAndRewrite(
     tensor::ExtractSliceOp sliceOp, PatternRewriter &rewriter) const {
   auto sourceOp = sliceOp.getSource().getDefiningOp<TilingInterface>();
   if (!sourceOp)
     return failure();
-  SmallVector<Operation *> tiledOps = sourceOp.getTiledImplementation(
+  FailureOr<TilingResult> tilingResult = sourceOp.getTiledImplementation(
       rewriter, sliceOp.getMixedOffsets(), sliceOp.getMixedSizes());
-  assert(tiledOps.size() && "expected single tiled op");
-  Operation *tiledOp = tiledOps.front();
-  rewriter.replaceOp(sliceOp, tiledOp->getResults());
-  return tiledOp;
+  if (failed(tilingResult)) {
+    return failure();
+  }
+  rewriter.replaceOp(sliceOp, tilingResult->tiledValues);
+  return tilingResult.value();
 }
