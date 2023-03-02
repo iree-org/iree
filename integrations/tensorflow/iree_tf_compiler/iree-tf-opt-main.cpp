@@ -22,6 +22,7 @@
 #include "stablehlo/dialect/ChloOps.h"
 #include "tensorflow/compiler/mlir/tensorflow/dialect_registration.h"
 #include "tensorflow/compiler/mlir/tensorflow/transforms/passes.h"
+#include "tensorflow/compiler/mlir/tensorflow/transforms/tf_saved_model_passes.h"
 #include "tensorflow/compiler/mlir/tosa/tf_passes.h"
 #include "tensorflow/compiler/mlir/tosa/tfl_passes.h"
 #include "tensorflow/compiler/mlir/tosa/transforms/passes.h"
@@ -53,6 +54,13 @@ int main(int argc, char **argv) {
   mlir::registerTensorFlowShapeInferencePassPass();
   mlir::registerTensorFlowOptimizePassPass();
   mlir::TFDevice::registerDecomposeResourceOpsPassPass();
+  // Needed for reproducer.
+  mlir::registerDeviceIndexSelectorPass();
+  mlir::registerExecutorIslandCoarseningPass();
+  mlir::registerGuaranteeAllFuncsOneUsePass();
+  mlir::registerMaterializePassthroughOpPass();
+  mlir::registerFunctionalControlFlowToCFGPass();
+  mlir::tf_saved_model::registerOptimizeGlobalTensorsPass();
 
   // Old style static registration based TF passes.
   mlir::TF::CreateDeviceIndexSelectorPass();

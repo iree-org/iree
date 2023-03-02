@@ -41,6 +41,7 @@ cc_binary(
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_passes",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_saved_model_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/tosa:tf_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/tosa:tf_tfl_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/tosa:tfl_passes",
