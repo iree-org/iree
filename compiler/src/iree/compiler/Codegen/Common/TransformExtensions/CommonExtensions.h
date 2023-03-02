@@ -38,6 +38,7 @@ struct ApplyPatternsOpPatterns {
   bool additionalIreePatterns = false;
   bool bubbleCollapseExpand = false;
   bool canonicalization = false;
+  bool cse = false;
   bool eraseUnnecessaryTensorOperands = false;
   bool expandMemrefStridedMetadata = false;
   bool foldMemrefAliases = false;

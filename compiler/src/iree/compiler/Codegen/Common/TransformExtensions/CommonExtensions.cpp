@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
@@ -135,6 +136,7 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(additionalIreePatterns, getAdditionalIreePatternsAttrName)
   ADD_PATTERN(bubbleCollapseExpand, getBubbleCollapseExpandAttrName)
   ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
+  ADD_PATTERN(cse, getCseAttrName)
   ADD_PATTERN(eraseUnnecessaryTensorOperands,
               getEraseUnnecessaryTensorOperandsAttrName)
   ADD_PATTERN(expandMemrefStridedMetadata,
@@ -328,13 +330,35 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   });
   LogicalResult result =
       applyOpPatternsAndFold(ops, std::move(patterns), config);
-  LogicalResult listenerResult = listener.checkErrorState();
   if (failed(result)) {
-    return mlir::emitDefiniteFailure(target,
-                                     "greedy pattern application failed");
+    return mlir::emitDefiniteFailure(target, "greedy patterns failed");
   }
+  LogicalResult listenerResult = listener.checkErrorState();
   if (failed(listenerResult))
-    return mlir::emitDefiniteFailure(target, "listener tracking failed");
+    return mlir::emitDefiniteFailure(target, "pattern listener tracker fail");
+
+  if (getCse()) {
+    func::FuncOp lastFuncVisited;
+    auto walkResult = target->walk([&](func::FuncOp funcOp) -> WalkResult {
+      lastFuncVisited = funcOp;
+      result =
+          eliminateCommonSubexpressions(funcOp, /*domInfo=*/nullptr, &listener);
+      if (failed(result)) return WalkResult::interrupt();
+      listenerResult = listener.checkErrorState();
+      if (failed(listenerResult)) return WalkResult::interrupt();
+      return WalkResult::advance();
+    });
+    if (walkResult.wasInterrupted()) {
+      if (failed(result)) {
+        return mlir::emitDefiniteFailure(lastFuncVisited,
+                                         "greedy patterns failed");
+      }
+      LogicalResult listenerResult = listener.checkErrorState();
+      if (failed(listenerResult))
+        return mlir::emitDefiniteFailure(lastFuncVisited,
+                                         "pattern listener tracker fail");
+    }
+  }
 
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();

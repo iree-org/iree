@@ -78,6 +78,10 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       down across Linalg ops.
       - canonicalization: adds all the canonicalization patterns of all
       registered dialects and ops.
+      - cse: additionally apply common subexpression elimination. This must
+      apply on a funcOp. This is not a set of patterns per se but is still very
+      convenient to apply it close to canonicalization and other greedy pattern
+      applications.
       - erase_unnecessary_tensor_operands: add patterns that erase unnecessary
       tensor operands.
       - expand_memref_strided_metadata: adds patterns that expand memref
@@ -127,6 +131,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$additional_iree_patterns,
                        UnitAttr:$bubble_collapse_expand,
                        UnitAttr:$canonicalization,
+                       UnitAttr:$cse,
                        UnitAttr:$erase_unnecessary_tensor_operands,
                        UnitAttr:$expand_memref_strided_metadata,
                        UnitAttr:$fold_memref_aliases,
