@@ -1,7 +1,7 @@
 // RUN: iree-opt %s
 
 // Codegen
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %ops = transform.structured.match ops{["linalg.fill", "linalg.generic"]}
     in %variant_op : (!pdl.operation) -> !pdl.operation

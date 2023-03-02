@@ -44,7 +44,7 @@ func.func @static_tile_buffers(%arg0: index, %arg1: memref<?xf32>, %arg2: memref
   return
 }
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%module_op: !pdl.operation):
   %0 = transform.structured.match ops{["scf.forall"]} in %module_op : (!pdl.operation) -> !pdl.operation
   %1 = forall_to_scf_for %0

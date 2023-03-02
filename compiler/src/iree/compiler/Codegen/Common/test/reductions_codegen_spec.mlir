@@ -1,6 +1,6 @@
 // RUN: iree-opt %s
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb0(%arg0: !pdl.operation):
   transform.iree.register_match_callbacks
 

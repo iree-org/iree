@@ -1,4 +1,4 @@
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   // Step 1. Find three linalg.generics and tile to GPU thread blocks.
   // ===========================================================================

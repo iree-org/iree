@@ -23,7 +23,7 @@ transform.with_pdl_patterns {
   }
 
   // CHECK-NOT: canonicalized_sequence
-  transform.structured.canonicalized_sequence %arg0 failures(propagate) {
+  transform.sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.tile %0 [4, 4, 4]

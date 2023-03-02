@@ -14,7 +14,7 @@ func.func @matmul_tensors(
 }
 
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%module_op: !pdl.operation):
   %0 = transform.structured.match ops{["linalg.matmul"]} in %module_op : (!pdl.operation) -> !pdl.operation
   %1, %loops:3 = transform.structured.tile %0 [4, 4, 4]
