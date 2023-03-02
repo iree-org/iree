@@ -104,6 +104,77 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
   return paddedSubviewResults;
 }
 
+static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
+                                          tensor::UnPackOp op,
+                                          tensor::UnPackOp &paddedOp) {
+  Location loc = op.getLoc();
+
+  // Set IP after op because we also take the dims of the original output.
+  IRRewriter::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfter(op);
+
+  auto tensorLoad =
+      op.getDest().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+  if (!tensorLoad) {
+    return rewriter.notifyMatchFailure(op, "does not have tensor load");
+  }
+
+  // Determine the padded shape from the load
+  ArrayRef<int64_t> shape = op.getDestType().getShape();
+  SmallVector<int64_t> paddedShape(shape.begin(), shape.end());
+  for (const auto &[index, size] :
+       llvm::enumerate(tensorLoad.getMixedSizes())) {
+    if (Optional<int64_t> cst = getConstantIntValue(size)) {
+      paddedShape[index] = cst.value();
+    } else {
+      FailureOr<int64_t> upperBound =
+          linalg::getConstantUpperBoundForIndex(size.get<Value>());
+      if (failed(upperBound)) {
+        return rewriter.notifyMatchFailure(
+            op, "No constant bounding box can be found for padding");
+      }
+      paddedShape[index] = *upperBound;
+    }
+  }
+
+  // Pad to the shape that makes tensor.unpack ops produce full tiles.
+  SmallVector<int64_t> innerTiles = op.getStaticTiles();
+  ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
+  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+    paddedShape[pos] = llvm::divideCeil(paddedShape[pos], size) * size;
+  }
+
+  Value paddingValue = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getZeroAttr(getElementTypeOrSelf(tensorLoad)));
+  auto paddedTensorType =
+      RankedTensorType::get(paddedShape, getElementTypeOrSelf(tensorLoad));
+  Value paddedValue = linalg::makeComposedPadHighOp(
+      rewriter, loc, paddedTensorType, tensorLoad, paddingValue,
+      /*nofold=*/false);
+
+  SmallVector<Value> paddedOperands = {op.getSource(), paddedValue};
+  paddedOperands.append(op.getInnerTiles().begin(), op.getInnerTiles().end());
+  paddedOp = rewriter.create<tensor::UnPackOp>(
+      loc, TypeRange{paddedValue.getType()}, paddedOperands, op->getAttrs());
+
+  // Slice out the original shape from the padded result to pass on to
+  // consumers.
+  SmallVector<SmallVector<Value>> reifiedResultShapes;
+  if (failed(op.reifyResultShapes(rewriter, reifiedResultShapes))) {
+    return failure();
+  }
+
+  Value paddedSubviewResults;
+  int64_t rank = paddedOp.getDestRank();
+  SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
+  SmallVector<OpFoldResult> sizes =
+      getAsOpFoldResult(ValueRange(reifiedResultShapes[0]));
+  SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
+  paddedSubviewResults = rewriter.create<tensor::ExtractSliceOp>(
+      loc, paddedOp.getResult(), offsets, sizes, strides);
+  return paddedSubviewResults;
+}
+
 static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
   return linalgOp.getNumParallelLoops() >= 2 &&
          linalgOp.getNumParallelLoops() <= 3;
@@ -138,6 +209,18 @@ struct LLVMGPUTensorPadPass
 
       // Replace the original operation to pad.
       rewriter.replaceOp(linalgOp, *newResults);
+    });
+
+    funcOp.walk([&](tensor::UnPackOp unpackOp) {
+      tensor::UnPackOp paddedOp;
+      FailureOr<Value> newResult =
+          rewriteAsPaddedOp(rewriter, unpackOp, paddedOp);
+      if (failed(newResult)) {
+        return;
+      }
+
+      // Replace the original operation to pad.
+      rewriter.replaceOp(unpackOp, *newResult);
     });
   }
 };
