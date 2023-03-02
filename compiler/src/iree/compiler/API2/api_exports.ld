@@ -454,7 +454,7 @@ VER_0 {
     mlirPassManagerEnableVerifier;
     mlirPassManagerGetAsOpPassManager;
     mlirPassManagerGetNestedUnder;
-    mlirPassManagerRun;
+    mlirPassManagerRunOnOp;
     mlirPrintPassPipeline;
     mlirRankedTensorTypeGet;
     mlirRankedTensorTypeGetChecked;

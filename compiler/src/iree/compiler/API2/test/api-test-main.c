@@ -16,6 +16,7 @@
 
 #include "iree/base/api.h"
 #include "iree/compiler/API2/MLIRInterop.h"
+#include "mlir-c/IR.h"
 
 static void bytecode_builder_callback(MlirStringRef str, void* userdata) {
   iree_string_builder_t* builder = (iree_string_builder_t*)userdata;
@@ -84,7 +85,7 @@ static bool iree_compile_mlir_to_bytecode(iree_string_view_t mlir_source,
   MlirPassManager pass = mlirPassManagerCreate(context);
   MlirOpPassManager op_pass = mlirPassManagerGetAsOpPassManager(pass);
   ireeCompilerBuildIREEVMPassPipeline(options, op_pass);
-  status = mlirPassManagerRun(pass, module);
+  status = mlirPassManagerRunOnOp(pass, mlirModuleGetOperation(module));
   if (mlirLogicalResultIsFailure(status)) {
     mlirPassManagerDestroy(pass);
     ireeCompilerOptionsDestroy(options);

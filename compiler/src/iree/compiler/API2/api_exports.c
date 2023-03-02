@@ -461,7 +461,7 @@ extern void mlirPassManagerEnableIRPrinting();
 extern void mlirPassManagerEnableVerifier();
 extern void mlirPassManagerGetAsOpPassManager();
 extern void mlirPassManagerGetNestedUnder();
-extern void mlirPassManagerRun();
+extern void mlirPassManagerRunOnOp();
 extern void mlirPrintPassPipeline();
 extern void mlirRankedTensorTypeGet();
 extern void mlirRankedTensorTypeGetChecked();
@@ -1044,7 +1044,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirPassManagerEnableVerifier;
   x += (uintptr_t)&mlirPassManagerGetAsOpPassManager;
   x += (uintptr_t)&mlirPassManagerGetNestedUnder;
-  x += (uintptr_t)&mlirPassManagerRun;
+  x += (uintptr_t)&mlirPassManagerRunOnOp;
   x += (uintptr_t)&mlirPrintPassPipeline;
   x += (uintptr_t)&mlirRankedTensorTypeGet;
   x += (uintptr_t)&mlirRankedTensorTypeGetChecked;

@@ -452,7 +452,7 @@ _mlirPassManagerEnableIRPrinting
 _mlirPassManagerEnableVerifier
 _mlirPassManagerGetAsOpPassManager
 _mlirPassManagerGetNestedUnder
-_mlirPassManagerRun
+_mlirPassManagerRunOnOp
 _mlirPrintPassPipeline
 _mlirRankedTensorTypeGet
 _mlirRankedTensorTypeGetChecked

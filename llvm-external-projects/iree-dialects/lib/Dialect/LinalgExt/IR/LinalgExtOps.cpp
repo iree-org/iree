@@ -1881,7 +1881,8 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
 
   auto createLoad = [&]() -> Value {
     return builder.create<memref::LoadOp>(
-        loc, packOp.getInput(), getAsValues(builder, loc, sourceIndices));
+        loc, packOp.getInput(),
+        getValueOrCreateConstantIndexOp(builder, loc, sourceIndices));
   };
   Value scalar;
   if (auto paddingValue = packOp.getPaddingValue()) {
