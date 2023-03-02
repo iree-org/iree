@@ -63,15 +63,20 @@ static LLVMTargetOptions getDefaultLLVMTargetOptions() {
 }
 
 static void addTargetCPUFeaturesForCPU(LLVMTarget &target) {
-  if (!llvm::Triple(target.triple).isX86()) {
-    // Currently only implemented on x86.
+  if (!(llvm::Triple(target.triple).isX86() ||
+        llvm::Triple(target.triple).isAArch64())) {
+    // Currently only implemented on x86 or AArch64.
     return;
   }
   llvm::SubtargetFeatures targetCpuFeatures(target.cpuFeatures);
-  llvm::SmallVector<llvm::StringRef> cpuFeatures;
-  llvm::X86::getFeaturesForCPU(target.cpu, cpuFeatures);
-  for (auto &feature : cpuFeatures) {
-    targetCpuFeatures.AddFeature(feature);
+  if (llvm::Triple(target.triple).isAArch64()) {
+    targetCpuFeatures.AddFeature("reserve-x18", true);
+  } else {
+    llvm::SmallVector<llvm::StringRef> cpuFeatures;
+    llvm::X86::getFeaturesForCPU(target.cpu, cpuFeatures);
+    for (auto &feature : cpuFeatures) {
+      targetCpuFeatures.AddFeature(feature);
+    }
   }
   target.cpuFeatures = targetCpuFeatures.getString();
 }
