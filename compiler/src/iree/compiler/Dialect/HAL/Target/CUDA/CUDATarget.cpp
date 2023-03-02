@@ -58,7 +58,7 @@ static llvm::cl::opt<std::string> clTargetChip(
 
 static llvm::cl::opt<std::string> clTargetFeature(
     "iree-hal-cuda-llvm-target-feature", llvm::cl::desc("PTX version."),
-    llvm::cl::init("+ptx78"));
+    llvm::cl::init("+ptx77"));
 
 namespace llvm {
 class FunctionPass;
