@@ -103,6 +103,8 @@ jobs:
         env:
           PR_TITLE: ${{ fromJSON(steps.fetch-pr.outputs.pr-title || '""') }}
           PR_BODY: ${{ fromJSON(steps.fetch-pr.outputs.pr-body || '""') }}
+          ORIGINAL_PR_TITLE: ${{ github.event.pull_request.title }}
+          ORIGINAL_PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           # Just informative logging. There should only be two commits in the
           # history here, but limiting the depth helps when copying from a local

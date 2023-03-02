@@ -10,20 +10,28 @@
 The following environment variables are required:
 - GITHUB_EVENT_NAME: GitHub event name, e.g. pull_request.
 - GITHUB_OUTPUT: path to write workflow output variables.
+- GITHUB_STEP_SUMMARY: path to write workflow summary output.
 
 When GITHUB_EVENT_NAME is "pull_request", there are additional environment
 variables to be set:
 - PR_TITLE (required): PR title.
 - PR_BODY (optional): PR description.
 - BASE_REF (required): base commit SHA of the PR.
+- ORIGINAL_PR_TITLE (optional): PR title from the original PR event, showing a
+    notice if PR_TITLE is different.
+- ORIGINAL_PR_BODY (optional): PR description from the original PR event,
+    showing a notice if PR_BODY is different. ORIGINAL_PR_TITLE must also be
+    set.
 
 Exit code 0 indicates that it should and exit code 2 indicates that it should
 not.
 """
 
+import difflib
 import fnmatch
 import os
 import subprocess
+import textwrap
 from typing import Iterable, Mapping, MutableMapping
 
 PULL_REQUEST_EVENT_NAME = "pull_request"
@@ -64,6 +72,8 @@ RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
 BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64", "comp-stats"]
 
+PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"
+
 
 def skip_path(path: str) -> bool:
   return any(fnmatch.fnmatch(path, pattern) for pattern in SKIP_PATH_PATTERNS)
@@ -76,11 +86,56 @@ def set_output(d: Mapping[str, str]):
     f.writelines(f"{k}={v}" "\n" for k, v in d.items())
 
 
+def write_job_summary(summary: str):
+  """Write markdown messages on Github workflow UI.
+  See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary
+  """
+  step_summary_file = os.environ["GITHUB_STEP_SUMMARY"]
+  with open(step_summary_file, "a") as f:
+    # Use double newlines to split sections in markdown.
+    f.write(summary + "\n\n")
+
+
+def check_description_and_show_diff(original_description: str,
+                                    current_description: str):
+  if original_description == current_description:
+    return
+
+  diffs = difflib.unified_diff(original_description.splitlines(keepends=True),
+                               current_description.splitlines(keepends=True))
+
+  write_job_summary(
+      textwrap.dedent("""\
+  :pushpin: Using a PR description different from the original PR event \
+  started this workflow.
+
+  <details>
+  <summary>Click to show diff (original vs. current)</summary>
+
+  ```diff
+  {}
+  ```
+  </details>""").format("".join(diffs)))
+
+
 def get_trailers() -> Mapping[str, str]:
   title = os.environ["PR_TITLE"]
   body = os.environ.get("PR_BODY", "")
+  original_title = os.environ.get("ORIGINAL_PR_TITLE")
+  original_body = os.environ.get("ORIGINAL_PR_BODY", "")
 
-  description = f"{title}" "\n\n" f"{body}"
+  description = PR_DESCRIPTION_TEMPLATE.format(title=title, body=body)
+
+  # PR_TITLE and PR_BODY can be fetched from API for the latest updates. If
+  # ORIGINAL_PR_TITLE is set, compare the current and original description and
+  # show a notice if they are different. This is mostly to inform users that the
+  # workflow might not parse the PR description they expect.
+  if original_title is not None:
+    original_description = PR_DESCRIPTION_TEMPLATE.format(title=original_title,
+                                                          body=original_body)
+    print("Original PR description:", original_description, sep="\n")
+    check_description_and_show_diff(original_description=original_description,
+                                    current_description=description)
 
   print("Parsing PR description:", description, sep="\n")
 
