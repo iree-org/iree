@@ -78,6 +78,37 @@ iree_status_t iree_hal_nccl_result_to_status(
   IREE_IGNORE_ERROR(iree_hal_nccl_result_to_status((syms), ((syms)->expr), \
                                                    __FILE__, __LINE__))
 
+// Converts a kvs_status_t to an iree_status_t.
+//
+// Usage:
+//   iree_status_t status = KVS_RESULT_TO_STATUS(KVSDoThing(...));
+#define KVS_RESULT_TO_STATUS(syms, expr, ...) \
+  iree_hal_kvs_status_to_status((syms), ((syms)->expr), __FILE__, __LINE__)
+
+// Converts a kvsResult_t to a Status object.
+iree_status_t iree_hal_kvs_status_to_status(
+    iree_hal_cuda_dynamic_symbols_t* syms, kvs_status_t result,
+    const char* file, uint32_t line);
+
+// IREE_RETURN_IF_ERROR but implicitly converts the kvs_status_t return value to
+// a Status.
+//
+// Usage:
+//   KVS_RETURN_IF_ERROR(kvsDoThing(...), "message");
+#define KVS_RETURN_IF_ERROR(syms, expr, ...)                                 \
+  IREE_RETURN_IF_ERROR(iree_hal_kvs_status_to_status((syms), ((syms)->expr), \
+                                                     __FILE__, __LINE__),    \
+                       __VA_ARGS__)
+
+// IREE_IGNORE_ERROR but implicitly converts the kvs_status_t return value to a
+// Status.
+//
+// Usage:
+//   KVS_IGNORE_ERROR(kvsDoThing(...));
+#define KVS_IGNORE_ERROR(syms, expr)                                      \
+  IREE_IGNORE_ERROR(iree_hal_kvs_status_to_status((syms), ((syms)->expr), \
+                                                  __FILE__, __LINE__))
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

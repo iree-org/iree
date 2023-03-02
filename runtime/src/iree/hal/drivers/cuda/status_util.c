@@ -68,3 +68,36 @@ iree_status_t iree_hal_nccl_result_to_status(
                                         result,
                                         syms->ncclGetErrorString(result));
 }
+
+iree_status_t iree_hal_kvs_status_to_status(
+    iree_hal_cuda_dynamic_symbols_t* syms, kvs_status_t status,
+    const char* file, uint32_t line) {
+  iree_status_code_t code;
+
+  switch (status) {
+    case KVS_STATUS_OK:
+      return iree_ok_status();
+    case KVS_STATUS_DEADLINE_EXCEEDED:
+      code = IREE_STATUS_DEADLINE_EXCEEDED;
+      break;
+    case KVS_STATUS_INVALID_ARGUMENT:
+      code = IREE_STATUS_INVALID_ARGUMENT;
+      break;
+    case KVS_STATUS_IN_PROGRESS:
+      code = IREE_STATUS_DEFERRED;
+      break;
+    case KVS_STATUS_INVALID_USAGE:
+      code = IREE_STATUS_UNIMPLEMENTED;
+      break;
+    case KVS_STATUS_INTERNAL_ERROR:
+    case KVS_STATUS_SYSTEM_ERROR:
+    case KVS_STATUS_SERVER_ERROR:
+    case KVS_STATUS_CONNECTION_ERROR:
+    case KVS_STATUS_NUM:
+      code = IREE_STATUS_INTERNAL;
+      break;
+  }
+  // TODO(okkwon): provide an error message string
+  return iree_make_status_with_location(file, line, code, "KVS error %d",
+                                        status);
+}
