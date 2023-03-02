@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
@@ -32,6 +33,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
@@ -39,6 +41,8 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -145,6 +149,7 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
+  ADD_PATTERN(licm, getLicmAttrName)
   ADD_PATTERN(lowerTransferOpPermutations,
               getLowerTransferOpPermutationsAttrName)
   ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
@@ -344,6 +349,25 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   LogicalResult listenerResult = listener.checkErrorState();
   if (failed(listenerResult))
     return mlir::emitDefiniteFailure(target, "pattern listener tracker fail");
+  
+  if (getLicm()) {
+    target->walk([&](func::FuncOp funcOp){
+      // This assumes LICM never removes operations so we don't need tracking.
+      // TODO: confirm / revisit this assumption and plumb a rewriter through
+      // upstream moveLoopInvariantCode if necessary.
+      funcOp->walk(
+          [](LoopLikeOpInterface loopLike) { moveLoopInvariantCode(loopLike); });
+      // For now, put single loop promotion as part of licm.
+      // TODO: This is almost certainly mising rewriter/listener and needs to be 
+      // plumbed through upstream `promoteIfSingleIteration`.
+      funcOp->walk([](Operation *op) {
+        (void)llvm::TypeSwitch<Operation *, LogicalResult>(op)
+            .Case<AffineForOp, scf::ForOp>(
+                [](auto loop) { return promoteIfSingleIteration(loop); })
+            .Default([](Operation *) { return success(); });
+      });
+    });
+  }
 
   if (getCse()) {
     func::FuncOp lastFuncVisited;
