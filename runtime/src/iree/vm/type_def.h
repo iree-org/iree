@@ -66,8 +66,10 @@ static inline iree_vm_type_def_t iree_vm_type_def_make_ref_type(
 typedef struct iree_vm_variant_t {
   iree_vm_type_def_t type;
   union {
-    uint8_t value_storage[IREE_VM_VARIANT_STORAGE_SIZE];  // max size of all
-                                                          // variant types
+    // Max size of all union value types. This must come first so the whole
+    // union gets initialized, at least until we can use structured initializers
+    // from C++20. See #12428.
+    uint8_t value_storage[IREE_VM_VARIANT_STORAGE_SIZE];
 
     // TODO(benvanik): replace with iree_vm_value_t.
     int8_t i8;

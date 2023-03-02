@@ -46,8 +46,11 @@ typedef enum iree_vm_value_type_e {
 typedef struct iree_vm_value_t {
   iree_vm_value_type_t type;
   union {
-    uint8_t value_storage[IREE_VM_VALUE_STORAGE_SIZE];  // max size of all value
-                                                        // types
+    // Max size of all union value types. This must come first so the whole
+    // union gets initialized, at least until we can use structured initializers
+    // from C++20. See #12428.
+    uint8_t value_storage[IREE_VM_VALUE_STORAGE_SIZE];
+
     int8_t i8;
     int16_t i16;
     int32_t i32;
