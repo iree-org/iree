@@ -243,9 +243,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
     %dim_i32 = arith.index_cast %dim : index to i32
 
     // Dispatch a basic `ret = lhs * rhs` using an external function.
-    // This form (@executable::@export) allows for automatic variant selection
-    // when multi-targeting (@x86_64 will be chosen if available).
-    %0 = flow.dispatch @executable::@simple_mul[%dim](%dim_i32, %arg0, %arg1) {
+    %0 = flow.dispatch @executable::@x86_64::@simple_mul[%dim](%dim_i32, %arg0, %arg1) {
       // Bindings are automatically inferred when possible as part of the ABI
       // but can be overridden if the user wants to use features such as sparse
       // bindings or multiple descriptor sets. To do so the
