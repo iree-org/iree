@@ -327,7 +327,8 @@ mlir::transform_ext::StructuredTransformOpsExtension::
 
 /// Find the linalg op that defines all values in range, potentially
 /// transitively through tensor casts.
-static FailureOr<linalg::LinalgOp> findSingleLinalgOpDefiningAll(ValueRange range) {
+static FailureOr<linalg::LinalgOp>
+findSingleLinalgOpDefiningAll(ValueRange range) {
   LLVM_DEBUG(DBGS() << "Start findSingleLinalgOpDefiningAll\n");
   linalg::LinalgOp sourceOp = nullptr;
   for (Value value : range) {
@@ -374,9 +375,9 @@ static FailureOr<linalg::LinalgOp> findSingleLinalgOpDefiningAll(ValueRange rang
 /// Take into account the the op may just disappear when it is replaced by its
 /// body, in the case od a single iteration loop.
 // It is unclear atm how to account for this properly.
-static FailureOr<Operation*> findSingleForOpDefiningAll(ValueRange range) {
+static FailureOr<Operation *> findSingleForOpDefiningAll(ValueRange range) {
   LLVM_DEBUG(DBGS() << "Start findSingleForOpDefiningAll\n");
-  Operation* forOp = nullptr;
+  Operation *forOp = nullptr;
   for (Value value : range) {
     LLVM_DEBUG(DBGS() << "--find for: " << value << "\n");
     // Block arguments are just dropped.
@@ -390,8 +391,9 @@ static FailureOr<Operation*> findSingleForOpDefiningAll(ValueRange range) {
       forOp = currentSourceOp;
       continue;
     }
-    LLVM_DEBUG(DBGS()<< "---no single scf.for replacement found -> SKIP\n");
-    LLVM_DEBUG(DBGS()<< "---WARNING: this will drop tracking of the scf.for\n");
+    LLVM_DEBUG(DBGS() << "---no single scf.for replacement found -> SKIP\n");
+    LLVM_DEBUG(
+        DBGS() << "---WARNING: this will drop tracking of the scf.for\n");
     return nullptr;
   }
   return forOp;
