@@ -56,4 +56,9 @@ transform.sequence failures(propagate) {
     transform.iree.tile_to_forall_and_workgroup_count_region %original_matmul
       num_threads [32]
       ( mapping = [#gpu.block<x>] )
+
+  // Late canonicalizations to cleanup and pass the checks.
+  // Needs to occur on the whole variant to perform cse on the workgroup_count region
+  transform.iree.apply_patterns %variant_op
+    { canonicalization, tiling_canonicalization, licm, cse }
 }
