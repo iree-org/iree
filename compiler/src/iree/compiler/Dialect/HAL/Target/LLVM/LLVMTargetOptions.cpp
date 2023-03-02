@@ -64,12 +64,12 @@ static LLVMTargetOptions getDefaultLLVMTargetOptions() {
 
 static void addTargetCPUFeaturesForCPU(LLVMTarget &target) {
   if (!(llvm::Triple(target.triple).isX86() ||
-        llvm::Triple(target.triple).isAArch64())) {
+        llvm::Triple(target.triple).isMacOSX())) {
     // Currently only implemented on x86 or AArch64.
     return;
   }
   llvm::SubtargetFeatures targetCpuFeatures(target.cpuFeatures);
-  if (llvm::Triple(target.triple).isAArch64()) {
+  if (llvm::Triple(target.triple).isMacOSX()) {
     targetCpuFeatures.AddFeature("reserve-x18", true);
   } else {
     llvm::SmallVector<llvm::StringRef> cpuFeatures;
