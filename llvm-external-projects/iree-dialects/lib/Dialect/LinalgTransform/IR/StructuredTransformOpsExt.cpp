@@ -468,13 +468,16 @@ void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
   if (hadErrors)
     return;
 
-  // Exit early if the op is not tracked.
-  SmallVector<Value> handles;
-  if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
-    return;
+  // TODO: Walk can be removed when D144193 has landed.
+  op->walk([&](Operation *op) {
+    // Exit early if the op is not tracked.
+    SmallVector<Value> handles;
+    if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
+      return;
 
-  LLVM_DEBUG(DBGS() << "removing tracked @" << op << " : " << *op << "\n");
-  mayFail(replacePayloadOp(op, nullptr));
+    LLVM_DEBUG(DBGS() << "removing tracked @" << op << " : " << *op << "\n");
+    mayFail(replacePayloadOp(op, nullptr));
+  });
 }
 
 void mlir::TrackingListener::removeMappings(Operation *op) {
