@@ -16,4 +16,7 @@ iree_py_test(
     compile_sample_module
   SRCS
     "compile_sample_module.py"
+  LABELS
+    # TODO(#12496): Remove the following label after fixing the test on macOS
+    exclude-os=macos
 )

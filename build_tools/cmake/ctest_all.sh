@@ -62,6 +62,10 @@ if [[ "${IREE_VULKAN_F16_DISABLE}" == 1 ]]; then
   label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
 fi
 
+if [[ "$(uname)" == "Darwin" ]]; then
+  label_exclude_args+=("^exclude-os=macos$")
+fi
+
 IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
 label_exclude_args+=(${extra_label_exclude_args[@]})
 
