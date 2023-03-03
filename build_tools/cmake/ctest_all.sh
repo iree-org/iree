@@ -15,8 +15,16 @@ set -euo pipefail
 
 BUILD_DIR="$1"
 
+get_default_parallel_level() {
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo "$(sysctl -n hw.logicalcpu)"
+  else
+    echo "$(nproc)"
+  fi
+}
+
 # Respect the user setting, but default to as many jobs as we have cores.
-export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
+export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(get_default_parallel_level)}
 
 # Respect the user setting, but default to turning on Vulkan.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
