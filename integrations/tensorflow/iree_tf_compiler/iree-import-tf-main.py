@@ -1,10 +1,19 @@
+import argparse
 import re
 
 import tensorflow as tf
 from tensorflow.python import pywrap_mlir
 from pathlib import Path
 
-def convert_to_hlo(model_path: str, use_stablehlo=True):
+parser = argparse.ArgumentParser()
+parser.add_argument('-p', '--saved_model_path', dest='saved_model_path', required=True,
+                        help='Path to the saved model directory to import.')
+parser.add_argument('-o', '--output_path', dest='output_path', required=True,
+                        help='Path to the mlir file name to output.')
+args = parser.parse_args()
+
+
+def convert_to_hlo(model_path: str):
   result = pywrap_mlir.experimental_convert_saved_model_to_mlir(
       model_path, "", show_debug_info=False)
 
@@ -14,13 +23,10 @@ def convert_to_hlo(model_path: str, use_stablehlo=True):
   result = re.sub(r"__inference_(.*)_\d+", r"\1", result)
 
   pipeline = ["tf-lower-to-mlprogram-and-hlo"]
-  if not use_stablehlo:
-    pipeline.append("stablehlo-legalize-to-hlo")
   result = pywrap_mlir.experimental_run_pass_pipeline(
       result, ",".join(pipeline), show_debug_info=False)
   return result
 
-Path("/tmp/simple-model-new.stablehlo.mlir").write_text(
-  convert_to_hlo("/tmp/simple-model", True))
-Path("/tmp/simple-model-new.hlo.mlir").write_text(
-  convert_to_hlo("/tmp/simple-model", False))
+
+if __name__ == "__main__":
+  Path(args.output_path).write_text(convert_to_hlo(args.saved_model_path))
