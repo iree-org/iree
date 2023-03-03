@@ -19,7 +19,7 @@
 #include "iree/integrations/pjrt/common/platform.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 #include "tensorflow/compiler/xla/pjrt/c/pjrt_c_api.h"
 #include "tensorflow/compiler/xla/shape_util.h"
 

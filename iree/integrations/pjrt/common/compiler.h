@@ -10,7 +10,7 @@
 #include <memory>
 #include <string>
 
-#include "iree/compiler/API2/Embed.h"
+#include "iree/compiler/embedding_api.h"
 #include "iree/integrations/pjrt/common/debugging.h"
 
 namespace iree::pjrt {

@@ -11,7 +11,7 @@
 
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/path.h"
-#include "iree/compiler/API2/Stub/Loader.h"
+#include "iree/compiler/loader.h"
 
 namespace iree::pjrt {
 

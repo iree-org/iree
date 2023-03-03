@@ -31,7 +31,7 @@ iree_pjrt_cc_library(
         "@iree_core//runtime/src/iree/hal",
         "@iree_core//runtime/src/iree/modules/hal",
         "@iree_core//runtime/src/iree/vm",
-        "@iree_core//runtime/src/iree/vm:bytecode_module",
+        "@iree_core//runtime/src/iree/vm/bytecode:module",
         "@org_tensorflow//tensorflow/compiler/xla:shape_util",
         "@org_tensorflow//tensorflow/compiler/xla/pjrt/c:pjrt_c_api_hdrs",
     ],
@@ -46,9 +46,10 @@ iree_pjrt_cc_library(
         "dylib_platform.h",
     ],
     deps = [
-        ":impl",
         ":debugging",
-        "@iree_core//compiler/src/iree/compiler/API2/Stub",
+        ":impl",
+        "@iree_core//compiler/bindings/c:headers",
+        "@iree_core//compiler/bindings/c:loader",
         "@iree_core//runtime/src/iree/base/internal:file_io",
         "@iree_core//runtime/src/iree/base/internal:path",
     ],
@@ -64,7 +65,7 @@ iree_pjrt_cc_library(
     ],
     deps = [
         ":debugging",
-        "@iree_core//compiler/src/iree/compiler/API2:EmbedHeaders",
+        "@iree_core//compiler/bindings/c:headers",
     ],
 )
 
