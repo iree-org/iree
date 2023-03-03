@@ -100,7 +100,9 @@ function clean_wheels() {
   local wheel_basename="$1"
   local python_version="$2"
   echo ":::: Clean wheels $wheel_basename $python_version"
-  rm -f -v /wheelhouse/${wheel_basename}-*-${python_version}-*.whl
+  # python_version is something like "3.11", but we'd want something like "cp311".
+  local cpython_version_string="cp${python_version%.*}${python_version#*.}"
+  rm -f -v ${output_dir}/${wheel_basename}-*-${cpython_version_string}-*.whl
 }
 
 run
