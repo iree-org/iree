@@ -205,8 +205,6 @@ jobs:
       # Attempt to restore from cache unconditionally.
       # Note: this will first try to grab a cache entry for this exact commit
       #       then it will fall back to the latest for any commit.
-      # We're pretty limited on repository cache space (10GB) relative to cache
-      # entry size (~2.5GB), so this usage is pretty optimistic.
       - name: "Fetching cache (CMake/ccache)"
         uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
         with:
@@ -238,9 +236,15 @@ jobs:
           IREE_READ_LOCAL_CCACHE: 1
           IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
           CCACHE_DIR: ${{ github.workspace }}/.ccache
-          # A full build is around 2.5GB, but uploads/downloads are slow and
-          # we have a limit of 10GB per repository
-          CCACHE_MAXSIZE: 3G
+          # Cache size and compression level settings are a delicate balance.
+          # * A full build cache is around 2-5GB depending on compression level
+          # * Upload/download is slow (double compression may or may not help)
+          # * We have a limit of 10GB across all cached files per repository
+          # * Cache misses are quite costly:
+          #   * 99% cache hits -> ~5 minutes to build
+          #   * 20% cache hits -> ~15-20 minutes to build
+          CCACHE_MAXSIZE: 4G
+          CCACHE_COMPRESSLEVEL: 5
         run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
