@@ -28,5 +28,6 @@ function symlink_import_binary() {
 }
 
 symlink_import_binary tf
+symlink_import_binary tf-py
 symlink_import_binary tflite
 symlink_import_binary xla
