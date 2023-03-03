@@ -190,6 +190,9 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
     A bytes-like object with the compiled output or None if output_file=
     was specified.
   """
+  print("XXX: kwargs: ", kwargs)
+  import traceback
+  traceback.print_stack()
   with TempFileSaver.implicit() as tfs:
     options = ImportOptions(**kwargs)
     import_cl = build_import_command_line(saved_model_dir, tfs, options)
@@ -219,6 +222,9 @@ def compile_module(module, saved_model_dir: Optional[str] = None, **kwargs):
   Returns:
     Same as compile_saved_model().
   """
+  print("XXX: kwargs: ", kwargs)
+  import traceback
+  traceback.print_stack()
   with TempFileSaver.implicit() as tfs:
 
     def do_it(saved_model_dir):
