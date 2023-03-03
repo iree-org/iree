@@ -92,6 +92,10 @@ bool hasZve32fFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// Returns true if the 'targetAttr' contains '+zve64x' in its cpu features.
 bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
+/// Returns true if the 'targetAttr' contains '+sve' or '+sve2' in its cpu
+/// features.
+bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`
 /// operation.

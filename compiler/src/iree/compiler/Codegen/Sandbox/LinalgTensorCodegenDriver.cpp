@@ -18,10 +18,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
-#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Dialect/X86Vector/Transforms.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -333,6 +330,7 @@ struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
     this->hoistPaddings = options.hoistPaddings;
     this->transposePaddings = options.transposePaddings;
     this->vectorize = options.vectorize;
+    this->enableVectorMasking = options.enableVectorMasking;
     this->vectorizePadding = options.vectorizePadding;
     this->tilingLevel = options.tilingLevel;
   }
@@ -371,6 +369,7 @@ struct LinalgSingleTilingExpertPass
     this->decomposeToLowerDimOp = options.decomposeToLowerDimOp;
     this->peel = options.peel;
     this->vectorize = options.vectorize;
+    this->enableVectorMasking = options.enableVectorMasking;
     this->vectorizePadding = options.vectorizePadding;
     this->tilingLevel = options.tilingLevel;
   }
@@ -779,8 +778,12 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
 
   LinalgVectorizationOptions vectorizationOptions;
   vectorizationOptions.setVectorizePadding(vectorizePadding);
-  vectorizationOptions.setCanonicalVectorSizes(getCanonicalVectorShape(funcOp));
-  vectorizationOptions.setVectorSizeComputationFunction(getVectorSizes);
+  vectorizationOptions.setEnableVectorMasking(enableVectorMasking);
+  if (enableVectorMasking) {
+    vectorizationOptions.setCanonicalVectorSizes(
+        getCanonicalVectorShape(funcOp));
+    vectorizationOptions.setVectorSizeComputationFunction(getVectorSizes);
+  }
 
   CodegenStrategy strategy;
   StringRef genericOpName = linalg::GenericOp::getOperationName();
