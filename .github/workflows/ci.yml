@@ -252,6 +252,39 @@ jobs:
           path: ${{ github.workspace }}/.ccache
           key: ccache_all_windows_${{ github.sha }}
 
+  build_test_all_macos:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
+    runs-on:
+      - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}  # must come first
+      - runner-group=postsubmit
+      - os-family=macOS
+    env:
+      BUILD_DIR: build-macos
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Updating git submodules"
+        run: git submodule update --init --jobs 8 --depth 1
+      - name: "Installing Python packages"
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: "Building IREE"
+        env:
+          IREE_READ_REMOTE_CCACHE: 0
+          IREE_WRITE_REMOTE_CCACHE: 0
+          IREE_READ_LOCAL_CCACHE: 1
+          IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
+          # We'll remove the GITHUB_WORKSPACE directory after the job.
+          # Persist the cache by storing in the parent directory.
+          CCACHE_DIR: ${{ github.workspace }}/../.ccache
+          CCACHE_MAXSIZE: 30G
+        run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+      - name: "Testing IREE"
+        run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+
   build_test_all_bazel:
     needs: setup
     if: needs.setup.outputs.should-run == 'true'
@@ -1301,6 +1334,7 @@ jobs:
       # Basic
       - build_all
       - build_test_all_windows
+      - build_test_all_macos
       - build_test_all_bazel
       - test_all
       - test_gpu
