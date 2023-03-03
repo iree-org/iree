@@ -216,8 +216,6 @@ iree_compiler_cc_library(
         "MemrefCopyToLinalg.cpp",
         "PadDynamicAlloc.cpp",
         "RemoveTrivialLoops.cpp",
-        "TestPartitionableLoopsInterface.cpp",
-        "TileAndDistributeToWorkgroupsPass.cpp",
         "TileDispatchUsingInterface.cpp",
         "UserConfig.cpp",
         "VectorReductionToGPU.cpp",
