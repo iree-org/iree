@@ -119,39 +119,25 @@ __forceinline__ __device__ void gemm_ukernel(
   cutlass::debug::dump_fragment(accum);
 #endif
 
-  // Set initValue to zero. This can be done in the codegen
-  if (hasLinalgFill) initValue = 0;
+  /* Use itself */
+  typename ThreadblockMma::FragmentC accumC;
+  if (!hasLinalgFill) {
+    accumC.clear();
+    iterator_C.load(accumC);
+  }
 
   /* Store accumulator to shared memory */
   int total_elements = accum.size();
   ElementC* offset_shmem =
       &GemmSharedStorageBase[tb_thread_id * total_elements];
   for (int i = 0; i < total_elements; ++i)
-    offset_shmem[i] =
+    ElementC res =
         initValue +
         ElementC(typename ThreadblockMma::FragmentC::value_type(accum[i]));
-#if 0 
-  /* Store accumulator to global memory */
-  int total_elements = accum.size();
-  if (hasLinalgFill && initValue != 0) {
-    for (int i = 0; i < total_elements; ++i) accum[i] += initValue;
-  }
-
-  auto offset_X = (tb_tile_offset.m() * ThreadblockMma::WarpCount::kM) +
-                  (warp_id % ThreadblockMma::WarpCount::kM);
-  auto offset_Y = (tb_tile_offset.n() * ThreadblockMma::WarpCount::kN) +
-                  (warp_id / ThreadblockMma::WarpCount::kM);
-  typename ThreadblockMma::Operator::IteratorC iterator_C(
-      {pres, problem_size.n()}, threadIdx.x);
-  iterator_C.add_tile_offset({offset_X, offset_Y});
   if (!hasLinalgFill) {
-    typename ThreadblockMma::FragmentC loadme;
-    loadme.clear();
-    iterator_C.load(loadme);
-    for (int i = 0; i < accum.size(); ++i) accum[i] += loadme[i];
+    res += accumC[i];
   }
-  iterator_C.store(accum);
-#endif
+  offset_shmem[i] = res;
 }
 
 #endif  // UCUDA_GEMM_CUTLASS
