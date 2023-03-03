@@ -80,7 +80,6 @@ private:
 
   void mayFail(LogicalResult result) {
     hadErrors |= result.failed();
-    assert(!hadErrors && "mayFail has actually failed");
 #ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
     errorStateChecked = false;
 #endif // LLVM_ENABLE_ABI_BREAKING_CHECKS

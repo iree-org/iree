@@ -442,8 +442,9 @@ static FailureOr<Operation *> findSingleDefiningOp(Operation *replacedOp,
 
 void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
                                                      ValueRange newValues) {
-  // Fail hard if in an error state.
-  assert(!hadErrors && "already had errors");
+  // Bail out if in error state.
+  if (hadErrors)
+    return;
 
   // Exit early if the op is not tracked.
   SmallVector<Value> handles;
@@ -459,6 +460,14 @@ void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
     return;
   }
 
+  // If this would cause an error with replacement, drop instead.
+  if (*replacement && (*replacement)->getNumResults() != op->getNumResults()) {
+    LLVM_DEBUG(DBGS() << "failsafe error tracking activated due to mismatched "
+                         "number of results for op: "
+                      << op << " and replacement " << *replacement << "\n");
+    replacement = nullptr;
+  }
+
   if (*replacement == nullptr) {
     // TODO: Check if the handle is dead. Otherwise, the op should not be
     // dropped. This needs a change in the transform dialect interpreter.
@@ -471,8 +480,9 @@ void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
 }
 
 void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
-  // Fail hard if in an error state.
-  assert(!hadErrors && "already had errors");
+  // Bail out if in error state.
+  if (hadErrors)
+    return;
 
   // TODO: Walk can be removed when D144193 has landed.
   op->walk([&](Operation *op) {
@@ -488,8 +498,9 @@ void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
 }
 
 void mlir::TrackingListener::removeMappings(Operation *op) {
-  // Fail hard if in an error state.
-  assert(!hadErrors && "already had errors");
+  // Bail out if in error state.
+  if (hadErrors)
+    return;
 
   // Replacing the tracked op with null will stop the tracking.
   LLVM_DEBUG(DBGS() << "removing mappings @" << op << " : " << *op << "\n");
