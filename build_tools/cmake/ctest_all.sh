@@ -13,8 +13,6 @@
 
 set -euo pipefail
 
-echo $OSTYPE
-
 BUILD_DIR="$1"
 
 # Respect the user setting, but default to as many jobs as we have cores.
