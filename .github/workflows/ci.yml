@@ -124,74 +124,74 @@ jobs:
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
-  # build_all:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   env:
-  #     BUILD_DIR: full-build-dir
-  #   outputs:
-  #     # Pass through the build directory as output so it's available to
-  #     # dependent jobs.
-  #     build-dir: ${{ env.BUILD_DIR }}
-  #     build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
-  #     build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: "Building IREE"
-  #       env:
-  #         IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-  #           --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8" \
-  #           gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
-  #           ./build_tools/cmake/build_all.sh \
-  #           "${BUILD_DIR}"
-  #     # The archive step below doesn't include these files. Remove them first to
-  #     # save disk space.
-  #     # TODO(#10739): This step can be removed once we enlarge the disk sapce.
-  #     - name: "Removing unused files"
-  #       run: |
-  #         find "${BUILD_DIR}" -type f -name "*.a" -o -type f -name "*.o" \
-  #           -print \
-  #           -delete
-  #     # Things get more complicated here than when we're just building the
-  #     # runtime. The build directory is way bigger. We're also using on our own
-  #     # runners on GCE. So uploading to GitHub actions artifact storage hosted
-  #     # on Azure is dirt slow. We drop static libraries and object files, which
-  #     # aren't needed for testing. Then we do some minimal compression locally
-  #     # *in parallel* and upload to GCS. This can be further optimized.
-  #     # Especially decompression is still pretty slow. See #9881.
-  #     - name: "Creating build dir archive"
-  #       id: archive
-  #       env:
-  #         BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
-  #       run: |
-  #         tar -I 'zstd -T0' \
-  #           -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
-  #         echo "build-dir-archive=${BUILD_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
-  #     - name: "Uploading build dir archive"
-  #       id: upload
-  #       env:
-  #         BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
-  #         BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
-  #       run: |
-  #         gcloud storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
-  #         echo "build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+  build_all:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: full-build-dir
+    outputs:
+      # Pass through the build directory as output so it's available to
+      # dependent jobs.
+      build-dir: ${{ env.BUILD_DIR }}
+      build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
+      build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Building IREE"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8" \
+            gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
+            ./build_tools/cmake/build_all.sh \
+            "${BUILD_DIR}"
+      # The archive step below doesn't include these files. Remove them first to
+      # save disk space.
+      # TODO(#10739): This step can be removed once we enlarge the disk sapce.
+      - name: "Removing unused files"
+        run: |
+          find "${BUILD_DIR}" -type f -name "*.a" -o -type f -name "*.o" \
+            -print \
+            -delete
+      # Things get more complicated here than when we're just building the
+      # runtime. The build directory is way bigger. We're also using on our own
+      # runners on GCE. So uploading to GitHub actions artifact storage hosted
+      # on Azure is dirt slow. We drop static libraries and object files, which
+      # aren't needed for testing. Then we do some minimal compression locally
+      # *in parallel* and upload to GCS. This can be further optimized.
+      # Especially decompression is still pretty slow. See #9881.
+      - name: "Creating build dir archive"
+        id: archive
+        env:
+          BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
+        run: |
+          tar -I 'zstd -T0' \
+            -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+          echo "build-dir-archive=${BUILD_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading build dir archive"
+        id: upload
+        env:
+          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
+        run: |
+          gcloud storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
+          echo "build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
   build_test_all_windows:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
     runs-on: managed-windows-cpu
     defaults:
       run:
@@ -252,1038 +252,1038 @@ jobs:
           path: ${{ github.workspace }}/.ccache
           key: ccache_all_windows_${{ github.sha }}
 
-  # build_test_all_bazel:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: "Building with Bazel"
-  #       env:
-  #         IREE_WRITE_REMOTE_BAZEL_CACHE: ${{ needs.setup.outputs.write-caches }}
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
-  #           gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:b3cce73eb9f41d67981bc8f00e98fd66fe3487caec1bcbf38d4039dcc61e499d \
-  #           ./build_tools/bazel/build_core.sh
+  build_test_all_bazel:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Building with Bazel"
+        env:
+          IREE_WRITE_REMOTE_BAZEL_CACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
+            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:b3cce73eb9f41d67981bc8f00e98fd66fe3487caec1bcbf38d4039dcc61e499d \
+            ./build_tools/bazel/build_core.sh
 
-  # test_all:
-  #   needs: [setup, build_all]
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   env:
-  #     BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-  #     BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-  #     BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: "Downloading build dir archive"
-  #       run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-  #     - name: "Extracting build dir archive"
-  #       run: tar -xf "${BUILD_DIR_ARCHIVE}"
-  #     - name: "Testing all"
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env IREE_CUDA_DISABLE=1 \
-  #           gcr.io/iree-oss/swiftshader@sha256:05d59843bcd48352e4a14e96e9c6845b04d137e1132dc85f0a05fd7e53210263 \
-  #           ./build_tools/cmake/ctest_all.sh \
-  #           "${BUILD_DIR}"
+  test_all:
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Testing all"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_CUDA_DISABLE=1 \
+            gcr.io/iree-oss/swiftshader@sha256:05d59843bcd48352e4a14e96e9c6845b04d137e1132dc85f0a05fd7e53210263 \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
 
-  # test_gpu:
-  #   needs: [setup, build_all]
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - gpu
-  #     - os-family=Linux
-  #   env:
-  #     BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-  #     BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-  #     BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: Querying GPU information
-  #       run: |
-  #         ./build_tools/scripts/check_cuda.sh
-  #         ./build_tools/scripts/check_vulkan.sh
-  #     - name: "Downloading build dir archive"
-  #       run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-  #     - name: "Extracting build dir archive"
-  #       run: tar -xf "${BUILD_DIR_ARCHIVE}"
-  #     - name: "Testing with GPU"
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env IREE_VULKAN_F16_DISABLE=0 \
-  #           --env IREE_CUDA_DISABLE=0 \
-  #           --env CTEST_PARALLEL_LEVEL=2 \
-  #           --gpus all \
-  #           --env NVIDIA_DRIVER_CAPABILITIES=all \
-  #           gcr.io/iree-oss/nvidia@sha256:0088a9efa980de8c699dc75eb89a5d758e38c9f825181d8d5e679ac5a09a7da6 \
-  #           bash -euo pipefail -c \
-  #             "./build_tools/scripts/check_cuda.sh
-  #             ./build_tools/scripts/check_vulkan.sh
-  #             ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
+  test_gpu:
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - gpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: Querying GPU information
+        run: |
+          ./build_tools/scripts/check_cuda.sh
+          ./build_tools/scripts/check_vulkan.sh
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Testing with GPU"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VULKAN_F16_DISABLE=0 \
+            --env IREE_CUDA_DISABLE=0 \
+            --env CTEST_PARALLEL_LEVEL=2 \
+            --gpus all \
+            --env NVIDIA_DRIVER_CAPABILITIES=all \
+            gcr.io/iree-oss/nvidia@sha256:0088a9efa980de8c699dc75eb89a5d758e38c9f825181d8d5e679ac5a09a7da6 \
+            bash -euo pipefail -c \
+              "./build_tools/scripts/check_cuda.sh
+              ./build_tools/scripts/check_vulkan.sh
+              ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
 
-  # ################################## Subsets ###################################
-  # # Jobs that build some subset of IREE
-  # ##############################################################################
-  # build_test_runtime:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on: ubuntu-20.04-64core
-  #   env:
-  #     BUILD_DIR: build-runtime
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #     - name: "Checking out runtime submodules"
-  #       run: ./build_tools/scripts/git/update_runtime_submodules.sh
-  #     - name: "Building runtime"
-  #       # Note ccache is read-only here since this job runs on a GitHub-hosted runner
-  #       # and GitHub runners don't have write access to GCS
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "BUILD_PRESET=test" \
-  #           gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
-  #           ./build_tools/cmake/build_runtime.sh \
-  #           "${BUILD_DIR}"
-  #     - name: "Testing runtime"
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env IREE_VULKAN_DISABLE=1 \
-  #           gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
-  #           ./build_tools/cmake/ctest_all.sh \
-  #           "${BUILD_DIR}"
+  ################################## Subsets ###################################
+  # Jobs that build some subset of IREE
+  ##############################################################################
+  build_test_runtime:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on: ubuntu-20.04-64core
+    env:
+      BUILD_DIR: build-runtime
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Building runtime"
+        # Note ccache is read-only here since this job runs on a GitHub-hosted runner
+        # and GitHub runners don't have write access to GCS
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "BUILD_PRESET=test" \
+            gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
+            ./build_tools/cmake/build_runtime.sh \
+            "${BUILD_DIR}"
+      - name: "Testing runtime"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VULKAN_DISABLE=1 \
+            gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
 
-  # build_test_runtime_windows:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on: managed-windows-cpu
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #   env:
-  #     BUILD_DIR: build-runtime-windows
-  #     IREE_VULKAN_DISABLE: 1
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #     - name: "Checking out runtime submodules"
-  #       run: ./build_tools/scripts/git/update_runtime_submodules.sh
-  #     - name: "Configuring MSVC"
-  #       uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
-  #     - name: "Installing Python requirements"
-  #       run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-  #     - name: "Building runtime"
-  #       env:
-  #         BUILD_PRESET: "test"
-  #       run: ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
-  #     - name: "Testing runtime"
-  #       run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+  build_test_runtime_windows:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on: managed-windows-cpu
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_DIR: build-runtime-windows
+      IREE_VULKAN_DISABLE: 1
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Configuring MSVC"
+        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
+      - name: "Installing Python requirements"
+        run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: "Building runtime"
+        env:
+          BUILD_PRESET: "test"
+        run: ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
+      - name: "Testing runtime"
+        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
-  # ################################# Tensorflow #################################
-  # # Jobs that build the IREE-Tensorflow integrations
-  # ##############################################################################
-  # build_tf_integrations:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   outputs:
-  #     binaries-dir: ${{ steps.build.outputs.binaries-dir }}
-  #     binaries-archive: ${{ steps.archive.outputs.binaries-archive }}
-  #     binaries-gcs-artifact: ${{ steps.upload.outputs.binaries-gcs-artifact }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: "Building TF binaries"
-  #       id: build
-  #       env:
-  #         IREE_TF_BINARIES_OUTPUT_DIR: iree-tf-binaries
-  #         IREE_WRITE_REMOTE_BAZEL_CACHE: ${{ needs.setup.outputs.write-caches }}
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
-  #           --env "IREE_TF_BINARIES_OUTPUT_DIR=${IREE_TF_BINARIES_OUTPUT_DIR}" \
-  #           gcr.io/iree-oss/frontends-swiftshader@sha256:b8c41a6ae0bd8b094fcd4ea5998b82d29f62f9e595f7d02f53291ef72ba7d478 \
-  #           build_tools/cmake/build_tf_binaries.sh
-  #         echo "binaries-dir=${IREE_TF_BINARIES_OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
-  #     - name: "Creating archive of binaries"
-  #       id: archive
-  #       env:
-  #         BINARIES_ARCHIVE: tf-binaries.tar
-  #         BINARIES_DIR: ${{ steps.build.outputs.binaries-dir }}
-  #       run: |
-  #         tar -cf "${BINARIES_ARCHIVE}" "${BINARIES_DIR}"
-  #         echo "binaries-archive=${BINARIES_ARCHIVE}" >> "${GITHUB_OUTPUT}"
-  #     - name: "Uploading binaries archive"
-  #       id: upload
-  #       env:
-  #         BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
-  #         BINARIES_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
-  #       run: |
-  #         gcloud storage cp "${BINARIES_ARCHIVE}" "${BINARIES_GCS_ARTIFACT}"
-  #         echo "binaries-gcs-artifact=${BINARIES_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+  ################################# Tensorflow #################################
+  # Jobs that build the IREE-Tensorflow integrations
+  ##############################################################################
+  build_tf_integrations:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    outputs:
+      binaries-dir: ${{ steps.build.outputs.binaries-dir }}
+      binaries-archive: ${{ steps.archive.outputs.binaries-archive }}
+      binaries-gcs-artifact: ${{ steps.upload.outputs.binaries-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Building TF binaries"
+        id: build
+        env:
+          IREE_TF_BINARIES_OUTPUT_DIR: iree-tf-binaries
+          IREE_WRITE_REMOTE_BAZEL_CACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
+            --env "IREE_TF_BINARIES_OUTPUT_DIR=${IREE_TF_BINARIES_OUTPUT_DIR}" \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:b8c41a6ae0bd8b094fcd4ea5998b82d29f62f9e595f7d02f53291ef72ba7d478 \
+            build_tools/cmake/build_tf_binaries.sh
+          echo "binaries-dir=${IREE_TF_BINARIES_OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
+      - name: "Creating archive of binaries"
+        id: archive
+        env:
+          BINARIES_ARCHIVE: tf-binaries.tar
+          BINARIES_DIR: ${{ steps.build.outputs.binaries-dir }}
+        run: |
+          tar -cf "${BINARIES_ARCHIVE}" "${BINARIES_DIR}"
+          echo "binaries-archive=${BINARIES_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading binaries archive"
+        id: upload
+        env:
+          BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
+          BINARIES_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
+        run: |
+          gcloud storage cp "${BINARIES_ARCHIVE}" "${BINARIES_GCS_ARTIFACT}"
+          echo "binaries-gcs-artifact=${BINARIES_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
-  # test_tf_integrations:
-  #   needs: [setup, build_all, build_tf_integrations]
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   env:
-  #     BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-  #     BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-  #     BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-  #     TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
-  #     TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-  #     TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: "Downloading TF binaries archive"
-  #       run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
-  #     - name: "Extracting TF binaries archive"
-  #       run: tar -xvf "${TF_BINARIES_ARCHIVE}"
-  #     - name: "Symlinking TF binaries"
-  #       run: |
-  #         ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
-  #     - name: "Downloading build dir archive"
-  #       run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-  #     - name: "Extracting build dir archive"
-  #       run: tar -xf "${BUILD_DIR_ARCHIVE}"
-  #     - name: "Running TF integrations tests"
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           gcr.io/iree-oss/frontends-swiftshader@sha256:b8c41a6ae0bd8b094fcd4ea5998b82d29f62f9e595f7d02f53291ef72ba7d478 \
-  #           build_tools/cmake/run_tf_tests.sh \
-  #           "${BUILD_DIR}"
+  test_tf_integrations:
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
+      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Downloading TF binaries archive"
+        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+      - name: "Extracting TF binaries archive"
+        run: tar -xvf "${TF_BINARIES_ARCHIVE}"
+      - name: "Symlinking TF binaries"
+        run: |
+          ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Running TF integrations tests"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:b8c41a6ae0bd8b094fcd4ea5998b82d29f62f9e595f7d02f53291ef72ba7d478 \
+            build_tools/cmake/run_tf_tests.sh \
+            "${BUILD_DIR}"
 
-  # test_tf_integrations_gpu:
-  #   needs: [setup, build_all, build_tf_integrations]
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - gpu
-  #     - os-family=Linux
-  #   env:
-  #     BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-  #     BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-  #     BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-  #     TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
-  #     TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-  #     TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: "Downloading TF binaries archive"
-  #       run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
-  #     - name: "Extracting TF binaries archive"
-  #       run: tar -xvf "${TF_BINARIES_ARCHIVE}"
-  #     - name: "Symlinking TF binaries"
-  #       run: |
-  #         ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
-  #     - name: "Downloading build dir archive"
-  #       run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-  #     - name: "Extracting build dir archive"
-  #       run: tar -xf "${BUILD_DIR_ARCHIVE}"
-  #     - name: "Running TF integrations tests"
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env IREE_LLVM_CPU_DISABLE=1 \
-  #           --gpus all \
-  #           --env NVIDIA_DRIVER_CAPABILITIES=all \
-  #           gcr.io/iree-oss/frontends-nvidia@sha256:a0d8c3d918619c5c5519273e60b976b2ed03cb8000117d86911c41ba27a90988 \
-  #           bash -euo pipefail -c \
-  #             "./build_tools/scripts/check_cuda.sh
-  #             ./build_tools/scripts/check_vulkan.sh
-  #             build_tools/cmake/run_tf_tests.sh ${BUILD_DIR}"
+  test_tf_integrations_gpu:
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - gpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
+      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Downloading TF binaries archive"
+        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+      - name: "Extracting TF binaries archive"
+        run: tar -xvf "${TF_BINARIES_ARCHIVE}"
+      - name: "Symlinking TF binaries"
+        run: |
+          ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Running TF integrations tests"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_LLVM_CPU_DISABLE=1 \
+            --gpus all \
+            --env NVIDIA_DRIVER_CAPABILITIES=all \
+            gcr.io/iree-oss/frontends-nvidia@sha256:a0d8c3d918619c5c5519273e60b976b2ed03cb8000117d86911c41ba27a90988 \
+            bash -euo pipefail -c \
+              "./build_tools/scripts/check_cuda.sh
+              ./build_tools/scripts/check_vulkan.sh
+              build_tools/cmake/run_tf_tests.sh ${BUILD_DIR}"
 
-  # ######################## Community Model Coverage ############################
-  # # Jobs that test IREE behavior on a set of models.
-  # ##############################################################################
-  # # TODO(#11263): Drop this job once the IREE_BUILD_BENCHMARKS is removed.
-  # test_build_benchmark_suites:
-  #   needs: [setup, build_all, build_tf_integrations]
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   env:
-  #     BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-  #     BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-  #     BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-  #     TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
-  #     TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-  #     TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
-  #     BUILD_BENCHMARKS_DIR: build-benchmarks
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #     - name: "Checking out runtime submodules"
-  #       run: ./build_tools/scripts/git/update_runtime_submodules.sh
-  #     - name: "Downloading build dir archive"
-  #       run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-  #     - name: "Extracting install from build dir archive"
-  #       run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-  #     - name: "Downloading TF binaries archive"
-  #       run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
-  #     - name: "Extracting TF binaries archive"
-  #       run: tar -xf "${TF_BINARIES_ARCHIVE}"
-  #     - name: "Building benchmarks"
-  #       id: build
-  #       run: |
-  #         build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
-  #           --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
-  #           --env "IREE_BUILD_BENCHMARKS_DIR=${BUILD_BENCHMARKS_DIR}" \
-  #           gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
-  #           build_tools/cmake/build_benchmarks.sh
+  ######################## Community Model Coverage ############################
+  # Jobs that test IREE behavior on a set of models.
+  ##############################################################################
+  # TODO(#11263): Drop this job once the IREE_BUILD_BENCHMARKS is removed.
+  test_build_benchmark_suites:
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
+      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+      BUILD_BENCHMARKS_DIR: build-benchmarks
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Downloading TF binaries archive"
+        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+      - name: "Extracting TF binaries archive"
+        run: tar -xf "${TF_BINARIES_ARCHIVE}"
+      - name: "Building benchmarks"
+        id: build
+        run: |
+          build_tools/github_actions/docker_run.sh \
+            --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
+            --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
+            --env "IREE_BUILD_BENCHMARKS_DIR=${BUILD_BENCHMARKS_DIR}" \
+            gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
+            build_tools/cmake/build_benchmarks.sh
 
-  # ############################### Configurations ###############################
-  # # Jobs that build IREE in some non-default configuration
-  # ##############################################################################
-  # python_release_packages:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: Build runtime wheels (Linux)
-  #       shell: bash
-  #       env:
-  #         packages: "iree-runtime iree-runtime-instrumented"
-  #         output_dir: "${{ github.workspace }}/bindist"
-  #         # Note when upgrading: Build just one Python version synced to our
-  #         # minimum. Note that 3.7 is the last with this naming convention.
-  #         # Look at the script for the full list.
-  #         override_python_versions: cp37-cp37m
-  #       run: |
-  #         ./build_tools/python_deploy/build_linux_packages.sh
-  #     # Note that it is just a trade-off decision to have this serialized
-  #     # as a separate step vs parallelized as a separate job. The runtime
-  #     # build is fast, pays the clone/docker overhead and provides early
-  #     # signal (since it runs in just a couple of minutes).
-  #     - name: Build compiler wheels (Linux)
-  #       shell: bash
-  #       env:
-  #         packages: "iree-compiler"
-  #         output_dir: "${{ github.workspace }}/bindist"
-  #         # Note when upgrading: Build just one Python version synced to our
-  #         # minimum. Note that 3.7 is the last with this naming convention.
-  #         # Look at the script for the full list.
-  #         override_python_versions: cp37-cp37m
-  #       run: |
-  #         ./build_tools/python_deploy/build_linux_packages.sh
+  ############################### Configurations ###############################
+  # Jobs that build IREE in some non-default configuration
+  ##############################################################################
+  python_release_packages:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: Build runtime wheels (Linux)
+        shell: bash
+        env:
+          packages: "iree-runtime iree-runtime-instrumented"
+          output_dir: "${{ github.workspace }}/bindist"
+          # Note when upgrading: Build just one Python version synced to our
+          # minimum. Note that 3.7 is the last with this naming convention.
+          # Look at the script for the full list.
+          override_python_versions: cp37-cp37m
+        run: |
+          ./build_tools/python_deploy/build_linux_packages.sh
+      # Note that it is just a trade-off decision to have this serialized
+      # as a separate step vs parallelized as a separate job. The runtime
+      # build is fast, pays the clone/docker overhead and provides early
+      # signal (since it runs in just a couple of minutes).
+      - name: Build compiler wheels (Linux)
+        shell: bash
+        env:
+          packages: "iree-compiler"
+          output_dir: "${{ github.workspace }}/bindist"
+          # Note when upgrading: Build just one Python version synced to our
+          # minimum. Note that 3.7 is the last with this naming convention.
+          # Look at the script for the full list.
+          override_python_versions: cp37-cp37m
+        run: |
+          ./build_tools/python_deploy/build_linux_packages.sh
 
-  # asan:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: "Building and testing with AddressSanitizer"
-  #       env:
-  #         IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-  #       run: |
-  #         # Note that this uses the latest version of the clang compiler, etc.
-  #         # This gives us access to the latest features and validates that IREE
-  #         # builds using the latest versions.
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-  #           --env "CCACHE_NAMESPACE=swiftshader-bleeding-edge@sha256:c22afc61198e14a98e06e5261149de74c629acd2bc61b82e57ec90e5461b69be" \
-  #           gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:b3cce73eb9f41d67981bc8f00e98fd66fe3487caec1bcbf38d4039dcc61e499d \
-  #           ./build_tools/cmake/build_and_test_asan.sh
+  asan:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Building and testing with AddressSanitizer"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          # Note that this uses the latest version of the clang compiler, etc.
+          # This gives us access to the latest features and validates that IREE
+          # builds using the latest versions.
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=swiftshader-bleeding-edge@sha256:c22afc61198e14a98e06e5261149de74c629acd2bc61b82e57ec90e5461b69be" \
+            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:b3cce73eb9f41d67981bc8f00e98fd66fe3487caec1bcbf38d4039dcc61e499d \
+            ./build_tools/cmake/build_and_test_asan.sh
 
-  # tsan:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: "Building and testing with ThreadSanitizer"
-  #       env:
-  #         IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-  #           --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8" \
-  #           gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
-  #           ./build_tools/cmake/build_and_test_tsan.sh
+  tsan:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Building and testing with ThreadSanitizer"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8" \
+            gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
+            ./build_tools/cmake/build_and_test_tsan.sh
 
-  # small_runtime:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on: ubuntu-20.04-64core
-  #   env:
-  #     BUILD_DIR: build-runtime
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #     - name: "Checking out runtime submodules"
-  #       run: ./build_tools/scripts/git/update_runtime_submodules.sh
-  #     - name: "Building size-optimized runtime"
-  #       # Note ccache is read-only here since this job runs on a GitHub-hosted runner
-  #       # and GitHub runners don't have write access to GCS
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
-  #           ./build_tools/cmake/build_runtime_small.sh \
-  #           "${BUILD_DIR}"
-  #     - name: "Testing runtime"
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env IREE_VULKAN_DISABLE=1 \
-  #           gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
-  #           ./build_tools/cmake/ctest_all.sh \
-  #           "${BUILD_DIR}"
+  small_runtime:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on: ubuntu-20.04-64core
+    env:
+      BUILD_DIR: build-runtime
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Building size-optimized runtime"
+        # Note ccache is read-only here since this job runs on a GitHub-hosted runner
+        # and GitHub runners don't have write access to GCS
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
+            ./build_tools/cmake/build_runtime_small.sh \
+            "${BUILD_DIR}"
+      - name: "Testing runtime"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VULKAN_DISABLE=1 \
+            gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
 
-  # gcc:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   env:
-  #     BUILD_DIR: build-gcc
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: "Building IREE with gcc"
-  #       env:
-  #         IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env CC=/usr/bin/gcc-9 \
-  #           --env CXX=/usr/bin/g++-9 \
-  #           --env CMAKE_BUILD_TYPE=Release \
-  #           --env "IREE_TARGET_BACKEND_WEBGPU=OFF" \
-  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-  #           --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8" \
-  #           gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
-  #           ./build_tools/cmake/build_all.sh \
-  #           "${BUILD_DIR}"
+  gcc:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: build-gcc
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Building IREE with gcc"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env CC=/usr/bin/gcc-9 \
+            --env CXX=/usr/bin/g++-9 \
+            --env CMAKE_BUILD_TYPE=Release \
+            --env "IREE_TARGET_BACKEND_WEBGPU=OFF" \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8" \
+            gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
+            ./build_tools/cmake/build_all.sh \
+            "${BUILD_DIR}"
 
-  # tracing:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   env:
-  #     BUILD_DIR: build-tracing
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: "Building IREE with tracing enabled"
-  #       env:
-  #         IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-  #       run: |
-  #         # TODO(#11394): Enable Web GPU
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-  #           --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8" \
-  #           gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
-  #           ./build_tools/cmake/build_tracing.sh \
-  #           "${BUILD_DIR}"
+  tracing:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: build-tracing
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Building IREE with tracing enabled"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          # TODO(#11394): Enable Web GPU
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8" \
+            gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
+            ./build_tools/cmake/build_tracing.sh \
+            "${BUILD_DIR}"
 
-  # debug:
-  #   needs: setup
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   env:
-  #     BUILD_DIR: build-debug
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         submodules: true
-  #     - name: "Building IREE in Debug configuration"
-  #       env:
-  #         IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-  #           --env "CMAKE_BUILD_TYPE=Debug" \
-  #           --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8" \
-  #           gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
-  #           ./build_tools/cmake/build_all.sh \
-  #           "${BUILD_DIR}"
+  debug:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: build-debug
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Building IREE in Debug configuration"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CMAKE_BUILD_TYPE=Debug" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8" \
+            gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
+            ./build_tools/cmake/build_all.sh \
+            "${BUILD_DIR}"
 
-  # ############################### Configurations ###############################
-  # # Jobs that build and run IREE e2e tests/benchmarks                          #
-  # ##############################################################################
+  ############################### Configurations ###############################
+  # Jobs that build and run IREE e2e tests/benchmarks                          #
+  ##############################################################################
 
-  # build_benchmark_tools:
-  #   needs: [setup, build_all]
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   outputs:
-  #     # We can't collect all outputs from the matrix jobs due to Github's
-  #     # limitation (https://github.com/orgs/community/discussions/17245).
-  #     # Therefore, the output is the GCS directory that stores all benchmark
-  #     # tools archives. The following jobs need to construct the archive names
-  #     # by themselves and combine with path of GCS directory here to fetch the
-  #     # archives.
-  #     benchmark-tools-gcs-artifact-dir: ${{ steps.upload.outputs.benchmark-tools-gcs-artifact-dir }}
-  #   strategy:
-  #     matrix:
-  #       target:
-  #         - platform: "linux"
-  #           arch: "x86_64"
-  #           docker_image: "gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8"
-  #           # Builds tools on the host and assumes the builder is Linux x86_64.
-  #           build_script: "./build_tools/cmake/build_runtime.sh"
-  #         - platform: "linux"
-  #           arch: "riscv_64"
-  #           docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
-  #           build_script: "./build_tools/cmake/build_riscv.sh"
-  #   env:
-  #     PLATFORM: ${{ matrix.target.platform }}
-  #     ARCH: ${{ matrix.target.arch }}
-  #     DOCKER_IMAGE: ${{ matrix.target.docker_image }}
-  #     BUILD_SCRIPT: ${{ matrix.target.build_script }}
-  #     BUILD_TOOLS_DIR: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools-dir
-  #     BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-  #     BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-  #     BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #     - name: "Checking out runtime submodules"
-  #       run: ./build_tools/scripts/git/update_runtime_submodules.sh
-  #     - name: "Downloading build dir archive"
-  #       run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-  #     - name: "Extracting host binaries"
-  #       run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-  #     - name: "Compiling the benchmark tools"
-  #       id: build
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
-  #           --env "IREE_TARGET_ARCH=${ARCH}" \
-  #           --env "BUILD_PRESET=benchmark" \
-  #           --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
-  #           "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build"
-  #     - name: "Compiling the benchmark tools with tracing"
-  #       id: build-with-tracing
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
-  #           --env "IREE_TARGET_ARCH=${ARCH}" \
-  #           --env "BUILD_PRESET=benchmark-with-tracing" \
-  #           --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
-  #           "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
-  #     - name: "Creating the benchmark tools archive"
-  #       id: archive
-  #       env:
-  #         BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools.tar
-  #       run: |
-  #         tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
-  #           "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module \
-  #           "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt
-  #         echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
-  #     - name: "Uploading the benchmark tools archive"
-  #       id: upload
-  #       env:
-  #         BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}
-  #         BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/benchmark-tools
-  #       run: |
-  #         gcloud storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}/"
-  #         echo "benchmark-tools-gcs-artifact-dir=${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
+  build_benchmark_tools:
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    outputs:
+      # We can't collect all outputs from the matrix jobs due to Github's
+      # limitation (https://github.com/orgs/community/discussions/17245).
+      # Therefore, the output is the GCS directory that stores all benchmark
+      # tools archives. The following jobs need to construct the archive names
+      # by themselves and combine with path of GCS directory here to fetch the
+      # archives.
+      benchmark-tools-gcs-artifact-dir: ${{ steps.upload.outputs.benchmark-tools-gcs-artifact-dir }}
+    strategy:
+      matrix:
+        target:
+          - platform: "linux"
+            arch: "x86_64"
+            docker_image: "gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8"
+            # Builds tools on the host and assumes the builder is Linux x86_64.
+            build_script: "./build_tools/cmake/build_runtime.sh"
+          - platform: "linux"
+            arch: "riscv_64"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
+            build_script: "./build_tools/cmake/build_riscv.sh"
+    env:
+      PLATFORM: ${{ matrix.target.platform }}
+      ARCH: ${{ matrix.target.arch }}
+      DOCKER_IMAGE: ${{ matrix.target.docker_image }}
+      BUILD_SCRIPT: ${{ matrix.target.build_script }}
+      BUILD_TOOLS_DIR: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools-dir
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting host binaries"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Compiling the benchmark tools"
+        id: build
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "BUILD_PRESET=benchmark" \
+            --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
+            "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build"
+      - name: "Compiling the benchmark tools with tracing"
+        id: build-with-tracing
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "BUILD_PRESET=benchmark-with-tracing" \
+            --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
+            "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
+      - name: "Creating the benchmark tools archive"
+        id: archive
+        env:
+          BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools.tar
+        run: |
+          tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
+            "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module \
+            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt
+          echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading the benchmark tools archive"
+        id: upload
+        env:
+          BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}
+          BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/benchmark-tools
+        run: |
+          gcloud storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}/"
+          echo "benchmark-tools-gcs-artifact-dir=${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
 
-  # build_e2e_test_artifacts:
-  #   needs: [setup, build_all, build_tf_integrations]
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   env:
-  #     HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-  #     HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-  #     HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-  #     TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
-  #     TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-  #     TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
-  #   outputs:
-  #     e2e-test-artifacts-dir: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
-  #     e2e-test-artifacts-gcs-artifact-dir: ${{ steps.upload.outputs.e2e-test-artifacts-gcs-artifact-dir }}
-  #     e2e-test-artifacts-build-log: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
-  #     e2e-test-artifacts-build-log-gcs-artifact: ${{ steps.upload.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #     - name: "Checking out runtime submodules"
-  #       run: ./build_tools/scripts/git/update_runtime_submodules.sh
-  #     - name: "Downloading build dir archive"
-  #       run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
-  #     - name: "Extracting install from build dir archive"
-  #       run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
-  #     - name: "Downloading TF binaries archive"
-  #       run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
-  #     - name: "Extracting TF binaries archive"
-  #       run: tar -xf "${TF_BINARIES_ARCHIVE}"
-  #     - name: "Building e2e test artifacts"
-  #       id: build
-  #       env:
-  #         BUILD_E2E_TEST_ARTIFACTS_DIR: build-e2e-test-artifacts
-  #       run: |
-  #         build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
-  #           --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
-  #           gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
-  #           build_tools/cmake/build_e2e_test_artifacts.sh \
-  #           "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
-  #         echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
-  #         echo "e2e-test-artifacts-build-log=${BUILD_E2E_TEST_ARTIFACTS_DIR}/.ninja_log" >> "${GITHUB_OUTPUT}"
-  #     - name: "Uploading e2e test artifacts"
-  #       id: upload
-  #       env:
-  #         E2E_TEST_ARTIFACTS_DIR: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
-  #         E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
-  #         E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
-  #         E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ env.GCS_DIR }}/e2e-test-artifacts/ninja_log
-  #       run: |
-  #         # Uploads all IREE artifacts and MLIR files (including the imported
-  #         # MLIR files and MLIR source models).
-  #         # Not archiving the directory to allow fetching each file as needed
-  #         # separately.
-  #         find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 \
-  #           -name "iree_*" -o -name "model_*.mlir" | \
-  #           gcloud storage cp --read-paths-from-stdin -r \
-  #             "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
-  #         gcloud storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
-  #             "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}"
-  #         echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
-  #         echo "e2e-test-artifacts-build-log-gcs-artifact=${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+  build_e2e_test_artifacts:
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
+      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+    outputs:
+      e2e-test-artifacts-dir: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
+      e2e-test-artifacts-gcs-artifact-dir: ${{ steps.upload.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      e2e-test-artifacts-build-log: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
+      e2e-test-artifacts-build-log-gcs-artifact: ${{ steps.upload.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+      - name: "Downloading TF binaries archive"
+        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+      - name: "Extracting TF binaries archive"
+        run: tar -xf "${TF_BINARIES_ARCHIVE}"
+      - name: "Building e2e test artifacts"
+        id: build
+        env:
+          BUILD_E2E_TEST_ARTIFACTS_DIR: build-e2e-test-artifacts
+        run: |
+          build_tools/github_actions/docker_run.sh \
+            --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
+            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
+            gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8 \
+            build_tools/cmake/build_e2e_test_artifacts.sh \
+            "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
+          echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
+          echo "e2e-test-artifacts-build-log=${BUILD_E2E_TEST_ARTIFACTS_DIR}/.ninja_log" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading e2e test artifacts"
+        id: upload
+        env:
+          E2E_TEST_ARTIFACTS_DIR: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
+          E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
+          E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
+          E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ env.GCS_DIR }}/e2e-test-artifacts/ninja_log
+        run: |
+          # Uploads all IREE artifacts and MLIR files (including the imported
+          # MLIR files and MLIR source models).
+          # Not archiving the directory to allow fetching each file as needed
+          # separately.
+          find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 \
+            -name "iree_*" -o -name "model_*.mlir" | \
+            gcloud storage cp --read-paths-from-stdin -r \
+              "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
+          gcloud storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
+              "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}"
+          echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
+          echo "e2e-test-artifacts-build-log-gcs-artifact=${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
-  # compilation_benchmarks:
-  #   needs: [setup, build_e2e_test_artifacts]
-  #   if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   env:
-  #     E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
-  #     E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
-  #     E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log }}
-  #     E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
-  #   outputs:
-  #     compile-stats-results: ${{ steps.collect.outputs.compile-stats-results }}
-  #     compile-stats-results-gcs-artifact: ${{ steps.upload.outputs.compile-stats-results-gcs-artifact }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #     - name: "Exporting configs"
-  #       id: "export"
-  #       env:
-  #         COMPILATION_CONFIG: "compilation-config.json"
-  #       run: |
-  #         ./build_tools/benchmarks/export_benchmark_config.py \
-  #           compilation \
-  #           --output="${COMPILATION_CONFIG}"
-  #         echo "compilation-config=${COMPILATION_CONFIG}" >> "${GITHUB_OUTPUT}"
-  #     - name: "Downloading assets"
-  #       id: "download-assets"
-  #       env:
-  #         COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
-  #       run: |
-  #         gcloud storage cp \
-  #           "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" \
-  #           "${E2E_TEST_ARTIFACTS_BUILD_LOG}"
-  #         mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
-  #         jq -r \
-  #           --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
-  #           '.module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
-  #           "${COMPILATION_CONFIG}" | \
-  #           gcloud storage cp -r --read-paths-from-stdin \
-  #             "${E2E_TEST_ARTIFACTS_DIR}"
-  #     - name: "Collecting compilation statistics"
-  #       id: collect
-  #       env:
-  #         COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
-  #         GENERATION_CONFIG: generation-config.json
-  #         COMPILE_STATS_RESULTS: benchmark-results/compile-stats-results.json
-  #       run: |
-  #         jq '.generation_configs' "${COMPILATION_CONFIG}" > "${GENERATION_CONFIG}"
-  #         mkdir -p benchmark-results
-  #         ./build_tools/benchmarks/collect_compilation_statistics.py alpha \
-  #           --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
-  #           --build_log="${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
-  #           --generation_config="${GENERATION_CONFIG}" \
-  #           --output="${COMPILE_STATS_RESULTS}"
-  #         echo "compile-stats-results=${COMPILE_STATS_RESULTS}" >> "${GITHUB_OUTPUT}"
-  #     - name: "Uploading benchmark results"
-  #       id: upload
-  #       env:
-  #         COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
-  #         COMPILE_STATS_RESULTS: ${{ steps.collect.outputs.compile-stats-results }}
-  #         COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.collect.outputs.compile-stats-results }}
-  #       run: |
-  #         # Upload files with two commands since they go into different GCS
-  #         # directories.
-  #         gcloud storage cp "${COMPILATION_CONFIG}" "${GCS_DIR}"
-  #         gcloud storage cp \
-  #           "${COMPILE_STATS_RESULTS}" \
-  #           "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
-  #         echo "compile-stats-results-gcs-artifact=${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+  compilation_benchmarks:
+    needs: [setup, build_e2e_test_artifacts]
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+      E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log }}
+      E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
+    outputs:
+      compile-stats-results: ${{ steps.collect.outputs.compile-stats-results }}
+      compile-stats-results-gcs-artifact: ${{ steps.upload.outputs.compile-stats-results-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Exporting configs"
+        id: "export"
+        env:
+          COMPILATION_CONFIG: "compilation-config.json"
+        run: |
+          ./build_tools/benchmarks/export_benchmark_config.py \
+            compilation \
+            --output="${COMPILATION_CONFIG}"
+          echo "compilation-config=${COMPILATION_CONFIG}" >> "${GITHUB_OUTPUT}"
+      - name: "Downloading assets"
+        id: "download-assets"
+        env:
+          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
+        run: |
+          gcloud storage cp \
+            "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" \
+            "${E2E_TEST_ARTIFACTS_BUILD_LOG}"
+          mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
+          jq -r \
+            --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
+            '.module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
+            "${COMPILATION_CONFIG}" | \
+            gcloud storage cp -r --read-paths-from-stdin \
+              "${E2E_TEST_ARTIFACTS_DIR}"
+      - name: "Collecting compilation statistics"
+        id: collect
+        env:
+          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
+          GENERATION_CONFIG: generation-config.json
+          COMPILE_STATS_RESULTS: benchmark-results/compile-stats-results.json
+        run: |
+          jq '.generation_configs' "${COMPILATION_CONFIG}" > "${GENERATION_CONFIG}"
+          mkdir -p benchmark-results
+          ./build_tools/benchmarks/collect_compilation_statistics.py alpha \
+            --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
+            --build_log="${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
+            --generation_config="${GENERATION_CONFIG}" \
+            --output="${COMPILE_STATS_RESULTS}"
+          echo "compile-stats-results=${COMPILE_STATS_RESULTS}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading benchmark results"
+        id: upload
+        env:
+          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
+          COMPILE_STATS_RESULTS: ${{ steps.collect.outputs.compile-stats-results }}
+          COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.collect.outputs.compile-stats-results }}
+        run: |
+          # Upload files with two commands since they go into different GCS
+          # directories.
+          gcloud storage cp "${COMPILATION_CONFIG}" "${GCS_DIR}"
+          gcloud storage cp \
+            "${COMPILE_STATS_RESULTS}" \
+            "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
+          echo "compile-stats-results-gcs-artifact=${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
-  # execution_benchmarks:
-  #   needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
-  #   if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
-  #   uses: ./.github/workflows/benchmark_execution.yml
-  #   with:
-  #     # env.GCS_DIR is also duplicated in this workflow. See the note there on
-  #     # why this is.
-  #     runner-group: ${{ needs.setup.outputs.runner-group }}
-  #     runner-env: ${{ needs.setup.outputs.runner-env }}
-  #     e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
-  #     e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
-  #     benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
-  #     benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
+  execution_benchmarks:
+    needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+    uses: ./.github/workflows/benchmark_execution.yml
+    with:
+      # env.GCS_DIR is also duplicated in this workflow. See the note there on
+      # why this is.
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+      e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
+      benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
 
-  # process_benchmark_results:
-  #   needs: [setup, compilation_benchmarks, execution_benchmarks]
-  #   if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   env:
-  #     COMPILE_STATS_RESULTS: ${{ needs.compilation_benchmarks.outputs.compile-stats-results }}
-  #     COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
-  #     # Empty if no execution benchmark runs.
-  #     EXECUTION_BENCHMARK_RESULTS_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-dir }}
-  #     # Empty if no execution benchmark runs.
-  #     EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #       with:
-  #         # We need the full history (and main branch) to generate the report.
-  #         fetch-depth: 0
-  #     - name: Downloading compilation benchmark results
-  #       run: |
-  #         gcloud storage cp \
-  #           "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" \
-  #           "${COMPILE_STATS_RESULTS}"
-  #     - name: Downloading execution benchmark results
-  #       id: download-execution-results
-  #       # Skip the download if there is no execution benchmark results (e.g. no
-  #       # benchmark matches the preset/filter). In such case, no benchmark job
-  #       # is run in benchmark_execution.yml and the output variables are empty.
-  #       if: env.EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR != ''
-  #       run: |
-  #         gcloud storage cp -r \
-  #           "${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/benchmark-results-*.json" \
-  #           "${EXECUTION_BENCHMARK_RESULTS_DIR}"
-  #         echo "execution-benchmark-results-pattern=${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-*.json" >> "${GITHUB_OUTPUT}"
-  #     - name: Generating comment
-  #       if: needs.setup.outputs.ci-stage == 'presubmit'
-  #       id: generate-comment
-  #       env:
-  #         # Wildcard pattern to match all execution benchmark results. Empty if
-  #         # execution_benchmarks is skipped, which results in no match.
-  #         EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
-  #         IREE_BUILD_URL: https://github.com/openxla/iree/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
-  #         PR_NUMBER: ${{ github.event.pull_request.number }}
-  #         BENCHMARK_COMMENT_ARTIFACT: benchmark-comment.json
-  #       run: |
-  #         build_tools/github_actions/docker_run.sh \
-  #           gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
-  #           ./build_tools/benchmarks/generate_benchmark_comment.py \
-  #             --verbose \
-  #             --pr_number="${PR_NUMBER}" \
-  #             --pr_committish="${GITHUB_SHA}" \
-  #             --pr_base_branch="origin/${GITHUB_BASE_REF}" \
-  #             --comment_type="benchmark-summary" \
-  #             --build_url="${IREE_BUILD_URL}" \
-  #             --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
-  #             --compile_stats_files="${COMPILE_STATS_RESULTS}" \
-  #             --output="${BENCHMARK_COMMENT_ARTIFACT}"
-  #         echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
-  #     - name: Uploading comment artifact
-  #       # Due to security reasons, instead of posting the comment to PR, we only
-  #       # upload the comment data in presubmit workflow and trigger the posting
-  #       # workflow on the main branch. See post_benchmark_comment.yaml
-  #       if: needs.setup.outputs.ci-stage == 'presubmit'
-  #       env:
-  #         BENCHMARK_COMMENT_ARTIFACT: ${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
-  #         BENCHMARK_COMMENT_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
-  #       run: |
-  #         gcloud storage cp \
-  #           "${BENCHMARK_COMMENT_ARTIFACT}" \
-  #           "${BENCHMARK_COMMENT_GCS_ARTIFACT}"
-  #     - name: Uploading results to dashboard
-  #       if: needs.setup.outputs.ci-stage == 'postsubmit'
-  #       env:
-  #         EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
-  #         IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
-  #       run: |
-  #         build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_DASHBOARD_API_TOKEN=${IREE_DASHBOARD_API_TOKEN}" \
-  #           gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
-  #           ./build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
-  #             --verbose \
-  #             --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
-  #             --compile_stats_files="${COMPILE_STATS_RESULTS}"
+  process_benchmark_results:
+    needs: [setup, compilation_benchmarks, execution_benchmarks]
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      COMPILE_STATS_RESULTS: ${{ needs.compilation_benchmarks.outputs.compile-stats-results }}
+      COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
+      # Empty if no execution benchmark runs.
+      EXECUTION_BENCHMARK_RESULTS_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-dir }}
+      # Empty if no execution benchmark runs.
+      EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          # We need the full history (and main branch) to generate the report.
+          fetch-depth: 0
+      - name: Downloading compilation benchmark results
+        run: |
+          gcloud storage cp \
+            "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}" \
+            "${COMPILE_STATS_RESULTS}"
+      - name: Downloading execution benchmark results
+        id: download-execution-results
+        # Skip the download if there is no execution benchmark results (e.g. no
+        # benchmark matches the preset/filter). In such case, no benchmark job
+        # is run in benchmark_execution.yml and the output variables are empty.
+        if: env.EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR != ''
+        run: |
+          gcloud storage cp -r \
+            "${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/benchmark-results-*.json" \
+            "${EXECUTION_BENCHMARK_RESULTS_DIR}"
+          echo "execution-benchmark-results-pattern=${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-*.json" >> "${GITHUB_OUTPUT}"
+      - name: Generating comment
+        if: needs.setup.outputs.ci-stage == 'presubmit'
+        id: generate-comment
+        env:
+          # Wildcard pattern to match all execution benchmark results. Empty if
+          # execution_benchmarks is skipped, which results in no match.
+          EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
+          IREE_BUILD_URL: https://github.com/openxla/iree/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BENCHMARK_COMMENT_ARTIFACT: benchmark-comment.json
+        run: |
+          build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
+            ./build_tools/benchmarks/generate_benchmark_comment.py \
+              --verbose \
+              --pr_number="${PR_NUMBER}" \
+              --pr_committish="${GITHUB_SHA}" \
+              --pr_base_branch="origin/${GITHUB_BASE_REF}" \
+              --comment_type="benchmark-summary" \
+              --build_url="${IREE_BUILD_URL}" \
+              --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
+              --compile_stats_files="${COMPILE_STATS_RESULTS}" \
+              --output="${BENCHMARK_COMMENT_ARTIFACT}"
+          echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+      - name: Uploading comment artifact
+        # Due to security reasons, instead of posting the comment to PR, we only
+        # upload the comment data in presubmit workflow and trigger the posting
+        # workflow on the main branch. See post_benchmark_comment.yaml
+        if: needs.setup.outputs.ci-stage == 'presubmit'
+        env:
+          BENCHMARK_COMMENT_ARTIFACT: ${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
+          BENCHMARK_COMMENT_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
+        run: |
+          gcloud storage cp \
+            "${BENCHMARK_COMMENT_ARTIFACT}" \
+            "${BENCHMARK_COMMENT_GCS_ARTIFACT}"
+      - name: Uploading results to dashboard
+        if: needs.setup.outputs.ci-stage == 'postsubmit'
+        env:
+          EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
+          IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
+        run: |
+          build_tools/github_actions/docker_run.sh \
+            --env "IREE_DASHBOARD_API_TOKEN=${IREE_DASHBOARD_API_TOKEN}" \
+            gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
+            ./build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
+              --verbose \
+              --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
+              --compile_stats_files="${COMPILE_STATS_RESULTS}"
 
-  # ############################## Crosscompilation ##############################
-  # # Jobs that cross-compile IREE for other platforms
-  # ##############################################################################
+  ############################## Crosscompilation ##############################
+  # Jobs that cross-compile IREE for other platforms
+  ##############################################################################
 
-  # cross_compile_and_test:
-  #   needs: [setup, build_all]
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   strategy:
-  #     matrix:
-  #       target:
-  #         - platform: android
-  #           arch: armv8.2-a
-  #           abi: arm64-v8a
-  #           docker_image: "gcr.io/iree-oss/android@sha256:5bdfe7baab407f75e337be564caec79617b4daf065363214c060833971a83819"
-  #           build_script: "./build_tools/cmake/build_android.sh"
-  #           # No test_script
-  #         - platform: linux
-  #           arch: riscv_64
-  #           abi: lp64d
-  #           docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
-  #           build_script: "./build_tools/cmake/build_riscv.sh"
-  #           test_script: "./build_tools/cmake/test_riscv.sh"
-  #         - platform: linux
-  #           arch: riscv_32
-  #           abi: ilp32d
-  #           docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
-  #           build_script: "./build_tools/cmake/build_riscv.sh"
-  #           test_script: "./build_tools/cmake/test_riscv.sh"
-  #         - platform: generic
-  #           arch: riscv_32
-  #           abi: ilp32
-  #           docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
-  #           build_script: "./build_tools/cmake/build_riscv.sh"
-  #           test_script: "./tests/riscv32/smoke.sh"
-  #         - platform: emscripten
-  #           arch: wasm32
-  #           abi: wasm32
-  #           docker_image: "gcr.io/iree-oss/emscripten@sha256:b119aa6f2719205092a41e4512a194ed0b16192030cc2f14d6e02771facf8f4a"
-  #           build_script: "./build_tools/cmake/build_runtime_emscripten.sh"
-  #           # No test script
+  cross_compile_and_test:
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    strategy:
+      matrix:
+        target:
+          - platform: android
+            arch: armv8.2-a
+            abi: arm64-v8a
+            docker_image: "gcr.io/iree-oss/android@sha256:5bdfe7baab407f75e337be564caec79617b4daf065363214c060833971a83819"
+            build_script: "./build_tools/cmake/build_android.sh"
+            # No test_script
+          - platform: linux
+            arch: riscv_64
+            abi: lp64d
+            docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
+            build_script: "./build_tools/cmake/build_riscv.sh"
+            test_script: "./build_tools/cmake/test_riscv.sh"
+          - platform: linux
+            arch: riscv_32
+            abi: ilp32d
+            docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
+            build_script: "./build_tools/cmake/build_riscv.sh"
+            test_script: "./build_tools/cmake/test_riscv.sh"
+          - platform: generic
+            arch: riscv_32
+            abi: ilp32
+            docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
+            build_script: "./build_tools/cmake/build_riscv.sh"
+            test_script: "./tests/riscv32/smoke.sh"
+          - platform: emscripten
+            arch: wasm32
+            abi: wasm32
+            docker_image: "gcr.io/iree-oss/emscripten@sha256:b119aa6f2719205092a41e4512a194ed0b16192030cc2f14d6e02771facf8f4a"
+            build_script: "./build_tools/cmake/build_runtime_emscripten.sh"
+            # No test script
 
-  #   env:
-  #     PLATFORM: ${{ matrix.target.platform }}
-  #     ARCH: ${{ matrix.target.arch }}
-  #     ABI: ${{ matrix.target.abi }}
-  #     DOCKER_IMAGE: ${{ matrix.target.docker_image }}
-  #     BUILD_SCRIPT: ${{ matrix.target.build_script }}
-  #     TEST_SCRIPT: ${{ matrix.target.test_script }}
-  #     HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-  #     HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-  #     HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-  #     TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
-  #     IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #     - name: "Checking out runtime submodules"
-  #       run: ./build_tools/scripts/git/update_runtime_submodules.sh
-  #     - name: "Downloading build dir archive"
-  #       run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
-  #     - name: "Extracting build dir archive"
-  #       run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
-  #     - name: "Build cross-compiling target"
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-  #           --env "CCACHE_NAMESPACE=${DOCKER_IMAGE}" \
-  #           --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
-  #           --env "IREE_TARGET_ARCH=${ARCH}" \
-  #           --env "IREE_TARGET_ABI=${ABI}" \
-  #           --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
-  #           --env "BUILD_PRESET=test" \
-  #           --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
-  #           "${DOCKER_IMAGE}" \
-  #           "${BUILD_SCRIPT}"
-  #     - name: "Test cross-compiling target"
-  #       if: ${{ matrix.target.test_script }}
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
-  #           --env "IREE_TARGET_ARCH=${ARCH}" \
-  #           --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
-  #           --env "BUILD_PRESET=test" \
-  #           "${DOCKER_IMAGE}" \
-  #           "${TEST_SCRIPT}"
+    env:
+      PLATFORM: ${{ matrix.target.platform }}
+      ARCH: ${{ matrix.target.arch }}
+      ABI: ${{ matrix.target.abi }}
+      DOCKER_IMAGE: ${{ matrix.target.docker_image }}
+      BUILD_SCRIPT: ${{ matrix.target.build_script }}
+      TEST_SCRIPT: ${{ matrix.target.test_script }}
+      HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
+      IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+      - name: "Build cross-compiling target"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=${DOCKER_IMAGE}" \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "IREE_TARGET_ABI=${ABI}" \
+            --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
+            --env "BUILD_PRESET=test" \
+            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
+            "${DOCKER_IMAGE}" \
+            "${BUILD_SCRIPT}"
+      - name: "Test cross-compiling target"
+        if: ${{ matrix.target.test_script }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
+            --env "BUILD_PRESET=test" \
+            "${DOCKER_IMAGE}" \
+            "${TEST_SCRIPT}"
 
-  # test_benchmark_suites:
-  #   needs: [setup, build_all, build_e2e_test_artifacts]
-  #   if: needs.setup.outputs.should-run == 'true'
-  #   runs-on:
-  #     - self-hosted  # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   strategy:
-  #     matrix:
-  #       target:
-  #         - platform: linux
-  #           arch: riscv_64
-  #           docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
-  #           run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
-  #         - platform: linux
-  #           arch: riscv_32
-  #           docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
-  #           run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
-  #         - platform: linux
-  #           arch: x86_64
-  #           docker_image: "gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8"
-  #           run_scripts: "./build_tools/cmake/test_benchmark_suites_on_linux.sh"
-  #   env:
-  #     PLATFORM: ${{ matrix.target.platform }}
-  #     ARCH: ${{ matrix.target.arch }}
-  #     DOCKER_IMAGE: ${{ matrix.target.docker_image }}
-  #     RUN_SCRIPTS: ${{ matrix.target.run_scripts }}
-  #     HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-  #     HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-  #     HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-  #     TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
-  #     E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
-  #     E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #     - name: "Checking out runtime submodules"
-  #       run: ./build_tools/scripts/git/update_runtime_submodules.sh
-  #     - name: "Downloading build dir archive"
-  #       run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
-  #     - name: "Extracting build dir archive"
-  #       run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
-  #     # TODO(#11136): Only download the needed artifacts instead of everything.
-  #     - name: "Downloading e2e test artifacts"
-  #       run: |
-  #         mkdir -p ${E2E_TEST_ARTIFACTS_DIR}
-  #         gcloud storage cp -r "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/*" "${E2E_TEST_ARTIFACTS_DIR}"
-  #     - name: "Download benchmark expected output"
-  #       env:
-  #         EXPECTED_OUTPUT_GSC_ARTIFACT: gs://iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy
-  #         EXPECTED_OUTPUT_FILE: deeplab_v3_fp32_input_0_expected_output.npy
-  #       run: |
-  #         gcloud storage cp "${EXPECTED_OUTPUT_GSC_ARTIFACT}" "${E2E_TEST_ARTIFACTS_DIR}/${EXPECTED_OUTPUT_FILE}"
-  #     - name: "Build iree-run-module and test benchmark suite modules"
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
-  #           --env "IREE_TARGET_ARCH=${ARCH}" \
-  #           --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
-  #           --env "BUILD_PRESET=benchmark-suite-test" \
-  #           --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
-  #           --env "E2E_TEST_ARTIFACTS_DIR=${E2E_TEST_ARTIFACTS_DIR}" \
-  #           "${DOCKER_IMAGE}" \
-  #           bash -euo pipefail -c \
-  #             "${RUN_SCRIPTS}"
+  test_benchmark_suites:
+    needs: [setup, build_all, build_e2e_test_artifacts]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    strategy:
+      matrix:
+        target:
+          - platform: linux
+            arch: riscv_64
+            docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
+            run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
+          - platform: linux
+            arch: riscv_32
+            docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
+            run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
+          - platform: linux
+            arch: x86_64
+            docker_image: "gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8"
+            run_scripts: "./build_tools/cmake/test_benchmark_suites_on_linux.sh"
+    env:
+      PLATFORM: ${{ matrix.target.platform }}
+      ARCH: ${{ matrix.target.arch }}
+      DOCKER_IMAGE: ${{ matrix.target.docker_image }}
+      RUN_SCRIPTS: ${{ matrix.target.run_scripts }}
+      HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
+      E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+      E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+      # TODO(#11136): Only download the needed artifacts instead of everything.
+      - name: "Downloading e2e test artifacts"
+        run: |
+          mkdir -p ${E2E_TEST_ARTIFACTS_DIR}
+          gcloud storage cp -r "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/*" "${E2E_TEST_ARTIFACTS_DIR}"
+      - name: "Download benchmark expected output"
+        env:
+          EXPECTED_OUTPUT_GSC_ARTIFACT: gs://iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy
+          EXPECTED_OUTPUT_FILE: deeplab_v3_fp32_input_0_expected_output.npy
+        run: |
+          gcloud storage cp "${EXPECTED_OUTPUT_GSC_ARTIFACT}" "${E2E_TEST_ARTIFACTS_DIR}/${EXPECTED_OUTPUT_FILE}"
+      - name: "Build iree-run-module and test benchmark suite modules"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
+            --env "BUILD_PRESET=benchmark-suite-test" \
+            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
+            --env "E2E_TEST_ARTIFACTS_DIR=${E2E_TEST_ARTIFACTS_DIR}" \
+            "${DOCKER_IMAGE}" \
+            bash -euo pipefail -c \
+              "${RUN_SCRIPTS}"
 
   ##############################################################################
 
@@ -1299,46 +1299,46 @@ jobs:
       - setup
 
       # Basic
-      # - build_all
+      - build_all
       - build_test_all_windows
-      # - build_test_all_bazel
-      # - test_all
-      # - test_gpu
+      - build_test_all_bazel
+      - test_all
+      - test_gpu
 
-      # # Subsets
-      # - build_test_runtime
-      # - build_test_runtime_windows
+      # Subsets
+      - build_test_runtime
+      - build_test_runtime_windows
 
-      # # Tensorflow
-      # - build_tf_integrations
-      # - test_tf_integrations
-      # - test_tf_integrations_gpu
+      # Tensorflow
+      - build_tf_integrations
+      - test_tf_integrations
+      - test_tf_integrations_gpu
 
-      # # Model Coverage
-      # - test_build_benchmark_suites
+      # Model Coverage
+      - test_build_benchmark_suites
 
-      # # Configurations
-      # - asan
-      # - tsan
-      # - small_runtime
-      # - gcc
-      # - tracing
-      # - debug
+      # Configurations
+      - asan
+      - tsan
+      - small_runtime
+      - gcc
+      - tracing
+      - debug
 
-      # # Crosscompilation
-      # - cross_compile_and_test
+      # Crosscompilation
+      - cross_compile_and_test
 
-      # # Artifacts for e2e testing and benchmarking
-      # - build_benchmark_tools
-      # - build_e2e_test_artifacts
+      # Artifacts for e2e testing and benchmarking
+      - build_benchmark_tools
+      - build_e2e_test_artifacts
 
-      # # Test modules from benchmark pipeline
-      # - test_benchmark_suites
+      # Test modules from benchmark pipeline
+      - test_benchmark_suites
 
-      # # Benchmark pipeline
-      # - compilation_benchmarks
-      # - execution_benchmarks
-      # - process_benchmark_results
+      # Benchmark pipeline
+      - compilation_benchmarks
+      - execution_benchmarks
+      - process_benchmark_results
     steps:
       - name: Getting failed jobs
         id: failed_jobs
