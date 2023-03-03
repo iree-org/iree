@@ -254,24 +254,23 @@ jobs:
 
   build_test_all_macos:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true' # && needs.setup.outputs.ci-stage == 'postsubmit'
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
     runs-on:
       - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}  # must come first
-      # - runner-group=postsubmit
+      - runner-group=postsubmit
       - os-family=macOS
     env:
       BUILD_DIR: build-macos
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-        with:
-          submodules: true
+      - name: "Updating git submodules"
+        run: git submodule update --init --jobs 8 --depth 1
       - name: "Installing Python packages"
         run: |
           python3 -m venv .venv
           source .venv/bin/activate
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
-      # Finally: build and run tests.
       - name: "Building IREE"
         env:
           IREE_READ_REMOTE_CCACHE: 0
@@ -1335,6 +1334,7 @@ jobs:
       # Basic
       - build_all
       - build_test_all_windows
+      - build_test_all_macos
       - build_test_all_bazel
       - test_all
       - test_gpu
