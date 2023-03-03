@@ -35,6 +35,8 @@ import textwrap
 from typing import Iterable, Mapping, MutableMapping
 
 PULL_REQUEST_EVENT_NAME = "pull_request"
+PUSH_EVENT_NAME = "push"
+WORKFLOW_DISPATCH_EVENT_NAME = "workflow_dispatch"
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
 BENCHMARK_PRESET_KEY = "benchmarks"
@@ -202,7 +204,13 @@ def get_runner_env(trailers: Mapping[str, str]) -> str:
 
 
 def get_ci_stage(event_name):
-  return 'presubmit' if event_name == PULL_REQUEST_EVENT_NAME else 'postsubmit'
+  if event_name == PULL_REQUEST_EVENT_NAME:
+    return "presubmit"
+  elif event_name == PUSH_EVENT_NAME:
+    return "postsubmit"
+  elif event_name == WORKFLOW_DISPATCH_EVENT_NAME:
+    return "unknown"
+  raise ValueError(f"Unrecognized event name '{event_name}'")
 
 
 def get_benchmark_presets(ci_stage: str, trailers: Mapping[str, str]) -> str:
