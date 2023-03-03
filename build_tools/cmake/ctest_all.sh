@@ -17,7 +17,7 @@ BUILD_DIR="$1"
 
 get_default_parallel_level() {
   if [[ "$(uname)" == "Darwin" ]]; then
-    echo $(sysctl -n hw.physicalcpu)
+    echo $(sysctl -n hw.logicalcpu)
   else
     echo $(nproc)
   fi
