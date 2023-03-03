@@ -202,17 +202,11 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      # Attempt to restore from caches unconditionally.
-      # Note: these will first try to grab a cache entry for this exact commit
-      #       then they will fall back to the latest for any commit.
+      # Attempt to restore from cache unconditionally.
+      # Note: this will first try to grab a cache entry for this exact commit
+      #       then it will fall back to the latest for any commit.
       # We're pretty limited on repository cache space (10GB) relative to cache
       # entry size (~2.5GB), so this usage is pretty optimistic.
-      - name: "Fetching cache (git submodules)"
-        uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
-        with:
-          path: .git/modules
-          key: gitmodules_all_windows_${{ github.sha }}
-          restore-keys: gitmodules_all_windows
       - name: "Fetching cache (CMake/ccache)"
         uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
         with:
@@ -250,13 +244,7 @@ jobs:
         run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-      # Write caches (if configured to) after all other steps are finished.
-      - name: "Saving cache (git submodules)"
-        if: needs.setup.outputs.write-caches == '1'
-        uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
-        with:
-          path: .git/modules
-          key: gitmodules_all_windows_${{ github.sha }}
+      # Write cache (if configured to) after all other steps are finished.
       - name: "Saving cache (CMake/ccache)"
         if: needs.setup.outputs.write-caches == '1'
         uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
