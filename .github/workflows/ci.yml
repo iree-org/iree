@@ -191,7 +191,7 @@ jobs:
 
   build_test_all_windows:
     needs: setup
-    if: ${{ false }}
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
     runs-on: managed-windows-cpu
     defaults:
       run:
@@ -287,7 +287,7 @@ jobs:
 
   build_test_all_bazel:
     needs: setup
-    if: ${{ false }}
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -383,7 +383,7 @@ jobs:
   ##############################################################################
   build_test_runtime:
     needs: setup
-    if: ${{ false }}
+    if: needs.setup.outputs.should-run == 'true'
     runs-on: ubuntu-20.04-64core
     env:
       BUILD_DIR: build-runtime
@@ -411,7 +411,7 @@ jobs:
 
   build_test_runtime_windows:
     needs: setup
-    if: ${{ false }}
+    if: needs.setup.outputs.should-run == 'true'
     runs-on: managed-windows-cpu
     defaults:
       run:
@@ -770,7 +770,7 @@ jobs:
 
   tracing:
     needs: setup
-    if: ${{ false }}
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
