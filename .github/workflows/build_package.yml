@@ -56,14 +56,14 @@ jobs:
           - runs-on:
               - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
               - os-family=macOS
-              - runner-group=releaser
+              - runner-group=postsubmit
             build-family: macos
             build-package: py-compiler-pkg
             experimental: true
           - runs-on:
               - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
               - os-family=macOS
-              - runner-group=releaser
+              - runner-group=postsubmit
             build-family: macos
             build-package: py-runtime-pkg
             experimental: true
