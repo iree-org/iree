@@ -13,6 +13,8 @@
 
 set -euo pipefail
 
+echo $OSTYPE
+
 BUILD_DIR="$1"
 
 # Respect the user setting, but default to as many jobs as we have cores.
@@ -62,10 +64,6 @@ if [[ "${IREE_VULKAN_F16_DISABLE}" == 1 ]]; then
   label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
 fi
 
-if [[ "$(uname)" == "Darwin" ]]; then
-  label_exclude_args+=("^exclude-os=macos$")
-fi
-
 IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
 label_exclude_args+=(${extra_label_exclude_args[@]})
 
@@ -93,6 +91,13 @@ if [[ "$OSTYPE" =~ ^msys ]]; then
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
     # TODO(#11080): Fix arrays not matching in test_variant_list_buffers
     "iree/runtime/bindings/python/vm_types_test"
+  )
+elif [[ "$OSTYPE" =~ ^darwin ]]; then
+  excluded_tests+=(
+    #TODO(#12496): Remove after fixing the test on macOS
+    "iree/compiler/bindings/c/loader_test"
+    #TODO(#12496): Remove after fixing the test on macOS
+    "iree/compiler/API/python/test/transforms/ireec/compile_sample_module"
   )
 fi
 

@@ -52,9 +52,6 @@ if(IREE_HAVE_DYNAMIC_LIBRARY_LOADING)
           "$<TARGET_FILE:iree::compiler::API2::SharedImpl>"
       DEPS
           ::loader
-      LABELS
-          # TODO(#12496): Remove the following label after fixing the test on macOS
-          exclude-os=macos
       )
 
       # Must be a build dependency but not a library dep (we depend on it at
