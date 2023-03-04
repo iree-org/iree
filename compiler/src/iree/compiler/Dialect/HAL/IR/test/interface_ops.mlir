@@ -38,9 +38,9 @@ func.func @interface_subspan_cse() {
   %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<2x32x16384xf32>>
   %1 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<2x32x16384xf32>>
 
-//   CSE-NEXT: %[[LOAD:.+]] = flow.dispatch.tensor.load %[[BIND]], offsets = [0, 0, 0], sizes = [2, 32, 16384], strides = [1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<2x32x16384xf32>> -> tensor<2x32x16384xf32>
+//   CSE-NEXT: %[[LOAD:.+]] = flow.dispatch.tensor.load %[[BIND]]
   %2 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [2, 32, 16384], strides = [1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<2x32x16384xf32>> -> tensor<2x32x16384xf32>
-//   CSE-NEXT: flow.dispatch.tensor.store %[[LOAD]], %[[BIND]], offsets = [0, 0, 0], sizes = [2, 32, 16384], strides = [1, 1, 1] : tensor<2x32x16384xf32> -> !flow.dispatch.tensor<readwrite:tensor<2x32x16384xf32>>
+//   CSE-NEXT: flow.dispatch.tensor.store %[[LOAD]], %[[BIND]]
   flow.dispatch.tensor.store %2, %0, offsets = [0, 0, 0], sizes = [2, 32, 16384], strides = [1, 1, 1] : tensor<2x32x16384xf32> -> !flow.dispatch.tensor<readwrite:tensor<2x32x16384xf32>>
   return
 }
