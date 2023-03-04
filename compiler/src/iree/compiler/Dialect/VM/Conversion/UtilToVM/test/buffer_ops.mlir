@@ -139,10 +139,10 @@ func.func @buffer_fill_i8(%arg0: !util.buffer, %arg1: index, %arg2: i8) {
 func.func @buffer_fill_i32(%arg0: !util.buffer, %arg1: index, %arg2: i32) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
-  // CHECK-32-DAG: %[[C100:.+]] = vm.const.i64 100
-  // CHECK-32-DAG: %[[C200:.+]] = vm.const.i64 200
-  // CHECK-32: vm.buffer.fill.i32 %arg0, %[[C100]], %[[C200]], %arg2 : i32 -> !vm.buffer
-  // CHECK-64: vm.buffer.fill.i32 %arg0, %c100, %c200, %arg2 : i32 -> !vm.buffer
+  // CHECK-32-DAG: %[[C25:.+]] = vm.const.i64 25
+  // CHECK-32-DAG: %[[C50:.+]] = vm.const.i64 50
+  // CHECK-32: vm.buffer.fill.i32 %arg0, %[[C25]], %[[C50]], %arg2 : i32 -> !vm.buffer
+  // CHECK-64: vm.buffer.fill.i32 %arg0, %c25, %c50, %arg2 : i32 -> !vm.buffer
   util.buffer.fill %arg2, %arg0[%c100 for %c200] : i32 -> !util.buffer{%arg1}
   return
 }
@@ -151,13 +151,13 @@ func.func @buffer_fill_i32(%arg0: !util.buffer, %arg1: index, %arg2: i32) {
 
 // CHECK-LABEL: @buffer_fill_i64
 func.func @buffer_fill_i64(%arg0: !util.buffer, %arg1: index, %arg2: i64) {
-  %c100 = arith.constant 100 : index
-  %c200 = arith.constant 200 : index
-  // CHECK-32-DAG: %[[C100:.+]] = vm.const.i64 100
-  // CHECK-32-DAG: %[[C200:.+]] = vm.const.i64 200
-  // CHECK-32: vm.buffer.fill.i64 %arg0, %[[C100]], %[[C200]], %arg2 : i64 -> !vm.buffer
-  // CHECK-64: vm.buffer.fill.i64 %arg0, %c100, %c200, %arg2 : i64 -> !vm.buffer
-  util.buffer.fill %arg2, %arg0[%c100 for %c200] : i64 -> !util.buffer{%arg1}
+  %c104 = arith.constant 104 : index
+  %c208 = arith.constant 208 : index
+  // CHECK-32-DAG: %[[C13:.+]] = vm.const.i64 13
+  // CHECK-32-DAG: %[[C26:.+]] = vm.const.i64 26
+  // CHECK-32: vm.buffer.fill.i64 %arg0, %[[C13]], %[[C26]], %arg2 : i64 -> !vm.buffer
+  // CHECK-64: vm.buffer.fill.i64 %arg0, %c13, %c26, %arg2 : i64 -> !vm.buffer
+  util.buffer.fill %arg2, %arg0[%c104 for %c208] : i64 -> !util.buffer{%arg1}
   return
 }
 

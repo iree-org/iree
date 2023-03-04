@@ -179,8 +179,9 @@ static std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
 // Canonicalizes the module to its final form prior to emission.
 // This verifies that we only have ops we can serialize and performs any of the
 // required transformations (such as debug op stripping).
-static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
-                                        IREE::VM::ModuleOp moduleOp) {
+static LogicalResult canonicalizeModule(
+    IREE::VM::BytecodeTargetOptions bytecodeOptions,
+    IREE::VM::ModuleOp moduleOp) {
   RewritePatternSet patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
@@ -198,7 +199,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
     // Debug ops must not be present when stripping.
     // TODO(benvanik): add RemoveDisabledDebugOp pattern.
     if (op.hasTrait<OpTrait::IREE::VM::DebugOnly>() &&
-        targetOptions.stripDebugOps) {
+        bytecodeOptions.stripDebugOps) {
       target.setOpAction(op, ConversionTarget::LegalizationAction::Illegal);
     }
   }
@@ -219,7 +220,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
   modulePasses.addPass(IREE::VM::createGlobalInitializationPass());
   modulePasses.addPass(IREE::VM::createDropEmptyModuleInitializersPass());
 
-  if (targetOptions.optimize) {
+  if (bytecodeOptions.optimize) {
     // TODO(benvanik): run this as part of a fixed-point iteration.
     modulePasses.addPass(mlir::createInlinerPass());
     modulePasses.addPass(mlir::createCSEPass());
@@ -274,9 +275,9 @@ static iree_vm_FunctionSignatureDef_ref_t makeImportFunctionSignatureDef(
 }
 
 // Returns a serialized function signature.
-static iree_vm_FunctionSignatureDef_ref_t makeExportFunctionSignatureDef(
-    IREE::VM::ExportOp exportOp, IREE::VM::FuncOp funcOp,
-    llvm::DenseMap<Type, int> &typeTable, FlatbufferBuilder &fbb) {
+static iree_vm_FunctionSignatureDef_ref_t makeFunctionSignatureDef(
+    IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
+    FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   auto cconv = makeCallingConventionString(funcOp);
   if (!cconv.has_value()) return {};
@@ -314,6 +315,20 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
                                     cconv.value(), /*attrsRef=*/0, fbb);
 }
 
+// Walks |rootOp| to find all VM features required by it and its children.
+static iree_vm_FeatureBits_enum_t findRequiredFeatures(Operation *rootOp) {
+  iree_vm_FeatureBits_enum_t result = 0;
+  rootOp->walk([&](Operation *op) {
+    if (op->hasTrait<OpTrait::IREE::VM::ExtF32>()) {
+      result |= iree_vm_FeatureBits_EXT_F32;
+    }
+    if (op->hasTrait<OpTrait::IREE::VM::ExtF64>()) {
+      result |= iree_vm_FeatureBits_EXT_F64;
+    }
+  });
+  return result;
+}
+
 // Builds a complete BytecodeModuleDef FlatBuffer object in |fbb|.
 // The order of the encoding is ordered to ensure that all metadata is at the
 // front of the resulting buffer. Large read-only data and bytecode blobs always
@@ -325,8 +340,10 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
 // here during serialization but a much more trivial (and cache-friendly)
 // representation at runtime.
 static LogicalResult buildFlatBufferModule(
-    BytecodeTargetOptions targetOptions, IREE::VM::ModuleOp moduleOp,
-    MutableArrayRef<RodataRef> rodataRefs, FlatbufferBuilder &fbb) {
+    IREE::VM::TargetOptions vmOptions,
+    IREE::VM::BytecodeTargetOptions bytecodeOptions,
+    IREE::VM::ModuleOp moduleOp, MutableArrayRef<RodataRef> rodataRefs,
+    FlatbufferBuilder &fbb) {
   // Start the buffer so that we can begin recording data prior to the root
   // table (which we do at the very end). This does not change the layout of the
   // file and is only used to prime the flatcc builder.
@@ -376,20 +393,23 @@ static LogicalResult buildFlatBufferModule(
   SmallVector<iree_vm_FunctionDescriptor_t, 8> functionDescriptors;
   bytecodeDataParts.resize(internalFuncOps.size());
   functionDescriptors.resize(internalFuncOps.size());
+  iree_vm_FeatureBits_enum_t moduleRequirements = 0;
   size_t totalBytecodeLength = 0;
-  for (auto funcOp : llvm::enumerate(internalFuncOps)) {
+  for (auto [i, funcOp] : llvm::enumerate(internalFuncOps)) {
     auto encodedFunction = BytecodeEncoder::encodeFunction(
-        funcOp.value(), typeOrdinalMap, symbolTable, debugDatabase);
+        funcOp, typeOrdinalMap, symbolTable, debugDatabase);
     if (!encodedFunction) {
-      return funcOp.value().emitError() << "failed to encode function bytecode";
+      return funcOp.emitError() << "failed to encode function bytecode";
     }
+    auto funcRequirements = findRequiredFeatures(funcOp);
+    moduleRequirements |= funcRequirements;
     iree_vm_FunctionDescriptor_assign(
-        &functionDescriptors[funcOp.index()], totalBytecodeLength,
-        encodedFunction->bytecodeData.size(), encodedFunction->i32RegisterCount,
-        encodedFunction->refRegisterCount);
+        &functionDescriptors[i], totalBytecodeLength,
+        encodedFunction->bytecodeLength, funcRequirements,
+        /*reserved=*/0u, encodedFunction->blockCount,
+        encodedFunction->i32RegisterCount, encodedFunction->refRegisterCount);
     totalBytecodeLength += encodedFunction->bytecodeData.size();
-    bytecodeDataParts[funcOp.index()] =
-        std::move(encodedFunction->bytecodeData);
+    bytecodeDataParts[i] = std::move(encodedFunction->bytecodeData);
   }
   flatbuffers_uint8_vec_start(fbb);
   uint8_t *bytecodeDataPtr =
@@ -399,8 +419,7 @@ static LogicalResult buildFlatBufferModule(
   // for both security and determinism).
   memset(bytecodeDataPtr, 0, totalBytecodeLength);
   size_t currentBytecodeOffset = 0;
-  for (const auto &it : llvm::enumerate(internalFuncOps)) {
-    int ordinal = it.index();
+  for (const auto &[ordinal, _] : llvm::enumerate(internalFuncOps)) {
     auto data = std::move(bytecodeDataParts[ordinal]);
     std::memcpy(bytecodeDataPtr + currentBytecodeOffset, data.data(),
                 data.size());
@@ -450,16 +469,18 @@ static LogicalResult buildFlatBufferModule(
   // NOTE: rwdata is currently unused.
   SmallVector<iree_vm_RwdataSegmentDef_ref_t, 8> rwdataSegmentRefs;
 
+  auto signatureRefs =
+      llvm::to_vector<8>(llvm::map_range(internalFuncOps, [&](auto funcOp) {
+        return makeFunctionSignatureDef(funcOp, typeOrdinalMap, fbb);
+      }));
+
   auto exportFuncRefs =
       llvm::to_vector<8>(llvm::map_range(exportFuncOps, [&](auto exportOp) {
         auto localNameRef = fbb.createString(exportOp.getExportName());
         auto funcOp =
             symbolTable.lookup<IREE::VM::FuncOp>(exportOp.getFunctionRef());
-        auto signatureRef = makeExportFunctionSignatureDef(exportOp, funcOp,
-                                                           typeOrdinalMap, fbb);
         iree_vm_ExportFunctionDef_start(fbb);
         iree_vm_ExportFunctionDef_local_name_add(fbb, localNameRef);
-        iree_vm_ExportFunctionDef_signature_add(fbb, signatureRef);
         iree_vm_ExportFunctionDef_internal_ordinal_add(
             fbb, funcOp.getOrdinal()->getLimitedValue());
         return iree_vm_ExportFunctionDef_end(fbb);
@@ -516,7 +537,8 @@ static LogicalResult buildFlatBufferModule(
   // of the file.
   auto rodataSegmentsRef = fbb.createOffsetVecDestructive(rodataSegmentRefs);
   auto rwdataSegmentsRef = fbb.createOffsetVecDestructive(rwdataSegmentRefs);
-  auto exportFuncsOffset = fbb.createOffsetVecDestructive(exportFuncRefs);
+  auto signaturesRef = fbb.createOffsetVecDestructive(signatureRefs);
+  auto exportFuncsRef = fbb.createOffsetVecDestructive(exportFuncRefs);
   auto importFuncsRef = fbb.createOffsetVecDestructive(importFuncRefs);
   auto dependenciesRef = fbb.createOffsetVecDestructive(dependencyRefs);
   auto typesRef = fbb.createOffsetVecDestructive(typeRefs);
@@ -533,21 +555,35 @@ static LogicalResult buildFlatBufferModule(
   }
 
   iree_vm_DebugDatabaseDef_ref_t debugDatabaseRef = 0;
-  if (!targetOptions.stripSourceMap) {
+  if (!bytecodeOptions.stripSourceMap) {
     debugDatabaseRef = debugDatabase.build(fbb);
   }
 
   auto moduleNameRef = fbb.createString(
       moduleOp.getSymName().empty() ? "module" : moduleOp.getSymName());
 
+  // TODO(benvanik): let moduleRequirements be a subset of function requirements
+  // so that we can multi-version. For now the moduleRequirements will be the OR
+  // of all functions.
+  iree_vm_FeatureBits_enum_t allowedFeatures = 0;
+  if (vmOptions.f32Extension) allowedFeatures |= iree_vm_FeatureBits_EXT_F32;
+  if (vmOptions.f64Extension) allowedFeatures |= iree_vm_FeatureBits_EXT_F64;
+  if ((moduleRequirements & allowedFeatures) != moduleRequirements) {
+    return moduleOp.emitError()
+           << "module uses features not allowed by flags (requires "
+           << moduleRequirements << ", allowed " << allowedFeatures << ")";
+  }
+
   iree_vm_BytecodeModuleDef_name_add(fbb, moduleNameRef);
   iree_vm_BytecodeModuleDef_version_add(fbb,
                                         moduleOp.getVersion().value_or(0u));
+  iree_vm_BytecodeModuleDef_requirements_add(fbb, moduleRequirements);
   // TODO(benvanik): iree_vm_BytecodeModuleDef_attrs_add
   iree_vm_BytecodeModuleDef_types_add(fbb, typesRef);
   iree_vm_BytecodeModuleDef_dependencies_add(fbb, dependenciesRef);
   iree_vm_BytecodeModuleDef_imported_functions_add(fbb, importFuncsRef);
-  iree_vm_BytecodeModuleDef_exported_functions_add(fbb, exportFuncsOffset);
+  iree_vm_BytecodeModuleDef_exported_functions_add(fbb, exportFuncsRef);
+  iree_vm_BytecodeModuleDef_function_signatures_add(fbb, signaturesRef);
   iree_vm_BytecodeModuleDef_module_state_add(fbb, moduleStateDef);
   iree_vm_BytecodeModuleDef_rodata_segments_add(fbb, rodataSegmentsRef);
   iree_vm_BytecodeModuleDef_rwdata_segments_add(fbb, rwdataSegmentsRef);
@@ -562,28 +598,30 @@ static LogicalResult buildFlatBufferModule(
   return success();
 }
 
-LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
-                                        BytecodeTargetOptions targetOptions,
-                                        llvm::raw_ostream &output) {
+LogicalResult translateModuleToBytecode(
+    IREE::VM::ModuleOp moduleOp, IREE::VM::TargetOptions vmOptions,
+    IREE::VM::BytecodeTargetOptions bytecodeOptions,
+    llvm::raw_ostream &output) {
   moduleOp.getContext()->getOrLoadDialect<IREE::Util::UtilDialect>();
 
-  if (failed(canonicalizeModule(targetOptions, moduleOp))) {
+  if (failed(canonicalizeModule(bytecodeOptions, moduleOp))) {
     return moduleOp.emitError()
            << "failed to canonicalize vm.module to a serializable form";
   }
 
   // Dump VM assembly source listing to a file and annotate IR locations.
-  if (!targetOptions.sourceListing.empty()) {
+  if (!bytecodeOptions.sourceListing.empty()) {
     OpPrintingFlags printFlags;
     printFlags.elideLargeElementsAttrs(8192);
-    if (failed(mlir::generateLocationsFromIR(targetOptions.sourceListing, "vm",
-                                             moduleOp, printFlags))) {
+    if (failed(mlir::generateLocationsFromIR(bytecodeOptions.sourceListing,
+                                             "vm", moduleOp, printFlags))) {
       return moduleOp.emitError() << "failed to write source listing to '"
-                                  << targetOptions.sourceListing << "'";
+                                  << bytecodeOptions.sourceListing << "'";
     }
   }
 
-  if (targetOptions.outputFormat == BytecodeOutputFormat::kAnnotatedMlirText) {
+  if (bytecodeOptions.outputFormat ==
+      BytecodeOutputFormat::kAnnotatedMlirText) {
     // Run register allocation now and put the info in the IR so it's printed.
     for (auto funcOp : moduleOp.getBlock().getOps<IREE::VM::FuncOp>()) {
       if (!funcOp.empty()) {
@@ -597,8 +635,9 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   }
 
   // Debug-only formats:
-  if (targetOptions.outputFormat == BytecodeOutputFormat::kMlirText ||
-      targetOptions.outputFormat == BytecodeOutputFormat::kAnnotatedMlirText) {
+  if (bytecodeOptions.outputFormat == BytecodeOutputFormat::kMlirText ||
+      bytecodeOptions.outputFormat ==
+          BytecodeOutputFormat::kAnnotatedMlirText) {
     // Use the standard MLIR text printer.
     moduleOp.getOperation()->print(output);
     output << "\n";
@@ -607,15 +646,15 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
 
   // Set up the output archive builder based on output format.
   std::unique_ptr<ArchiveWriter> archiveWriter;
-  if (targetOptions.emitPolyglotZip &&
-      targetOptions.outputFormat == BytecodeOutputFormat::kFlatBufferBinary) {
+  if (bytecodeOptions.emitPolyglotZip &&
+      bytecodeOptions.outputFormat == BytecodeOutputFormat::kFlatBufferBinary) {
     archiveWriter =
         std::make_unique<ZIPArchiveWriter>(moduleOp.getLoc(), output);
-  } else if (targetOptions.outputFormat ==
+  } else if (bytecodeOptions.outputFormat ==
              BytecodeOutputFormat::kFlatBufferBinary) {
     archiveWriter =
         std::make_unique<FlatArchiveWriter>(moduleOp.getLoc(), output);
-  } else if (targetOptions.outputFormat ==
+  } else if (bytecodeOptions.outputFormat ==
              BytecodeOutputFormat::kFlatBufferText) {
     archiveWriter =
         std::make_unique<JSONArchiveWriter>(moduleOp.getLoc(), output);
@@ -673,7 +712,8 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   // the first few pages need to be accessed to get the metadata and the rest
   // can be large bulk data.
   FlatbufferBuilder fbb;
-  if (failed(buildFlatBufferModule(targetOptions, moduleOp, rodataRefs, fbb))) {
+  if (failed(buildFlatBufferModule(vmOptions, bytecodeOptions, moduleOp,
+                                   rodataRefs, fbb))) {
     return failure();
   }
   if (failed(archiveWriter->flush(fbb))) {
@@ -684,15 +724,17 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   return success();
 }
 
-LogicalResult translateModuleToBytecode(mlir::ModuleOp outerModuleOp,
-                                        BytecodeTargetOptions targetOptions,
-                                        llvm::raw_ostream &output) {
+LogicalResult translateModuleToBytecode(
+    mlir::ModuleOp outerModuleOp, IREE::VM::TargetOptions vmOptions,
+    IREE::VM::BytecodeTargetOptions bytecodeOptions,
+    llvm::raw_ostream &output) {
   auto moduleOps = outerModuleOp.getOps<IREE::VM::ModuleOp>();
   if (moduleOps.empty()) {
     return outerModuleOp.emitError()
            << "outer module does not contain a vm.module op";
   }
-  return translateModuleToBytecode(*moduleOps.begin(), targetOptions, output);
+  return translateModuleToBytecode(*moduleOps.begin(), vmOptions,
+                                   bytecodeOptions, output);
 }
 
 void BytecodeTargetOptions::bindOptions(OptionsBinder &binder) {

@@ -188,6 +188,61 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
     iree_host_size_t target_offset, iree_host_size_t element_count,
     iree_host_size_t element_length);
 
+// Low-level helper for accessing a typed view of a buffer for read access.
+// The calling function must be safe to return from. Assumes buffer is non-null.
+// Prefer iree_vm_buffer_read_elements for larger reads.
+//
+// Usage (read 4 floats from the buffer):
+//  const float* IREE_RESTRICT buffer_ptr = NULL;
+//  iree_vm_buffer_check_ro(buffer, offset, 4, float, buffer_ptr);
+//  process(buffer_ptr[0], buffer_ptr[1], buffer_ptr[2], buffer_ptr[3]);
+#define iree_vm_buffer_check_ro(buffer, element_offset, element_length,        \
+                                element_type, out_buffer_ptr)                  \
+  {                                                                            \
+    const iree_host_size_t end =                                               \
+        ((element_offset) + (element_length)) * sizeof(element_type);          \
+    if (IREE_UNLIKELY(end > buffer->data.data_length)) {                       \
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                        \
+                              "out-of-bounds access detected (offset=%zu, "    \
+                              "length=%zu, alignment=%zu, buffer length=%zu)", \
+                              (element_offset) * sizeof(element_type),         \
+                              (element_length) * sizeof(element_type),         \
+                              sizeof(element_type), buffer->data.data_length); \
+    }                                                                          \
+    out_buffer_ptr =                                                           \
+        (const element_type*)buffer->data.data + (element_offset);             \
+  }
+
+// Low-level helper for accessing a typed view of a buffer for write access.
+// The calling function must be safe to return from. Assumes buffer is non-null.
+// Prefer iree_vm_buffer_write_elements for larger reads.
+//
+// Usage (write a single float to the buffer):
+//  float* IREE_RESTRICT buffer_ptr = NULL;
+//  iree_vm_buffer_check_rw(buffer, offset, 1, float, buffer_ptr);
+//  buffer_ptr[0] = 1.0f;
+#define iree_vm_buffer_check_rw(buffer, element_offset, element_length,        \
+                                element_type, out_buffer_ptr)                  \
+  {                                                                            \
+    if (IREE_UNLIKELY(!iree_all_bits_set(buffer->access,                       \
+                                         IREE_VM_BUFFER_ACCESS_MUTABLE))) {    \
+      return iree_make_status(                                                 \
+          IREE_STATUS_PERMISSION_DENIED,                                       \
+          "buffer is read-only and cannot be mapped for mutation");            \
+    }                                                                          \
+    const iree_host_size_t end =                                               \
+        ((element_offset) + (element_length)) * sizeof(element_type);          \
+    if (IREE_UNLIKELY(end > buffer->data.data_length)) {                       \
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                        \
+                              "out-of-bounds access detected (offset=%zu, "    \
+                              "length=%zu, alignment=%zu, buffer length=%zu)", \
+                              (element_offset) * sizeof(element_type),         \
+                              (element_length) * sizeof(element_type),         \
+                              sizeof(element_type), buffer->data.data_length); \
+    }                                                                          \
+    out_buffer_ptr = (element_type*)buffer->data.data + (element_offset);      \
+  }
+
 // Returns the a string view referencing the given |value| buffer.
 // The returned view will only be valid for as long as the buffer is live.
 static inline iree_string_view_t iree_vm_buffer_as_string(

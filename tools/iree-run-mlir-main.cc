@@ -285,12 +285,14 @@ Status PrepareModule(std::string target_backend,
   // NOTE: if we have an output file specified then we could compile into that
   // for greater efficiency. Today we assume that users aren't passing multi-GB
   // models through this tool (or if they are they have the memory to run them).
+  auto vm_options =
+      mlir::iree_compiler::IREE::VM::TargetOptions::FromFlags::get();
   auto bytecode_options =
       mlir::iree_compiler::IREE::VM::BytecodeTargetOptions::FromFlags::get();
   std::string binary_contents;
   llvm::raw_string_ostream binary_output(binary_contents);
   if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
-          mlir_module.get(), bytecode_options, binary_output))) {
+          mlir_module.get(), vm_options, bytecode_options, binary_output))) {
     return iree_make_status(
         IREE_STATUS_INTERNAL,
         "serialization to flatbuffer bytecode (binary) failed");
@@ -305,7 +307,7 @@ Status PrepareModule(std::string target_backend,
     std::string text_contents;
     llvm::raw_string_ostream text_output(text_contents);
     if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
-            mlir_module.get(), bytecode_options, text_output))) {
+            mlir_module.get(), vm_options, bytecode_options, text_output))) {
       return iree_make_status(IREE_STATUS_INTERNAL,
                               "serialization to annotated MLIR (text) failed");
     }
@@ -318,7 +320,7 @@ Status PrepareModule(std::string target_backend,
     std::string text_contents;
     llvm::raw_string_ostream text_output(text_contents);
     if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
-            mlir_module.get(), bytecode_options, text_output))) {
+            mlir_module.get(), vm_options, bytecode_options, text_output))) {
       return iree_make_status(
           IREE_STATUS_INTERNAL,
           "serialization to flatbuffer bytecode (text) failed");

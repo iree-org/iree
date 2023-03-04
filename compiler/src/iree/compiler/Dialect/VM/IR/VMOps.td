@@ -1306,7 +1306,7 @@ class VM_BufferFillOp<Type type, string mnemonic, VM_OPC opcode,
       MemoryEffects<[MemWrite]>,
     ])> {
   let description = [{
-    Fills a range of the buffer with the given value, like memset.
+    Fills an element range of the buffer with the given value, like memset.
   }];
 
   let arguments = (ins
@@ -1364,9 +1364,7 @@ class VM_BufferLoadOp<Type type, string mnemonic, VM_OPC opcode,
       MemoryEffects<[MemRead]>,
     ])> {
   let description = [{
-    Loads a value from the buffer at the given offset. Offsets must match the
-    natural alignment of the loaded type and will be coerced to the alignment
-    at runtime automatically.
+    Loads a value from the buffer at the given element offset.
   }];
 
   let arguments = (ins
@@ -1397,9 +1395,7 @@ class VM_BufferStoreOp<Type type, string mnemonic, VM_OPC opcode,
       MemoryEffects<[MemWrite]>,
     ])> {
   let description = [{
-    Stores a value to the buffer at the given offset. Offsets must match the
-    natural alignment of the loaded type and will be coerced to the alignment
-    at runtime automatically.
+    Stores a value to the buffer at the given element offset.
   }];
 
   let arguments = (ins

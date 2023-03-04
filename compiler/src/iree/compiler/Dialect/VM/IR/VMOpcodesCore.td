@@ -22,7 +22,7 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 // but we are a long way out to stabilizing this format :)
 //
 // Some opcodes require an extension prefix to indicate that runtime support
-// is optional. An op with the ExtI64 trait will require VM_OPC_ExtI64, for
+// is optional. An op with the ExtF64 trait will require VM_OPC_ExtF64, for
 // example. Ops that bridge extension sets have a canonical form that may
 // require multiple prefix codes (for example, the i64<->f64 extensions).
 
@@ -34,7 +34,7 @@ class VM_OPC_EnumAttr<string name, string enumName, string enumTag,
                       VM_OPC prefix = ?,
                       list<VM_OPC> cases> :
     IntEnumAttr<I8, name, description, cases> {
-  let cppNamespace = "IREE::VM";
+  let cppNamespace = "::mlir::iree_compiler::IREE::VM";
   let returnType = cppNamespace # "::" # name;
   let underlyingType = "uint8_t";
   let convertFromStorage = "static_cast<" # returnType # ">($_self.getInt())";
@@ -46,6 +46,8 @@ class VM_OPC_EnumAttr<string name, string enumName, string enumTag,
   VM_OPC opcodePrefix = prefix;
   string opcodeEnumTag = enumTag;
 }
+
+// Next available opcode: 0x7A
 
 // Globals:
 def VM_OPC_GlobalLoadI32         : VM_OPC<0x00, "GlobalLoadI32">;
@@ -170,6 +172,7 @@ def VM_OPC_CmpNERef              : VM_OPC<0x54, "CmpNERef">;
 def VM_OPC_CmpNZRef              : VM_OPC<0x55, "CmpNZRef">;
 
 // Control flow:
+def VM_OPC_Block                 : VM_OPC<0x79, "Block">;
 def VM_OPC_Branch                : VM_OPC<0x56, "Branch">;
 def VM_OPC_CondBranch            : VM_OPC<0x57, "CondBranch">;
 def VM_OPC_Call                  : VM_OPC<0x58, "Call">;
@@ -357,6 +360,8 @@ def VM_CoreOpcodeAttr :
     VM_OPC_BufferFillI64,
     VM_OPC_BufferCopy,
     VM_OPC_BufferCompare,
+
+    VM_OPC_Block,
 
     // Extension opcodes (0xE0-0xFF):
     VM_OPC_PrefixExtF32,  // VM_ExtF32OpcodeAttr

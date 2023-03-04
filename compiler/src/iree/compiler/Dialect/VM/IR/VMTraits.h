@@ -42,15 +42,6 @@ class PseudoOp : public OpTrait::TraitBase<ConcreteType, PseudoOp> {
 };
 
 template <typename ConcreteType>
-class ExtI64 : public OpTrait::TraitBase<ConcreteType, ExtI64> {
- public:
-  static LogicalResult verifyTrait(Operation *op) {
-    // TODO(benvanik): verify i64 ext is supported.
-    return success();
-  }
-};
-
-template <typename ConcreteType>
 class ExtF32 : public OpTrait::TraitBase<ConcreteType, ExtF32> {
  public:
   static LogicalResult verifyTrait(Operation *op) {

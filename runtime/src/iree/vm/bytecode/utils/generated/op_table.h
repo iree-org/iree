@@ -128,7 +128,7 @@ typedef enum {
   IREE_VM_OP_CORE_CtlzI64 = 0x76,
   IREE_VM_OP_CORE_AbsI32 = 0x77,
   IREE_VM_OP_CORE_AbsI64 = 0x78,
-  IREE_VM_OP_CORE_RSV_0x79,
+  IREE_VM_OP_CORE_Block = 0x79,
   IREE_VM_OP_CORE_RSV_0x7A,
   IREE_VM_OP_CORE_RSV_0x7B,
   IREE_VM_OP_CORE_RSV_0x7C,
@@ -387,7 +387,7 @@ typedef enum {
     OPC(0x76, CtlzI64) \
     OPC(0x77, AbsI32) \
     OPC(0x78, AbsI64) \
-    RSV(0x79) \
+    OPC(0x79, Block) \
     RSV(0x7A) \
     RSV(0x7B) \
     RSV(0x7C) \

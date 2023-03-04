@@ -10,6 +10,14 @@ namespace iree.vm;
 file_identifier "IREE";
 file_extension "vmfb";
 
+// Available runtime features supported by the active VM implementation.
+enum FeatureBits:uint32 (bit_flags) {
+  // 32-bit floating point extension.
+  EXT_F32 = 0,  // 1u << 0
+  // 64-bit floating point extension.
+  EXT_F64 = 1,  // 1u << 1
+}
+
 // Arbitrary key/value reflection attribute.
 table AttrDef {
   key:string;
@@ -82,22 +90,8 @@ table ExportFunctionDef {
   // Local name of the function (excluding the module namespace).
   local_name:string;
 
-  // Signature of the function expected used for verifying that imports match.
-  signature:FunctionSignatureDef;
-
   // Ordinal in the internal_functions table that implements this function.
   internal_ordinal:int32;
-}
-
-// Defines a bytecode function.
-table InternalFunctionDef {
-  // Local name of the function or empty if the names have been stripped.
-  // The full name of the function when referenced from external modules will
-  // include the BytecodeModuleDef.name prefix.
-  local_name:string;
-
-  // Signature of the function used for reflection.
-  signature:FunctionSignatureDef;
 }
 
 table UncompressedDataDef {
@@ -146,7 +140,17 @@ struct FunctionDescriptor {
   bytecode_offset:int32;
   bytecode_length:int32;
 
-  // TODO(benvanik): remove counts and embed directly in bytecode.
+  // Features required in order to execute this function.
+  // Note that this may be a superset of the module-level features if some
+  // functions are conditionally executed based on runtime-derived capabilities.
+  requirements:FeatureBits;
+
+  // Unused, must be 0.
+  reserved:int16;
+
+  // Total number of blocks in the function.
+  block_count:int16;
+
   // Total number of i32 registers used by the function.
   i32_register_count:int16;
   // Total number of ref registers used by the function.
@@ -239,6 +243,11 @@ table BytecodeModuleDef {
   // resolve.
   version:uint32;
 
+  // Features required to load and run bytecode from the module.
+  // Some functions may have additional requirements for when there are multiple
+  // variants selected based on runtime feature detection.
+  requirements:FeatureBits = 0;
+
   // Module-level attributes, if any.
   attrs:[AttrDef];
 
@@ -253,6 +262,9 @@ table BytecodeModuleDef {
 
   // Exported function definitions used to resolve imports.
   exported_functions:[ExportFunctionDef];
+
+  // All local function signatures (internal and exports).
+  function_signatures:[FunctionSignatureDef];
 
   // Read-only data segments (like non-code .text).
   // May optionally be compressed and decompressed by the loader.

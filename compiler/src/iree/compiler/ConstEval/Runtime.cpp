@@ -295,9 +295,10 @@ InMemoryCompiledBinary::~InMemoryCompiledBinary() { deinitialize(); }
 LogicalResult InMemoryCompiledBinary::translateFromModule(
     mlir::ModuleOp moduleOp) {
   llvm::raw_string_ostream os(binary);
-  iree_compiler::IREE::VM::BytecodeTargetOptions targetOptions;
+  iree_compiler::IREE::VM::TargetOptions vmOptions;
+  iree_compiler::IREE::VM::BytecodeTargetOptions bytecodeOptions;
   if (failed(iree_compiler::IREE::VM::translateModuleToBytecode(
-          moduleOp, targetOptions, os))) {
+          moduleOp, vmOptions, bytecodeOptions, os))) {
     return failure();
   }
   os.flush();
