@@ -437,7 +437,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
-    options.enableVectorMasking = true;
+    options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
