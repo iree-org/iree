@@ -112,6 +112,7 @@ function(iree_cc_test)
   # Replace dependencies passed by ::name with iree::package::name
 
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  iree_cc_filter_deps(_RULE_DEPS)
 
   target_link_libraries(${_NAME}
     PUBLIC

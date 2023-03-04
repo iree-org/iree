@@ -69,7 +69,7 @@ do_build_llvm() {
   echo "*********************** BUILDING LLVM *********************************"
   main_build_dir="${LLVM_BUILD_DIR}/llvm"
   main_install_dir="${LLVM_INSTALL_DIR}/llvm"
-  targets_to_build="${LLVM_TARGETS_TO_BUILD:-X86}"
+  targets_to_build="${LLVM_TARGETS_TO_BUILD:-AArch64;ARM;RISCV;WebAssembly;X86;NVPTX;WebAssembly}"
   enable_projects="${LLVM_ENABLE_TARGETS:-clang;lld}"
 
   cmake_options="-DLLVM_ENABLE_PROJECTS='${enable_projects}' -DLLVM_TARGETS_TO_BUILD='${targets_to_build}'"
@@ -77,6 +77,8 @@ do_build_llvm() {
   cmake_options="${cmake_options} -DLLVM_INSTALL_UTILS=ON"
   cmake_options="${cmake_options} -DCMAKE_BUILD_TYPE=Release"
   cmake_options="${cmake_options} -DLLVM_ENABLE_ASSERTIONS=ON"
+  cmake_options="${cmake_options} -DLLVM_BUILD_LLVM_DYLIB=ON"
+  cmake_options="${cmake_options} -DLLVM_LINK_LLVM_DYLIB=ON"
   cmake_options="${cmake_options} $(print_toolchain_config)"
   if $has_lld; then
     cmake_options="${cmake_options} -DLLVM_ENABLE_LLD=ON"
@@ -101,6 +103,7 @@ do_build_mlir() {
   cmake_options="${cmake_options} -DPython3_EXECUTABLE='$(which $python3_command)'"
   cmake_options="${cmake_options} -DLLVM_INSTALL_TOOLCHAIN_ONLY=OFF"
   cmake_options="${cmake_options} -DLLVM_BUILD_TOOLS=ON"
+  cmake_options="${cmake_options} -DCMAKE_BUILD_TYPE=Release"
   cmake_options="${cmake_options} -DLLVM_ENABLE_ASSERTIONS=ON"
   cmake_options="${cmake_options} -DMLIR_ENABLE_BINDINGS_PYTHON=ON"
   cmake_options="${cmake_options} $(print_toolchain_config)"
@@ -144,7 +147,7 @@ print_iree_config() {
     return 1
   fi
 
-  echo "-DLLVM_DIR='$llvm_cmake_dir' -DLLD_DIR='$lld_cmake_dir' -DCLANG_DIR='$clang_cmake_dir' -DMLIR_DIR='$mlir_cmake_dir' -DIREE_BUILD_BUNDLED_LLVM=OFF"
+  echo "-DLLVM_DIR='$llvm_cmake_dir' -DLLD_DIR='$lld_cmake_dir' -DClang_DIR='$clang_cmake_dir' -DMLIR_DIR='$mlir_cmake_dir' -DIREE_BUILD_BUNDLED_LLVM=OFF"
 }
 
 do_build_iree() {
@@ -156,6 +159,9 @@ do_build_iree() {
   cmake_options="${cmake_options} -DPython3_EXECUTABLE='$(which $python3_command)'"
   cmake_options="${cmake_options} -DIREE_BUILD_PYTHON_BINDINGS=ON"
   cmake_options="${cmake_options} -DIREE_TARGET_BACKEND_DEFAULTS=OFF"
+  # TODO: Needed so as to have the iree-llvm-embedded-linker-path cli option.
+  # Eliminate that need.
+  cmake_options="${cmake_options} -DIREE_TARGET_BACKEND_LLVM_CPU=ON"
   cmake_options="${cmake_options} -DIREE_HAL_DRIVER_DEFAULTS=OFF"
   cmake_options="${cmake_options} -DIREE_HAL_DRIVER_LOCAL_SYNC=ON"
   cmake_options="${cmake_options} -DIREE_HAL_DRIVER_LOCAL_TASK=ON"

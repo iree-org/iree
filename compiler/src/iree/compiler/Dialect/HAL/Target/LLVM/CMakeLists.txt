@@ -146,11 +146,13 @@ add_library(IREELLVMCPUTargetDeps INTERFACE)
 function(_add_optional_llvm_target_deps target)
   # Key off of the CodeGen target and then include the rest.
   if(TARGET "LLVM${target}CodeGen")
-    target_link_libraries(IREELLVMCPUTargetDeps INTERFACE
+    set(_deps
       "LLVM${target}AsmParser"
       "LLVM${target}CodeGen"
       "LLVM${target}Desc"
       "LLVM${target}Info")
+    iree_cc_filter_deps(_deps)
+    target_link_libraries(IREELLVMCPUTargetDeps INTERFACE ${_deps})
   endif()
 endfunction()
 

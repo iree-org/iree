@@ -81,6 +81,11 @@ macro(iree_llvm_configure_installed)
   find_package(Clang REQUIRED)
   list(APPEND CMAKE_MODULE_PATH "${CLANG_CMAKE_DIR}")
 
+  # Tell IREE that we have clang and lld available.
+  set(IREE_CLANG_TARGET "clang")
+  set(IREE_LLD_TARGET "lld")
+  set(IREE_LLVM_LINK_TARGET "llvm-link")
+
   # Lit never gets installed with LLVM. So we have to reach into our copy
   # of the monorepo to get it. I'm sorry. If this doesn't work for you,
   # feel free to -DLLVM_EXTERNAL_LIT to provide your own.

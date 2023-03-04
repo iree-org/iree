@@ -127,6 +127,7 @@ function(iree_cc_binary)
   if(IREE_IMPLICIT_DEFS_CC_DEPS)
     list(APPEND _RULE_DEPS ${IREE_IMPLICIT_DEFS_CC_DEPS})
   endif()
+  iree_cc_filter_deps(_RULE_DEPS)
 
   target_link_libraries(${_NAME}
     PUBLIC
