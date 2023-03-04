@@ -227,6 +227,9 @@ class BuildFileFunctions(object):
   def alias(self, *args, **kwargs):
     pass
 
+  def bool_flag(self, *args, **kwargs):
+    pass
+
   def load(self, *args, **kwargs):
     pass
 
@@ -307,9 +310,11 @@ class BuildFileFunctions(object):
   def platform_trampoline_deps(self, basename, path="base"):
     return [f"//{path}/internal:{basename}_internal"]
 
-  def select(self, d):
-    self._convert_unimplemented_function("select", str(d))
-    return d["//conditions:default"]
+  def select(self, selector):
+    default_value = selector.get("//conditions:default")
+    if default_value is None:
+      raise ValueError("bazel_to_cmake can only convert selects with a default")
+    return default_value
 
   def cc_library(self,
                  name,

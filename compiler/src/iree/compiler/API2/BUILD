@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
 
 package(
@@ -49,12 +50,30 @@ iree_compiler_cc_library(
     ],
 )
 
-# Bazel does not have a well-defined mechanism for managing
-# shared libraries in a cross-platform way. Therefore, we
-# only support static linking of tools. Separately, we do
-# build an actual shared library for platforms that support
-# it, but this is only done to support stub use-cases.
+iree_compiler_cc_library(
+    name = "SharedImpl",
+    srcs = [
+        "//lib:libIREECompiler.so",
+    ],
+    tags = ["skip-bazel_to_cmake"],
+)
+
+bool_flag(
+    name = "link_shared",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "link_shared_config",
+    flag_values = {
+        ":link_shared": "True",
+    },
+)
+
 alias(
     name = "Impl",
-    actual = ":StaticImpl",
+    actual = select({
+        ":link_shared_config": ":SharedImpl",
+        "//conditions:default": ":StaticImpl",
+    }),
 )
