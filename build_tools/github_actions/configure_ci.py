@@ -16,12 +16,15 @@ When GITHUB_EVENT_NAME is "pull_request", there are additional environment
 variables to be set:
 - PR_TITLE (required): PR title.
 - PR_BODY (optional): PR description.
+- PR_LABELS (optional): PR label names, splitted by comma.
 - BASE_REF (required): base commit SHA of the PR.
 - ORIGINAL_PR_TITLE (optional): PR title from the original PR event, showing a
     notice if PR_TITLE is different.
 - ORIGINAL_PR_BODY (optional): PR description from the original PR event,
     showing a notice if PR_BODY is different. ORIGINAL_PR_TITLE must also be
     set.
+- ORIGINAL_PR_LABELS (optional): PR labels from the original PR event, showing a
+    notice if PR_LABELS is different. ORIGINAL_PR_TITLE must also be set.
 
 Exit code 0 indicates that it should and exit code 2 indicates that it should
 not.
@@ -32,7 +35,7 @@ import fnmatch
 import os
 import subprocess
 import textwrap
-from typing import Iterable, Mapping, MutableMapping
+from typing import Iterable, List, Mapping, MutableMapping, Sequence, Tuple
 
 PULL_REQUEST_EVENT_NAME = "pull_request"
 PUSH_EVENT_NAME = "push"
@@ -99,7 +102,11 @@ def write_job_summary(summary: str):
 
 
 def check_description_and_show_diff(original_description: str,
-                                    current_description: str):
+                                    original_labels_string: str,
+                                    current_description: str,
+                                    current_labels_string: str):
+  original_description += f"\n\nLabels: {original_labels_string}"
+  current_description += f"\n\nLabels: {current_labels_string}"
   if original_description == current_description:
     return
 
@@ -108,8 +115,7 @@ def check_description_and_show_diff(original_description: str,
 
   write_job_summary(
       textwrap.dedent("""\
-  :pushpin: Using a PR description different from the original PR event \
-  started this workflow.
+  :pushpin: Using the PR description and labels different from the original PR event started this workflow.
 
   <details>
   <summary>Click to show diff (original vs. current)</summary>
@@ -120,26 +126,37 @@ def check_description_and_show_diff(original_description: str,
   </details>""").format("".join(diffs)))
 
 
-def get_trailers() -> Mapping[str, str]:
+def get_trailers_and_labels() -> Tuple[Mapping[str, str], List[str]]:
   title = os.environ["PR_TITLE"]
   body = os.environ.get("PR_BODY", "")
+  labels_string = os.environ.get("PR_LABELS", "")
   original_title = os.environ.get("ORIGINAL_PR_TITLE")
   original_body = os.environ.get("ORIGINAL_PR_BODY", "")
+  original_labels_string = os.environ.get("ORIGINAL_PR_LABELS", "")
 
   description = PR_DESCRIPTION_TEMPLATE.format(title=title, body=body)
 
-  # PR_TITLE and PR_BODY can be fetched from API for the latest updates. If
+  # PR information can be fetched from API for the latest updates. If
   # ORIGINAL_PR_TITLE is set, compare the current and original description and
   # show a notice if they are different. This is mostly to inform users that the
   # workflow might not parse the PR description they expect.
   if original_title is not None:
     original_description = PR_DESCRIPTION_TEMPLATE.format(title=original_title,
                                                           body=original_body)
-    print("Original PR description:", original_description, sep="\n")
-    check_description_and_show_diff(original_description=original_description,
-                                    current_description=description)
+    print("Original PR description and labels:",
+          original_description,
+          original_labels_string,
+          sep="\n")
+    check_description_and_show_diff(
+        original_description=original_description,
+        original_labels_string=original_labels_string,
+        current_description=description,
+        current_labels_string=labels_string)
 
-  print("Parsing PR description:", description, sep="\n")
+  print("Parsing PR description and labels:",
+        description,
+        labels_string,
+        sep="\n")
 
   trailer_lines = subprocess.run(
       ["git", "interpret-trailers", "--parse", "--no-divider"],
@@ -148,10 +165,12 @@ def get_trailers() -> Mapping[str, str]:
       check=True,
       text=True,
       timeout=60).stdout.splitlines()
-  return {
+  trailer_map = {
       k.lower().strip(): v.strip()
       for k, v in (line.split(":", maxsplit=1) for line in trailer_lines)
   }
+  labels = [label.strip() for label in labels_string.split(",")]
+  return (trailer_map, labels)
 
 
 def get_modified_paths(base_ref: str) -> Iterable[str]:
@@ -213,11 +232,14 @@ def get_ci_stage(event_name):
   raise ValueError(f"Unrecognized event name '{event_name}'")
 
 
-def get_benchmark_presets(ci_stage: str, trailers: Mapping[str, str]) -> str:
+def get_benchmark_presets(ci_stage: str, trailers: Mapping[str, str],
+                          labels: Sequence[str]) -> str:
   """Parses and validates the benchmark presets from trailers.
 
   Args:
+    ci_stage: CI stage.
     trailers: trailers from PR description.
+    labels: list of PR labels.
 
   Returns:
     A comma separated preset string, which later will be parsed by
@@ -226,11 +248,16 @@ def get_benchmark_presets(ci_stage: str, trailers: Mapping[str, str]) -> str:
   if ci_stage == "postsubmit":
     preset_options = ["all"]
   else:
+    preset_options = set(
+        label.split(":", maxsplit=1)[1]
+        for label in labels
+        if label.startswith(BENCHMARK_PRESET_KEY + ":"))
     trailer = trailers.get(BENCHMARK_PRESET_KEY)
-    if trailer is None:
-      return ""
-    print(f"Using benchmark preset '{trailer}' from PR description trailers")
-    preset_options = [option.strip() for option in trailer.split(",")]
+    if trailer is not None:
+      preset_options = preset_options.union(
+          option.strip() for option in trailer.split(","))
+    preset_options = sorted(preset_options)
+    print(f"Using benchmark preset '{preset_options}' from trailers and labels")
 
   for preset_option in preset_options:
     if preset_option not in BENCHMARK_PRESET_OPTIONS:
@@ -247,7 +274,8 @@ def get_benchmark_presets(ci_stage: str, trailers: Mapping[str, str]) -> str:
 def main():
   output: MutableMapping[str, str] = {}
   event_name = os.environ["GITHUB_EVENT_NAME"]
-  trailers = get_trailers() if event_name == PULL_REQUEST_EVENT_NAME else {}
+  trailers, labels = (get_trailers_and_labels()
+                      if event_name == PULL_REQUEST_EVENT_NAME else {})
   if should_run_ci(event_name, trailers):
     output["should-run"] = "true"
   else:
@@ -260,7 +288,9 @@ def main():
   if ci_stage == "postsubmit":
     write_caches = "1"
   output["write-caches"] = write_caches
-  output["benchmark-presets"] = get_benchmark_presets(ci_stage, trailers)
+  output["benchmark-presets"] = get_benchmark_presets(ci_stage=ci_stage,
+                                                      trailers=trailers,
+                                                      labels=labels)
 
   set_output(output)
 

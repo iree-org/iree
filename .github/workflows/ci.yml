@@ -93,18 +93,17 @@ jobs:
         run: |
           gh api "/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "${PR_JSON}"
           # It requires delimiter to pass multiline strings through
-          # GITHUB_OUTPUT. Since these are already escaped JSON strings, pass
-          # the JSON strings and later use fromJSON to decode them.
-          echo "pr-title=$(jq '.title' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
-          echo "pr-body=$(jq '.body' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
-
+          # GITHUB_OUTPUT. Convert into a single line JSON.
+          echo "pr-json=$(jq --compact-output '.' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
       - name: "Configuring CI options"
         id: configure
         env:
-          PR_TITLE: ${{ fromJSON(steps.fetch-pr.outputs.pr-title || '""') }}
-          PR_BODY: ${{ fromJSON(steps.fetch-pr.outputs.pr-body || '""') }}
+          PR_TITLE: ${{ fromJSON(steps.fetch-pr.outputs.pr-json || '{}').title }}
+          PR_BODY: ${{ fromJSON(steps.fetch-pr.outputs.pr-json || '{}').body }}
+          PR_LABELS: ${{ join(fromJSON(steps.fetch-pr.outputs.pr-json || '{}').labels.*.name, ',') }}
           ORIGINAL_PR_TITLE: ${{ github.event.pull_request.title }}
           ORIGINAL_PR_BODY: ${{ github.event.pull_request.body }}
+          ORIGINAL_PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
           # Just informative logging. There should only be two commits in the
           # history here, but limiting the depth helps when copying from a local
