@@ -204,13 +204,16 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
     // operation (e.g., `tensor.extract_slice`, `affine.min`) that contains
     // static information about the `dim` size.
     Operation *currentOp = operand.getDefiningOp();
+    bool foundSlicingOp = false;
     while (currentOp) {
       LDBG("Inspecting for vector sizes: " << *currentOp << "\n");
-
-      if (isa<AffineMinOp>(currentOp)) {
+      // Make sure affine.min is feeding the size symbol of a
+      // tensor.extract_slice or memref.subview.
+      if (foundSlicingOp && isa<AffineMinOp>(currentOp)) {
         break;
       }
       if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(currentOp)) {
+        foundSlicingOp = true;
         if (!extractSliceOp.isDynamicSize(operandDim)) {
           // Extract slice has static information about the `dim` size.
           break;
@@ -219,18 +222,12 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
         continue;
       }
       if (auto subviewOp = dyn_cast<memref::SubViewOp>(currentOp)) {
+        foundSlicingOp = true;
         if (!subviewOp.isDynamicSize(operandDim)) {
           // Subview has static information about the `dim` size.
           break;
         }
         currentOp = subviewOp.getDynamicSize(operandDim).getDefiningOp();
-        continue;
-      }
-      if (auto affineApplyOp = dyn_cast<AffineApplyOp>(currentOp)) {
-        AffineValueMap valueMap = affineApplyOp.getAffineValueMap();
-        if (valueMap.getNumDims() != 1 || valueMap.getNumSymbols() != 1)
-          return failure();
-        currentOp = valueMap.getOperand(1).getDefiningOp();
         continue;
       }
 
@@ -255,13 +252,18 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
       return failure();
     }
 
-    auto minResults = affineMin.getAffineMap().getResults();
-    if (minResults.size() != 2) {
+    // Process affine.min op. Make sure that the affine.min has a form like:
+    // affine.min affine_map<(d0)[s0] -> (-d0 + s0, 128).
+
+    // Make sure the affine.min doesn't have more than two expressions.
+    auto minMapResults = affineMin.getAffineMap().getResults();
+    if (minMapResults.size() != 2) {
       return failure();
     }
 
-    auto const0Result = minResults[0].dyn_cast<AffineConstantExpr>();
-    auto const1Result = minResults[1].dyn_cast<AffineConstantExpr>();
+    // Extract constant result from affine.min.
+    auto const0Result = minMapResults[0].dyn_cast<AffineConstantExpr>();
+    auto const1Result = minMapResults[1].dyn_cast<AffineConstantExpr>();
     if ((!const0Result && !const1Result) || (const0Result && const1Result)) {
       return failure();
     }
