@@ -87,5 +87,5 @@ func.func @bubble_up(%arg0: tensor<32x64xf32>) -> tensor<32x2x32xf32> {
 transform.sequence failures(propagate) {
 ^bb1(%arg1: !pdl.operation):
   %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %0 { bubble_collapse_expand }
+  transform.iree.apply_patterns %0 { bubble_expand }
 }

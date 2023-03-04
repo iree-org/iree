@@ -139,7 +139,8 @@ void transform_dialect::ApplyPatternsOp::build(
   /// When touching something here, do not forget to update CommonExtensions.h.
   ///
   ADD_PATTERN(additionalIreePatterns, getAdditionalIreePatternsAttrName)
-  ADD_PATTERN(bubbleCollapseExpand, getBubbleCollapseExpandAttrName)
+  ADD_PATTERN(bubbleCollapse, getBubbleCollapseAttrName)
+  ADD_PATTERN(bubbleExpand, getBubbleExpandAttrName)
   ADD_PATTERN(bubblePackUnPack, getBubblePackUnPackAttrName)
   ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
   ADD_PATTERN(cse, getCseAttrName)
@@ -318,7 +319,11 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
   if (getAdditionalIreePatterns()) addAdditionalIreePatterns(patterns);
-  if (getBubbleCollapseExpand()) {
+  if (getBubbleCollapse()) {
+    linalg::populateFoldReshapeOpsByCollapsingPatterns(
+        patterns, [](OpOperand *) { return true; });
+  }
+  if (getBubbleExpand()) {
     linalg::populateFoldReshapeOpsByExpansionPatterns(
         patterns, [](OpOperand *) { return true; });
   }

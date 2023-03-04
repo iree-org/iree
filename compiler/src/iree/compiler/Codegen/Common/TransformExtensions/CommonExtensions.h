@@ -36,7 +36,8 @@ namespace transform_dialect {
 /// Selected patterns for ApplyPatternOp.
 struct ApplyPatternsOpPatterns {
   bool additionalIreePatterns = false;
-  bool bubbleCollapseExpand = false;
+  bool bubbleCollapse = false;
+  bool bubbleExpand = false;
   bool bubblePackUnPack = false;
   bool canonicalization = false;
   bool cse = false;
