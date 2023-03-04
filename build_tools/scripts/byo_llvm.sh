@@ -76,7 +76,7 @@ do_build_llvm() {
   cmake_options="${cmake_options} -DLLVM_BUILD_EXAMPLES=OFF"
   cmake_options="${cmake_options} -DLLVM_INSTALL_UTILS=ON"
   cmake_options="${cmake_options} -DCMAKE_BUILD_TYPE=Release"
-  cmake_options="${cmake_options} -DLLVM_ENABLE_ASSERTIONS=ON"
+  #cmake_options="${cmake_options} -DLLVM_ENABLE_ASSERTIONS=ON"
   cmake_options="${cmake_options} -DLLVM_BUILD_LLVM_DYLIB=ON"
   cmake_options="${cmake_options} -DLLVM_LINK_LLVM_DYLIB=ON"
   cmake_options="${cmake_options} $(print_toolchain_config)"
@@ -104,7 +104,7 @@ do_build_mlir() {
   cmake_options="${cmake_options} -DLLVM_INSTALL_TOOLCHAIN_ONLY=OFF"
   cmake_options="${cmake_options} -DLLVM_BUILD_TOOLS=ON"
   cmake_options="${cmake_options} -DCMAKE_BUILD_TYPE=Release"
-  cmake_options="${cmake_options} -DLLVM_ENABLE_ASSERTIONS=ON"
+  #cmake_options="${cmake_options} -DLLVM_ENABLE_ASSERTIONS=ON"
   cmake_options="${cmake_options} -DMLIR_ENABLE_BINDINGS_PYTHON=ON"
   cmake_options="${cmake_options} $(print_toolchain_config)"
   if $has_lld; then
@@ -166,7 +166,7 @@ do_build_iree() {
   cmake_options="${cmake_options} -DIREE_HAL_DRIVER_LOCAL_SYNC=ON"
   cmake_options="${cmake_options} -DIREE_HAL_DRIVER_LOCAL_TASK=ON"
   cmake_options="${cmake_options} -DCMAKE_BUILD_TYPE=Release"
-  cmake_options="${cmake_options} -DIREE_ENABLE_ASSERTIONS=ON"
+  #cmake_options="${cmake_options} -DIREE_ENABLE_ASSERTIONS=ON"
   cmake_options="${cmake_options} $(print_toolchain_config)"
   if $has_lld; then
     cmake_options="${cmake_options} -DIREE_ENABLE_LLD=ON"
