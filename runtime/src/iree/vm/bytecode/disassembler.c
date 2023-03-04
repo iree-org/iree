@@ -650,6 +650,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 
     DISASM_OP(CORE, BufferAlloc) {
       uint16_t length_reg = VM_ParseOperandRegI64("length");
+      uint16_t alignment_reg = VM_ParseOperandRegI32("alignment");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
       EMIT_REF_REG_NAME(result_reg);
@@ -657,6 +658,9 @@ iree_status_t iree_vm_bytecode_disassemble_op(
           iree_string_builder_append_cstring(b, " = vm.buffer.alloc "));
       EMIT_I64_REG_NAME(length_reg);
       EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I32_REG_NAME(alignment_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[alignment_reg]);
       break;
     }
 
@@ -665,6 +669,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       uint16_t source_reg = VM_ParseOperandRegRef("source", &source_is_move);
       uint16_t offset_reg = VM_ParseOperandRegI64("offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
+      uint16_t alignment_reg = VM_ParseOperandRegI32("alignment");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
       EMIT_REF_REG_NAME(result_reg);
@@ -678,6 +683,9 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
       EMIT_I64_REG_NAME(length_reg);
       EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I32_REG_NAME(alignment_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[alignment_reg]);
       break;
     }
 

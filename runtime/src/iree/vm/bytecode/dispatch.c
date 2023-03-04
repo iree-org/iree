@@ -881,12 +881,13 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, BufferAlloc, {
       iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
+      iree_host_size_t alignment = VM_DecOperandRegI32("alignment");
       bool result_is_move;
       iree_vm_ref_t* result_ref = VM_DecResultRegRef("result", &result_is_move);
       iree_vm_buffer_t* buffer = NULL;
       IREE_RETURN_IF_ERROR(iree_vm_buffer_create(
           IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST,
-          length, module_state->allocator, &buffer));
+          length, alignment, module_state->allocator, &buffer));
       IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
           buffer, iree_vm_buffer_type_id(), result_ref));
     });
@@ -901,12 +902,13 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
       iree_host_size_t offset = VM_DecOperandRegI64HostSize("offset");
       iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
+      iree_host_size_t alignment = VM_DecOperandRegI32("alignment");
       bool result_is_move;
       iree_vm_ref_t* result_ref = VM_DecResultRegRef("result", &result_is_move);
       iree_vm_buffer_t* result = NULL;
       IREE_RETURN_IF_ERROR(iree_vm_buffer_clone(
           IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST,
-          source, offset, length, module_state->allocator, &result));
+          source, offset, length, alignment, module_state->allocator, &result));
       IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
           result, iree_vm_buffer_type_id(), result_ref));
     });

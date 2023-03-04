@@ -1158,6 +1158,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
 
     VERIFY_OP(CORE, BufferAlloc, {
       VM_VerifyOperandRegI64HostSize(length);
+      VM_VerifyOperandRegI32(alignment);
       VM_VerifyResultRegRef(result);
     });
 
@@ -1165,6 +1166,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
       VM_VerifyOperandRegRef(source);
       VM_VerifyOperandRegI64HostSize(offset);
       VM_VerifyOperandRegI64HostSize(length);
+      VM_VerifyOperandRegI32(alignment);
       VM_VerifyResultRegRef(result);
     });
 

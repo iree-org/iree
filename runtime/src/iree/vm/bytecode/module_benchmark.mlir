@@ -87,7 +87,8 @@ vm.module @bytecode_module_benchmark {
     %c4 = vm.const.i64 4
     %count_i64 = vm.ext.i32.i64.u %count : i32 -> i64
     %count_bytes = vm.mul.i64 %count_i64, %c4 : i64
-    %buf = vm.buffer.alloc %count_bytes : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %count_bytes, %alignment : !vm.buffer
     vm.buffer.fill.i32 %buf, %c0, %count_i64, %pattern : i32 -> !vm.buffer
     vm.br ^loop(%c0, %c0_i32 : i64, i32)
   ^loop(%i : i64, %sum : i32):
@@ -110,7 +111,8 @@ vm.module @bytecode_module_benchmark {
     %c4 = vm.const.i64 4
     %count_i64 = vm.ext.i32.i64.u %count : i32 -> i64
     %count_bytes = vm.mul.i64 %count_i64, %c4 : i64
-    %buf = vm.buffer.alloc %count_bytes : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %count_bytes, %alignment : !vm.buffer
     vm.buffer.fill.i32 %buf, %c0, %count_i64, %pattern : i32 -> !vm.buffer
     %sum_init = vm.const.i32.zero
     vm.br ^loop(%c0, %sum_init : i64, i32)

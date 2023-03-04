@@ -93,13 +93,14 @@ IREE_API_EXPORT void iree_vm_buffer_deinitialize(iree_vm_buffer_t* buffer);
 
 // Creates a new zero-initialized buffer of the given byte |length|.
 // The underlying storage buffer may be allocated larger to ensure alignment.
-// The allocated data will be aligned to iree_max_align_t.
+// The allocated data will be aligned to |alignment| or iree_max_align_t if 0.
 //
 // |access| can be used to control who (guest, host, etc) and how (read/write)
 // the buffer may be accessed.
-IREE_API_EXPORT iree_status_t iree_vm_buffer_create(
-    iree_vm_buffer_access_t access, iree_host_size_t length,
-    iree_allocator_t allocator, iree_vm_buffer_t** out_buffer);
+IREE_API_EXPORT iree_status_t
+iree_vm_buffer_create(iree_vm_buffer_access_t access, iree_host_size_t length,
+                      iree_host_size_t alignment, iree_allocator_t allocator,
+                      iree_vm_buffer_t** out_buffer);
 
 // Retains the given |buffer| for the caller.
 IREE_API_EXPORT void iree_vm_buffer_retain(iree_vm_buffer_t* buffer);
@@ -108,7 +109,7 @@ IREE_API_EXPORT void iree_vm_buffer_retain(iree_vm_buffer_t* buffer);
 IREE_API_EXPORT void iree_vm_buffer_release(iree_vm_buffer_t* buffer);
 
 // Clones a range of bytes in |source| to a new buffer.
-// The allocated data will be aligned to iree_max_align_t.
+// The allocated data will be aligned to |alignment| or iree_max_align_t if 0.
 //
 // |access| can be used to control who (guest, host, etc) and how (read/write)
 // the buffer may be accessed. As this returns a newly allocated buffer the
@@ -116,7 +117,8 @@ IREE_API_EXPORT void iree_vm_buffer_release(iree_vm_buffer_t* buffer);
 IREE_API_EXPORT iree_status_t iree_vm_buffer_clone(
     iree_vm_buffer_access_t access, const iree_vm_buffer_t* source_buffer,
     iree_host_size_t source_offset, iree_host_size_t length,
-    iree_allocator_t allocator, iree_vm_buffer_t** out_buffer);
+    iree_host_size_t alignment, iree_allocator_t allocator,
+    iree_vm_buffer_t** out_buffer);
 
 // Returns the user-visible length of the buffer in bytes.
 IREE_API_EXPORT iree_host_size_t

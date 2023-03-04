@@ -137,12 +137,6 @@ iree_allocator_system_ctl(void* self, iree_allocator_command_t command,
 // Aligned allocations via iree_allocator_t
 //===----------------------------------------------------------------------===//
 
-// Returns true if |alignment| is a power of two (or 0).
-static inline iree_host_size_t iree_alignment_is_pot(
-    iree_host_size_t alignment) {
-  return (alignment & (alignment - 1)) == 0;
-}
-
 // Returns a pointer into |unaligned_ptr| where |offset| matches |alignment|.
 static inline void* iree_aligned_ptr(void* unaligned_ptr,
                                      iree_host_size_t alignment,
@@ -177,7 +171,7 @@ IREE_API_EXPORT iree_status_t iree_allocator_malloc_aligned(
                             "allocations must be >0 bytes");
   }
   const iree_host_size_t alignment = iree_max(min_alignment, iree_max_align_t);
-  if (IREE_UNLIKELY(!iree_alignment_is_pot(alignment))) {
+  if (IREE_UNLIKELY(!iree_host_size_is_power_of_two(alignment))) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "alignments must be powers of two (got %" PRIhsz ")", min_alignment);
@@ -209,7 +203,7 @@ IREE_API_EXPORT iree_status_t iree_allocator_realloc_aligned(
                             "allocations must be >0 bytes");
   }
   const iree_host_size_t alignment = iree_min(min_alignment, iree_max_align_t);
-  if (IREE_UNLIKELY(!iree_alignment_is_pot(alignment))) {
+  if (IREE_UNLIKELY(!iree_host_size_is_power_of_two(alignment))) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "alignments must be powers of two (got %" PRIhsz ")", min_alignment);

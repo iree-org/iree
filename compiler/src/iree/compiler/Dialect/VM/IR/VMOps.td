@@ -1151,7 +1151,8 @@ def VM_BufferAllocOp :
   }];
 
   let arguments = (ins
-    VM_BufferIndex:$length
+    VM_BufferIndex:$length,
+    I32:$alignment
   );
   let results = (outs
     VM_RefOf<VM_BufferType>:$result
@@ -1164,6 +1165,7 @@ def VM_BufferAllocOp :
   let encoding = [
     VM_EncOpcode<VM_OPC_BufferAlloc>,
     VM_EncOperand<"length", 0>,
+    VM_EncOperand<"alignment", 1>,
     VM_EncResult<"result">,
   ];
 }
@@ -1183,7 +1185,8 @@ def VM_BufferCloneOp :
   let arguments = (ins
     VM_RefOf<VM_BufferType>:$source_buffer,
     VM_BufferIndex:$source_offset,
-    VM_BufferIndex:$length
+    VM_BufferIndex:$length,
+    I32:$alignment
   );
   let results = (outs
     VM_RefOf<VM_BufferType>:$result
@@ -1198,6 +1201,7 @@ def VM_BufferCloneOp :
     VM_EncOperand<"source_buffer", 0>,
     VM_EncOperand<"source_offset", 1>,
     VM_EncOperand<"length", 2>,
+    VM_EncOperand<"alignment", 3>,
     VM_EncResult<"result">,
   ];
 }

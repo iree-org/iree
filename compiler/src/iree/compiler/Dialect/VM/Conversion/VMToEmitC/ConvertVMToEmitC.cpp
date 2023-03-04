@@ -3781,9 +3781,11 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
                                        "IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST"))
             .getResult();
     Value length = adaptor.getOperands()[0];
+    Value alignment = adaptor.getOperands()[1];
 
     result.push_back(access);
     result.push_back(length);
+    result.push_back(alignment);
     result.push_back(allocator);
     result.push_back(containerPtr);
 
@@ -3832,11 +3834,13 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
 
     Value offset = adaptor.getOperands()[1];
     Value length = adaptor.getOperands()[2];
+    Value alignment = adaptor.getOperands()[3];
 
     result.push_back(access);
     result.push_back(source);
     result.push_back(offset);
     result.push_back(length);
+    result.push_back(alignment);
     result.push_back(allocator);
     result.push_back(containerPtr);
 

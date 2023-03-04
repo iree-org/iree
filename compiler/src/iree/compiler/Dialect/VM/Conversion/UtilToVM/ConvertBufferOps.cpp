@@ -52,19 +52,26 @@ struct BufferConstantOpConversion
   }
 };
 
+static Value getAlignment(Location loc, std::optional<APInt> alignment,
+                          OpBuilder &builder) {
+  uint32_t alignmentValue =
+      alignment.has_value()
+          ? static_cast<int32_t>(alignment.value().getZExtValue())
+          : 0;
+  return builder.create<IREE::VM::ConstI32Op>(loc, alignmentValue);
+}
+
 struct BufferAllocOpConversion
     : public OpConversionPattern<IREE::Util::BufferAllocOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
       IREE::Util::BufferAllocOp allocOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    // TODO(#9165): support alignment for vm.buffer.alloc. So far we ignore the
-    // alignment attribute when lowering the op to VM dialect.
-    (void)adaptor.getAlignment();
     auto resultType =
         getTypeConverter()->convertType(allocOp.getResult().getType());
     rewriter.replaceOpWithNewOp<IREE::VM::BufferAllocOp>(
-        allocOp, resultType, castToI64(adaptor.getStorageSize(), rewriter));
+        allocOp, resultType, castToI64(adaptor.getStorageSize(), rewriter),
+        getAlignment(allocOp.getLoc(), adaptor.getAlignment(), rewriter));
     return success();
   }
 };
@@ -91,14 +98,12 @@ struct BufferSliceOpConversion
   LogicalResult matchAndRewrite(
       IREE::Util::BufferSliceOp sliceOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    // TODO(#9165): support alignment for vm.buffer.alloc. So far we ignore the
-    // alignment attribute when lowering the op to VM dialect.
-    (void)adaptor.getAlignment();
     auto resultType =
         getTypeConverter()->convertType(sliceOp.getResult().getType());
     auto sliceLength = castToI64(adaptor.getResultSize(), rewriter);
     Value newBuffer = rewriter.create<IREE::VM::BufferAllocOp>(
-        sliceOp.getLoc(), resultType, sliceLength);
+        sliceOp.getLoc(), resultType, sliceLength,
+        getAlignment(sliceOp.getLoc(), adaptor.getAlignment(), rewriter));
     Value zero = rewriter.create<IREE::VM::ConstI64ZeroOp>(sliceOp.getLoc());
     rewriter.create<IREE::VM::BufferCopyOp>(
         sliceOp.getLoc(), adaptor.getSource(),

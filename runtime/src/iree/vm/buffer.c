@@ -80,9 +80,10 @@ IREE_API_EXPORT void iree_vm_buffer_deinitialize(iree_vm_buffer_t* buffer) {
   iree_allocator_free(buffer->allocator, buffer->data.data);
 }
 
-IREE_API_EXPORT iree_status_t iree_vm_buffer_create(
-    iree_vm_buffer_access_t access, iree_host_size_t length,
-    iree_allocator_t allocator, iree_vm_buffer_t** out_buffer) {
+IREE_API_EXPORT iree_status_t
+iree_vm_buffer_create(iree_vm_buffer_access_t access, iree_host_size_t length,
+                      iree_host_size_t alignment, iree_allocator_t allocator,
+                      iree_vm_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(out_buffer);
   *out_buffer = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -95,7 +96,8 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_create(
   // Allocate combined [prefix | buffer] memory.
   uint8_t* data_ptr = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(allocator, total_size, (void**)&data_ptr));
+      z0, iree_allocator_malloc_aligned(allocator, total_size, alignment,
+                                        prefix_size, (void**)&data_ptr));
 
   // Initialize the prefix buffer handle.
   iree_vm_buffer_t* buffer = (iree_vm_buffer_t*)data_ptr;
@@ -115,7 +117,7 @@ static void iree_vm_buffer_destroy(void* ptr) {
   // Buffers are stored as [prefix | data]; freeing the prefix is all we need
   // to do to free it all.
   iree_vm_buffer_t* buffer = (iree_vm_buffer_t*)ptr;
-  iree_allocator_free(buffer->allocator, buffer);
+  iree_allocator_free_aligned(buffer->allocator, buffer);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -131,7 +133,8 @@ IREE_API_EXPORT void iree_vm_buffer_release(iree_vm_buffer_t* buffer) {
 IREE_API_EXPORT iree_status_t iree_vm_buffer_clone(
     iree_vm_buffer_access_t access, const iree_vm_buffer_t* source_buffer,
     iree_host_size_t source_offset, iree_host_size_t length,
-    iree_allocator_t allocator, iree_vm_buffer_t** out_buffer) {
+    iree_host_size_t alignment, iree_allocator_t allocator,
+    iree_vm_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(source_buffer);
   IREE_ASSERT_ARGUMENT(out_buffer);
   *out_buffer = NULL;
@@ -151,12 +154,11 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_clone(
   iree_host_size_t total_size = prefix_size + source_span.data_length;
 
   // Allocate combined [prefix | buffer] memory.
-  // NOTE: we are allocating without initialization here as we will be writing
-  // over all of it.
+  // TODO(benvanik): uninitialized allocation here to avoid the memset(0).
   uint8_t* data_ptr = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc_uninitialized(allocator, total_size,
-                                              (void**)&data_ptr));
+      z0, iree_allocator_malloc_aligned(allocator, total_size, alignment,
+                                        prefix_size, (void**)&data_ptr));
 
   // Initialize the prefix buffer handle.
   iree_vm_buffer_t* buffer = (iree_vm_buffer_t*)data_ptr;
