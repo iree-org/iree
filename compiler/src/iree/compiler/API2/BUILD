@@ -70,11 +70,6 @@ config_setting(
     },
 )
 
-# Bazel does not have a well-defined mechanism for managing
-# shared libraries in a cross-platform way. Therefore, we
-# only support static linking of tools. Separately, we do
-# build an actual shared library for platforms that support
-# it, but this is only done to support stub use-cases.
 alias(
     name = "Impl",
     actual = select({
