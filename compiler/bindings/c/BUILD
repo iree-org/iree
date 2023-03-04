@@ -33,4 +33,20 @@ cc_library(
     ],
 )
 
-# TODO: Support loader_test in Bazel.
+cc_test(
+    name = "loader_test",
+    srcs = [
+        "iree/compiler/loader/loader_test.c",
+    ],
+    args = [
+        "lib/libIREECompiler.so",
+    ],
+    data = [
+        "//lib:libIREECompiler.so",
+    ],
+    tags = ["skip-bazel_to_cmake"],
+    deps = [
+        ":headers",
+        ":loader",
+    ],
+)

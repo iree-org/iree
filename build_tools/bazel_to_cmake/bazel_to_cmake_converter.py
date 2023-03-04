@@ -49,6 +49,12 @@ timeout_map = {
 }
 
 
+def _should_skip_target(tags=None, **kwargs):
+  if tags and "skip-bazel_to_cmake" in tags:
+    return True
+  return False
+
+
 def _convert_timeout_arg_block(name, value):
   if value is None:
     return ""
@@ -255,6 +261,8 @@ class BuildFileFunctions(object):
     self._convert_unimplemented_function("filegroup", name)
 
   def sh_binary(self, name, **kwargs):
+    if _should_skip_target(**kwargs):
+      return
     self._convert_unimplemented_function("sh_binary", name)
 
   def enforce_glob(self, files, **kwargs):
@@ -316,6 +324,8 @@ class BuildFileFunctions(object):
                  linkopts=None,
                  includes=None,
                  **kwargs):
+    if _should_skip_target(**kwargs):
+      return
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
@@ -363,6 +373,8 @@ class BuildFileFunctions(object):
               tags=None,
               includes=None,
               **kwargs):
+    if _should_skip_target(tags=tags, **kwargs):
+      return
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
     srcs_block = _convert_srcs_block(srcs)
@@ -406,6 +418,8 @@ class BuildFileFunctions(object):
                 testonly=None,
                 includes=None,
                 **kwargs):
+    if _should_skip_target(**kwargs):
+      return
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
@@ -442,6 +456,8 @@ class BuildFileFunctions(object):
                    identifier=None,
                    deps=None,
                    **kwargs):
+    if _should_skip_target(**kwargs):
+      return
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     c_file_output_block = _convert_string_arg_block("C_FILE_OUTPUT",
@@ -565,6 +581,8 @@ class BuildFileFunctions(object):
                             f")\n\n")
 
   def iree_gentbl_cc_library(self, **kwargs):
+    if _should_skip_target(**kwargs):
+      return
     # The bazel version of this rule adds some include directories and defs
     # that are implicitly handled by the cmake version.
     self.gentbl_cc_library(**kwargs)
@@ -598,6 +616,8 @@ class BuildFileFunctions(object):
                           tags=None,
                           timeout=None,
                           **kwargs):
+    if _should_skip_target(tags=tags, **kwargs):
+      return
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     tools_block = _convert_target_list_block("TOOLS", tools)
@@ -626,6 +646,8 @@ class BuildFileFunctions(object):
                                            target_cpu_features=None,
                                            timeout=None,
                                            **kwargs):
+    if _should_skip_target(tags=tags, **kwargs):
+      return
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     target_backend_block = _convert_string_arg_block("TARGET_BACKEND",
@@ -661,6 +683,8 @@ class BuildFileFunctions(object):
                             target_cpu_features_variants=None,
                             timeout=None,
                             **kwargs):
+    if _should_skip_target(tags=tags, **kwargs):
+      return
     target_backends = None
     drivers = None
     if target_backends_and_drivers is not None:
@@ -703,6 +727,8 @@ class BuildFileFunctions(object):
                                        tags=None,
                                        target_cpu_features_variants=None,
                                        **kwargs):
+    if _should_skip_target(tags=tags, **kwargs):
+      return
     target_backends = None
     drivers = None
     if target_backends_and_drivers is not None:
@@ -749,6 +775,8 @@ class BuildFileFunctions(object):
                   data=None,
                   tags=None,
                   timeout=None):
+    if _should_skip_target(tags=tags):
+      return
     if data is not None:
       self._convert_unimplemented_function("native_test", name + " has data")
 
@@ -779,7 +807,8 @@ class BuildFileFunctions(object):
       # unused
       size="small",
       timeout=None):
-
+    if _should_skip_target(tags=tags):
+      return
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     data_block = _convert_target_list_block("DATA", data)

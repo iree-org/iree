@@ -1,16 +1,15 @@
-# Copyright 2022 The IREE Authors
+# Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# bazel-to-cmake: skip
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
 
-# This is problematic on anything non-Linux but Bazel has failed
-# for years to provide the flexibility to make it any better. Yolo.
-# We really only support this for some very narrow use cases that
-# need to dynamically load the compiler as a shared library, and other
-# uses are served by the cross-platform CMake build.
 cc_binary(
     name = "libIREECompiler.so",
     srcs = [
