@@ -100,11 +100,55 @@ vm.module @arithmetic_ops {
 
   vm.export @test_abs_i32
   vm.func @test_abs_i32() {
-    %c1 = vm.const.i32 -1
-    %c1dno = util.optimization_barrier %c1 : i32
-    %v = vm.abs.i32 %c1dno : i32
-    %c2 = vm.const.i32 1
-    vm.check.eq %v, %c2, "abs(-1)=1" : i32
+    %cn1 = vm.const.i32 -1
+    %cn1dno = util.optimization_barrier %cn1 : i32
+    %v = vm.abs.i32 %cn1dno : i32
+    %c1 = vm.const.i32 1
+    vm.check.eq %v, %c1, "abs(-1)=1" : i32
+    vm.return
+  }
+
+  vm.export @test_min_i32s
+  vm.func @test_min_i32s() {
+    %cn3 = vm.const.i32 -3
+    %cn3dno = util.optimization_barrier %cn3 : i32
+    %c2 = vm.const.i32 2
+    %c2dno = util.optimization_barrier %c2 : i32
+    %v = vm.min.i32.s %cn3dno, %c2dno : i32
+    vm.check.eq %v, %cn3, "smin(-3,2)=-3" : i32
+    vm.return
+  }
+
+  vm.export @test_min_i32u
+  vm.func @test_min_i32u() {
+    %cn3 = vm.const.i32 -3
+    %cn3dno = util.optimization_barrier %cn3 : i32
+    %c2 = vm.const.i32 2
+    %c2dno = util.optimization_barrier %c2 : i32
+    %v = vm.min.i32.u %cn3dno, %c2dno : i32
+    vm.check.eq %v, %c2, "umin(-3,2)=2" : i32
+    vm.return
+  }
+
+  vm.export @test_max_i32s
+  vm.func @test_max_i32s() {
+    %cn3 = vm.const.i32 -3
+    %cn3dno = util.optimization_barrier %cn3 : i32
+    %c2 = vm.const.i32 2
+    %c2dno = util.optimization_barrier %c2 : i32
+    %v = vm.max.i32.s %cn3dno, %c2dno : i32
+    vm.check.eq %v, %c2, "smax(-3,2)=2" : i32
+    vm.return
+  }
+
+  vm.export @test_max_i32u
+  vm.func @test_max_i32u() {
+    %cn3 = vm.const.i32 -3
+    %cn3dno = util.optimization_barrier %cn3 : i32
+    %c2 = vm.const.i32 2
+    %c2dno = util.optimization_barrier %c2 : i32
+    %v = vm.max.i32.u %cn3dno, %c2dno : i32
+    vm.check.eq %v, %cn3, "umax(-3,2)=-3" : i32
     vm.return
   }
 

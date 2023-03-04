@@ -284,6 +284,46 @@ vm.module @abs_i32_folds {
 
 // -----
 
+// CHECK-LABEL: @min_i32_folds
+vm.module @min_i32_folds {
+  // CHECK-LABEL: @min_i32_cst_y
+  vm.func @min_i32_cst_y(%arg0: i32) -> i32 {
+    %c123 = vm.const.i32 123
+    // CHECK: vm.min.i32.s %arg0, %c123 : i32
+    %0 = vm.min.i32.s %c123, %arg0 : i32
+    vm.return %0 : i32
+  }
+
+  // CHECK-LABEL: @min_i32_x_x
+  vm.func @min_i32_x_x(%arg0: i32) -> i32 {
+    // CHECK: vm.return %arg0 : i32
+    %0 = vm.min.i32.s %arg0, %arg0 : i32
+    vm.return %0 : i32
+  }
+
+  // CHECK-LABEL: @min_i32_s_const
+  vm.func @min_i32_s_const() -> i32 {
+    // CHECK: %[[CST:.+]] = vm.const.i32 -5
+    // CHECK-NEXT: vm.return %[[CST]] : i32
+    %cn5 = vm.const.i32 -5
+    %c4 = vm.const.i32 4
+    %0 = vm.min.i32.s %cn5, %c4 : i32
+    vm.return %0 : i32
+  }
+
+  // CHECK-LABEL: @min_i32_u_const
+  vm.func @min_i32_u_const() -> i32 {
+    // CHECK: %[[CST:.+]] = vm.const.i32 2147483647
+    // CHECK-NEXT: vm.return %[[CST]] : i32
+    %c7f = vm.const.i32 0x7FFFFFFF
+    %c80 = vm.const.i32 0x80000000
+    %0 = vm.min.i32.u %c7f, %c80 : i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @not_i32_folds
 vm.module @not_i32_folds {
   // CHECK-LABEL: @not_i32_const

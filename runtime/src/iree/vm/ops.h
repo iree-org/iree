@@ -256,6 +256,18 @@ static inline int32_t vm_fma_i32(int32_t a, int32_t b, int32_t c) {
   return a * b + c;
 }
 static inline int32_t vm_abs_i32(int32_t operand) { return abs(operand); }
+static inline int32_t vm_min_i32s(int32_t lhs, int32_t rhs) {
+  return rhs < lhs ? rhs : lhs;
+}
+static inline int32_t vm_min_i32u(int32_t lhs, int32_t rhs) {
+  return (uint32_t)rhs < (uint32_t)lhs ? rhs : lhs;
+}
+static inline int32_t vm_max_i32s(int32_t lhs, int32_t rhs) {
+  return lhs < rhs ? rhs : lhs;
+}
+static inline int32_t vm_max_i32u(int32_t lhs, int32_t rhs) {
+  return (uint32_t)lhs < (uint32_t)rhs ? rhs : lhs;
+}
 static inline int32_t vm_not_i32(int32_t operand) {
   return (int32_t)(~((uint32_t)operand));
 }
@@ -382,6 +394,18 @@ static inline int64_t vm_fma_i64(int64_t a, int64_t b, int64_t c) {
   return a * b + c;
 }
 static inline int64_t vm_abs_i64(int64_t operand) { return labs(operand); }
+static inline int64_t vm_min_i64s(int64_t lhs, int64_t rhs) {
+  return rhs < lhs ? rhs : lhs;
+}
+static inline int64_t vm_min_i64u(int64_t lhs, int64_t rhs) {
+  return (uint64_t)rhs < (uint64_t)lhs ? rhs : lhs;
+}
+static inline int64_t vm_max_i64s(int64_t lhs, int64_t rhs) {
+  return lhs < rhs ? rhs : lhs;
+}
+static inline int64_t vm_max_i64u(int64_t lhs, int64_t rhs) {
+  return (uint64_t)lhs < (uint64_t)rhs ? rhs : lhs;
+}
 static inline int64_t vm_not_i64(int64_t operand) {
   return (int64_t)(~((uint64_t)operand));
 }
@@ -527,6 +551,12 @@ static inline float vm_neg_f32(float operand) { return -operand; }
 static inline float vm_ceil_f32(float operand) { return ceilf(operand); }
 static inline float vm_floor_f32(float operand) { return floorf(operand); }
 static inline float vm_round_f32(float operand) { return roundf(operand); }
+static inline float vm_min_f32(float lhs, float rhs) {
+  return rhs < lhs ? rhs : lhs;
+}
+static inline float vm_max_f32(float lhs, float rhs) {
+  return lhs < rhs ? rhs : lhs;
+}
 
 static inline float vm_atan_f32(float operand) { return atanf(operand); }
 static inline float vm_atan2_f32(float y, float x) { return atan2f(y, x); }

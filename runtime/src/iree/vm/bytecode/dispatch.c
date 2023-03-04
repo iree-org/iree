@@ -1428,6 +1428,10 @@ static iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_CORE_BINARY_I32(RemI32U, vm_rem_i32u);
     DISPATCH_OP_CORE_TERNARY_I32(FMAI32, vm_fma_i32);
     DISPATCH_OP_CORE_UNARY_I32(AbsI32, vm_abs_i32);
+    DISPATCH_OP_CORE_BINARY_I32(MinI32S, vm_min_i32s);
+    DISPATCH_OP_CORE_BINARY_I32(MinI32U, vm_min_i32u);
+    DISPATCH_OP_CORE_BINARY_I32(MaxI32S, vm_max_i32s);
+    DISPATCH_OP_CORE_BINARY_I32(MaxI32U, vm_max_i32u);
     DISPATCH_OP_CORE_UNARY_I32(NotI32, vm_not_i32);
     DISPATCH_OP_CORE_BINARY_I32(AndI32, vm_and_i32);
     DISPATCH_OP_CORE_BINARY_I32(OrI32, vm_or_i32);
@@ -1443,6 +1447,10 @@ static iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_CORE_BINARY_I64(RemI64U, vm_rem_i64u);
     DISPATCH_OP_CORE_TERNARY_I64(FMAI64, vm_fma_i64);
     DISPATCH_OP_CORE_UNARY_I64(AbsI64, vm_abs_i64);
+    DISPATCH_OP_CORE_BINARY_I64(MinI64S, vm_min_i64s);
+    DISPATCH_OP_CORE_BINARY_I64(MinI64U, vm_min_i64u);
+    DISPATCH_OP_CORE_BINARY_I64(MaxI64S, vm_max_i64s);
+    DISPATCH_OP_CORE_BINARY_I64(MaxI64U, vm_max_i64u);
     DISPATCH_OP_CORE_UNARY_I64(NotI64, vm_not_i64);
     DISPATCH_OP_CORE_BINARY_I64(AndI64, vm_and_i64);
     DISPATCH_OP_CORE_BINARY_I64(OrI64, vm_or_i64);
@@ -1926,6 +1934,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_F32_UNARY_F32(CeilF32, vm_ceil_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(FloorF32, vm_floor_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32, vm_round_f32);
+      DISPATCH_OP_EXT_F32_BINARY_F32(MinF32, vm_min_f32);
+      DISPATCH_OP_EXT_F32_BINARY_F32(MaxF32, vm_max_f32);
 
       DISPATCH_OP_EXT_F32_UNARY_F32(AtanF32, vm_atan_f32);
       DISPATCH_OP_EXT_F32_BINARY_F32(Atan2F32, vm_atan2_f32);

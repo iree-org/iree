@@ -47,7 +47,7 @@ class VM_OPC_EnumAttr<string name, string enumName, string enumTag,
   string opcodeEnumTag = enumTag;
 }
 
-// Next available opcode: 0x7A
+// Next available opcode: 0x82
 
 // Globals:
 def VM_OPC_GlobalLoadI32         : VM_OPC<0x00, "GlobalLoadI32">;
@@ -107,6 +107,10 @@ def VM_OPC_RemI32S               : VM_OPC<0x27, "RemI32S">;
 def VM_OPC_RemI32U               : VM_OPC<0x28, "RemI32U">;
 def VM_OPC_FMAI32                : VM_OPC<0x29, "FMAI32">;
 def VM_OPC_AbsI32                : VM_OPC<0x77, "AbsI32">;
+def VM_OPC_MinI32S               : VM_OPC<0x7A, "MinI32S">;
+def VM_OPC_MinI32U               : VM_OPC<0x7B, "MinI32U">;
+def VM_OPC_MaxI32S               : VM_OPC<0x7C, "MaxI32S">;
+def VM_OPC_MaxI32U               : VM_OPC<0x7D, "MaxI32U">;
 
 // 64-bit integer arithmetic:
 def VM_OPC_AddI64                : VM_OPC<0x2A, "AddI64">;
@@ -118,6 +122,10 @@ def VM_OPC_RemI64S               : VM_OPC<0x2F, "RemI64S">;
 def VM_OPC_RemI64U               : VM_OPC<0x30, "RemI64U">;
 def VM_OPC_FMAI64                : VM_OPC<0x31, "FMAI64">;
 def VM_OPC_AbsI64                : VM_OPC<0x78, "AbsI64">;
+def VM_OPC_MinI64S               : VM_OPC<0x7E, "MinI64S">;
+def VM_OPC_MinI64U               : VM_OPC<0x7F, "MinI64U">;
+def VM_OPC_MaxI64S               : VM_OPC<0x80, "MaxI64S">;
+def VM_OPC_MaxI64U               : VM_OPC<0x81, "MaxI64U">;
 
 // 32-bit integer bit manipulation:
 def VM_OPC_NotI32                : VM_OPC<0x32, "NotI32">;
@@ -272,6 +280,10 @@ def VM_CoreOpcodeAttr :
     VM_OPC_RemI32U,
     VM_OPC_FMAI32,
     VM_OPC_AbsI32,
+    VM_OPC_MinI32S,
+    VM_OPC_MinI32U,
+    VM_OPC_MaxI32S,
+    VM_OPC_MaxI32U,
 
     VM_OPC_AddI64,
     VM_OPC_SubI64,
@@ -282,6 +294,10 @@ def VM_CoreOpcodeAttr :
     VM_OPC_RemI64U,
     VM_OPC_FMAI64,
     VM_OPC_AbsI64,
+    VM_OPC_MinI64S,
+    VM_OPC_MinI64U,
+    VM_OPC_MaxI64S,
+    VM_OPC_MaxI64U,
 
     VM_OPC_NotI32,
     VM_OPC_AndI32,

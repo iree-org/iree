@@ -4312,6 +4312,14 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                         "vm_fma_i32");
   patterns.add<GenericOpConversion<IREE::VM::AbsI32Op>>(typeConverter, context,
                                                         "vm_abs_i32");
+  patterns.add<GenericOpConversion<IREE::VM::MinI32SOp>>(typeConverter, context,
+                                                         "vm_min_i32s");
+  patterns.add<GenericOpConversion<IREE::VM::MinI32UOp>>(typeConverter, context,
+                                                         "vm_min_i32u");
+  patterns.add<GenericOpConversion<IREE::VM::MaxI32SOp>>(typeConverter, context,
+                                                         "vm_max_i32s");
+  patterns.add<GenericOpConversion<IREE::VM::MaxI32UOp>>(typeConverter, context,
+                                                         "vm_max_i32u");
   patterns.add<GenericOpConversion<IREE::VM::NotI32Op>>(typeConverter, context,
                                                         "vm_not_i32");
   patterns.add<GenericOpConversion<IREE::VM::AndI32Op>>(typeConverter, context,
@@ -4413,6 +4421,10 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
       typeConverter, context, "vm_floor_f32");
   patterns.add<GenericOpConversion<IREE::VM::RoundF32Op>>(
       typeConverter, context, "vm_round_f32");
+  patterns.add<GenericOpConversion<IREE::VM::MinF32Op>>(typeConverter, context,
+                                                        "vm_min_f32");
+  patterns.add<GenericOpConversion<IREE::VM::MaxF32Op>>(typeConverter, context,
+                                                        "vm_max_f32");
 
   patterns.add<GenericOpConversion<IREE::VM::AtanF32Op>>(typeConverter, context,
                                                          "vm_atan_f32");
@@ -4534,6 +4546,14 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                         "vm_fma_i64");
   patterns.add<GenericOpConversion<IREE::VM::AbsI64Op>>(typeConverter, context,
                                                         "vm_abs_i64");
+  patterns.add<GenericOpConversion<IREE::VM::MinI64SOp>>(typeConverter, context,
+                                                         "vm_min_i64s");
+  patterns.add<GenericOpConversion<IREE::VM::MinI64UOp>>(typeConverter, context,
+                                                         "vm_min_i64u");
+  patterns.add<GenericOpConversion<IREE::VM::MaxI64SOp>>(typeConverter, context,
+                                                         "vm_max_i64s");
+  patterns.add<GenericOpConversion<IREE::VM::MaxI64UOp>>(typeConverter, context,
+                                                         "vm_max_i64u");
   patterns.add<GenericOpConversion<IREE::VM::NotI64Op>>(typeConverter, context,
                                                         "vm_not_i64");
   patterns.add<GenericOpConversion<IREE::VM::AndI64Op>>(typeConverter, context,
