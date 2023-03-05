@@ -2,7 +2,7 @@
 
 // RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
 // RUN:  iree-run-module --device=local-sync --function=no_output) | \
-// RUN: FileCheck --check-prefix=NO-OUTPUT %s
+// RUN: FileCheck --check-prefix=NO-OUTPUT-LABEL %s
 // NO-OUTPUT-LABEL: EXEC @no_output
 func.func @no_output() {
   return

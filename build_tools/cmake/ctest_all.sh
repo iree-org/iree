@@ -102,8 +102,6 @@ elif [[ "$OSTYPE" =~ ^darwin ]]; then
   excluded_tests+=(
     #TODO(#12496): Remove after fixing the test on macOS
     "iree/compiler/bindings/c/loader_test"
-    #TODO(#12496): Remove after fixing the test on macOS
-    "iree/compiler/API/python/test/transforms/ireec/compile_sample_module"
   )
 fi
 
