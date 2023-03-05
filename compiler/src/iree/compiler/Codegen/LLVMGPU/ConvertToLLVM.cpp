@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "mlir/Analysis/Liveness.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
@@ -20,10 +21,14 @@
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "iree-llvmgpu-convert-to-llvm"
 namespace mlir {
 namespace iree_compiler {
+
+static const StringLiteral kAllocAliasGroup = "__alloc_alias_group__";
 
 LogicalResult verifyLLVMConversionCompatibility(ModuleOp moduleOp) {
   LogicalResult compatible = success();
@@ -42,6 +47,104 @@ LogicalResult verifyLLVMConversionCompatibility(ModuleOp moduleOp) {
   });
 
   return compatible;
+}
+
+/// Sink allocs in the CFG to reduce its liverange.
+void sinkAlloc(ModuleOp moduleOp) {
+  DominanceInfo dominators(moduleOp);
+  SmallVector<Operation *> sinkOps;
+  moduleOp.walk([&](memref::AllocOp alloc) { sinkOps.push_back(alloc); });
+  for (Operation *sinkOp : sinkOps) {
+    Block *dom = nullptr;
+    for (Operation *user : sinkOp->getUsers()) {
+      if (!dom) {
+        dom = user->getBlock();
+        continue;
+      }
+      dom = dominators.findNearestCommonDominator(dom, user->getBlock());
+    }
+    llvm::SmallDenseSet<Operation *> users(sinkOp->getUsers().begin(),
+                                           sinkOp->getUsers().end());
+    Operation *firstUse = dom->getTerminator();
+    for (Operation &op : dom->getOperations()) {
+      if (users.count(&op)) {
+        firstUse = &op;
+        break;
+      }
+    }
+    sinkOp->moveBefore(firstUse);
+  }
+}
+
+/// Analyze the liverange of allocs and set them in individual groups if
+/// possible and mark allocs with an attributes.
+/// The algorithm is a simplistic memory allocation solution. It sorts
+/// allocations into alias groups. Everytime two alloc's liverange interfers
+/// they are merge into the same group. If a new alloc is part of multiple alias
+/// groups all those are merged into one. At the end we are left with groups of
+/// allocations that are disjoint and can use the same memory.
+// TODO: Move this to a common place if needed by other backends.
+void analyzeSharedMemoryAlloc(ModuleOp moduleOp) {
+  // First sink the alloc as low as possible in the CFG.
+  sinkAlloc(moduleOp);
+  struct AllocGroup {
+    std::vector<Operation *> allocs;
+    // Keep track of every operation where any of the alloc in the group is
+    // live.
+    llvm::DenseSet<Operation *> liveness;
+  };
+  Liveness liveness(moduleOp);
+  SmallVector<AllocGroup> groups;
+  moduleOp.walk([&](memref::AllocOp alloc) {
+    SmallVector<size_t> aliasGroups;
+    for (size_t i : llvm::seq<size_t>(0, groups.size())) {
+      AllocGroup &group = groups[i];
+      for (Operation *user : alloc->getUsers()) {
+        if (group.liveness.count(user)) {
+          aliasGroups.push_back(i);
+          break;
+        }
+      }
+    }
+    if (aliasGroups.empty()) {
+      AllocGroup &newGroup = groups.emplace_back();
+      newGroup.allocs.push_back(alloc);
+      Liveness::OperationListT liveInfo = liveness.resolveLiveness(alloc);
+      newGroup.liveness.insert(liveInfo.begin(), liveInfo.end());
+    } else {
+      // Merge the alloc into the first alias group it interfers with.
+      AllocGroup &mergeGroup = groups[aliasGroups[0]];
+      mergeGroup.allocs.push_back(alloc);
+      Liveness::OperationListT liveInfo = liveness.resolveLiveness(alloc);
+      mergeGroup.liveness.insert(liveInfo.begin(), liveInfo.end());
+      // Then merge all the other alias groups into the first group.
+      for (size_t i = 1, e = aliasGroups.size(); i < e; i++) {
+        AllocGroup &group = groups[aliasGroups[i]];
+        mergeGroup.allocs.insert(mergeGroup.allocs.end(), group.allocs.begin(),
+                                 group.allocs.end());
+        mergeGroup.liveness.insert(group.liveness.begin(),
+                                   group.liveness.end());
+        // For simplicity we leave the group empty and don't remove it.
+        group.allocs.clear();
+        group.liveness.clear();
+      }
+    }
+  });
+
+  LLVM_DEBUG({
+    for (size_t i = 0; i < groups.size(); i++) {
+      llvm::dbgs() << "Alias group " << i << ":\n";
+      for (Operation *op : groups[i].allocs) op->dump();
+    }
+  });
+
+  // Builder only used as attribute helper.
+  OpBuilder builder(moduleOp.getContext());
+  for (size_t i = 0; i < groups.size(); i++) {
+    for (Operation *alloc : groups[i].allocs) {
+      alloc->setAttr(kAllocAliasGroup, builder.getIndexAttr(i));
+    }
+  }
 }
 
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
@@ -63,24 +166,35 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
       moduleOp.getLoc(), type, /*isConstant=*/false, LLVM::Linkage::External,
       "__dynamic_shared_memory__", Attribute(),
       /*alignment=*/16, /*addr_space=*/3);
-  uint32_t numberOfBytes = 0;
+  int64_t numberOfBytes = 0;
+  llvm::SmallDenseMap<int64_t, int64_t> numberOfBytesPerGroup;
   // Replace the addressOfOps with correctly offseted pointers to dynamic
   // shared memory.
   llvm::SmallDenseMap<LLVM::GlobalOp, uint32_t> globalMemoryOffsetMap;
   for (auto addressOfOp : addressOfOps) {
-    uint32_t offset = 0;
+    int64_t offset = 0;
     auto globalOp = addressOfOp.getGlobal(symbolTableCollection);
     if (globalMemoryOffsetMap.count(globalOp)) {
       offset = globalMemoryOffsetMap[globalOp];
     } else {
-      offset = numberOfBytes;
+      int64_t *numberOfBytesGroup = &numberOfBytes;
+      if (globalOp->hasAttr(kAllocAliasGroup)) {
+        int64_t aliasGroup =
+            globalOp->getAttr(kAllocAliasGroup).cast<IntegerAttr>().getInt();
+        if (!numberOfBytesPerGroup.count(aliasGroup))
+          numberOfBytesPerGroup[aliasGroup] = 0;
+        numberOfBytesGroup = &numberOfBytesPerGroup[aliasGroup];
+      }
+      offset = *numberOfBytesGroup;
       if (std::optional<uint64_t> alignment = globalOp.getAlignment()) {
         offset = llvm::alignTo(offset, *alignment);
       }
       globalMemoryOffsetMap[globalOp] = offset;
       auto thisarray = globalOp.getType();
       DataLayout dataLayout = DataLayout::closest(addressOfOp);
-      numberOfBytes = offset + dataLayout.getTypeSizeInBits(thisarray) / 8;
+      *numberOfBytesGroup =
+          offset + dataLayout.getTypeSizeInBits(thisarray) / 8;
+      numberOfBytes = std::max(numberOfBytes, *numberOfBytesGroup);
     }
     auto loc = addressOfOp.getLoc();
     builder.setInsertionPoint(addressOfOp);
@@ -192,10 +306,81 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
         /*constant=*/false,
         /*alignment=*/rewriter.getI64IntegerAttr(alignement));
     symbolTable.insert(global);
+    if (allocOp->hasAttr(kAllocAliasGroup)) {
+      global->setAttr(kAllocAliasGroup, allocOp->getAttr(kAllocAliasGroup));
+    }
 
     rewriter.setInsertionPointToStart(&(*funcOp.getFunctionBody().begin()));
     rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(allocOp, global.getType(),
                                                      global.getName());
+    return success();
+  }
+};
+
+/// Returns the LLVM type of the global variable given the memref type `type`.
+static Type convertGlobalMemrefTypeToLLVM(MemRefType type,
+                                          LLVMTypeConverter &typeConverter) {
+  // LLVM type for a global memref will be a multi-dimension array. For
+  // declarations or uninitialized global memrefs, we can potentially flatten
+  // this to a 1D array. However, for memref.global's with an initial value,
+  // we do not intend to flatten the ElementsAttribute when going from std ->
+  // LLVM dialect, so the LLVM type needs to me a multi-dimension array.
+  Type elementType = typeConverter.convertType(type.getElementType());
+  Type arrayTy = elementType;
+  // Shape has the outermost dim at index 0, so need to walk it backwards
+  for (int64_t dim : llvm::reverse(type.getShape()))
+    arrayTy = LLVM::LLVMArrayType::get(arrayTy, dim);
+  return arrayTy;
+}
+
+/// Alias group information needs to be propagated to LLVM dialect, therefore we
+/// need our own lowering.
+struct GlobalMemrefOpLowering
+    : public ConvertOpToLLVMPattern<memref::GlobalOp> {
+  using ConvertOpToLLVMPattern<memref::GlobalOp>::ConvertOpToLLVMPattern;
+
+  LogicalResult matchAndRewrite(
+      memref::GlobalOp global, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    MemRefType type = global.getType();
+    if (!isConvertibleAndHasIdentityMaps(type)) return failure();
+
+    Type arrayTy = convertGlobalMemrefTypeToLLVM(type, *getTypeConverter());
+
+    LLVM::Linkage linkage =
+        global.isPublic() ? LLVM::Linkage::External : LLVM::Linkage::Private;
+
+    Attribute initialValue = nullptr;
+    if (!global.isExternal() && !global.isUninitialized()) {
+      auto elementsAttr = global.getInitialValue()->cast<ElementsAttr>();
+      initialValue = elementsAttr;
+
+      // For scalar memrefs, the global variable created is of the element type,
+      // so unpack the elements attribute to extract the value.
+      if (type.getRank() == 0)
+        initialValue = elementsAttr.getSplatValue<Attribute>();
+    }
+
+    uint64_t alignment = global.getAlignment().value_or(0);
+    FailureOr<unsigned> addressSpace =
+        getTypeConverter()->getMemRefAddressSpace(type);
+    if (failed(addressSpace))
+      return global.emitOpError(
+          "memory space cannot be converted to an integer address space");
+    auto newGlobal = rewriter.replaceOpWithNewOp<LLVM::GlobalOp>(
+        global, arrayTy, global.getConstant(), linkage, global.getSymName(),
+        initialValue, alignment, *addressSpace);
+    if (!global.isExternal() && global.isUninitialized()) {
+      Block *blk = new Block();
+      newGlobal.getInitializerRegion().push_back(blk);
+      rewriter.setInsertionPointToStart(blk);
+      Value undef[] = {
+          rewriter.create<LLVM::UndefOp>(global.getLoc(), arrayTy)};
+      rewriter.create<LLVM::ReturnOp>(global.getLoc(), undef);
+    }
+    if (global->hasAttr(kAllocAliasGroup)) {
+      newGlobal->setAttr(kAllocAliasGroup, global->getAttr(kAllocAliasGroup));
+    }
     return success();
   }
 };
@@ -488,6 +673,7 @@ struct HALInterfaceWorkgroupOpsConverter final
 void populateLLVMConversionPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns,
                                     LLVMTypeConverter &converter) {
+  patterns.add<GlobalMemrefOpLowering>(converter, 2);
   patterns
       .insert<ConvertFunc, ConvertIREEBindingSubspanOp, ConvertIREEConstantOp>(
           context, converter);

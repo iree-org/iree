@@ -204,6 +204,7 @@ hal.executable @shared_memory_lowering {
         %0 = memref.alloc() : memref<1x16x32xf32, #gpu.address_space<workgroup>>
         %1 = memref.alloc() : memref<1x32x16xf32, #gpu.address_space<workgroup>>
         %2 = memref.alloc() : memref<1x8x16xf32, #gpu.address_space<workgroup>>
+        vector.store %cst, %0[%c0, %c0, %c0] : memref<1x16x32xf32, #gpu.address_space<workgroup>>, vector<4xf32>
         vector.store %cst, %1[%c0, %c0, %c0] : memref<1x32x16xf32, #gpu.address_space<workgroup>>, vector<4xf32>
         vector.store %cst, %2[%c0, %c0, %c0] : memref<1x8x16xf32, #gpu.address_space<workgroup>>, vector<4xf32>
         vector.store %cst, %0[%c0, %c0, %c0] : memref<1x16x32xf32, #gpu.address_space<workgroup>>, vector<4xf32>
@@ -275,11 +276,13 @@ hal.executable @shared_memory_lowering_aligned_alloc {
         %1 = memref.alloc() : memref<32xf32, #gpu.address_space<workgroup>>
         memref.store %cst_i8, %0[%c0] : memref<1xi8, #gpu.address_space<workgroup>>
         memref.store %cst_f32, %1[%c0] : memref<32xf32, #gpu.address_space<workgroup>>
+        memref.store %cst_i8, %0[%c0] : memref<1xi8, #gpu.address_space<workgroup>>
         return
       }
     }
   }
 }
+//       CHECK: {workgroup_local_memory = 132 
 // CHECK-LABEL: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
 // CHECK-LABEL: llvm.func @shared_memory_lowering_aligned_alloc() {
 //       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
@@ -292,6 +295,46 @@ hal.executable @shared_memory_lowering_aligned_alloc {
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
 //  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<32 x f32>, 3>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
+hal.executable @shared_memory_lowering_disjoint {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.export @shared_memory_lowering_disjoint layout(#pipeline_layout)
+    builtin.module {
+      func.func @shared_memory_lowering_disjoint() {
+        %c0 = arith.constant 0 : index
+        %cst_f32 = arith.constant 0.000000e+00 : f32
+        %cst_i8 = arith.constant 0 : i8
+        %0 = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
+        %1 = memref.alloc() : memref<32xf32, #gpu.address_space<workgroup>>
+        memref.store %cst_f32, %0[%c0] : memref<128xf32, #gpu.address_space<workgroup>>
+        memref.store %cst_f32, %1[%c0] : memref<32xf32, #gpu.address_space<workgroup>>
+        return
+      }
+    }
+  }
+}
+// Check that we are re-using the shared memory for the second allocation.
+//       CHECK: {workgroup_local_memory = 512 
+// CHECK-LABEL: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
+// CHECK-LABEL: llvm.func @shared_memory_lowering_disjoint() {
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<128 x f32>, 3> 
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<32 x f32>, 3>
+
 
 // -----
 
