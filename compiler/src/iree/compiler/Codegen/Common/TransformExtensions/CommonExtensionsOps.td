@@ -197,8 +197,8 @@ def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
     It always return success.
   }];
 
-  let arguments = (ins Transform_ConcreteOpType<"func.func">:$target);
-  let results = (outs Transform_ConcreteOpType<"func.func">:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$result);
 
   let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -425,10 +425,10 @@ def ShareForallOperandsOp : Op<
   }];
 
   let arguments = (
-      ins Transform_ConcreteOpType<"scf.forall">:$forall_op,
+      ins TransformHandleTypeInterface:$forall_op,
           DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$share_operands
   );
-  let results = (outs Transform_ConcreteOpType<"scf.forall">:$result);
+  let results = (outs TransformHandleTypeInterface:$result);
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
