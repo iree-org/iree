@@ -210,7 +210,7 @@ def get_ci_stage(event_name):
   elif event_name == PUSH_EVENT_NAME:
     return "postsubmit"
   elif event_name == SCHEDULE_EVENT_NAME:
-    return "schedule"
+    return "postsubmit"
   elif event_name == WORKFLOW_DISPATCH_EVENT_NAME:
     return "unknown"
   raise ValueError(f"Unrecognized event name '{event_name}'")
