@@ -467,16 +467,24 @@ static LogicalResult setUnPackConfig(func::FuncOp entryPoint,
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   auto srcType = op.getSourceType();
-  std::array<int64_t, 3> workgroupSizes = {1, 1, 1};
+  int srcRank = op.getSourceRank();
+  std::array<int64_t, 3> workgroupSizes = {cudaWarpSize, 1, 1};
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
     if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
     tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
-    if (pos >= 3) continue;
-    // Distribute one tile on one thread.
+    int id = pos + 3 - srcRank;
+    if (srcRank < 3) id = pos;
+    if (id >= 3) continue;
+    // Distribute one tile on one thread if the dimension is a data tiling
+    // dimension. It makes the amount of elements along the dimension align to
+    // inner tile sizes, which introduces perfect tiling cases for unpack ops.
+    // It allows each thread working on a full tile, which makes thread level
+    // distribution and vectorization easier. See tensor.unpack tiling
+    // implementation for more details about perfect tiling cases.
     if (srcType.isDynamicDim(pos)) {
-      workgroupSizes[pos] = tileSizes[pos] / size;
+      workgroupSizes[id] = tileSizes[pos] / size;
     } else {
-      workgroupSizes[pos] =
+      workgroupSizes[id] =
           std::min(tileSizes[pos], srcType.getDimSize(pos) * size) / size;
     }
   }
