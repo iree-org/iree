@@ -21,6 +21,11 @@
 namespace mlir {
 namespace iree_compiler {
 
+static llvm::cl::list<int> x86Mmt4dSizes(
+    "iree-llvmcpu-x86-mmt4d-sizes",
+    llvm::cl::desc("linalg.mmt4d vector tile size"), llvm::cl::CommaSeparated,
+    llvm::cl::ZeroOrMore);
+
 using namespace IREE::LinalgExt;
 using IREE::HAL::ExecutableTargetAttr;
 
@@ -51,9 +56,13 @@ static MatmulTileParams chooseMatmulTileParamsAArch64(
 
 static MatmulTileParams chooseMatmulTileParamsX86_64(
     MatmulType type, ExecutableTargetAttr target) {
+  if (!x86Mmt4dSizes.empty()) {
+    return {x86Mmt4dSizes[0], x86Mmt4dSizes[1], x86Mmt4dSizes[2]};
+  }
+
   switch (type) {
     case MatmulType::F32F32F32:
-      if (hasFeature(target, "+avx512f")) return {16, 1, 16};
+      if (hasFeature(target, "+avx512f")) return {8, 2, 32};
       if (hasFeature(target, "+avx2")) {
         // Note: for good performance, most +avx2 users will also want to add
         // +fma, but that's a local instruction selection detail and the tile
@@ -64,6 +73,7 @@ static MatmulTileParams chooseMatmulTileParamsX86_64(
       // SSE fallback.
       return {8, 1, 4};
     case MatmulType::I8I8I32:
+      return {8, 1, 32};
       if (hasFeature(target, "+avx512vnni")) {
         // Aim to use VPDPWSSD.
         return {16, 4, 16};

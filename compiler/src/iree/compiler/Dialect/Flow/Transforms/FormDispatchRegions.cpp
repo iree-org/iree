@@ -428,11 +428,11 @@ static bool isFusableWithConsumer(
            });
   }
   auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
-  if (producerUnsetEncodingOp && consumerLinalgOp) {
-    return linalg::isElementwise(consumerLinalgOp) &&
-           consumerLinalgOp.getNumLoops() ==
-               producerUnsetEncodingOp.getType().getRank();
-  }
+  //if (producerUnsetEncodingOp && consumerLinalgOp) {
+    //return linalg::isElementwise(consumerLinalgOp) &&
+           //consumerLinalgOp.getNumLoops() ==
+               //producerUnsetEncodingOp.getType().getRank();
+  //}
 
   auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
   if (!producerLinalgOp || !consumerLinalgOp) return false;
