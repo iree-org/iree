@@ -337,12 +337,15 @@ class PackDispatchOperandsPass
 
     // Walk the module and update all dispatch operands.
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      auto exportOp =
-          symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
-              dispatchOp, dispatchOp.getEntryPoint());
-      if (exportOp) {
-        updateDispatchOp(dispatchOp, exportOp);
-      }
+      dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+        auto exportOp =
+            symbolTable
+                .lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
+                    dispatchOp, entryPointAttr);
+        if (exportOp) {
+          updateDispatchOp(dispatchOp, exportOp);
+        }
+      });
       return WalkResult::advance();
     });
   }

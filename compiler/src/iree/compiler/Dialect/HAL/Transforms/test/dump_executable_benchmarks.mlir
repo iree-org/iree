@@ -124,7 +124,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     %result, %result_timepoint = stream.resource.alloca uninitialized : !stream.resource<transient>{%c128} => !stream.timepoint
     %6 = stream.cmd.execute await(%result_timepoint) => with(%result as %result_capture: !stream.resource<transient>{%c128}) {
       // Dispatches with static and dynamic args.
-      stream.cmd.dispatch @ex0::@dispatch0[%c512](%c100_i32, %c200_i32 : i32, i32) {
+      stream.cmd.dispatch @ex0::@embedded_elf_x86_64::@dispatch0[%c512](%c100_i32, %c200_i32 : i32, i32) {
         ro %result_capture[%c0 for %c32] : !stream.resource<transient>{%c128},
         rw %result_capture[%c32 for %c32] : !stream.resource<transient>{%c128},
         rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
@@ -135,7 +135,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
       ]}
       // NOTE: today the dynamic args will prevent us from generating
       // benchmarks. We could handle this better by tracking alignment and such.
-      stream.cmd.dispatch @ex0::@dispatch0[%c512](%c300_i32, %dynamic_arg : i32, i32) {
+      stream.cmd.dispatch @ex0::@embedded_elf_x86_64::@dispatch0[%c512](%c300_i32, %dynamic_arg : i32, i32) {
         ro %result_capture[%c0 for %c32] : !stream.resource<transient>{%c128},
         rw %result_capture[%c32 for %c32] : !stream.resource<transient>{%c128},
         rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
@@ -147,21 +147,21 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
 
       // Multiple dispatches to a single entry point.
       // Dispatches are deduplicated and the two 128x32x1 should combine.
-      stream.cmd.dispatch @ex0::@dispatch1[%c512, %c1] {
+      stream.cmd.dispatch @ex0::@embedded_elf_x86_64::@dispatch1[%c512, %c1] {
         ro %result_capture[%c0 for %c64] : !stream.resource<transient>{%c128},
         rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
       } attributes {hal.interface.bindings = [
         #hal.interface.binding<0, 0>,
         #hal.interface.binding<0, 1>
       ]}
-      stream.cmd.dispatch @ex0::@dispatch1[%c128, %c32] {
+      stream.cmd.dispatch @ex0::@embedded_elf_x86_64::@dispatch1[%c128, %c32] {
         ro %result_capture[%c0 for %c64] : !stream.resource<transient>{%c128},
         rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
       } attributes {hal.interface.bindings = [
         #hal.interface.binding<0, 0>,
         #hal.interface.binding<0, 1>
       ]}
-      stream.cmd.dispatch @ex0::@dispatch1[%c128, %c32] {
+      stream.cmd.dispatch @ex0::@embedded_elf_x86_64::@dispatch1[%c128, %c32] {
         ro %result_capture[%c0 for %c64] : !stream.resource<transient>{%c128},
         rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
       } attributes {hal.interface.bindings = [

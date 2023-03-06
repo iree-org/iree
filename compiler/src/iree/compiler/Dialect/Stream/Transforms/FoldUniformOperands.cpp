@@ -267,9 +267,11 @@ class FoldUniformOperandsPass
     DenseMap<Operation *, SmallVector<IREE::Stream::CmdDispatchOp>>
         entryDispatchMap;
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      auto exportOp = symbolTable.lookupNearestSymbolFrom(
-          dispatchOp, dispatchOp.getEntryPoint());
-      entryDispatchMap[exportOp].push_back(dispatchOp);
+      dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+        auto exportOp =
+            symbolTable.lookupNearestSymbolFrom(dispatchOp, entryPointAttr);
+        entryDispatchMap[exportOp].push_back(dispatchOp);
+      });
     });
 
     // Optimize each dispatch op.
