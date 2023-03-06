@@ -22,19 +22,26 @@ include(CMakeParseArguments)
 # The |deps_var| is the name of a list of deps in the parent scope.
 function(iree_cc_filter_deps deps_var)
   # If linking against libLLVM, detect if we are linking to any LLVM libs
-  # and substitute libLLVM.
+  # that are part of libLLVM.so and substitute.
   if(LLVM_LINK_LLVM_DYLIB)
-    set(_all_deps "${${deps_var}}")
-    set(_llvm_deps "${_all_deps}")
-    list(FILTER _llvm_deps INCLUDE REGEX "^LLVM.+")
-    if(_llvm_deps)
-      # TODO: We don't actually want to blindly exclude as not every library
-      # will be included in libLLVM. But we need installed LLVM to preserve
-      # properties about what was and was not included.
-      list(FILTER _all_deps EXCLUDE REGEX "^LLVM.+")
-      list(PREPEND _all_deps LLVM)
-      set(${deps_var} "${_all_deps}" PARENT_SCOPE)
+    get_property(_llvm_dylib_targets GLOBAL PROPERTY LLVM_DYLIB_INCLUDED_LIBNAMES)
+    if(NOT _llvm_dylib_targets)
+      # Old installs of LLVM do not include this global property. Fake it
+      # by just including LLVMSupport, which is the bare minimum anyway and
+      # avoids certain bad things about duplicate CLI registrations.
+      set(_llvm_dylib_targets LLVMSupport)
     endif()
+    set(_all_deps "${${deps_var}}")
+    set(_new_deps)
+    foreach(_dep ${_all_deps})
+      if(_dep IN_LIST _llvm_dylib_targets)
+        # Substitute the LLVM library.
+        list(APPEND _new_deps "LLVM")
+      else()
+        list(APPEND _new_deps "${_dep}")
+      endif()
+    endforeach()
+    set(${deps_var} "${_new_deps}" PARENT_SCOPE)
   endif()
 endfunction()
 

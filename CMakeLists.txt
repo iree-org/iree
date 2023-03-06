@@ -715,6 +715,9 @@ else()
   # we add usage requirements to libraries at the root of all things LLVM.
   iree_llvm_add_usage_requirements(LLVMSupport IREELLVMIncludeSetup)
   iree_llvm_add_usage_requirements(MLIRSupport IREELLVMIncludeSetup)
+  if(TARGET LLVM)
+    iree_llvm_add_usage_requirements(LLVM IREELLVMIncludeSetup)
+  endif()
 
   # Add default external projects.
   iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
