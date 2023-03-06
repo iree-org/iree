@@ -204,19 +204,10 @@ def get_runner_env(trailers: Mapping[str, str]) -> str:
   return runner_env
 
 
-def get_ci_stage(event_name):
-  if event_name == PULL_REQUEST_EVENT_NAME:
-    return "presubmit"
-  elif event_name == PUSH_EVENT_NAME:
-    return "postsubmit"
-  elif event_name == SCHEDULE_EVENT_NAME:
-    return "postsubmit"
-  elif event_name == WORKFLOW_DISPATCH_EVENT_NAME:
-    return "unknown"
-  raise ValueError(f"Unrecognized event name '{event_name}'")
+def run_on_fork(event_name):
+  return event_name == PULL_REQUEST_EVENT_NAME
 
-
-def get_benchmark_presets(ci_stage: str, trailers: Mapping[str, str]) -> str:
+def get_benchmark_presets(event_name: str, trailers: Mapping[str, str]) -> str:
   """Parses and validates the benchmark presets from trailers.
 
   Args:
@@ -226,7 +217,7 @@ def get_benchmark_presets(ci_stage: str, trailers: Mapping[str, str]) -> str:
     A comma separated preset string, which later will be parsed by
     build_tools/benchmarks/export_benchmark_config.py.
   """
-  if ci_stage == "postsubmit":
+  if event_name != "pull_request":
     preset_options = ["all"]
   else:
     trailer = trailers.get(BENCHMARK_PRESET_KEY)
@@ -256,14 +247,10 @@ def main():
   else:
     output["should-run"] = "false"
   output[RUNNER_ENV_KEY] = get_runner_env(trailers)
-  ci_stage = get_ci_stage(event_name)
-  output["ci-stage"] = ci_stage
-  output["runner-group"] = ci_stage
-  write_caches = "0"
-  if ci_stage == "postsubmit":
-    write_caches = "1"
-  output["write-caches"] = write_caches
-  output["benchmark-presets"] = get_benchmark_presets(ci_stage, trailers)
+  on_fork = run_on_fork(event_name)
+  output["runner-group"] = "presubmit" if on_fork else "postsubmit"
+  output["write-caches"] = "0" if on_fork else "1"
+  output["benchmark-presets"] = get_benchmark_presets(event_name, trailers)
 
   set_output(output)
 
