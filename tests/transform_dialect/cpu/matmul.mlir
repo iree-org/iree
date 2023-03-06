@@ -38,7 +38,7 @@ func.func @matmul_static(
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset({{.*}}) : memref<3x3xf32>
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           memref.assume_alignment %{{.*}}, 64 : memref<3x3xf32>
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-// CODEGEN-CUSTOM-DISPATCH-FORMATION:           affine.apply {{.*}}()[%workgroup_id_x]
+// CODEGEN-CUSTOM-DISPATCH-FORMATION:           affine.apply {{.*}}(%workgroup_id_x)
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           memref.subview %{{.*}}[%{{.*}}, 0] [%{{.*}}, 5] [1, 1] : memref<3x5xf32> to memref<?x5xf32, strided<[5, 1], offset: ?>>
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           memref.subview %{{.*}}[%{{.*}}, 0] [%{{.*}}, 3] [1, 1] : memref<3x3xf32> to memref<?x3xf32, strided<[3, 1], offset: ?>>
 // CODEGEN-CUSTOM-DISPATCH-FORMATION:           linalg.matmul ins(%{{.*}}, %{{.*}} : memref<?x5xf32, strided<[5, 1], offset: ?>>, memref<5x3xf32>) outs(%{{.*}} : memref<?x3xf32, strided<[3, 1], offset: ?>>)

@@ -327,7 +327,9 @@ mlir::transform_ext::StructuredTransformOpsExtension::
 
 /// Find the linalg op that defines all values in range, potentially
 /// transitively through tensor casts.
-static linalg::LinalgOp findSingleLinalgOpDefiningAll(ValueRange range) {
+static FailureOr<linalg::LinalgOp>
+findSingleLinalgOpDefiningAll(ValueRange range) {
+  LLVM_DEBUG(DBGS() << "Start findSingleLinalgOpDefiningAll\n");
   linalg::LinalgOp sourceOp = nullptr;
   for (Value value : range) {
     // See through tensor casts and reshape ops.
@@ -357,35 +359,41 @@ static linalg::LinalgOp findSingleLinalgOpDefiningAll(ValueRange range) {
       }
 
       LLVM_DEBUG(
-          DBGS() << "different source linalg ops for replacing one op: \n"
+          DBGS() << "--different source linalg ops for replacing one op: \n"
                  << sourceOp << "\n"
                  << currentSourceOp << "\n");
-      return nullptr;
+      return failure();
     }
-    LLVM_DEBUG(DBGS() << "replacing linalg op with unknown non-linalg op:\n"
+    LLVM_DEBUG(DBGS() << "--replacing linalg op with unknown non-linalg op:\n"
                       << *value.getDefiningOp() << "\n");
-    return nullptr;
+    return failure();
   }
   return sourceOp;
 }
 
 /// Find the scf "for" op that defines all values in the range.
-static scf::ForOp findSingleForOpDefiningAll(ValueRange range) {
-  scf::ForOp forOp = nullptr;
+/// Take into account the the op may just disappear when it is replaced by its
+/// body, in the case od a single iteration loop.
+// It is unclear atm how to account for this properly.
+static FailureOr<Operation *> findSingleForOpDefiningAll(ValueRange range) {
+  LLVM_DEBUG(DBGS() << "Start findSingleForOpDefiningAll\n");
+  Operation *forOp = nullptr;
   for (Value value : range) {
-    if (auto currentSourceOp = value.getDefiningOp<scf::ForOp>()) {
-      if (!forOp || forOp == currentSourceOp) {
-        forOp = currentSourceOp;
-        continue;
-      }
-      LLVM_DEBUG(
-          DBGS() << "different source scf.for ops when replacing one op\n");
-      return nullptr;
+    LLVM_DEBUG(DBGS() << "--find for: " << value << "\n");
+    // Block arguments are just dropped.
+    auto currentSourceOp = value.getDefiningOp();
+    if (!currentSourceOp) {
+      LLVM_DEBUG(DBGS() << "--replacing tracked op with bbarg -> SKIP\n");
+      continue;
     }
-
+    auto currentForOp = dyn_cast<scf::ForOp>(currentSourceOp);
+    if (!forOp || (currentForOp && forOp == currentForOp)) {
+      forOp = currentSourceOp;
+      continue;
+    }
+    LLVM_DEBUG(DBGS() << "---no single scf.for replacement found -> SKIP\n");
     LLVM_DEBUG(
-        DBGS()
-        << "could not find a source scf.for when replacing another scf.for\n");
+        DBGS() << "---WARNING: this will drop tracking of the scf.for\n");
     return nullptr;
   }
   return forOp;
@@ -420,15 +428,12 @@ static FailureOr<Operation *> findSingleDefiningOp(Operation *replacedOp,
   return llvm::TypeSwitch<Operation *, FailureOr<Operation *>>(replacedOp)
       .Case<linalg::LinalgOp>([&](linalg::LinalgOp) -> FailureOr<Operation *> {
         auto op = findSingleLinalgOpDefiningAll(range);
-        if (!op)
+        if (failed(op))
           return failure();
-        return op.getOperation();
+        return op->getOperation();
       })
       .Case<scf::ForOp>([&](scf::ForOp) -> FailureOr<Operation *> {
-        auto op = findSingleForOpDefiningAll(range);
-        if (!op)
-          return failure();
-        return op.getOperation();
+        return findSingleForOpDefiningAll(range);
       })
       .Default([&](Operation *) -> FailureOr<Operation *> {
         return findSingleOpDefiningAll(range);
@@ -443,13 +448,24 @@ void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
 
   // Exit early if the op is not tracked.
   SmallVector<Value> handles;
-  if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
+  if (failed(getTransformState().getHandlesForPayloadOp(op, handles))) {
+    LLVM_DEBUG(DBGS() << "no tracking handle to remove\n");
     return;
+  }
 
   FailureOr<Operation *> replacement = findSingleDefiningOp(op, newValues);
   if (failed(replacement)) {
+    LLVM_DEBUG(DBGS() << "could not find replacement for tracked op\n");
     emitError(op) << "could not find replacement for tracked op";
     return;
+  }
+
+  // If this would cause an error with replacement, drop instead.
+  if (*replacement && (*replacement)->getNumResults() != op->getNumResults()) {
+    LLVM_DEBUG(DBGS() << "failsafe error tracking activated due to mismatched "
+                         "number of results for op: "
+                      << op << " and replacement " << *replacement << "\n");
+    replacement = nullptr;
   }
 
   if (*replacement == nullptr) {
@@ -472,16 +488,17 @@ void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
   op->walk([&](Operation *op) {
     // Exit early if the op is not tracked.
     SmallVector<Value> handles;
-    if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
+    if (failed(getTransformState().getHandlesForPayloadOp(op, handles))) {
+      LLVM_DEBUG(DBGS() << "no tracking handle to remove\n");
       return;
-
+    }
     LLVM_DEBUG(DBGS() << "removing tracked @" << op << " : " << *op << "\n");
     mayFail(replacePayloadOp(op, nullptr));
   });
 }
 
 void mlir::TrackingListener::removeMappings(Operation *op) {
-  // Bail if in error state.
+  // Bail out if in error state.
   if (hadErrors)
     return;
 

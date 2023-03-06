@@ -65,7 +65,7 @@ module {
       %2 = operation "scf.forall"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
       rewrite %2 with "transform.dialect"
     }
-    transform.structured.canonicalized_sequence %arg0 failures(propagate) {
+    transform.sequence %arg0 failures(propagate) {
     ^bb1(%arg1: !pdl.operation):
       %0 = pdl_match @match_elemwise in %arg1 : (!pdl.operation) -> !pdl.operation
       %1, %fusedOps:2 = fuse_producers %0 {operands_to_fuse=[0, 1]}
@@ -131,7 +131,7 @@ module {
       %2 = operation "scf.forall"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
       rewrite %2 with "transform.dialect"
     }
-    transform.structured.canonicalized_sequence %arg0 failures(propagate) {
+    transform.sequence %arg0 failures(propagate) {
     ^bb1(%arg1: !pdl.operation):
       %0 = pdl_match @match_elemwise in %arg1 : (!pdl.operation) -> !pdl.operation
       %1, %fusedOps = fuse_producers %0 {operands_to_fuse=[0]}

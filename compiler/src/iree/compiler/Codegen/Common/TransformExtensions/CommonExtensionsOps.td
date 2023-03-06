@@ -78,6 +78,10 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       down across Linalg ops.
       - canonicalization: adds all the canonicalization patterns of all
       registered dialects and ops.
+      - cse: additionally apply common subexpression elimination. This must
+      apply on a funcOp. This is not a set of patterns per se but is still very
+      convenient to apply it close to canonicalization and other greedy pattern
+      applications.
       - erase_unnecessary_tensor_operands: add patterns that erase unnecessary
       tensor operands.
       - expand_memref_strided_metadata: adds patterns that expand memref
@@ -89,6 +93,10 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       extract_slice ops with reassociative reshape ops.
       - fold_tensor_empty_extract: Fold tensor.empty used by extract_slice in
       case it is the only use of extract.
+      - licm: additionally apply loop-independent code motion and single 
+      iteration loop promotion. This is not a set of patterns per se but is still
+      very convenient to apply it close to canonicalization and other greedy 
+      pattern applications.
       - lower_transfer_op_permutations: Lower transfer ops to transfer ops
       with minor identity permutations.
       - rank_reducing_linalg: adds patterns that results in rank-reducing
@@ -102,6 +110,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       tensor.extract_slice swapping pattern. This injects static information
       that guarantees padding is smaller than the window size which guarantees
       we never see a tile comprised of padding-only.
+      - tiling_canonicalization: adds specific tiling-related canonicalization
+      patterns.
       - unroll_vectors_gpu_mma_sync: adds patterns that unroll vectors to a native tile
       size for GPUs with mma operations. The size is currently hardcoded but 
       should be refactored upstream and made pluggable.
@@ -127,16 +137,19 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$additional_iree_patterns,
                        UnitAttr:$bubble_collapse_expand,
                        UnitAttr:$canonicalization,
+                       UnitAttr:$cse,
                        UnitAttr:$erase_unnecessary_tensor_operands,
                        UnitAttr:$expand_memref_strided_metadata,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
                        UnitAttr:$fold_tensor_empty_extract,
+                       UnitAttr:$licm,
                        UnitAttr:$lower_transfer_op_permutations,
                        UnitAttr:$rank_reducing_linalg,
                        UnitAttr:$rank_reducing_vector,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns,
+                       UnitAttr:$tiling_canonicalization,
                        UnitAttr:$unroll_vectors_gpu_mma_sync,
                        UnitAttr:$unroll_vectors_gpu_wmma);
   let results = (outs PDL_Operation:$result);
