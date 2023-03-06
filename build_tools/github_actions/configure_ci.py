@@ -204,9 +204,6 @@ def get_runner_env(trailers: Mapping[str, str]) -> str:
   return runner_env
 
 
-def run_on_fork(event_name):
-  return event_name == PULL_REQUEST_EVENT_NAME
-
 def get_benchmark_presets(event_name: str, trailers: Mapping[str, str]) -> str:
   """Parses and validates the benchmark presets from trailers.
 
@@ -247,9 +244,9 @@ def main():
   else:
     output["should-run"] = "false"
   output[RUNNER_ENV_KEY] = get_runner_env(trailers)
-  on_fork = run_on_fork(event_name)
-  output["runner-group"] = "presubmit" if on_fork else "postsubmit"
-  output["write-caches"] = "0" if on_fork else "1"
+  is_pr = event_name == PULL_REQUEST_EVENT_NAME
+  output["runner-group"] = "presubmit" if is_pr else "postsubmit"
+  output["write-caches"] = "0" if is_pr else "1"
   output["benchmark-presets"] = get_benchmark_presets(event_name, trailers)
 
   set_output(output)
