@@ -20,10 +20,10 @@ BINARIES_DIR="${1:-${SCRIPT_DIR}/bazel-bin/iree_tf_compiler}"
 function symlink_import_binary() {
   local type="$1"
   local import_binary="${BINARIES_DIR}/iree-import-${type}"
-  echo "XXX: symlink binaries ${from} {$to}"
   if [ -f "${import_binary}" ]; then
     local to="${SCRIPT_DIR}/python_projects/iree_${type}/iree/tools/${type}"
     local from="$(realpath --no-symlinks --relative-to=${to} --relative-base="${ROOT_DIR}" "${import_binary}")"
+    echo "XXX: symlink binaries ${from} {$to}"
     ln --symbolic --verbose --force "${from}" "${to}"
   fi
 }
