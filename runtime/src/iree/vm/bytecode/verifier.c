@@ -1158,6 +1158,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
 
     VERIFY_OP(CORE, BufferAlloc, {
       VM_VerifyOperandRegI64HostSize(length);
+      VM_VerifyOperandRegI32(alignment);
       VM_VerifyResultRegRef(result);
     });
 
@@ -1165,6 +1166,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
       VM_VerifyOperandRegRef(source);
       VM_VerifyOperandRegI64HostSize(offset);
       VM_VerifyOperandRegI64HostSize(length);
+      VM_VerifyOperandRegI32(alignment);
       VM_VerifyResultRegRef(result);
     });
 
@@ -1392,6 +1394,10 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP_CORE_BINARY_I32(RemI32U);
     VERIFY_OP_CORE_TERNARY_I32(FMAI32);
     VERIFY_OP_CORE_UNARY_I32(AbsI32);
+    VERIFY_OP_CORE_BINARY_I32(MinI32S);
+    VERIFY_OP_CORE_BINARY_I32(MinI32U);
+    VERIFY_OP_CORE_BINARY_I32(MaxI32S);
+    VERIFY_OP_CORE_BINARY_I32(MaxI32U);
     VERIFY_OP_CORE_UNARY_I32(NotI32);
     VERIFY_OP_CORE_BINARY_I32(AndI32);
     VERIFY_OP_CORE_BINARY_I32(OrI32);
@@ -1407,6 +1413,10 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP_CORE_BINARY_I64(RemI64U);
     VERIFY_OP_CORE_TERNARY_I64(FMAI64);
     VERIFY_OP_CORE_UNARY_I64(AbsI64);
+    VERIFY_OP_CORE_BINARY_I64(MinI64S);
+    VERIFY_OP_CORE_BINARY_I64(MinI64U);
+    VERIFY_OP_CORE_BINARY_I64(MaxI64S);
+    VERIFY_OP_CORE_BINARY_I64(MaxI64U);
     VERIFY_OP_CORE_UNARY_I64(NotI64);
     VERIFY_OP_CORE_BINARY_I64(AndI64);
     VERIFY_OP_CORE_BINARY_I64(OrI64);
@@ -1748,6 +1758,8 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP_EXT_F32_UNARY_F32(CeilF32);
     VERIFY_OP_EXT_F32_UNARY_F32(FloorF32);
     VERIFY_OP_EXT_F32_UNARY_F32(RoundF32);
+    VERIFY_OP_EXT_F32_BINARY_F32(MinF32);
+    VERIFY_OP_EXT_F32_BINARY_F32(MaxF32);
 
     VERIFY_OP_EXT_F32_UNARY_F32(AtanF32);
     VERIFY_OP_EXT_F32_BINARY_F32(Atan2F32);

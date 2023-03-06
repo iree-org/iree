@@ -24,9 +24,21 @@ func.func @buffer_constant_string() -> !util.buffer {
 // CHECK-LABEL: @buffer_alloc
 func.func @buffer_alloc(%arg0: index) -> !util.buffer {
   // CHECK-32: %[[SIZE_64:.+]] = vm.ext.i32.i64.u %arg0 : i32 -> i64
-  // CHECK-32: %[[BUFFER:.+]] = vm.buffer.alloc %[[SIZE_64]] : !vm.buffer
-  // CHECK-64: %[[BUFFER:.+]] = vm.buffer.alloc %arg0 : !vm.buffer
-  %0 = util.buffer.alloc uninitialized {alignment = 16 : index} : !util.buffer{%arg0}
+  // CHECK-32: %[[BUFFER:.+]] = vm.buffer.alloc %[[SIZE_64]], %zero : !vm.buffer
+  // CHECK-64: %[[BUFFER:.+]] = vm.buffer.alloc %arg0, %zero : !vm.buffer
+  %0 = util.buffer.alloc uninitialized : !util.buffer{%arg0}
+  // CHECK-32: return %[[BUFFER]]
+  return %0 : !util.buffer
+}
+
+// -----
+
+// CHECK-LABEL: @buffer_alloc_aligned
+func.func @buffer_alloc_aligned(%arg0: index) -> !util.buffer {
+  // CHECK-32: %[[SIZE_64:.+]] = vm.ext.i32.i64.u %arg0 : i32 -> i64
+  // CHECK-32: %[[BUFFER:.+]] = vm.buffer.alloc %[[SIZE_64]], %c32 : !vm.buffer
+  // CHECK-64: %[[BUFFER:.+]] = vm.buffer.alloc %arg0, %c32 : !vm.buffer
+  %0 = util.buffer.alloc uninitialized {alignment = 32 : index} : !util.buffer{%arg0}
   // CHECK-32: return %[[BUFFER]]
   return %0 : !util.buffer
 }
@@ -47,11 +59,11 @@ func.func @buffer_dealloc(%arg0: !util.buffer, %arg1: index) {
 // CHECK-LABEL: @buffer_slice
 func.func @buffer_slice(%arg0: !util.buffer, %arg1: index, %arg2: index, %arg3: index) -> !util.buffer {
   // CHECK-32: %[[SIZE_64:.+]] = vm.ext.i32.i64.u %arg3 : i32 -> i64
-  // CHECK-32: %[[BUFFER:.+]] = vm.buffer.alloc %[[SIZE_64]] : !vm.buffer
+  // CHECK-32: %[[BUFFER:.+]] = vm.buffer.alloc %[[SIZE_64]], %c16 : !vm.buffer
   // CHECK-32-DAG: %[[ZERO:.+]] = vm.const.i64.zero
   // CHECK-32-DAG: %[[OFFSET_64:.+]] = vm.ext.i32.i64.u %arg1 : i32 -> i64
   // CHECK-32: vm.buffer.copy %arg0, %[[OFFSET_64]], %[[BUFFER]], %[[ZERO]], %[[SIZE_64]] : !vm.buffer -> !vm.buffer
-  // CHECK-64-DAG: %[[BUFFER:.+]] = vm.buffer.alloc %arg3 : !vm.buffer
+  // CHECK-64-DAG: %[[BUFFER:.+]] = vm.buffer.alloc %arg3, %c16 : !vm.buffer
   // CHECK-64-DAG: %[[ZERO:.+]] = vm.const.i64.zero
   // CHECK-64: vm.buffer.copy %arg0, %arg1, %[[BUFFER]], %[[ZERO]], %arg3 : !vm.buffer -> !vm.buffer
   %0 = util.buffer.slice %arg0[%arg1] {alignment = 16 : index} : !util.buffer{%arg2} -> !util.buffer{%arg3}

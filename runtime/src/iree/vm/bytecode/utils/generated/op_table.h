@@ -129,14 +129,14 @@ typedef enum {
   IREE_VM_OP_CORE_AbsI32 = 0x77,
   IREE_VM_OP_CORE_AbsI64 = 0x78,
   IREE_VM_OP_CORE_Block = 0x79,
-  IREE_VM_OP_CORE_RSV_0x7A,
-  IREE_VM_OP_CORE_RSV_0x7B,
-  IREE_VM_OP_CORE_RSV_0x7C,
-  IREE_VM_OP_CORE_RSV_0x7D,
-  IREE_VM_OP_CORE_RSV_0x7E,
-  IREE_VM_OP_CORE_RSV_0x7F,
-  IREE_VM_OP_CORE_RSV_0x80,
-  IREE_VM_OP_CORE_RSV_0x81,
+  IREE_VM_OP_CORE_MinI32S = 0x7A,
+  IREE_VM_OP_CORE_MinI32U = 0x7B,
+  IREE_VM_OP_CORE_MaxI32S = 0x7C,
+  IREE_VM_OP_CORE_MaxI32U = 0x7D,
+  IREE_VM_OP_CORE_MinI64S = 0x7E,
+  IREE_VM_OP_CORE_MinI64U = 0x7F,
+  IREE_VM_OP_CORE_MaxI64S = 0x80,
+  IREE_VM_OP_CORE_MaxI64U = 0x81,
   IREE_VM_OP_CORE_RSV_0x82,
   IREE_VM_OP_CORE_RSV_0x83,
   IREE_VM_OP_CORE_RSV_0x84,
@@ -388,14 +388,14 @@ typedef enum {
     OPC(0x77, AbsI32) \
     OPC(0x78, AbsI64) \
     OPC(0x79, Block) \
-    RSV(0x7A) \
-    RSV(0x7B) \
-    RSV(0x7C) \
-    RSV(0x7D) \
-    RSV(0x7E) \
-    RSV(0x7F) \
-    RSV(0x80) \
-    RSV(0x81) \
+    OPC(0x7A, MinI64S) \
+    OPC(0x7B, MinI64U) \
+    OPC(0x7C, MaxI64S) \
+    OPC(0x7D, MaxI64U) \
+    OPC(0x7E, MinI64S) \
+    OPC(0x7F, MinI64U) \
+    OPC(0x80, MaxI64S) \
+    OPC(0x81, MaxI64U) \
     RSV(0x82) \
     RSV(0x83) \
     RSV(0x84) \
@@ -579,8 +579,8 @@ typedef enum {
   IREE_VM_OP_EXT_F32_BufferStoreF32 = 0x34,
   IREE_VM_OP_EXT_F32_BufferFillF32 = 0x35,
   IREE_VM_OP_EXT_F32_RoundF32 = 0x36,
-  IREE_VM_OP_EXT_F32_RSV_0x37,
-  IREE_VM_OP_EXT_F32_RSV_0x38,
+  IREE_VM_OP_EXT_F32_MinF32 = 0x37,
+  IREE_VM_OP_EXT_F32_MaxF32 = 0x38,
   IREE_VM_OP_EXT_F32_RSV_0x39,
   IREE_VM_OP_EXT_F32_RSV_0x3A,
   IREE_VM_OP_EXT_F32_RSV_0x3B,
@@ -838,8 +838,8 @@ typedef enum {
     OPC(0x34, BufferStoreF32) \
     OPC(0x35, BufferFillF32) \
     OPC(0x36, RoundF32) \
-    RSV(0x37) \
-    RSV(0x38) \
+    OPC(0x37, MinF32) \
+    OPC(0x38, MaxF32) \
     RSV(0x39) \
     RSV(0x3A) \
     RSV(0x3B) \
@@ -1102,8 +1102,8 @@ typedef enum {
   IREE_VM_OP_EXT_F64_BufferStoreF64 = 0x3A,
   IREE_VM_OP_EXT_F64_BufferFillF64 = 0x3B,
   IREE_VM_OP_EXT_F64_RoundF64 = 0x3C,
-  IREE_VM_OP_EXT_F64_RSV_0x3D,
-  IREE_VM_OP_EXT_F64_RSV_0x3E,
+  IREE_VM_OP_EXT_F64_MinF64 = 0x3D,
+  IREE_VM_OP_EXT_F64_MaxF64 = 0x3E,
   IREE_VM_OP_EXT_F64_RSV_0x3F,
   IREE_VM_OP_EXT_F64_RSV_0x40,
   IREE_VM_OP_EXT_F64_RSV_0x41,
@@ -1361,8 +1361,8 @@ typedef enum {
     OPC(0x3A, BufferStoreF64) \
     OPC(0x3B, BufferFillF64) \
     OPC(0x3C, RoundF64) \
-    RSV(0x3D) \
-    RSV(0x3E) \
+    OPC(0x3D, MinF64) \
+    OPC(0x3E, MaxF64) \
     RSV(0x3F) \
     RSV(0x40) \
     RSV(0x41) \

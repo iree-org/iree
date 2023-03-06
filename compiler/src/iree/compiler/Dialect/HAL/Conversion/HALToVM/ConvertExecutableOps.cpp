@@ -50,7 +50,8 @@ Value createPackedConstantBuffer(Location loc, ValueRange constantValues,
   auto constantBuffer = builder.create<IREE::VM::BufferAllocOp>(
       constantBufferLoc, bufferRefType,
       builder.create<IREE::VM::ConstI64Op>(constantBufferLoc,
-                                           constantCount * sizeof(uint32_t)));
+                                           constantCount * sizeof(uint32_t)),
+      builder.create<IREE::VM::ConstI32Op>(constantBufferLoc, 16));
 
   // Store each constant into it.
   // TODO(#8477): better ops for this pattern; this creates a lot of

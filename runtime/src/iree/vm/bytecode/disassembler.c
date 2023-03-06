@@ -650,6 +650,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 
     DISASM_OP(CORE, BufferAlloc) {
       uint16_t length_reg = VM_ParseOperandRegI64("length");
+      uint16_t alignment_reg = VM_ParseOperandRegI32("alignment");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
       EMIT_REF_REG_NAME(result_reg);
@@ -657,6 +658,9 @@ iree_status_t iree_vm_bytecode_disassemble_op(
           iree_string_builder_append_cstring(b, " = vm.buffer.alloc "));
       EMIT_I64_REG_NAME(length_reg);
       EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I32_REG_NAME(alignment_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[alignment_reg]);
       break;
     }
 
@@ -665,6 +669,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       uint16_t source_reg = VM_ParseOperandRegRef("source", &source_is_move);
       uint16_t offset_reg = VM_ParseOperandRegI64("offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
+      uint16_t alignment_reg = VM_ParseOperandRegI32("alignment");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
       EMIT_REF_REG_NAME(result_reg);
@@ -678,6 +683,9 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
       EMIT_I64_REG_NAME(length_reg);
       EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I32_REG_NAME(alignment_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[alignment_reg]);
       break;
     }
 
@@ -1320,6 +1328,10 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     DISASM_OP_CORE_BINARY_I32(RemI32U, "vm.rem.i32.u");
     DISASM_OP_CORE_TERNARY_I32(FMAI32, "vm.fma.i32");
     DISASM_OP_CORE_UNARY_I32(AbsI32, "vm.abs.i32");
+    DISASM_OP_CORE_BINARY_I32(MinI32S, "vm.min.i32.s");
+    DISASM_OP_CORE_BINARY_I32(MinI32U, "vm.min.i32.u");
+    DISASM_OP_CORE_BINARY_I32(MaxI32S, "vm.max.i32.s");
+    DISASM_OP_CORE_BINARY_I32(MaxI32U, "vm.max.i32.u");
     DISASM_OP_CORE_UNARY_I32(NotI32, "vm.not.i32");
     DISASM_OP_CORE_BINARY_I32(AndI32, "vm.and.i32");
     DISASM_OP_CORE_BINARY_I32(OrI32, "vm.or.i32");
@@ -1335,6 +1347,10 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     DISASM_OP_CORE_BINARY_I64(RemI64U, "vm.rem.i64.u");
     DISASM_OP_CORE_TERNARY_I64(FMAI64, "vm.fma.i64");
     DISASM_OP_CORE_UNARY_I64(AbsI64, "vm.abs.i64");
+    DISASM_OP_CORE_BINARY_I64(MinI64S, "vm.min.i64.s");
+    DISASM_OP_CORE_BINARY_I64(MinI64U, "vm.min.i64.u");
+    DISASM_OP_CORE_BINARY_I64(MaxI64S, "vm.max.i64.s");
+    DISASM_OP_CORE_BINARY_I64(MaxI64U, "vm.max.i64.u");
     DISASM_OP_CORE_UNARY_I64(NotI64, "vm.not.i64");
     DISASM_OP_CORE_BINARY_I64(AndI64, "vm.and.i64");
     DISASM_OP_CORE_BINARY_I64(OrI64, "vm.or.i64");
@@ -1939,6 +1955,9 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     DISASM_OP_EXT_F32_UNARY_F32(NegF32, "vm.neg.f32");
     DISASM_OP_EXT_F32_UNARY_F32(CeilF32, "vm.ceil.f32");
     DISASM_OP_EXT_F32_UNARY_F32(FloorF32, "vm.floor.f32");
+    DISASM_OP_EXT_F32_UNARY_F32(RoundF32, "vm.round.f32");
+    DISASM_OP_EXT_F32_BINARY_F32(MinF32, "vm.min.f32");
+    DISASM_OP_EXT_F32_BINARY_F32(MaxF32, "vm.max.f32");
 
     DISASM_OP_EXT_F32_UNARY_F32(AtanF32, "vm.atan.f32");
     DISASM_OP_EXT_F32_BINARY_F32(Atan2F32, "vm.atan2.f32");

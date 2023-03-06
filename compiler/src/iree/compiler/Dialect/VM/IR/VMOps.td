@@ -1151,7 +1151,8 @@ def VM_BufferAllocOp :
   }];
 
   let arguments = (ins
-    VM_BufferIndex:$length
+    VM_BufferIndex:$length,
+    I32:$alignment
   );
   let results = (outs
     VM_RefOf<VM_BufferType>:$result
@@ -1164,6 +1165,7 @@ def VM_BufferAllocOp :
   let encoding = [
     VM_EncOpcode<VM_OPC_BufferAlloc>,
     VM_EncOperand<"length", 0>,
+    VM_EncOperand<"alignment", 1>,
     VM_EncResult<"result">,
   ];
 }
@@ -1183,7 +1185,8 @@ def VM_BufferCloneOp :
   let arguments = (ins
     VM_RefOf<VM_BufferType>:$source_buffer,
     VM_BufferIndex:$source_offset,
-    VM_BufferIndex:$length
+    VM_BufferIndex:$length,
+    I32:$alignment
   );
   let results = (outs
     VM_RefOf<VM_BufferType>:$result
@@ -1198,6 +1201,7 @@ def VM_BufferCloneOp :
     VM_EncOperand<"source_buffer", 0>,
     VM_EncOperand<"source_offset", 1>,
     VM_EncOperand<"length", 2>,
+    VM_EncOperand<"alignment", 3>,
     VM_EncResult<"result">,
   ];
 }
@@ -2211,6 +2215,54 @@ def VM_AbsI64Op :
   let hasFolder = 1;
 }
 
+def VM_MinI32SOp :
+    VM_BinaryArithmeticOp<I32, "min.i32.s", VM_OPC_MinI32S, [Commutative]> {
+  let summary = [{signed integer minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MinI32UOp :
+    VM_BinaryArithmeticOp<I32, "min.i32.u", VM_OPC_MinI32U, [Commutative]> {
+  let summary = [{unsigned integer minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MinI64SOp :
+    VM_BinaryArithmeticOp<I64, "min.i64.s", VM_OPC_MinI64S, [Commutative]> {
+  let summary = [{signed integer minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MinI64UOp :
+    VM_BinaryArithmeticOp<I64, "min.i64.u", VM_OPC_MinI64U, [Commutative]> {
+  let summary = [{unsigned integer minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxI32SOp :
+    VM_BinaryArithmeticOp<I32, "max.i32.s", VM_OPC_MaxI32S, [Commutative]> {
+  let summary = [{signed integer maximum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxI32UOp :
+    VM_BinaryArithmeticOp<I32, "max.i32.u", VM_OPC_MaxI32U, [Commutative]> {
+  let summary = [{unsigned integer maximum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxI64SOp :
+    VM_BinaryArithmeticOp<I64, "max.i64.s", VM_OPC_MaxI64S, [Commutative]> {
+  let summary = [{signed integer maximum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxI64UOp :
+    VM_BinaryArithmeticOp<I64, "max.i64.u", VM_OPC_MaxI64U, [Commutative]> {
+  let summary = [{unsigned integer maximum operation}];
+  let hasFolder = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Floating-point arithmetic
 //===----------------------------------------------------------------------===//
@@ -2369,6 +2421,34 @@ def VM_RoundF64Op :
     VM_TotalUnaryArithmeticOp<F64, "round.f64", VM_OPC_RoundF64,
                               [VM_ExtF64]> {
   let summary = [{rounds the value to the nearest integer away from zero}];
+}
+
+def VM_MinF32Op :
+    VM_TotalBinaryArithmeticOp<F32, "min.f32", VM_OPC_MinF32,
+                               [VM_ExtF32, Commutative]> {
+  let summary = [{floating point minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MinF64Op :
+    VM_TotalBinaryArithmeticOp<F64, "min.f64", VM_OPC_MinF64,
+                               [VM_ExtF64, Commutative]> {
+  let summary = [{floating point minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxF32Op :
+    VM_TotalBinaryArithmeticOp<F32, "max.f32", VM_OPC_MaxF32,
+                               [VM_ExtF32, Commutative]> {
+  let summary = [{floating point maximum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxF64Op :
+    VM_TotalBinaryArithmeticOp<F64, "max.f64", VM_OPC_MaxF64,
+                               [VM_ExtF32, Commutative]> {
+  let summary = [{floating point maximum operation}];
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//

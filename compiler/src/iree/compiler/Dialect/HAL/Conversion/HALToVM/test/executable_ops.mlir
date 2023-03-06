@@ -97,7 +97,7 @@ func.func @executableConstants(
   // CHECK-DAG: %[[FORMAT:.+]] = vm.rodata.inline "_utf8_format_
   // CHECK-DAG: %[[BINARY:.+]] = vm.const.ref.rodata @exe_binary : !vm.buffer
 
-  // CHECK: %[[CONSTANTS:.+]] = vm.buffer.alloc %c12 : !vm.buffer
+  // CHECK: %[[CONSTANTS:.+]] = vm.buffer.alloc %c12, %c16 : !vm.buffer
   // CHECK-DAG: %[[INDEX0:.+]] = vm.const.i64 0
   // CHECK-DAG: vm.buffer.store.i32 %[[CONSTANT0]], %[[CONSTANTS]][%[[INDEX0]]] : i32 -> !vm.buffer
 

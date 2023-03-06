@@ -110,6 +110,28 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @my_module_min_f32
+vm.module @my_module {
+  vm.func @min_f32(%arg0 : f32, %arg1 : f32) -> f32 {
+    // CHECK-NEXT: %0 = emitc.call "vm_min_f32"(%arg3, %arg4) : (f32, f32) -> f32
+    %0 = vm.min.f32 %arg0, %arg1 : f32
+    vm.return %0 : f32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @my_module_max_f32
+vm.module @my_module {
+  vm.func @max_f32(%arg0 : f32, %arg1 : f32) -> f32 {
+    // CHECK-NEXT: %0 = emitc.call "vm_max_f32"(%arg3, %arg4) : (f32, f32) -> f32
+    %0 = vm.max.f32 %arg0, %arg1 : f32
+    vm.return %0 : f32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @my_module_atan_f32
 vm.module @my_module {
   vm.func @atan_f32(%arg0 : f32) -> f32 {
