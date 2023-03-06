@@ -16,49 +16,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 
-def CanonicalizedSequenceOp
-    : TransformDialectOp<"structured.canonicalized_sequence",
-      [OpAsmOpInterface,
-       PossibleTopLevelTransformOpTrait,
-       DeclareOpInterfaceMethods<RegionBranchOpInterface,
-          ["getSuccessorEntryOperands", "getSuccessorRegions",
-           "getRegionInvocationBounds"]>,
-       DeclareOpInterfaceMethods<TransformOpInterface>,
-       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-       SingleBlockImplicitTerminator<"::mlir::transform::YieldOp">]> {
-
-  let summary = "A transformation sequence interspersed with canonicalizations";
-  let description = [{
-    This op is a copy of `transform.sequence`, but applies canonicalizations
-    after each step in the sequence.
-  }];
-
-  let arguments = (ins FailurePropagationMode:$failure_propagation_mode,
-                       Optional<PDL_Operation>:$root);
-  let results = (outs Variadic<AnyType>:$results);
-  let regions = (region SizedRegion<1>:$body);
-
-  let assemblyFormat =
-    "($root^)? `failures` `(` $failure_propagation_mode `)` attr-dict-with-keyword regions (`:` type($results)^)?";
-
-  let builders = [
-    OpBuilder<(ins "::mlir::transform::FailurePropagationMode":$failure_propagation_mode,
-                   CArg<"::llvm::function_ref<void(::mlir::OpBuilder &, ::mlir::Location, ::mlir::Value)>",
-                        "nullptr">)>
-  ];
-
-  let extraClassDeclaration = [{
-    using BodyBuilderFn =
-        ::llvm::function_ref<void(::mlir::OpBuilder &, ::mlir::Location, ::mlir::Value)>;
-
-    /// Allow the dialect prefix to be omitted.
-    static ::llvm::StringRef getDefaultDialect() { return "transform"; }
-  }];
-
-  let cppNamespace = "mlir::transform_ext";
-  let hasVerifier = 1;
-}
-
 def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,

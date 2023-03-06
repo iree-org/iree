@@ -78,8 +78,8 @@ std::pair<Value, Value> buildCommonTrailingStrategy(
 // in schedule complexity and can be handled with simple padding of the
 // underlying allocation.
 void build1DSplittingStrategyWithOptionalThreadMapping(
-    ImplicitLocOpBuilder& b, Value opH, int64_t rank, int64_t mostMinorDim,
-    SmallVector<int64_t> opSizes, int64_t numThreads,
+    ImplicitLocOpBuilder& b, Value isolatedParentOpH, Value opH, int64_t rank,
+    int64_t mostMinorDim, SmallVector<int64_t> opSizes, int64_t numThreads,
     Attribute mappingAttr = Attribute(), int64_t maxVectorSize = 4);
 
 //===----------------------------------------------------------------------===//

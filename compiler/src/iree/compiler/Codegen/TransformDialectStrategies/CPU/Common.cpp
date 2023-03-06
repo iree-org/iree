@@ -31,6 +31,7 @@ using namespace mlir;
 using iree_compiler::cpu::CPUModel;
 using iree_compiler::cpu::ReductionConfig;
 using iree_compiler::cpu::ReductionStrategy;
+using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using transform::LowerVectorsOp;
 using transform::MatchOp;
@@ -53,9 +54,24 @@ using transform_ext::StructuredOpMatcher;
 std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const vector::LowerVectorsOptions &lowerVectorsOpts) {
-  // Step N-2. Bufferize and drop HAL descriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+
+  // Step N-5. Fold tensor.empty to avoid large allocations.
+  ApplyPatternsOpPatterns configuration;
+  configuration.foldTensorEmptyExtract = true;
+
+  // Step N-4. Perform a pass of canonicalization + enabling after tiling.
+  funcH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, configuration, funcH);
   funcH = iree_compiler::buildVectorize(b, funcH);
+
+  // Step N-3. Perform a pass of canonicalization + enabling after vectorization
+  // as well as hoisting subset operations such as vector.transfer_read/write.
+  funcH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, configuration, funcH);
+  funcH = iree_compiler::buildHoisting(b, funcH);
+
+  // Step N-2. Bufferize and drop HAL descriptor from memref ops.
   variantH = iree_compiler::buildBufferize(b, variantH);
 
   // Step N-1. Post-bufferization mapping to blocks only.
