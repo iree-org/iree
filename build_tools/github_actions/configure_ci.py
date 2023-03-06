@@ -36,6 +36,7 @@ from typing import Iterable, Mapping, MutableMapping
 
 PULL_REQUEST_EVENT_NAME = "pull_request"
 PUSH_EVENT_NAME = "push"
+SCHEDULE_EVENT_NAME = "schedule"
 WORKFLOW_DISPATCH_EVENT_NAME = "workflow_dispatch"
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
@@ -207,6 +208,8 @@ def get_ci_stage(event_name):
   if event_name == PULL_REQUEST_EVENT_NAME:
     return "presubmit"
   elif event_name == PUSH_EVENT_NAME:
+    return "postsubmit"
+  elif event_name == SCHEDULE_EVENT_NAME:
     return "postsubmit"
   elif event_name == WORKFLOW_DISPATCH_EVENT_NAME:
     return "unknown"
