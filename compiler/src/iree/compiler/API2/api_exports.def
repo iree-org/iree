@@ -380,6 +380,7 @@ EXPORTS
   mlirOpPassManagerAddOwnedPass
   mlirOpPassManagerAddPipeline
   mlirOpPassManagerGetNestedUnder
+  mlirOpPrintingFlagsAssumeVerified
   mlirOpPrintingFlagsCreate
   mlirOpPrintingFlagsDestroy
   mlirOpPrintingFlagsElideLargeElementsAttrs
@@ -396,6 +397,7 @@ EXPORTS
   mlirOpaqueTypeGetDialectNamespace
   mlirOperationClone
   mlirOperationCreate
+  mlirOperationCreateParse
   mlirOperationDestroy
   mlirOperationDump
   mlirOperationEqual
@@ -452,7 +454,7 @@ EXPORTS
   mlirPassManagerEnableVerifier
   mlirPassManagerGetAsOpPassManager
   mlirPassManagerGetNestedUnder
-  mlirPassManagerRun
+  mlirPassManagerRunOnOp
   mlirPrintPassPipeline
   mlirRankedTensorTypeGet
   mlirRankedTensorTypeGetChecked

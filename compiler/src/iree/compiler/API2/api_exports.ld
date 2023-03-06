@@ -381,6 +381,7 @@ VER_0 {
     mlirOpPassManagerAddOwnedPass;
     mlirOpPassManagerAddPipeline;
     mlirOpPassManagerGetNestedUnder;
+    mlirOpPrintingFlagsAssumeVerified;
     mlirOpPrintingFlagsCreate;
     mlirOpPrintingFlagsDestroy;
     mlirOpPrintingFlagsElideLargeElementsAttrs;
@@ -397,6 +398,7 @@ VER_0 {
     mlirOpaqueTypeGetDialectNamespace;
     mlirOperationClone;
     mlirOperationCreate;
+    mlirOperationCreateParse;
     mlirOperationDestroy;
     mlirOperationDump;
     mlirOperationEqual;
@@ -453,7 +455,7 @@ VER_0 {
     mlirPassManagerEnableVerifier;
     mlirPassManagerGetAsOpPassManager;
     mlirPassManagerGetNestedUnder;
-    mlirPassManagerRun;
+    mlirPassManagerRunOnOp;
     mlirPrintPassPipeline;
     mlirRankedTensorTypeGet;
     mlirRankedTensorTypeGetChecked;

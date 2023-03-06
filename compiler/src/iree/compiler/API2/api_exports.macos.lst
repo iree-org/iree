@@ -379,6 +379,7 @@ _mlirOpOperandIsNull
 _mlirOpPassManagerAddOwnedPass
 _mlirOpPassManagerAddPipeline
 _mlirOpPassManagerGetNestedUnder
+_mlirOpPrintingFlagsAssumeVerified
 _mlirOpPrintingFlagsCreate
 _mlirOpPrintingFlagsDestroy
 _mlirOpPrintingFlagsElideLargeElementsAttrs
@@ -395,6 +396,7 @@ _mlirOpaqueTypeGetData
 _mlirOpaqueTypeGetDialectNamespace
 _mlirOperationClone
 _mlirOperationCreate
+_mlirOperationCreateParse
 _mlirOperationDestroy
 _mlirOperationDump
 _mlirOperationEqual
@@ -451,7 +453,7 @@ _mlirPassManagerEnableIRPrinting
 _mlirPassManagerEnableVerifier
 _mlirPassManagerGetAsOpPassManager
 _mlirPassManagerGetNestedUnder
-_mlirPassManagerRun
+_mlirPassManagerRunOnOp
 _mlirPrintPassPipeline
 _mlirRankedTensorTypeGet
 _mlirRankedTensorTypeGetChecked
