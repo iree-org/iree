@@ -19,9 +19,9 @@
 #include "iree/modules/hal/module.h"
 #include "iree/vm/bytecode/module.h"
 
-// Parameter for locally defined lcg similar to std::minstd_rand.
-#define IREE_PRNG_MULTIPLIER 48271
-#define IREE_PRNG_MODULUS 2147483647
+//===----------------------------------------------------------------------===//
+// iree_trace_replay_t
+//===----------------------------------------------------------------------===//
 
 iree_status_t iree_trace_replay_initialize(
     iree_string_view_t root_path, iree_vm_instance_t* instance,
@@ -65,6 +65,10 @@ void iree_trace_replay_set_hal_devices_override(
   replay->device_uris = device_uris;
 }
 
+//===----------------------------------------------------------------------===//
+// type: context_load
+//===----------------------------------------------------------------------===//
+
 iree_status_t iree_trace_replay_event_context_load(iree_trace_replay_t* replay,
                                                    yaml_document_t* document,
                                                    yaml_node_t* event_node) {
@@ -79,6 +83,10 @@ iree_status_t iree_trace_replay_event_context_load(iree_trace_replay_t* replay,
   return iree_vm_context_create(replay->instance, replay->context_flags,
                                 replay->host_allocator, &replay->context);
 }
+
+//===----------------------------------------------------------------------===//
+// type: module_load
+//===----------------------------------------------------------------------===//
 
 // TODO(benvanik): rework this to allow for multiple devices from a device set.
 static iree_status_t iree_trace_replay_create_device(
@@ -106,12 +114,12 @@ static iree_status_t iree_trace_replay_load_builtin_module(
   iree_vm_module_t* module = NULL;
 
   yaml_node_t* name_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, module_node, iree_make_cstring_view("name"), &name_node));
-  if (iree_yaml_string_equal(name_node, iree_make_cstring_view("hal"))) {
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(document, module_node,
+                                              IREE_SV("name"), &name_node));
+  if (iree_yaml_string_equal(name_node, IREE_SV("hal"))) {
     yaml_node_t* driver_node = NULL;
     IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-        document, module_node, iree_make_cstring_view("driver"), &driver_node));
+        document, module_node, IREE_SV("driver"), &driver_node));
     IREE_RETURN_IF_ERROR(iree_trace_replay_create_device(
         replay, driver_node, replay->host_allocator, &replay->device));
     IREE_RETURN_IF_ERROR(iree_hal_module_create(
@@ -134,13 +142,13 @@ static iree_status_t iree_trace_replay_load_bytecode_module(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* module_node) {
   yaml_node_t* path_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, module_node, iree_make_cstring_view("path"), &path_node));
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(document, module_node,
+                                              IREE_SV("path"), &path_node));
 
   // Load bytecode file (or stdin) contents into memory.
   iree_file_contents_t* flatbuffer_contents = NULL;
   iree_status_t status = iree_ok_status();
-  if (iree_yaml_string_equal(path_node, iree_make_cstring_view("<stdin>"))) {
+  if (iree_yaml_string_equal(path_node, IREE_SV("<stdin>"))) {
     fprintf(stdout, "Reading bytecode contents from stdin...\n");
     status =
         iree_stdin_read_contents(replay->host_allocator, &flatbuffer_contents);
@@ -181,17 +189,17 @@ iree_status_t iree_trace_replay_event_module_load(iree_trace_replay_t* replay,
                                                   yaml_document_t* document,
                                                   yaml_node_t* event_node) {
   yaml_node_t* module_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, event_node, iree_make_cstring_view("module"), &module_node));
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(document, event_node,
+                                              IREE_SV("module"), &module_node));
 
   yaml_node_t* type_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, module_node, iree_make_cstring_view("type"), &type_node));
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(document, module_node,
+                                              IREE_SV("type"), &type_node));
   iree_string_view_t type = iree_yaml_node_as_string(type_node);
 
-  if (iree_string_view_equal(type, iree_make_cstring_view("builtin"))) {
+  if (iree_string_view_equal(type, IREE_SV("builtin"))) {
     return iree_trace_replay_load_builtin_module(replay, document, module_node);
-  } else if (iree_string_view_equal(type, iree_make_cstring_view("bytecode"))) {
+  } else if (iree_string_view_equal(type, IREE_SV("bytecode"))) {
     return iree_trace_replay_load_bytecode_module(replay, document,
                                                   module_node);
   }
@@ -200,6 +208,154 @@ iree_status_t iree_trace_replay_event_module_load(iree_trace_replay_t* replay,
                           "module type '%.*s' not recognized", (int)type.size,
                           type.data);
 }
+
+//===----------------------------------------------------------------------===//
+// RNG utilities
+//===----------------------------------------------------------------------===//
+// TODO(benvanik): move these out to another file.
+
+// Parameter for locally defined lcg similar to std::minstd_rand.
+#define IREE_PRNG_MULTIPLIER 48271
+#define IREE_PRNG_MODULUS 2147483647
+
+// Writes an element of the given |element_type| with the given integral |value|
+// to |dst|.
+static void iree_trace_replay_write_element(
+    iree_hal_element_type_t element_type, int32_t value, void* dst) {
+#define IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(ETYPE, CTYPE) \
+  case IREE_HAL_ELEMENT_TYPE_##ETYPE:                      \
+    *(CTYPE*)dst = (CTYPE)value;                           \
+    break;
+
+  switch (element_type) {
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_8, int8_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_16, int16_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_32, int32_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_64, int64_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_8, int8_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_16, int16_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_32, int32_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_64, int64_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_8, uint8_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_16, uint16_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_32, uint32_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_64, uint64_t)
+    // clang-format off
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+      *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
+      break;
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_32, float)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_64, double)
+    // clang-format on
+    default:
+      IREE_ASSERT(false, "unhandled element type");
+      break;
+  }
+
+#undef IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE
+}
+
+// Simple deterministic pseudorandom generator.
+// This function is same as C++'s std::minstd_rand.
+static uint32_t iree_tree_replay_pseudorandom_uint32(uint32_t* state) {
+  *state = (*state * IREE_PRNG_MULTIPLIER) % IREE_PRNG_MODULUS;
+  return *state;
+}
+
+// Returns a random uint8_t in the range of [0, UCHAR_MAX].
+static uint8_t iree_trace_replay_pseudorandom_uint8(uint32_t* state) {
+  // return the second-least-signicant out of the 4 bytes of state. it avoids
+  // some mild issues with the least-significant and most-significant bytes.
+  return iree_tree_replay_pseudorandom_uint32(state) >> 8;
+}
+
+// Returns a random uint32_t in the range [0, range).
+static inline uint32_t iree_trace_replay_pseudorandom_range(uint32_t* state,
+                                                            uint32_t range) {
+  return iree_tree_replay_pseudorandom_uint32(state) % range;
+}
+
+// Returns a random double in the range of [0, 1.0).
+static double iree_trace_replay_pseudorandom_double(uint32_t* state) {
+  const double inv_modulus = 1.0 / IREE_PRNG_MODULUS;
+  return iree_tree_replay_pseudorandom_uint32(state) * inv_modulus;
+}
+
+// Get minimum and maximum for integer-valued uniform distribution.
+static void iree_trace_replay_get_min_max_for_element_type(
+    iree_hal_element_type_t element_type, int32_t* min, int32_t* max) {
+  switch (element_type) {
+    case IREE_HAL_ELEMENT_TYPE_INT_8:
+    case IREE_HAL_ELEMENT_TYPE_SINT_8:
+      *min = -2;
+      *max = +2;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_8:
+      *min = 0;
+      *max = +2;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_INT_16:
+    case IREE_HAL_ELEMENT_TYPE_SINT_16:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+      *min = -4;
+      *max = +4;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_16:
+      *min = 0;
+      *max = +4;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_INT_32:
+    case IREE_HAL_ELEMENT_TYPE_SINT_32:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
+      *min = -8;
+      *max = +8;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_32:
+      *min = 0;
+      *max = +8;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_INT_64:
+    case IREE_HAL_ELEMENT_TYPE_SINT_64:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
+      *min = -16;
+      *min = +16;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_64:
+      *min = 0;
+      *max = +16;
+      break;
+    default:
+      IREE_ASSERT(false, "unhandled element type");
+      break;
+  }
+}
+
+// Fills the destination span with pseudorandom values of the given
+// |element_type|. The given |seed| is passed to the pseudorandom generator.
+// The pseudorandom values are reproducible both across runs and across
+// machines.
+static void iree_trace_replay_generate_fully_specified_pseudorandom_buffer(
+    iree_hal_element_type_t element_type, iree_byte_span_t span,
+    uint32_t seed) {
+  iree_host_size_t element_byte_count =
+      iree_hal_element_dense_byte_count(element_type);
+  uint8_t* data_end = span.data + span.data_length;
+  uint32_t state = seed;
+  uint32_t range;
+  int32_t min, max;
+  iree_trace_replay_get_min_max_for_element_type(element_type, &min, &max);
+  range = (max - min + 1);
+  for (uint8_t* data = span.data; data < data_end; data += element_byte_count) {
+    // Generate "uniform" integer-valued numbers in the range [min, max].
+    int32_t value =
+        (int32_t)iree_trace_replay_pseudorandom_range(&state, range) + min;
+    iree_trace_replay_write_element(element_type, value, data);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Input
+//===----------------------------------------------------------------------===//
 
 static iree_status_t iree_trace_replay_parse_item(iree_trace_replay_t* replay,
                                                   yaml_document_t* document,
@@ -218,8 +374,8 @@ static iree_status_t iree_trace_replay_parse_scalar(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* value_node, iree_vm_list_t* target_list) {
   yaml_node_t* data_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("i8"), &data_node));
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
+                                                  IREE_SV("i8"), &data_node));
   if (data_node) {
     int32_t value = 0;
     if (!iree_string_view_atoi_int32(iree_yaml_node_as_string(data_node),
@@ -233,8 +389,8 @@ static iree_status_t iree_trace_replay_parse_scalar(
     variant.i8 = (int8_t)value;
     return iree_vm_list_push_variant(target_list, &variant);
   }
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("i16"), &data_node));
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
+                                                  IREE_SV("i16"), &data_node));
   if (data_node) {
     int32_t value = 0;
     if (!iree_string_view_atoi_int32(iree_yaml_node_as_string(data_node),
@@ -248,8 +404,8 @@ static iree_status_t iree_trace_replay_parse_scalar(
     variant.i16 = (int16_t)value;
     return iree_vm_list_push_variant(target_list, &variant);
   }
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("i32"), &data_node));
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
+                                                  IREE_SV("i32"), &data_node));
   if (data_node) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     variant.type.value_type = IREE_VM_VALUE_TYPE_I32;
@@ -261,8 +417,8 @@ static iree_status_t iree_trace_replay_parse_scalar(
     }
     return iree_vm_list_push_variant(target_list, &variant);
   }
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("i64"), &data_node));
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
+                                                  IREE_SV("i64"), &data_node));
   if (data_node) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     variant.type.value_type = IREE_VM_VALUE_TYPE_I64;
@@ -274,8 +430,8 @@ static iree_status_t iree_trace_replay_parse_scalar(
     }
     return iree_vm_list_push_variant(target_list, &variant);
   }
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("f32"), &data_node));
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
+                                                  IREE_SV("f32"), &data_node));
   if (data_node) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     variant.type.value_type = IREE_VM_VALUE_TYPE_F32;
@@ -287,8 +443,8 @@ static iree_status_t iree_trace_replay_parse_scalar(
     }
     return iree_vm_list_push_variant(target_list, &variant);
   }
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("f64"), &data_node));
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
+                                                  IREE_SV("f64"), &data_node));
   if (data_node) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     variant.type.value_type = IREE_VM_VALUE_TYPE_F64;
@@ -324,7 +480,7 @@ static iree_status_t iree_trace_replay_parse_vm_list(
   }
   yaml_node_t* items_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("items"), &items_node));
+      document, value_node, IREE_SV("items"), &items_node));
 
   iree_vm_list_t* list = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/NULL,
@@ -515,141 +671,6 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_contents(
   }
 }
 
-// Writes an element of the given |element_type| with the given integral |value|
-// to |dst|.
-static void iree_trace_replay_write_element(
-    iree_hal_element_type_t element_type, int32_t value, void* dst) {
-#define IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(ETYPE, CTYPE) \
-  case IREE_HAL_ELEMENT_TYPE_##ETYPE:                      \
-    *(CTYPE*)dst = (CTYPE)value;                           \
-    break;
-
-  switch (element_type) {
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_8, int8_t)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_16, int16_t)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_32, int32_t)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_64, int64_t)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_8, int8_t)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_16, int16_t)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_32, int32_t)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_64, int64_t)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_8, uint8_t)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_16, uint16_t)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_32, uint32_t)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_64, uint64_t)
-    // clang-format off
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
-      break;
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_32, float)
-    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_64, double)
-    // clang-format on
-    default:
-      IREE_ASSERT(false, "unhandled element type");
-      break;
-  }
-
-#undef IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE
-}
-
-// Simple deterministic pseudorandom generator.
-// This function is same as C++'s std::minstd_rand.
-static uint32_t iree_tree_replay_pseudorandom_uint32(uint32_t* state) {
-  *state = (*state * IREE_PRNG_MULTIPLIER) % IREE_PRNG_MODULUS;
-  return *state;
-}
-
-// Returns a random uint8_t in the range of [0, UCHAR_MAX].
-static uint8_t iree_trace_replay_pseudorandom_uint8(uint32_t* state) {
-  // return the second-least-signicant out of the 4 bytes of state. it avoids
-  // some mild issues with the least-significant and most-significant bytes.
-  return iree_tree_replay_pseudorandom_uint32(state) >> 8;
-}
-
-// Returns a random uint32_t in the range [0, range).
-static inline uint32_t iree_trace_replay_pseudorandom_range(uint32_t* state,
-                                                            uint32_t range) {
-  return iree_tree_replay_pseudorandom_uint32(state) % range;
-}
-
-// Returns a random double in the range of [0, 1.0).
-static double iree_trace_replay_pseudorandom_double(uint32_t* state) {
-  const double inv_modulus = 1.0 / IREE_PRNG_MODULUS;
-  return iree_tree_replay_pseudorandom_uint32(state) * inv_modulus;
-}
-
-// Get minimum and maximum for integer-valued uniform distribution.
-static void iree_trace_replay_get_min_max_for_element_type(
-    iree_hal_element_type_t element_type, int32_t* min, int32_t* max) {
-  switch (element_type) {
-    case IREE_HAL_ELEMENT_TYPE_INT_8:
-    case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      *min = -2;
-      *max = +2;
-      break;
-    case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      *min = 0;
-      *max = +2;
-      break;
-    case IREE_HAL_ELEMENT_TYPE_INT_16:
-    case IREE_HAL_ELEMENT_TYPE_SINT_16:
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      *min = -4;
-      *max = +4;
-      break;
-    case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      *min = 0;
-      *max = +4;
-      break;
-    case IREE_HAL_ELEMENT_TYPE_INT_32:
-    case IREE_HAL_ELEMENT_TYPE_SINT_32:
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      *min = -8;
-      *max = +8;
-      break;
-    case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      *min = 0;
-      *max = +8;
-      break;
-    case IREE_HAL_ELEMENT_TYPE_INT_64:
-    case IREE_HAL_ELEMENT_TYPE_SINT_64:
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      *min = -16;
-      *min = +16;
-      break;
-    case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      *min = 0;
-      *max = +16;
-      break;
-    default:
-      IREE_ASSERT(false, "unhandled element type");
-      break;
-  }
-}
-
-// Fills the destination span with pseudorandom values of the given
-// |element_type|. The given |seed| is passed to the pseudorandom generator.
-// The pseudorandom values are reproducible both across runs and across
-// machines.
-static void iree_trace_replay_generate_fully_specified_pseudorandom_buffer(
-    iree_hal_element_type_t element_type, iree_byte_span_t span,
-    uint32_t seed) {
-  iree_host_size_t element_byte_count =
-      iree_hal_element_dense_byte_count(element_type);
-  uint8_t* data_end = span.data + span.data_length;
-  uint32_t state = seed;
-  uint32_t range;
-  int32_t min, max;
-  iree_trace_replay_get_min_max_for_element_type(element_type, &min, &max);
-  range = (max - min + 1);
-  for (uint8_t* data = span.data; data < data_end; data += element_byte_count) {
-    // Generate "uniform" integer-valued numbers in the range [min, max].
-    int32_t value =
-        (int32_t)iree_trace_replay_pseudorandom_range(&state, range) + min;
-    iree_trace_replay_write_element(element_type, value, data);
-  }
-}
-
 // Generates the destination |buffer| using the generator specified by
 // |generator_node|.
 static iree_status_t iree_trace_replay_generate_hal_buffer(
@@ -724,7 +745,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
     yaml_node_t* value_node, iree_vm_list_t* target_list) {
   yaml_node_t* shape_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("shape"), &shape_node));
+      document, value_node, IREE_SV("shape"), &shape_node));
   iree_hal_dim_t shape[16];
   iree_host_size_t shape_rank = 0;
   IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_shape(
@@ -732,16 +753,14 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
 
   yaml_node_t* element_type_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, value_node, iree_make_cstring_view("element_type"),
-      &element_type_node));
+      document, value_node, IREE_SV("element_type"), &element_type_node));
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
   IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_element_type(
       replay, document, element_type_node, &element_type));
 
   yaml_node_t* encoding_type_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("encoding_type"),
-      &encoding_type_node));
+      document, value_node, IREE_SV("encoding_type"), &encoding_type_node));
   iree_hal_encoding_type_t encoding_type =
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
   IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_encoding_type(
@@ -780,7 +799,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
     yaml_node_t* value_node, iree_vm_list_t* target_list) {
   yaml_node_t* shape_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("shape"), &shape_node));
+      document, value_node, IREE_SV("shape"), &shape_node));
   iree_hal_dim_t shape[16];
   iree_host_size_t shape_rank = 0;
   IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_shape(
@@ -788,16 +807,14 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
 
   yaml_node_t* element_type_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, value_node, iree_make_cstring_view("element_type"),
-      &element_type_node));
+      document, value_node, IREE_SV("element_type"), &element_type_node));
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
   IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_element_type(
       replay, document, element_type_node, &element_type));
 
   yaml_node_t* encoding_type_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("encoding_type"),
-      &encoding_type_node));
+      document, value_node, IREE_SV("encoding_type"), &encoding_type_node));
   iree_hal_encoding_type_t encoding_type =
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
   IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_encoding_type(
@@ -805,13 +822,11 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
 
   yaml_node_t* contents_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("contents"),
-      &contents_node));
+      document, value_node, IREE_SV("contents"), &contents_node));
 
   yaml_node_t* generator_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, value_node, iree_make_cstring_view("contents_generator"),
-      &generator_node));
+      document, value_node, IREE_SV("contents_generator"), &generator_node));
 
   iree_hal_buffer_view_t* buffer_view = NULL;
   if (contents_node && generator_node) {
@@ -860,7 +875,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
 // metadata is thrown away.
 //
 // ```yaml
-// !!hal.buffer 4xf32=[0 1 2 3]
+// !hal.buffer 4xf32=[0 1 2 3]
 // ```
 static iree_status_t iree_trace_replay_parse_inline_hal_buffer(
     iree_trace_replay_t* replay, yaml_document_t* document,
@@ -917,24 +932,22 @@ static iree_status_t iree_trace_replay_parse_item(iree_trace_replay_t* replay,
   }
 
   yaml_node_t* type_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, value_node, iree_make_cstring_view("type"), &type_node));
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(document, value_node,
+                                              IREE_SV("type"), &type_node));
   iree_string_view_t type = iree_yaml_node_as_string(type_node);
-  if (iree_string_view_equal(type, iree_make_cstring_view("null"))) {
+  if (iree_string_view_equal(type, IREE_SV("null"))) {
     iree_vm_variant_t null_value = iree_vm_variant_empty();
     return iree_vm_list_push_variant(target_list, &null_value);
-  } else if (iree_string_view_equal(type, iree_make_cstring_view("value"))) {
+  } else if (iree_string_view_equal(type, IREE_SV("value"))) {
     return iree_trace_replay_parse_scalar(replay, document, value_node,
                                           target_list);
-  } else if (iree_string_view_equal(type, iree_make_cstring_view("vm.list"))) {
+  } else if (iree_string_view_equal(type, IREE_SV("vm.list"))) {
     return iree_trace_replay_parse_vm_list(replay, document, value_node,
                                            target_list);
-  } else if (iree_string_view_equal(type,
-                                    iree_make_cstring_view("hal.buffer"))) {
+  } else if (iree_string_view_equal(type, IREE_SV("hal.buffer"))) {
     return iree_trace_replay_parse_hal_buffer(replay, document, value_node,
                                               target_list);
-  } else if (iree_string_view_equal(
-                 type, iree_make_cstring_view("hal.buffer_view"))) {
+  } else if (iree_string_view_equal(type, IREE_SV("hal.buffer_view"))) {
     return iree_trace_replay_parse_hal_buffer_view(replay, document, value_node,
                                                    target_list);
   }
@@ -955,6 +968,10 @@ static iree_status_t iree_trace_replay_parse_item_sequence(
   }
   return iree_ok_status();
 }
+
+//===----------------------------------------------------------------------===//
+// Output
+//===----------------------------------------------------------------------===//
 
 static iree_status_t iree_trace_replay_print_item(
     iree_vm_variant_t* value, iree_allocator_t host_allocator);
@@ -1024,6 +1041,10 @@ static iree_status_t iree_trace_replay_print_item(
   return iree_ok_status();
 }
 
+//===----------------------------------------------------------------------===//
+// type: call
+//===----------------------------------------------------------------------===//
+
 iree_status_t iree_trace_replay_event_call_prepare(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* event_node, iree_vm_function_t* out_function,
@@ -1035,8 +1056,7 @@ iree_status_t iree_trace_replay_event_call_prepare(
   // Resolve the function ('module.function') within the context.
   yaml_node_t* function_node = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_yaml_mapping_find(document, event_node,
-                                 iree_make_cstring_view("function"),
+      z0, iree_yaml_mapping_find(document, event_node, IREE_SV("function"),
                                  &function_node));
   iree_vm_function_t function;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -1047,9 +1067,8 @@ iree_status_t iree_trace_replay_event_call_prepare(
   // Parse function inputs.
   yaml_node_t* args_node = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_yaml_mapping_try_find(document, event_node,
-                                 iree_make_cstring_view("args"), &args_node));
+      z0, iree_yaml_mapping_try_find(document, event_node, IREE_SV("args"),
+                                     &args_node));
   iree_vm_list_t* input_list = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
@@ -1105,8 +1124,7 @@ static iree_status_t iree_trace_replay_event_call_stdout(
     yaml_node_t* event_node) {
   yaml_node_t* function_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, event_node, iree_make_cstring_view("function"),
-      &function_node));
+      document, event_node, IREE_SV("function"), &function_node));
   iree_string_view_t function_name = iree_yaml_node_as_string(function_node);
   fprintf(stdout, "--- CALL[%.*s] ---\n", (int)function_name.size,
           function_name.data);
@@ -1139,6 +1157,10 @@ static iree_status_t iree_trace_replay_event_call_stdout(
   return status;
 }
 
+//===----------------------------------------------------------------------===//
+// Event dispatch
+//===----------------------------------------------------------------------===//
+
 iree_status_t iree_trace_replay_event(iree_trace_replay_t* replay,
                                       yaml_document_t* document,
                                       yaml_node_t* event_node) {
@@ -1148,16 +1170,13 @@ iree_status_t iree_trace_replay_event(iree_trace_replay_t* replay,
                             event_node->start_mark.line);
   }
   yaml_node_t* type_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, event_node, iree_make_cstring_view("type"), &type_node));
-  if (iree_yaml_string_equal(type_node,
-                             iree_make_cstring_view("context_load"))) {
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(document, event_node,
+                                              IREE_SV("type"), &type_node));
+  if (iree_yaml_string_equal(type_node, IREE_SV("context_load"))) {
     return iree_trace_replay_event_context_load(replay, document, event_node);
-  } else if (iree_yaml_string_equal(type_node,
-                                    iree_make_cstring_view("module_load"))) {
+  } else if (iree_yaml_string_equal(type_node, IREE_SV("module_load"))) {
     return iree_trace_replay_event_module_load(replay, document, event_node);
-  } else if (iree_yaml_string_equal(type_node,
-                                    iree_make_cstring_view("call"))) {
+  } else if (iree_yaml_string_equal(type_node, IREE_SV("call"))) {
     return iree_trace_replay_event_call_stdout(replay, document, event_node);
   }
   return iree_make_status(
