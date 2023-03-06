@@ -100,7 +100,8 @@ class BenchmarkConfigTest(unittest.TestCase):
           f"--tmp_dir={self.tmp_dir}",
           f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
           f"--e2e_test_artifacts_dir={e2e_test_artifacts_dir}",
-          f"--execution_benchmark_config={exec_bench_config}"
+          f"--execution_benchmark_config={exec_bench_config}",
+          f"--target_device_name=device_a",
       ])
 
       config = benchmark_config.BenchmarkConfig.build_from_args(
@@ -118,6 +119,7 @@ class BenchmarkConfigTest(unittest.TestCase):
           f"--tmp_dir={self.tmp_dir}",
           f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
           f"--execution_benchmark_config={exec_bench_config}",
+          f"--target_device_name=device_a",
           str(self.build_dir)
       ])
 

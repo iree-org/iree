@@ -138,10 +138,10 @@ def get_module_map_from_compilation_benchmark_config(
     compilation_benchmark_config_data: TextIO,
     e2e_test_artifacts_dir: pathlib.PurePath
 ) -> Dict[CompilationInfo, pathlib.Path]:
-  compilation_benchmark_config = export_definitions.CompilationBenchmarkConfig(
+  compilation_benchmark_group = export_definitions.CompilationBenchmarkGroup(
       **json.load(compilation_benchmark_config_data))
   gen_configs = serialization.unpack_and_deserialize(
-      data=compilation_benchmark_config.generation_configs,
+      data=compilation_benchmark_group.generation_configs,
       root_type=List[iree_definitions.ModuleGenerationConfig])
   module_map = {}
   for gen_config in gen_configs:

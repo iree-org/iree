@@ -159,15 +159,29 @@ class Parser(argparse.ArgumentParser):
                       type=_check_file_path,
                       default=None,
                       help="JSON config for the execution benchmarks")
+    self.add_argument("--target_device_name",
+                      type=str,
+                      default=None,
+                      help="Target device in benchmark config to run")
 
   def parse_args(
       self, arg_strs: Optional[Sequence[str]] = None) -> argparse.Namespace:
     args = super().parse_args(arg_strs)
 
-    if (args.e2e_test_artifacts_dir is not None and
-        args.execution_benchmark_config is None):
+    # TODO(#11076): Remove these checks and make --execution_benchmark_config
+    # and --target_device_name required args.
+    use_new_benchmark_suite = (args.execution_benchmark_config is not None or
+                               args.target_device_name is not None)
+    if use_new_benchmark_suite:
+      if (args.execution_benchmark_config is None or
+          args.target_device_name is None):
+        self.error(
+            "--execution_benchmark_config and --target_device_name must be set together."
+        )
+    elif args.e2e_test_artifacts_dir is not None:
       self.error(
-          "--e2e_test_artifacts_dir requires --execution_benchmark_config.")
+          "--e2e_test_artifacts_dir requires --execution_benchmark_config and --target_device_name."
+      )
 
     return args
 

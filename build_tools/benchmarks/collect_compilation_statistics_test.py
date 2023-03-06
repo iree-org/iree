@@ -128,7 +128,7 @@ class CollectCompilationStatistics(unittest.TestCase):
         imported_model=imported_model_a, compile_config=compile_config_a)
     gen_config_b = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_a, compile_config=compile_config_b)
-    compile_bench_config = export_definitions.CompilationBenchmarkConfig(
+    compilation_benchmark_group = export_definitions.CompilationBenchmarkGroup(
         generation_configs=serialization.serialize_and_pack(
             [gen_config_a, gen_config_b]),
         module_dir_paths=["a", "b"])
@@ -136,7 +136,7 @@ class CollectCompilationStatistics(unittest.TestCase):
 
     module_map = collect_compilation_statistics.get_module_map_from_compilation_benchmark_config(
         compilation_benchmark_config_data=StringIO(
-            json.dumps(dataclasses.asdict(compile_bench_config))),
+            json.dumps(dataclasses.asdict(compilation_benchmark_group))),
         e2e_test_artifacts_dir=root_dir)
 
     compile_info_a = common.benchmark_definition.CompilationInfo(

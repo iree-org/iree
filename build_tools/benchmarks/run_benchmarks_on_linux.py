@@ -153,10 +153,14 @@ def main(args):
     benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
         benchmark_config.root_benchmark_dir)
   else:
-    execution_benchmark_config = export_definitions.ExecutionBenchmarkConfig(
-        **json.loads(args.execution_benchmark_config.read_text()))
+    benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
+    benchmark_group = benchmark_groups.get(args.target_device_name)
+    if benchmark_group is None:
+      raise ValueError("Target device not found in the benchmark config.")
+    benchmark_group = export_definitions.ExecutionBenchmarkGroup(
+        **benchmark_group)
     run_configs = serialization.unpack_and_deserialize(
-        data=execution_benchmark_config.run_configs,
+        data=benchmark_group.run_configs,
         root_type=typing.List[iree_definitions.E2EModelRunConfig])
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
         run_configs=run_configs)

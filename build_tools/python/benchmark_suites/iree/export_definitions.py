@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 
 @dataclass(frozen=True)
-class ExecutionBenchmarkConfig(object):
+class ExecutionBenchmarkGroup(object):
   """E2E model run configs with metadata."""
   run_configs: Dict[str, Any]
   module_dir_paths: List[str]
@@ -21,7 +21,7 @@ class ExecutionBenchmarkConfig(object):
 
 
 @dataclass(frozen=True)
-class CompilationBenchmarkConfig(object):
+class CompilationBenchmarkGroup(object):
   """Module generation configs with metadata."""
   generation_configs: Dict[str, Any]
   module_dir_paths: List[str]

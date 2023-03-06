@@ -1012,7 +1012,6 @@ jobs:
         run: |
           ./build_tools/benchmarks/export_benchmark_config.py \
             compilation \
-            --ci \
             --output="${COMPILATION_CONFIG}"
           echo "compilation-config=${COMPILATION_CONFIG}" >> "${GITHUB_OUTPUT}"
       - name: "Downloading assets"

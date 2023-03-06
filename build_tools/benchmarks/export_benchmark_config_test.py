@@ -122,6 +122,8 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
     run_config_map = export_benchmark_config.filter_and_group_run_configs(
         run_configs=[run_config_a, run_config_b, run_config_c])
 
+    self.maxDiff = 100000
+
     self.assertEqual(run_config_map, {
         "dev_a_cpu": [run_config_a],
         "dev_a_gpu": [run_config_b, run_config_c],
@@ -217,35 +219,6 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
 
     self.assertEqual(run_config_map, {
         "dev_a": [run_config_a],
-    })
-
-  def test_filter_and_group_run_configs_with_single_group(self):
-    device_spec_a = common_definitions.DeviceSpec(
-        id="dev_a",
-        device_name="dev_a",
-        architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
-        host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
-    device_spec_b = common_definitions.DeviceSpec(
-        id="dev_b",
-        device_name="dev_b",
-        architecture=common_definitions.DeviceArchitecture.RV32_GENERIC,
-        host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
-    run_config_a = iree_definitions.E2EModelRunConfig.with_flag_generation(
-        module_generation_config=COMMON_GEN_CONFIG,
-        module_execution_config=COMMON_EXEC_CONFIG,
-        target_device_spec=device_spec_a,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
-    run_config_b = iree_definitions.E2EModelRunConfig.with_flag_generation(
-        module_generation_config=COMMON_GEN_CONFIG,
-        module_execution_config=COMMON_EXEC_CONFIG,
-        target_device_spec=device_spec_b,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
-
-    run_config_map = export_benchmark_config.filter_and_group_run_configs(
-        run_configs=[run_config_a, run_config_b], single_group="local")
-
-    self.assertEqual(run_config_map, {
-        "local": [run_config_a, run_config_b],
     })
 
 
