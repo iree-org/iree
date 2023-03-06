@@ -51,6 +51,7 @@ def _get_tf_import_output_kwargs(artifacts_dir: str,
   Returns:
     A dict of output kwargs.
   """
+  print("XXX: _get_tf_import_output_kwargs")
   kwargs = {}
   backend_dir = os.path.join(artifacts_dir, backend_id)
   os.makedirs(backend_dir, exist_ok=True)
