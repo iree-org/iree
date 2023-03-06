@@ -2739,8 +2739,9 @@ struct SimplifyBrToBlockWithSinglePred : public OpRewritePattern<BranchOp> {
     }
 
     // Merge the successor into the current block and erase the branch.
-    rewriter.mergeBlocks(succ, opParent, op.getOperands());
+    SmallVector<Value> operands(op.getOperands());
     rewriter.eraseOp(op);
+    rewriter.mergeBlocks(succ, opParent, operands);
     return success();
   }
 };
