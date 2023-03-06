@@ -367,8 +367,14 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
       // Element type.
       iree_hal_element_type_t element_type =
           iree_hal_buffer_view_element_type(buffer_view);
-      // TODO: Would be nice to output as hex.
-      record["element_type"] = element_type;
+      char element_type_str[64] = {0};
+      iree_host_size_t element_type_length = 0;
+      CheckApiStatus(
+          iree_hal_format_element_type(element_type, sizeof(element_type_str),
+                                       element_type_str, &element_type_length),
+          "Formatting element type");
+      record["element_type"] =
+          std::string(element_type_str, element_type_length);
 
       // Map memory.
       iree_device_size_t byte_length = iree_hal_buffer_byte_length(raw_buffer);
