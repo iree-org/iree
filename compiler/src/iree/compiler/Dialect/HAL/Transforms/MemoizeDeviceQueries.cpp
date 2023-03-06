@@ -64,6 +64,7 @@ class MemoizeDeviceQueriesPass
     }
 
     // Create each query variable and replace the uses with loads.
+    SymbolTable symbolTable(moduleOp);
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
     for (auto queryKey : llvm::enumerate(deviceQueryKeys)) {
       auto queryOps = deviceQueryOps[queryKey.value()];
@@ -82,10 +83,12 @@ class MemoizeDeviceQueriesPass
       auto valueGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
           fusedLoc, variableName,
           /*isMutable=*/false, queryType);
+      symbolTable.insert(valueGlobalOp);
       valueGlobalOp.setPrivate();
       auto okGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
           fusedLoc, variableName + "_ok",
           /*isMutable=*/false, moduleBuilder.getI1Type());
+      symbolTable.insert(okGlobalOp);
       okGlobalOp.setPrivate();
 
       auto initializerOp =

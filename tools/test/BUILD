@@ -18,6 +18,8 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "compile_pipelines.mlir",
+            "compile_to_continuation.mlir",
             "compile_to_phase.mlir",
             "executable_benchmarks.mlir",
             "executable_sources.mlir",
@@ -46,6 +48,7 @@ iree_lit_test_suite(
     tools = [
         "//tools:iree-benchmark-module",
         "//tools:iree-compile",
+        "//tools:iree-opt",
         "//tools:iree-run-mlir",
         "//tools:iree-run-module",
         "@llvm-project//lld",
