@@ -152,6 +152,8 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
   ADD_PATTERN(licm, getLicmAttrName)
+  ADD_PATTERN(linalgElementwiseGreedyFusion,
+              getLinalgElementwiseGreedyFusionAttrName)
   ADD_PATTERN(lowerTransferOpPermutations,
               getLowerTransferOpPermutationsAttrName)
   ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
@@ -166,6 +168,31 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(unrollVectorsGpuWmma, getUnrollVectorsGpuWmmaAttrName)
 #undef ADD_PATTERN
   result.addTypes({pdl::OperationType::get(ctx)});
+}
+
+static void addOperands(Operation *op, SetVector<Value> &operandSet) {
+  if (!op) return;
+  TypeSwitch<Operation *, void>(op)
+      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+        SmallVector<Value> inputOperands{linalgOp.getDpsInputOperands()};
+        operandSet.insert(inputOperands.begin(), inputOperands.end());
+      })
+      .Default([&](Operation *operation) {
+        operandSet.insert(operation->operand_begin(), operation->operand_end());
+      });
+}
+
+template <int limit = 3>
+static bool setFusedOpOperandLimit(OpOperand *fusedOperand) {
+  Operation *producer = fusedOperand->get().getDefiningOp();
+  if (!producer) return false;
+  Operation *consumer = fusedOperand->getOwner();
+  SetVector<Value> fusedOpOperands;
+  if (producer->getNumResults() != 1) return false;
+  addOperands(consumer, fusedOpOperands);
+  fusedOpOperands.remove(producer->getResult(0));
+  addOperands(producer, fusedOpOperands);
+  return fusedOpOperands.size() <= limit;
 }
 
 namespace {
@@ -337,6 +364,9 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
+  if (getLinalgElementwiseGreedyFusion())
+    linalg::populateElementwiseOpsFusionPatterns(patterns,
+                                                 setFusedOpOperandLimit<3>);
   if (getLowerTransferOpPermutations())
     addLowerTransferOpPermutationsPatterns(patterns);
   if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);

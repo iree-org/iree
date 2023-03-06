@@ -47,6 +47,7 @@ struct ApplyPatternsOpPatterns {
   bool foldReassociativeReshapes = false;
   bool foldTensorEmptyExtract = false;
   bool licm = false;
+  bool linalgElementwiseGreedyFusion = false;
   bool lowerTransferOpPermutations = false;
   bool promoteForallCaptureToShared = false;
   bool rankReducingLinalg = false;

@@ -103,6 +103,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       iteration loop promotion. This is not a set of patterns per se but is still
       very convenient to apply it close to canonicalization and other greedy 
       pattern applications.
+      - linalg_elementwise_greedy_fusion: add linalg elementwise ops fusion 
+      patterns using a naive default heuristic.
       - lower_transfer_op_permutations: Lower transfer ops to transfer ops
       with minor identity permutations.
       - rank_reducing_linalg: adds patterns that results in rank-reducing
@@ -154,6 +156,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$fold_reassociative_reshapes,
                        UnitAttr:$fold_tensor_empty_extract,
                        UnitAttr:$licm,
+                       UnitAttr:$linalg_elementwise_greedy_fusion,
                        UnitAttr:$lower_transfer_op_permutations,
                        UnitAttr:$rank_reducing_linalg,
                        UnitAttr:$rank_reducing_linalg_via_reshapes,
