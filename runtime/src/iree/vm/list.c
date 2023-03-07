@@ -925,34 +925,60 @@ IREE_API_EXPORT iree_status_t iree_vm_list_pop_front_ref_move(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t
-iree_vm_list_get_variant(const iree_vm_list_t* list, iree_host_size_t i,
-                         iree_vm_variant_t* out_value) {
+typedef enum {
+  IREE_VM_LIST_REF_ASSIGN = 0,
+  IREE_VM_LIST_REF_RETAIN,
+  IREE_VM_LIST_REF_MOVE,
+} iree_vm_list_ref_mode_t;
+
+static void iree_vm_list_ref_op(iree_vm_list_ref_mode_t mode,
+                                iree_vm_ref_t* ref, iree_vm_ref_t* out_ref) {
+  switch (mode) {
+    case IREE_VM_LIST_REF_ASSIGN:
+      iree_vm_ref_assign(ref, out_ref);
+      break;
+    case IREE_VM_LIST_REF_RETAIN:
+      iree_vm_ref_retain(ref, out_ref);
+      break;
+    case IREE_VM_LIST_REF_MOVE:
+      iree_vm_ref_move(ref, out_ref);
+      break;
+  }
+}
+
+static iree_status_t iree_vm_list_get_variant(const iree_vm_list_t* list,
+                                              iree_host_size_t i,
+                                              iree_vm_list_ref_mode_t ref_mode,
+                                              iree_vm_variant_t* out_variant) {
+  IREE_ASSERT_ARGUMENT(list);
+  IREE_ASSERT_ARGUMENT(out_variant);
   if (i >= list->count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "index %zu out of bounds (%zu)", i, list->count);
   }
+  iree_vm_variant_reset(out_variant);
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;
   switch (list->storage_mode) {
     case IREE_VM_LIST_STORAGE_MODE_VALUE: {
-      out_value->type = list->element_type;
-      memcpy(out_value->value_storage, (void*)element_ptr, list->element_size);
+      out_variant->type = list->element_type;
+      memcpy(out_variant->value_storage, (void*)element_ptr,
+             list->element_size);
       break;
     }
     case IREE_VM_LIST_STORAGE_MODE_REF: {
       iree_vm_ref_t* element_ref = (iree_vm_ref_t*)element_ptr;
-      out_value->type.ref_type = element_ref->type;
-      out_value->type.value_type = IREE_VM_VALUE_TYPE_NONE;
-      iree_vm_ref_assign(element_ref, &out_value->ref);
+      out_variant->type.ref_type = element_ref->type;
+      out_variant->type.value_type = IREE_VM_VALUE_TYPE_NONE;
+      iree_vm_list_ref_op(ref_mode, element_ref, &out_variant->ref);
       break;
     }
     case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
       iree_vm_variant_t* variant = (iree_vm_variant_t*)element_ptr;
-      out_value->type = variant->type;
+      out_variant->type = variant->type;
       if (iree_vm_type_def_is_ref(&variant->type)) {
-        iree_vm_ref_assign(&variant->ref, &out_value->ref);
+        iree_vm_list_ref_op(ref_mode, &variant->ref, &out_variant->ref);
       } else {
-        memcpy(out_value->value_storage, variant->value_storage,
+        memcpy(out_variant->value_storage, variant->value_storage,
                sizeof(variant->value_storage));
       }
       break;
@@ -963,17 +989,80 @@ iree_vm_list_get_variant(const iree_vm_list_t* list, iree_host_size_t i,
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t iree_vm_list_set_variant(
-    iree_vm_list_t* list, iree_host_size_t i, const iree_vm_variant_t* value) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "iree_vm_list_set_variant unimplemented");
+IREE_API_EXPORT iree_status_t
+iree_vm_list_get_variant_assign(const iree_vm_list_t* list, iree_host_size_t i,
+                                iree_vm_variant_t* out_variant) {
+  return iree_vm_list_get_variant(list, i, IREE_VM_LIST_REF_ASSIGN,
+                                  out_variant);
 }
 
-IREE_API_EXPORT iree_status_t iree_vm_list_push_variant(
-    iree_vm_list_t* list, const iree_vm_variant_t* value) {
+IREE_API_EXPORT iree_status_t
+iree_vm_list_get_variant_retain(const iree_vm_list_t* list, iree_host_size_t i,
+                                iree_vm_variant_t* out_variant) {
+  return iree_vm_list_get_variant(list, i, IREE_VM_LIST_REF_RETAIN,
+                                  out_variant);
+}
+
+IREE_API_EXPORT iree_status_t
+iree_vm_list_get_variant_move(const iree_vm_list_t* list, iree_host_size_t i,
+                              iree_vm_variant_t* out_variant) {
+  return iree_vm_list_get_variant(list, i, IREE_VM_LIST_REF_MOVE, out_variant);
+}
+
+static iree_status_t iree_vm_list_set_variant(iree_vm_list_t* list,
+                                              iree_host_size_t i, bool is_move,
+                                              iree_vm_variant_t* variant) {
+  if (iree_vm_type_def_is_variant(&variant->type)) {
+    iree_vm_value_t value = iree_vm_variant_value(*variant);
+    return iree_vm_list_set_value(list, i, &value);
+  } else if (iree_vm_type_def_is_value(&variant->type)) {
+    iree_vm_value_t value = {
+        .type = variant->type.value_type,
+    };
+    memcpy(value.value_storage, variant->value_storage,
+           sizeof(value.value_storage));
+    return iree_vm_list_set_value(list, i, &value);
+  } else if (iree_vm_type_def_is_ref(&variant->type)) {
+    iree_status_t status =
+        iree_vm_list_set_ref(list, i, is_move, &variant->ref);
+    if (iree_status_is_ok(status) && is_move) {
+      variant->type.ref_type = IREE_VM_REF_TYPE_NULL;
+    }
+    return status;
+  } else {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "unhandled variant value type");
+  }
+}
+
+IREE_API_EXPORT iree_status_t
+iree_vm_list_set_variant_retain(iree_vm_list_t* list, iree_host_size_t i,
+                                const iree_vm_variant_t* variant) {
+  return iree_vm_list_set_variant(list, i, /*is_move=*/false,
+                                  (iree_vm_variant_t*)variant);
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_list_set_variant_move(
+    iree_vm_list_t* list, iree_host_size_t i, iree_vm_variant_t* variant) {
+  return iree_vm_list_set_variant(list, i, /*is_move=*/true, variant);
+}
+
+static iree_status_t iree_vm_list_push_variant(
+    iree_vm_list_t* list, bool is_move, const iree_vm_variant_t* variant) {
   iree_host_size_t i = iree_vm_list_size(list);
   IREE_RETURN_IF_ERROR(iree_vm_list_resize(list, i + 1));
-  return iree_vm_list_set_variant(list, i, value);
+  return iree_vm_list_set_variant(list, i, is_move,
+                                  (iree_vm_variant_t*)variant);
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_list_push_variant_retain(
+    iree_vm_list_t* list, const iree_vm_variant_t* variant) {
+  return iree_vm_list_push_variant(list, /*is_move=*/false, variant);
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_list_push_variant_move(
+    iree_vm_list_t* list, iree_vm_variant_t* variant) {
+  return iree_vm_list_push_variant(list, /*is_move=*/true, variant);
 }
 
 iree_status_t iree_vm_list_register_types(iree_vm_instance_t* instance) {

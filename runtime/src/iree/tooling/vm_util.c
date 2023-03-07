@@ -376,7 +376,7 @@ iree_status_t iree_tooling_append_variant_list_lines(
   for (iree_host_size_t i = 0; i < iree_vm_list_size(list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_vm_list_get_variant(list, i, &variant),
+        z0, iree_vm_list_get_variant_assign(list, i, &variant),
         "variant %zu not present", i);
     iree_string_builder_append_format(builder, "result[%zu]: ", i);
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -482,7 +482,7 @@ iree_status_t iree_tooling_output_variant_list(
   for (iree_host_size_t i = 0; i < output_strings_count; ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_vm_list_get_variant(list, i, &variant));
+        z0, iree_vm_list_get_variant_assign(list, i, &variant));
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_tooling_output_variant(variant, output_strings[i],
                                         max_element_count, file));

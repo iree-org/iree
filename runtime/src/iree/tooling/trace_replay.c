@@ -387,7 +387,7 @@ static iree_status_t iree_trace_replay_parse_scalar(
     iree_vm_variant_t variant = iree_vm_variant_empty();
     variant.type.value_type = IREE_VM_VALUE_TYPE_I8;
     variant.i8 = (int8_t)value;
-    return iree_vm_list_push_variant(target_list, &variant);
+    return iree_vm_list_push_variant_move(target_list, &variant);
   }
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
                                                   IREE_SV("i16"), &data_node));
@@ -402,7 +402,7 @@ static iree_status_t iree_trace_replay_parse_scalar(
     iree_vm_variant_t variant = iree_vm_variant_empty();
     variant.type.value_type = IREE_VM_VALUE_TYPE_I16;
     variant.i16 = (int16_t)value;
-    return iree_vm_list_push_variant(target_list, &variant);
+    return iree_vm_list_push_variant_move(target_list, &variant);
   }
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
                                                   IREE_SV("i32"), &data_node));
@@ -415,7 +415,7 @@ static iree_status_t iree_trace_replay_parse_scalar(
           IREE_STATUS_INVALID_ARGUMENT, "failed to parse i32 value: '%.*s'",
           (int)data_node->data.scalar.length, data_node->data.scalar.value);
     }
-    return iree_vm_list_push_variant(target_list, &variant);
+    return iree_vm_list_push_variant_move(target_list, &variant);
   }
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
                                                   IREE_SV("i64"), &data_node));
@@ -428,7 +428,7 @@ static iree_status_t iree_trace_replay_parse_scalar(
           IREE_STATUS_INVALID_ARGUMENT, "failed to parse i64 value: '%.*s'",
           (int)data_node->data.scalar.length, data_node->data.scalar.value);
     }
-    return iree_vm_list_push_variant(target_list, &variant);
+    return iree_vm_list_push_variant_move(target_list, &variant);
   }
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
                                                   IREE_SV("f32"), &data_node));
@@ -441,7 +441,7 @@ static iree_status_t iree_trace_replay_parse_scalar(
           IREE_STATUS_INVALID_ARGUMENT, "failed to parse f32 value: '%.*s'",
           (int)data_node->data.scalar.length, data_node->data.scalar.value);
     }
-    return iree_vm_list_push_variant(target_list, &variant);
+    return iree_vm_list_push_variant_move(target_list, &variant);
   }
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
                                                   IREE_SV("f64"), &data_node));
@@ -454,7 +454,7 @@ static iree_status_t iree_trace_replay_parse_scalar(
           IREE_STATUS_INVALID_ARGUMENT, "failed to parse f64 value: '%.*s'",
           (int)data_node->data.scalar.length, data_node->data.scalar.value);
     }
-    return iree_vm_list_push_variant(target_list, &variant);
+    return iree_vm_list_push_variant_move(target_list, &variant);
   }
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "(%zu): unimplemented scalar type parser",
@@ -937,7 +937,7 @@ static iree_status_t iree_trace_replay_parse_item(iree_trace_replay_t* replay,
   iree_string_view_t type = iree_yaml_node_as_string(type_node);
   if (iree_string_view_equal(type, IREE_SV("null"))) {
     iree_vm_variant_t null_value = iree_vm_variant_empty();
-    return iree_vm_list_push_variant(target_list, &null_value);
+    return iree_vm_list_push_variant_move(target_list, &null_value);
   } else if (iree_string_view_equal(type, IREE_SV("value"))) {
     return iree_trace_replay_parse_scalar(replay, document, value_node,
                                           target_list);
@@ -1007,7 +1007,7 @@ static iree_status_t iree_trace_replay_print_vm_list(
     iree_vm_list_t* list, iree_allocator_t host_allocator) {
   for (iree_host_size_t i = 0; i < iree_vm_list_size(list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
-    IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(list, i, &variant),
+    IREE_RETURN_IF_ERROR(iree_vm_list_get_variant_assign(list, i, &variant),
                          "variant %zu not present", i);
     IREE_RETURN_IF_ERROR(
         iree_trace_replay_print_item(&variant, host_allocator));
