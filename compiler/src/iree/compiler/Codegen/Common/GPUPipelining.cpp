@@ -145,9 +145,6 @@ static void insertUnscheduledDependentOps(
     llvm::SetVector<Operation*>& filteredOps,
     llvm::SetVector<Operation*>& dependentOps, Operation* op, Block* block) {
   if (filteredOps.count(op) || !scheduledOps.insert(op)) return;
-  std::cout << "insertUnscheduledDependentOps ";
-  std::cout << std::flush;
-  op->dump();
   dependentOps.insert(op);
   for (Value operand : op->getOperands()) {
     Operation* defOp = operand.getDefiningOp();
@@ -294,28 +291,6 @@ struct WarpMmaOp {
   llvm::SetVector<Operation*> mmaOperations;
 };
 
-struct KgroupStagePair {
-  int kgroup;
-  int stage;
-  KgroupStagePair() : kgroup(-1), stage(-1) {}
-  KgroupStagePair(int kgroup, int stage) : kgroup(kgroup), stage(stage) {}
-
-  bool operator==(const KgroupStagePair& other) const {
-    return kgroup == other.kgroup && stage == other.stage;
-  }
-  bool operator!=(const KgroupStagePair& other) const {
-    return !(*this == other);
-  }
-};
-
-/// Hash function for KgroupStagePair
-struct HashKgroupStagePair {
-  size_t operator()(KgroupStagePair const& kgroupStagePair) const {
-    std::hash<int> hasher;
-    return ((hasher(kgroupStagePair.kgroup)) ^ (hasher(kgroupStagePair.stage)));
-  }
-};
-
 /// Structure to hold the matmul's mainloop information:
 /// Seperates the mmasync operations into kgroups and collects the Shared Memory
 /// loads for each kgroup. This information is used to pipeline the mainloop and
@@ -391,8 +366,8 @@ struct MainLoopInfo {
     }
 
     // Recurse upwards towards the definition until a Shared Memory load is
-    // found. Assumption here is that only single operand operations are leading
-    // up to LdMatrix.
+    // found. Assumption here is that only single operand operations are
+    // leading up to LdMatrix.
     Operation* defOp = op->getOperand(0).getDefiningOp();
 
     backtrackToFindSmemLoad(defOp, loadOperations, block);
@@ -429,15 +404,15 @@ struct MainLoopInfo {
   MainLoopInfo(int totalPipelineStages)
       : totalPipelineStages(totalPipelineStages) {}
 
-  // Iterate through the mainloop and collect the `async.copy`,
-  // `async.wait`, and `barrier` operations. These operations are used to
-  // pipeline the mainloop. Additionally, collect the `mma.sync` operations and
-  // separate them into kgroups. These operations are used to generate an
-  // optimal finer-grained schedule of  Global Memory, Shared Memory loads, and
-  // math operations.
+  // Iterate through the mainloop and collect the `cp.async`,
+  // `cp.commit_group`, `cp.wait_group`, and `barrier` operations. These
+  // operations are used to pipeline the mainloop. Additionally, collect the
+  // `mma.sync` and `ldmatrix`/`ld.shared` operations and separate them into
+  // kgroups. These operations are used to generate an optimal *finer-grained*
+  // schedule of global memory loads, shared memory loads, and math operations.
   void collect(scf::ForOp forOp) {
     int numForLoopInst = 0;
-    std::cout << "ForOp: " << std::endl;
+    std::cout << ">>>>>> Collecting MainLoopInfo: " << std::endl;
     forOp.dump();
     // std::cout << "Collecting MainLoopInfo: " << std::endl;
     for (Operation& op : forOp.getBody()->getOperations()) {
@@ -463,13 +438,14 @@ struct MainLoopInfo {
         vistMmaSyncOp(&op, 0 /*kgroup = 0*/);
       }
     }
-    std::cout << "Number of for loop instructions: " << numForLoopInst
-              << std::endl;
 
     // Assert that barrierOps and asyncWaitOps have only 1 occurance in
     // un-pipelined mainloop.
-    assert(barrierOps.size() == 1 && "Expected only one barrier op");
+
+    assert(asyncCreateGroupOp.size() == 1 &&
+           "Expected only one async.create.group op");
     assert(asyncWaitOps.size() == 1 && "Expected only one async.wait op");
+    assert(barrierOps.size() == 1 && "Expected only one barrier op");
 
     // Fill the reverse map from operation to kgroup, stage.
     for (auto& warpOp : warpOperations) {
@@ -487,24 +463,24 @@ struct MainLoopInfo {
     ldmatrixOpDeps.resize(warpOperations.size());
     mmasyncOpDeps.resize(warpOperations.size());
 
-    // Find all the dependent operations in the order of the stages schedule.
+    // Collect the dependent operations for mma.sync and ldmatix operations
+    // seperated by kgroups for fine-grained instruction scheduling. cp.async
+    // depedencies are collected colleted for course-grained pipelining.
     // Dependent operations for cp.async
     for (Operation& op : forOp.getBody()->getOperations()) {
       if (isa<nvgpu::DeviceAsyncCopyOp>(&op)) {
-        // setDependentOps(&op, forOp.getBody());
         backwardSliceOfDependentOps(copyGlobalToSharedOpDeps, &op,
                                     forOp.getBody());
       }
     }
     setDependentOps(asyncCreateGroupOp[0], forOp.getBody());
-
     setDependentOps(asyncWaitOps[0], forOp.getBody());
     setDependentOps(barrierOps[0], forOp.getBody());
+
     // Dependent operations for loads in the kgroup = 0
     for (Operation& op : forOp.getBody()->getOperations()) {
       if (isa<nvgpu::LdMatrixOp>(&op)) {
         if (opToKgroupMap[&op] == 0) {
-          // setDependentOps(&op, forOp.getBody());
           backwardSliceOfDependentOps(ldmatrixOpDeps[0], &op, forOp.getBody());
         }
       }
@@ -514,7 +490,6 @@ struct MainLoopInfo {
     for (Operation& op : forOp.getBody()->getOperations()) {
       if (isa<nvgpu::MmaSyncOp>(&op)) {
         if (opToKgroupMap[&op] == 0) {
-          // setDependentOps(&op, forOp.getBody());
           backwardSliceOfDependentOps(mmasyncOpDeps[0], &op, forOp.getBody());
         }
       }
@@ -524,7 +499,6 @@ struct MainLoopInfo {
     for (Operation& op : forOp.getBody()->getOperations()) {
       if (isa<nvgpu::LdMatrixOp>(&op)) {
         if (opToKgroupMap[&op] == 1) {
-          // setDependentOps(&op, forOp.getBody());
           backwardSliceOfDependentOps(ldmatrixOpDeps[1], &op, forOp.getBody());
         }
       }
@@ -534,7 +508,6 @@ struct MainLoopInfo {
     for (Operation& op : forOp.getBody()->getOperations()) {
       if (isa<nvgpu::MmaSyncOp>(&op)) {
         if (opToKgroupMap[&op] == 1) {
-          // setDependentOps(&op, forOp.getBody());
           backwardSliceOfDependentOps(mmasyncOpDeps[1], &op, forOp.getBody());
         }
       }
@@ -542,50 +515,7 @@ struct MainLoopInfo {
   }
 
   // Returns the number of kgroups in the Warp-level MMA operations.
-  int getNumKGroups() { return warpOperations.size(); }
-
-  void dumpDeps(Operation* op) {
-    std::cout << "Backward slice operations for op leading upto op: ";
-    std::cout << std::flush;
-    op->dump();
-    for (auto depOp : operationDeps[op]) {
-      depOp->dump();
-    }
-  }
-
-  // Debug dump the MainloopInfo.
-  void dump() {
-    // Debug prints
-    std::cout << ">>> MainLoopInfo::dump() for kGroup *fine-grained* "
-                 "instruction scheduling"
-              << std::endl;
-    for (auto warpOp : warpOperations) {
-      std::cout << "Load operations for operandA kGroup (" << warpOp.first
-                << ")" << std::endl;
-
-      for (auto loadOp : warpOp.second.loadOperationsA) dumpDeps(loadOp);
-
-      std::cout << "Load operations for operandB kGroup (" << warpOp.first
-                << ")" << std::endl;
-
-      for (auto loadOp : warpOp.second.loadOperationsB) dumpDeps(loadOp);
-
-      std::cout << "Mma Sync kGroup (" << warpOp.first << ")" << std::endl;
-      for (auto mmaOp : warpOp.second.mmaOperations) dumpDeps(mmaOp);
-    }
-
-    std::cout << ">>> MainLoopInfo::dump() for kGroup *course-grained* "
-                 "software pipelining"
-              << std::endl;
-    std::cout << "Copy Global to Shared Memory" << std::endl;
-    for (auto copyOp : copyGlobalToSharedOps) dumpDeps(copyOp);
-
-    std::cout << "CpAsync Wait" << std::endl;
-    for (auto asyncWaitOp : asyncWaitOps) dumpDeps(asyncWaitOp);
-
-    std::cout << "Gpu Barrier" << std::endl;
-    for (auto barrierOp : barrierOps) dumpDeps(barrierOp);
-  }
+  int getNumberOfKgroups() { return warpOperations.size(); }
 };
 
 /// Return a pipelining schedule that gives good performance on Nvidia
@@ -706,16 +636,15 @@ static void getNvidiaTensorCoreScheduleAndPipeline(
     unsigned depth) {
   MainLoopInfo info(depth);
   info.collect(forOp);
-  info.dump();
 
-  // Schedule loads for kgroup 1.
+  // Schedule loads for kgroup = 1. Maintain the forOp loop order.
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (info.ldmatrixOpDeps[1].count(&op))
       ops.push_back(std::make_pair(&op, depth - 1));
   }
   // scheduleOperations(ops, info.ldmatrixOpDeps[1], depth - 1);
 
-  // Schedule math for kgroup 0.
+  // Schedule mma.sync for kgroup = 1. Maintain the forOp loop order.
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (info.mmasyncOpDeps[0].count(&op))
       ops.push_back(std::make_pair(&op, depth - 1));
@@ -728,22 +657,23 @@ static void getNvidiaTensorCoreScheduleAndPipeline(
       ops.push_back(std::make_pair(&op, 0));
   }
 
-  // ops.push_back(std::make_pair(info.asyncCreateGroupOp[0], 0));
-  // ops.push_back(std::make_pair(info.asyncWaitOps[0], depth - 2));
-  // ops.push_back(std::make_pair(info.barrierOps[0], depth - 2));
+  ops.push_back(std::make_pair(info.asyncCreateGroupOp[0], 0));
+  ops.push_back(std::make_pair(info.asyncWaitOps[0], depth - 2));
+  ops.push_back(std::make_pair(info.barrierOps[0], depth - 2));
 
-  scheduleOperations(ops, info.operationDeps[info.asyncCreateGroupOp[0]], 0);
-  scheduleOperations(ops, info.operationDeps[info.asyncWaitOps[0]], depth - 2);
-  scheduleOperations(ops, info.operationDeps[info.barrierOps[0]], depth - 2);
+  // scheduleOperations(ops, info.operationDeps[info.asyncCreateGroupOp[0]], 0);
+  // scheduleOperations(ops, info.operationDeps[info.asyncWaitOps[0]], depth -
+  // 2); scheduleOperations(ops, info.operationDeps[info.barrierOps[0]], depth -
+  // 2);
 
-  // Schedule loads for kgroup 0.
+  // Schedule loads for kgroup = 0. Maintain the forOp loop order.
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (info.ldmatrixOpDeps[0].count(&op))
       ops.push_back(std::make_pair(&op, depth - 2));
   }
   // scheduleOperations(ops, info.ldmatrixOpDeps[0], depth - 2);
 
-  // Schedule math for kgroup 1.
+  // Schedule mma.sync for kgroup = 1. Maintain the forOp loop order.
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (info.mmasyncOpDeps[1].count(&op))
       ops.push_back(std::make_pair(&op, depth - 1));
