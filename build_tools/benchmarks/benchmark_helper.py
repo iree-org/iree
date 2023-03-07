@@ -27,6 +27,7 @@ def dump_flags_of_generation_config(
   imported_model_path = iree_artifacts.get_imported_model_path(
       imported_model=imported_model)
   source_model_path = model_artifacts.get_model_path(model=imported_model.model)
+  # TODO(#12215): Include benchmark name to make them searchable by keywords.
   return {
       "composite_id":
           module_generation_config.composite_id,
@@ -46,6 +47,7 @@ def dump_flags_from_run_config(
   gen_config = e2e_model_run_config.module_generation_config
   module_path = iree_artifacts.get_module_dir_path(
       module_generation_config=gen_config) / iree_artifacts.MODULE_FILENAME
+  # TODO(#12215): Include benchmark name to make them searchable by keywords.
   return {
       "composite_id":
           e2e_model_run_config.composite_id,
