@@ -294,19 +294,6 @@ struct WarpMmaOp {
   llvm::SetVector<Operation*> mmaOperations;
 };
 
-struct KgroupStagePair {
-  int kgroup;
-  int stage;
-  KgroupStagePair() : kgroup(-1), stage(-1) {}
-  KgroupStagePair(int kgroup, int stage) : kgroup(kgroup), stage(stage) {}
-
-  bool operator==(const KgroupStagePair& other) const {
-    return kgroup == other.kgroup && stage == other.stage;
-  }
-  bool operator!=(const KgroupStagePair& other) const {
-    return !(*this == other);
-  }
-};
 /// Structure to hold the matmul's mainloop information:
 /// Seperates the mmasync operations into kgroups and collects the Shared Memory
 /// loads for each kgroup. This information is used to pipeline the mainloop and
@@ -335,7 +322,6 @@ struct MainLoopInfo {
 
   // Map: Operation -> kgroupIdx
   std::unordered_map<Operation*, int> opToKgroupMap;
-  std::unordered_map<Operation*, KgroupStagePair> opToKgroupStageMap;
 
   // Set to track the dependencies already seen to a backward slice.
   llvm::SetVector<Operation*> seenDepOps;
@@ -434,29 +420,21 @@ struct MainLoopInfo {
       // used for coarse-grained pipelining of the mainloop.
       if (isa<nvgpu::DeviceAsyncCopyOp>(op)) {
         copyGlobalToSharedOps.insert(&op);
-        // setDependentOps(&op, forOp.getBody());
       }
       if (isa<nvgpu::DeviceAsyncCreateGroupOp>(op)) {
         asyncCreateGroupOp.insert(&op);
-        // setDependentOps(&op, forOp.getBody());
       }
       if (isa<gpu::BarrierOp>(op)) {
         barrierOps.insert(&op);
-        // setDependentOps(&op, forOp.getBody());
       }
       if (isa<nvgpu::DeviceAsyncWaitOp>(op)) {
         asyncWaitOps.insert(&op);
-        // setDependentOps(&op, forOp.getBody());
       }
       // Collect the warp-level mma.sync and Shared Memory load operations and
       // separate them into kgroups. These are used for fine-grained instruction
       // scheduling.
-      if (isa<nvgpu::LdMatrixOp>(op)) {
-        // setDependentOps(&op, forOp.getBody());
-      }
       if (isa<nvgpu::MmaSyncOp>(op)) {
         vistMmaSyncOp(&op, 0 /*kgroup = 0*/);
-        // setDependentOps(&op, forOp.getBody());
       }
     }
     std::cout << "Number of for loop instructions: " << numForLoopInst
@@ -471,38 +449,59 @@ struct MainLoopInfo {
     for (auto& warpOp : warpOperations) {
       for (auto mmaOp : warpOp.second.mmaOperations) {
         opToKgroupMap[mmaOp] = warpOp.first;
-        opToKgroupStageMap[mmaOp] = {warpOp.first, totalPipelineStages - 1};
       }
       for (auto loadOp : warpOp.second.loadOperationsA) {
         opToKgroupMap[loadOp] = warpOp.first;
-        int stage = totalPipelineStages - 1;
-        if (warpOp.first == 0) {
-          stage = totalPipelineStages - 2;
-        }
-        opToKgroupStageMap[loadOp] = {warpOp.first, stage};
       }
       for (auto loadOp : warpOp.second.loadOperationsB) {
         opToKgroupMap[loadOp] = warpOp.first;
-        int stage = totalPipelineStages - 1;
-        if (warpOp.first == 0) {
-          stage = totalPipelineStages - 2;
-        }
-        opToKgroupStageMap[loadOp] = {warpOp.first, stage};
       }
     }
 
-    // Assign all cp.async a kgroup and stage.
-    for (auto copyOp : copyGlobalToSharedOps) {
-      opToKgroupStageMap[copyOp] = {0, 0};
+    // Find all the dependent operations in the order of the mainloop schedule.
+    // Dependent operations for loads in the kgroup = 1
+    for (Operation& op : forOp.getBody()->getOperations()) {
+      if (isa<nvgpu::LdMatrixOp>(&op)) {
+        if (opToKgroupMap[&op] == 1) {
+          setDependentOps(&op, forOp.getBody());
+        }
+      }
     }
 
-    opToKgroupStageMap[asyncCreateGroupOp[0]] = {0, 0};
+    // Dependent operations for mma.sync in the kgroup = 0
+    for (Operation& op : forOp.getBody()->getOperations()) {
+      if (isa<nvgpu::MmaSyncOp>(&op)) {
+        if (opToKgroupMap[&op] == 0) {
+          setDependentOps(&op, forOp.getBody());
+        }
+      }
+    }
 
-    opToKgroupStageMap[asyncWaitOps[0]] = {0, totalPipelineStages - 2};
-    opToKgroupStageMap[barrierOps[0]] = {0, totalPipelineStages - 2};
+    // Dependent operations for cp.async
+    for (auto& op : copyGlobalToSharedOps) {
+      setDependentOps(op, forOp.getBody());
+    }
+    setDependentOps(asyncCreateGroupOp[0], forOp.getBody());
+    setDependentOps(asyncWaitOps[0], forOp.getBody());
+    setDependentOps(barrierOps[0], forOp.getBody());
 
-    // Find all the dependent operations for each kgroup, stage in the schedule
-    // order.
+    // Dependent operations for loads in the kgroup = 0
+    for (Operation& op : forOp.getBody()->getOperations()) {
+      if (isa<nvgpu::LdMatrixOp>(&op)) {
+        if (opToKgroupMap[&op] == 0) {
+          setDependentOps(&op, forOp.getBody());
+        }
+      }
+    }
+
+    // Dependent operations for mma.sync in the kgroup = 1
+    for (Operation& op : forOp.getBody()->getOperations()) {
+      if (isa<nvgpu::MmaSyncOp>(&op)) {
+        if (opToKgroupMap[&op] == 1) {
+          setDependentOps(&op, forOp.getBody());
+        }
+      }
+    }
   }
 
   // Returns the number of kgroups in the Warp-level MMA operations.
@@ -696,6 +695,8 @@ static void getNvidiaTensorCoreScheduleAndPipeline(
   for (auto& copyOp : info.copyGlobalToSharedOps) {
     scheduleOperations(ops, info.operationDeps[copyOp], 0);
   }
+
+  scheduleOperations(ops, info.operationDeps[info.asyncCreateGroupOp[0]], 0);
   scheduleOperations(ops, info.operationDeps[info.asyncWaitOps[0]], depth - 2);
   scheduleOperations(ops, info.operationDeps[info.barrierOps[0]], depth - 2);
 
@@ -716,55 +717,6 @@ static void getNvidiaTensorCoreScheduleAndPipeline(
       }
     }
   }
-
-#if 0
-  for (int kgroup = 0; kgroup < info.getNumKGroups(); kgroup = kgroup + 2) {
-    // Schedule load operations for kgroup + 1.
-    for (auto& ldmatrixOp : info.warpOperations[kgroup + 1].loadOperationsA) {
-      scheduleOperations(ops, info.operationDeps[ldmatrixOp], depth - 1);
-    }
-
-    for (auto& ldmatrixOp : info.warpOperations[kgroup + 1].loadOperationsB) {
-      scheduleOperations(ops, info.operationDeps[ldmatrixOp], depth - 1);
-    }
-
-    // Schedule mma.sync for kgroup.
-    for (auto& mmaOp : info.warpOperations[kgroup].mmaOperations) {
-      scheduleOperations(ops, info.operationDeps[mmaOp], depth - 1);
-    }
-
-    // TODO: Distribute cp.async accross kgroup and schedule wait and bar.sync
-    // after the last cp.async.
-    // Schedule *all* cp.async.wait and bar.sync 0 if
-    // it is the kgroup 0.
-    if (kgroup == 0) {
-      for (auto& copyOp : info.copyGlobalToSharedOps) {
-        scheduleOperations(ops, info.operationDeps[copyOp], 0);
-      }
-
-      scheduleOperations(ops, info.operationDeps[info.asyncWaitOps[0]],
-                         depth - 2);
-      scheduleOperations(ops, info.operationDeps[info.barrierOps[0]],
-                         depth - 2);
-    }
-
-    // Schedule load operations for kgroup.
-    for (auto& ldmatrixOp : info.warpOperations[kgroup].loadOperationsA) {
-      int pipelineStage = (kgroup == 0) ? depth - 2 : depth - 1;
-      scheduleOperations(ops, info.operationDeps[ldmatrixOp], pipelineStage);
-    }
-
-    for (auto& ldmatrixOp : info.warpOperations[kgroup].loadOperationsB) {
-      int pipelineStage = (kgroup == 0) ? depth - 2 : depth - 1;
-      scheduleOperations(ops, info.operationDeps[ldmatrixOp], pipelineStage);
-    }
-
-    // Schedule mma.sync for kgroup + 1.
-    for (auto& mmaOp : info.warpOperations[kgroup + 1].mmaOperations) {
-      scheduleOperations(ops, info.operationDeps[mmaOp], depth - 1);
-    }
-  }
-#endif
 
   llvm::SmallDenseSet<Operation*> scheduledOperations;
   std::cout << std::flush;
@@ -801,8 +753,8 @@ static FailureOr<scf::ForOp> applyPipelining(
                          scf::ForOp forOp,
                          std::vector<std::pair<Operation*, unsigned>>& ops) {
     if (schedule == PipeliningSchedulingStrategy::nvidiaTensorCore) {
-      // return getNvidiaTensorCoreScheduleAndPipeline(forOp, ops, maxDepth);
-      return getNvidiaTensorCorePipeline(forOp, ops, maxDepth);
+      return getNvidiaTensorCoreScheduleAndPipeline(forOp, ops, maxDepth);
+      // return getNvidiaTensorCorePipeline(forOp, ops, maxDepth);
     }
     return getPipelineStages(forOp, ops, maxDepth);
   };
