@@ -159,6 +159,31 @@ iree_status_t iree_tooling_parse_to_variant_list(
       z0,
       iree_vm_list_create(
           /*element_type=*/NULL, input_strings_count, host_allocator, &list));
+
+  iree_status_t status = iree_tooling_parse_into_variant_list(
+      device_allocator, input_strings, input_strings_count, host_allocator,
+      list);
+  if (iree_status_is_ok(status)) {
+    *out_list = list;
+  } else {
+    iree_vm_list_release(list);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+iree_status_t iree_tooling_parse_into_variant_list(
+    iree_hal_allocator_t* device_allocator,
+    const iree_string_view_t* input_strings,
+    iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
+    iree_vm_list_t* list) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Reset the list and prepare for pushing items.
+  iree_vm_list_clear(list);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_list_reserve(list, input_strings_count));
+
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < input_strings_count; ++i) {
     if (!iree_status_is_ok(status)) break;
@@ -250,11 +275,7 @@ iree_status_t iree_tooling_parse_to_variant_list(
       if (!iree_status_is_ok(status)) break;
     }
   }
-  if (iree_status_is_ok(status)) {
-    *out_list = list;
-  } else {
-    iree_vm_list_release(list);
-  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

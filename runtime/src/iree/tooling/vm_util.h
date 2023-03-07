@@ -32,6 +32,19 @@ iree_status_t iree_tooling_parse_to_variant_list(
     iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
     iree_vm_list_t** out_list);
 
+// Parses |input_strings| into a variant list of VM scalars and buffers.
+// Scalars should be in the format:
+//   type=value
+// Buffers should be in the IREE standard shaped buffer format:
+//   [shape]xtype=[value]
+// described in iree/hal/api.h
+// Uses |device_allocator| to allocate the buffers.
+iree_status_t iree_tooling_parse_into_variant_list(
+    iree_hal_allocator_t* device_allocator,
+    const iree_string_view_t* input_strings,
+    iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
+    iree_vm_list_t* list);
+
 // Appends fences to |list| if the invocation model of |function| requires them.
 // If no |wait_fence| is provided then the invocation will begin immediately.
 // The caller must wait on the returned |out_signal_fence| before accessing the
