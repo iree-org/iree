@@ -27,6 +27,7 @@ iree_lit_test_suite(
             "distribute_gpu_shared_memory.mlir",
             "eliminate_empty_tensors.mlir",
             "erase_hal_descriptor_type.mlir",
+            "fixup_subspan_with_offsets.mlir",
             "flatten_memref_subspan.mlir",
             "fold_affine_min_in_distributed_loops.mlir",
             "fold_tensor_extract_op.mlir",

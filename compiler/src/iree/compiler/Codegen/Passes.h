@@ -63,6 +63,11 @@ createBufferizeCopyOnlyDispatchesPass();
 // one op in the body.
 std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
 
+// Fixes resturn types of `hal.interface.binding.subspan` ops with non-zero
+// offsets.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createFixupSubspanWithOffsetsPass();
+
 /// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets
 /// on subspan ops to the consumer load/store ops, in preparation for lowering
 /// to backends that require linearized access.

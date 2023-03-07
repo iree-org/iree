@@ -47,6 +47,18 @@ def DecomposeLinalgGeneric :
   let constructor = "mlir::iree_compiler::createDecomposeLinalgGenericPass()";
 }
 
+def FixupSubspanWithOffsets :
+    Pass<"iree-codegen-fixup-subspan-with-offsets", "func::FuncOp"> {
+  let summary = "Fixes up `hal.interface.binding.subspan` ops with offsets";
+  let constructor =
+      "mlir::iree_compiler::createFixupSubspanWithOffsetsPass()";
+  let options = [
+    Option<"keepDeadSubspanOps", "keep-dead-subspan-ops",
+            "bool", /*default=*/"false",
+            "Flag to not remove dead subspan ops (used for testing only)">
+  ];
+}
+
 def FlattenMemRefSubspan :
   Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
