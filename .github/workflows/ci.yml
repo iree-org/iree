@@ -84,7 +84,7 @@ jobs:
         # See https://github.com/openxla/iree/issues/10042#issuecomment-1449250094
         # for more details.
         id: fetch-pr
-        if: github.event_name == 'pull_request'
+        if: fromJson(needs.setup.outputs.is-pr)
         env:
           PR_NUMBER: ${{ github.event.number }}
           PR_JSON: pull_request.json
@@ -125,7 +125,7 @@ jobs:
   ##############################################################################
   build_all:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -190,7 +190,7 @@ jobs:
 
   build_test_all_windows:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true' && contains(['push', 'workflow_dispatch'], github.event_name)
+    if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
     runs-on: managed-windows-cpu
     defaults:
       run:
@@ -257,7 +257,7 @@ jobs:
 
   build_test_all_macos:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true' && contains(['push', 'workflow_dispatch'], github.event_name)
+    if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
     runs-on:
       - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}  # must come first
       - runner-group=postsubmit
@@ -290,7 +290,7 @@ jobs:
 
   build_test_all_bazel:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -313,7 +313,7 @@ jobs:
 
   test_all:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -343,7 +343,7 @@ jobs:
 
   test_gpu:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -386,7 +386,7 @@ jobs:
   ##############################################################################
   build_test_runtime:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on: ubuntu-20.04-64core
     env:
       BUILD_DIR: build-runtime
@@ -414,7 +414,7 @@ jobs:
 
   build_test_runtime_windows:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on: managed-windows-cpu
     defaults:
       run:
@@ -443,7 +443,7 @@ jobs:
   ##############################################################################
   build_tf_integrations:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -490,7 +490,7 @@ jobs:
 
   test_tf_integrations:
     needs: [setup, build_all, build_tf_integrations]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -529,7 +529,7 @@ jobs:
 
   test_tf_integrations_gpu:
     needs: [setup, build_all, build_tf_integrations]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -577,7 +577,7 @@ jobs:
   # TODO(#11263): Drop this job once the IREE_BUILD_BENCHMARKS is removed.
   test_build_benchmark_suites:
     needs: [setup, build_all, build_tf_integrations]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -620,7 +620,7 @@ jobs:
   ##############################################################################
   python_release_packages:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -661,7 +661,7 @@ jobs:
 
   asan:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -689,7 +689,7 @@ jobs:
 
   tsan:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -714,7 +714,7 @@ jobs:
 
   small_runtime:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on: ubuntu-20.04-64core
     env:
       BUILD_DIR: build-runtime
@@ -741,7 +741,7 @@ jobs:
 
   gcc:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -773,7 +773,7 @@ jobs:
 
   tracing:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -802,7 +802,7 @@ jobs:
 
   debug:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -835,7 +835,7 @@ jobs:
 
   build_benchmark_tools:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -918,7 +918,7 @@ jobs:
 
   build_e2e_test_artifacts:
     needs: [setup, build_all, build_tf_integrations]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -986,7 +986,7 @@ jobs:
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+    if: fromJson(needs.setup.outputs.should-run) && needs.setup.outputs.benchmark-presets != ''
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -1060,7 +1060,7 @@ jobs:
 
   execution_benchmarks:
     needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+    if: fromJson(needs.setup.outputs.should-run) && needs.setup.outputs.benchmark-presets != ''
     uses: ./.github/workflows/benchmark_execution.yml
     with:
       # env.GCS_DIR is also duplicated in this workflow. See the note there on
@@ -1074,7 +1074,7 @@ jobs:
 
   process_benchmark_results:
     needs: [setup, compilation_benchmarks, execution_benchmarks]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+    if: fromJson(needs.setup.outputs.should-run) && needs.setup.outputs.benchmark-presets != ''
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -1111,7 +1111,7 @@ jobs:
             "${EXECUTION_BENCHMARK_RESULTS_DIR}"
           echo "execution-benchmark-results-pattern=${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-*.json" >> "${GITHUB_OUTPUT}"
       - name: Generating comment
-        if: github.event_name == 'pull_request'
+        if: fromJson(needs.setup.outputs.is-pr)
         id: generate-comment
         env:
           # Wildcard pattern to match all execution benchmark results. Empty if
@@ -1138,7 +1138,7 @@ jobs:
         # Due to security reasons, instead of posting the comment to PR, we only
         # upload the comment data in presubmit workflow and trigger the posting
         # workflow on the main branch. See post_benchmark_comment.yaml
-        if: github.event_name == 'pull_request'
+        if: fromJson(needs.setup.outputs.is-pr)
         env:
           BENCHMARK_COMMENT_ARTIFACT: ${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
           BENCHMARK_COMMENT_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
@@ -1166,7 +1166,7 @@ jobs:
 
   cross_compile_and_test:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -1255,7 +1255,7 @@ jobs:
 
   test_benchmark_suites:
     needs: [setup, build_all, build_e2e_test_artifacts]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
