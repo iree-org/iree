@@ -1036,12 +1036,11 @@ jobs:
           GENERATION_CONFIG: generation-config.json
           COMPILE_STATS_RESULTS: benchmark-results/compile-stats-results.json
         run: |
-          jq '.generation_configs' "${COMPILATION_CONFIG}" > "${GENERATION_CONFIG}"
           mkdir -p benchmark-results
           ./build_tools/benchmarks/collect_compilation_statistics.py alpha \
             --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
             --build_log="${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
-            --generation_config="${GENERATION_CONFIG}" \
+            --compilation_benchmark_config="${COMPILATION_CONFIG}" \
             --output="${COMPILE_STATS_RESULTS}"
           echo "compile-stats-results=${COMPILE_STATS_RESULTS}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading benchmark results"

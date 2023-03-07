@@ -113,7 +113,7 @@ class BenchmarkConfig:
     else:
       # TODO(#11076): Remove legacy path.
       build_dir = args.build_dir.resolve()
-      if args.run_config is not None:
+      if args.execution_benchmark_config is not None:
         root_benchmark_dir = build_dir / E2E_TEST_ARTIFACTS_REL_PATH
       else:
         root_benchmark_dir = build_dir / BENCHMARK_SUITE_REL_PATH
