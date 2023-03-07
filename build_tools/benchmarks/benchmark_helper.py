@@ -16,13 +16,12 @@ import argparse
 import json
 from typing import List
 
-from benchmark_suites.iree import export_definitions
 from e2e_test_framework import serialization
 from e2e_test_artifacts import model_artifacts, iree_artifacts
 from e2e_test_framework.definitions import iree_definitions
 
 
-def _dump_flags_of_generation_config(
+def dump_flags_of_generation_config(
     module_generation_config: iree_definitions.ModuleGenerationConfig):
   imported_model = module_generation_config.imported_model
   imported_model_path = iree_artifacts.get_imported_model_path(
@@ -42,7 +41,7 @@ def _dump_flags_of_generation_config(
   }
 
 
-def _dump_flags_from_run_config(
+def dump_flags_from_run_config(
     e2e_model_run_config: iree_definitions.E2EModelRunConfig):
   gen_config = e2e_model_run_config.module_generation_config
   module_path = iree_artifacts.get_module_dir_path(
@@ -54,7 +53,7 @@ def _dump_flags_from_run_config(
           e2e_model_run_config.materialize_run_flags() +
           [f"--module={module_path}"],
       "module_generation_config":
-          _dump_flags_of_generation_config(module_generation_config=gen_config)
+          dump_flags_of_generation_config(module_generation_config=gen_config)
   }
 
 
@@ -62,25 +61,23 @@ def _dump_flags_handler(args: argparse.Namespace):
   dump_configs = {}
   if args.execution_benchmark_config is not None:
     benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
-    for target_device, group in benchmark_groups.items():
-      benchmark_group = export_definitions.ExecutionBenchmarkGroup(**group)
+    for target_device, benchmark_group in benchmark_groups.items():
       run_configs = serialization.unpack_and_deserialize(
-          data=benchmark_group.run_configs,
+          data=benchmark_group["run_configs"],
           root_type=List[iree_definitions.E2EModelRunConfig])
       dump_configs[target_device] = dict(
           (run_config.composite_id,
-           _dump_flags_from_run_config(e2e_model_run_config=run_config))
+           dump_flags_from_run_config(e2e_model_run_config=run_config))
           for run_config in run_configs)
 
   elif args.compilation_benchmark_config is not None:
-    benchmark_group = export_definitions.CompilationBenchmarkGroup(
-        **json.loads(args.compilation_benchmark_config.read_text()))
+    benchmark_config = json.loads(args.compilation_benchmark_config.read_text())
     gen_configs = serialization.unpack_and_deserialize(
-        data=benchmark_group.generation_configs,
+        data=benchmark_config["generation_configs"],
         root_type=List[iree_definitions.ModuleGenerationConfig])
     dump_configs = dict(
         (gen_config.composite_id,
-         _dump_flags_of_generation_config(module_generation_config=gen_config))
+         dump_flags_of_generation_config(module_generation_config=gen_config))
         for gen_config in gen_configs)
 
   else:
