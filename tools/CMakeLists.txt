@@ -65,6 +65,7 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::internal::atomic_slist
+    iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::path
     iree::base::tracing
@@ -73,6 +74,7 @@ iree_cc_binary(
     iree::testing::benchmark
     iree::tooling::device_util
     iree::tooling::trace_replay
+    iree::tooling::vm_util
     iree::tooling::yaml_util
     iree::vm
     yaml
