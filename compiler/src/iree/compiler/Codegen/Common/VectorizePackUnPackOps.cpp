@@ -45,14 +45,6 @@ struct VectorizePackUnPackOpsPass
           scf::SCFTilingOptions().setTileSizeComputationFunction(
               [](OpBuilder &builder, Operation *op) -> SmallVector<Value> {
                 auto packOp = cast<tensor::PackOp>(op);
-
-                // Do nothing if any of inner tile sizes is dynamic.
-                if (llvm::any_of(packOp.getMixedTiles(), [](OpFoldResult tile) {
-                      return tile.is<Value>();
-                    })) {
-                  return {};
-                }
-
                 int inputRank = packOp.getSourceRank();
                 SmallVector<Value> tileSizes(
                     inputRank,
@@ -60,6 +52,10 @@ struct VectorizePackUnPackOpsPass
                 return tileSizes;
               }));
       funcOp->walk([&](tensor::PackOp op) {
+        if (llvm::any_of(op.getMixedTiles(),
+                         [](OpFoldResult tile) { return tile.is<Value>(); })) {
+          return;
+        }
         FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
             scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
                 rewriter, cast<TilingInterface>(op.getOperation()),

@@ -529,9 +529,17 @@ static bool isFusableWithProducer(
   auto linalgProducerOp = dyn_cast<linalg::LinalgOp>(producer);
   auto setEncodingOp = dyn_cast<IREE::LinalgExt::SetEncodingOp>(consumer);
   if (linalgProducerOp && setEncodingOp) {
+    return isa<linalg::GenericOp>(producer);
     return linalg::isElementwise(linalgProducerOp) &&
            linalgProducerOp.getNumLoops() ==
                setEncodingOp.getSourceType().getRank();
+  }
+
+  auto packOp = dyn_cast<tensor::PackOp>(consumer);
+  if (linalgProducerOp && packOp) {
+    return isa<linalg::GenericOp>(producer);
+    return linalg::isElementwise(linalgProducerOp) &&
+           linalgProducerOp.getNumLoops() == packOp.getSourceRank();
   }
 
   if (!isa<linalg::LinalgOp>(consumer) || !isa<linalg::LinalgOp>(producer)) {

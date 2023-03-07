@@ -532,6 +532,8 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createVectorizePackUnPackOpsPass());
   }
 
   addBufferizePasses(nestedModulePM);

@@ -345,6 +345,7 @@ void setLoweringConfig(Operation *op,
                        IREE::Codegen::LoweringConfigAttr config) {
   op->setAttr(kConfigAttrName, config);
 }
+void removeLoweringConfig(Operation *op) { op->removeAttr(kConfigAttrName); }
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting `iree_codegen.compilation_info` attribute on root
