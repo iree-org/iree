@@ -214,6 +214,7 @@ iree_cc_library(
   SRCS
     "trace_replay.c"
   DEPS
+    ::numpy_io
     ::yaml_util
     iree::base
     iree::base::internal
