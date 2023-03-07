@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <iostream>
-
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -108,49 +106,6 @@ static void addDepOps(llvm::SmallDenseSet<Operation*>& dep, Operation* op,
   for (Value operand : op->getOperands()) {
     Operation* defOp = operand.getDefiningOp();
     if (defOp && defOp->getBlock() == block) addDepOps(dep, defOp, block);
-  }
-}
-
-/// Add an op and its dependency to `ops` set and skip operations contained into
-/// filter. This also adds all the ops to filter so that they don't get matched
-/// again.
-static void addOpsAndDeps(llvm::SmallDenseSet<Operation*>& filter,
-                          llvm::SmallDenseSet<Operation*>& ops, Operation* op,
-                          Block* block) {
-  if (!filter.insert(op).second) return;
-  ops.insert(op);
-  for (Value operand : op->getOperands()) {
-    Operation* defOp = operand.getDefiningOp();
-    if (defOp && defOp->getBlock() == block)
-      addOpsAndDeps(filter, ops, defOp, block);
-  }
-}
-
-/// Insert an op and its dependency chain to `dependentOps` set.
-static void insertDependentOps(llvm::SetVector<Operation*>& dependentOps,
-                               Operation* op, Block* block) {
-  dependentOps.insert(op);
-  for (Value operand : op->getOperands()) {
-    Operation* defOp = operand.getDefiningOp();
-    if (defOp && defOp->getBlock() == block)
-      insertDependentOps(dependentOps, defOp, block);
-  }
-}
-
-/// Insert an op and its dependency chain to `dependentOps` set. It skip
-/// operations that are already scheduled (`scheduleOps` list) or ignored
-/// (`filteredOps` list).
-static void insertUnscheduledDependentOps(
-    llvm::SetVector<Operation*>& scheduledOps,
-    llvm::SetVector<Operation*>& filteredOps,
-    llvm::SetVector<Operation*>& dependentOps, Operation* op, Block* block) {
-  if (filteredOps.count(op) || !scheduledOps.insert(op)) return;
-  dependentOps.insert(op);
-  for (Value operand : op->getOperands()) {
-    Operation* defOp = operand.getDefiningOp();
-    if (defOp && defOp->getBlock() == block)
-      insertUnscheduledDependentOps(scheduledOps, filteredOps, dependentOps,
-                                    defOp, block);
   }
 }
 
@@ -265,21 +220,6 @@ static bool setPipeliningMarkers(scf::ForOp forOp, bool pipelineStoreStage) {
   }
   return copyToWorkgroupMemory;
 }
-
-/// Return true if the op is used as operand `index` of an mma.sync op.
-static bool isMMAOperand(Operation* op, int64_t index) {
-  OpOperand* use = &(*((op->getUses()).begin()));
-  if (auto extract = dyn_cast<vector::ExtractStridedSliceOp>(use->getOwner())) {
-    use = &(*((extract->getUses()).begin()));
-  }
-  if (!isa<nvgpu::MmaSyncOp>(use->getOwner())) return false;
-  return use->getOperandNumber() == index;
-}
-
-/// Return true if the op is used as operand A of an mma.sync op.
-static bool isAOperand(Operation* op) { return isMMAOperand(op, 0); }
-/// Return true if the op is used as operand B of an mma.sync op.
-static bool isBOperand(Operation* op) { return isMMAOperand(op, 1); }
 
 /// Loads from Shared Memory and the MMA operations on registers for a kgroup.
 struct WarpMmaOp {
@@ -585,7 +525,6 @@ static FailureOr<scf::ForOp> applyPipelining(
                          std::vector<std::pair<Operation*, unsigned>>& ops) {
     if (schedule == PipeliningSchedulingStrategy::nvidiaTensorCore) {
       return getMultiStagedPipelineSchedule(forOp, ops, maxDepth);
-      // return getNvidiaTensorCorePipeline(forOp, ops, maxDepth);
     }
     return getPipelineStages(forOp, ops, maxDepth);
   };
