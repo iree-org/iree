@@ -18,20 +18,27 @@ from typing import List
 
 from benchmark_suites.iree import export_definitions
 from e2e_test_framework import serialization
-from e2e_test_artifacts import iree_artifacts
+from e2e_test_artifacts import model_artifacts, iree_artifacts
 from e2e_test_framework.definitions import iree_definitions
 
 
 def _dump_flags_of_generation_config(
     module_generation_config: iree_definitions.ModuleGenerationConfig):
+  imported_model = module_generation_config.imported_model
   imported_model_path = iree_artifacts.get_imported_model_path(
-      imported_model=module_generation_config.imported_model)
+      imported_model=imported_model)
+  source_model_path = model_artifacts.get_model_path(model=imported_model.model)
   return {
       "composite_id":
           module_generation_config.composite_id,
       "compile_flags":
           module_generation_config.materialize_compile_flags() +
-          [str(imported_model_path)]
+          [str(imported_model_path)],
+      "import_tool":
+          imported_model.import_config.tool.value,
+      "import_flags":
+          imported_model.import_config.materialize_import_flags(
+              model=imported_model.model) + [str(source_model_path)]
   }
 
 
