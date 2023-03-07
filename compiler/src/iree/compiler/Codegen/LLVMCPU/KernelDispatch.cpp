@@ -1113,28 +1113,6 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
   return workgroupTileSizes;
 }
 
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   tensor::PackOp op) {
-  SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
-      cast<TilingInterface>(op.getOperation()), defaultWorkgroupTileSize);
-
-  // The default function aims to returns the number of workload per workgroup,
-  // but it does not know that it is working on packed domain. We need to take
-  // inner tile sizes into account and adjust the distribution tile sizes.
-  SmallVector<int64_t> innerTiles = op.getStaticTiles();
-  ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
-  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
-    tileSizes[pos] = tileSizes[pos] / size;
-    tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
-  }
-
-  TileSizesListType tileSizesList = {tileSizes};
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizesList,
-      DispatchLoweringPassPipeline::CPUDataTiling);
-}
-
 static LogicalResult setUnPackOpRootConfig(
     func::FuncOp entryPointFn, tensor::UnPackOp op,
     DispatchLoweringPassPipeline pipeline =
@@ -1515,6 +1493,48 @@ static LogicalResult setRootConfig(
   return success();
 }
 
+static LogicalResult setPackOpRootConfig(
+    func::FuncOp entryPointFn, tensor::PackOp op,
+    const TargetMLTransformInfo &targetMLTransInfo,
+    DispatchLoweringPassPipeline pipeline =
+        DispatchLoweringPassPipeline::CPUDataTiling) {
+  TileSizesListType tileSizesList;
+  if (auto srcGenericOp = op.getSource().getDefiningOp<linalg::GenericOp>()) {
+    if (failed(setRootConfig(entryPointFn, srcGenericOp,
+                             LinalgOpInfo(srcGenericOp.getOperation()),
+                             targetMLTransInfo))) {
+      return failure();
+    }
+    tileSizesList = getLoweringConfig(srcGenericOp).getTileSizeVals();
+    pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
+    removeLoweringConfig(srcGenericOp);
+  } else {
+    SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
+        cast<TilingInterface>(op.getOperation()), defaultWorkgroupTileSize);
+    tileSizesList = {tileSizes};
+  }
+
+  // The default function aims to returns the number of workload per workgroup,
+  // but it does not know that it is working on packed domain. We need to take
+  // inner tile sizes into account and adjust the distribution tile sizes.
+  for (SmallVectorImpl<int64_t> &tileSizes : tileSizesList) {
+    SmallVector<int64_t> innerTiles = op.getStaticTiles();
+    ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
+    for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+      if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+      tileSizes[pos] = tileSizes[pos] / size;
+      tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
+    }
+  }
+
+  // The config must be set on tensor.pack ops. Otherwise the
+  // IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp will not get lowered in
+  // tile and distribute pass. See Common/TileAndDistributeToWorkgroupsPass.cpp
+  // for more details.
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, tileSizesList,
+                                               pipeline);
+}
+
 namespace {
 bool is2DPoolingOp(linalg::LinalgOp op) {
   return isa<linalg::PoolingNhwcSumOp, linalg::PoolingNchwSumOp,
@@ -1787,13 +1807,16 @@ static LogicalResult setRootConfigImpl(
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
         })
-        .Case<IREE::LinalgExt::FftOp, tensor::PackOp, linalg::Mmt4DOp,
-              linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-              linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-              linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-              linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+        .Case<IREE::LinalgExt::FftOp, linalg::Mmt4DOp, linalg::Conv2DNhwcHwcfOp,
+              linalg::Conv2DNchwFchwOp, linalg::PoolingNhwcSumOp,
+              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
+              linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp,
+              linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<tensor::PackOp>([&](auto op) {
+          return setPackOpRootConfig(entryPointFn, op, targetMLTransInfo);
+        })
         .Case<tensor::UnPackOp>(
             [&](auto op) { return setUnPackOpRootConfig(entryPointFn, op); })
         .Case<linalg::ContractionOpInterface>(
@@ -1809,8 +1832,9 @@ static LogicalResult setRootConfigImpl(
 
 /// Redirects to methods that set the configuration based on operation type for
 /// VMVX backend.
-static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
-                                           Operation *op) {
+static LogicalResult setVMVXRootConfigImpl(
+    func::FuncOp entryPointFn, Operation *op,
+    const TargetMLTransformInfo &targetMLTransInfo) {
   if (getLoweringConfig(op)) return success();
 
   // Redirect to individual operations.
@@ -1823,6 +1847,10 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
         .Case<linalg::LinalgOp>([&](auto op) {
           return setRootConfig(entryPointFn, op,
                                DispatchLoweringPassPipeline::VMVXDefault);
+        })
+        .Case<tensor::PackOp>([&](auto op) {
+          return setPackOpRootConfig(entryPointFn, op, targetMLTransInfo,
+                                     DispatchLoweringPassPipeline::VMVXDefault);
         })
         .Case<tensor::UnPackOp>([&](auto op) {
           return setUnPackOpRootConfig(
@@ -1882,13 +1910,14 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 
   if (rootOperation) {
     auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+    auto targetMLTransInfo =
+        TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
     if (isVMVXBackend(targetAttr)) {
-      if (failed(setVMVXRootConfigImpl(entryPointFn, rootOperation))) {
+      if (failed(setVMVXRootConfigImpl(entryPointFn, rootOperation,
+                                       targetMLTransInfo))) {
         return failure();
       }
     } else {
-      auto targetMLTransInfo =
-          TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
       if (failed(setRootConfigImpl(entryPointFn, rootOperation,
                                    targetMLTransInfo))) {
         return failure();
