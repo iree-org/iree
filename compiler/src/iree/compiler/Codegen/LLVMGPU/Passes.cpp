@@ -42,6 +42,10 @@ llvm::cl::opt<bool> llvmgpuUseMMASync(
     "iree-codegen-llvmgpu-use-mma-sync",
     llvm::cl::desc("use mma sync instead of wmma ops"), llvm::cl::init(false));
 
+llvm::cl::opt<bool> llvmgpuUseGPUPipeliner(
+    "iree-codegen-llvmgpu-use-gpu-pipeliner",
+    llvm::cl::desc("use the gpu pipeliner"), llvm::cl::init(true));
+
 static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
                                         ValueRange dynamicSizes,
@@ -266,13 +270,19 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
       memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorToGPU());
   nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
   nestedModulePM.addPass(createCSEPass());
 
-  // Pipeline memory operations.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUPipeliningPass(/*epiloguePeeling=*/false, pipelineDepth));
+  if (llvmgpuUseGPUPipeliner) {
+    // Pipeline memory operations.
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGPUPipeliningPass(/*epiloguePeeling=*/false, pipelineDepth));
+  }
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {
