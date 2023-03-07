@@ -334,7 +334,12 @@ static iree_status_t iree_variant_format(iree_vm_variant_t variant,
     IREE_RETURN_IF_ERROR(iree_string_builder_append_string(builder, type_name));
     IREE_RETURN_IF_ERROR(
         iree_string_builder_append_string(builder, IREE_SV("\n")));
-    if (iree_hal_buffer_view_isa(variant.ref)) {
+    if (iree_vm_list_isa(variant.ref)) {
+      iree_vm_list_t* child_list = iree_vm_list_deref(variant.ref);
+      IREE_RETURN_IF_ERROR(iree_tooling_append_variant_list_lines(
+          IREE_SV("child_list"), child_list, max_element_count, builder));
+      return iree_string_builder_append_string(builder, IREE_SV("\n"));
+    } else if (iree_hal_buffer_view_isa(variant.ref)) {
       iree_hal_buffer_view_t* buffer_view =
           iree_hal_buffer_view_deref(variant.ref);
       IREE_RETURN_IF_ERROR(iree_hal_buffer_view_append_to_builder(
@@ -370,15 +375,16 @@ static iree_status_t iree_variant_fprint(iree_vm_variant_t variant,
 }
 
 iree_status_t iree_tooling_append_variant_list_lines(
-    iree_vm_list_t* list, iree_host_size_t max_element_count,
-    iree_string_builder_t* builder) {
+    iree_string_view_t list_name, iree_vm_list_t* list,
+    iree_host_size_t max_element_count, iree_string_builder_t* builder) {
   IREE_TRACE_ZONE_BEGIN(z0);
   for (iree_host_size_t i = 0; i < iree_vm_list_size(list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_vm_list_get_variant_assign(list, i, &variant),
         "variant %zu not present", i);
-    iree_string_builder_append_format(builder, "result[%zu]: ", i);
+    iree_string_builder_append_format(
+        builder, "%.*s[%" PRIhsz "]: ", (int)list_name.size, list_name.data, i);
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_variant_format(variant, max_element_count, builder));
   }
@@ -387,11 +393,12 @@ iree_status_t iree_tooling_append_variant_list_lines(
 }
 
 iree_status_t iree_tooling_variant_list_fprint(
-    iree_vm_list_t* list, iree_host_size_t max_element_count, FILE* file) {
+    iree_string_view_t list_name, iree_vm_list_t* list,
+    iree_host_size_t max_element_count, FILE* file) {
   iree_string_builder_t builder;
   iree_string_builder_initialize(iree_allocator_system(), &builder);
-  iree_status_t status =
-      iree_tooling_append_variant_list_lines(list, max_element_count, &builder);
+  iree_status_t status = iree_tooling_append_variant_list_lines(
+      list_name, list, max_element_count, &builder);
   if (iree_status_is_ok(status)) {
     size_t written = fwrite(iree_string_builder_buffer(&builder), 1,
                             iree_string_builder_size(&builder), file);

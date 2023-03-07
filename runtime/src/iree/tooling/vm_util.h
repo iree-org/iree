@@ -42,6 +42,8 @@ iree_status_t iree_tooling_append_async_fence_inputs(
     iree_hal_fence_t** out_signal_fence);
 
 // Appends a variant list of VM scalars and buffers to |builder|.
+// |list_name| will be printed alongside each element ordinal.
+//
 // Prints scalars in the format:
 //   value
 // Prints buffers in the IREE standard shaped buffer format:
@@ -49,12 +51,14 @@ iree_status_t iree_tooling_append_async_fence_inputs(
 // described in
 // https://github.com/openxla/iree/tree/main/iree/hal/api.h
 iree_status_t iree_tooling_append_variant_list_lines(
-    iree_vm_list_t* list, iree_host_size_t max_element_count,
-    iree_string_builder_t* builder);
+    iree_string_view_t list_name, iree_vm_list_t* list,
+    iree_host_size_t max_element_count, iree_string_builder_t* builder);
 
-// Prints a variant list to a file.
+// Prints a variant list to a |file|.
+// |list_name| will be printed alongside each element ordinal.
 iree_status_t iree_tooling_variant_list_fprint(
-    iree_vm_list_t* list, iree_host_size_t max_element_count, FILE* file);
+    iree_string_view_t list_name, iree_vm_list_t* list,
+    iree_host_size_t max_element_count, FILE* file);
 
 // Prints a variant |list| to targets based on the provided |output_strings|.
 //
