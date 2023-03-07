@@ -70,5 +70,6 @@ iree_runtime_cc_library(
     name = "cpu_data",
     hdrs = [
         "cpu_data.h",
+        "cpu_feature_bits.inl",
     ],
 )

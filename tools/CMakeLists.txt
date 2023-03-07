@@ -186,6 +186,17 @@ iree_cc_binary(
     yaml
 )
 
+iree_cc_binary(
+  NAME
+    iree-cpuinfo
+  SRCS
+    "iree-cpuinfo.c"
+  DEPS
+    iree::base
+    iree::base::internal::cpu
+    iree::schemas::cpu_data
+)
+
 if(IREE_BUILD_COMPILER)
   # If a target backend that requires LLD to link codegen executables is
   # enabled, install the target.

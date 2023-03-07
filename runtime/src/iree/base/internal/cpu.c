@@ -221,39 +221,6 @@ static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
 }
 
 //===----------------------------------------------------------------------===//
-// Architecture-specific string lookup
-//===----------------------------------------------------------------------===//
-
-#define IREE_TEST_FIELD_BIT(field_key, field_value, bit_value)          \
-  if (iree_string_view_equal(key, IREE_SV(field_key))) {                \
-    *out_value = iree_all_bits_set((field_value), (bit_value)) ? 1 : 0; \
-    return true;                                                        \
-  }
-
-#if defined(IREE_ARCH_ARM_64)
-
-static bool iree_cpu_lookup_data_by_key_for_arch(
-    const uint64_t* fields, iree_string_view_t key,
-    int64_t* IREE_RESTRICT out_value) {
-  IREE_TEST_FIELD_BIT("dotprod", fields[0], IREE_CPU_DATA0_ARM_64_DOTPROD);
-  IREE_TEST_FIELD_BIT("i8mm", fields[0], IREE_CPU_DATA0_ARM_64_I8MM);
-  return false;
-}
-
-#else
-
-static bool iree_cpu_lookup_data_by_key_for_arch(
-    const uint64_t* fields, iree_string_view_t key,
-    int64_t* IREE_RESTRICT out_value) {
-  // Not yet implemented for this architecture.
-  return false;
-}
-
-#endif  // IREE_ARCH_*
-
-#undef IREE_TEST_FIELD_BIT
-
-//===----------------------------------------------------------------------===//
 // Processor data query
 //===----------------------------------------------------------------------===//
 
@@ -289,15 +256,30 @@ void iree_cpu_read_data(iree_host_size_t field_count, uint64_t* out_fields) {
              sizeof(*out_fields));
 }
 
+//===----------------------------------------------------------------------===//
+// Processor data lookup by key
+//===----------------------------------------------------------------------===//
+
 iree_status_t iree_cpu_lookup_data_by_key(iree_string_view_t key,
                                           int64_t* IREE_RESTRICT out_value) {
-  if (!iree_cpu_lookup_data_by_key_for_arch(iree_cpu_data_cache_, key,
-                                            out_value)) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "CPU data key '%.*s' not found", (int)key.size,
-                            key.data);
+#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name)  \
+  if (IREE_ARCH_ENUM == IREE_ARCH_ENUM_##arch) {                               \
+    if (iree_string_view_equal(key, IREE_SV(llvm_name))) {                     \
+      *out_value = iree_all_bits_set(                                          \
+                       (iree_cpu_data_cache_[field_index]),                    \
+                       IREE_CPU_FEATURE_BIT_NAME(arch, field_index, bit_name)) \
+                       ? 1                                                     \
+                       : 0;                                                    \
+      return iree_ok_status();                                                 \
+    }                                                                          \
   }
-  return iree_ok_status();
+#include "iree/schemas/cpu_feature_bits.inl"
+#undef IREE_CPU_FEATURE_BIT
+
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "CPU feature '%.*s' unknown on this architecture (%s)", (int)key.size,
+      key.data, IREE_ARCH);
 }
 
 //===----------------------------------------------------------------------===//

@@ -211,6 +211,16 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iree-cpuinfo",
+    srcs = ["iree-cpuinfo.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:cpu",
+        "//runtime/src/iree/schemas:cpu_data",
+    ],
+)
+
+cc_binary(
     name = "iree-tblgen",
     srcs = [
         "//compiler/src/iree/compiler/Dialect/VM/Tools:GenSrcs",
