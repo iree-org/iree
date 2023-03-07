@@ -61,7 +61,7 @@ LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
         return setConvOpConfig(op, subgroupSize,
                                /*bestTilingFactor=*/16);
       })
-      .Default([](Operation *) { return success(); });
+      .Default([](Operation *) { return failure(); });
 }
 
 }  // namespace detail
