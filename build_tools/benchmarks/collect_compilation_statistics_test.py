@@ -5,14 +5,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import dataclasses
 from io import BytesIO, StringIO
 import json
 import pathlib
 import unittest
 import zipfile
 
-from benchmark_suites.iree import export_definitions
 from common.benchmark_definition import ModuleComponentSizes
 from collect_compilation_statistics import CONST_COMPONENT_NAME, VM_COMPONENT_NAME, get_module_component_info, get_module_path, parse_compilation_time_from_ninja_log
 from e2e_test_artifacts import iree_artifacts
@@ -128,15 +126,14 @@ class CollectCompilationStatistics(unittest.TestCase):
         imported_model=imported_model_a, compile_config=compile_config_a)
     gen_config_b = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_a, compile_config=compile_config_b)
-    compilation_benchmark_group = export_definitions.CompilationBenchmarkGroup(
-        generation_configs=serialization.serialize_and_pack(
-            [gen_config_a, gen_config_b]),
-        module_dir_paths=["a", "b"])
+    benchmark_config = dict(generation_configs=serialization.serialize_and_pack(
+        [gen_config_a, gen_config_b]),
+                            module_dir_paths=["a", "b"])
     root_dir = pathlib.PurePath("artifacts_dir")
 
     module_map = collect_compilation_statistics.get_module_map_from_compilation_benchmark_config(
         compilation_benchmark_config_data=StringIO(
-            json.dumps(dataclasses.asdict(compilation_benchmark_group))),
+            json.dumps(benchmark_config)),
         e2e_test_artifacts_dir=root_dir)
 
     compile_info_a = common.benchmark_definition.CompilationInfo(

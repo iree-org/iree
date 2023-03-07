@@ -25,7 +25,6 @@ import zipfile
 from dataclasses import asdict
 from typing import BinaryIO, Dict, List, Optional, TextIO
 
-from benchmark_suites.iree import export_definitions
 from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes, get_git_commit_hash
 from common.benchmark_suite import BenchmarkSuite
 from common import benchmark_config
@@ -138,10 +137,9 @@ def get_module_map_from_compilation_benchmark_config(
     compilation_benchmark_config_data: TextIO,
     e2e_test_artifacts_dir: pathlib.PurePath
 ) -> Dict[CompilationInfo, pathlib.Path]:
-  compilation_benchmark_group = export_definitions.CompilationBenchmarkGroup(
-      **json.load(compilation_benchmark_config_data))
+  benchmark_config = json.load(compilation_benchmark_config_data)
   gen_configs = serialization.unpack_and_deserialize(
-      data=compilation_benchmark_group.generation_configs,
+      data=benchmark_config["generation_configs"],
       root_type=List[iree_definitions.ModuleGenerationConfig])
   module_map = {}
   for gen_config in gen_configs:

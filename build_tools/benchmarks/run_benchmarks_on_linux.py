@@ -20,7 +20,6 @@ import shutil
 import subprocess
 import tarfile
 
-from benchmark_suites.iree import export_definitions
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
@@ -157,10 +156,8 @@ def main(args):
     benchmark_group = benchmark_groups.get(args.target_device_name)
     if benchmark_group is None:
       raise ValueError("Target device not found in the benchmark config.")
-    benchmark_group = export_definitions.ExecutionBenchmarkGroup(
-        **benchmark_group)
     run_configs = serialization.unpack_and_deserialize(
-        data=benchmark_group.run_configs,
+        data=benchmark_group["run_configs"],
         root_type=typing.List[iree_definitions.E2EModelRunConfig])
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
         run_configs=run_configs)
