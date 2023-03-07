@@ -84,7 +84,7 @@ jobs:
         # See https://github.com/openxla/iree/issues/10042#issuecomment-1449250094
         # for more details.
         id: fetch-pr
-        if: fromJson(needs.setup.outputs.is-pr)
+        if: github.event_name == 'pull_request'
         env:
           PR_NUMBER: ${{ github.event.number }}
           PR_JSON: pull_request.json
