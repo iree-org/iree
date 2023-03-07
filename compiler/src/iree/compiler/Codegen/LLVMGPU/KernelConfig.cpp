@@ -467,13 +467,13 @@ static LogicalResult setUnPackConfig(func::FuncOp entryPoint,
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   auto srcType = op.getSourceType();
-  int srcRank = op.getSourceRank();
+  int destRank = op.getDestRank();
   std::array<int64_t, 3> workgroupSizes = {cudaWarpSize, 1, 1};
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
     if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
     tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
-    int id = pos + 3 - srcRank;
-    if (srcRank < 3) id = pos;
+    int id = pos + 3 - destRank;
+    if (destRank <= 3) id = pos;
     if (id >= 3) continue;
     // Distribute one tile on one thread if the dimension is a data tiling
     // dimension. It makes the amount of elements along the dimension align to
