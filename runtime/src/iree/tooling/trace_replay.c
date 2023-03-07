@@ -17,6 +17,7 @@
 #include "iree/base/internal/path.h"
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/module.h"
+#include "iree/tooling/device_util.h"
 #include "iree/tooling/numpy_io.h"
 #include "iree/vm/bytecode/module.h"
 
@@ -125,8 +126,8 @@ static iree_status_t iree_trace_replay_create_device(
   }
 
   // Try to create the device.
-  return iree_hal_create_device(replay->driver_registry, device_uri,
-                                host_allocator, out_device);
+  return iree_hal_create_device_from_flags(replay->driver_registry, device_uri,
+                                           host_allocator, out_device);
 }
 
 static iree_status_t iree_trace_replay_load_builtin_module(

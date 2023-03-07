@@ -193,6 +193,7 @@ cc_library(
     srcs = ["trace_replay.c"],
     hdrs = ["trace_replay.h"],
     deps = [
+        ":device_util",
         ":numpy_io",
         ":yaml_util",
         "//runtime/src/iree/base",
