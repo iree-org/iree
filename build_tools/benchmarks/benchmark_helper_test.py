@@ -5,6 +5,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import pathlib
 import unittest
 
 import benchmark_helper
@@ -36,13 +37,15 @@ class BenchmarkHelper(unittest.TestCase):
     imported_model = iree_definitions.ImportedModel.from_model(model)
     gen_config = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model, compile_config=compile_config)
+    root_path = pathlib.PurePath("root")
 
     output = benchmark_helper.dump_flags_of_generation_config(
-        module_generation_config=gen_config)
+        module_generation_config=gen_config, root_path=root_path)
 
-    model_path = model_artifacts.get_model_path(model=imported_model.model)
+    model_path = model_artifacts.get_model_path(model=imported_model.model,
+                                                root_path=root_path)
     imported_model_path = iree_artifacts.get_imported_model_path(
-        imported_model=imported_model)
+        imported_model=imported_model, root_path=root_path)
     self.assertEquals(output["composite_id"], gen_config.composite_id)
     self.assertIn(str(imported_model_path), output["compile_flags"])
     self.assertIn("--test-flag=abcd", output["compile_flags"])
@@ -88,12 +91,14 @@ class BenchmarkHelper(unittest.TestCase):
         module_execution_config=exec_config,
         target_device_spec=device_spec,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+    root_path = pathlib.PurePath("root")
 
     output = benchmark_helper.dump_flags_from_run_config(
-        e2e_model_run_config=run_config)
+        e2e_model_run_config=run_config, root_path=root_path)
 
     module_path = iree_artifacts.get_module_dir_path(
-        module_generation_config=gen_config) / iree_artifacts.MODULE_FILENAME
+        module_generation_config=gen_config,
+        root_path=root_path) / iree_artifacts.MODULE_FILENAME
     self.assertEqual(output["composite_id"], run_config.composite_id)
     self.assertIn(f"--module={str(module_path)}", output["run_flags"])
     self.assertIn(f"--test-flag=abcd", output["run_flags"])
