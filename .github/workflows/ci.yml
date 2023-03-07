@@ -65,6 +65,7 @@ jobs:
       BASE_REF: HEAD^
     outputs:
       should-run: ${{ steps.configure.outputs.should-run }}
+      is-pr: ${{ steps.configure.outputs.is-pr }}
       runner-env: ${{ steps.configure.outputs.runner-env }}
       runner-group: ${{ steps.configure.outputs.runner-group }}
       write-caches: ${{ steps.configure.outputs.write-caches }}
