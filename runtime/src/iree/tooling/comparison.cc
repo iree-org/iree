@@ -244,9 +244,10 @@ bool iree_tooling_compare_variant_lists_and_append(
   for (iree_host_size_t i = 0; i < iree_vm_list_size(expected_list); ++i) {
     iree_vm_variant_t expected_variant = iree_vm_variant_empty();
     IREE_CHECK_OK(
-        iree_vm_list_get_variant(expected_list, i, &expected_variant));
+        iree_vm_list_get_variant_assign(expected_list, i, &expected_variant));
     iree_vm_variant_t actual_variant = iree_vm_variant_empty();
-    IREE_CHECK_OK(iree_vm_list_get_variant(actual_list, i, &actual_variant));
+    IREE_CHECK_OK(
+        iree_vm_list_get_variant_assign(actual_list, i, &actual_variant));
     bool did_match = iree_tooling_compare_variants(
         (int)i, expected_variant, actual_variant, host_allocator,
         /*max_element_count=*/1024, builder);

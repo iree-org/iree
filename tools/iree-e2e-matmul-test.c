@@ -166,7 +166,7 @@ static iree_status_t get_item_as_buffer_view(
     iree_vm_list_t* list, iree_host_size_t i,
     iree_hal_buffer_view_t** out_value) {
   iree_vm_variant_t variant = iree_vm_variant_empty();
-  IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(list, i, &variant));
+  IREE_RETURN_IF_ERROR(iree_vm_list_get_variant_assign(list, i, &variant));
   if (!iree_vm_variant_is_ref(variant)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "expected list item %zu to be a ref", i);

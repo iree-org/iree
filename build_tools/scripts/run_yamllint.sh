@@ -21,6 +21,8 @@ declare -a included_files_patterns=(
 declare -a excluded_files_patterns=(
   "/third_party/"
   "^third_party/"
+  "/tools/test/"
+  "^tools/test/"
 )
 
 # Join on |
