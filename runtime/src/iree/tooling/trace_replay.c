@@ -41,11 +41,31 @@ iree_status_t iree_trace_replay_initialize(
 
   out_replay->driver_registry = driver_registry;
 
-  return iree_ok_status();
+  iree_status_t status = iree_ok_status();
+  if (iree_status_is_ok(status)) {
+    status = iree_vm_list_create(NULL, 8u, host_allocator, &out_replay->inputs);
+  }
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_vm_list_create(NULL, 8u, host_allocator, &out_replay->outputs);
+  }
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_vm_list_create(NULL, 8u, host_allocator, &out_replay->blackboard);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    iree_trace_replay_deinitialize(out_replay,
+                                   IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+  }
+  return status;
 }
 
 void iree_trace_replay_deinitialize(iree_trace_replay_t* replay,
                                     iree_trace_replay_shutdown_flags_t flags) {
+  iree_vm_list_release(replay->inputs);
+  iree_vm_list_release(replay->outputs);
+  iree_vm_list_release(replay->blackboard);
   iree_vm_context_release(replay->context);
   iree_vm_instance_release(replay->instance);
 
@@ -117,11 +137,11 @@ static iree_status_t iree_trace_replay_load_builtin_module(
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(document, module_node,
                                               IREE_SV("name"), &name_node));
   if (iree_yaml_string_equal(name_node, IREE_SV("hal"))) {
-    yaml_node_t* driver_node = NULL;
+    yaml_node_t* device_node = NULL;
     IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-        document, module_node, IREE_SV("driver"), &driver_node));
+        document, module_node, IREE_SV("device"), &device_node));
     IREE_RETURN_IF_ERROR(iree_trace_replay_create_device(
-        replay, driver_node, replay->host_allocator, &replay->device));
+        replay, device_node, replay->host_allocator, &replay->device));
     IREE_RETURN_IF_ERROR(iree_hal_module_create(
         replay->instance, replay->device, IREE_HAL_MODULE_FLAG_NONE,
         replay->host_allocator, &module));
@@ -354,13 +374,123 @@ static void iree_trace_replay_generate_fully_specified_pseudorandom_buffer(
 }
 
 //===----------------------------------------------------------------------===//
-// Input
+// List I/O macros
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_trace_replay_parse_item(iree_trace_replay_t* replay,
-                                                  yaml_document_t* document,
-                                                  yaml_node_t* value_node,
-                                                  iree_vm_list_t* target_list);
+// Parses an I/O macro referencing the replay-global inputs/outputs.
+// If |is_move| is true then the value is consumed from |list| and the original
+// value in the list is reset to NULL.
+//
+// ```yaml
+// !input.get 0
+// !input.take 1
+// !output.get 2
+// ```
+static iree_status_t iree_trace_replay_parse_list_get_macro(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* value_node, iree_vm_list_t* list, bool is_move,
+    iree_vm_variant_t* out_result) {
+  iree_string_view_t value_str = iree_yaml_node_as_string(value_node);
+  int32_t ordinal = 0;
+  if (!iree_string_view_atoi_int32(value_str, &ordinal)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "failed to parse I/O ordinal from `%.*s`",
+                            (int)value_str.size, value_str.data);
+  }
+  iree_vm_variant_t variant = iree_vm_variant_empty();
+  if (is_move) {
+    IREE_RETURN_IF_ERROR(
+        iree_vm_list_get_variant_move(list, ordinal, &variant));
+  } else {
+    IREE_RETURN_IF_ERROR(
+        iree_vm_list_get_variant_retain(list, ordinal, &variant));
+  }
+  *out_result = variant;
+  return iree_ok_status();
+}
+
+// Parses a list load macro referencing a replay-global |list|.
+//
+// ```yaml
+// # gets |variant| at index 2, leaving it in the list for future use
+// [!input.]get 2
+// # takes |variant| at index 2, clearing the entry in the list
+// [!input.]take 2
+// ```
+static iree_status_t iree_trace_replay_parse_list_load_macro(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* value_node, iree_string_view_t name, iree_vm_list_t* list,
+    iree_vm_variant_t* out_result) {
+  if (iree_string_view_equal(name, IREE_SV("get"))) {
+    return iree_trace_replay_parse_list_get_macro(
+        replay, document, value_node, list,
+        /*is_move=*/false, out_result);
+  } else if (iree_string_view_equal(name, IREE_SV("take"))) {
+    return iree_trace_replay_parse_list_get_macro(replay, document, value_node,
+                                                  list,
+                                                  /*is_move=*/true, out_result);
+  } else if (iree_string_view_equal(name, IREE_SV("pop"))) {
+    iree_host_size_t i = iree_vm_list_size(list) - 1;
+    IREE_RETURN_IF_ERROR(iree_vm_list_get_variant_move(list, i, out_result));
+    return iree_vm_list_resize(list, i);
+  }
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "unsupported list load macro: `%.*s`", (int)name.size,
+                          name.data);
+}
+
+// Parses an output-set macro referencing the replay-global outputs.
+// The provided |variant| value is set at the specified index.
+//
+// ```yaml
+// !output.set 2
+// ```
+static iree_status_t iree_trace_replay_parse_list_set_macro(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* value_node, iree_vm_list_t* list, iree_vm_variant_t variant) {
+  iree_string_view_t value_str = iree_yaml_node_as_string(value_node);
+  int32_t ordinal = 0;
+  if (!iree_string_view_atoi_int32(value_str, &ordinal)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "failed to parse I/O ordinal from `%.*s`",
+                            (int)value_str.size, value_str.data);
+  }
+  if (iree_vm_list_size(list) <= ordinal) {
+    IREE_RETURN_IF_ERROR(iree_vm_list_resize(list, ordinal + 1));
+  }
+  return iree_vm_list_set_variant_retain(list, ordinal, &variant);
+}
+
+// Parses a list store macro referencing a replay-global |list|.
+//
+// ```yaml
+// # sets |variant| at index 2 in the output list
+// [!output.]set 2
+// # pushes |variant| to the end of the output list
+// [!output.]push
+// ```
+static iree_status_t iree_trace_replay_parse_list_store_macro(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* value_node, iree_string_view_t name, iree_vm_list_t* list,
+    iree_vm_variant_t variant) {
+  if (iree_string_view_equal(name, IREE_SV("set"))) {
+    return iree_trace_replay_parse_list_set_macro(replay, document, value_node,
+                                                  list, variant);
+  } else if (iree_string_view_equal(name, IREE_SV("push"))) {
+    return iree_vm_list_push_variant_retain(list, &variant);
+  }
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "unsupported list store macro: `%.*s`",
+                          (int)name.size, name.data);
+}
+
+//===----------------------------------------------------------------------===//
+// YAML value parsing
+//===----------------------------------------------------------------------===//
+
+static iree_status_t iree_trace_replay_parse_item(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* value_node, iree_vm_variant_t* out_result);
 static iree_status_t iree_trace_replay_parse_item_sequence(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* sequence_node, iree_vm_list_t* target_list);
@@ -372,7 +502,7 @@ static iree_status_t iree_trace_replay_parse_item_sequence(
 // ```
 static iree_status_t iree_trace_replay_parse_scalar(
     iree_trace_replay_t* replay, yaml_document_t* document,
-    yaml_node_t* value_node, iree_vm_list_t* target_list) {
+    yaml_node_t* value_node, iree_vm_variant_t* out_result) {
   yaml_node_t* data_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
                                                   IREE_SV("i8"), &data_node));
@@ -384,10 +514,9 @@ static iree_status_t iree_trace_replay_parse_scalar(
           IREE_STATUS_INVALID_ARGUMENT, "failed to parse i8 value: '%.*s'",
           (int)data_node->data.scalar.length, data_node->data.scalar.value);
     }
-    iree_vm_variant_t variant = iree_vm_variant_empty();
-    variant.type.value_type = IREE_VM_VALUE_TYPE_I8;
-    variant.i8 = (int8_t)value;
-    return iree_vm_list_push_variant_move(target_list, &variant);
+    *out_result =
+        iree_vm_make_variant_value(iree_vm_value_make_i8((int8_t)value));
+    return iree_ok_status();
   }
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
                                                   IREE_SV("i16"), &data_node));
@@ -399,69 +528,66 @@ static iree_status_t iree_trace_replay_parse_scalar(
           IREE_STATUS_INVALID_ARGUMENT, "failed to parse i16 value: '%.*s'",
           (int)data_node->data.scalar.length, data_node->data.scalar.value);
     }
-    iree_vm_variant_t variant = iree_vm_variant_empty();
-    variant.type.value_type = IREE_VM_VALUE_TYPE_I16;
-    variant.i16 = (int16_t)value;
-    return iree_vm_list_push_variant_move(target_list, &variant);
+    *out_result =
+        iree_vm_make_variant_value(iree_vm_value_make_i16((int16_t)value));
+    return iree_ok_status();
   }
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
                                                   IREE_SV("i32"), &data_node));
   if (data_node) {
-    iree_vm_variant_t variant = iree_vm_variant_empty();
-    variant.type.value_type = IREE_VM_VALUE_TYPE_I32;
+    int32_t value = 0;
     if (!iree_string_view_atoi_int32(iree_yaml_node_as_string(data_node),
-                                     &variant.i32)) {
+                                     &value)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT, "failed to parse i32 value: '%.*s'",
           (int)data_node->data.scalar.length, data_node->data.scalar.value);
     }
-    return iree_vm_list_push_variant_move(target_list, &variant);
+    *out_result = iree_vm_make_variant_value(iree_vm_value_make_i32(value));
+    return iree_ok_status();
   }
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
                                                   IREE_SV("i64"), &data_node));
   if (data_node) {
-    iree_vm_variant_t variant = iree_vm_variant_empty();
-    variant.type.value_type = IREE_VM_VALUE_TYPE_I64;
+    int64_t value = 0;
     if (!iree_string_view_atoi_int64(iree_yaml_node_as_string(data_node),
-                                     &variant.i64)) {
+                                     &value)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT, "failed to parse i64 value: '%.*s'",
           (int)data_node->data.scalar.length, data_node->data.scalar.value);
     }
-    return iree_vm_list_push_variant_move(target_list, &variant);
+    *out_result = iree_vm_make_variant_value(iree_vm_value_make_i64(value));
+    return iree_ok_status();
   }
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
                                                   IREE_SV("f32"), &data_node));
   if (data_node) {
-    iree_vm_variant_t variant = iree_vm_variant_empty();
-    variant.type.value_type = IREE_VM_VALUE_TYPE_F32;
-    if (!iree_string_view_atof(iree_yaml_node_as_string(data_node),
-                               &variant.f32)) {
+    float value = 0.0f;
+    if (!iree_string_view_atof(iree_yaml_node_as_string(data_node), &value)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT, "failed to parse f32 value: '%.*s'",
           (int)data_node->data.scalar.length, data_node->data.scalar.value);
     }
-    return iree_vm_list_push_variant_move(target_list, &variant);
+    *out_result = iree_vm_make_variant_value(iree_vm_value_make_f32(value));
+    return iree_ok_status();
   }
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, value_node,
                                                   IREE_SV("f64"), &data_node));
   if (data_node) {
-    iree_vm_variant_t variant = iree_vm_variant_empty();
-    variant.type.value_type = IREE_VM_VALUE_TYPE_F64;
-    if (!iree_string_view_atod(iree_yaml_node_as_string(data_node),
-                               &variant.f64)) {
+    double value = 0.0;
+    if (!iree_string_view_atod(iree_yaml_node_as_string(data_node), &value)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT, "failed to parse f64 value: '%.*s'",
           (int)data_node->data.scalar.length, data_node->data.scalar.value);
     }
-    return iree_vm_list_push_variant_move(target_list, &variant);
+    *out_result = iree_vm_make_variant_value(iree_vm_value_make_f64(value));
+    return iree_ok_status();
   }
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "(%zu): unimplemented scalar type parser",
                           value_node->start_mark.line);
 }
 
-// Parses a !vm.list and appends it to |target_list|.
+// Parses a !vm.list into |out_result|.
 //
 // ```yaml
 // items:
@@ -472,7 +598,7 @@ static iree_status_t iree_trace_replay_parse_scalar(
 // ```
 static iree_status_t iree_trace_replay_parse_vm_list(
     iree_trace_replay_t* replay, yaml_document_t* document,
-    yaml_node_t* value_node, iree_vm_list_t* target_list) {
+    yaml_node_t* value_node, iree_vm_variant_t* out_result) {
   if (value_node->type != YAML_MAPPING_NODE) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "(%zu): expected sequence node for type",
@@ -494,10 +620,8 @@ static iree_status_t iree_trace_replay_parse_vm_list(
   }
 
   if (iree_status_is_ok(status)) {
-    iree_vm_ref_t list_ref = iree_vm_list_move_ref(list);
-    status = iree_vm_list_push_ref_move(target_list, &list_ref);
-  }
-  if (!iree_status_is_ok(status)) {
+    *out_result = iree_vm_make_variant_ref_assign(iree_vm_list_move_ref(list));
+  } else {
     iree_vm_list_release(list);
   }
   return status;
@@ -733,7 +857,7 @@ static iree_status_t iree_trace_replay_generate_hal_buffer_callback(
   }
 }
 
-// Parses a !hal.buffer and appends it to |target_list|.
+// Parses a !hal.buffer into |out_result|.
 //
 // ```yaml
 // shape:
@@ -742,7 +866,7 @@ static iree_status_t iree_trace_replay_generate_hal_buffer_callback(
 // ```
 static iree_status_t iree_trace_replay_parse_hal_buffer(
     iree_trace_replay_t* replay, yaml_document_t* document,
-    yaml_node_t* value_node, iree_vm_list_t* target_list) {
+    yaml_node_t* value_node, iree_vm_variant_t* out_result) {
   yaml_node_t* shape_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
       document, value_node, IREE_SV("shape"), &shape_node));
@@ -779,13 +903,12 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
       },
       allocation_size, iree_const_byte_span_empty(), &buffer));
 
-  iree_vm_ref_t buffer_ref = iree_hal_buffer_move_ref(buffer);
-  iree_status_t status = iree_vm_list_push_ref_move(target_list, &buffer_ref);
-  iree_vm_ref_release(&buffer_ref);
-  return status;
+  *out_result =
+      iree_vm_make_variant_ref_assign(iree_hal_buffer_move_ref(buffer));
+  return iree_ok_status();
 }
 
-// Parses a !hal.buffer_view and appends it to |target_list|.
+// Parses a !hal.buffer_view into |out_result|.
 //
 // ```yaml
 // shape:
@@ -796,7 +919,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
 // ```
 static iree_status_t iree_trace_replay_parse_hal_buffer_view(
     iree_trace_replay_t* replay, yaml_document_t* document,
-    yaml_node_t* value_node, iree_vm_list_t* target_list) {
+    yaml_node_t* value_node, iree_vm_variant_t* out_result) {
   yaml_node_t* shape_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
       document, value_node, IREE_SV("shape"), &shape_node));
@@ -863,14 +986,12 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
         iree_const_byte_span_empty(), &buffer_view));
   }
 
-  iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
-  iree_status_t status =
-      iree_vm_list_push_ref_move(target_list, &buffer_view_ref);
-  iree_vm_ref_release(&buffer_view_ref);
-  return status;
+  *out_result = iree_vm_make_variant_ref_assign(
+      iree_hal_buffer_view_move_ref(buffer_view));
+  return iree_ok_status();
 }
 
-// Parses a !hal.buffer in tensor form and appends it to |target_list|.
+// Parses a !hal.buffer in tensor form into |out_result|.
 // The tensor form is used to size and initialize the buffer but then the
 // metadata is thrown away.
 //
@@ -879,35 +1000,35 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
 // ```
 static iree_status_t iree_trace_replay_parse_inline_hal_buffer(
     iree_trace_replay_t* replay, yaml_document_t* document,
-    yaml_node_t* value_node, iree_vm_list_t* target_list) {
+    yaml_node_t* value_node, iree_vm_variant_t* out_result) {
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
       iree_yaml_node_as_string(value_node),
       iree_hal_device_allocator(replay->device), &buffer_view));
-  iree_vm_ref_t buffer_ref =
-      iree_hal_buffer_retain_ref(iree_hal_buffer_view_buffer(buffer_view));
-  iree_status_t status = iree_vm_list_push_ref_move(target_list, &buffer_ref);
+  *out_result = iree_vm_make_variant_ref_assign(
+      iree_hal_buffer_retain_ref(iree_hal_buffer_view_buffer(buffer_view)));
   iree_hal_buffer_view_release(buffer_view);
-  return status;
+  return iree_ok_status();
 }
 
-// Parses a !hal.buffer_view in tensor form and appends it to |target_list|.
+// Parses a !hal.buffer_view in tensor form into |out_result|.
 //
 // ```yaml
 // !hal.buffer_view 4xf32=[0 1 2 3]
 // ```
 static iree_status_t iree_trace_replay_parse_inline_hal_buffer_view(
     iree_trace_replay_t* replay, yaml_document_t* document,
-    yaml_node_t* value_node, iree_vm_list_t* target_list) {
+    yaml_node_t* value_node, iree_vm_variant_t* out_result) {
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
       iree_yaml_node_as_string(value_node),
       iree_hal_device_allocator(replay->device), &buffer_view));
-  iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
-  return iree_vm_list_push_ref_move(target_list, &buffer_view_ref);
+  *out_result = iree_vm_make_variant_ref_assign(
+      iree_hal_buffer_view_move_ref(buffer_view));
+  return iree_ok_status();
 }
 
-// Parses a typed item from |value_node| and appends it to |target_list|.
+// Parses a typed item from |value_node| into |out_result|.
 //
 // ```yaml
 // type: vm.list
@@ -919,16 +1040,25 @@ static iree_status_t iree_trace_replay_parse_inline_hal_buffer_view(
 // ```yaml
 // !hal.buffer_view 4xf32=[0 1 2 3]
 // ```
-static iree_status_t iree_trace_replay_parse_item(iree_trace_replay_t* replay,
-                                                  yaml_document_t* document,
-                                                  yaml_node_t* value_node,
-                                                  iree_vm_list_t* target_list) {
-  if (strcmp(value_node->tag, "!hal.buffer") == 0) {
+static iree_status_t iree_trace_replay_parse_item(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* value_node, iree_vm_variant_t* out_result) {
+  iree_string_view_t tag = iree_make_cstring_view(value_node->tag);
+  if (iree_string_view_consume_prefix(&tag, IREE_SV("!input."))) {
+    return iree_trace_replay_parse_list_load_macro(
+        replay, document, value_node, tag, replay->inputs, out_result);
+  } else if (iree_string_view_consume_prefix(&tag, IREE_SV("!output."))) {
+    return iree_trace_replay_parse_list_load_macro(
+        replay, document, value_node, tag, replay->outputs, out_result);
+  } else if (iree_string_view_consume_prefix(&tag, IREE_SV("!blackboard."))) {
+    return iree_trace_replay_parse_list_load_macro(
+        replay, document, value_node, tag, replay->blackboard, out_result);
+  } else if (strcmp(value_node->tag, "!hal.buffer") == 0) {
     return iree_trace_replay_parse_inline_hal_buffer(replay, document,
-                                                     value_node, target_list);
+                                                     value_node, out_result);
   } else if (strcmp(value_node->tag, "!hal.buffer_view") == 0) {
     return iree_trace_replay_parse_inline_hal_buffer_view(
-        replay, document, value_node, target_list);
+        replay, document, value_node, out_result);
   }
 
   yaml_node_t* type_node = NULL;
@@ -936,20 +1066,20 @@ static iree_status_t iree_trace_replay_parse_item(iree_trace_replay_t* replay,
                                               IREE_SV("type"), &type_node));
   iree_string_view_t type = iree_yaml_node_as_string(type_node);
   if (iree_string_view_equal(type, IREE_SV("null"))) {
-    iree_vm_variant_t null_value = iree_vm_variant_empty();
-    return iree_vm_list_push_variant_move(target_list, &null_value);
+    *out_result = iree_vm_variant_empty();
+    return iree_ok_status();
   } else if (iree_string_view_equal(type, IREE_SV("value"))) {
     return iree_trace_replay_parse_scalar(replay, document, value_node,
-                                          target_list);
+                                          out_result);
   } else if (iree_string_view_equal(type, IREE_SV("vm.list"))) {
     return iree_trace_replay_parse_vm_list(replay, document, value_node,
-                                           target_list);
+                                           out_result);
   } else if (iree_string_view_equal(type, IREE_SV("hal.buffer"))) {
     return iree_trace_replay_parse_hal_buffer(replay, document, value_node,
-                                              target_list);
+                                              out_result);
   } else if (iree_string_view_equal(type, IREE_SV("hal.buffer_view"))) {
     return iree_trace_replay_parse_hal_buffer_view(replay, document, value_node,
-                                                   target_list);
+                                                   out_result);
   }
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "unimplemented type parser: '%.*s'", (int)type.size,
@@ -963,8 +1093,13 @@ static iree_status_t iree_trace_replay_parse_item_sequence(
   for (yaml_node_item_t* item = sequence_node->data.sequence.items.start;
        item != sequence_node->data.sequence.items.top; ++item) {
     yaml_node_t* item_node = yaml_document_get_node(document, *item);
+    iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_IF_ERROR(
-        iree_trace_replay_parse_item(replay, document, item_node, target_list));
+        iree_trace_replay_parse_item(replay, document, item_node, &variant));
+    iree_status_t status =
+        iree_vm_list_push_variant_move(target_list, &variant);
+    iree_vm_variant_reset(&variant);
+    IREE_RETURN_IF_ERROR(status);
   }
   return iree_ok_status();
 }
@@ -973,70 +1108,36 @@ static iree_status_t iree_trace_replay_parse_item_sequence(
 // Output
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_trace_replay_print_item(
-    iree_vm_variant_t* value, iree_allocator_t host_allocator);
-
-static iree_status_t iree_trace_replay_print_scalar(iree_vm_variant_t* value) {
-  switch (value->type.value_type) {
-    case IREE_VM_VALUE_TYPE_I8:
-      fprintf(stdout, "i8=%" PRIi8, value->i8);
-      break;
-    case IREE_VM_VALUE_TYPE_I16:
-      fprintf(stdout, "i16=%" PRIi16, value->i16);
-      break;
-    case IREE_VM_VALUE_TYPE_I32:
-      fprintf(stdout, "i32=%" PRIi32, value->i32);
-      break;
-    case IREE_VM_VALUE_TYPE_I64:
-      fprintf(stdout, "i64=%" PRIi64, value->i64);
-      break;
-    case IREE_VM_VALUE_TYPE_F32:
-      fprintf(stdout, "f32=%G", value->f32);
-      break;
-    case IREE_VM_VALUE_TYPE_F64:
-      fprintf(stdout, "f64=%G", value->f64);
-      break;
-    default:
-      fprintf(stdout, "?");
-      break;
+// Parses a single item.
+static iree_status_t iree_trace_replay_parse_result_item(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* item_node, iree_vm_variant_t variant) {
+  iree_string_view_t tag = iree_make_cstring_view(item_node->tag);
+  if (iree_string_view_consume_prefix(&tag, IREE_SV("!output."))) {
+    return iree_trace_replay_parse_list_store_macro(
+        replay, document, item_node, tag, replay->outputs, variant);
+  } else if (iree_string_view_consume_prefix(&tag, IREE_SV("!blackboard."))) {
+    return iree_trace_replay_parse_list_store_macro(
+        replay, document, item_node, tag, replay->blackboard, variant);
   }
+  // NOTE: we ignore other types currently; we could parse them and compare
+  // against the |source_list| values or something.
   return iree_ok_status();
 }
 
-static iree_status_t iree_trace_replay_print_vm_list(
-    iree_vm_list_t* list, iree_allocator_t host_allocator) {
-  for (iree_host_size_t i = 0; i < iree_vm_list_size(list); ++i) {
+// Parses a sequence of items and checks each against |source_list|.
+static iree_status_t iree_trace_replay_parse_result_item_sequence(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* sequence_node, iree_vm_list_t* source_list) {
+  iree_host_size_t i = 0;
+  for (yaml_node_item_t* item = sequence_node->data.sequence.items.start;
+       item != sequence_node->data.sequence.items.top; ++item, ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
-    IREE_RETURN_IF_ERROR(iree_vm_list_get_variant_assign(list, i, &variant),
-                         "variant %zu not present", i);
     IREE_RETURN_IF_ERROR(
-        iree_trace_replay_print_item(&variant, host_allocator));
-    fprintf(stdout, "\n");
-  }
-  return iree_ok_status();
-}
-
-static iree_status_t iree_trace_replay_print_item(
-    iree_vm_variant_t* value, iree_allocator_t host_allocator) {
-  if (iree_vm_variant_is_value(*value)) {
-    IREE_RETURN_IF_ERROR(iree_trace_replay_print_scalar(value));
-  } else if (iree_vm_variant_is_ref(*value)) {
-    if (iree_hal_buffer_view_isa(value->ref)) {
-      iree_hal_buffer_view_t* buffer_view =
-          iree_hal_buffer_view_deref(value->ref);
-      IREE_RETURN_IF_ERROR(iree_hal_buffer_view_fprint(
-          stdout, buffer_view,
-          /*max_element_count=*/1024, host_allocator));
-    } else if (iree_vm_list_isa(value->ref)) {
-      iree_vm_list_t* list = iree_vm_list_deref(value->ref);
-      IREE_RETURN_IF_ERROR(
-          iree_trace_replay_print_vm_list(list, host_allocator));
-    } else {
-      // TODO(benvanik): a way for ref types to describe themselves.
-      fprintf(stdout, "(no printer)");
-    }
-  } else {
-    fprintf(stdout, "(null)");
+        iree_vm_list_get_variant_assign(source_list, i, &variant));
+    yaml_node_t* item_node = yaml_document_get_node(document, *item);
+    IREE_RETURN_IF_ERROR(iree_trace_replay_parse_result_item(
+        replay, document, item_node, variant));
   }
   return iree_ok_status();
 }
@@ -1085,12 +1186,31 @@ iree_status_t iree_trace_replay_event_call_prepare(
   return status;
 }
 
-iree_status_t iree_trace_replay_event_call(iree_trace_replay_t* replay,
-                                           yaml_document_t* document,
-                                           yaml_node_t* event_node,
-                                           iree_vm_list_t** out_output_list) {
+iree_status_t iree_trace_replay_event_call_finish(iree_trace_replay_t* replay,
+                                                  yaml_document_t* document,
+                                                  yaml_node_t* event_node,
+                                                  iree_vm_function_t function,
+                                                  iree_vm_list_t* output_list) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  if (out_output_list) *out_output_list = NULL;
+
+  yaml_node_t* results_node = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_yaml_mapping_try_find(document, event_node, IREE_SV("results"),
+                                     &results_node));
+  if (results_node) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_trace_replay_parse_result_item_sequence(
+                replay, document, results_node, output_list));
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+iree_status_t iree_trace_replay_event_call(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* event_node, const iree_trace_replay_call_hooks_t* hooks) {
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_vm_function_t function;
   iree_vm_list_t* input_list = NULL;
@@ -1098,62 +1218,91 @@ iree_status_t iree_trace_replay_event_call(iree_trace_replay_t* replay,
       z0, iree_trace_replay_event_call_prepare(replay, document, event_node,
                                                &function, &input_list));
 
-  // Invoke the function to produce outputs.
+  iree_status_t status = iree_ok_status();
+  if (hooks && hooks->before) {
+    status = hooks->before(hooks->user_data, replay, document, event_node,
+                           function, input_list);
+  }
+
   iree_vm_list_t* output_list = NULL;
-  iree_status_t status =
-      iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
-                          replay->host_allocator, &output_list);
   if (iree_status_is_ok(status)) {
-    status = iree_vm_invoke(replay->context, function,
-                            IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/NULL,
-                            input_list, output_list, replay->host_allocator);
+    status = iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
+                                 replay->host_allocator, &output_list);
+  }
+
+  // Invoke the function to produce outputs.
+  iree_status_t call_status = iree_ok_status();
+  if (iree_status_is_ok(status)) {
+    call_status = iree_vm_invoke(
+        replay->context, function, IREE_VM_INVOCATION_FLAG_NONE,
+        /*policy=*/NULL, input_list, output_list, replay->host_allocator);
   }
   iree_vm_list_release(input_list);
 
-  if (iree_status_is_ok(status) && out_output_list) {
-    *out_output_list = output_list;
-  } else {
-    iree_vm_list_release(output_list);
+  if (!iree_status_is_ok(call_status)) {
+    if (hooks && hooks->error) {
+      status = hooks->error(hooks->user_data, replay, document, event_node,
+                            function, call_status);
+    } else {
+      status = call_status;
+    }
+  } else if (hooks && hooks->after) {
+    status = hooks->after(hooks->user_data, replay, document, event_node,
+                          function, output_list);
   }
+
+  if (iree_status_is_ok(status)) {
+    status = iree_trace_replay_event_call_finish(replay, document, event_node,
+                                                 function, output_list);
+  }
+  iree_vm_list_release(output_list);
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-static iree_status_t iree_trace_replay_event_call_stdout(
+//===----------------------------------------------------------------------===//
+// Blackboard management
+//===----------------------------------------------------------------------===//
+
+static iree_status_t iree_trace_replay_event_blackboard_clear(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* event_node) {
-  yaml_node_t* function_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, event_node, IREE_SV("function"), &function_node));
-  iree_string_view_t function_name = iree_yaml_node_as_string(function_node);
-  fprintf(stdout, "--- CALL[%.*s] ---\n", (int)function_name.size,
-          function_name.data);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_vm_list_clear(replay->blackboard);
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
 
-  // Prepare to call the function.
-  iree_vm_function_t function;
-  iree_vm_list_t* input_list = NULL;
-  IREE_RETURN_IF_ERROR(iree_trace_replay_event_call_prepare(
-      replay, document, event_node, &function, &input_list));
+static iree_status_t iree_trace_replay_event_blackboard_assign(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* event_node) {
+  IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Invoke the function to produce outputs.
-  iree_vm_list_t* output_list = NULL;
+  yaml_node_t* from_node = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_yaml_mapping_find(document, event_node, IREE_SV("from"),
+                                 &from_node));
+  yaml_node_t* to_node = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_yaml_mapping_find(document, event_node, IREE_SV("to"), &to_node));
+
+  iree_vm_list_t* list = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_list_create(/*element_type=*/NULL, 8u, replay->host_allocator,
+                              &list));
+
   iree_status_t status =
-      iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
-                          replay->host_allocator, &output_list);
+      iree_trace_replay_parse_item_sequence(replay, document, from_node, list);
   if (iree_status_is_ok(status)) {
-    status = iree_vm_invoke(replay->context, function,
-                            IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/NULL,
-                            input_list, output_list, replay->host_allocator);
+    status = iree_trace_replay_parse_result_item_sequence(replay, document,
+                                                          to_node, list);
   }
-  iree_vm_list_release(input_list);
 
-  // Print the outputs.
-  if (iree_status_is_ok(status)) {
-    status =
-        iree_trace_replay_print_vm_list(output_list, replay->host_allocator);
-  }
-  iree_vm_list_release(output_list);
+  iree_vm_list_release(list);
 
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -1176,8 +1325,15 @@ iree_status_t iree_trace_replay_event(iree_trace_replay_t* replay,
     return iree_trace_replay_event_context_load(replay, document, event_node);
   } else if (iree_yaml_string_equal(type_node, IREE_SV("module_load"))) {
     return iree_trace_replay_event_module_load(replay, document, event_node);
+  } else if (iree_yaml_string_equal(type_node, IREE_SV("blackboard_clear"))) {
+    return iree_trace_replay_event_blackboard_clear(replay, document,
+                                                    event_node);
+  } else if (iree_yaml_string_equal(type_node, IREE_SV("assign"))) {
+    return iree_trace_replay_event_blackboard_assign(replay, document,
+                                                     event_node);
   } else if (iree_yaml_string_equal(type_node, IREE_SV("call"))) {
-    return iree_trace_replay_event_call_stdout(replay, document, event_node);
+    return iree_trace_replay_event_call(replay, document, event_node,
+                                        &replay->call_hooks);
   }
   return iree_make_status(
       IREE_STATUS_UNIMPLEMENTED, "(%zu): unhandled type '%.*s'",

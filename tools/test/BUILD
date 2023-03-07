@@ -28,6 +28,7 @@ iree_lit_test_suite(
             "iree-run-module.mlir",
             "iree-run-module-expected.mlir",
             "iree-run-module-outputs.mlir",
+            "iree-run-trace.mlir",
             "multiple_args.mlir",
             "multiple_exported_functions.mlir",
             "null_values.mlir",
@@ -39,6 +40,7 @@ iree_lit_test_suite(
     cfg = "//tools:lit.cfg.py",
     data = [
         "echo_npy.py",
+        "iree-run-trace.yml",
     ],
     tags = [
         "driver=local-task",
@@ -51,6 +53,7 @@ iree_lit_test_suite(
         "//tools:iree-opt",
         "//tools:iree-run-mlir",
         "//tools:iree-run-module",
+        "//tools:iree-run-trace",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
         "@llvm-project//llvm:not",
