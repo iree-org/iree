@@ -94,9 +94,8 @@ struct uGPUContracts {
   uGPUContracts() {
     ukernels.clear();
     ukernels.insert(uGPUKernel("float", "float", {128, 128}, true));
-
+    ukernels.insert(uGPUKernel("float", "float", {128, 128}, false));
     // todo(guray) Generate more microkernels
-    // ukernels.insert(uGPUKernel("float", "float", {128, 128}, true));
     // ukernels.insert(uGPUKernel("float", "float", {64, 64}, true));
     // ukernels.insert(uGPUKernel("float", "float", {64, 64}, false));
   }

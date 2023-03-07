@@ -80,7 +80,7 @@ function make_arch_nvcc_lineinfo_ptx {
 function generate_generator {
   local SOURCE=$1
   local GENERATOR_FILE=$2.cu
-  rm $GENERATOR_FILE
+  rm -f $GENERATOR_FILE
   rm -f GenerateKernels
   ${CLANG?} -std=c++17 -O3 $SOURCE -o GenerateKernels
   ./GenerateKernels $GENERATOR_FILE
@@ -96,8 +96,8 @@ function generate_ukernels {
   
   # # Generate microkernels
   make_arch_nvcc_ptx $SM $GENERATOR_FILE
-  make_arch_nvcc_lineinfo_ptx $SM $GENERATOR_FILE
-  make_arch_bc $SM $GENERATOR_FILE
+  # make_arch_nvcc_lineinfo_ptx $SM $GENERATOR_FILE
+  # make_arch_bc $SM $GENERATOR_FILE
 
   # # Remove the temps
   rm -rf $GENERATOR_FILE*
